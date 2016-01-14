@@ -431,6 +431,63 @@ void printQudaInvertParam(QudaInvertParam *param) {
 }
 
 
+#if defined INIT_PARAM
+ QudaMultigridParam newQudaMultigridParam(void) {
+   QudaMultigridParam ret;
+   QudaMultigridParam *param = &ret;
+#elif defined CHECK_PARAM
+   static void checkMultigridParam(QudaMultigridParam *param) {
+#else
+void printQudaMultigridParam(QudaMultigridParam *param) {
+  printfQuda("QUDA Multigrid Parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  // do nothing
+#elif defined CHECK_PARAM
+  checkInvertParam(param->invert_param);
+#else
+  printQudaInvertParam(param->invert_param);
+#endif
+
+  P(n_level, INVALID_INT);
+
+  for (int i=0; i<param->n_level; i++) {
+    // these parameters are not set for the bottom grid
+    if (i<param->n_level-1) {
+      for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
+      P(spin_block_size[i], INVALID_INT);
+      P(n_vec[i], INVALID_INT);
+      P(nu_pre[i], INVALID_INT);
+      P(nu_post[i], INVALID_INT);
+      P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
+    }
+
+    P(smoother[i], QUDA_INVALID_INVERTER);
+    P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+    P(omega[i], INVALID_DOUBLE);
+
+    P(location[i], QUDA_INVALID_FIELD_LOCATION);
+  }
+
+  P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
+  P(run_verify, QUDA_BOOLEAN_INVALID);
+
+#ifdef INIT_PARAM
+  P(gflops, 0.0);
+  P(secs, 0.0);
+#elif defined(PRINT_PARAM)
+  P(gflops, INVALID_DOUBLE);
+  P(secs, INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+
+}
+
+
 // clean up
 
 #undef INVALID_INT

@@ -2159,7 +2159,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   QudaInvertParam *param = mg_param.invert_param;
 
   cudaGaugeField *cudaGauge = checkGauge(param);
-  checkInvertParam(param);
+  checkMultigridParam(&mg_param);
 
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
@@ -2173,10 +2173,9 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   setTuning(param->tune);
   pushVerbosity(param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
-  param->secs = 0;
-  param->gflops = 0;
-  param->iter = 0;
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaMultigridParam(&mg_param);
+  mg_param.secs = 0;
+  mg_param.gflops = 0;
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
