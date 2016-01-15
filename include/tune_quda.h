@@ -277,9 +277,72 @@ namespace quda {
       param.block.y = 2;
     }
 
-
   };
   
+  /**
+     This derived class is for algorithms that deploy a vector of
+     computations across the y dimension of both the threads block and
+     grid.  For example this could be parity in the y dimension and
+     checkerboarded volume in x.
+   */
+  class TunableVectorY : public Tunable {
+
+  protected:
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+    // don't tune the grid dimension
+    bool tuneGridDim() const { return false; }
+
+    const int vector_length;
+
+  public:
+    TunableVectorY(int vector_length) : vector_length(vector_length)
+    {
+
+    };
+
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      dim3 block = param.block;
+      dim3 grid = param.grid;
+      bool ret = Tunable::advanceBlockDim(param);
+      param.block.y = block.y;
+      param.grid.y = grid.y;
+
+      if (ret) { // we advanced the block.x so we're done
+	return true;
+      } else { // block.x (spacetime) was reset
+
+	// we can advance spin/block-color since this is valid
+	if (param.block.y <= vector_length) {
+	  param.block.y++;
+	  param.grid.y = (vector_length + param.block.y - 1) / param.block.y;
+	  return true;
+	} else { // we have run off the end so let's reset
+	  param.block.y = 1;
+	  param.grid.y = vector_length;
+	  return false;
+	}
+      }
+    }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      Tunable::initTuneParam(param);
+      param.block.y = 1;
+      param.grid.y = vector_length;
+    }
+
+    /** sets default values for when tuning is disabled */
+    void defaultTuneParam(TuneParam &param) const
+    {
+      Tunable::defaultTuneParam(param);
+      param.block.y = 1;
+      param.grid.y = vector_length;
+    }
+
+  };
 
   void loadTuneCache(QudaVerbosity verbosity);
   void saveTuneCache(QudaVerbosity verbosity);
