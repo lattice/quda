@@ -178,7 +178,8 @@ namespace quda {
 	virtual ~FieldOrder() { ; } 
     
     	/**
-	 * Read-only complex-member accessor function
+	 * @brief Read-only complex-member accessor function
+	 *
 	 * @param parity Parity index
 	 * @param x 1-d site index
 	 * @param s_row row spin index
@@ -191,8 +192,28 @@ namespace quda {
 	  return accessor(parity, x, s_row, s_col, c_row, c_col);
 	}
 	
+    	/**
+	 * @brief Read-only complex-member accessor function.  This is a
+	 * special variant that is compatible with the equivalent
+	 * gauge::FieldOrder accessor so these can be used
+	 * interchangebly in templated code
+	 *
+	 * @param dummy Dummy parameter that is ignored
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ inline complex<Float> operator()(int dummy, int parity, int x, int s_row,
+							     int s_col, int c_row, int c_col) const {
+	  return accessor(parity,x,s_row,s_col,c_row,c_col);
+	}
+
 	/**
-	 * Complex-member accessor function
+	 * @brief Complex-member accessor function
+	 *
 	 * @param parity Parity index
 	 * @param x 1-d site index
 	 * @param s_row row spin index
