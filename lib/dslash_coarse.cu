@@ -384,7 +384,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	//coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover>(arg);
+	coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	coarseDslashKernel<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
