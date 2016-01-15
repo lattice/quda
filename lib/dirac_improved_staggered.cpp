@@ -148,10 +148,9 @@ namespace quda {
   grid , this one is trivial but let's keep it for the moment
   */
 
-  void DiracImprovedStaggered::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
-    CoarseKSOp(T, Y, X, &fatGauge, &longGauge,  2*mass);//
+  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+    CoarseKSOp(Y, X, Xinv, Yhat, T, &fatGauge, &longGauge,  2*mass);//
   }
-
 
   DiracImprovedStaggeredPC::DiracImprovedStaggeredPC(const DiracParam &param)
     : DiracImprovedStaggered(param)

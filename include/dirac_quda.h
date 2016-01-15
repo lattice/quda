@@ -149,7 +149,18 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return matpcType; }
 //    QudaDagType getDagger() const { return dagger; }
     void Dagger(QudaDagType dag) { dagger = dag; }
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {errorQuda("Not implemented");}
+
+    /**
+     * @brief Create the coarse operator (virtual parent)
+     *
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat[out] Coarse preconditioned link field
+     * @param T[in] Transfer operator defining the coarse grid
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
+    {errorQuda("Not implemented");}
   };
 
   // Full Wilson
@@ -179,7 +190,17 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+
+    /**
+     * @brief Create the coarse Wilson operator
+     *
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat[out] Coarse preconditioned link field
+     * @param T[in] Transfer operator defining the coarse grid
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -228,10 +249,18 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
-  };
 
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
+    /**
+     * @brief Create the coarse clover operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+  };
 
   // Even-odd preconditioned clover
   class DiracCloverPC : public DiracClover {
@@ -496,7 +525,7 @@ namespace quda {
          const QudaSolutionType) const;
   };
 
-  void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);
+  //void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);
 
   // Full staggered
   class DiracStaggered : public Dirac {
@@ -525,7 +554,18 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+   /**
+    * @brief Create the coarse operator (virtual parent)
+    *
+    * @param Y[out] Coarse link field
+    * @param X[out] Coarse clover field
+    * @param Xinv[out] Coarse clover inverse field
+    * @param Yhat[out] Coarse preconditioned link field
+    * @param T[in] Transfer operator defining the coarse grid
+    */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+
+    //virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
   // Even-odd preconditioned staggered
@@ -578,7 +618,17 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+   /**
+    * @brief Create the coarse operator (virtual parent)
+    *
+    * @param Y[out] Coarse link field
+    * @param X[out] Coarse clover field
+    * @param Xinv[out] Coarse clover inverse field
+    * @param Yhat[out] Coarse preconditioned link field
+    * @param T[in] Transfer operator defining the coarse grid
+    */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+//    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
   // Even-odd preconditioned staggered
@@ -612,13 +662,15 @@ namespace quda {
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
 
-    cpuGaugeField *Y_h; /** CPU copy of coarse gauge field */
-    cpuGaugeField *X_h; /** CPU copy of coarse clover term */
-    cpuGaugeField *Xinv_h; /** CPU copy of inverse coarse clover term */
+    cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
+    cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
+    cpuGaugeField *Xinv_h; /** CPU copy of the inverse coarse clover term */
+    cpuGaugeField *Yhat_h; /** CPU copy of the preconditioned coarse link field */
 
-    cudaGaugeField *Y_d; /** GPU copy of coarse gauge field */
-    cudaGaugeField *X_d; /** GPU copy of coarse clover term */
+    cudaGaugeField *Y_d; /** GPU copy of the coarse link field */
+    cudaGaugeField *X_d; /** GPU copy of the coarse clover term */
     cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
+    cudaGaugeField *Yhat_d; /** GPU copy of the preconditioned coarse link field */
 
     void initializeCoarse();  /** Initialize the coarse gauge field */
 
@@ -637,13 +689,15 @@ namespace quda {
        @param[in] Y_h CPU coarse link field
        @param[in] X_h CPU coarse clover field
        @param[in] Xinv_h CPU coarse inverse clover field
+       @param[in] Yhat_h CPU coarse preconditioned link field
        @param[in] Y_d GPU coarse link field
        @param[in] X_d GPU coarse clover field
        @param[in] Xinv_d GPU coarse inverse clover field
+       @param[in] Yhat_d GPU coarse preconditioned link field
      */
     DiracCoarse(const DiracParam &param,
-		cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
-		cudaGaugeField *Y_d=0, cudaGaugeField *X_d=0, cudaGaugeField *Xinv_d=0);
+		cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h, cpuGaugeField *Yhat_h,
+		cudaGaugeField *Y_d=0, cudaGaugeField *X_d=0, cudaGaugeField *Xinv_d=0, cudaGaugeField *Yhat_d=0);
 
     /**
        @param[in] dirac Another operator instance to clone from (shallow copy)
@@ -701,12 +755,15 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
     /**
-       Create the coarse operator for this coarse operator
-       @param T Transfer operator that defines the coarse grid
-       @param Y Storage for the coarsened gauge field
-       @param X Storage for the coarsened clover field
+     * @brief Create the coarse operator from this coarse operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat[out] Coarse preconditioned link field
      */
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   /**
@@ -727,7 +784,6 @@ namespace quda {
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
-    void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)

@@ -2408,8 +2408,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Normal-error solve requires Mat solution");
   }
 
-  if (param->inv_type_precondition == QUDA_MG_INVERTER && (pc_solve || pc_solution || !direct_solve || !mat_solution))
-      errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
+  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution))
+      errorQuda("Multigrid preconditioning only supported for direct solves");
 
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);

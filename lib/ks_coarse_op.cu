@@ -207,6 +207,9 @@ namespace quda {
       printf("KS Y2[%d] = %e\n", d, Y.norm2(d));
     }
 
+
+    createYreverse<Float,coarseSpin,coarseColor>(Y);
+
     printf("KS X2 = %e\n", X.norm2(0));
     printfQuda("Computing coarse diagonal\n");
     createKSCoarseLocal<Float>(X, nDim, xc_size, k);
@@ -218,7 +221,7 @@ namespace quda {
 
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int fineColor, int coarseColor, int coarseSpin>
-  void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
+  void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
 
     const int fineSpin = 1;
 
@@ -245,35 +248,55 @@ namespace quda {
       gFine *lAccessor = NULL;
       F *uvlAccessor = NULL;
       calculateKSY<Float>(yAccessor, xAccessor, &uvAccessor, uvlAccessor, vAccessor, &fAccessor, lAccessor, f->X(),Y.X(), k);
-    }    
+    } 
+
+    // now exchange Y halos for multi-process dslash
+    Y.exchangeGhost();
+
+    // compute the preconditioned links
+    // Yhat_back(x-\mu) = Y_back(x-\mu) * Xinv^dagger(x) (positive projector)
+    // Yhat_fwd(x) = Xinv(x) * Y_fwd(x)                  (negative projector)
+    {
+      // use spin-ignorant accessor to make multiplication simpler
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,1,gOrder> gCoarse;
+      gCoarse yAccessor(const_cast<GaugeField&>(Y));
+      gCoarse yHatAccessor(const_cast<GaugeField&>(Yhat));
+      gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
+      int comm_dim[4];
+      for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
+      createYpreconditioned<Float,coarseSpin*coarseColor>(yHatAccessor, xInvAccessor, yAccessor, X.X(), 1, comm_dim);
+    }
+    // fill back in the bulk of Yhat so that the backward link is updated on the previous node
+    Yhat.injectGhost();
+   
   }
 
   // template on the number of coarse degrees of freedom
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int fineColor>
-  void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
+  void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
 
     if ((T.Vectors().Nspin() != 1) && (T.Vectors().Nspin()/T.Spin_bs() != 2))  errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
     if (coarseColor == 2) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,2, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,2, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 4) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,4, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,4, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 8) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,8, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,8, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 12) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,12, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,12, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 16) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,16, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,16, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 20) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,20, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,20, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 24) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,24, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,24, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 48) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,48, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,48, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 96) {
-      calculateKSY<Float,csOrder,gOrder,fineColor,96, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder,fineColor,96, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -282,39 +305,39 @@ namespace quda {
 
   // template on fine colors
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
-  void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
+  void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,  ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
     if (f->Ncolor() == 3) {
       if( l ) if( f->Ncolor() != l->Ncolor() ) errorQuda("Unsupported number of colors %d\n", l->Ncolor());
 
-      calculateKSY<Float,csOrder,gOrder, 3>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,gOrder, 3>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported number of colors %d\n", f->Ncolor());
     }
   }
 
   template <typename Float, QudaFieldOrder csOrder>
-  void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
+  void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,  ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
     if (f->FieldOrder() == QUDA_QDP_GAUGE_ORDER) {
       if( l ) if( l->FieldOrder() != QUDA_QDP_GAUGE_ORDER ) errorQuda("Unsupported field order for long links %d\n", l->FieldOrder());
 
-      calculateKSY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported field order %d\n", f->FieldOrder());
     }
   }
 
  template <typename Float>
-  void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
+  void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
     if (T.Vectors().FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
 
-      calculateKSY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
     }
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
+  void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
     if (X.Precision() != Y.Precision() || Y.Precision() != uv->Precision() ||
         Y.Precision() != T.Vectors().Precision() || Y.Precision() != f->Precision())
     {
@@ -328,9 +351,9 @@ namespace quda {
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
-      calculateKSY<double>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<double>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-      calculateKSY<float>(Y, X, uv, uv_long, T, f, l, k);
+      calculateKSY<float>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
@@ -342,7 +365,8 @@ namespace quda {
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
-  void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField *fat_links, const cudaGaugeField *long_links,  double k) {
+  void CoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,
+		const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links,  double k) {
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
 
@@ -390,7 +414,7 @@ namespace quda {
     }
 
     //If the fine lattice operator is the clover operator, copy the cudaCloverField to cpuCloverField
-    calculateKSY(Y, X, uv, uv_long, T, f, l, k);
+    calculateKSY(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, k);
 
     // now exchange Y halos for multi-process dslash
     Y.exchangeGhost();

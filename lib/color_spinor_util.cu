@@ -188,7 +188,7 @@ namespace quda {
 
     for (int f=0; f<fail_check; f++) {
       printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)tol), 
-		 fail[f], u.Volume()*N, fail[f] / (double)(u.Volume()*N));
+		 fail[f], u.Nparity()*u.VolumeCB()*N, fail[f] / (double)(u.Nparity()*u.VolumeCB()*N));
     }
 
     delete []iter;

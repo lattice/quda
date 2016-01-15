@@ -1,6 +1,7 @@
 #include <iostream>
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -156,8 +157,8 @@ namespace quda {
     // do nothing
   }
 
-  void DiracClover::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
-    CoarseOp(T, Y, X, *gauge, &clover, kappa);
+  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 

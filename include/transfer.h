@@ -88,6 +88,9 @@ namespace quda {
         and is trivial one-to-one for the other levels*/
     int *spin_map;
 
+    /** The parity of any single-parity fine-grid fields that are passed into the transfer operator */
+    QudaParity parity;
+
     /** The length of the fine lattice */
     int fine_length;
 
@@ -165,10 +168,11 @@ namespace quda {
      * @param Nvec Number of null-space vectors
      * @param d The Dirac operator to which these null-space vectors correspond
      * @param geo_bs The geometric block sizes to use
-     * @param spin_bs The spin block sizes to use (default is 1)
+     * @param spin_bs The spin block sizes to use
+     * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
+    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaParity parity,
 	     bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */

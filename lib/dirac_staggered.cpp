@@ -1,5 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -137,8 +138,8 @@ namespace quda {
   grid , this one is trivial but let's keep it for the moment
   */
 
-  void DiracStaggered::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
-    CoarseKSOp(T, Y, X, gauge, NULL,  2*mass);//
+  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+    CoarseKSOp(Y, X, Xinv, Yhat, T, gauge, nullptr,  2*mass);//
   }
 
 

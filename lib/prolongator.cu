@@ -42,7 +42,9 @@ namespace quda {
   template <typename Float, int coarseSpin, int coarseColor, class Coarse>
   __device__ __host__ inline void prolongate2TopLevelStaggered(complex<Float> out[coarseSpin*coarseColor], const Coarse &in, 
 					     int parity_coarse, int x_coarse_cb) {
+#pragma unroll
     for (int p = 0; p < coarseSpin; p++) { //coarse-grid spin is transformed into the fine-grid parity index
+#pragma unroll
       for (int c = 0; c < coarseColor; c++) {
         int staggered_coarse_spin = p;
         out[p*coarseColor+c] = in(parity_coarse, x_coarse_cb, staggered_coarse_spin, c); 
@@ -119,7 +121,7 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread, typename Arg>
   void Prolongate(Arg &arg) {
-    for (int parity=0; parity<2; parity++) {
+    for (int parity=0; parity<arg.nParity; parity++) {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb=0; x_cb<arg.out.VolumeCB(); x_cb++) {
@@ -276,7 +278,7 @@ namespace quda {
     }
 
     long long bytes() const {
-      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes() + arg.out.Volume()*sizeof(int);
+      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.nParity&arg.out.VolumeCB()*sizeof(int);
     }
 
   };

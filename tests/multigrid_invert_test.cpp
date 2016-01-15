@@ -57,6 +57,8 @@ extern int geo_block_size[];
 
 extern QudaInverterType precon_type;
 
+extern QudaMatPCType matpc_type;
+
 extern char vec_infile[];
 extern char vec_outfile[];
 
@@ -94,13 +96,224 @@ display_test_info()
   
 }
 
+QudaPrecision &cpu_prec = prec;
+QudaPrecision &cuda_prec = prec;
+QudaPrecision &cuda_prec_sloppy = prec_sloppy;
+QudaPrecision &cuda_prec_precondition = prec_sloppy;
+
+void setGaugeParam(QudaGaugeParam &gauge_param) {
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
+
+  gauge_param.anisotropy = anisotropy;
+  gauge_param.type = QUDA_WILSON_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  
+  gauge_param.cpu_prec = cpu_prec;
+
+  gauge_param.cuda_prec = cuda_prec;
+  gauge_param.reconstruct = link_recon;
+
+  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+
+  gauge_param.cuda_prec_precondition = cuda_prec_precondition;
+  gauge_param.reconstruct_precondition = link_recon_sloppy;
+
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int pad_size =MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+  gauge_param.ga_pad = pad_size;    
+#endif
+}
+
+void setMultigridParam(QudaMultigridParam &mg_param) {
+  QudaInvertParam &inv_param = *mg_param.invert_param;
+
+  inv_param.Ls = 1;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    inv_param.clover_cpu_prec = cpu_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+  }
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
+
+  inv_param.dslash_type = dslash_type;
+
+  //Free field!
+  inv_param.mass = mass;
+  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+
+  inv_param.matpc_type = matpc_type;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  inv_param.solve_type = QUDA_DIRECT_SOLVE;
+
+  mg_param.invert_param = &inv_param;
+  mg_param.n_level = mg_levels;
+  for (int i=0; i<mg_param.n_level; i++) {
+    for (int j=0; j<QUDA_MAX_DIM; j++) {
+      mg_param.geo_block_size[i][j] = geo_block_size[j];
+    }
+    mg_param.spin_block_size[i] = 1;
+    mg_param.n_vec[i] = nvec;
+    mg_param.nu_pre[i] = nu_pre;
+    mg_param.nu_post[i] = nu_post;
+
+    mg_param.smoother[i] = precon_type;
+
+    // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
+    // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
+    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
+
+    // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
+    // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
+    mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION; // EVEN-ODD
+
+    mg_param.omega[i] = 0.85; // over/under relaxation factor
+
+    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
+  }
+
+  // only coarsen the spin on the first restriction
+  mg_param.spin_block_size[0] = 2;
+
+  // coarse grid solver is GCR
+  mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
+
+  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
+    : QUDA_COMPUTE_NULL_VECTOR_NO;
+
+  mg_param.run_verify = QUDA_BOOLEAN_YES;
+
+  // set file i/o parameters
+  strcpy(mg_param.vec_infile, vec_infile);
+  strcpy(mg_param.vec_outfile, vec_outfile);
+
+  // these need to tbe set for now but are actually ignored by the MG setup
+  // needed to make it pass the initialization test
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.tol = 1e-10;
+  inv_param.maxiter = 1000;
+  inv_param.reliable_delta = 1e-10;
+  inv_param.gcrNkrylov = 10;
+
+  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity_precondition = QUDA_VERBOSE;
+}
+
+void setInvertParam(QudaInvertParam &inv_param) {
+  inv_param.Ls = 1;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    inv_param.clover_cpu_prec = cpu_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+  }
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
+
+  inv_param.dslash_type = dslash_type;
+
+  //Free field!
+  inv_param.mass = mass;
+  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+
+  // do we want full solution or single-parity solution
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.matpc_type = matpc_type;
+
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+
+  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity_precondition = QUDA_SILENT;
+
+
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
+  inv_param.gcrNkrylov = 20;
+  inv_param.tol = tol;
+
+  // require both L2 relative and heavy quark residual to determine convergence
+  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
+
+  // these can be set individually
+  for (int i=0; i<inv_param.num_offset; i++) {
+    inv_param.tol_offset[i] = inv_param.tol;
+    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+  }
+  inv_param.maxiter = niter;
+  inv_param.reliable_delta = 1e-4;
+
+  // domain decomposition preconditioner parameters
+  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 1;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.omega = 1.0;
+}
+
 int main(int argc, char **argv)
 {
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
-    } 
+    }
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -123,200 +336,28 @@ int main(int argc, char **argv)
   // *** QUDA parameters begin here.
 
   if (dslash_type != QUDA_WILSON_DSLASH &&
-      dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
-      dslash_type != QUDA_TWISTED_MASS_DSLASH &&
-      dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+      dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
 
-  QudaPrecision cpu_prec = prec;
-  QudaPrecision cuda_prec = prec;
-  QudaPrecision cuda_prec_sloppy = prec_sloppy;
-  QudaPrecision cuda_prec_precondition = prec_sloppy;
-  //QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
-
-
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  QudaInvertParam inv_param = newQudaInvertParam();
- 
-  double kappa5;
+  setGaugeParam(gauge_param);
 
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-  inv_param.Ls = 1;
-
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.cuda_prec_precondition = cuda_prec_precondition;
-  gauge_param.reconstruct_precondition = link_recon_sloppy;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  inv_param.dslash_type = dslash_type;
-
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-    inv_param.mu = 0.12;
-    inv_param.epsilon = 0.1385;
-    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
-    //inv_param.twist_flavor = QUDA_TWIST_MINUS;
-    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-    inv_param.m5 = -1.8;
-    kappa5 = 0.5/(5 + inv_param.m5);  
-    inv_param.Ls = Lsdim;
-  }
-
-  if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-    inv_param.solution_type = QUDA_MAT_SOLUTION;
-  } else {
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-    inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  }
-
-  inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
-
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.inv_type = QUDA_CG_INVERTER;
-  } else {
-    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
-  }
-
-  inv_param.inv_type = QUDA_GCR_INVERTER;
-
-  // MG only these options are supported with MG currently
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_SOLVE;
-
-  inv_param.gcrNkrylov = 20;
-  inv_param.tol = tol;
-#if __COMPUTE_CAPABILITY__ >= 200
-  // require both L2 relative and heavy quark residual to determine convergence
-  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
-#else
-  // Pre Fermi architecture only supports L2 relative residual norm
-  inv_param.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-#endif
-  // these can be set individually
-  for (int i=0; i<inv_param.num_offset; i++) {
-    inv_param.tol_offset[i] = inv_param.tol;
-    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
-  }
-  inv_param.maxiter = 10000;
-  inv_param.reliable_delta = 1e-4;
-
-  // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 1;
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
-  inv_param.omega = 1.0;
-
-  inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = cuda_prec;
-  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
-
-  gauge_param.ga_pad = 0; // 24*24*24/2;
-  inv_param.sp_pad = 0; // 24*24*24/2;
-  inv_param.cl_pad = 0; // 24*24*24/2;
-
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
-#endif
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-  }
-
-  inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_SILENT;
-
+  QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param;
-  
-  mg_param.invert_param = &inv_param;
-  mg_param.n_level = mg_levels;
-  for (int i=0; i<mg_param.n_level; i++) {
-    for (int j=0; j<QUDA_MAX_DIM; j++) {
-      mg_param.geo_block_size[i][j] = geo_block_size[j];
-    }
-    mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec;
-    mg_param.nu_pre[i] = nu_pre;
-    mg_param.nu_post[i] = nu_post;
+  mg_param.invert_param = &mg_inv_param;
+  setMultigridParam(mg_param);
 
-    mg_param.smoother[i] = precon_type;
 
-    // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
-    mg_param.omega[i] = 0.85; // over/under relaxation factor
 
-    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
-  }
-
-  // only coarsen the spin on the first restriction
-  mg_param.spin_block_size[0] = 2;
-
-  // coarse grid solver is GCR
-  mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
-
-  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
-    : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-  mg_param.run_verify = QUDA_BOOLEAN_YES;
-
-  // set file i/o parameters
-  strcpy(mg_param.vec_infile, vec_infile);
-  strcpy(mg_param.vec_outfile, vec_outfile);
+  QudaInvertParam inv_param = newQudaInvertParam();
+  setInvertParam(inv_param);
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 
-  // set parameters for the reference Dslash, and prepare fields to be loaded
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-    dw_setDims(gauge_param.X, inv_param.Ls);
-  } else {
-    setDims(gauge_param.X);
-  }
+  setDims(gauge_param.X);
 
   setSpinorSiteSize(24);
 
@@ -383,6 +424,8 @@ int main(int argc, char **argv)
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
+
+
   // setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
@@ -408,6 +451,8 @@ int main(int argc, char **argv)
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);
 
+
+
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
@@ -422,60 +467,28 @@ int main(int argc, char **argv)
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     
-    if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
-	tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
-      else
-	{
-          int tm_offset = V*spinorSiteSize; //12*spinorRef->Volume(); 	  
-	  void *evenOut = spinorCheck;
-	  void *oddOut  = cpu_prec == sizeof(double) ? (void*)((double*)evenOut + tm_offset): (void*)((float*)evenOut + tm_offset);
-	  
-	  void *evenIn  = spinorOut;
-	  void *oddIn   = cpu_prec == sizeof(double) ? (void*)((double*)evenIn + tm_offset): (void*)((float*)evenIn + tm_offset);
-	  
-	  tm_ndeg_mat(evenOut, oddOut, gauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0, inv_param.cpu_prec, gauge_param);	
-	}
-    } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
-    } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-      dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else {
       printfQuda("Unsupported dslash_type\n");
       exit(-1);
     }
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-      if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-	ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-      } else {
-	ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-      }
+      ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
     }
     
   } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
     
-    if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-      if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
-	errorQuda("Twisted mass solution type not supported");
-      tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
-	       inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-    } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+    if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
 		inv_param.cpu_prec, gauge_param);
-    } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-      dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else {
       printfQuda("Unsupported dslash_type\n");
       exit(-1);
     }
     
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-      if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-	ax(0.25/(kappa5*kappa5), spinorCheck, Vh*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-      } else {
-	ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
-	
-      }
+      ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
     }
 
   }

@@ -1,0 +1,26 @@
+
+Auto-merging lib/transfer_util.cu
+Auto-merging lib/transfer.cpp
+Auto-merging lib/restrictor.cu
+CONFLICT (content): Merge conflict in lib/restrictor.cu
+Auto-merging lib/prolongator.cu
+CONFLICT (content): Merge conflict in lib/prolongator.cu
+Auto-merging lib/multigrid.cpp
+CONFLICT (content): Merge conflict in lib/multigrid.cpp
+Auto-merging lib/interface_quda.cpp
+Auto-merging lib/extract_gauge_ghost_mg.cu
+CONFLICT (content): Merge conflict in lib/extract_gauge_ghost_mg.cu
+Auto-merging lib/dslash_coarse.cu
+CONFLICT (content): Merge conflict in lib/dslash_coarse.cu
+Auto-merging lib/dirac_coarse.cpp
+CONFLICT (content): Merge conflict in lib/dirac_coarse.cpp
+Auto-merging lib/color_spinor_util.cu
+Auto-merging lib/color_spinor_pack.cu
+Auto-merging include/transfer.h
+CONFLICT (content): Merge conflict in include/transfer.h
+Auto-merging include/multigrid.h
+CONFLICT (content): Merge conflict in include/multigrid.h
+Auto-merging include/gauge_field_order.h
+Auto-merging include/dirac_quda.h
+Automatic merge failed; fix conflicts and then commit the result.
+

@@ -40,6 +40,7 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.smoother[level]),
+      coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level])
       { 
@@ -69,6 +70,7 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.mg_global.smoother[level]),
+      coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level])
       {
@@ -121,6 +123,10 @@ namespace quda {
 
     /** What type of smoother to use */
     QudaInverterType smoother;
+
+    /** The type of residual to send to the next coarse grid, and thus the
+	type of solution to receive back from this coarse grid */
+    QudaSolutionType coarse_grid_solution_type;
 
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
     QudaSolveType smoother_solve_type;
@@ -228,46 +234,83 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       Load the null space vectors in from file
+       @brief Load the null space vectors in from file
        @param B Loaded null-space vectors (pre-allocated)
     */
     void loadVectors(std::vector<ColorSpinorField*> &B);
 
     /**
-       Save the null space vectors in from file
+       @brief Save the null space vectors in from file
        @param B Save null-space vectors from here
     */
     void saveVectors(std::vector<ColorSpinorField*> &B);
 
     /**
-       Generate the null-space vectors
+       @brief Generate the null-space vectors
        @param B Generated null-space vectors
      */
     void generateNullVectors(std::vector<ColorSpinorField*> B);
 
     /**
-       Return the total flops done on this and all coarser levels.
+       @brief Return the total flops done on this and all coarser levels.
      */
     double flops() const;
 
-    /**
-       Run performance critical routines to benchmark their
-       performance.
-     */
-    void benchmark();
-
   };
 
+<<<<<<< HEAD
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
 
   void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField *fat_links, const cudaGaugeField *long_links);
 
+=======
+>>>>>>> feature/multigrid
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
 		   bool dslash=true, bool clover=true, bool staggered=false);
 
-  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, 
-		      const cpuGaugeField &clover, double kappa);
+  /**
+     @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param Xinv[out] Coarse clover inverse field
+     @param Yhat[out] Preconditioned coarse link field
+     @param T[in] Transfer operator that defines the coarse space
+     @param gauge[in] Gauge field from fine grid
+     @param clover[in] Clover field on fine grid (optional)
+     @param kappa[in] Kappa parameter
+   */
+  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
+		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
+
+
+  /**
+     @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param Xinv[out] Coarse clover inverse field
+     @param Yhat[out] Preconditioned coarse link field
+     @param T[in] Transfer operator that defines the coarse space
+     @param fat_links[in] Gauge field from fine grid
+     @param long_links[in] Gauge field from fine grid
+     @param k[in] K parameter
+   */
+
+  void CoarseKSOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);
+
+  /**
+     @brief Coarse operator construction from an intermediate-grid operator (Coarse)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param Xinv[out] Coarse clover inverse field
+     @param Y[out] Preconditioned coarse link field
+     @param T[in] Transfer operator that defines the new coarse space
+     @param gauge[in] Link field from fine grid
+     @param clover[in] Clover field on fine grid
+     @param kappa[in] Kappa parameter
+   */
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
+		      const cpuGaugeField &gauge, const cpuGaugeField &clover, double kappa);
 
   /**
      This is an object that captures an entire MG preconditioner

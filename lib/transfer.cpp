@@ -18,12 +18,12 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
 
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaParity parity,
 		     bool enable_gpu, TimeProfile &profile)
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0),
+      spin_bs(spin_bs), spin_map(0), parity(parity),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
       flops_(0), profile(profile)
   {
@@ -230,11 +230,12 @@ namespace quda {
 
     if (use_gpu) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
-      if (out.Location() == QUDA_CPU_FIELD_LOCATION ||
-	  out.GammaBasis() != V->GammaBasis()) output = fine_tmp_d;
+      if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
+	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
-      output = (out.Location() == QUDA_CUDA_FIELD_LOCATION) ? fine_tmp_h : &out;
+      if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
+	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
     *input = in; // copy result to input field (aliasing handled automatically)
@@ -244,7 +245,7 @@ namespace quda {
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
     }
 
-    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map);
+    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
@@ -255,6 +256,7 @@ namespace quda {
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
@@ -265,20 +267,21 @@ namespace quda {
 
     if (use_gpu) {
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION ||
-	  in.GammaBasis() != V->GammaBasis()) input = fine_tmp_d;
+      if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
+	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
-      if (in.Location() == QUDA_CUDA_FIELD_LOCATION) input = fine_tmp_h;
+      if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
+	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
-    *input = in; // copy result to input field (aliasing handled automatically)  
-    
+    *input = in;
+
     if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
     out = *output; // copy result to out field (aliasing handled automatically)
 

@@ -1,23 +1,24 @@
 #include <string.h>
 #include <multigrid.h>
 #include <algorithm>
-#include <blas_magma.h>
 
 namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
     : Dirac(param), transfer(param.transfer), dirac(param.dirac),
-      Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr),
+      Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Yhat_h(nullptr),
+      Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr), Yhat_d(nullptr),
       enable_gpu(enable_gpu), init(true)
   {
     initializeCoarse();
   }
 
   DiracCoarse::DiracCoarse(const DiracParam &param,
-			   cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,    // cpu link fields
-			   cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d) // gpu link field
+			   cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h, cpuGaugeField *Yhat_h,   // cpu link fields
+			   cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d, cudaGaugeField *Yhat_d) // gpu link field
     : Dirac(param), transfer(nullptr), dirac(nullptr),
-      Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d),
+      Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Yhat_h(Yhat_h),
+      Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d), Yhat_d(Yhat_d),
       enable_gpu(Y_d && X_d && Xinv_d), init(false)
   {
 
@@ -25,7 +26,8 @@ namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param)
     : Dirac(param), transfer(param.transfer), dirac(param.dirac),
-      Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d),
+      Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Yhat_h(dirac.Yhat_h),
+      Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d), Yhat_d(dirac.Yhat_d),
       enable_gpu(dirac.enable_gpu), init(false)
   {
 
@@ -37,9 +39,70 @@ namespace quda {
       if (Y_h) delete Y_h;
       if (X_h) delete X_h;
       if (Xinv_h) delete Xinv_h;
+      if (Yhat_h) delete Yhat_h;
       if (Y_d) delete Y_d;
       if (X_d) delete X_d;
       if (Xinv_d) delete Xinv_d;
+      if (Yhat_d) delete Yhat_d;
+    }
+  }
+
+  void DiracCoarse::initializeCoarse()
+  {
+    QudaPrecision prec = transfer->Vectors().Precision();
+    int ndim = transfer->Vectors().Ndim();
+    int x[QUDA_MAX_DIM];
+    //Number of coarse sites.
+    const int *geo_bs = transfer->Geo_bs();
+    for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
+
+    //Coarse Color
+    int Nc_c = transfer->nvec();
+
+    //Coarse Spin
+    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs();
+
+    GaugeFieldParam gParam;
+    memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
+    gParam.nColor = Nc_c*Ns_c;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = QUDA_QDP_GAUGE_ORDER;
+    gParam.link_type = QUDA_COARSE_LINKS;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.precision = prec;
+    gParam.nDim = ndim;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+    gParam.nFace = 1;
+
+    gParam.geometry = QUDA_COARSE_GEOMETRY;
+
+    Y_h = new cpuGaugeField(gParam);
+    Yhat_h = new cpuGaugeField(gParam);
+
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+    X_h = new cpuGaugeField(gParam);
+    Xinv_h = new cpuGaugeField(gParam);
+
+    dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer);
+
+    if (enable_gpu) {
+      gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+      gParam.geometry = QUDA_COARSE_GEOMETRY;
+      int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
+      gParam.pad = gParam.nFace * pad;
+      Y_d = new cudaGaugeField(gParam);
+      Yhat_d = new cudaGaugeField(gParam);
+      Y_d->copy(*Y_h);
+      Yhat_d->copy(*Yhat_h);
+
+      gParam.geometry = QUDA_SCALAR_GEOMETRY;
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      X_d = new cudaGaugeField(gParam);
+      Xinv_d = new cudaGaugeField(gParam);
+      X_d->copy(*X_h);
+      Xinv_d->copy(*Xinv_h);
     }
   }
 
@@ -93,6 +156,8 @@ namespace quda {
     bool is_staggered = false;
     if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
 
+    if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
+
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
       ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, is_staggered);
@@ -143,71 +208,11 @@ namespace quda {
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
   {
-    CoarseCoarseOp(T, Y, X, *(this->Y_h), *(this->X_h), kappa);
-  }
 
-  void DiracCoarse::initializeCoarse()
-  {
-    QudaPrecision prec = transfer->Vectors().Precision();
-    int ndim = transfer->Vectors().Ndim();
-    int x[QUDA_MAX_DIM];
-    //Number of coarse sites.
-    const int *geo_bs = transfer->Geo_bs();
-    for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
-
-    //Coarse Color
-    int Nc_c = transfer->nvec();
-
-    //Coarse Spin
-    int Ns_c = (transfer->Vectors().Nspin() == 1) ? 2 : transfer->Vectors().Nspin()/transfer->Spin_bs();
-
-    GaugeFieldParam gParam;
-    memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
-    gParam.nColor = Nc_c*Ns_c;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = QUDA_QDP_GAUGE_ORDER;
-    gParam.link_type = QUDA_COARSE_LINKS;
-    gParam.t_boundary = QUDA_PERIODIC_T;
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.precision = prec;
-    gParam.nDim = ndim;
-    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    gParam.nFace = 1;
-
-    gParam.geometry = QUDA_VECTOR_GEOMETRY;
-    Y_h = new cpuGaugeField(gParam);
-
-    gParam.geometry = QUDA_SCALAR_GEOMETRY;
-    X_h = new cpuGaugeField(gParam);
-    Xinv_h = new cpuGaugeField(gParam);
-
-    dirac->createCoarseOp(*transfer,*Y_h,*X_h);
-
-    {
-      // invert the clover matrix field
-      const int n = X_h->Ncolor();
-      BlasMagmaArgs magma(X_h->Precision());
-      magma.BatchInvertMatrix(((float**)Xinv_h->Gauge_p())[0], ((float**)X_h->Gauge_p())[0], n, X_h->Volume());
-    }
-
-    if (enable_gpu) {
-      gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-      gParam.geometry = QUDA_VECTOR_GEOMETRY;
-      int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
-      gParam.pad = gParam.nFace * pad;
-      Y_d = new cudaGaugeField(gParam);
-      Y_d->copy(*Y_h);
-
-      gParam.geometry = QUDA_SCALAR_GEOMETRY;
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      X_d = new cudaGaugeField(gParam);
-      Xinv_d = new cudaGaugeField(gParam);
-      X_d->copy(*X_h);
-      Xinv_d->copy(*Xinv_h);
-    }
+    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) errorQuda("\nCoarseCoarse operator is not implemented!\n");
+    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), kappa);
   }
 
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu) : DiracCoarse(param, enable_gpu)
@@ -224,32 +229,26 @@ namespace quda {
 
   void DiracCoarsePC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    ColorSpinorParam param(in);
-    bool reset = newTmp(&tmp2, in);
-
-    DiracCoarse::Dslash(*tmp2, in, parity);
-    CloverInv(out, *tmp2, parity);
-
-    deleteTmp(&tmp2, reset);
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false);
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false);
+    }
 
     int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB();
+    flops += (8*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
   }
 
   void DiracCoarsePC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
 				 const ColorSpinorField &x, const double &k) const
   {
-    ColorSpinorParam param(in);
-    bool reset = newTmp(&tmp2, in);
-
-    DiracCoarse::Dslash(*tmp2, in, parity);
-    CloverInv(out, *tmp2, parity);
+    // emulated for now
+    Dslash(out, in, parity);
     blas::xpay(const_cast<ColorSpinorField&>(x), k, out);
 
-    deleteTmp(&tmp2, reset);
-
     int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)+2*n)*in.VolumeCB();
+    flops += (8*(8*n*n)-2*n)*in.VolumeCB(); // blas flops counted separately so only need to count dslash flops
   }
 
   void DiracCoarsePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -371,11 +370,6 @@ namespace quda {
     }
 
     deleteTmp(&tmp1, reset);
-  }
-
-  void DiracCoarsePC::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const
-  {
-    DiracCoarse::createCoarseOp(T, Y, X);
   }
 
 }

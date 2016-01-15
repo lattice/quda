@@ -90,9 +90,6 @@ extern "C" {
 }
 #endif
 
-#define REAL(a) (*((double*)&a))
-#define IMAG(a) (*((double*)&a+1))
-
 namespace quda {
 
   typedef std::complex<double> Complex;

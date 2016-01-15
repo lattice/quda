@@ -159,8 +159,8 @@ namespace quda {
     // blockIdx.x  - which coarse block are we working on
     // assume that coarse_to_fine look up map is ordered as (coarse-block-id + fine-point-id)
     // and that fine-point-id is parity ordered
-    int x_fine = arg.coarse_to_fine[ (blockIdx.x*blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x];
     int parity = arg.nParity == 2 ? threadIdx.y : arg.parity;
+    int x_fine = arg.coarse_to_fine[ (blockIdx.x*2 + parity) * blockDim.x + threadIdx.x];
     int x_fine_cb = x_fine - parity*arg.in.VolumeCB();
 
     int coarse_color_block = (blockDim.z*blockIdx.z + threadIdx.z) * coarse_colors_per_thread;
@@ -235,9 +235,6 @@ namespace quda {
 	}
       }
     }
-
-    return;
-
   }
 
   template <typename Float, typename Arg, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
@@ -258,8 +255,8 @@ namespace quda {
 
   public:
     RestrictLaunch(Arg &arg, const ColorSpinorField &coarse, const ColorSpinorField &fine, 
-		   const QudaFieldLocation location) : arg(arg), location(location), 
-	block_size((arg.in.VolumeCB())/arg.out.Volume()) {
+		   const QudaFieldLocation location)
+      : arg(arg), location(location), block_size((arg.in.VolumeCB())/(2*arg.out.VolumeCB())) {
       strcpy(vol, coarse.VolString());
       strcat(vol, ",");
       strcat(vol, fine.VolString());
@@ -337,7 +334,7 @@ namespace quda {
     }
 
     long long bytes() const {
-      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes() + arg.in.Volume()*sizeof(int);
+      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.nParity*arg.in.VolumeCB()*sizeof(int);
     }
 
   };

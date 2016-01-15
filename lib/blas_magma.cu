@@ -1080,7 +1080,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
     device_free(Ainv_array);
     device_free(A_array);
   } else {
-    errorQuda("%s not implemented for precision=%d", prec);
+    errorQuda("%s not implemented for precision=%d", __func__, prec);
   }
 
   cudaMemcpy(Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);

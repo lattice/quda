@@ -40,8 +40,8 @@ using namespace quda;
 ColorSpinorField *xH, *yH;
 ColorSpinorField *xD, *yD;
 
-cpuGaugeField *Y_h, *X_h, *Xinv_h;
-cudaGaugeField *Y_d, *X_d, *Xinv_d;
+cpuGaugeField *Y_h, *X_h, *Xinv_h, *Yhat_h;
+cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
 
 int Nspin;
 int Ncolor;
@@ -125,6 +125,7 @@ void initFields(QudaPrecision prec)
 
   gParam.geometry = QUDA_VECTOR_GEOMETRY;
   Y_h = new cpuGaugeField(gParam);
+  Yhat_h = new cpuGaugeField(gParam);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   X_h = new cpuGaugeField(gParam);
@@ -138,7 +139,9 @@ void initFields(QudaPrecision prec)
 	(gParam.x[0]*gParam.x[1]*gParam.x[3])/2 } );
   gParam.pad = gParam.nFace * pad;
   Y_d = new cudaGaugeField(gParam);
+  Yhat_d = new cudaGaugeField(gParam);
   Y_d->copy(*Y_h);
+  Yhat_d->copy(*Yhat_h);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -160,10 +163,12 @@ void freeFields()
   delete Y_h;
   delete X_h;
   delete Xinv_h;
+  delete Yhat_h;
 
   delete Y_d;
   delete X_d;
   delete Xinv_d;
+  delete Yhat_d;
 }
 
 Dirac *dirac;
@@ -176,12 +181,17 @@ double benchmark(int test, const int niter) {
   cudaEventRecord(start, 0);
 
   switch(test) {
-    case 0:
-      for (int i=0; i < niter; ++i) dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
-      break;
-
-    default:
-      errorQuda("Undefined test %d", test);
+  case 0:
+    for (int i=0; i < niter; ++i) dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
+    break;
+  case 1:
+    for (int i=0; i < niter; ++i) {
+      dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
+      dirac->Dslash(*yD, *xD, QUDA_ODD_PARITY);
+    }
+    break;
+  default:
+    errorQuda("Undefined test %d", test);
   }
 
   cudaEventRecord(end, 0);
@@ -227,7 +237,7 @@ int main(int argc, char** argv)
     initFields(prec);
 
     DiracParam param;
-    dirac = new DiracCoarse(param, Y_h, X_h, Xinv_h, Y_d, X_d, Xinv_d);
+    dirac = new DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d);
 
     for (int kernel = 0; kernel < Nkernels; kernel++) {
       // do the initial tune
