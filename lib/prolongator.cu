@@ -162,10 +162,10 @@ namespace quda {
     int fine_color_block = (blockDim.z*blockIdx.z + threadIdx.z) * fine_colors_per_thread;
     if (fine_color_block >= fineColor) return;
 
-    int x = parity*arg.out.Volume()/2 + x_cb;
+    int x = parity*arg.out.VolumeCB() + x_cb;
     int x_coarse = arg.geo_map[x];
-    int parity_coarse = (x_coarse >= arg.in.Volume()/2) ? 1 : 0;
-    int x_coarse_cb = x_coarse - parity_coarse*arg.in.Volume()/2;
+    int parity_coarse = (x_coarse >= arg.in.VolumeCB()) ? 1 : 0;
+    int x_coarse_cb = x_coarse - parity_coarse*arg.in.VolumeCB();
 
     if(fineSpin == 1)
     {

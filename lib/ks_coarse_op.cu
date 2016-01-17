@@ -7,6 +7,8 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 
+#include <coarse_op.cuh> //remove it!
+
 namespace quda {
 
   //Zero out a field, using the accessor.
@@ -169,7 +171,7 @@ namespace quda {
   }
 
  //Calculates the coarse gauge field: separated from coarseSpin = 2 computations:
-  template<typename Float, typename F, typename coarseGauge, typename fineGauge>
+  template<typename Float, int coarseColor, int coarseSpin, typename F, typename coarseGauge, typename fineGauge>
   void calculateKSY(coarseGauge &Y, coarseGauge &X, F *UV, F *UVL, F &V, fineGauge *FL, fineGauge *LL, const int *x_size, const int *xc_size,  double k) {
 
     if (FL->Ndim() != 4) errorQuda("Number of dimensions not supported");
@@ -242,12 +244,12 @@ namespace quda {
     if(l != NULL) {
       gFine lAccessor(const_cast<GaugeField&>(*l));
       F uvlAccessor(const_cast<ColorSpinorField&>(*uv_long));
-      calculateKSY<Float>(yAccessor, xAccessor, &uvAccessor, &uvlAccessor, vAccessor, &fAccessor, &lAccessor, f->X(), Y.X(), k);
+      calculateKSY<Float,coarseSpin,coarseColor>(yAccessor, xAccessor, &uvAccessor, &uvlAccessor, vAccessor, &fAccessor, &lAccessor, f->X(), Y.X(), k);
     }
     else {
       gFine *lAccessor = NULL;
       F *uvlAccessor = NULL;
-      calculateKSY<Float>(yAccessor, xAccessor, &uvAccessor, uvlAccessor, vAccessor, &fAccessor, lAccessor, f->X(),Y.X(), k);
+      calculateKSY<Float,coarseSpin,coarseColor>(yAccessor, xAccessor, &uvAccessor, uvlAccessor, vAccessor, &fAccessor, lAccessor, f->X(),Y.X(), k);
     } 
 
     // now exchange Y halos for multi-process dslash

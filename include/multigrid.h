@@ -258,13 +258,6 @@ namespace quda {
 
   };
 
-<<<<<<< HEAD
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
-
-  void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField *fat_links, const cudaGaugeField *long_links);
-
-=======
->>>>>>> feature/multigrid
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
 		   bool dslash=true, bool clover=true, bool staggered=false);
@@ -296,7 +289,7 @@ namespace quda {
      @param k[in] K parameter
    */
 
-  void CoarseKSOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);
+  void CoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
