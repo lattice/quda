@@ -294,10 +294,10 @@ namespace quda {
     // don't tune the grid dimension
     bool tuneGridDim() const { return false; }
 
-    const int vector_length;
+    const unsigned int vector_length;
 
   public:
-    TunableVectorY(int vector_length) : vector_length(vector_length)
+    TunableVectorY(unsigned int vector_length) : vector_length(vector_length)
     {
 
     };
