@@ -170,7 +170,7 @@ namespace quda {
     CloverFieldParam cf_param;
     cf_param.nDim = 4;
     cf_param.pad = pad;
-    cf_param.precision = clover->Precision();
+    cf_param.precision = clover ? clover->Precision() : QUDA_INVALID_PRECISION;
 
     // if we have no clover term then create an empty clover field
     for(int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
