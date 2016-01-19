@@ -23,9 +23,13 @@ namespace quda {
 
     Float kappa;                /** kappa value */
 
+    const int fineVolumeCB;     /** Fine grid volume */
+    const int coarseVolumeCB;   /** Coarse grid volume */
+
     CalculateYArg(coarseGauge &Y, coarseGauge &X, fineSpinorTmp &UV, const fineGauge &U, const fineSpinor &V,
 		  const fineClover &C, double kappa, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
-      : Y(Y), X(X), UV(UV), U(U), V(V), C(C), kappa(static_cast<Float>(kappa)), spin_bs(spin_bs_)
+      : Y(Y), X(X), UV(UV), U(U), V(V), C(C), spin_bs(spin_bs_), kappa(static_cast<Float>(kappa)),
+	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
     {
       if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
 	errorQuda("Gamma basis %d not supported", V.GammaBasis());
@@ -51,7 +55,6 @@ namespace quda {
     getCoords(coord, x_cb, arg.x_size, parity);
 
     constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
-    if (x_cb==0 && parity==0) printf("uvSpin = %d\n", uvSpin);
 
     for(int s = 0; s < uvSpin; s++) {
       for(int c = 0; c < fineColor; c++) {
@@ -107,7 +110,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int dim, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   void ComputeUVCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.V.VolumeCB(); x_cb++) {
+      for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	computeUV<from_coarse,Float,dim,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(arg, parity, x_cb);
       } // c/b volume
     }   // parity
@@ -116,7 +119,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int dim, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __global__ void ComputeUVGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.V.VolumeCB()) return;
+    if (x_cb >= arg.fineVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
     computeUV<from_coarse,Float,dim,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(arg, parity, x_cb);
@@ -228,7 +231,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int dim, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   void ComputeVUVCPU(Arg arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.UV.VolumeCB(); x_cb++) { // Loop over fine volume
+      for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) { // Loop over fine volume
 	computeVUV<from_coarse,Float,dim,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(arg, parity, x_cb);
       } // c/b volume
     } // parity
@@ -237,7 +240,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int dim, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __global__ void ComputeVUVGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.V.VolumeCB()) return;
+    if (x_cb >= arg.fineVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
     computeVUV<from_coarse,Float,dim,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(arg, parity, x_cb);
@@ -272,7 +275,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void ComputeYReverseCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.Y.VolumeCB(); x_cb++) {
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
 	computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb);
       } // c/b volume
     } // parity
@@ -281,7 +284,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   __global__ void ComputeYReverseGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.Y.VolumeCB()) return;
+    if (x_cb >= arg.coarseVolumeCB()) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
     computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb);
@@ -334,7 +337,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void ComputeCoarseLocalCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.X.VolumeCB(); x_cb++) {
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
 	computeCoarseLocal<Float,nSpin,nColor,Arg>(arg, parity, x_cb);
       } // c/b volume
     } // parity
@@ -343,7 +346,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   __global__ void ComputeCoarseLocalGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.X.VolumeCB()) return;
+    if (x_cb >= arg.coarseVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
     computeCoarseLocal<Float,nSpin,nColor,Arg>(arg, parity, x_cb);
@@ -414,7 +417,7 @@ namespace quda {
   template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   void ComputeCoarseCloverCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.C.VolumeCB(); x_cb++) {
+      for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	computeCoarseClover<from_coarse,Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb);
       } // c/b volume
     } // parity
@@ -423,7 +426,7 @@ namespace quda {
   template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   void ComputeCoarseCloverGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.C.VolumeCB()) return;
+    if (x_cb >= arg.fineVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
     computeCoarseClover<from_coarse,Float,fineSpin,fineColor,coarseColor>(arg, parity, x_cb);
   }
@@ -434,7 +437,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void AddCoarseDiagonalCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.X.VolumeCB(); x_cb++) {
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
         for(int s = 0; s < nSpin; s++) { //Spin
          for(int c = 0; c < nColor; c++) { //Color
 	   arg.X(0,parity,x_cb,s,s,c,c) += static_cast<Float>(1.0);
@@ -449,7 +452,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   __global__ void AddCoarseDiagonalGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.X.VolumeCB()) return;
+    if (x_cb >= arg.coarseVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
 
     for(int s = 0; s < nSpin; s++) { //Spin
@@ -463,9 +466,9 @@ namespace quda {
   enum ComputeType {
     COMPUTE_UV,
     COMPUTE_VUV,
+    COMPUTE_COARSE_CLOVER,
     COMPUTE_REVERSE_Y,
     COMPUTE_COARSE_LOCAL,
-    COMPUTE_COARSE_CLOVER,
     COMPUTE_DIAGONAL
   };
 
@@ -482,15 +485,81 @@ namespace quda {
 
     long long flops() const
     {
+      long long flops_ = 0;
+      switch (type) {
+      case COMPUTE_UV:
+	// when fine operator is coarse take into account that the link matrix has spin dependence
+	flops_ = 2*arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * !from_coarse ? 1 : fineSpin;
+	break;
+      case COMPUTE_VUV:
+	// when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
+	flops_ = 2*arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
+	break;
+      case COMPUTE_COARSE_CLOVER:
+	// when the fine operator is truly fine the clover multiplication is block sparse which halves the number of operations
+	flops_ = 2*arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / (!from_coarse ? coarseSpin : 1);
+	break;
+      case COMPUTE_REVERSE_Y:
+	// no floating point operations
+	flops_ = 0;
+	break;
+      case COMPUTE_COARSE_LOCAL:
+	// complex addition over all components
+	flops_ = 2*arg.coarseVolumeCB*coarseSpin*coarseSpin*coarseColor*coarseColor*2;
+	break;
+      case COMPUTE_DIAGONAL:
+	// read addition on the diagonal
+	flops_ = 2*arg.coarseVolumeCB*coarseSpin*coarseColor;
+	break;
+      default:
+	errorQuda("Undefined compute type %d", type);
+      }
       // 2 from parity, 8 from complex
-      return !from_coarse ? 2*arg.V.VolumeCB()*8*arg.V.Nspin()*arg.V.Nvec()*arg.U.Ncolor() : // FIXME need to set this according to compute type
-	2*arg.V.VolumeCB()*8*arg.V.Nspin()*arg.V.Nvec()*arg.U.NcolorCoarse();
+      return flops_;
     }
     long long bytes() const
     {
-      return arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes(); // FIXME need to set this according to compute type
+      long long bytes_ = 0;
+      switch (type) {
+      case COMPUTE_UV:
+	bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes();
+	break;
+      case COMPUTE_VUV:
+	bytes_ = arg.UV.Bytes() + arg.V.Bytes();
+	break;
+      case COMPUTE_COARSE_CLOVER:
+	bytes_ = 2*arg.X.Bytes() + 2*arg.C.Bytes() + arg.V.Bytes(); // 2 from parity
+	break;
+      case COMPUTE_REVERSE_Y:
+	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
+      case COMPUTE_COARSE_LOCAL:
+      case COMPUTE_DIAGONAL:
+	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+	break;
+      default:
+	errorQuda("Undefined compute type %d", type);
+      }
+      return bytes_;
     }
-    unsigned int minThreads() const { return arg.V.VolumeCB(); } // FIXME need to set this according to compute type
+
+    unsigned int minThreads() const {
+      unsigned int threads = 0;
+      switch (type) {
+      case COMPUTE_UV:
+      case COMPUTE_VUV:
+      case COMPUTE_COARSE_CLOVER:
+	threads = arg.fineVolumeCB;
+	break;
+      case COMPUTE_REVERSE_Y:
+      case COMPUTE_COARSE_LOCAL:
+      case COMPUTE_DIAGONAL:
+	threads = arg.coarseVolumeCB;
+	break;
+      default:
+	errorQuda("Undefined compute type %d", type);
+      }
+      return threads;
+    }
 
   public:
     CalculateY(Arg &arg, ComputeType type, const ColorSpinorField &meta)
@@ -527,6 +596,10 @@ namespace quda {
 	  else if (dim==2) ComputeVUVCPU<from_coarse,Float,2,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
 	  else if (dim==3) ComputeVUVCPU<from_coarse,Float,3,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
 
+	} else if (type == COMPUTE_COARSE_CLOVER) {
+
+	  ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,fineColor,coarseColor>(arg);
+
 	} else if (type == COMPUTE_REVERSE_Y) {
 
 	  ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
@@ -534,10 +607,6 @@ namespace quda {
 	} else if (type == COMPUTE_COARSE_LOCAL) {
 
 	  ComputeCoarseLocalCPU<Float,coarseSpin,coarseColor>(arg);
-
-	} else if (type == COMPUTE_COARSE_CLOVER) {
-
-	  ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,fineColor,coarseColor>(arg);
 
 	} else if (type == COMPUTE_DIAGONAL) {
 
@@ -567,9 +636,9 @@ namespace quda {
 
       if      (type == COMPUTE_UV)            strcat(Aux,",computeUV");
       else if (type == COMPUTE_VUV)           strcat(Aux,",computeVUV");
+      else if (type == COMPUTE_COARSE_CLOVER) strcat(Aux,",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)     strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_COARSE_LOCAL)  strcat(Aux,",computeCoarseLocal");
-      else if (type == COMPUTE_COARSE_CLOVER) strcat(Aux,",computeCoarseClover");
       else if (type == COMPUTE_DIAGONAL)      strcat(Aux,",computeCoarseDiagonal");
       else errorQuda("Unknown type=%d\n", type);
 
