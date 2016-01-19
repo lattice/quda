@@ -233,7 +233,7 @@ namespace quda {
     } else if (typeid(src) == typeid(cpuCloverField)) {
       resizeBufferPinned(bytes + norm_bytes);
       void *packClover = bufferPinned[0];
-      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned[0] + bytes : 0;
+      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
       
       if (src.V(false)) {
 	copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
@@ -263,8 +263,8 @@ namespace quda {
     // we know we are copying from GPU to CPU here, so for now just
     // assume that reordering is on CPU
     resizeBufferPinned(bytes + norm_bytes);
-    void *packClover = bufferPinned;
-    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned + bytes : 0;
+    void *packClover = bufferPinned[0];
+    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
 
     // first copy over the direct part (if it exists)
     if (V(false) && cpu.V(false)) {
