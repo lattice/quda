@@ -50,7 +50,10 @@ namespace quda {
     coord[4] = 0;
     getCoords(coord, x_cb, arg.x_size, parity);
 
-    for(int s = 0; s < fineSpin; s++) {
+    constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
+    if (x_cb==0 && parity==0) printf("uvSpin = %d\n", uvSpin);
+
+    for(int s = 0; s < uvSpin; s++) {
       for(int c = 0; c < fineColor; c++) {
 	for(int v = 0; v < coarseColor; v++) {
 	  arg.UV(parity,x_cb,s,c,v) = static_cast<Float>(0.0);
@@ -71,7 +74,7 @@ namespace quda {
 		  arg.U(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
 	      else
 		for (int s_col=0; s_col<fineSpin; s_col++) {
-		  arg.UV(parity, x_cb, s_col*2+s, ic, ic_c) += arg.U(dim, parity, x_cb, s, s_col, ic, jc) *
+		  arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += arg.U(dim, parity, x_cb, s, s_col, ic, jc) *
 		    arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c);
 		} // which chiral block
 	    }  //Fine color columns
@@ -90,7 +93,7 @@ namespace quda {
 		arg.UV(parity, x_cb, s, ic, ic_c) += arg.U(dim, parity, x_cb, ic, jc) * arg.V((parity+1)&1, y_cb, s, jc, ic_c);
 	      else
 		for (int s_col=0; s_col<fineSpin; s_col++) {
-		  arg.UV(parity, x_cb, s_col*2+s, ic, ic_c) += arg.U(dim, parity, x_cb, s, s_col, ic, jc) * arg.V((parity+1)&1, y_cb, s_col, jc, ic_c);
+		  arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += arg.U(dim, parity, x_cb, s, s_col, ic, jc) * arg.V((parity+1)&1, y_cb, s_col, jc, ic_c);
 		} // which chiral block
 	    }  //Fine color columns
 	  }  //Fine color rows
@@ -170,7 +173,7 @@ namespace quda {
 	    for(int jc_c = 0; jc_c < coarseColor; jc_c++) { //Coarse Color column
 	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color
 		vuv[((s*coarseSpin+s_col)*coarseColor+ic_c)*coarseColor+jc_c] +=
-		  conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.UV(parity, x_cb, 2*s_col+s, ic, jc_c);
+		  conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.UV(parity, x_cb, s_col*fineSpin+s, ic, jc_c);
 	      } //Fine color
 	    } //Coarse Color column
 	  } //Coarse Color row

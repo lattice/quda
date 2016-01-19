@@ -162,7 +162,7 @@ namespace quda {
     //computation.
     ColorSpinorParam UVparam(T.Vectors());
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
-    UVparam.nSpin *= 2; // nSpin == 4
+    UVparam.nSpin *= 2; // so nSpin == 4
     cpuColorSpinorField uv(UVparam);
 
     calculateYcoarse(Y, X, Xinv, Yhat, uv, T, gauge, clover, kappa);
