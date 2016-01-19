@@ -45,7 +45,13 @@ namespace quda {
     }
 
     this->geo_bs = new int[ndim];
-    for (int d = 0; d < ndim; d++) this->geo_bs[d] = geo_bs[d];
+    int total_block_size = 1;
+    for (int d = 0; d < ndim; d++) {
+      this->geo_bs[d] = geo_bs[d];
+      total_block_size *= geo_bs[d];
+    }
+
+    if (total_block_size == 1) errorQuda("Total geometric block size is 1");
 
     char block_str[128];
     sprintf(block_str, "%d", geo_bs[0]);
