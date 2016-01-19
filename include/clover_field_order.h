@@ -237,6 +237,13 @@ namespace quda {
 
 	/** Returns the field volume */
 	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
+
+	/** Return the size of the allocation (parity left out and added as needed in Tunable::bytes) */
+	size_t Bytes() const {
+	  constexpr int n = (nSpin * nColor) / 2;
+	  constexpr int chiral_block = n * n / 2;
+	  return volumeCB * chiral_block * 2 * 2 * sizeof(Float); // 2 from complex, 2 from chirality
+	}
       };
 
     /**
@@ -306,7 +313,7 @@ namespace quda {
 	  }
 	}
 
-	size_t Bytes() const { 
+	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
 	  if (sizeof(Float)==sizeof(short)) bytes += 2*sizeof(float);
 	  return bytes;

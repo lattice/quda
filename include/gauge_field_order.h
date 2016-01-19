@@ -291,7 +291,7 @@ namespace quda {
 	  return nrm2;
 	}
 
-	// geometry and parity left out and added as needed in Tunable::bytes
+	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
 	size_t Bytes() const { return volumeCB * nColor * nColor * 2 * sizeof(Float); }
       };
 
