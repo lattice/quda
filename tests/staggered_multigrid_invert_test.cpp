@@ -224,27 +224,35 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
     mg_param->smoother[i] = precon_type;
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
-    //mg_param->smoother_solve_type[i] = QUDA_DIRECT_SOLVE;
-    mg_param->smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
-    mg_param->omega[i] = 1.0; // over/under relaxation factor
+    mg_param->smoother_solve_type[i] = QUDA_DIRECT_SOLVE;
+    //mg_param->smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
+
+    // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
+    // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
+//    mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION; // EVEN-ODD, not supported for the staggered
+    mg_param->coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION; 
+
+    mg_param->omega[i] = 0.85; // over/under relaxation factor
 
     mg_param->location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
  
-  mg_param->smoother_solve_type[0] = QUDA_NORMOP_PC_SOLVE; //or choose QUDA_DIRECT_SOLVE;
+  //mg_param->smoother_solve_type[0] = QUDA_NORMOP_PC_SOLVE; //or choose QUDA_DIRECT_SOLVE;
   // coarsen the spin on the first restriction is undefined for staggered fields
   mg_param->spin_block_size[0] = 0;
 
   if(mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE) mg_param->smoother[0] = QUDA_CG_INVERTER; //or choose QUDA_GCR_INVERTER
 
   //number of the top-level smoothing:
-  mg_param->nu_pre[0] = nu_pre;
-  mg_param->nu_post[0] = nu_post;
+  mg_param->nu_pre[0] = 16;//nu_pre;
+  mg_param->nu_post[0] = 16;//nu_post;
 
   // coarse grid solver is GCR
   mg_param->smoother[mg_levels-1] = QUDA_GCR_INVERTER;
   mg_param->compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
+
+  mg_param->run_verify = QUDA_BOOLEAN_YES;
 
   // set file i/o parameters
   strcpy(mg_param->vec_infile, vec_infile);

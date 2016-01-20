@@ -60,7 +60,7 @@ namespace quda {
     int Nc_c = transfer->nvec();
 
     //Coarse Spin
-    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs();
+    int Ns_c = (transfer->Vectors().Nspin() == 1) ? 2 : transfer->Vectors().Nspin()/transfer->Spin_bs();
 
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));

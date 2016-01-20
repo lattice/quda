@@ -46,7 +46,7 @@ namespace quda {
     param_presmooth->Nkrylov = 4;
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 20;
-      param_presmooth->maxiter = 1000;
+      param_presmooth->maxiter = 500;
       param_presmooth->tol = 2e-1;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-2;
@@ -108,10 +108,11 @@ namespace quda {
       {
         diracParam.kappa = param.matResidual.Expose()->Kappa();
         printfQuda("Kappa = %e\n", diracParam.kappa);
+      }else {
+        printfQuda("Mass = %e\n", diracParam.mass);
       }
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
-      printfQuda("Kappa = %e\n", diracParam.kappa);
       // use even-odd preconditioning for the coarse grid solver
       diracCoarseResidual = new DiracCoarse(diracParam);
       matCoarseResidual = new DiracM(*diracCoarseResidual);

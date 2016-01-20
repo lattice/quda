@@ -8,6 +8,7 @@
 #include <index_helper.cuh>
 
 #include <coarse_op.cuh> //remove it!
+#include <blas_magma.h>
 
 namespace quda {
 
@@ -209,8 +210,7 @@ namespace quda {
       printf("KS Y2[%d] = %e\n", d, Y.norm2(d));
     }
 
-
-    createYreverse<Float,coarseSpin,coarseColor>(Y);
+    //createYreverse<Float,coarseSpin,coarseColor>(Y);
 
     printf("KS X2 = %e\n", X.norm2(0));
     printfQuda("Computing coarse diagonal\n");
@@ -251,6 +251,16 @@ namespace quda {
       F *uvlAccessor = NULL;
       calculateKSY<Float,coarseSpin,coarseColor>(yAccessor, xAccessor, &uvAccessor, uvlAccessor, vAccessor, &fAccessor, lAccessor, f->X(),Y.X(), k);
     } 
+
+    {
+      cpuGaugeField *X_h = static_cast<cpuGaugeField*>(&X);
+      cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
+
+      // invert the clover matrix field
+      const int n = X_h->Ncolor();
+      BlasMagmaArgs magma(X_h->Precision());
+      magma.BatchInvertMatrix(((float**)Xinv_h->Gauge_p())[0], ((float**)X_h->Gauge_p())[0], n, X_h->Volume());
+    }
 
     // now exchange Y halos for multi-process dslash
     Y.exchangeGhost();
