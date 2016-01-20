@@ -271,8 +271,7 @@ namespace quda {
 	  // perform a restart
 	  copyCuda(p, rSloppy);
 	  heavy_quark_restart = false;
-	}
-	else {
+	} else {
 	  // explicitly restore the orthogonality of the gradient vector
 	  double rp = reDotProductCuda(rSloppy, p) / (r2);
 	  axpyCuda(-rp, rSloppy, p);
@@ -293,11 +292,11 @@ namespace quda {
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
       converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
       
-      // check for recent enough relibale updates of the HQ residual if we use it
+      // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
         // L2 is concverged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
-        // HQ is converged and if we do reliable update the HQ residual has been caclculated using a reliable update
+        // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
         bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
         converged = L2done and HQdone;
       }
