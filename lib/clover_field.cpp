@@ -24,10 +24,10 @@ namespace quda {
     length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
     bytes = length*precision;
-    bytes = ALIGNMENT_ADJUST(bytes);
+    bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
-      norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
+      norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
 //for twisted mass only:
     twisted = false;//param.twisted;
@@ -63,10 +63,10 @@ namespace quda {
       }
 
       even = clover;
-      odd = (char*)clover + bytes/2;
+      odd = static_cast<char*>(clover) + bytes/2;
     
       evenNorm = norm;
-      oddNorm = (char*)norm + norm_bytes/2;
+      oddNorm = static_cast<char*>(norm) + norm_bytes/2;
 
       total_bytes += bytes + norm_bytes;
 
@@ -91,10 +91,10 @@ namespace quda {
       }
 
       evenInv = cloverInv;
-      oddInv = (char*)cloverInv + bytes/2;
+      oddInv = static_cast<char*>(cloverInv) + bytes/2;
     
       evenInvNorm = invNorm;
-      oddInvNorm = (char*)invNorm + norm_bytes/2;
+      oddInvNorm = static_cast<char*>(invNorm) + norm_bytes/2;
 
       total_bytes += bytes + norm_bytes;
 
@@ -223,7 +223,7 @@ namespace quda {
     } else if (typeid(src) == typeid(cpuCloverField)) {
       resizeBufferPinned(bytes + norm_bytes);
       void *packClover = bufferPinned[0];
-      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned[0] + bytes : 0;
+      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
       
       if (src.V(false)) {
 	copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
@@ -268,6 +268,8 @@ namespace quda {
       cloverInv = param.cloverInv;
       invNorm = param.invNorm;
     }
+
+    if (param.pad != 0) errorQuda("%s pad must be zero", __func__);
   }
 
   cpuCloverField::~cpuCloverField() { 
