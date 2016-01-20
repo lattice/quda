@@ -752,7 +752,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   CloverField *in=NULL, *inInv=NULL;
 
   if(!device_calc){
-    printfQuda("Device_calc = %d\n", device_calc);
     // create a param for the cpu clover field
     profileClover.TPSTART(QUDA_PROFILE_INIT);
     CloverFieldParam cpuParam;
