@@ -322,7 +322,7 @@ namespace quda {
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals
-    mat(r, x, y);
+    mat(r, x, y, tmp3);
     param.true_res = sqrt(xmyNormCuda(b, r) / b2);
     param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 
