@@ -1593,6 +1593,7 @@ QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
+QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
 
 int mg_levels = 2;
 
@@ -1651,6 +1652,7 @@ void usage(char** argv )
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
+  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
@@ -2165,6 +2167,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     matpc_type = get_matpc_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--solve-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    solve_type = get_solve_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

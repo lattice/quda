@@ -58,6 +58,7 @@ extern int geo_block_size[];
 extern QudaInverterType precon_type;
 
 extern QudaMatPCType matpc_type;
+extern QudaSolveType solve_type;
 
 extern char vec_infile[];
 extern char vec_outfile[];
@@ -201,7 +202,10 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
-    mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION; // EVEN-ODD
+
+    // if we are using an outer even-odd preconditioned solve, then we
+    // use single parity injection into the coarse grid
+    mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     mg_param.omega[i] = 0.85; // over/under relaxation factor
 
@@ -272,8 +276,10 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   // do we want full solution or single-parity solution
-  inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  // do we want to use an even-odd preconditioned solve or not
+  inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
 
   inv_param.inv_type = QUDA_GCR_INVERTER;

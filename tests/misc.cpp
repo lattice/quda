@@ -909,7 +909,7 @@ get_matpc_type(char* s)
   }else if (strcmp(s, "odd_odd_asym") == 0){
     ret = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
   }else{
-    fprintf(stderr, "Error: invalid matpc type\n");
+    fprintf(stderr, "Error: invalid matpc type %s\n", s);
     exit(1);
   }
 
@@ -935,7 +935,64 @@ get_matpc_str(QudaMatPCType type)
     ret = "odd_odd_asym";
     break;
   default:
-    fprintf(stderr, "Error: invalid matpc type\n");
+    fprintf(stderr, "Error: invalid matpc type %d\n", type);
+    exit(1);
+  }
+
+  return ret;
+}
+
+QudaSolveType
+get_solve_type(char* s)
+{
+  QudaSolveType ret = QUDA_INVALID_SOLVE;
+
+  if (strcmp(s, "direct") == 0) {
+    ret = QUDA_DIRECT_SOLVE;
+  } else if (strcmp(s, "direct-pc") == 0) {
+    ret = QUDA_DIRECT_PC_SOLVE;
+  } else if (strcmp(s, "normop") == 0) {
+    ret = QUDA_NORMOP_SOLVE;
+  } else if (strcmp(s, "normop-pc") == 0) {
+    ret = QUDA_NORMOP_PC_SOLVE;
+  } else if (strcmp(s, "normerr") == 0) {
+    ret = QUDA_NORMERR_SOLVE;
+  } else if (strcmp(s, "normerr-pc") == 0) {
+    ret = QUDA_NORMERR_PC_SOLVE;
+  } else {
+    fprintf(stderr, "Error: invalid matpc type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+const char *
+get_solve_str(QudaSolveType type)
+{
+  const char* ret;
+
+  switch(type) {
+  case QUDA_DIRECT_SOLVE:
+    ret = "direct";
+    break;
+  case QUDA_DIRECT_PC_SOLVE:
+    ret = "direct-pc";
+    break;
+  case QUDA_NORMOP_SOLVE:
+    ret = "normop";
+    break;
+  case QUDA_NORMOP_PC_SOLVE:
+    ret = "normop-pc";
+    break;
+  case QUDA_NORMERR_SOLVE:
+    ret = "normerr";
+    break;
+  case QUDA_NORMERR_PC_SOLVE:
+    ret = "normerr-pc";
+    break;
+  default:
+    fprintf(stderr, "Error: invalid solve type %d\n", type);
     exit(1);
   }
 
