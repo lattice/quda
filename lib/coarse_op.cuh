@@ -729,6 +729,8 @@ namespace quda {
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, const ColorSpinorField &v,
 		  double kappa, QudaMatPCType matpc) {
 
+    if (matpc != QUDA_MATPC_INVALID) errorQuda("Unsupported coarsening of matpc = %d", matpc);
+
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
 

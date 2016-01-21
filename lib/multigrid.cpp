@@ -99,11 +99,14 @@ namespace quda {
       // create coarse solution vector
       x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
-      // create coarse grid operator
+      // check if we are coarsening the preconditioned system then
+      bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
 
+      // create coarse grid operator
       DiracParam diracParam;
       diracParam.transfer = transfer;
-      diracParam.dirac = const_cast<Dirac*>(param.matResidual.Expose());
+
+      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth.Expose()) : const_cast<Dirac*>(param.matResidual.Expose());
       diracParam.kappa = param.matResidual.Expose()->Kappa();
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
