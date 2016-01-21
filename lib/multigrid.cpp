@@ -99,11 +99,13 @@ namespace quda {
       // create coarse solution vector
       x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
-      // create coarse grid operator
+      // check if we are coarsening the preconditioned system then
+      bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
 
+      // create coarse grid operator
       DiracParam diracParam;
       diracParam.transfer = transfer;
-      diracParam.dirac = const_cast<Dirac*>(param.matResidual.Expose());
+      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth.Expose()) : const_cast<Dirac*>(param.matResidual.Expose());
       if (param.B[0]->Nspin() != 1)
       {
         diracParam.kappa = param.matResidual.Expose()->Kappa();
@@ -174,7 +176,10 @@ namespace quda {
 
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
-      if (B_coarse) for (int i=0; i<param.Nvec; i++) delete (*B_coarse)[i];
+      if (B_coarse) {
+	for (int i=0; i<param.Nvec; i++) if ((*B_coarse)[i]) delete (*B_coarse)[i];
+	delete B_coarse;
+      }
       if (coarse) delete coarse;
       if (transfer) delete transfer;
       if (matCoarseSmoother) delete matCoarseSmoother;

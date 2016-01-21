@@ -362,6 +362,12 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
+    /** The Gflops rate of the multigrid solver setup */
+    double gflops;
+
+    /**< The time taken by the multigrid solver setup */
+    double secs;
+
   } QudaMultigridParam;
 
 

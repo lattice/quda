@@ -285,6 +285,20 @@ namespace quda {
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse even-odd preconditioned clover
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned clover operator differs from that of the
+     * unpreconditioned clover operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
 
@@ -784,6 +798,20 @@ namespace quda {
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse even-odd preconditioned coarse
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned coarse operator differs from that of the
+     * unpreconditioned coarse operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
