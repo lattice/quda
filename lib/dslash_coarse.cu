@@ -39,7 +39,7 @@ namespace quda {
   /**
      Applies the coarse dslash on a given parity and checkerboard site index
 
-     @param out The result -2 * kappa * Dslash in
+     @param out The result - kappa * Dslash in
      @param Y The coarse gauge field
      @param kappa Kappa value
      @param in The input field
@@ -158,10 +158,10 @@ namespace quda {
 
       // apply kappa
 #pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -(Float)2.0*arg.kappa;
+      for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
     }
 #else
-    for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -(Float)2.0*arg.kappa;
+    for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
 #endif
 
   }
@@ -189,7 +189,7 @@ namespace quda {
       for(int s_col = 0; s_col < Ns; s_col++) //Spin in
 #pragma unroll
 	for(int c_col = 0; c_col < Nc; c_col++) { //Color in
-	  //Factor of 2*kappa and diagonal addition now incorporated in X
+	  //Factor of kappa and diagonal addition now incorporated in X
 	  int col = s_col*Nc + c_col;
 	  out[color_local] += arg.X(0, parity, x_cb, row, col) * arg.inB(spinor_parity, x_cb, s_col, c_col);
 	}
@@ -476,10 +476,8 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 #endif // GPU_MULTIGRID
 
   //Apply the coarse Dirac matrix to a coarse grid vector
-  //out(x) = M*in = X*in - 2*kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
+  //out(x) = M*in = X*in - kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   //Uses the kappa normalization for the Wilson operator.
-  //Note factor of 2*kappa compensates for the factor of 1/2 already
-  //absorbed into the Y matrices.
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover) {
 #ifdef GPU_MULTIGRID
