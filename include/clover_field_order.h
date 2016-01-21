@@ -170,7 +170,7 @@ namespace quda {
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-      FieldOrder(CloverField &A) : A(A), volumeCB(A.VolumeCB()), accessor(A)
+      FieldOrder(CloverField &A, bool inverse=false) : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse)
 	{ }
 	
 	CloverField& Field() { return A; }
