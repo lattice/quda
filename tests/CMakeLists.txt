@@ -64,12 +64,12 @@ if(${QUDA_HISQ_LINK})
   target_link_libraries(unitarize_link_test ${TEST_LIBS})
 endif()
 
-if(${QUDA_GAUGE_FORCE})
+if(${QUDA_FORCE_GAUGE})
   cuda_add_executable(gauge_force_test gauge_force_test.cpp gauge_force_reference.cpp)
   target_link_libraries(gauge_force_test ${TEST_LIBS})
 endif()
 
-if(${QUDA_ASQTAD_FORCE})
+if(${QUDA_FORCE_ASQTAD})
   cuda_add_executable(fermion_force_test fermion_force_test.cpp fermion_force_reference.cpp)
   target_link_libraries(fermion_force_test ${TEST_LIBS})
 endif()
@@ -79,7 +79,7 @@ if(${QUDA_GAUGE_ALG})
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
 endif()
 
-if(${QUDA_HISQ_FORCE})
+if(${QUDA_FORCE_HISQ})
   cuda_add_executable(hisq_paths_force_test hisq_paths_force_test.cpp hisq_force_reference.cpp hisq_force_reference2.cpp fermion_force_reference.cpp   )
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
 
