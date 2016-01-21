@@ -169,7 +169,10 @@ namespace quda {
 
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
-      if (B_coarse) for (int i=0; i<param.Nvec; i++) delete (*B_coarse)[i];
+      if (B_coarse) {
+	for (int i=0; i<param.Nvec; i++) if ((*B_coarse)[i]) delete (*B_coarse)[i];
+	delete B_coarse;
+      }
       if (coarse) delete coarse;
       if (transfer) delete transfer;
       if (matCoarseSmoother) delete matCoarseSmoother;

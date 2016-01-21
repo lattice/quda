@@ -157,6 +157,8 @@ namespace quda {
 
     if (coarse_tmp_h) delete coarse_tmp_h;
     if (coarse_tmp_d) delete coarse_tmp_d;
+
+    if (geo_bs) delete []geo_bs;
   }
 
   void Transfer::fillV(ColorSpinorField &V) { 
