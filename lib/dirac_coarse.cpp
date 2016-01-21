@@ -199,7 +199,7 @@ namespace quda {
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
   void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
   {
-    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), kappa);
+    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa);
   }
 
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu) : DiracCoarse(param, enable_gpu)

@@ -246,10 +246,10 @@ namespace quda {
     computeVUV<from_coarse,Float,dim,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(arg, parity, x_cb);
   }
 
-  //Adds the reverse links to the coarse local term, which is just
-  //the conjugate of the existing coarse local term but with
-  //plus/minus signs for off-diagonal spin components
-  //Also multiply by the appropriate factor of -2*kappa
+  /**
+   * Compute the forward links from backwards links by flipping the
+   * sign of the spin projector
+   */
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb) {
     auto &Y = arg.Y;
@@ -725,14 +725,12 @@ namespace quda {
   //Calculates the coarse gauge field
   template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
 	   QudaGaugeFieldOrder gOrder, typename F, typename Ftmp, typename coarseGauge, typename fineGauge, typename fineClover>
-  void calculateY(coarseGauge &Y, coarseGauge &X, Ftmp &UV, F &V, fineGauge &G, fineClover &C,
-		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, const ColorSpinorField &v, double kappa) {
+  void calculateY(coarseGauge &Y, coarseGauge &X, Ftmp &UV, F &V, fineGauge &G, fineClover &C, fineClover &Cinv,
+		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, const ColorSpinorField &v,
+		  double kappa, QudaMatPCType matpc) {
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
-
-    int dummy = 0;
-    v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
     int x_size[5];
     for (int i=0; i<4; i++) x_size[i] = v.X(i);
@@ -808,6 +806,7 @@ namespace quda {
 
     {
       // use spin-ignorant accessor to make multiplication simpler
+      // alse with new accessor we ensure we're accessing the same ghost buffer in Y_ as was just exchanged
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,1,gOrder> gCoarse;
       gCoarse yAccessor(const_cast<GaugeField&>(Y_));
       gCoarse yHatAccessor(const_cast<GaugeField&>(Yhat_));
