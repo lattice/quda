@@ -294,13 +294,16 @@ namespace quda {
    * Adds the reverse links to the coarse local term, which is just
    * the conjugate of the existing coarse local term but with
    * plus/minus signs for off-diagonal spin components so multiply by
-   * the appropriate factor of -2*kappa
+   * the appropriate factor of -2*kappa.  The factor of comes from the
+   * fact that the Y matrices include a factor of half in them, which
+   * also included in the kappa normalization.
+   *
   */
   template<typename Float, int nSpin, int nColor, typename Arg>
   void computeCoarseLocal(Arg &arg, int parity, int x_cb)
   {
     auto X = arg.X;
-    Float kap = arg.kappa;
+    Float two_kappa = static_cast<Float>(2.0)*arg.kappa;
     complex<Float> Xlocal[nSpin*nSpin*nColor*nColor];
 
     for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
@@ -325,8 +328,8 @@ namespace quda {
 	  for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
 	    //Transpose color part
 	    X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) =
-	      -2*kap*(sign*X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
-		      +conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
+	      -two_kappa*(sign*X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
+			  +conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
 	  } //Color column
 	} //Color row
       } //Spin column

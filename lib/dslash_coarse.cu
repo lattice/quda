@@ -74,18 +74,10 @@ namespace quda {
 	    int row = s_row*Nc + c_row;
 #pragma unroll
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-	      //#define SIGN
-#ifdef SIGN
-	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
-#endif
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 		int col = s_col*Nc + c_col;
-#ifdef SIGN
-		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col);
-#else
 		out[color_local] += arg.Y(d+4, parity, x_cb, row, col) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col);
-#endif
 	      }
 	    }
 	  }
@@ -96,17 +88,10 @@ namespace quda {
 	    int row = s_row*Nc + c_row;
 #pragma unroll
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-#ifdef SIGN
-	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
-#endif
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 		int col = s_col*Nc + c_col;
-#ifdef SIGN
-		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
-#else
 		out[color_local] += arg.Y(d+4, parity, x_cb, row, col) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
-#endif
 	      }
 	    }
 	  }
