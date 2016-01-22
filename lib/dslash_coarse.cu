@@ -46,18 +46,24 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
+  extern __shared__ float s[];
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
-  __device__ __host__ inline void applyDslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block) {
+  __device__ __host__ inline void applyDslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block, int dir) {
+
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
     int coord[5];
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
+#ifdef __CUDA_ARCH__
+    complex<Float> *shared_sum = (complex<Float>*)s;
+    if (!dir) {
+#endif
+
+      //Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
-    for(int d = 0; d < nDim; d++) { //Ndim
-      //Forward link - compute fwd offset for spinor fetch
-      {
+      for(int d = 0; d < nDim; d++) { //Ndim
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	  int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
@@ -68,36 +74,39 @@ namespace quda {
 	    int row = s_row*Nc + c_row;
 #pragma unroll
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 		int col = s_col*Nc + c_col;
-		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col);
+		out[color_local] += arg.Y(d+4, parity, x_cb, row, col) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col);
 	      }
 	    }
 	  }
 	} else {
-
 #pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	    int c_row = color_block + color_local; // global color index
 	    int row = s_row*Nc + c_row;
 #pragma unroll
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 		int col = s_col*Nc + c_col;
-		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+		out[color_local] += arg.Y(d+4, parity, x_cb, row, col) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
 	      }
 	    }
 	  }
 	}
 
-      }
+      } // nDim
 
-      //Backward link - compute back offset for spinor and gauge fetch
-      {
+#ifdef __CUDA_ARCH__
+    } else {
+#endif
+
+      //Backward gather - compute back offset for spinor and gauge fetch
+#pragma unroll
+      for(int d = 0; d < nDim; d++) { //Ndim
+
 	const int back_idx = linkIndexM1(coord, arg.dim, d);
 	const int gauge_idx = back_idx;
 	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
@@ -127,15 +136,34 @@ namespace quda {
 		out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
 	      }
 	  }
-
 	}
 
       } //nDim
-    }
 
-    // apply kappa
+#ifdef __CUDA_ARCH__
+      for (int color_local=0; color_local < Mc; color_local++) {
+	shared_sum[ ((color_local * (blockDim.z>>1) + (threadIdx.z>>1) ) * blockDim.y + threadIdx.y ) * blockDim.x + threadIdx.x] = out[color_local];
+      }
+
+    } // forwards / backwards thread split
+#endif
+
+#ifdef __CUDA_ARCH__ // CUDA path has to recombine the foward and backward results
+    __syncthreads();
+
+    if (dir == 0) {
+      for (int color_local=0; color_local < Mc; color_local++) {
+	out[color_local] += shared_sum[ ((color_local * (blockDim.z>>1) + (threadIdx.z>>1) ) * blockDim.y + threadIdx.y ) * blockDim.x + threadIdx.x];
+      }
+
+      // apply kappa
 #pragma unroll
+      for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -(Float)2.0*arg.kappa;
+    }
+#else
     for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -(Float)2.0*arg.kappa;
+#endif
+
   }
 
 
@@ -151,7 +179,7 @@ namespace quda {
    */
 //#define CHECK_STAGGERED
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
-  __device__ __host__ inline void applyStaggeredDslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block) {
+  __device__ __host__ inline void applyStaggeredDslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block, int dir) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
     int coord[5];
@@ -160,33 +188,67 @@ namespace quda {
 
     const int s_col = (1 - s_row);//s_col = 1 if s_row = 0, and  s_col = 0 if s_row = 1.
 
-    for(int d = 0; d < nDim; d++) { //Ndim
-      //Forward link - compute fwd offset for spinor fetch
-      {
-	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-        for(int color_local = 0; color_local < Mc; color_local++) { //Color row
-          int c_row = color_block + color_local; // global color index
-          int row = s_row*Nc + c_row;
-	  for(int c_col = 0; c_col < Nc; c_col++){ //Color column
-             int col = s_col*Nc + c_col;
-	     out[color_local] -= (arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+#ifdef __CUDA_ARCH__
+    complex<Float> *shared_sum = (complex<Float>*)s;
+    if (!dir) {//compute forward links (dir = 0)
+#endif
+#pragma unroll
+      for(int d = 0; d < nDim; d++) { //Ndim
+        //Forward link - compute fwd offset for spinor fetch
+        {
+	  const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+#pragma unroll
+          for(int color_local = 0; color_local < Mc; color_local++) { //Color row
+            int c_row = color_block + color_local; // global color index
+            int row = s_row*Nc + c_row;
+#pragma unroll
+	    for(int c_col = 0; c_col < Nc; c_col++){ //Color column
+               int col = s_col*Nc + c_col;
+	       out[color_local] -= (arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+            }
           }
         }
+      } //nDim
+#ifdef __CUDA_ARCH__
+    }else{//compute backward links (dir = 1)
+#endif
+#pragma unroll
+      for(int d = 0; d < nDim; d++) { //Ndim
+        //Backward link - compute back offset for spinor and gauge fetch
+        {
+	  const int back_idx = linkIndexM1(coord, arg.dim, d);
+	  const int gauge_idx = back_idx;
+#pragma unroll
+          for(int color_local = 0; color_local < Mc; color_local++) {
+            int c_row = color_block + color_local;
+            int row = s_row*Nc + c_row;
+#pragma unroll
+	    for(int c_col = 0; c_col < Nc; c_col++){
+               int col = s_col*Nc + c_col;
+	       out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+            }  
+          }
+        } 
+      } //nDim
+
+#ifdef __CUDA_ARCH__
+      for (int color_local=0; color_local < Mc; color_local++) {
+	shared_sum[ ((color_local * (blockDim.z>>1) + (threadIdx.z>>1) ) * blockDim.y + threadIdx.y ) * blockDim.x + threadIdx.x] = out[color_local];
       }
-      //Backward link - compute back offset for spinor and gauge fetch
-      {
-	const int back_idx = linkIndexM1(coord, arg.dim, d);
-	const int gauge_idx = back_idx;
-        for(int color_local = 0; color_local < Mc; color_local++) {
-          int c_row = color_block + color_local;
-          int row = s_row*Nc + c_row;
-	  for(int c_col = 0; c_col < Nc; c_col++){
-             int col = s_col*Nc + c_col;
-	     out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
-          }  
-        }
-      } 
-    } //nDim
+
+    } // forwards / backwards thread split
+#endif
+
+#ifdef __CUDA_ARCH__ // CUDA path has to recombine the foward and backward results
+    __syncthreads();
+    if (dir == 0) {
+      for (int color_local=0; color_local < Mc; color_local++) {
+	out[color_local] += shared_sum[ ((color_local * (blockDim.z>>1) + (threadIdx.z>>1) ) * blockDim.y + threadIdx.y ) * blockDim.x + threadIdx.x];
+      }
+    }
+#endif
+
+    return;
   }
 
 
@@ -223,21 +285,24 @@ namespace quda {
 
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool staggered>
-  __device__ __host__ inline void coarseDslash(CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block)
+  __device__ __host__ inline void coarseDslash(CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block, int dir)
   {
     complex <Float> out[Mc];
 #pragma unroll
     for (int c=0; c<Mc; c++) out[c] = 0.0;
-    if (dslash && !staggered) applyDslash<Float,F,G,nDim,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
-    else if(staggered)
-      applyStaggeredDslash<Float,F,G,nDim,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
-    if (clover) applyClover<Float,F,G,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
 
-    const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
+    if (dslash && !staggered) applyDslash<Float,F,G,nDim,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block, dir);
+    else if(staggered)
+      applyStaggeredDslash<Float,F,G,nDim,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block, dir);
+    if (clover && dir==0) applyClover<Float,F,G,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
+
+    if (dir==0) {
+      const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 #pragma unroll
-    for (int color_local=0; color_local<Mc; color_local++) {
-      int c = color_block + color_local; // global color index
-      arg.out(my_spinor_parity, x_cb, s, c) = out[color_local];
+      for (int color_local=0; color_local<Mc; color_local++) {
+	int c = color_block + color_local; // global color index
+	arg.out(my_spinor_parity, x_cb, s, c) = out[color_local];
+      }
     }
   }
 
@@ -253,7 +318,7 @@ namespace quda {
       for(int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { //Volume
 	for (int s=0; s<2; s++) {
 	  for (int color_block=0; color_block<Nc; color_block+=Mc) { // Mc=Nc means all colors in a thread
-	    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,staggered>(arg, x_cb, parity, s, color_block);
+	    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,staggered>(arg, x_cb, parity, s, color_block, 0);
 	  }
 	}
       }//VolumeCB
@@ -270,11 +335,14 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 
     // for full fields then set parity from y thread index else use arg setting
     int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
-    int sM = blockDim.z*blockIdx.z + threadIdx.z;
+
+    int sMd = blockDim.z*blockIdx.z + threadIdx.z;
+    int dir = sMd & 1;
+    int sM = sMd >> 1;
     int s = sM / (Nc/Mc);
     int color_block = (sM % (Nc/Mc)) * Mc;
 
-    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover, staggered>(arg, x_cb, parity, s, color_block);
+    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover, staggered>(arg, x_cb, parity, s, color_block, dir);
   }
 
 template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool staggered>
@@ -293,7 +361,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       return (dslash||clover) * arg.out.Bytes() + dslash*8*arg.inA.Bytes() + clover*arg.inB.Bytes() +
 	arg.nParity*(dslash*8*arg.Y.Bytes() + clover*arg.X.Bytes());
     }
-    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc)/2; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.volumeCB; }
@@ -320,16 +388,16 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 	  param.grid.y = arg.nParity;
 
 	  // let's try to advance spin/block-color
-	  while(param.block.z <= 2* (Nc/Mc)) {
-	    param.block.z++;
-	    if ( (2*(Nc/Mc)) % param.block.z == 0) {
-	      param.grid.z = (2 * (Nc/Mc)) / param.block.z;
+	  while(param.block.z <= 2 * 2 * (Nc/Mc)) {
+	    param.block.z+=2;
+	    if ( (2*2*(Nc/Mc)) % param.block.z == 0) {
+	      param.grid.z = (2 * 2 * (Nc/Mc)) / param.block.z;
 	      break;
 	    }
 	  }
 
 	  // we can advance spin/block-color since this is valid
-	  if (param.block.z <= 2 * (Nc/Mc)) { //
+	  if (param.block.z <= 2 * 2 * (Nc/Mc) && param.block.z <= 64 ) { //
 	    return true;
 	  } else { // we have run off the end so let's reset
 	    param.block.z = 1;
@@ -352,8 +420,10 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       Tunable::initTuneParam(param);
       param.block.y = 1;
       param.grid.y = arg.nParity;
-      param.block.z = 1;
+      param.block.z = 2;
       param.grid.z = 2*(Nc/Mc);
+      param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z > sharedBytesPerBlock(param) ?
+	sharedBytesPerThread()*param.block.x*param.block.y*param.block.z : sharedBytesPerBlock(param);
     }
 
     /** sets default values for when tuning is disabled */
@@ -362,8 +432,10 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       Tunable::defaultTuneParam(param);
       param.block.y = 1;
       param.grid.y = arg.nParity;
-      param.block.z = 1;
+      param.block.z = 2;
       param.grid.z = 2*(Nc/Mc);
+      param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z > sharedBytesPerBlock(param) ?
+	sharedBytesPerThread()*param.block.x*param.block.y*param.block.z : sharedBytesPerBlock(param);
     }
 
 
