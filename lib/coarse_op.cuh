@@ -913,9 +913,9 @@ namespace quda {
 
       printfQuda("AV2 = %e\n", AV.norm2());
 
-      // this exchange will break since the send is reallocated after the accessor has been created
       int dummy = 0;
       av.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+      arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
     }
 
     for(int d = 0; d < nDim; d++) {

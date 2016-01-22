@@ -11,13 +11,6 @@
 
 namespace quda {
 
-  /*
-    To do setup when the source is preconditioned links we have to run
-    setup twice: once for forwards links, and once for backward links.
-    Then need to combine the resulting X fields, which would replace
-    the createCoarseLocal function that's currently done.
-   */
-
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, 
             int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,
