@@ -1,5 +1,7 @@
 namespace quda {
 
+  static bool bidirectional_debug = false;
+
   template <typename Float, typename coarseGauge, typename fineGauge, typename fineSpinor,
 	    typename fineSpinorTmp, typename fineClover>
   struct CalculateYArg {
@@ -156,7 +158,7 @@ namespace quda {
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	      arg.AV(parity, x_cb, s, ic, ic_c) +=
-		arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * arg.V((parity+1)&1, x_cb, s_col, jc, ic_c);
+		arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
 	    }  //Fine color columns
 	  }  //Fine color rows
 	} //Coarse color
@@ -405,7 +407,7 @@ namespace quda {
 	    if (bidirectional) {
 	      // here we have forwards links in Xinv and backwards links in X
 	      arg.X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) =
-		-arg.kappa*(sign*arg.Xinv(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
+		-arg.kappa*(arg.Xinv(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
 			    +conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
 	    } else {
 	      // here we have just backwards links
@@ -661,7 +663,8 @@ namespace quda {
 
   public:
     CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta)
-      : TunableVectorY(2), arg(arg), type(type), bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC),
+      : TunableVectorY(2), arg(arg), type(type),
+	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || bidirectional_debug),
 	meta(meta), dim(0), dir(QUDA_BACKWARDS)
     {
       strcpy(aux, meta.AuxString());
@@ -776,6 +779,9 @@ namespace quda {
 	else if (dim == 1) strcat(Aux,",dim=1");
 	else if (dim == 2) strcat(Aux,",dim=2");
 	else if (dim == 3) strcat(Aux,",dim=3");
+
+	if (dir == QUDA_BACKWARDS) strcat(Aux,",dir=back");
+	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
       }
 
       return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
@@ -905,6 +911,13 @@ namespace quda {
     Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, x_size, xc_size, geo_bs, spin_bs);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v);
 
+    // If doing a preconditioned operator with a clover term then we
+    // have bi-directional links, though we can do the bidirectional setup for all operators for debug
+    bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug);
+
+    // If doing prconditioned clover then we first multiply the
+    // null-space vectors by the clover inverse matrix, since this is
+    // needed for the coarse link computation
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       printfQuda("Computing AV\n");
 
@@ -918,12 +931,13 @@ namespace quda {
       arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
     }
 
+    // Now compute the coarse links
     for(int d = 0; d < nDim; d++) {
       y.setDimension(d);
       printfQuda("Computing %d UV and VUV\n", d);
 
-      if (dirac == QUDA_CLOVERPC_DIRAC) {
-	y.setDirection(QUDA_FORWARDS);
+      if (bidirectional_links) {
+	y.setDirection(QUDA_FORWARDS); // what does this mean for the preconditioned coarse operator?
 	y.setComputeType(COMPUTE_UV);  // compute U*V product
 	y.apply(0);
 	printfQuda("UV2[%d] = %e\n", d, UV.norm2());
@@ -944,8 +958,12 @@ namespace quda {
     }
     printfQuda("X2 = %e\n", X.norm2(0));
 
-    y.setComputeType(COMPUTE_REVERSE_Y);  // reverse the links for the backwards direction
-    y.apply(0);
+    // if not doing a preconditioned operator then we can trivially
+    // construct the forward links from the backward links
+    if ( !bidirectional_links ) {
+      y.setComputeType(COMPUTE_REVERSE_Y);  // reverse the links for the forwards direction
+      y.apply(0);
+    }
 
     printfQuda("Computing coarse local\n");
     y.setComputeType(COMPUTE_COARSE_LOCAL);
