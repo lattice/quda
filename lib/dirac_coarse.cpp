@@ -359,10 +359,12 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
+  //Make the coarse operator one level down.  For the preconditioned
+  //operator we are coarsening the Yhat links, not the Y links.  We
+  //pass the fine clover fields, though they are actually ignored.
   void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
   {
-    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSEPC_DIRAC, matpcType);
+    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSEPC_DIRAC, matpcType);
   }
 
 }
