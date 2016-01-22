@@ -285,7 +285,16 @@ namespace quda {
 
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
-    param.matResidual(*tmp2,*tmp1);
+
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      const Dirac &dirac = *(param.matSmooth.Expose());
+      double kappa = param.matResidual.Expose()->Kappa();
+      dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+      dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+    } else {
+      param.matResidual(*tmp2,*tmp1);
+    }
+
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
 
