@@ -289,8 +289,13 @@ namespace quda {
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
       const Dirac &dirac = *(param.matSmooth.Expose());
       double kappa = param.matResidual.Expose()->Kappa();
-      dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
-      dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+      if (param.level==0) {
+	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+      } else { // this is a hack since the coarse Dslash doesn't proerly use the same xpay conventions yet
+	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+      }
     } else {
       param.matResidual(*tmp2,*tmp1);
     }
