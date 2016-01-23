@@ -55,6 +55,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __device__ __host__ inline void computeUV(Arg &arg, int parity, int x_cb) {
 
+    // only for preconditioned clover is V != AV
     auto &W = (dir == QUDA_FORWARDS) ? arg.V : arg.AV;
 
     int coord[5];
@@ -84,7 +85,9 @@ namespace quda {
 		  arg.U(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
 	      else
 		for (int s_col=0; s_col<fineSpin; s_col++) {
-		  arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += arg.U(dim, parity, x_cb, s, s_col, ic, jc) *
+		  // on the coarse lattice if forwards then use the forwards links
+		  arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) +=
+		    arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) *
 		    W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c);
 		} // which chiral block
 	    }  //Fine color columns
@@ -103,7 +106,10 @@ namespace quda {
 		arg.UV(parity, x_cb, s, ic, ic_c) += arg.U(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y_cb, s, jc, ic_c);
 	      else
 		for (int s_col=0; s_col<fineSpin; s_col++) {
-		  arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += arg.U(dim, parity, x_cb, s, s_col, ic, jc) * W((parity+1)&1, y_cb, s_col, jc, ic_c);
+		  // on the coarse lattice if forwards then use the forwards links
+		  arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) +=
+		    arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) *
+		    W((parity+1)&1, y_cb, s_col, jc, ic_c);
 		} // which chiral block
 	    }  //Fine color columns
 	  }  //Fine color rows
@@ -912,10 +918,13 @@ namespace quda {
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v);
 
     // If doing a preconditioned operator with a clover term then we
-    // have bi-directional links, though we can do the bidirectional setup for all operators for debug
+    // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
     bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug);
+    if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
+    else printfQuda("Doing uni-directional link coarsening\n");
 
-    // If doing prconditioned clover then we first multiply the
+
+    // If doing preconditioned clover then we first multiply the
     // null-space vectors by the clover inverse matrix, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
@@ -961,6 +970,7 @@ namespace quda {
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
     if ( !bidirectional_links ) {
+      printfQuda("Reversing links\n");
       y.setComputeType(COMPUTE_REVERSE_Y);  // reverse the links for the forwards direction
       y.apply(0);
     }
