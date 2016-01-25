@@ -186,6 +186,9 @@ namespace quda {
     /** Residual vector */
     ColorSpinorField *r;
 
+    /** Projected source vector for preconditioned syste, else just points to source */
+    ColorSpinorField *b_tilde;
+
     /** Coarse residual vector */
     ColorSpinorField *r_coarse;
 
@@ -279,7 +282,7 @@ namespace quda {
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa,
-		QudaMatPCType matpc=QUDA_MATPC_INVALID);
+		QudaDiracType dirac, QudaMatPCType matpc);
 
 
   /**
@@ -314,7 +317,7 @@ namespace quda {
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		      const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
-		      double kappa, QudaMatPCType matpc=QUDA_MATPC_INVALID);
+		      double kappa, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      This is an object that captures an entire MG preconditioner

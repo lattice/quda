@@ -135,6 +135,14 @@ namespace quda {
        */
       virtual ~FieldOrderCB() { ; }
 
+      void resetGhost(void * const *ghost_)
+      {
+	for (int d=0; d<4; d++) {
+	  ghost[2*d+0] = static_cast<complex<Float>*>(ghost_[2*d+0]);
+	  ghost[2*d+1] = static_cast<complex<Float>*>(ghost_[2*d+1]);
+	}
+      }
+
       /**
        * Read-only complex-member accessor function.  The last
        * parameter n is only used for indexed into the packed

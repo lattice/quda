@@ -64,6 +64,9 @@ namespace quda {
 				    param.matSmooth, param.matSmooth, profile);
     }
 
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
+      errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
+
     // create residual vectors
     {
       ColorSpinorParam csParam(*(param.B[0]));
@@ -78,6 +81,13 @@ namespace quda {
       }
       if(param.B[0]->Nspin() == 1)  csParam.gammaBasis = param.B[0]->GammaBasis();//We need this hack for staggered.
       r = ColorSpinorField::Create(csParam);
+
+      // if we're using preconditioning then allocate storate for the preconditioned source vector
+      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+	csParam.x[0] /= 2;
+	csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+	b_tilde = ColorSpinorField::Create(csParam);
+      }
     }
 
     // if not on the coarsest level, construct it
@@ -190,6 +200,7 @@ namespace quda {
     }
     if (presmoother) delete presmoother;
 
+    if (b_tilde && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) delete b_tilde;
     if (r) delete r;
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
@@ -291,7 +302,21 @@ namespace quda {
 
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
-    param.matResidual(*tmp2,*tmp1);
+
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      const Dirac &dirac = *(param.matSmooth.Expose());
+      double kappa = param.matResidual.Expose()->Kappa();
+      if (param.level==0) {
+	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+      } else { // this is a hack since the coarse Dslash doesn't proerly use the same xpay conventions yet
+	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+      }
+    } else {
+      param.matResidual(*tmp2,*tmp1);
+    }
+
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
 
@@ -346,12 +371,10 @@ namespace quda {
     if ( inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
-    if ( debug ) {
-      printfQuda("entering V-cycle with x2=%e, r2=%e\n", norm2(x), norm2(b));
-    }
+    if ( debug ) printfQuda("entering V-cycle with x2=%e, r2=%e\n", norm2(x), norm2(b));
 
     if (param.level < param.Nlevel-1) {
-      //transfer->setTransferGPU(false); // use this to force location of transfer
+      //transfer->setTransferGPU(false); // use this to force location of transfer (need to check if still works for multi-level)
       
       // do the pre smoothing
       if ( debug ) printfQuda("pre-smoothing b2=%e\n", norm2(b));
@@ -359,26 +382,31 @@ namespace quda {
       ColorSpinorField *out=nullptr, *in=nullptr;
 
       ColorSpinorField &residual = outer_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even();
+
+      // FIXME only need to make a copy if not preconditioning
       residual = b; // copy source vector since we will overwrite source with iterated residual
 
       const Dirac &dirac = *(param.matSmooth.Expose());
       dirac.prepare(in, out, x, residual, outer_solution_type);
+
+      // b_tilde holds either a copy of preconditioned source or a pointer to original source
+      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
+      else b_tilde = &b;
+
       (*presmoother)(*out, *in);
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
       dirac.reconstruct(solution, b, inner_solution_type);
 
-      double r2 = 0.0;
-
       // if using preconditioned smoother then need to reconstruct full residual
-      // FIXME extend this check for precision, etc.
-      // also need to extend this when residual operator is itself preconditioned
+      // FIXME extend this check for precision, Schwarz, etc.
       bool use_solver_residual =
 	( ((param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) && inner_solution_type == QUDA_MATPC_SOLUTION) ||
 	  (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION) )
 	? true : false;
 
       // FIXME this is currently borked if inner solver is preconditioned
+      double r2 = 0.0;
       if (use_solver_residual) {
 	if (debug) r2 = norm2(*r);
       } else {
@@ -389,28 +417,20 @@ namespace quda {
 
       // restrict to the coarse grid
       transfer->R(*r_coarse, residual);
-      if ( debug ) {
-	printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", 
-		   norm2(x), r2, norm2(*r_coarse));
-      }
+      if ( debug ) printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", norm2(x), r2, norm2(*r_coarse));
 
       // recurse to the next lower level
       (*coarse)(*x_coarse, *r_coarse);
 
       setOutputPrefix(prefix); // restore prefix after return from coarse grid
 
-      if ( debug ) {
-	printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", 
-		   norm2(*x_coarse), norm2(*r_coarse));
-      }
+      if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
 
       // prolongate back to this grid
-      residual = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
-      transfer->P(residual, *x_coarse); // repurpose residual storage
+      ColorSpinorField &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
+      transfer->P(x_coarse_2_fine, *x_coarse); // repurpose residual storage
 
-      // FIXME - sum should be done inside the transfer operator
-      xpy(residual, solution); // sum to solution
-
+      xpy(x_coarse_2_fine, solution); // sum to solution FIXME - sum should be done inside the transfer operator
       if ( debug ) {
 	printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
 	printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
@@ -418,11 +438,18 @@ namespace quda {
       }
 
       // do the post smoothing
-      residual = outer_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // refine for outer solution type
-      residual = b;
+      //residual = outer_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // refine for outer solution type
+      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+	in = b_tilde;
+      } else { // this incurs unecessary copying
+	*r = b;
+	in = r;
+      }
 
-      dirac.prepare(in, out, solution, residual, inner_solution_type);
-      (*postsmoother)(*out, *in);
+      //dirac.prepare(in, out, solution, residual, inner_solution_type);
+      // we should keep a copy of the prepared right hand side as we've already destroyed it
+      (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
+
       dirac.reconstruct(x, b, outer_solution_type);
 
     } else { // do the coarse grid solve
