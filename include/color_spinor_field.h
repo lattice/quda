@@ -30,13 +30,13 @@ namespace quda {
      int volume;       // volume of a single eigenvector
      int volumeCB;     // CB volume of a single eigenvector 
      int stride;       // stride of a single eigenvector
-     int real_length;  // physical length of a single eigenvector
-     int length;       // length including pads (but not ghost zones)
+     size_t real_length;  // physical length of a single eigenvector
+     size_t length;       // length including pads (but not ghost zones)
 
-     int total_length;
-     int total_norm_length;
-     int ghost_length;
-     int ghost_norm_length;
+     size_t total_length;
+     size_t total_norm_length;
+     size_t ghost_length;
+     size_t ghost_norm_length;
  
      size_t bytes;      // size in bytes of spinor field
      size_t norm_bytes; // makes no sense but let's keep it...
@@ -377,13 +377,13 @@ namespace quda {
     int ComponentVolume() const { return composite_descr.volume; }
     int ComponentVolumeCB() const { return composite_descr.volumeCB; }
     int ComponentStride() const { return composite_descr.stride; }
-    int ComponentLength() const { return composite_descr.length; }
-    int ComponentRealLength() const { return composite_descr.real_length; } 
-    int ComponentTotalLength() const { return composite_descr.total_length; }
+    size_t ComponentLength() const { return composite_descr.length; }
+    size_t ComponentRealLength() const { return composite_descr.real_length; } 
+    size_t ComponentTotalLength() const { return composite_descr.total_length; }
  
     size_t ComponentBytes() const { return composite_descr.bytes; }
     size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
-    int    ComponentGhostLength() const { return composite_descr.ghost_length; }
+    size_t    ComponentGhostLength() const { return composite_descr.ghost_length; }
 
 
     QudaDWFPCType DWFPCtype() const { return PCtype; }

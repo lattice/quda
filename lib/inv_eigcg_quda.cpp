@@ -600,6 +600,7 @@ namespace quda {
          //Restart search space :
          int cldn = Vm->ComponentTotalLength() >> 1; //complex leading dimension
          int clen = Vm->ComponentLength()      >> 1; //complex vector length
+         if(Vm->SiteSubset() != QUDA_PARITY_SITE_SUBSET) clen += Vm->ComponentGhostLength() >> 1;
          //
          int _2nev = eigcg_args->RestartVm(Vm->V(), cldn, clen, Vm->Precision());
 
@@ -704,7 +705,7 @@ namespace quda {
   {
     printfQuda("\nCreate deflation space...\n");
 
-    if(eigcgSpinor.SiteSubset() != QUDA_PARITY_SITE_SUBSET) errorQuda("\nRitz spinors must be parity spinors\n");//or adjust it
+    //if(eigcgSpinor.SiteSubset() != QUDA_PARITY_SITE_SUBSET) errorQuda("\nRitz spinors must be parity spinors\n");//or adjust it
 
     ColorSpinorParam cudaEigvParam(eigcgSpinor);
 

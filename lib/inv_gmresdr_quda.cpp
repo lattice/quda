@@ -406,6 +406,7 @@ namespace quda {
 
    int cldn = Vm->ComponentTotalLength() >> 1; //complex leading dimension
    int clen = Vm->ComponentLength()      >> 1; //complex vector length
+   if(Vm->SiteSubset() != QUDA_PARITY_SITE_SUBSET) clen += Vm->ComponentGhostLength() >> 1;
 
    for(int j = 0; j <= m; j++) //row index
    {
