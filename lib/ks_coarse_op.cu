@@ -7,8 +7,9 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 
-#include <coarse_op.cuh> //remove it!
+#include <gamma.cuh> //temporary header
 #include <blas_magma.h>
+#include <coarse_op.cuh> //remove it!
 
 namespace quda {
 
