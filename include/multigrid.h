@@ -186,6 +186,9 @@ namespace quda {
     /** Residual vector */
     ColorSpinorField *r;
 
+    /** Projected source vector for preconditioned syste, else just points to source */
+    ColorSpinorField *b_tilde;
+
     /** Coarse residual vector */
     ColorSpinorField *r_coarse;
 
