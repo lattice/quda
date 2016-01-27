@@ -540,6 +540,9 @@ namespace quda {
 
    Vm = new cudaColorSpinorFieldSet(csParam); //search space for Ritz vectors
 
+   csParam.is_composite  = false;
+   csParam.composite_dim = 0;
+
    checkCudaError();
 
    printfQuda("\n..done.\n");
