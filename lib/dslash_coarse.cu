@@ -311,7 +311,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 	  if (param.block.z <= 2 * 2 * (Nc/Mc) && param.block.z <= 64 ) { //
 	    return true;
 	  } else { // we have run off the end so let's reset
-	    param.block.z = 1;
+	    param.block.z = 2;
 	    param.grid.z = 2 * (Nc/Mc);
 	    return false;
 	  }
