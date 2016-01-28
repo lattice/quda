@@ -33,7 +33,6 @@ struct ReductionArg : public ReduceArg<ReduceType> {
 template <int block_size, typename ReduceType, typename ReduceSimpleType, 
 	  typename FloatN, int M, typename SpinorX, typename SpinorY, 
 	  typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
-__launch_bounds__(block_size)
 __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
   unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
