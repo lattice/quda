@@ -1,8 +1,6 @@
-#ifdef SSTEP
-
 template <int N, typename ReduceType, typename SpinorX, typename SpinorY, 
          typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
-struct MultiReduceArg {
+  struct MultiReduceArg : public ReduceArg<ReduceType> {
   
   SpinorX X[N];
   SpinorY Y[N];
@@ -10,11 +8,8 @@ struct MultiReduceArg {
   SpinorW W[N];
   SpinorV V[N];
   Reducer r;
-  ReduceType *partial;
-  ReduceType *complete;
   const int length;
-  MultiReduceArg(SpinorX X[N], SpinorY Y[N], SpinorZ Z[N], SpinorW W[N], SpinorV V[N],
-                 Reducer r, ReduceType *partial, ReduceType *complete, int length)
+  MultiReduceArg(SpinorX X[N], SpinorY Y[N], SpinorZ Z[N], SpinorW W[N], SpinorV V[N], Reducer r, int length)
     : r(r), length(length){
     
     for(int i=0; i<N; ++i){
@@ -23,8 +18,6 @@ struct MultiReduceArg {
       this->Z[i]         = Z[i];
       this->W[i]         = W[i];
       this->V[i]         = V[i];
-      this->partial      = partial;
-      this->complete     = complete;
     }
   }
 };
@@ -33,17 +26,12 @@ struct MultiReduceArg {
 template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
   typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg){
-  
     unsigned int tid = threadIdx.x;
     unsigned int gridSize = gridDim.x*blockDim.x;
-    
-
     ReduceType sum[N];
 
-    
-
     for(int i=0; i<N; ++i){
-      zero(sum[i]);
+      ::quda::zero(sum[i]);
       unsigned int id = blockIdx.x*(blockDim.x) + threadIdx.x;
       FloatN x[M], y[M], z[M], w[M], v[M];
       while(id < arg.length){
@@ -53,15 +41,13 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
         arg.Z[i].load(z, id);
         arg.W[i].load(w, id);
         arg.V[i].load(v, id);
-#if (__COMPUTE_CAPABILITY__ >= 200)
         arg.r.pre();
-#endif
+
 #pragma unroll
         for (int j=0; j<M; j++) arg.r(sum[i], x[j], y[j], z[j], w[j], v[j]);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
         arg.r.post(sum[i]);
-#endif
+
         arg.X[i].save(x, id);
         arg.Y[i].save(y, id);
         arg.Z[i].save(z, id);
@@ -72,71 +58,11 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
       } // loop over id
     } // loop over i
 
-
-
-    extern __shared__ ReduceSimpleType sdata[];
-    ReduceSimpleType *s = sdata + tid;
-
-    // Copy data into shared memory
-    for(int i=0; i<N; ++i){
-      if(tid >= warpSize) copytoshared(s, 0, sum[i], block_size);
-      __syncthreads;
-
-      // now reduce using the first warp only
-      if(tid < warpSize){
-        for(int j=warpSize; j<block_size; j+=warpSize) add<ReduceType>(sum[i], s, j, block_size);
-        warpReduce<block_size>(s, sum[i]);
-
-        // write result for this block to global memory
-        if(tid == 0){
-          ReduceType tmp;
-          copyfromshared(tmp, s, 0, block_size);
-          arg.partial[i*gridDim.x + blockIdx.x] = tmp;
-        }
-      } 
-    } // loop over i
-
-    if(tid==0){ 
-       __threadfence(); // flush result
-      unsigned int value = atomicInc(&count, gridDim.x);
-
-      isLastBlockDone = (value == (gridDim.x-1));
+    for (int i=0; i<N; ++i) {
+      if ( i>0 ) __syncthreads();
+      ::quda::reduce<block_size, ReduceType>(arg, sum[i], i);
     }
-    __syncthreads();
 
-
-    // Finish the reduction if last block
-    if(isLastBlockDone){
-      for(int i=0; i<N; ++i){
-       unsigned int id = threadIdx.x;
-
-        zero(sum[i]); 
-        while(id < gridDim.x){
-          sum[i] += arg.partial[i*gridDim.x + id]; 
-          id += block_size;
-        }
-      } // loop over i
-
-      extern __shared__ ReduceSimpleType sdata[];
-      ReduceSimpleType *s = sdata + tid;
-
-      for(int i=0; i<N; ++i){
-        if(tid >= warpSize) copytoshared(s, 0, sum[i], block_size);
-        __syncthreads();
-
-        if(tid < warpSize){
-          for(int j=warpSize; j<block_size; j+=warpSize){ add<ReduceType>(sum[i], s, j, block_size); }
-          warpReduce<block_size>(s, sum[i]);
-
-          if(tid == 0){
-            ReduceType tmp;
-            copyfromshared(tmp, s, 0, block_size);
-            arg.complete[i] = tmp;
-          }
-        }
-      } // loop over i
-      if(threadIdx.x == 0) count = 0;
-    } // isLastBlockDone
   } // multiReduceKernel
 
 template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN,
@@ -158,11 +84,9 @@ void multiReduceLaunch(doubleN result[],
 #endif
   { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType)*N, cudaMemcpyDeviceToHost); }
 
-  memset(result, 0, N*sizeof(doubleN));
-  for(int i=0; i<N; ++i) result[i] += ((ReduceType*)h_reduce)[i]; // Need to check this
+  for(int i=0; i<N; ++i) result[i] = set(((ReduceType*)h_reduce)[i]);
   
   const int Nreduce = N*(sizeof(doubleN)/sizeof(double));
-
   reduceDoubleArray((double*)result, Nreduce);
 }
 
@@ -204,7 +128,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
     public:
       MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], 
           SpinorZ Z[], SpinorW W[], SpinorV V[], Reducer &r, int length) :
-        arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, length), result(result) {
+        arg(X, Y, Z, W, V, r, length), result(result) {
             for(int i=0; i<N; ++i){
               X_h[i] = 0;
               Y_h[i] = 0;
@@ -223,20 +147,16 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
       virtual ~MultiReduceCuda(){}
 
       inline TuneKey tuneKey() const {
-        return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_str);
+        return TuneKey(blasStrings.vol_str, typeid(*this).name(), blasStrings.aux_str);
       }
 
       void apply(const cudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         multiReduceLaunch<N,doubleN,ReduceType,ReduceSimpleType,FloatN,M>(result,arg,tp,stream);
-
       }
-
 
 #define BYTES(X) ( arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride() )
 #define NORM_BYTES(X) ( (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0 )
-
-
 
       void preTune() {
         for(int i=0; i<N; ++i){
@@ -379,7 +299,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
           Spinor<double2, double2, double2, M, writeZ>, Spinor<double2, double2, double2, M, writeW>,
           Spinor<double2, double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
             reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
-        reduce.apply(*getBlasStream());
+        reduce.apply(*blas::getStream());
 
         
 
@@ -409,7 +329,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
             reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
 
         
-        reduce.apply(*getBlasStream());
+        reduce.apply(*blas::getStream());
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
 
     }else if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
@@ -437,7 +357,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float4,float4,float4,M,writeZ>, Spinor<float4,float4,float4,M,writeW>,
 	  Spinor<float4,float4,float4,M,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(4*M));
-	reduce.apply(*getBlasStream());
+	reduce.apply(*blas::getStream());
       }else if(x[0]->Nspin() == 1){ // staggered
 
 	const int M = siteUnroll ? 3 : 1; 
@@ -462,7 +382,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float2,float2,float2,M,writeZ>, Spinor<float2,float2,float2,M,writeW>,
 	  Spinor<float2,float2,float2,M,writeV>, Reducer<ReduceType, float2, float2> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
-	reduce.apply(*getBlasStream());
+	reduce.apply(*blas::getStream());
       }
     }else{ // half precision
       if(x[0]->Nspin() == 4){ // wilson
@@ -486,7 +406,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float4,float4,short4,6,writeZ>, Spinor<float4,float4,short4,6,writeW>,
 	  Spinor<float4,float4,short4,6,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
-	reduce.apply(*getBlasStream());	  
+	reduce.apply(*blas::getStream());	  
       }else if(x[0]->Nspin() == 1){ // staggered
         Spinor<float2,float2,short2,3,writeX> X[N];
 	Spinor<float2,float2,short2,3,writeY> Y[N];
@@ -508,17 +428,15 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float2,float2,short2,3,writeZ>, Spinor<float2,float2,short2,3,writeW>,
 	  Spinor<float2,float2,short2,3,writeV>, Reducer<ReduceType, float2, float2> >
 	  reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
-	reduce.apply(*getBlasStream());
+	reduce.apply(*blas::getStream());
 
       }else{ errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
     }
 
     for(int i=0; i<N; ++i){
-      blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x[i]->RealLength()*x[i]->Precision();
-      blas_flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x[i]->RealLength();
+      blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x[i]->RealLength()*x[i]->Precision();
+      blas::flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x[i]->RealLength();
     }
     checkCudaError();
     return;
   }
-
-#endif // SSTEP

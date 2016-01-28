@@ -185,21 +185,13 @@ int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDi
 if (sid >= param.threads*param.Ls) return;
 
 int dim;
-int face_num;
 int face_idx;
 int Y[4] = {X1,X2,X3,X4};
-int faceVolume[4];
-faceVolume[0] = (X2*X3*X4)>>1;
-faceVolume[1] = (X1*X3*X4)>>1;
-faceVolume[2] = (X1*X2*X4)>>1;
-faceVolume[3] = (X1*X2*X3)>>1;
 
 
 
 
-int boundaryCrossing;
-
-int X, x1, x2, x3, x4, xs;
+int x1, x2, x3, x4, xs;
 
 { // exterior kernel
 
@@ -228,11 +220,6 @@ coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, 
 }
 
 
-
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
 
 READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
  o00_re = i00_re; o00_im = i00_im;

@@ -25,17 +25,10 @@
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
-#elif (__COMPUTE_CAPABILITY__ >= 200)
+#else // fermi
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#else
-#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-//#define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
@@ -56,6 +49,7 @@ namespace quda {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
+#include <io_spinor.h>
 
 #include <tm_core.h>              // solo twisted mass kernel
 #include <tmc_core.h>              // solo twisted mass kernel
@@ -103,6 +97,11 @@ namespace quda {
     cudaEvent_t scatterEnd[Nstream];
     cudaEvent_t dslashStart;
     cudaEvent_t dslashEnd;
+
+
+    // FIX this is a hack from hell
+    // Auxiliary work that can be done while waiting on comms to finis
+    Worker *aux_worker;
   }
 
   void createDslashEvents()
@@ -121,6 +120,8 @@ namespace quda {
 #ifdef PTHREADS
     cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
 #endif
+
+    aux_worker = NULL;
 
     checkCudaError();
   }
@@ -147,6 +148,104 @@ namespace quda {
   }
 
   using namespace dslash_aux;
+
+#include <gamma5.h>		// g5 kernel
+  
+  /**
+     Class for the gamma5 kernels, sFloat is the typename of the spinor components (double2, float4...)
+  */
+
+  template <typename sFloat>
+  class Gamma5Cuda : public Tunable {
+    
+  private:
+    cudaColorSpinorField *out;		//Output spinor
+    const cudaColorSpinorField *in;		//Input spinor
+    
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
+    
+    char *saveOut, *saveOutNorm;
+    
+  public:
+    Gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in) :
+      out(out), in(in) { bindSpinorTex<sFloat>(in, out); strcpy(aux,"gamma5");}
+    
+    virtual ~Gamma5Cuda() { unbindSpinorTex<sFloat>(in, out); }
+    
+    TuneKey tuneKey() const
+    {
+      return TuneKey(in->VolString(), typeid(*this).name());
+    }
+    
+    void apply(const cudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      gamma5Kernel<<<tp.grid, tp.block, tp.shared_bytes>>> ((sFloat*)out->V(), (float*)out->Norm(), (sFloat*)in->V(), (float*)in->Norm(), dslashParam, in->Stride());
+    }
+    
+    void preTune()
+    {
+      saveOut = new char[out->Bytes()];
+      cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
+
+      if (typeid(sFloat) == typeid(short4))
+	{
+	  saveOutNorm = new char[out->NormBytes()];
+	  cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
+	}
+    }
+    
+    void postTune()
+    {
+      cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      
+      if (typeid(sFloat) == typeid(short4))
+	{
+	  cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
+	  delete[] saveOutNorm;
+	}
+    }
+    
+    std::string paramString(const TuneParam &param) const
+    {
+      std::stringstream ps;
+      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+      ps << "shared=" << param.shared_bytes;
+      return ps.str();
+    }
+    
+    long long flops() const { return 12ll * in->VolumeCB(); }
+    long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
+  };
+
+  /**
+     Applies a gamma5 matrix to a spinor, this is the function to be called in interfaces and it requires only
+     pointers to the output spinor (out) and the input spinor (in), in that order
+  */
+
+  void gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in)
+  {
+    dslashParam.threads = in->Volume();
+
+    Tunable *gamma5 = 0;
+
+    if (in->Precision() == QUDA_DOUBLE_PRECISION) {
+      gamma5 = new Gamma5Cuda<double2>(out, in);
+    } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+      gamma5 = new Gamma5Cuda<float4>(out, in);
+    } else if (in->Precision() == QUDA_HALF_PRECISION) {
+      errorQuda("Half precision not supported for gamma5 kernel yet");
+    }
+
+    gamma5->apply(streams[Nstream-1]);
+    checkCudaError();
+
+    delete gamma5;
+  }
 
 template <typename sFloat, typename cFloat>
 class CloverCuda : public Tunable {
@@ -241,11 +340,7 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
     errorQuda("Mixing clover and spinor precision not supported");
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     clov = new CloverCuda<double2, double2>(out, (double2*)cloverP, (float*)cloverNormP, clover.stride, in);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
     clov = new CloverCuda<float4, float4>(out, (float4*)cloverP, (float*)cloverNormP, clover.stride, in);
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
@@ -365,11 +460,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
   Tunable *twistGamma5 = 0;
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     twistGamma5 = new TwistGamma5Cuda<double2>(out, in, kappa, mu, epsilon, dagger, twist);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
     twistGamma5 = new TwistGamma5Cuda<float4>(out, in, kappa, mu, epsilon, dagger, twist);
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
@@ -385,7 +476,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 #endif // GPU_TWISTED_MASS_DIRAC
 }
 
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
+#if defined(GPU_TWISTED_CLOVER_DIRAC)
 #include "dslash_core/tmc_gamma_core.h"
 #endif
 
@@ -408,12 +499,13 @@ class TwistCloverGamma5Cuda : public Tunable {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
     char *saveOut, *saveOutNorm;
+    char aux_string[TuneKey::aux_n];
 
   public:
     TwistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
         double kappa, double mu, double epsilon, const int dagger, QudaTwistGamma5Type tw,
 			  cFloat *clov, const float *cN, cFloat *clovInv, const float *cN2, int cl_stride) :
-      out(out), in(in)
+      clover(clov), cNorm(cN), cloverInv(clovInv), cNrm2(cN2), twist(tw), out(out), in(in)
   {
     bindSpinorTex<sFloat>(in);
     dslashParam.sp_stride = in->Stride();
@@ -421,29 +513,31 @@ class TwistCloverGamma5Cuda : public Tunable {
     dslashParam.cl_stride = cl_stride;
     dslashParam.fl_stride = in->VolumeCB();
 #endif
-    twist = tw;
-    clover = clov;
-    cNorm = cN;
-    cloverInv = clovInv;
-    cNrm2 = cN2;
 
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
       setTwistParam(a, b, kappa, mu, dagger, tw);
     else{//twist doublet
       errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
     } 
+
+    strcpy(aux_string,in->AuxString());
+    if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+      strcat(aux_string,",direct");
+    } else {
+      strcat(aux_string,",inverse");
+    }
   }
     virtual ~TwistCloverGamma5Cuda() {
       unbindSpinorTex<sFloat>(in);    
     }
 
     TuneKey tuneKey() const {
-      return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString());
+      return TuneKey(in->VolString(), typeid(*this).name(), aux_string);
     }  
 
     void apply(const cudaStream_t &stream)
     {
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
+#if defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)
@@ -509,17 +603,15 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
   if (in->Precision() != clover_prec)
     errorQuda("ERROR: Clover precision and spinor precision do not match\n");
 
+#ifndef DYNAMIC_CLOVER
   if (clov->stride != clovInv->stride) 
     errorQuda("clover and cloverInv must have matching strides (%d != %d)", clov->stride, clovInv->stride);
+#endif
     
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     tmClovGamma5 = new TwistCloverGamma5Cuda<double2,double2>
       (out, in, kappa, mu, epsilon, dagger, twist, (double2 *) clover, (float *) cNorm, (double2 *) cloverInv, (float *) cNorm2, clov->stride);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
     tmClovGamma5 = new TwistCloverGamma5Cuda<float4,float4>
       (out, in, kappa, mu, epsilon, dagger, twist, (float4 *) clover, (float *) cNorm, (float4 *) cloverInv, (float *) cNorm2, clov->stride);
@@ -540,6 +632,4 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
 
 } // namespace quda
 
-#ifdef GPU_CONTRACT
 #include "contract.cu"
-#endif

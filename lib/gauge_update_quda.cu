@@ -107,25 +107,6 @@ namespace quda {
     q(8) = y31*conj(wl31) + y32*conj(wl32) + y33*conj(wl33);
   }
 
-  /**
-     Direct port of TIFR vmcm2 routine
-     Vector matrix multiply: b = (a^\dag).b
-  */
-  template <typename complex, typename Cmplx>
-  __device__ __host__ void vmcm2(Matrix<Cmplx,3> a, Matrix<Cmplx,3> &b) {
-    complex c[9];
-    c[0] = conj(a(0))*b(0)+conj(a(1))*b(1) + conj(a(2))*b(2);
-    c[3] = conj(a(0))*b(3)+conj(a(1))*b(4) + conj(a(2))*b(5);
-    c[6] = conj(a(0))*b(6)+conj(a(1))*b(7) + conj(a(2))*b(8);
-    c[1] = conj(a(3))*b(0)+conj(a(4))*b(1) + conj(a(5))*b(2);
-    c[4] = conj(a(3))*b(3)+conj(a(4))*b(4) + conj(a(5))*b(5);
-    c[7] = conj(a(3))*b(6)+conj(a(4))*b(7) + conj(a(5))*b(8);
-    c[2] = conj(a(6))*b(0)+conj(a(7))*b(1) + conj(a(8))*b(2);
-    c[5] = conj(a(6))*b(3)+conj(a(7))*b(4) + conj(a(8))*b(5);
-    c[8] = conj(a(6))*b(6)+conj(a(7))*b(7) + conj(a(8))*b(8);
-    for (int i=0; i<9; i++) b(i) = c[i];
-  }
-
   template<typename Cmplx, typename Gauge, typename Mom, int N, 
 	   bool conj_mom, bool exact>
   __device__ __host__  void updateGaugeFieldCompute
@@ -161,7 +142,6 @@ namespace quda {
 	  link = mom * link;
 	} else {
 	  link = conj(mom) * link;
-	  //vmcm2<complex<real> >(mom, link);
 	}
 
 	result = link;
@@ -221,13 +201,9 @@ namespace quda {
     
     void apply(const cudaStream_t &stream){
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-#if __COMPUTE_CAPABILITY__ >= 200
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	updateGaugeFieldKernel<Complex,Gauge,Mom,N,conj_mom,exact>
 	  <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
-	errorQuda("Not supported on pre-Fermi architecture");
-#endif
       } else { // run the CPU code
 	updateGaugeField<Complex,Gauge,Mom,N,conj_mom,exact>(arg);
       }
@@ -289,12 +265,12 @@ namespace quda {
     if (mom.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (mom.Reconstruct() == QUDA_RECONSTRUCT_10) {
 	// FIX ME - 11 is a misnomer to avoid confusion in template instantiation
-	updateGaugeField<Float>(out, in, FloatNOrder<Float,18,2,11>(mom), dt, mom, conj_mom, exact, location);
+	updateGaugeField<Float>(out, in, gauge::FloatNOrder<Float,18,2,11>(mom), dt, mom, conj_mom, exact, location);
       } else {
 	errorQuda("Reconstruction type not supported");
       }
     } else if (mom.Order() == QUDA_MILC_GAUGE_ORDER) {
-      updateGaugeField<Float>(out, in, MILCOrder<Float,10>(mom), dt, mom, conj_mom, exact, location);
+      updateGaugeField<Float>(out, in, gauge::MILCOrder<Float,10>(mom), dt, mom, conj_mom, exact, location);
     } else {
       errorQuda("Gauge Field order %d not supported", mom.Order());
     }
@@ -314,29 +290,19 @@ namespace quda {
       errorQuda("Input and output gauge field ordering and reconstruction must match");
     }
 
-    if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (out.isNative()) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	updateGaugeField<Float>(FloatNOrder<Float, Nc*Nc*2, 2, 18>(out),
-				FloatNOrder<Float, Nc*Nc*2, 2, 18>(in), 
-				mom, dt, conj_mom, exact, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	updateGaugeField<Float>(G(out),G(in), mom, dt, conj_mom, exact, location);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	updateGaugeField<Float>(FloatNOrder<Float, Nc*Nc*2, 2, 12>(out),
-				FloatNOrder<Float, Nc*Nc*2, 2, 12>(in), 
-				mom, dt, conj_mom, exact, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+	updateGaugeField<Float>(G(out), G(in), mom, dt, conj_mom, exact, location);
       } else {
 	errorQuda("Reconstruction type not supported");
       }
-    } else if (out.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	updateGaugeField<Float>(FloatNOrder<Float, Nc*Nc*2, 4, 12>(out),
-				FloatNOrder<Float, Nc*Nc*2, 4, 12>(in), 
-				mom, dt, conj_mom, exact,  location);
-      } else {
-	errorQuda("Reconstruction type %d not supported", out.Order());
-      }
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
-      updateGaugeField<Float>(MILCOrder<Float, Nc*Nc*2>(out),
-			      MILCOrder<Float, Nc*Nc*2>(in), 
+      updateGaugeField<Float>(gauge::MILCOrder<Float, Nc*Nc*2>(out),
+			      gauge::MILCOrder<Float, Nc*Nc*2>(in), 
 			      mom, dt, conj_mom, exact, location);
     } else {
       errorQuda("Gauge Field order %d not supported", out.Order());

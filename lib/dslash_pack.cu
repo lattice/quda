@@ -148,13 +148,11 @@ namespace quda {
 						     const int &face_idx, const int &face_volume, 
 						     PackParam<double2> &param)
   {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif // (__COMPUTE_CAPABILITY__ >= 130)
   }
 
   template <int dim, int dagger, int face_num>
@@ -163,13 +161,11 @@ namespace quda {
 						       const int &face_idx, const int &face_volume, 
 						       PackParam<double2> &param)
   {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     if (dagger) {
 #include "wilson_pack_face_dagger_core.h"
     } else {
 #include "wilson_pack_face_core.h"
     }
-#endif // (__COMPUTE_CAPABILITY__ >= 130)
   }
 
 #undef READ_SPINOR
@@ -531,13 +527,11 @@ namespace quda {
 							    const int &face_idx, const int &face_volume, 
 							    PackParam<double2> &param)
   {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     if (dagger) {
 #include "wilson_pack_twisted_face_dagger_core.h"
     } else {
 #include "wilson_pack_twisted_face_core.h"
     }
-#endif // (__COMPUTE_CAPABILITY__ >= 130)
   }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
@@ -789,6 +783,16 @@ namespace quda {
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
       if (getKernelPackT() || getTwistPack()) { strcat(aux,",kernelPackT"); }
+      switch (nFace) {
+      case 1:
+	strcat(aux,",nFace=1");
+	break;
+      case 3:
+	strcat(aux,",nFace=3");
+	break;
+      default:
+	errorQuda("Number of faces not supported");
+      }
     }
 
   public:
@@ -875,7 +879,9 @@ namespace quda {
         pack.apply(stream);
       }
       break;
-    }  
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
+    }
   }
 
   template <typename FloatN, typename Float>
@@ -935,7 +941,9 @@ namespace quda {
         pack.apply(stream);
       }
       break;
-    }  
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
+    }
   }
 
 #ifdef GPU_STAGGERED_DIRAC
@@ -991,7 +999,6 @@ namespace quda {
 
 
 #else
-#if __COMPUTE_CAPABILITY__ >= 130
   __device__ void packFaceStaggeredCore(double2 *out, float *outNorm, const int out_idx, 
 					const int out_stride, const double2 *in, const float *inNorm, 
 					const int in_idx, const PackParam<double2> &param) {
@@ -999,7 +1006,7 @@ namespace quda {
     out[out_idx + 1*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx + 1*param.sp_stride);
     out[out_idx + 2*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx + 2*param.sp_stride);
   }	
-#endif
+
   __device__ void packFaceStaggeredCore(float2 *out, float *outNorm, const int out_idx, 
 					const int out_stride, const float2 *in, 
 					const float *inNorm, const int in_idx, 
@@ -1330,10 +1337,8 @@ namespace quda {
     switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
-#if __COMPUTE_CAPABILITY__ >= 130
         PackFaceStaggered<double2, double> pack((double2*)ghost_buf, &in, nFace, dagger, parity, dim, face_num);
         pack.apply(stream);
-#endif
       }
       break;
     case QUDA_SINGLE_PRECISION:
@@ -1348,7 +1353,9 @@ namespace quda {
         pack.apply(stream);
       }
       break;
-    }  
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
+    }
   }
 
   void packFaceExtendedStaggered(void *buffer, cudaColorSpinorField &field, const int nFace, const int R[],
@@ -1357,10 +1364,8 @@ namespace quda {
     switch(field.Precision()){
     case QUDA_DOUBLE_PRECISION:
       {
-#if __COMPUTE_CAPABILITY__ >= 130
         PackFaceStaggered<double2,double> pack(static_cast<double2*>(buffer), &field, nFace, dagger, parity, dim, face_num, R, unpack);
         pack.apply(stream);  
-#endif
       }
       break;
     case QUDA_SINGLE_PRECISION:
@@ -1375,7 +1380,8 @@ namespace quda {
         pack.apply(stream);  
       }
       break;
-
+    default:
+      errorQuda("Precision %d not supported", field.Precision());
     } // switch(field.Precision())
   }
 
@@ -1610,7 +1616,9 @@ namespace quda {
 	    pack.apply(stream);
 	  }
 	  break;
-	}  
+	default:
+	  errorQuda("Precision %d not supported", in.Precision());
+	}
       }
     else
       {
@@ -1633,7 +1641,9 @@ namespace quda {
 	    pack.apply(stream);
 	  }
 	  break;
-	}  
+	default:
+	  errorQuda("Precision %d not supported", in.Precision());
+	}
       }
   }
 
@@ -1761,6 +1771,8 @@ namespace quda {
         pack.apply(stream);
       }
       break;
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
     } 
   }
 

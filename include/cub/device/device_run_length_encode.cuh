@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,8 +37,8 @@
 #include <stdio.h>
 #include <iterator>
 
-#include "dispatch/device_rle_dispatch.cuh"
-#include "dispatch/device_reduce_by_key_dispatch.cuh"
+#include "dispatch/dispatch_rle.cuh"
+#include "dispatch/dispatch_reduce_by_key.cuh"
 #include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -147,7 +147,7 @@ struct DeviceRunLengthEncode
         typename                    NumRunsOutputIteratorT>
     CUB_RUNTIME_FUNCTION __forceinline__
     static cudaError_t Encode(
-        void                        *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of keys
         UniqueOutputIteratorT       d_unique_out,                   ///< [out] Pointer to the output sequence of unique keys (one key per run)
@@ -172,7 +172,7 @@ struct DeviceRunLengthEncode
         Value one_val;
         one_val = 1;
 
-        return DeviceReduceByKeyDispatch<InputIteratorT, UniqueOutputIteratorT, LengthsInputIteratorT, LengthsOutputIteratorT, NumRunsOutputIteratorT, EqualityOp, ReductionOp, OffsetT>::Dispatch(
+        return DispatchReduceByKey<InputIteratorT, UniqueOutputIteratorT, LengthsInputIteratorT, LengthsOutputIteratorT, NumRunsOutputIteratorT, EqualityOp, ReductionOp, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_in,
@@ -245,7 +245,7 @@ struct DeviceRunLengthEncode
         typename                NumRunsOutputIteratorT>
     CUB_RUNTIME_FUNCTION __forceinline__
     static cudaError_t NonTrivialRuns(
-        void                    *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                  &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT          d_in,                           ///< [in] Pointer to input sequence of data items
         OffsetsOutputIteratorT  d_offsets_out,                  ///< [out] Pointer to output sequence of run-offsets (one offset per non-trivial run)

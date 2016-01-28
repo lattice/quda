@@ -42,7 +42,6 @@ __device__ double2 operator*(const double &x, const double2 &y)
 #define SPINORTEX spinorTexDouble
 #endif
 
-#if (__COMPUTE_CAPABILITY__ >= 130)
 __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, 
 				  const double2 *in, const float *null2, DslashParam param)
 {
@@ -474,8 +473,6 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, const double a, 
     
 #endif
 }
-
-#endif // (__COMPUTE_CAPABILITY__ >= 130)
 
 #undef tmp0_re
 #undef tmp0_im

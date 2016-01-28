@@ -18,7 +18,7 @@ namespace quda {
   DiracDomainWall4DPC::DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac) 
     : DiracDomainWallPC(dirac)
   {
-    domainwall4d::initConstants(dirac.gauge, profile);
+    domainwall4d::initConstants(*dirac.gauge, profile);
   }
 
   DiracDomainWall4DPC::~DiracDomainWall4DPC()
@@ -36,7 +36,7 @@ namespace quda {
   }
 
 // Modification for the 4D preconditioned domain wall operator
-  void DiracDomainWall4DPC::Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void DiracDomainWall4DPC::Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
                             const QudaParity parity) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
@@ -45,12 +45,14 @@ namespace quda {
  
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
+    domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			 &static_cast<const cudaColorSpinorField&>(in),
+			 parity, dagger, 0, mass, 0, commDim, 0, profile);   
 
     flops += 1320LL*(long long)in.Volume();
   }
 
-  void DiracDomainWall4DPC::Dslash5(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void DiracDomainWall4DPC::Dslash5(ColorSpinorField &out, const ColorSpinorField &in, 
                             const QudaParity parity) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
@@ -59,7 +61,9 @@ namespace quda {
  
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
+    domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			 &static_cast<const cudaColorSpinorField&>(in),
+			 parity, dagger, 0, mass, 0, commDim, 1, profile);   
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -67,8 +71,8 @@ namespace quda {
     flops += 96LL*bulk + 120LL*wall;
   }
 
-  void DiracDomainWall4DPC::Dslash5inv(cudaColorSpinorField &out, const cudaColorSpinorField &in, \
-                            const QudaParity parity, const double &k) const
+  void DiracDomainWall4DPC::Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, \
+				       const QudaParity parity, const double &k) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
@@ -76,17 +80,19 @@ namespace quda {
     checkSpinorAlias(in, out);
  
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			 &static_cast<const cudaColorSpinorField&>(in),
+			 parity, dagger, 0, mass, k, commDim, 2, profile);   
 
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 2, profile);   
-
+  
     long long Ls = in.X(4);
     flops +=  144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
   }
 
   // Modification for the 4D preconditioned domain wall operator
-  void DiracDomainWall4DPC::Dslash4Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				   const QudaParity parity, const cudaColorSpinorField &x,
-				   const double &k) const
+  void DiracDomainWall4DPC::Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
+					const QudaParity parity, const ColorSpinorField &x,
+					const double &k) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
@@ -94,24 +100,28 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
-
+    domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			 &static_cast<const cudaColorSpinorField&>(in),
+			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
+			 mass, k, commDim, 0, profile);
+    
     flops += (1320LL+48LL)*(long long)in.Volume();
   }
   
-  void DiracDomainWall4DPC::Dslash5Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				   const QudaParity parity, const cudaColorSpinorField &x,
-				   const double &k) const
+  void DiracDomainWall4DPC::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
+					const QudaParity parity, const ColorSpinorField &x,
+					const double &k) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 1, profile);
-
+    domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			 &static_cast<const cudaColorSpinorField&>(in),
+			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
+			 mass, k, commDim, 1, profile);
+    
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
     long long wall = 2*in.Volume()/Ls;
@@ -119,7 +129,7 @@ namespace quda {
   }
 
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator
-  void DiracDomainWall4DPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracDomainWall4DPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     double kappa2 = -kappa5*kappa5;
@@ -145,7 +155,7 @@ namespace quda {
     deleteTmp(&tmp1, reset1);
   }
 
-  void DiracDomainWall4DPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracDomainWall4DPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp2, in);
     M(*tmp2, in);
@@ -153,9 +163,9 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracDomainWall4DPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-      cudaColorSpinorField &x, cudaColorSpinorField &b, 
-      const QudaSolutionType solType) const
+  void DiracDomainWall4DPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+				    ColorSpinorField &x, ColorSpinorField &b, 
+				    const QudaSolutionType solType) const
   {
     bool reset = newTmp(&tmp1, b);
     // we desire solution to preconditioned system
@@ -185,8 +195,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracDomainWall4DPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
-      const QudaSolutionType solType) const
+  void DiracDomainWall4DPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+					const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       return;

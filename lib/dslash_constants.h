@@ -8,9 +8,7 @@ enum KernelType {
 };
 
   struct DslashParam {
-#ifndef STAGGERED_TESLA_HACK
     char do_not_delete; // work around for bug in CUDA 6.5
-#endif
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
     int X[4];
@@ -18,9 +16,7 @@ enum KernelType {
     int Ls;
 #endif
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
-#ifndef STAGGERED_TESLA_HACK
     int commDim[4]; // Whether to do comms or not
-#endif
     int ghostDim[4]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM];
     int ghostNormOffset[QUDA_MAX_DIM];
@@ -205,7 +201,7 @@ __constant__ fat_force_const_t hf; //hisq force
 
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 {
-  profile.Start(QUDA_PROFILE_CONSTANT);
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
 
   checkCudaError();
 
@@ -377,13 +373,13 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 
   checkCudaError();
 
-  profile.Stop(QUDA_PROFILE_CONSTANT);
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
 
 void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile) 
 {
-  profile.Start(QUDA_PROFILE_CONSTANT);
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
 
   int ga_stride_h = gauge.Stride();
   cudaMemcpyToSymbol(ga_stride, &ga_stride_h, sizeof(int));  
@@ -419,12 +415,12 @@ void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile)
 
   checkCudaError();
 
-  profile.Stop(QUDA_PROFILE_CONSTANT);
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
 void initDslashConstants(TimeProfile &profile)
 {
-  profile.Start(QUDA_PROFILE_CONSTANT);
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
 
   float pi_f_h = M_PI;
   cudaMemcpyToSymbol(pi_f, &pi_f_h, sizeof(float));
@@ -437,15 +433,22 @@ void initDslashConstants(TimeProfile &profile)
   float tProjScale_fh = (float)tProjScale_h;
   cudaMemcpyToSymbol(tProjScale_f, &tProjScale_fh, sizeof(float));
 
+  // set these for naive staggered
+  float coeff_fh = 1.0;
+  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
+
+  double coeff_h = 1.0;
+  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
+  
   checkCudaError();
 
-  profile.Stop(QUDA_PROFILE_CONSTANT);
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge,
 			    TimeProfile &profile)
 {
-  profile.Start(QUDA_PROFILE_CONSTANT);
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
 
   int fat_ga_stride_h = fatgauge.Stride();
   int long_ga_stride_h = longgauge.Stride();
@@ -463,7 +466,7 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
 
   checkCudaError();
 
-  profile.Stop(QUDA_PROFILE_CONSTANT);
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
 //For initializing the coefficients used in MDWF
@@ -475,7 +478,7 @@ __constant__ float mdwf_c5_f[QUDA_MAX_DWF_LS];
 
 void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h, TimeProfile &profile)
 {
-  profile.Start(QUDA_PROFILE_CONSTANT);
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
 
   static int last_Ls = -1;
   if (dim_s != last_Ls) {
@@ -503,7 +506,7 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const do
     last_m5 = m5h;
   }
 
-  profile.Stop(QUDA_PROFILE_CONSTANT);
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 

@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -293,6 +293,16 @@ struct IterateThreadLoad<MAX, MAX>
 #else
     CUB_LOAD_ALL(LOAD_LDG, global)
 #endif
+
+
+// Macro cleanup
+#undef CUB_LOAD_ALL
+#undef CUB_LOAD_1
+#undef CUB_LOAD_2
+#undef CUB_LOAD_4
+#undef CUB_LOAD_8
+#undef CUB_LOAD_16
+
 
 
 /**

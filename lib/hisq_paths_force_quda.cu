@@ -3,15 +3,14 @@
 #include <read_gauge.h>
 #include <gauge_field.h>
 #include <ks_improved_force.h>
-#include <hw_quda.h>
 #include <hisq_force_macros.h>
 #include <utility>
 #include <quda_matrix.h>
 #include <force_common.h>
 #include <tune_quda.h>
 #include <color_spinor_field.h>
-
 #include <face_quda.h>
+#include <index_helper.cuh>
 
 #ifdef GPU_HISQ_FORCE
 
@@ -32,16 +31,14 @@
 #endif
 
 
-#if (__COMPUTE_CAPABILITY__ >= 130)
-
-  template<typename Tex>
+template<typename Tex>
 static __inline__ __device__ double fetch_double(Tex t, int i)
 {
   int2 v = TEX1DFETCH(int2, t, i);
   return __hiloint2double(v.y, v.x);
 }
 
-  template <typename Tex>
+template <typename Tex>
 static __inline__ __device__ double2 fetch_double2(Tex t, int i)
 {
   int4 v = TEX1DFETCH(int4, t, i);
@@ -53,8 +50,6 @@ static __inline__ __device__ double2 fetch_double2_old(texture<int4, 1> t, int i
   int4 v = tex1Dfetch(t,i);
   return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
 }
-
-#endif //__COMPUTE_CAPABILITY__ >= 130
 
 
 
@@ -73,6 +68,8 @@ namespace quda {
       int color_matrix_stride;
       int thin_link_stride;
       int momentum_stride;
+
+      mutable int oddness_change;
 
       void setStride(const QudaGaugeParam& param){
         int half_volume = param.X[0]*param.X[1]*param.X[2]*param.X[3]/2;
@@ -106,35 +103,34 @@ namespace quda {
     texture<float2, 1, cudaReadModeElementType>  newOprod0TexSingle;
     texture<float2, 1, cudaReadModeElementType> newOprod1TexSingle;
 
-
-
-    inline __device__  __host__ int linkIndex(int x[], int dx[], const int X[4]) {
-      int y[4];
-      for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-      int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-      return idx;
-    }
-
-    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned){
+    template <int dir>
+    inline __device__ __host__ void updateCoords(int x[], int shift, const int X[4], const int partitioned[]){
 #ifdef MULTI_GPU
-      if(shift == 1){
-        x[dir] = (partitioned || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
-      }else if(shift == -1){
-        x[dir] = (partitioned || (x[dir] != 2)) ? x[dir]-1 : X[dir]+1;
+      if (shift == 1) {
+        x[dir] = (partitioned[dir] || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
+      } else if (shift == -1) {
+        x[dir] = (partitioned[dir] || (x[dir] != 2)) ? x[dir]-1 : X[dir]+1;
       }
 #else 
       x[dir] = (x[dir]+shift + X[dir])%X[dir];
 #endif
-      return;
     }
 
-
-    __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity)
-    {
-      x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-      x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-      x[1] = (cb_index/(X[0]/2)) % X[1];
-      x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned[]) {
+      switch (dir) {
+        case 0:
+	  updateCoords<0>(x, shift, X, partitioned);
+	  break;
+        case 1:
+	  updateCoords<1>(x, shift, X, partitioned);
+	  break;
+        case 2:
+	  updateCoords<2>(x, shift, X, partitioned);
+	  break;
+        case 3:
+	  updateCoords<3>(x, shift, X, partitioned);
+	  break;
+      }
 
       return;
     }
@@ -422,9 +418,7 @@ namespace quda {
         field[idx + stride*7]   += coeff*mat[7];
         field[idx + stride*8]   += coeff*mat[8];
 
-#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
         printf("value is  coeff(%f) * mat[0].x(%f)=%f\n", coeff, mat[0].x, field[idx].x);
-#endif
         return;
       }
 
@@ -497,42 +491,13 @@ namespace quda {
         return;
       }
 
-    // Struct to determine the coefficient sign at compile time
-    template<int pos_dir, int odd_lattice>
-      struct CoeffSign
-      {
-        static const int result = -1;
-      };
+    __device__ __host__ inline int CoeffSign(int pos_dir, int odd_lattice) {
+      return 2*((pos_dir + odd_lattice + 1) & 1) - 1;
+    }
 
-    template<>
-      struct CoeffSign<0,1>
-      {
-        static const int result = -1;
-      }; 
-
-    template<>
-      struct CoeffSign<0,0>
-      {
-        static const int result = 1;
-      };
-
-    template<>
-      struct CoeffSign<1,1>
-      {
-        static const int result = 1;
-      };
-
-    template<int odd_lattice>
-      struct Sign
-      {
-        static const int result = 1;
-      };
-
-    template<>
-      struct Sign<1>
-      {
-        static const int result = -1;
-      };
+    __device__ __host__ inline int Sign(int parity) {
+      return parity ? -1 : 1;
+    }
 
     template<class RealX>
       struct ArrayLength
@@ -550,7 +515,7 @@ namespace quda {
 
 
     // Flops: four matrix additions per lattice site = 72 Flops per lattice site
-    template<class RealA, int oddBit>
+    template<class RealA>
       __global__ void 
       do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOdd,
           typename RealTypeId<RealA>::Type coeff,
@@ -558,13 +523,14 @@ namespace quda {
       {
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
         if (sid >= kparam.threads) return;
+	int oddBit = threadIdx.y;
 #ifdef MULTI_GPU
         int dx[4] = {0,0,0,0};
         int x[4];
         getCoords(x, sid, kparam.X, oddBit);
         int E[4] = {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
         for(int dir=0; dir<4; ++dir) x[dir] += 2; 
-        int new_sid = linkIndex(x,dx,E);
+        int new_sid = linkIndexShift(x,dx,E);
 #else
         int new_sid = sid;
 #endif
@@ -653,7 +619,7 @@ namespace quda {
 
 
     template<class RealA, class RealB>
-      class MiddleLink : public Tunable {
+      class MiddleLink : public TunableLocalParity {
 
         private:
           const cudaGaugeField &link;
@@ -667,13 +633,6 @@ namespace quda {
           cudaGaugeField &Qmu;
           cudaGaugeField &newOprod;
           const hisq_kernel_param_t &kparam;
-
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return kparam.threads; }
 
         public:
@@ -729,55 +688,28 @@ namespace quda {
 
 
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
-          if(oddness_change ==0 ){					\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float2); \
-                do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float4); \
-                do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{							\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }else{								\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float2); \
-                do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float4); \
-                do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{							\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }
-
-
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      } else {								\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
-                + kparam.base_idx[2] + kparam.base_idx[3])&1;
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+				  + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             const void *Qprev_even = (&Qprev == &link) ? NULL : Qprev.Even_p();
             const void *Qprev_odd = (&Qprev == &link) ? NULL : Qprev.Odd_p();
-
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
               CALL_MIDDLE_LINK_KERNEL(1,1);
@@ -812,7 +744,7 @@ namespace quda {
 
 
     template<class RealA, class RealB>
-      class LepageMiddleLink : public Tunable {
+      class LepageMiddleLink : public TunableLocalParity {
 
         private:
           const cudaGaugeField &link;
@@ -824,12 +756,6 @@ namespace quda {
           cudaGaugeField &P3; // write only
           cudaGaugeField &newOprod;
           const hisq_kernel_param_t &kparam;
-
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return kparam.threads; }
 
         public:
@@ -857,92 +783,68 @@ namespace quda {
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
-          ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
-           (typeA*)Qprev.Even_p(), (typeA*)Qprev.Odd_p(),			\
-           (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
-           sig, mu, coeff,							\
-           (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
-           (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
-           kparam)
-
+      ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
+       (typeA*)Qprev.Even_p(), (typeA*)Qprev.Odd_p(),			\
+       (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       sig, mu, coeff,							\
+       (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
+       (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
+       kparam)
+      
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
-          if(oddness_change == 0){						\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float2); \
-                do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float4); \
-                do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{							\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }else{								\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float2); \
-                do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float4); \
-                do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{							\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }     
-
-          void apply(const cudaStream_t &stream) {
-            TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-            QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
-                + kparam.base_idx[2] + kparam.base_idx[3])&1;
-
-            if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
-              CALL_MIDDLE_LINK_KERNEL(1,1);
-            }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-              CALL_MIDDLE_LINK_KERNEL(1,0);
-            }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-              CALL_MIDDLE_LINK_KERNEL(0,1);
-            }else{
-              CALL_MIDDLE_LINK_KERNEL(0,0);
-            }
-
-          }
-
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      } else {								\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }									\
+  
+      void apply(const cudaStream_t &stream) {
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	QudaReconstructType recon = link.Reconstruct();
+	kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+				 + kparam.base_idx[2] + kparam.base_idx[3])&1;
+	
+	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
+	  CALL_MIDDLE_LINK_KERNEL(1,1);
+	}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(1,0);
+	}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(0,1);
+	}else{
+	  CALL_MIDDLE_LINK_KERNEL(0,0);
+	}
+	
+      }
+      
 #undef CALL_ARGUMENTS	
 #undef CALL_MIDDLE_LINK_KERNEL
-
-          void preTune() {
-            P3.backup();
-            newOprod.backup();
-          }
-
-          void postTune() {
-            P3.restore();
-            newOprod.restore();
-          }
-
-          long long flops() const { 
-	    if(GOES_FORWARDS(sig)) return 810*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
-            return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*396; 
-	  }
-      };
+      
+      void preTune() {
+	P3.backup();
+	newOprod.backup();
+      }
+      
+      void postTune() {
+	P3.restore();
+	newOprod.restore();
+      }
+      
+      long long flops() const { 
+	if(GOES_FORWARDS(sig)) return 810*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
+	return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*396; 
+      }
+    };
 
     template<class RealA, class RealB>
-      class SideLink : public Tunable {
+      class SideLink : public TunableLocalParity {
 
         private:
           const cudaGaugeField &link;
@@ -956,11 +858,6 @@ namespace quda {
           cudaGaugeField &newOprod;
           const hisq_kernel_param_t &kparam;
 
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return kparam.threads; }
 
         public:
@@ -1002,48 +899,24 @@ namespace quda {
            kparam)
 
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
-          if(oddness_change == 0){						\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float2); \
-                do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float4); \
-                do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{								\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }else{								\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float2); \
-                do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float4); \
-                do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{								\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      } else {								\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -1075,7 +948,7 @@ namespace quda {
 
 
     template<class RealA, class RealB>
-      class SideLinkShort : public Tunable {
+      class SideLinkShort : public TunableLocalParity {
 
         private:
           const cudaGaugeField &link;
@@ -1086,11 +959,6 @@ namespace quda {
           cudaGaugeField &newOprod;
           const hisq_kernel_param_t &kparam;
 
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return kparam.threads; }
 
         public:
@@ -1120,48 +988,24 @@ namespace quda {
 
 
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
-          if(oddness_change == 0){						\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float2); \
-                do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float4); \
-                do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{								\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }else{								\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float2); \
-                do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float4); \
-                do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{								\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }
+    if (sizeof(RealA) == sizeof(float2)) {				\
+      if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+      }else{								\
+	do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+      }									\
+    } else {								\
+      if(recon  == QUDA_RECONSTRUCT_NO){				\
+	do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+      }else{								\
+	do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+      }									\
+    }
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -1192,7 +1036,7 @@ namespace quda {
       };
 
     template<class RealA, class RealB>
-      class AllLink : public Tunable {
+      class AllLink : public TunableLocalParity {
 
         private:
           const cudaGaugeField &link;
@@ -1206,11 +1050,6 @@ namespace quda {
           cudaGaugeField &newOprod;
           const hisq_kernel_param_t &kparam;
 
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return kparam.threads; }
 
         public:
@@ -1249,47 +1088,24 @@ namespace quda {
            (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(), kparam)
 
 #define CALL_ALL_LINK_KERNEL(sig_sign, mu_sign)				\
-          if(oddness_change == 0){						\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float2); \
-                do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(float2, float4); \
-                do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{								\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 0> CALL_ARGUMENTS(double2, double2); \
-                do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 0> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }else{								\
-            if(sizeof(RealA) == sizeof(float2)){				\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float2); \
-                do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float2); \
-              }else{							\
-                do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(float2, float4); \
-                do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(float2, float4); \
-              }								\
-            }else{								\
-              if(recon  == QUDA_RECONSTRUCT_NO){				\
-                do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }else{							\
-                do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0, 1> CALL_ARGUMENTS(double2, double2); \
-                do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1, 1> CALL_ARGUMENTS(double2, double2); \
-              }								\
-            }								\
-          }     
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      } else {								\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -1318,19 +1134,6 @@ namespace quda {
             newOprod.restore();
           }
 
-          virtual void initTuneParam(TuneParam &param) const
-          {
-            Tunable::initTuneParam(param);
-            param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-          }
-
-          /** sets default values for when tuning is disabled */
-          void defaultTuneParam(TuneParam &param) const
-          {
-            Tunable::defaultTuneParam(param);
-            param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-          }
-
           long long flops() const { 
 	    if(GOES_FORWARDS(sig)) return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*1242;
 	
@@ -1340,7 +1143,7 @@ namespace quda {
 
 
     template<class RealA, class RealB>
-      class OneLinkTerm : public Tunable {
+      class OneLinkTerm : public TunableLocalParity {
 
         private:
           const cudaGaugeField &oprod;
@@ -1349,11 +1152,6 @@ namespace quda {
           int X[4];
           hisq_kernel_param_t kparam;
 
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return X[0]*X[1]*X[2]*X[3]/2; }
 
         public:
@@ -1388,22 +1186,12 @@ namespace quda {
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-
-
-
-            do_one_link_term_kernel<RealA,0><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
-                static_cast<const RealA*>(oprod.Odd_p()), 
-                coeff,
-                static_cast<RealA*>(ForceMatrix.Even_p()), 
-                static_cast<RealA*>(ForceMatrix.Odd_p()),
-                kparam);
-            do_one_link_term_kernel<RealA,1><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
-                static_cast<const RealA*>(oprod.Odd_p()), 
-                coeff,
-                static_cast<RealA*>(ForceMatrix.Even_p()), 
-                static_cast<RealA*>(ForceMatrix.Odd_p()),
-                kparam);
-
+            do_one_link_term_kernel<RealA><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
+								 static_cast<const RealA*>(oprod.Odd_p()), 
+								 coeff,
+								 static_cast<RealA*>(ForceMatrix.Even_p()), 
+								 static_cast<RealA*>(ForceMatrix.Odd_p()),
+								 kparam);
           }
 
           void preTune() {
@@ -1421,7 +1209,7 @@ namespace quda {
 
 
     template<class RealA, class RealB>
-      class LongLinkTerm : public Tunable {
+      class LongLinkTerm : public TunableLocalParity {
 
         private:
           const cudaGaugeField &link;
@@ -1431,11 +1219,6 @@ namespace quda {
           int X[4];
           const hisq_kernel_param_t &kparam;
 
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return X[0]*X[1]*X[2]*X[3]/2; }
 
         public:
@@ -1472,19 +1255,15 @@ namespace quda {
 
             if(sizeof(RealA) == sizeof(float2)){
               if(recon == QUDA_RECONSTRUCT_NO){
-                do_longlink_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
-                do_longlink_sp_18_kernel<float2,float2, 1> CALL_ARGUMENTS(float2, float2);
+                do_longlink_sp_18_kernel<float2,float2> CALL_ARGUMENTS(float2, float2);
               }else{
-                do_longlink_sp_12_kernel<float2,float4, 0> CALL_ARGUMENTS(float2, float4);
-                do_longlink_sp_12_kernel<float2,float4, 1> CALL_ARGUMENTS(float2, float4);
+                do_longlink_sp_12_kernel<float2,float4> CALL_ARGUMENTS(float2, float4);
               }
             }else{
               if(recon == QUDA_RECONSTRUCT_NO){
-                do_longlink_dp_18_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
-                do_longlink_dp_18_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);
+                do_longlink_dp_18_kernel<double2,double2> CALL_ARGUMENTS(double2, double2);
               }else{
-                do_longlink_dp_12_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
-                do_longlink_dp_12_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);	    
+                do_longlink_dp_12_kernel<double2,double2> CALL_ARGUMENTS(double2, double2);
               }
             }
           }
@@ -1506,7 +1285,7 @@ namespace quda {
 
 
     template<class RealA, class RealB>
-      class CompleteForce : public Tunable {
+      class CompleteForce : public TunableLocalParity {
 
         private:
           const cudaGaugeField &link;
@@ -1515,11 +1294,6 @@ namespace quda {
           int X[4];
           hisq_kernel_param_t kparam;
 
-          unsigned int sharedBytesPerThread() const { return 0; }
-          unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
-          // don't tune the grid dimension
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return X[0]*X[1]*X[2]*X[3]/2; }
 
         public:
@@ -1557,26 +1331,19 @@ namespace quda {
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-            QudaReconstructType recon = link.Reconstruct();;
-
-
-
+            QudaReconstructType recon = link.Reconstruct();
 
             if(sizeof(RealA) == sizeof(float2)){
               if(recon == QUDA_RECONSTRUCT_NO){
-                do_complete_force_sp_18_kernel<float2,float2, 0> CALL_ARGUMENTS(float2, float2);
-                do_complete_force_sp_18_kernel<float2,float2, 1> CALL_ARGUMENTS(float2, float2);
+                do_complete_force_sp_18_kernel<float2,float2> CALL_ARGUMENTS(float2, float2);
               }else{
-                do_complete_force_sp_12_kernel<float2,float4, 0> CALL_ARGUMENTS(float2, float4);
-                do_complete_force_sp_12_kernel<float2,float4, 1> CALL_ARGUMENTS(float2, float4);
+                do_complete_force_sp_12_kernel<float2,float4> CALL_ARGUMENTS(float2, float4);
               }
             }else{
               if(recon == QUDA_RECONSTRUCT_NO){
-                do_complete_force_dp_18_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
-                do_complete_force_dp_18_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);
+                do_complete_force_dp_18_kernel<double2,double2> CALL_ARGUMENTS(double2, double2);
               }else{
-                do_complete_force_dp_12_kernel<double2,double2, 0> CALL_ARGUMENTS(double2, double2);
-                do_complete_force_dp_12_kernel<double2,double2, 1> CALL_ARGUMENTS(double2, double2);	    
+                do_complete_force_dp_12_kernel<double2,double2> CALL_ARGUMENTS(double2, double2);
               }
             }
           }

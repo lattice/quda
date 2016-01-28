@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,7 +37,7 @@
 #include <stdio.h>
 #include <iterator>
 
-#include "dispatch/device_radix_sort_dispatch.cuh"
+#include "dispatch/dispatch_radix_sort.cuh"
 #include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -145,8 +145,8 @@ struct DeviceRadixSort
         typename            Value>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortPairs(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         Key                 *d_keys_in,                             ///< [in] Pointer to the input data of key data to sort
         Key                 *d_keys_out,                            ///< [out] Pointer to the sorted output sequence of key data
         Value               *d_values_in,                           ///< [in] Pointer to the corresponding input sequence of associated value items
@@ -163,7 +163,7 @@ struct DeviceRadixSort
         DoubleBuffer<Key>       d_keys(d_keys_in, d_keys_out);
         DoubleBuffer<Value>     d_values(d_values_in, d_values_out);
 
-        return DeviceRadixSortDispatch<false, true, Key, Value, OffsetT>::Dispatch(
+        return DispatchRadixSort<false, true, Key, Value, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
@@ -246,8 +246,8 @@ struct DeviceRadixSort
         typename            Value>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortPairs(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose "current" buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         DoubleBuffer<Value> &d_values,                              ///< [in,out] Double-buffer of values whose "current" buffer contains the unsorted input values and, upon return, is updated to point to the sorted output values
         int                 num_items,                              ///< [in] Number of items to reduce
@@ -259,7 +259,7 @@ struct DeviceRadixSort
         // Signed integer type for global offsets
         typedef int OffsetT;
 
-        return DeviceRadixSortDispatch<false, false, Key, Value, OffsetT>::Dispatch(
+        return DispatchRadixSort<false, false, Key, Value, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
@@ -326,8 +326,8 @@ struct DeviceRadixSort
         typename            Value>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortPairsDescending(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         Key                 *d_keys_in,                             ///< [in] Pointer to the input data of key data to sort
         Key                 *d_keys_out,                            ///< [out] Pointer to the sorted output sequence of key data
         Value               *d_values_in,                           ///< [in] Pointer to the corresponding input sequence of associated value items
@@ -344,7 +344,7 @@ struct DeviceRadixSort
         DoubleBuffer<Key>       d_keys(d_keys_in, d_keys_out);
         DoubleBuffer<Value>     d_values(d_values_in, d_values_out);
 
-        return DeviceRadixSortDispatch<true, true, Key, Value, OffsetT>::Dispatch(
+        return DispatchRadixSort<true, true, Key, Value, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
@@ -422,8 +422,8 @@ struct DeviceRadixSort
         typename            Value>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortPairsDescending(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose "current" buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         DoubleBuffer<Value> &d_values,                              ///< [in,out] Double-buffer of values whose "current" buffer contains the unsorted input values and, upon return, is updated to point to the sorted output values
         int                 num_items,                              ///< [in] Number of items to reduce
@@ -435,7 +435,7 @@ struct DeviceRadixSort
         // Signed integer type for global offsets
         typedef int OffsetT;
 
-        return DeviceRadixSortDispatch<true, false, Key, Value, OffsetT>::Dispatch(
+        return DispatchRadixSort<true, false, Key, Value, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
@@ -504,8 +504,8 @@ struct DeviceRadixSort
     template <typename Key>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortKeys(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         Key                 *d_keys_in,                             ///< [in] Pointer to the input data of key data to sort
         Key                 *d_keys_out,                            ///< [out] Pointer to the sorted output sequence of key data
         int                 num_items,                              ///< [in] Number of items to reduce
@@ -521,7 +521,7 @@ struct DeviceRadixSort
         DoubleBuffer<Key>       d_keys(d_keys_in, d_keys_out);
         DoubleBuffer<NullType>  d_values;
 
-        return DeviceRadixSortDispatch<false, true, Key, NullType, OffsetT>::Dispatch(
+        return DispatchRadixSort<false, true, Key, NullType, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
@@ -593,8 +593,8 @@ struct DeviceRadixSort
     template <typename Key>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortKeys(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose "current" buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         int                 num_items,                              ///< [in] Number of items to reduce
         int                 begin_bit           = 0,                ///< [in] <b>[optional]</b> The least-significant bit index (inclusive)  needed for key comparison
@@ -608,7 +608,7 @@ struct DeviceRadixSort
         // Null value type
         DoubleBuffer<NullType> d_values;
 
-        return DeviceRadixSortDispatch<false, false, Key, NullType, OffsetT>::Dispatch(
+        return DispatchRadixSort<false, false, Key, NullType, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
@@ -668,8 +668,8 @@ struct DeviceRadixSort
     template <typename Key>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortKeysDescending(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         Key                 *d_keys_in,                             ///< [in] Pointer to the input data of key data to sort
         Key                 *d_keys_out,                            ///< [out] Pointer to the sorted output sequence of key data
         int                 num_items,                              ///< [in] Number of items to reduce
@@ -684,7 +684,7 @@ struct DeviceRadixSort
         DoubleBuffer<Key>       d_keys(d_keys_in, d_keys_out);
         DoubleBuffer<NullType>  d_values;
 
-        return DeviceRadixSortDispatch<true, false, Key, NullType, OffsetT>::Dispatch(
+        return DispatchRadixSort<true, false, Key, NullType, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,
@@ -752,8 +752,8 @@ struct DeviceRadixSort
     template <typename Key>
     CUB_RUNTIME_FUNCTION
     static cudaError_t SortKeysDescending(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        void*               d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose "current" buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         int                 num_items,                              ///< [in] Number of items to reduce
         int                 begin_bit           = 0,                ///< [in] <b>[optional]</b> The least-significant bit index (inclusive)  needed for key comparison
@@ -767,7 +767,7 @@ struct DeviceRadixSort
         // Null value type
         DoubleBuffer<NullType> d_values;
 
-        return DeviceRadixSortDispatch<true, false, Key, NullType, OffsetT>::Dispatch(
+        return DispatchRadixSort<true, false, Key, NullType, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys,

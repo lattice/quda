@@ -10,9 +10,9 @@ namespace quda {
   // they all have the same volume, etc. (used to initialize the various CUDA constants).
 
   Dirac::Dirac(const DiracParam &param) 
-    : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
+    : gauge(param.gauge), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
-      profile("Dirac")
+      profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
   }
@@ -20,7 +20,7 @@ namespace quda {
   Dirac::Dirac(const Dirac &dirac) 
     : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
       dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
-      profile("Dirac")
+      profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
@@ -48,15 +48,18 @@ namespace quda {
     return *this;
   }
 
-  bool Dirac::newTmp(cudaColorSpinorField **tmp, const cudaColorSpinorField &a) const {
+  bool Dirac::newTmp(ColorSpinorField **tmp, const ColorSpinorField &a) const {
     if (*tmp) return false;
     ColorSpinorParam param(a);
     param.create = QUDA_ZERO_FIELD_CREATE; // need to zero elements else padded region will be junk
-    *tmp = new cudaColorSpinorField(a, param);
+
+    if (typeid(a) == typeid(cudaColorSpinorField)) *tmp = new cudaColorSpinorField(a, param);
+    else *tmp = new cpuColorSpinorField(param);
+
     return true;
   }
 
-  void Dirac::deleteTmp(cudaColorSpinorField **a, const bool &reset) const {
+  void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
     if (reset) {
       delete *a;
       *a = NULL;
@@ -65,14 +68,14 @@ namespace quda {
 
 #define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
 
-  void Dirac::Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void Dirac::Mdag(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     flip(dagger);
     M(out, in);
     flip(dagger);
   }
 
-  void Dirac::MMdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void Dirac::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     flip(dagger);
     MdagM(out, in);
@@ -81,7 +84,7 @@ namespace quda {
 
 #undef flip
 
-  void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void Dirac::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if ( (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) && 
 	 in.Nspin() == 4) {
@@ -104,21 +107,24 @@ namespace quda {
 		in.SiteSubset(), out.SiteSubset());
     }
 
+    if (!static_cast<const cudaColorSpinorField&>(in).isNative()) errorQuda("Input field is not in native order");
+    if (!static_cast<const cudaColorSpinorField&>(out).isNative()) errorQuda("Output field is not in native order");
+
     if (out.Ndim() != 5) {
-      if ((out.Volume() != gauge.Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	  (out.Volume() != gauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.VolumeCB());
+      if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	  (out.Volume() != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
       }
     } else {
       // Domain wall fermions, compare 4d volumes not 5d
-      if ((out.Volume()/out.X(4) != gauge.Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	  (out.Volume()/out.X(4) != gauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.VolumeCB());
+      if ((out.Volume()/out.X(4) != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	  (out.Volume()/out.X(4) != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
       }
     }
   }
 
-  void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void Dirac::checkFullSpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not full fields: in = %d, out = %d", 
@@ -126,7 +132,7 @@ namespace quda {
     } 
   }
 
-  void Dirac::checkSpinorAlias(const cudaColorSpinorField &a, const cudaColorSpinorField &b) const {
+  void Dirac::checkSpinorAlias(const ColorSpinorField &a, const ColorSpinorField &b) const {
     if (a.V() == b.V()) errorQuda("Aliasing pointers");
   }
 

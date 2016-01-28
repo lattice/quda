@@ -11,12 +11,17 @@
 
 #ifdef GPU_HISQ_FORCE
 
+// work around for CUDA 7.0 bug on OSX
+#if defined(__APPLE__) && CUDA_VERSION >= 7000 && CUDA_VERSION < 7050
+#define EXPONENT_TYPE Real
+#else
+#define EXPONENT_TYPE int
+#endif
+
 namespace quda{
 namespace {
   #include <svd_quda.h>
 }
-
-//#ifdef GPU_HISQ_FORCE
 
 namespace { // anonymous
 #include <svd_quda.h>
@@ -115,18 +120,18 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC00(const Real & u, const Real & v, const Real & w){
-      Real result =   -pow(w,3)*pow(u,6)
-	+ 3*v*pow(w,3)*pow(u,4)
-	+ 3*pow(v,4)*w*pow(u,4)
-	-   pow(v,6)*pow(u,3)
-	- 4*pow(w,4)*pow(u,3)
-	- 12*pow(v,3)*pow(w,2)*pow(u,3)
-	+ 16*pow(v,2)*pow(w,3)*pow(u,2)
-	+ 3*pow(v,5)*w*pow(u,2)
-	- 8*v*pow(w,4)*u
-	- 3*pow(v,4)*pow(w,2)*u
-	+ pow(w,5)
-	+ pow(v,3)*pow(w,3);
+      Real result = -pow(w,static_cast<EXPONENT_TYPE>(3)) * pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ 3*v*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(4))
+	+ 3*pow(v,static_cast<EXPONENT_TYPE>(4))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	-   pow(v,static_cast<EXPONENT_TYPE>(6))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 4*pow(w,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 12*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 16*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 3*pow(v,static_cast<EXPONENT_TYPE>(5))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 8*v*pow(w,static_cast<EXPONENT_TYPE>(4))*u
+	- 3*pow(v,static_cast<EXPONENT_TYPE>(4))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ pow(w,static_cast<EXPONENT_TYPE>(5))
+	+ pow(v,static_cast<EXPONENT_TYPE>(3))*pow(w,static_cast<EXPONENT_TYPE>(3));
 
       return result;
     }
@@ -134,82 +139,82 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC01(const Real & u, const Real & v, const Real & w){
-      Real result =  - pow(w,2)*pow(u,7)
-	- pow(v,2)*w*pow(u,6)
-	+ pow(v,4)*pow(u,5)   // This was corrected!
-	+ 6*v*pow(w,2)*pow(u,5)
-	- 5*pow(w,3)*pow(u,4)    // This was corrected!
-	- pow(v,3)*w*pow(u,4)
-	- 2*pow(v,5)*pow(u,3)
-	- 6*pow(v,2)*pow(w,2)*pow(u,3)
-	+ 10*v*pow(w,3)*pow(u,2)
-	+ 6*pow(v,4)*w*pow(u,2)
-	- 3*pow(w,4)*u
-	- 6*pow(v,3)*pow(w,2)*u
-	+ 2*pow(v,2)*pow(w,3);
+      Real result =  - pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(7))
+	- pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ pow(v,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(5))   // This was corrected!
+	+ 6*v*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	- 5*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(4))    // This was corrected!
+	- pow(v,static_cast<EXPONENT_TYPE>(3))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- 2*pow(v,static_cast<EXPONENT_TYPE>(5))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 6*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 10*v*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 6*pow(v,static_cast<EXPONENT_TYPE>(4))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 3*pow(w,static_cast<EXPONENT_TYPE>(4))*u
+	- 6*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ 2*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC02(const Real & u, const Real & v, const Real & w){
-      Real result =   pow(w,2)*pow(u,5)
-	+ pow(v,2)*w*pow(u,4)
-	- pow(v,4)*pow(u,3)
-	- 4*v*pow(w,2)*pow(u,3)
-	+ 4*pow(w,3)*pow(u,2)
-	+ 3*pow(v,3)*w*pow(u,2)
-	- 3*pow(v,2)*pow(w,2)*u
-	+ v*pow(w,3);
+      Real result =   pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	+ pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- pow(v,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 4*v*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 4*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 3*pow(v,static_cast<EXPONENT_TYPE>(3))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 3*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ v*pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC11(const Real & u, const Real & v, const Real & w){
-      Real result = - w*pow(u,8)
-	- pow(v,2)*pow(u,7)
-	+ 7*v*w*pow(u,6)
-	+ 4*pow(v,3)*pow(u,5)
-	- 5*pow(w,2)*pow(u,5)
-	- 16*pow(v,2)*w*pow(u,4)
-	- 4*pow(v,4)*pow(u,3)
-	+ 16*v*pow(w,2)*pow(u,3)
-	- 3*pow(w,3)*pow(u,2)
-	+ 12*pow(v,3)*w*pow(u,2)
-	- 12*pow(v,2)*pow(w,2)*u
-	+ 3*v*pow(w,3);
+      Real result = - w*pow(u,static_cast<EXPONENT_TYPE>(8))
+	- pow(v,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(7))
+	+ 7*v*w*pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ 4*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	- 5*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	- 16*pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- 4*pow(v,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 16*v*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 3*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 12*pow(v,static_cast<EXPONENT_TYPE>(3))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 12*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ 3*v*pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC12(const Real & u, const Real & v, const Real & w){
-      Real result =  w*pow(u,6)
-	+ pow(v,2)*pow(u,5) // Fixed this!
-	- 5*v*w*pow(u,4)  // Fixed this!
-	- 2*pow(v,3)*pow(u,3)
-	+ 4*pow(w,2)*pow(u,3)
-	+ 6*pow(v,2)*w*pow(u,2)
-	- 6*v*pow(w,2)*u
-	+ pow(w,3);
+      Real result =  w*pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ pow(v,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5)) // Fixed this!
+	- 5*v*w*pow(u,static_cast<EXPONENT_TYPE>(4))  // Fixed this!
+	- 2*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 4*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 6*pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 6*v*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC22(const Real & u, const Real & v, const Real & w){
-      Real result = - w*pow(u,4)
-	- pow(v,2)*pow(u,3)
-	+ 3*v*w*pow(u,2)
-	- 3*pow(w,2)*u;
+      Real result = - w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- pow(v,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 3*v*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 3*pow(w,static_cast<EXPONENT_TYPE>(2))*u;
       return result;
     }
 
     template <class Real>
     __device__ __host__
     void  DerivativeCoefficients<Real>::set(const Real & u, const Real & v, const Real & w){
-      const Real & denominator = 2.0*pow(w*(u*v-w),3); 
+      const Real & denominator = 2.0*pow(w*(u*v-w),static_cast<EXPONENT_TYPE>(3));
       b[0] = computeC00(u,v,w)/denominator;
       b[1] = computeC01(u,v,w)/denominator;
       b[2] = computeC02(u,v,w)/denominator;
@@ -381,10 +386,8 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 #define MAX_DET_ERROR HOST_MAX_DET_ERROR
 #endif
 	  if(fabs(gprod - determinant) > MAX_DET_ERROR){
-#if  (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__ >= 200))
 	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), MAX_DET_ERROR);
 	    printLink(q);
-#endif
 
 #ifdef __CUDA_ARCH__
 	    atomicAdd(unitarization_failed,1);
@@ -641,7 +644,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       void preTune() { ; }
       void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
       
-      long long flops() const { return 4*4528*gauge.Volume(); } // FIXME: add flops counter
+      long long flops() const { return 4ll*4528*gauge.Volume(); }
       
       TuneKey tuneKey() const { return TuneKey(gauge.VolString(), typeid(*this).name(), aux); }
     }; // UnitarizeForceCuda
@@ -651,6 +654,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
       unitarizeForce.apply(0);
+      cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       if(flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }
@@ -660,5 +664,6 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
 //#endif
 } // namespace quda
+
 
 #endif

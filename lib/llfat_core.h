@@ -92,24 +92,24 @@
 
 #define f00_re F0.x
 #define f00_im F0.y
-#define f01_re F0.z
-#define f01_im F0.w
-#define f02_re F1.x
-#define f02_im F1.y
-#define f10_re F1.z
-#define f10_im F1.w
-#define f11_re F2.x
-#define f11_im F2.y
-#define f12_re F2.z
-#define f12_im F2.w
-#define f20_re F3.x
-#define f20_im F3.y
-#define f21_re F3.z
-#define f21_im F3.w
-#define f22_re F4.x
-#define f22_im F4.y
+#define f01_re F1.x
+#define f01_im F1.y
+#define f02_re F2.x
+#define f02_im F2.y
+#define f10_re F3.x
+#define f10_im F3.y
+#define f11_re F4.x
+#define f11_im F4.y
+#define f12_re F5.x
+#define f12_im F5.y
+#define f20_re F6.x
+#define f20_im F6.y
+#define f21_re F7.x
+#define f21_im F7.y
+#define f22_re F8.x
+#define f22_im F8.y
 
-#define WRITE_LONG_MATRIX WRITE_GAUGE_MATRIX_FLOAT4
+#define WRITE_LONG_MATRIX WRITE_GAUGE_MATRIX_FLOAT2
 
 #else
 #define a00_re A0.x
@@ -1466,7 +1466,7 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const Fl
 
 template<int odd_bit>
 __global__ void LLFAT_KERNEL(computeLongLinkParity,RECONSTRUCT)
-    (FloatN* const outField,
+    (FloatM* const outField,
     const FloatN* const sitelink_even, const FloatN* const sitelink_odd,
     Float coeff,
     const llfat_kernel_param_t kparam)
@@ -1500,7 +1500,7 @@ __global__ void LLFAT_KERNEL(computeLongLinkParity,RECONSTRUCT)
   DECLARE_VAR_SIGN;
   DECLARE_NEW_X;
   
-  FloatN F0, F1, F2, F3, F4, F5, F6, F7, F8;
+  FloatM F0, F1, F2, F3, F4, F5, F6, F7, F8;
 
   for(int dir=0; dir<4; ++dir){
     LOAD_EVEN_SITE_MATRIX(dir, mem_idx, A);

@@ -37,8 +37,7 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
-    //#if (__COMPUTE_CAPABILITY__) >= 200 && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
 #include <tm_ndeg_dslash_def.h>   // Non-degenerate twisted Mass
 #endif
 
@@ -55,7 +54,7 @@ namespace quda {
 
   using namespace ndegtwisted;
 
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
   template <typename sFloat, typename gFloat>
   class NdegTwistedDslashCuda : public SharedDslashCuda {
 
@@ -67,17 +66,12 @@ namespace quda {
   protected:
     unsigned int sharedBytesPerThread() const
     {
-#if (__COMPUTE_CAPABILITY__ >= 200)
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
 	int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
 	return NDEGTM_SHARED_FLOATS_PER_THREAD * reg_size;
       } else {
 	return 0;
       }
-#else
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return NDEGTM_SHARED_FLOATS_PER_THREAD * reg_size;
-#endif
     }
 
   public:
@@ -117,7 +111,23 @@ namespace quda {
 		     (sFloat*)in->V(), (float*)in->Norm(), a, b, c, d, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
     }
 
-    long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const {
+      int twisted_flops = 48;
+      long long flops = DslashCuda::flops();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+      case EXTERIOR_KERNEL_ALL:
+	break;
+      case INTERIOR_KERNEL:
+	// twisted-mass flops are done in the interior kernel
+	flops += twisted_flops * in->VolumeCB();	  
+	break;
+      }
+      return flops;
+    }
   };
 #endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
@@ -132,7 +142,7 @@ namespace quda {
 				 const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     int ghost_threads[4] = {0};
@@ -156,15 +166,10 @@ namespace quda {
     size_t regSize = sizeof(float);
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       dslash = new NdegTwistedDslashCuda<double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
       regSize = sizeof(double);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new NdegTwistedDslashCuda<float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
-
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new NdegTwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
     }
@@ -183,13 +188,7 @@ namespace quda {
 
     checkCudaError();
 #else
-
-#if (__COMPUTE_CAPABILITY__ < 200)
-  errorQuda("Non-degenerate twisted-mass fermions not supported on pre-Fermi architecture");
-#else
     errorQuda("Non-degenerate twisted mass dslash has not been built");
-#endif
-
 #endif
   }
 

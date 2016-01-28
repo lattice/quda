@@ -674,6 +674,20 @@ namespace quda{
     }
 
 
+  template<typename Complex,int N>
+    __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {
+    typedef typename RealTypeId<Complex>::Type real;
+    // first make the matrix anti-hermitian
+    Matrix<Complex,N> am = m - conj(m);
+
+    // second make it traceless
+    real imag_trace = 0.0;
+    for (int i=0; i<N; i++) imag_trace += am(i,i).y;
+    for (int i=0; i<N; i++) {
+      am(i,i).y -= imag_trace/N;
+    }
+    m = 0.5*am;
+  }
 
 
 
@@ -1004,13 +1018,42 @@ namespace quda{
       return;
     }
 
+  template<class T>
+  __device__ __host__ inline Matrix<T,3> getSubTraceUnit(const Matrix<T,3>& a){
+    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
+    Matrix<T,3> res;
+    res(0,0) = a(0,0) - tr; res(0,1) = a(0,1); res(0,2) = a(0,2);
+    res(1,0) = a(1,0); res(1,1) = a(1,1) - tr; res(1,2) = a(1,2);
+    res(2,0) = a(2,0); res(2,1) = a(2,1); res(2,2) = a(2,2) - tr;
+    return res;
+  }
+
+  template<class T>
+  __device__ __host__ inline void SubTraceUnit(Matrix<T,3>& a){
+    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
+    a(0,0) -= tr; a(1,1) -= tr; a(2,2) -= tr;
+  }
+
+  template<class T>
+  __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
+    double sum = (double)(a(0,0).x * b(0,0).x  + a(0,0).y * b(0,0).y);
+    sum += (double)(a(0,1).x * b(0,1).x  + a(0,1).y * b(0,1).y);
+    sum += (double)(a(0,2).x * b(0,2).x  + a(0,2).y * b(0,2).y);
+    sum += (double)(a(1,0).x * b(1,0).x  + a(1,0).y * b(1,0).y);
+    sum += (double)(a(1,1).x * b(1,1).x  + a(1,1).y * b(1,1).y);
+    sum += (double)(a(1,2).x * b(1,2).x  + a(1,2).y * b(1,2).y);
+    sum += (double)(a(2,0).x * b(2,0).x  + a(2,0).y * b(2,0).y);
+    sum += (double)(a(2,1).x * b(2,1).x  + a(2,1).y * b(2,1).y);
+    sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
+    return sum;
+  }
+
 
 
   // and this!
   template<class Cmplx>
     __host__ __device__ inline
     void printLink(const Matrix<Cmplx,3>& link){
-#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
       printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
       printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
       printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
@@ -1021,8 +1064,171 @@ namespace quda{
       printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
       printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
       printf("\n");
-#endif
     }
+
+  template<class Cmplx>
+  __device__ __host__
+  bool isUnitary(const Matrix<Cmplx,3>& matrix, double max_error)
+  {
+    const Matrix<Cmplx,3> identity = conj(matrix)*matrix;
+
+    for(int i=0; i<3; ++i){
+      if( fabs(identity(i,i).x - 1.0) > max_error || fabs(identity(i,i).y) > max_error) return false;
+      for(int j=i+1; j<3; ++j){
+	if( fabs(identity(i,j).x) > max_error || fabs(identity(i,j).y) > max_error
+	    ||  fabs(identity(j,i).x) > max_error || fabs(identity(j,i).y) > max_error ){
+	  return false;
+	}
+      }
+    }
+
+    for (int i=0; i<3; i++) {
+      for (int j=0; j<3; j++) {
+	if (isnan(matrix(i,j).x) || isnan(matrix(i,j).y)) return false;
+      }
+    }
+
+    return true;
+  }
+
+  template<class T> 
+    __device__  __host__ inline
+    void exponentiate_iQ(const Matrix<T,3>& M, Matrix<T,3>* exp_iM)
+    {
+      // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
+      // This algorithm is outlined in
+      // http://arxiv.org/pdf/hep-lat/0311018v1.pdf
+      // Equation numbers in the paper are referenced by [eq_no].
+
+      //Declarations
+      double inv3 = 1.0/3.0;
+      
+      double c0, c1, c0_max;
+      double2 Tr, f0, f1, f2;
+      double theta;
+      double u_p, w_p;  //u, w parameters.
+      Matrix<T,3> temp1, temp2;
+      
+      //[14] c0 = det(Q) = 1/3Tr(Q^3)
+      const T & det_M = getDeterminant(M);
+      c0 = det_M.x;      
+      //[15] c1 = 1/2Tr(Q^2)
+      // Q = Q^dag => Tr(Q^2) = Tr(QQ^dag) = sum_ab [Q_ab * Q_ab^*]
+      temp1 = M;
+      temp1 = temp1 * M;
+      Tr.x = getTrace(temp1).x;
+      Tr.y = getTrace(temp1).y;
+      Tr  = 0.5 * Tr;
+      c1 = Tr.x;
+      
+      //We now have the coeffiecients c0 and c1.
+      //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
+      //      where       fj = fj(c0,c1), j=0,1,2.
+      
+      //[17]
+      c0_max  = 2*pow(c1*inv3,1.5);
+      
+      //[25]
+      theta   = acos(c0/c0_max);
+      
+      //[23]
+      u_p = sqrt(c1*inv3)*cos(theta*inv3);
+      
+      //[24]
+      w_p = sqrt(c1)*sin(theta*inv3);
+      
+      //[29] Construct objects for fj = hj/(9u^2 - w^2).
+      double u_sq = u_p*u_p;
+      double w_sq = w_p*w_p;
+      double denom = 9*u_sq - w_sq;
+      double exp_iu_re = cos(u_p);
+      double exp_iu_im = sin(u_p);
+      double exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
+      double exp_2iu_im = 2*exp_iu_re*exp_iu_im;
+      double cos_w = cos(w_p);
+      double sinc_w;
+      double hj_re = 0.0;
+      double hj_im = 0.0;
+  
+      //[33] Added one more term to the series given in the paper.
+      if (w_p < 0.05 && w_p > -0.05) {      
+	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
+	sinc_w = 1.0-1.0/6.0*w_sq*(1-0.05*w_sq*(1-1.0/42.0*w_sq*(1-1.0/72.0*w_sq)));
+      }
+      else sinc_w = sin(w_p)/w_p;
+      
+    
+      //[34] Test for c0 < 0.
+      int parity = 0;
+      if(c0 < 0) {
+	c0 *= -1.0;
+	parity = 1;
+	//calculate fj with c0 > 0 and then convert all fj.
+      }
+      
+      //Get all the numerators for fj,
+      //[30] f0
+      hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
+      hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
+      f0.x = (hj_re/denom);
+      f0.y = (hj_im/denom);
+      
+      //[31] f1
+      hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
+      hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
+      f1.x = (hj_re/denom);
+      f1.y = (hj_im/denom);
+      
+      //[32] f2
+      hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
+      hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;  
+      f2.x = (hj_re/denom);
+      f2.y = (hj_im/denom);
+      
+      //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
+      if (parity == 1) {
+	f0.y *= -1.0; 
+	f1.x *= -1.0;
+	f2.y *= -1.0;
+      }
+      
+      T f0_c;
+      T f1_c;
+      T f2_c;
+      
+      f0_c.x = f0.x;
+      f0_c.y = f0.y;
+      
+      f1_c.x = f1.x;  
+      f1_c.y = f1.y;  
+      
+      f2_c.x = f2.y;
+      f2_c.y = f2.y;
+
+      //[19] Construct exp{iQ}
+      setZero(exp_iM);
+      Matrix<T,3> Unm;
+      setIdentity(&Unm);
+      // +f0*I
+      Unm = f0_c * Unm;
+      *exp_iM += Unm;
+      
+      // +f1*Q
+      temp1 = M;
+      temp1 = f1_c * temp1; 
+      *exp_iM += temp1;
+
+      // +f2Q^2
+      temp1 = M;
+      temp1 *= M;
+      setIdentity(&temp2);
+      temp2 = f2_c * temp2;
+      temp2 *= temp1;
+      *exp_iM += temp2;
+
+      return;
+    }
+
 
 } // end namespace quda
 #endif // _QUDA_MATRIX_H_

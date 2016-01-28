@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,8 +37,8 @@
 #include <stdio.h>
 #include <iterator>
 
-#include "dispatch/device_reduce_dispatch.cuh"
-#include "dispatch/device_reduce_by_key_dispatch.cuh"
+#include "dispatch/dispatch_reduce.cuh"
+#include "dispatch/dispatch_reduce_by_key.cuh"
 #include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -132,7 +132,7 @@ struct DeviceReduce
      *
      * \tparam InputIteratorT     <b>[inferred]</b> Random-access input iterator type for reading input items \iterator
      * \tparam OutputIteratorT    <b>[inferred]</b> Output iterator type for recording the reduced aggregate \iterator
-     * \tparam ReductionOp        <b>[inferred]</b> Binary reduction functor type having member <tt>T operator()(const T &a, const T &b)</tt>
+     * \tparam ReductionOp        <b>[inferred]</b> Binary reduction functor type having member <tt>T operator()(const T &a, const T &b)</tt> (e.g., cub::Sum, cub::Min, cub::Max, etc.)
      */
     template <
         typename                    InputIteratorT,
@@ -140,7 +140,7 @@ struct DeviceReduce
         typename                    ReductionOp>
     CUB_RUNTIME_FUNCTION
     static cudaError_t Reduce(
-        void                        *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*                       d_temp_storage,                     ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                              ///< [out] Pointer to the output aggregate
@@ -153,9 +153,9 @@ struct DeviceReduce
         typedef int OffsetT;
 
         // Dispatch type
-        typedef DeviceReduceDispatch<InputIteratorT, OutputIteratorT, OffsetT, ReductionOp> DeviceReduceDispatch;
+        typedef DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, ReductionOp> DispatchReduce;
 
-        return DeviceReduceDispatch::Dispatch(
+        return DispatchReduce::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_in,
@@ -217,7 +217,7 @@ struct DeviceReduce
         typename                    OutputIteratorT>
     CUB_RUNTIME_FUNCTION
     static cudaError_t Sum(
-        void                        *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*                       d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                              ///< [out] Pointer to the output aggregate
@@ -229,9 +229,9 @@ struct DeviceReduce
         typedef int OffsetT;
 
         // Dispatch type
-        typedef DeviceReduceDispatch<InputIteratorT, OutputIteratorT, OffsetT, cub::Sum> DeviceReduceDispatch;
+        typedef DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, cub::Sum> DispatchReduce;
 
-        return DeviceReduceDispatch::Dispatch(
+        return DispatchReduce::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_in,
@@ -289,7 +289,7 @@ struct DeviceReduce
         typename                    OutputIteratorT>
     CUB_RUNTIME_FUNCTION
     static cudaError_t Min(
-        void                        *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*                       d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                              ///< [out] Pointer to the output aggregate
@@ -301,9 +301,9 @@ struct DeviceReduce
         typedef int OffsetT;
 
         // Dispatch type
-        typedef DeviceReduceDispatch<InputIteratorT, OutputIteratorT, OffsetT, cub::Min> DeviceReduceDispatch;
+        typedef DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, cub::Min> DispatchReduce;
 
-        return DeviceReduceDispatch::Dispatch(
+        return DispatchReduce::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_in,
@@ -320,8 +320,8 @@ struct DeviceReduce
      *
      * \par
      * Assuming the input \p d_in has value type \p T, the output \p d_out must have value type
-     * <tt>ItemOffsetPair<T, int></tt>.  The minimum value is written to <tt>d_out.value</tt> and its
-     * location in the input array is written to <tt>d_out.offset</tt>.
+     * <tt>KeyValuePair<int, T></tt>.  The minimum value is written to <tt>d_out.value</tt> and its
+     * location in the input array is written to <tt>d_out.key</tt>.
      *
      * \par
      * - Does not support non-commutative minimum operators.
@@ -340,7 +340,7 @@ struct DeviceReduce
      * // Declare, allocate, and initialize device pointers for input and output
      * int                      num_items;      // e.g., 7
      * int                      *d_in;          // e.g., [8, 6, 7, 5, 3, 0, 9]
-     * ItemOffsetPair<int, int> *d_out;         // e.g., [{ , }]
+     * KeyValuePair<int, int>   *d_out;         // e.g., [{ , }]
      * ...
      *
      * // Determine temporary device storage requirements
@@ -359,14 +359,14 @@ struct DeviceReduce
      * \endcode
      *
      * \tparam InputIteratorT     <b>[inferred]</b> Random-access input iterator type for reading input items (of some type \p T) \iterator
-     * \tparam OutputIteratorT    <b>[inferred]</b> Output iterator type for recording the reduced aggregate (having value type <tt>ItemOffsetPair<T, int></tt>) \iterator
+     * \tparam OutputIteratorT    <b>[inferred]</b> Output iterator type for recording the reduced aggregate (having value type <tt>KeyValuePair<int, T></tt>) \iterator
      */
     template <
         typename                    InputIteratorT,
         typename                    OutputIteratorT>
     CUB_RUNTIME_FUNCTION
     static cudaError_t ArgMin(
-        void                        *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                              ///< [out] Pointer to the output aggregate
@@ -382,9 +382,9 @@ struct DeviceReduce
         ArgIndexInputIteratorT d_argmin_in(d_in, 0);
 
         // Dispatch type
-        typedef DeviceReduceDispatch<ArgIndexInputIteratorT, OutputIteratorT, OffsetT, cub::ArgMin> DeviceReduceDispatch;
+        typedef DispatchReduce<ArgIndexInputIteratorT, OutputIteratorT, OffsetT, cub::ArgMin> DispatchReduce;
 
-        return DeviceReduceDispatch::Dispatch(
+        return DispatchReduce::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_argmin_in,
@@ -442,7 +442,7 @@ struct DeviceReduce
         typename                    OutputIteratorT>
     CUB_RUNTIME_FUNCTION
     static cudaError_t Max(
-        void                        *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                              ///< [out] Pointer to the output aggregate
@@ -454,9 +454,9 @@ struct DeviceReduce
         typedef int OffsetT;
 
         // Dispatch type
-        typedef DeviceReduceDispatch<InputIteratorT, OutputIteratorT, OffsetT, cub::Max> DeviceReduceDispatch;
+        typedef DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, cub::Max> DispatchReduce;
 
-        return DeviceReduceDispatch::Dispatch(
+        return DispatchReduce::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_in,
@@ -473,8 +473,8 @@ struct DeviceReduce
      *
      * \par
      * Assuming the input \p d_in has value type \p T, the output \p d_out must have value type
-     * <tt>ItemOffsetPair<T, int></tt>.  The maximum value is written to <tt>d_out.value</tt> and its
-     * location in the input array is written to <tt>d_out.offset</tt>.
+     * <tt>KeyValuePair<int, T></tt>.  The maximum value is written to <tt>d_out.value</tt> and its
+     * location in the input array is written to <tt>d_out.key</tt>.
      *
      * \par
      * - Does not support non-commutative maximum operators.
@@ -493,7 +493,7 @@ struct DeviceReduce
      * // Declare, allocate, and initialize device pointers for input and output
      * int                      num_items;      // e.g., 7
      * int                      *d_in;          // e.g., [8, 6, 7, 5, 3, 0, 9]
-     * ItemOffsetPair<int, int> *d_out;         // e.g., [{ , }]
+     * KeyValuePair<int, int>   *d_out;         // e.g., [{ , }]
      * ...
      *
      * // Determine temporary device storage requirements
@@ -512,14 +512,14 @@ struct DeviceReduce
      * \endcode
      *
      * \tparam InputIteratorT     <b>[inferred]</b> Random-access input iterator type for reading input items (of some type \p T) \iterator
-     * \tparam OutputIteratorT    <b>[inferred]</b> Output iterator type for recording the reduced aggregate (having value type <tt>ItemOffsetPair<T, int></tt>) \iterator
+     * \tparam OutputIteratorT    <b>[inferred]</b> Output iterator type for recording the reduced aggregate (having value type <tt>KeyValuePair<int, T></tt>) \iterator
      */
     template <
         typename                    InputIteratorT,
         typename                    OutputIteratorT>
     CUB_RUNTIME_FUNCTION
     static cudaError_t ArgMax(
-        void                        *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                              ///< [out] Pointer to the output aggregate
@@ -535,9 +535,9 @@ struct DeviceReduce
         ArgIndexInputIteratorT d_argmax_in(d_in, 0);
 
         // Dispatch type
-        typedef DeviceReduceDispatch<ArgIndexInputIteratorT, OutputIteratorT, OffsetT, cub::ArgMax> DeviceReduceDispatch;
+        typedef DispatchReduce<ArgIndexInputIteratorT, OutputIteratorT, OffsetT, cub::ArgMax> DispatchReduce;
 
-        return DeviceReduceDispatch::Dispatch(
+        return DispatchReduce::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_argmax_in,
@@ -629,7 +629,7 @@ struct DeviceReduce
      * \tparam ValuesInputIteratorT     <b>[inferred]</b> Random-access input iterator type for reading input values \iterator
      * \tparam AggregatesOutputIterator <b>[inferred]</b> Random-access output iterator type for writing output value aggregates \iterator
      * \tparam NumRunsOutputIteratorT   <b>[inferred]</b> Output iterator type for recording the number of runs encountered \iterator
-     * \tparam ReductionOp              <b>[inferred]</b> Binary reduction functor type having member <tt>T operator()(const T &a, const T &b)</tt>
+     * \tparam ReductionOp              <b>[inferred]</b> Binary reduction functor type having member <tt>T operator()(const T &a, const T &b)</tt> (e.g., cub::Sum, cub::Min, cub::Max, etc.)
      */
     template <
         typename                    KeysInputIteratorT,
@@ -640,7 +640,7 @@ struct DeviceReduce
         typename                    ReductionOp>
     CUB_RUNTIME_FUNCTION __forceinline__
     static cudaError_t ReduceByKey(
-        void                        *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         KeysInputIteratorT          d_keys_in,                      ///< [in] Pointer to the input sequence of keys
         UniqueOutputIteratorT       d_unique_out,                   ///< [out] Pointer to the output sequence of unique keys (one key per run)
@@ -657,7 +657,7 @@ struct DeviceReduce
         typedef NullType            SelectOp;       // Selection op (not used)
         typedef Equality            EqualityOp;     // Default == operator
 
-        return DeviceReduceByKeyDispatch<KeysInputIteratorT, UniqueOutputIteratorT, ValuesInputIteratorT, AggregatesOutputIteratorT, NumRunsOutputIteratorT, EqualityOp, ReductionOp, OffsetT>::Dispatch(
+        return DispatchReduceByKey<KeysInputIteratorT, UniqueOutputIteratorT, ValuesInputIteratorT, AggregatesOutputIteratorT, NumRunsOutputIteratorT, EqualityOp, ReductionOp, OffsetT>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_keys_in,

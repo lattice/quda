@@ -21,6 +21,7 @@
 #define QUDA_GENERAL_LINKS 1
 #define QUDA_THREE_LINKS   2
 #define QUDA_MOMENTUM      3
+#define QUDA_COARSE_LINKS  4
 #define QUDA_WILSON_LINKS         QUDA_SU3_LINKS
 #define QUDA_ASQTAD_FAT_LINKS     QUDA_GENERAL_LINKS
 #define QUDA_ASQTAD_LONG_LINKS    QUDA_THREE_LINKS
@@ -100,6 +101,11 @@
 #define QUDA_MPCG_INVERTER 8
 #define QUDA_EIGCG_INVERTER 9
 #define QUDA_INC_EIGCG_INVERTER 10
+#define QUDA_GMRESDR_INVERTER 11
+#define QUDA_GMRESDR_PROJ_INVERTER 12
+#define QUDA_GMRESDR_SH_INVERTER 13
+#define QUDA_FGMRESDR_INVERTER 14
+#define QUDA_MG_INVERTER 15
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
@@ -247,8 +253,8 @@
   
 ! Which sites are included
 #define QudaSiteSubset integer(4)
-#define QUDA_FULL_SITE_SUBSET 0
 #define QUDA_PARITY_SITE_SUBSET 1
+#define QUDA_FULL_SITE_SUBSET 2
 #define QUDA_INVALID_SITE_SUBSET QUDA_INVALID_ENUM
   
 ! Site ordering (always t-z-y-x with rightmost varying fastest)
@@ -285,7 +291,14 @@
 #define QudaSourceType integer(4)
 #define QUDA_POINT_SOURCE 0
 #define QUDA_RANDOM_SOURCE 1
+#define QUDA_CONSTANT_SOURCE 2
+#define QUDA_SINUSOIDAL_SOURCE 3
 #define QUDA_INVALID_SOURCE QUDA_INVALID_ENUM
+
+#define QudaProjectionType
+#define QUDA_MINRES_PROJECTION 0
+#define QUDA_GALERKIN_PROJECTION 1
+#define QUDA_INVALID_PROJECTION QUDA_INVALID_ENUM
   
 #define QudaDWFPCType 
 #define QUDA_5D_PC 0
@@ -322,6 +335,11 @@
 #define QUDA_USE_INIT_GUESS_NO  0 
 #define QUDA_USE_INIT_GUESS_YES 1
 #define QUDA_USE_INIT_GUESS_INVALID QUDA_INVALID_ENUM
+
+#define QudaComputeNullVector integer(4)
+#define QUDA_COMPUTE_NULL_VECTOR_NO  0 
+#define QUDA_COMPUTE_NULL_VECTOR_YES 1
+#define QUDA_COMPUTE_NULL_VECTOR_INVALID QUDA_INVALID_ENUM
 
 #define QudaDirection integer(4)
 #define QUDA_BACKWARDS -1

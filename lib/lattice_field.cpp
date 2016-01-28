@@ -18,6 +18,13 @@ namespace quda {
   bool LatticeField::bufferDeviceInit = false;
   size_t LatticeField::bufferDeviceBytes = 0;
 
+  // cache of inactive allocations
+  std::multimap<size_t, void *> LatticeField::pinnedCache;
+
+  // sizes of active allocations
+  std::map<void *, size_t> LatticeField::pinnedSize;
+
+
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
       siteSubset(param.siteSubset)
@@ -49,7 +56,6 @@ namespace quda {
   LatticeField::~LatticeField() {
   }
 
-
   void LatticeField::setTuningString() {
     char vol_tmp[TuneKey::volume_n];
     int check;
@@ -62,7 +68,7 @@ namespace quda {
     }
   }
 
-  void LatticeField::checkField(const LatticeField &a) {
+  void LatticeField::checkField(const LatticeField &a) const {
     if (a.volume != volume) errorQuda("Volume does not match %d %d", volume, a.volume);
     if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %d %d", volumeCB, a.volumeCB);
     if (a.nDim != nDim) errorQuda("nDim does not match %d %d", nDim, a.nDim);
@@ -76,15 +82,26 @@ namespace quda {
   QudaFieldLocation LatticeField::Location() const { 
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (typeid(*this)==typeid(cudaCloverField) || 
+	typeid(*this)==typeid(cudaColorSpinorField) ||
 	typeid(*this)==typeid(cudaGaugeField)) {
       location = QUDA_CUDA_FIELD_LOCATION; 
     } else if (typeid(*this)==typeid(cpuCloverField) || 
+	       typeid(*this)==typeid(cpuColorSpinorField) ||
 	       typeid(*this)==typeid(cpuGaugeField)) {
+      location = QUDA_CPU_FIELD_LOCATION;
       location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
     }
     return location;
+}
+
+  void LatticeField::read(char *filename) {
+    errorQuda("Not implemented");
+  }
+  
+  void LatticeField::write(char *filename) {
+    errorQuda("Not implemented");
   }
 
   int LatticeField::Nvec() const {
@@ -140,6 +157,51 @@ namespace quda {
       bufferDeviceInit = false;
     }
   }
+
+  void *LatticeField::allocatePinned(size_t nbytes) const
+  {
+    std::multimap<size_t, void *>::iterator it;
+    void *ptr = 0;
+
+    if (pinnedCache.empty()) {
+      ptr = pinned_malloc(nbytes);
+    } else {
+      it = pinnedCache.lower_bound(nbytes);
+      if (it != pinnedCache.end()) { // sufficiently large allocation found
+	nbytes = it->first;
+	ptr = it->second;
+	pinnedCache.erase(it);
+      } else { // sacrifice the smallest cached allocation
+	it = pinnedCache.begin();
+	ptr = it->second;
+	pinnedCache.erase(it);
+	host_free(ptr);
+	ptr = pinned_malloc(nbytes);
+      }
+    }
+    pinnedSize[ptr] = nbytes;
+    return ptr;
+  }
+
+  void LatticeField::freePinned(void *ptr) const
+  {
+    if (!pinnedSize.count(ptr)) {
+      errorQuda("Attempt to free invalid pointer");
+    }
+    pinnedCache.insert(std::make_pair(pinnedSize[ptr], ptr));
+    pinnedSize.erase(ptr);
+  }
+
+  void LatticeField::flushPinnedCache()
+  {
+    std::multimap<size_t, void *>::iterator it;
+    for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
+      void *ptr = it->second;
+      host_free(ptr);
+    }
+    pinnedCache.clear();
+  }
+
 
   // This doesn't really live here, but is fine for the moment
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param)

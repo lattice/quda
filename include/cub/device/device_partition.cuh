@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,7 +37,7 @@
 #include <stdio.h>
 #include <iterator>
 
-#include "dispatch/device_select_dispatch.cuh"
+#include "dispatch/dispatch_select_if.cuh"
 #include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -125,7 +125,7 @@ struct DevicePartition
         typename                    NumSelectedIteratorT>
     CUB_RUNTIME_FUNCTION __forceinline__
     static cudaError_t Flagged(
-        void                        *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of data items
         FlagIterator                d_flags,                        ///< [in] Pointer to the input sequence of selection flags
@@ -139,7 +139,7 @@ struct DevicePartition
         typedef NullType                SelectOp;       // Selection op (not used)
         typedef NullType                EqualityOp;     // Equality operator (not used)
 
-        return DeviceSelectDispatch<InputIteratorT, FlagIterator, OutputIteratorT, NumSelectedIteratorT, SelectOp, EqualityOp, OffsetT, true>::Dispatch(
+        return DispatchSelectIf<InputIteratorT, FlagIterator, OutputIteratorT, NumSelectedIteratorT, SelectOp, EqualityOp, OffsetT, true>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_in,
@@ -234,7 +234,7 @@ struct DevicePartition
         typename                    SelectOp>
     CUB_RUNTIME_FUNCTION __forceinline__
     static cudaError_t If(
-        void                        *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                          ///< [out] Pointer to the output sequence of partitioned data items
@@ -248,7 +248,7 @@ struct DevicePartition
         typedef NullType*               FlagIterator;   // FlagT iterator type (not used)
         typedef NullType                EqualityOp;     // Equality operator (not used)
 
-        return DeviceSelectDispatch<InputIteratorT, FlagIterator, OutputIteratorT, NumSelectedIteratorT, SelectOp, EqualityOp, OffsetT, true>::Dispatch(
+        return DispatchSelectIf<InputIteratorT, FlagIterator, OutputIteratorT, NumSelectedIteratorT, SelectOp, EqualityOp, OffsetT, true>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
             d_in,

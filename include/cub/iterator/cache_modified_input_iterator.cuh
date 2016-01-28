@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -128,11 +128,10 @@ public:
 #endif  // THRUST_VERSION
 
 
-private:
-
-    ValueType* ptr;
-
 public:
+
+    /// Wrapped native pointer
+    ValueType* ptr;
 
     /// Constructor
     template <typename QualifiedValueType>
@@ -158,7 +157,7 @@ public:
     }
 
     /// Indirection
-    __host__ __device__ __forceinline__ reference operator*() const
+    __device__ __forceinline__ reference operator*() const
     {
         return ThreadLoad<MODIFIER>(ptr);
     }
@@ -203,13 +202,13 @@ public:
 
     /// Array subscript
     template <typename Distance>
-    __host__ __device__ __forceinline__ reference operator[](Distance n) const
+    __device__ __forceinline__ reference operator[](Distance n) const
     {
         return ThreadLoad<MODIFIER>(ptr + n);
     }
 
     /// Structure dereference
-    __host__ __device__ __forceinline__ pointer operator->()
+    __device__ __forceinline__ pointer operator->()
     {
         return &ThreadLoad<MODIFIER>(ptr);
     }

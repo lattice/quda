@@ -3,17 +3,54 @@
 
 namespace quda {
 
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(),
+    nColor(3),
+    nFace(u.Nface()),
+    reconstruct(u.Reconstruct()),
+    order(u.Order()),
+    fixed(u.GaugeFixed()),
+    link_type(u.LinkType()),
+    t_boundary(u.TBoundary()),
+    anisotropy(u.Anisotropy()),
+    tadpole(u.Tadpole()),
+    scale(u.Scale()),
+    gauge(NULL),
+    create(QUDA_NULL_FIELD_CREATE),
+    geometry(u.Geometry()),
+    pinned(0),
+    compute_fat_link_max(false),
+    ghostExchange(u.GhostExchange()),
+    staggeredPhaseType(u.StaggeredPhase()),
+    staggeredPhaseApplied(u.StaggeredPhaseApplied()),
+    i_mu(u.iMu())
+      {
+	precision = u.Precision();
+	nDim = u.Ndim();
+	pad = u.Pad();
+	siteSubset = QUDA_FULL_SITE_SUBSET;
+
+	for(int dir=0; dir<nDim; ++dir) {
+	  x[dir] = u.X()[dir];
+	  r[dir] = u.X()[dir];
+	}
+      }
+
+
   GaugeField::GaugeField(const GaugeFieldParam &param) :
     LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
-    geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 
-    fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
+    geometry(param.geometry), reconstruct(param.reconstruct), 
+    nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
+    order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
     create(param.create), ghostExchange(param.ghostExchange), 
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied)
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
   {
-    if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
-    if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d", nDim);
-    if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0) errorQuda("Anisotropy only supported for Wilson links");
+    if (link_type != QUDA_COARSE_LINKS) {
+      if (nColor != 3) errorQuda("nColor must be 3, not %d for this link type", nColor);
+      if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d for Nc=3 for this link type", nDim);
+    }
+    if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0) 
+      errorQuda("Anisotropy only supported for Wilson links");
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
 
@@ -23,14 +60,17 @@ namespace quda {
     if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
 
     if(geometry == QUDA_SCALAR_GEOMETRY) {
-      real_length = volume*reconstruct;
-      length = 2*stride*reconstruct; // two comes from being full lattice
+      real_length = volume*nInternal;
+      length = 2*stride*nInternal; // two comes from being full lattice
     } else if (geometry == QUDA_VECTOR_GEOMETRY) {
-      real_length = nDim*volume*reconstruct;
-      length = 2*nDim*stride*reconstruct; // two comes from being full lattice
+      real_length = nDim*volume*nInternal;
+      length = 2*nDim*stride*nInternal; // two comes from being full lattice
     } else if(geometry == QUDA_TENSOR_GEOMETRY){
-      real_length = (nDim*(nDim-1)/2)*volume*reconstruct;
-      length = 2*(nDim*(nDim-1)/2)*stride*reconstruct; // two comes from being full lattice
+      real_length = (nDim*(nDim-1)/2)*volume*nInternal;
+      length = 2*(nDim*(nDim-1)/2)*stride*nInternal; // two comes from being full lattice
+    } else if(geometry == QUDA_COARSE_GEOMETRY){
+      real_length = param.siteDim*volume*nInternal;
+      length = 2*param.siteDim*stride*nInternal;  //two comes from being full lattice
     }
 
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
@@ -40,8 +80,7 @@ namespace quda {
     }
 
 
-    if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13)
-    {
+    if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.  
       int half_phase_bytes = (length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
       int half_gauge_bytes = (length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
@@ -107,6 +146,71 @@ namespace quda {
     return false;
   }
 
+  void GaugeField::exchange(void **ghost_link, void **link_sendbuf) const {
+    MsgHandle *mh_from_back[4];
+    MsgHandle *mh_send_fwd[4];
+    size_t bytes[4];
+
+    for (int i=0; i<nDimComms; i++) bytes[i] = 2*nFace*surfaceCB[i]*nInternal*precision;
+
+    void *send[4];
+    void *receive[4];
+    if (Location() == QUDA_CPU_FIELD_LOCATION) {
+      for (int i=0; i<nDimComms; i++) {
+	if (comm_dim_partitioned(i)) {
+	  send[i] = link_sendbuf[i];
+	  receive[i] = ghost_link[i];
+	} else {
+	  memcpy(ghost_link[i], link_sendbuf[i], bytes[i]);
+	}
+      }
+    } else { // FIXME for CUDA field copy back to the CPU
+      for (int i=0; i<nDimComms; i++) {
+	if (comm_dim_partitioned(i)) {
+	  send[i] = allocatePinned(bytes[i]);
+	  receive[i] = allocatePinned(bytes[i]);
+	  cudaMemcpy(send[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToHost);
+	} else {
+	  cudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
+	}
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      mh_send_fwd[i] = comm_declare_send_relative(send[i], i, +1, bytes[i]);
+      mh_from_back[i] = comm_declare_receive_relative(receive[i], i, -1, bytes[i]);
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_start(mh_send_fwd[i]);
+      comm_start(mh_from_back[i]);
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_wait(mh_send_fwd[i]);
+      comm_wait(mh_from_back[i]);
+    }
+
+    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
+      for (int i=0; i<nDimComms; i++) {
+	if (!comm_dim_partitioned(i)) continue;
+	cudaMemcpy(ghost_link[i], receive[i], bytes[i], cudaMemcpyHostToDevice);
+	freePinned(send[i]);
+	freePinned(receive[i]);
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_free(mh_send_fwd[i]);
+      comm_free(mh_from_back[i]);
+    }
+
+  }
+
   void GaugeField::checkField(const GaugeField &a) {
     LatticeField::checkField(a);
     if (a.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, a.link_type);
@@ -124,6 +228,9 @@ namespace quda {
     output << "nColor = " << param.nColor << std::endl;
     output << "nFace = " << param.nFace << std::endl;
     output << "reconstruct = " << param.reconstruct << std::endl;
+    int nInternal = (param.reconstruct != QUDA_RECONSTRUCT_NO ? 
+		     param.reconstruct : param.nColor * param.nColor * 2);
+    output << "nInternal = " << nInternal << std::endl;
     output << "order = " << param.order << std::endl;
     output << "fixed = " << param.fixed << std::endl;
     output << "link_type = " << param.link_type << std::endl;

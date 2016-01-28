@@ -6,6 +6,8 @@
 #include <face_quda.h>
 #include <gauge_field.h>
 
+#include <worker.h>
+
 namespace quda {
 
   /**
@@ -136,6 +138,13 @@ namespace quda {
   void packFace(void *ghost_buf, cudaColorSpinorField &in, FullClover &clov, FullClover &clovInv,
 		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
 		const cudaStream_t &stream, const double a=0.0);
+
+  /**
+     out = gamma_5 in
+     @param out Output field
+     @param in Input field
+   */
+  void gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in);
 
 }
 

@@ -15,17 +15,10 @@
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
-#elif (__COMPUTE_CAPABILITY__ >= 200)
+#else // Fermi
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#else
-#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-//#define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
@@ -47,7 +40,6 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
-#define STAGGERED_TESLA_HACK
 #undef GPU_NDEG_TWISTED_MASS_DIRAC
 #undef GPU_CLOVER_DIRAC
 #undef GPU_DOMAIN_WALL_DIRAC
@@ -105,28 +97,105 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-#if (__COMPUTE_CAPABILITY__ >= 200)
       IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 				(sFloat*)out->V(), (float*)out->Norm(), 
 				fat0, fat1, long0, long1, phase0, phase1, 
 				(sFloat*)in->V(), (float*)in->Norm(), 
 				(sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
-#else
-      IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
-				(sFloat*)out->V(), (float*)out->Norm(), 
-				fat0, fat1, long0, long1,
-				(sFloat*)in->V(), (float*)in->Norm(), 
-				(sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
-#endif
     }
 
     int Nface() { return 6; } 
 
-    long long flops() const { 
+    /*
+      per direction / dimension flops
+      SU(3) matrix-vector flops = (8 Nc - 2) * Nc
+      xpay = 2 * 2 * Nc * Ns
+      
+      So for the full dslash we have      
+      flops = (2 * 2 * Nd * (8*Nc-2) * Nc)  +  ((2 * 2 * Nd - 1) * 2 * Nc * Ns)
+      flops_xpay = flops + 2 * 2 * Nc * Ns
+      
+      For Asqtad this should give 1146 for Nc=3,Ns=2 and 1158 for the axpy equivalent
+    */
+    virtual long long flops() const {
+      int mv_flops = (8 * in->Ncolor() - 2) * in->Ncolor(); // SU(3) matrix-vector flops
+      int ghost_flops = (3 + 1) * (mv_flops + 2*in->Ncolor()*in->Nspin());
+      int xpay_flops = 2 * 2 * in->Ncolor() * in->Nspin(); // multiply and add per real component
+      int num_dir = 2 * 4; // dir * dim
+
       long long flops;
-      flops = (x ? 1158ll : 1146ll) * in->VolumeCB();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	flops = ghost_flops * 2 * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	{
+	  long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	  flops = ghost_flops * ghost_sites;
+	  break;
+	}
+      case INTERIOR_KERNEL:
+	{
+	  long long sites = in->VolumeCB();
+	  flops = (2*num_dir*mv_flops +                   // SU(3) matrix-vector multiplies
+		   (2*num_dir-1)*2*in->Ncolor()*in->Nspin()) * sites;   // accumulation
+	  if (x) flops += xpay_flops * sites; // axpy is always on interior
+
+	  // now correct for flops done by exterior kernel
+	  long long ghost_sites = 0;
+	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
+	  flops -= ghost_flops * ghost_sites;
+	  
+	  break;
+	}
+      }
       return flops;
-    } 
+    }
+
+    virtual long long bytes() const {
+      int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in->Precision();
+      int gauge_bytes_long = reconstruct * in->Precision();
+      bool isHalf = in->Precision() == sizeof(short) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat) + spinor_bytes;
+      int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
+
+      long long bytes;
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	bytes = ghost_bytes * 2 * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	{
+	  long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	  bytes = ghost_bytes * ghost_sites;
+	  break;
+	}
+      case INTERIOR_KERNEL:
+	{
+	  long long sites = in->VolumeCB();
+	  bytes = (num_dir*(gauge_bytes_fat + gauge_bytes_long) + // gauge reads
+		   num_dir*2*spinor_bytes +                       // spinor reads
+		   spinor_bytes)*sites;                           // spinor write
+	  if (x) bytes += spinor_bytes;
+
+	  // now correct for bytes done by exterior kernel
+	  long long ghost_sites = 0;
+	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
+	  bytes -= ghost_bytes * ghost_sites;
+	  
+	  break;
+	}
+      }
+      return bytes;
+    }
+
   };
 #endif // GPU_STAGGERED_DIRAC
 
@@ -180,16 +249,12 @@ namespace quda {
     size_t regSize = sizeof(float);
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       dslash = new StaggeredDslashCuda<double2, double2, double2, double>
 	(out, (double2*)fatGauge0, (double2*)fatGauge1,
 	 (double2*)longGauge0, (double2*)longGauge1,
 	 (double*)longPhase0, (double*)longPhase1, 
 	 longGauge.Reconstruct(), in, x, k, dagger);
       regSize = sizeof(double);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new StaggeredDslashCuda<float2, float2, float4, float>
 	(out, (float2*)fatGauge0, (float2*)fatGauge1,

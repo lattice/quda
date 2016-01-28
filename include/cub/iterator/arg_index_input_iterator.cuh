@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -62,12 +62,12 @@ namespace cub {
 
 
 /**
- * \brief A random-access input wrapper for pairing dereferenced values with their corresponding indices (forming \p ItemOffsetPair tuples).
+ * \brief A random-access input wrapper for pairing dereferenced values with their corresponding indices (forming \p KeyValuePair tuples).
  *
  * \par Overview
  * - ArgIndexInputIteratorTwraps a random access input iterator \p itr of type \p InputIteratorT.
- *   Dereferencing an ArgIndexInputIteratorTat offset \p i produces a \p ItemOffsetPair value whose
- *   \p offset field is \p i and whose \p item field is <tt>itr[i]</tt>.
+ *   Dereferencing an ArgIndexInputIteratorTat offset \p i produces a \p KeyValuePair value whose
+ *   \p key field is \p i and whose \p value field is <tt>itr[i]</tt>.
  * - Can be used with any data type.
  * - Can be constructed, manipulated, and exchanged within and between host and device
  *   functions.  Wrapped host memory can only be dereferenced on the host, and wrapped
@@ -89,16 +89,16 @@ namespace cub {
  *
  * // Within device code:
  * typedef typename cub::ArgIndexInputIterator<double*>::value_type Tuple;
- * Tuple item_offset_pair.offset = *itr;
+ * Tuple item_offset_pair.key = *itr;
  * printf("%f @ %d\n",
  *  item_offset_pair.value,
- *  item_offset_pair.offset);   // 8.0 @ 0
+ *  item_offset_pair.key);   // 8.0 @ 0
  *
  * itr = itr + 6;
- * item_offset_pair.offset = *itr;
+ * item_offset_pair.key = *itr;
  * printf("%f @ %d\n",
  *  item_offset_pair.value,
- *  item_offset_pair.offset);   // 9.0 @ 6
+ *  item_offset_pair.key);   // 9.0 @ 6
  *
  * \endcode
  *
@@ -121,7 +121,7 @@ public:
     // Required iterator traits
     typedef ArgIndexInputIterator               self_type;              ///< My own type
     typedef OffsetT                             difference_type;        ///< Type to express the result of subtracting one iterator from another
-    typedef ItemOffsetPair<T, difference_type>  value_type;             ///< The type of the element the iterator can point to
+    typedef KeyValuePair<difference_type, T>    value_type;             ///< The type of the element the iterator can point to
     typedef value_type*                         pointer;                ///< The type of a pointer to an element the iterator can point to
     typedef value_type                          reference;              ///< The type of a reference to an element the iterator can point to
 
@@ -173,7 +173,7 @@ public:
     {
         value_type retval;
         retval.value = itr[offset];
-        retval.offset = offset;
+        retval.key = offset;
         return retval;
     }
 
@@ -219,7 +219,8 @@ public:
     template <typename Distance>
     __host__ __device__ __forceinline__ reference operator[](Distance n) const
     {
-        return *(*this + n);
+        self_type offset = (*this) + n;
+        return *offset;
     }
 
     /// Structure dereference

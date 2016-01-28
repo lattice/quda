@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -274,6 +274,15 @@ struct IterateThreadStore<MAX, MAX>
     CUB_STORE_ALL(STORE_CS, global)
     CUB_STORE_ALL(STORE_WT, volatile.global)
 #endif
+
+
+// Macro cleanup
+#undef CUB_STORE_ALL
+#undef CUB_STORE_1
+#undef CUB_STORE_2
+#undef CUB_STORE_4
+#undef CUB_STORE_8
+#undef CUB_STORE_16
 
 
 /**

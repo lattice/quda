@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -91,13 +91,13 @@ struct IteratorTexRef
         static TexRef ref;
 
         /// Bind texture
-        static cudaError_t BindTexture(void *d_in)
+        static cudaError_t BindTexture(void *d_in, size_t &offset)
         {
             if (d_in)
             {
                 cudaChannelFormatDesc tex_desc = cudaCreateChannelDesc<TextureWord>();
                 ref.channelDesc = tex_desc;
-                return (CubDebug(cudaBindTexture(NULL, ref, d_in)));
+                return (CubDebug(cudaBindTexture(&offset, ref, d_in)));
             }
 
             return cudaSuccess;
@@ -233,24 +233,26 @@ private:
     typedef typename IteratorTexRef<T>::template TexId<UNIQUE_ID> TexId;
 
 public:
-
+/*
     /// Constructor
     __host__ __device__ __forceinline__ TexRefInputIterator()
     :
         ptr(NULL),
         tex_offset(0)
     {}
-
+*/
     /// Use this iterator to bind \p ptr with a texture reference
     template <typename QualifiedT>
     cudaError_t BindTexture(
         QualifiedT      *ptr,                   ///< Native pointer to wrap that is aligned to cudaDeviceProp::textureAlignment
-        size_t          bytes,                  ///< Number of bytes in the range
+        size_t          bytes = size_t(-1),     ///< Number of bytes in the range
         size_t          tex_offset = 0)         ///< OffsetT (in items) from \p ptr denoting the position of the iterator
     {
         this->ptr = const_cast<typename RemoveQualifiers<QualifiedT>::Type *>(ptr);
-        this->tex_offset = (difference_type) tex_offset;
-        return TexId::BindTexture(this->ptr);
+        size_t offset;
+        cudaError_t retval = TexId::BindTexture(this->ptr + tex_offset, offset);
+        this->tex_offset = (difference_type) (offset / sizeof(QualifiedT));
+        return retval;
     }
 
     /// Unbind this iterator from its texture reference
@@ -332,7 +334,8 @@ public:
     template <typename Distance>
     __host__ __device__ __forceinline__ reference operator[](Distance n) const
     {
-        return *(*this + n);
+        self_type offset = (*this) + n;
+        return *offset;
     }
 
     /// Structure dereference

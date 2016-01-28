@@ -6,10 +6,6 @@
 
 namespace quda {
 
-  // forward declarations
-  double normCpu(const cpuColorSpinorField &b);
-  double normCuda(const cudaColorSpinorField &b);
-
   /*ColorSpinorField::ColorSpinorField() : init(false) {
 
     }*/
@@ -43,41 +39,38 @@ namespace quda {
 
   void ColorSpinorField::createGhostZone() {
 
-    if (!createSpinorGhost) {
+    if (!createSpinorGhost || typeid(*this) == typeid(cpuColorSpinorField)) {
       total_length = length;
-      total_norm_length = 2*stride;
+      total_norm_length = (precision == QUDA_HALF_PRECISION) ? 2*stride : 0;
+      ghost_length = 0;
+      ghost_norm_length = 0;
       return;
     }
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
       printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
 
-    int num_faces = 1;
-    int num_norm_faces=2;
+    // FIXME - The ghost zone is allocated before we know which
+    // operator (and hence number of faces are needed), thus we
+    // allocate a ghost zone large enough to cope with the maximum
+    // number of faces.  All Wilson-like operators support only
+    // involve the excahnge of one face so this is no problem.
+    // However, for staggered fermions, we have either nFace=1 or 3,
+    // thus we allocated using the latter.  This will artificially
+    // raise the GPU memory requirements for naive staggered fermions.
+    // One potential future solution may be to separate the ghost zone
+    // memory allocation from the field itself, which has other
+    // benefits (1. on multi-gpu machines with UVA, we can read the
+    // ghost zone directly from the neighbouring field and 2.) we can
+    // use a single contiguous buffer for the ghost zone and its norm
+    // which will reduce latency for half precision and allow us to
+    // enable GPU_COMMS support for half precision).
+    int nFaceGhost = (nSpin == 1) ? 3 : 1;
 
-    // FIXME - this is a hack from hell that needs to be fixed.  When
-    // the TIFR interface is enabled we are forcing naive staggered
-    // support which breaks asqtad/hisq fermions.  The problem occurs
-    // because the ghost zone is allocated before we know which
-    // operator (and hence number of faces are needed).  One solution
-    // may be to separate the ghost zone memory allocation from the
-    // field itself, which has other benefits (1. on multi-gpu
-    // machines with UVA, we can read the ghost zone directly from the
-    // neighbouring field and 2.) we can use a single contiguous
-    // buffer for the ghost zone and its norm which will reduce
-    // latency for half precision and allow us to enable GPU_COMMS
-    // support for half precision).
-#ifdef BUILD_TIFR_INTERFACE
-    if (nSpin == 1) { //staggered
-      num_faces=2;
-      num_norm_faces=2;
-    }
-#else
-    if (nSpin == 1) { // improved staggered
-      num_faces=6;
-      num_norm_faces=6;
-    }
-#endif
+    // For Wilson we have the number of effective faces since the
+    // fields are spin projected.
+    int num_faces = ((nSpin == 1) ? 2 : 1) * nFaceGhost;
+    int num_norm_faces = 2*nFaceGhost;
 
     // calculate size of ghost zone required
     int ghostVolume = 0;
@@ -128,17 +121,15 @@ namespace quda {
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       total_length = length + 2*ghost_length; // 2 ghost zones in a full field
-      total_norm_length = 2*(stride + ghost_norm_length); // norm length = 2*stride
+      total_norm_length = (precision == QUDA_HALF_PRECISION) ? 2*(stride + ghost_norm_length) : 0; // norm length = 2*stride
     } else {
       total_length = length + ghost_length;
       total_norm_length = (precision == QUDA_HALF_PRECISION) ? stride + ghost_norm_length : 0; // norm length = stride
     }
 
-    if (precision != QUDA_HALF_PRECISION) total_norm_length = 0;
-
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-      printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
-      printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
+      printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
+      printfQuda("total length = %lu, total norm length = %lu\n", total_length, total_norm_length);
     }
 
   } // createGhostZone
@@ -174,7 +165,8 @@ namespace quda {
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
+   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
+     errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
 
     pad = Pad;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -190,7 +182,7 @@ namespace quda {
     createGhostZone();
 
     bytes = total_length * precision; // includes pads and ghost zones
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     norm_bytes = total_norm_length * sizeof(float);
     norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
@@ -310,14 +302,14 @@ namespace quda {
 
     volume = 1;
     for (int d=0; d<nDim; d++) {
-      if (param.x[0] != 0) x[d] = param.x[d];
+      if (param.x[d] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-  if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
+    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
+      errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
 
-  
     if (param.pad != 0) pad = param.pad;
 
     if (param.siteSubset == QUDA_FULL_SITE_SUBSET){
@@ -341,7 +333,7 @@ namespace quda {
     real_length = volume*nColor*nSpin*2;
 
     bytes = total_length * precision; // includes pads and ghost zones
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = total_norm_length * sizeof(float);
@@ -415,6 +407,7 @@ namespace quda {
 
   // Fills the param with the contents of this field
   void ColorSpinorField::fill(ColorSpinorParam &param) const {
+    param.location = Location();
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.twistFlavor = twistFlavor;
@@ -432,10 +425,120 @@ namespace quda {
     param.create = QUDA_INVALID_FIELD_CREATE;
   }
 
+  void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const {
+
+    // FIXME: use LatticeField MsgHandles
+    MsgHandle *mh_send_fwd[4];
+    MsgHandle *mh_from_back[4];
+    MsgHandle *mh_from_fwd[4];
+    MsgHandle *mh_send_back[4];
+    size_t bytes[4];
+
+    const int Ninternal = 2*nColor*nSpin;
+    for (int i=0; i<nDimComms; i++) bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*precision;
+
+    void *send_fwd[4];
+    void *send_back[4];
+    void *recv_fwd[4];
+    void *recv_back[4];
+
+    // leave this option in there just in case
+    bool no_comms_fill = false;
+
+    for (int i=0; i<nDimComms; i++) {
+      if (Location() == QUDA_CPU_FIELD_LOCATION) {
+	if (comm_dim_partitioned(i)) {
+	  send_back[i] = sendbuf[2*i + 0];
+	  send_fwd[i]  = sendbuf[2*i + 1];
+	  recv_fwd[i]  =   ghost[2*i + 1];
+	  recv_back[i] =   ghost[2*i + 0];
+	} else if (no_comms_fill) {
+	  memcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i]);
+	  memcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i]);
+	}
+
+      } else { // FIXME add GPU_COMMS support
+	if (comm_dim_partitioned(i)) {
+	  send_back[i] = allocatePinned(bytes[i]);
+	  send_fwd[i] = allocatePinned(bytes[i]);
+	  recv_fwd[i] = allocatePinned(bytes[i]);
+	  recv_back[i] = allocatePinned(bytes[i]);
+	  cudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
+	  cudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
+	} else if (no_comms_fill) {
+	  cudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
+	  cudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
+	}
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      mh_send_fwd[i] = comm_declare_send_relative(send_fwd[i], i, +1, bytes[i]);
+      mh_send_back[i] = comm_declare_send_relative(send_back[i], i, -1, bytes[i]);
+      mh_from_fwd[i] = comm_declare_receive_relative(recv_fwd[i], i, +1, bytes[i]);
+      mh_from_back[i] = comm_declare_receive_relative(recv_back[i], i, -1, bytes[i]);
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (comm_dim_partitioned(i)) {
+	comm_start(mh_from_back[i]);
+	comm_start(mh_from_fwd[i]);
+	comm_start(mh_send_fwd[i]);
+	comm_start(mh_send_back[i]);
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_wait(mh_send_fwd[i]);
+      comm_wait(mh_send_back[i]);
+      comm_wait(mh_from_back[i]);
+      comm_wait(mh_from_fwd[i]);
+    }
+
+    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
+      for (int i=0; i<nDimComms; i++) {
+	if (!comm_dim_partitioned(i)) continue;
+	cudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], cudaMemcpyHostToDevice);
+	cudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], cudaMemcpyHostToDevice);
+	freePinned(send_back[i]);
+	freePinned(send_fwd[i]);
+	freePinned(recv_fwd[i]);
+	freePinned(recv_back[i]);
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_free(mh_send_fwd[i]);
+      comm_free(mh_send_back[i]);
+      comm_free(mh_from_back[i]);
+      comm_free(mh_from_fwd[i]);
+    }
+
+  }
+
+  bool ColorSpinorField::isNative() const {
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
+    } else if (precision == QUDA_SINGLE_PRECISION || 
+	       precision == QUDA_HALF_PRECISION) {
+      if (nSpin == 4) {
+	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
+      } else if (nSpin == 2) {
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+      } else if (nSpin == 1) {
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+      }
+    }
+    return false;
+  }
+
   // For kernels with precision conversion built in
   void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b) {
     if (a.Length() != b.Length()) {
-      errorQuda("checkSpinor: lengths do not match: %d %d", a.Length(), b.Length());
+      errorQuda("checkSpinor: lengths do not match: %lu %lu", a.Length(), b.Length());
     }
 
     if (a.Ncolor() != b.Ncolor()) {
@@ -449,6 +552,38 @@ namespace quda {
     if (a.TwistFlavor() != b.TwistFlavor()) {
       errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
     }
+  }
+
+  const ColorSpinorField& ColorSpinorField::Even() const {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
+    return *even;
+  }
+
+  const ColorSpinorField& ColorSpinorField::Odd() const {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
+    return *odd;
+  }
+
+  ColorSpinorField& ColorSpinorField::Even() {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
+    return *even;
+  }
+
+  ColorSpinorField& ColorSpinorField::Odd() {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
+    return *odd;
   }
 
   // Set the ghost pointers to NULL.
@@ -483,18 +618,139 @@ namespace quda {
     return ghostNorm[i];
   }
 
-  double norm2(const ColorSpinorField &a) {
+  void* const* ColorSpinorField::Ghost() const {
+    return ghost_fixme;
+  }
 
-    double rtn = 0.0;
-    if (typeid(a) == typeid(cudaColorSpinorField)) {
-      rtn = normCuda(dynamic_cast<const cudaColorSpinorField&>(a));
-    } else if (typeid(a) == typeid(cpuColorSpinorField)) {
-      rtn = normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
-    } else {
-      errorQuda("Unknown input ColorSpinorField %s", typeid(a).name());
+  /*
+    Convert from 1-dimensional index to the n-dimensional spatial index.
+    With full fields, we assume that the field is even-odd ordered.  The
+    lattice coordinates that are computed here are full-field
+    coordinates.
+  */
+  void ColorSpinorField::LatticeIndex(int *y, int i) const {
+    int z[QUDA_MAX_DIM];
+    memcpy(z, x, QUDA_MAX_DIM*sizeof(int));
+
+    // parity is the slowest running dimension
+    int parity = 0;
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) z[0] /= 2;
+
+    for (int d=0; d<nDim; d++) {
+      y[d] = i % z[d];
+      i /= z[d];    
     }
 
-    return rtn;
+    parity = i;
+
+    // convert into the full-field lattice coordinate
+    int oddBit = parity;
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      for (int d=1; d<nDim; d++) oddBit += y[d];
+      oddBit = oddBit & 1;
+    }
+    y[0] = 2*y[0] + oddBit;  // compute the full x coordinate
+  }
+
+  /*
+    Convert from n-dimensional spatial index to the 1-dimensional index.
+    With full fields, we assume that the field is even-odd ordered.  The
+    input lattice coordinates are always full-field coordinates.
+  */
+  void ColorSpinorField::OffsetIndex(int &i, int *y) const {
+
+    int parity = 0;
+    int z[QUDA_MAX_DIM];
+    memcpy(z, x, QUDA_MAX_DIM*sizeof(int));
+    int savey0 = y[0];
+
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      for (int d=0; d<nDim; d++) parity += y[d];
+      parity = parity & 1;
+      y[0] /= 2;
+      z[0] /= 2;
+    }
+
+    i = parity;
+    for (int d=nDim-1; d>=0; d--) {
+      i = z[d]*i + y[d];
+      //printf("z[%d]=%d y[%d]=%d ", d, z[d], d, y[d]);
+    }
+
+    //printf("\nparity = %d\n", parity);
+
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
+  }
+
+  ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) {
+
+    ColorSpinorField *field = NULL;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuColorSpinorField(param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaColorSpinorField(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
+  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec, 
+						   QudaFieldLocation new_location) {
+    ColorSpinorParam coarseParam(*this);
+    for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
+    coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin 
+
+    coarseParam.nColor = Nvec;
+    coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
+    coarseParam.create = QUDA_ZERO_FIELD_CREATE;
+    
+    // if new location is not set, use this->location
+    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
+    // for GPU fields, always use native ordering to ensure coalescing
+    if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+
+    ColorSpinorField *coarse = NULL;
+    if (new_location == QUDA_CPU_FIELD_LOCATION) {
+      coarse = new cpuColorSpinorField(coarseParam);
+    } else if (new_location== QUDA_CUDA_FIELD_LOCATION) {
+      coarse = new cudaColorSpinorField(coarseParam);
+    } else {
+      errorQuda("Invalid field location %d", new_location);
+    }
+
+    return coarse;
+  }
+
+  ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec, 
+						 QudaFieldLocation new_location) {
+    ColorSpinorParam fineParam(*this);
+    for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
+    fineParam.nSpin = nSpin * spinBlockSize;
+    fineParam.nColor = Nvec;
+    fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
+    fineParam.create = QUDA_ZERO_FIELD_CREATE;
+    
+    // if new location is not set, use this->location
+    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
+    // for GPU fields, always use native ordering to ensure coalescing
+    if (new_location == QUDA_CUDA_FIELD_LOCATION) {
+      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.precision!= QUDA_DOUBLE_PRECISION) ?
+	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+    }
+
+    ColorSpinorField *fine = NULL;
+    if (new_location == QUDA_CPU_FIELD_LOCATION) {
+      fine = new cpuColorSpinorField(fineParam);
+    } else if (new_location == QUDA_CUDA_FIELD_LOCATION) {
+      fine = new cudaColorSpinorField(fineParam);
+    } else {
+      errorQuda("Invalid field location %d", new_location);
+    }
+    return fine;
   }
 
   std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {

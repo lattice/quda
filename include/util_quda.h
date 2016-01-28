@@ -29,6 +29,12 @@ char *getPrintBuffer();
 
 // Note that __func__ is part of C++11 and has long been supported by GCC.
 
+#define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0)
+#define printfZero(...)	do {						\
+    if (threadIdx.x + blockDim.x*blockIdx.x==0) printf(__VA_ARGS__);	\
+  } while (0)
+
+
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \
@@ -53,13 +59,15 @@ char *getPrintBuffer();
 } while (0)
 
 #define warningQuda(...) do {                                   \
-  sprintf(getPrintBuffer(), __VA_ARGS__);			\
-  if (comm_rank() == 0) {                                       \
-    fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-    fprintf(getOutputFile(), "%s", getPrintBuffer());		\
-    fprintf(getOutputFile(), "\n");                             \
-    fflush(getOutputFile());                                    \
-  }                                                             \
+  if (getVerbosity() > QUDA_SILENT) {				\
+    sprintf(getPrintBuffer(), __VA_ARGS__);			\
+    if (comm_rank() == 0) {					\
+      fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix());	\
+      fprintf(getOutputFile(), "%s", getPrintBuffer());			\
+      fprintf(getOutputFile(), "\n");					\
+      fflush(getOutputFile());						\
+    }									\
+  }									\
 } while (0)
 
 #else
@@ -82,10 +90,12 @@ char *getPrintBuffer();
 } while (0)
 
 #define warningQuda(...) do {                                 \
-  fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-  fprintf(getOutputFile(), __VA_ARGS__);                      \
-  fprintf(getOutputFile(), "\n");                             \
-  fflush(getOutputFile());                                    \
+  if (getVerbosity() > QUDA_SILENT) {			      \
+    fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
+    fprintf(getOutputFile(), __VA_ARGS__);                      \
+    fprintf(getOutputFile(), "\n");                             \
+    fflush(getOutputFile());                                    \
+  }								\
 } while (0)
 
 #endif // MULTI_GPU

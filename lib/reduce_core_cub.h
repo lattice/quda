@@ -6,9 +6,9 @@ __host__ __device__ void zero(doubledouble &x) { x.a.x = 0.0; x.a.y = 0.0; }
 __host__ __device__ void zero(doubledouble2 &x) { zero(x.x); zero(x.y); }
 __host__ __device__ void zero(doubledouble3 &x) { zero(x.x); zero(x.y); zero(x.z); }
 
- __host__ __device__ double set(double &x) { return x;}
- __host__ __device__ double2 set(double2 &x) { return x;}
- __host__ __device__ double3 set(double3 &x) { return x;}
+__host__ __device__ double set(double &x) { return x;}
+__host__ __device__ double2 set(double2 &x) { return x;}
+__host__ __device__ double3 set(double3 &x) { return x;}
 
 __host__ __device__ double set(doubledouble &a) { return a.head(); }
 __host__ __device__ double2 set(doubledouble2 &a) { return make_double2(a.x.head(),a.y.head()); }
@@ -56,16 +56,12 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
     arg.W.load(w, i);
     arg.V.load(v, i);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.pre();
-#endif
 
 #pragma unroll
     for (int j=0; j<M; j++) arg.r(sum, x[j], y[j], z[j], w[j], v[j]);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.post(sum);
-#endif
 
     arg.X.save(x, i);
     arg.Y.save(y, i);

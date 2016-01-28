@@ -7,14 +7,15 @@ QDPXX_LDFLAGS = @QDPXX_LDFLAGS@
 QDPXX_LIBS = @QDPXX_LIBS@
 
 CPU_ARCH = @CPU_ARCH@  	  # x86 or x86_64
-GPU_ARCH = @GPU_ARCH@	  # sm_13, sm_20, sm_21, sm_30, or sm_35
+GPU_ARCH = @GPU_ARCH@	  # sm_13, sm_20, sm_21, sm_30, sm_35, sm_50 or sm_52
 OS       = @QUDA_OS@	  # linux or osx
+GIT      = @GIT@
 
 PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
 
 # compilation options
 HOST_DEBUG = @HOST_DEBUG@			# compile host debug code
-DEVICE_DEBUG = @DEVICE_DEBUG@		# compile device debug code for cuda-gdb 
+DEVICE_DEBUG = @DEVICE_DEBUG@		# compile device debug code for cuda-gdb
 VERBOSE = @VERBOSE@			# display kernel register useage
 BLAS_TEX = @BLAS_TEX@			# enable texture reads in BLAS?
 FERMI_DBLE_TEX = @FERMI_DBLE_TEX@		# enable double-precision texture reads on Fermi?
@@ -32,7 +33,12 @@ BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@				# build code for (1-loop Symanzik) ga
 BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@			# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
+BUILD_GAUGE_ALG = @BUILD_GAUGE_ALG@				# build gauge-fixing and pure-gauge algorithms?
 BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
+BUILD_MULTIGRID = @BUILD_MULTIGRID@                                 # build multigrid linear solvers?
+
+#Dynamically invert the clover term for twisted-clover?
+DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases the flops
 
 # Multi-GPU options
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
@@ -47,6 +53,10 @@ BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
 GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
+
+# Profiling options
+MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
+INTERFACE_NVTX = @INTERFACE_NVTX@            # set to 'yes' to add nvtx markup to interface calls for the visual profiler
 
 # Interface options
 BUILD_QDP_INTERFACE = @BUILD_QDP_INTERFACE@                     # build qdp interface
@@ -74,10 +84,6 @@ MPI_HOME=@MPI_HOME@
 QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
 
-MAGMA_HOME=@MAGMA_HOME@
-ATLAS_HOME=@ATLAS_HOME@
-LAPACK_HOME=@LAPACK_HOME@
-
 
 NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
 
@@ -94,8 +100,8 @@ ifeq ($(strip $(CPU_ARCH)), x86_64)
   endif
 else
   LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32
-  COPT = -malign-double -m32
-  NVCCOPT = -m32
+  COPT += -malign-double -m32
+  NVCCOPT += -m32
 endif
 
 COMP_CAP = $(GPU_ARCH:sm_%=%0)
@@ -103,9 +109,13 @@ COMP_CAP = $(GPU_ARCH:sm_%=%0)
 COPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 
-TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
-ifneq ($(TESLA_ARCH),true)
-  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false -w
+NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
+
+ifeq ($(strip $(GIT)), git)
+  GITCOUNT = $(shell git rev-list -q `git describe -q --abbrev=0 2> /dev/null`..  2> /dev/null | wc -l 2> /dev/null)
+  ifeq ($(strip $(GITCOUNT)),0)
+    NVCCOPT += -w
+  endif
 else
   NVCCOPT += -w
 endif
@@ -130,12 +140,6 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   COMM_OBJS = comm_mpi.o
 endif
 
-ifeq ($(strip $(BUILD_QIO)), yes)
-  INC += -DHAVE_QIO -I$(QIO_HOME)/include
-  LIB += -L$(QIO_HOME)/lib -lqio -llime
-  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
-endif
-
 ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
@@ -143,21 +147,45 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
-endif 
+endif
+
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio -llime
+  QIO_UTIL = qio_field.o qio_util.o layout_hyper.o
+endif
+
+ifeq ($(strip $(MPI_NVTX)), yes)
+  COMM_OBJS += nvtx_pmpi.o
+  LIB += -lnvToolsExt
+endif
+
+ifeq ($(strip $(INTERFACE_NVTX)), yes)
+  NVCCOPT += -DINTERFACE_NVTX
+  COPT += -DINTERFACE_NVTX
+  ifneq ($(strip $(MPI_NVTX)), yes)
+    LIB += -lnvToolsExt
+  endif
+endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
-  MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
+  MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
-  
-  LIB += -fopenmp -L$(MAGMA_HOME)/lib -lmagma 
-  LIB += -L$(LAPACK_HOME) -llapack -lf77blas -lgfortran 
-  LIB += -L$(ATLAS_HOME)/lib -lcblas -latlas
-  LIB += -L$(CUDA_INSTALL_PATH)/lib64 -lcublas
-
+  LIB += $(shell pkg-config --libs magma)
 else
-  MAGMA_INCLUDE = 
-  MAGMA_FLAGS   = 
+  MAGMA_INCLUDE =
+  MAGMA_FLAGS   =
+endif
+
+ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
+  NVCCOPT += -DDYNAMIC_CLOVER
+  COPT += -DDYNAMIC_CLOVER
+endif
+
+ifeq ($(strip $(BUILD_MULTIGRID)), yes)
+  NVCCOPT += -DGPU_MULTIGRID
+  COPT += -DGPU_MULTIGRID
 endif
 
 ifeq ($(strip $(BUILD_SSTEP)), yes)
@@ -170,27 +198,21 @@ ifeq ($(strip $(POSIX_THREADS)), yes)
   COPT += -DPTHREADS
 endif
 
-ifeq ($(strip $(POSIX_THREADS)), yes)
-  LIB += -lpthread
-endif
-
+LIB += -lpthread
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
   COPT += -DGPU_WILSON_DIRAC
-  DIRAC_TEST = dslash_test invert_test
 endif
 
 ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
   NVCCOPT += -DGPU_DOMAIN_WALL_DIRAC
   COPT += -DGPU_DOMAIN_WALL_DIRAC
-  DIRAC_TEST = dslash_test invert_test
 endif
 
 ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   NVCCOPT += -DGPU_STAGGERED_DIRAC
   COPT += -DGPU_STAGGERED_DIRAC
-  STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
 endif
 
 ifeq ($(strip $(BUILD_CLOVER_DIRAC)), yes)
@@ -216,16 +238,13 @@ endif
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
   COPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
-  FATLINK_TEST=llfat_test
 endif
 
 ifeq ($(strip $(BUILD_HISQLINK)), yes)
-  ifneq ($(strip $(BUILD_FATLINK)), yes) 
-    NVCCOPT += -DGPU_FATLINK 
+  ifneq ($(strip $(BUILD_FATLINK)), yes)
+    NVCCOPT += -DGPU_FATLINK
     COPT    += -DGPU_FATLINK
-    FATLINK_TEST=llfat_test
   endif
-  UNITARIZE_LINK_TEST=unitarize_link_test
   NVCCOPT += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
   COPT    += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
 endif
@@ -233,20 +252,16 @@ endif
 ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   NVCCOPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
   COPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
-  GAUGE_FORCE_TEST=gauge_force_test
 endif
 
 ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
   NVCCOPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
   COPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
-  FERMION_FORCE_TEST=fermion_force_test
 endif
 
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   NVCCOPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
   COPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
-  HISQ_PATHS_FORCE_TEST=hisq_paths_force_test
-  HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
 endif
 
 ifeq ($(strip $(BUILD_GAUGE_TOOLS)), yes)
@@ -254,13 +269,23 @@ ifeq ($(strip $(BUILD_GAUGE_TOOLS)), yes)
   COPT += -DGPU_GAUGE_TOOLS
 endif
 
+ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
+  NVCCOPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
+  COPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
+  LIB += -lcufft -lcurand
+endif
+
+QUDA_DEBUG = false
+
 ifeq ($(strip $(HOST_DEBUG)), yes)
   NVCCOPT += -g -DHOST_DEBUG
   COPT += -g -fno-inline -DHOST_DEBUG
+  QUDA_DEBUG = true
 endif
 
 ifeq ($(strip $(DEVICE_DEBUG)), yes)
   NVCCOPT += -G
+  QUDA_DEBUG = true
 endif
 
 ifeq ($(strip $(VERBOSE)), yes)
@@ -333,12 +358,6 @@ ifeq ($(strip $(NUMA_AFFINITY)), yes)
 endif
 
 ifeq ($(strip $(BUILD_CONTRACT)), yes)
-  LOOPVV_TEST=vvTrickLoops
-  LOOPVV_TUNE=tuneOneEndTrick
-  LOOPTD_TEST=tDilutionLoops
-  LPTDHP_TEST=tDilHPELoops
-  LOOPCV_TEST=loopsPlain
-  LOOPHP_TEST=loopsHPE
   NVCCOPT += -DGPU_CONTRACT
   COPT += -DGPU_CONTRACT
 endif
@@ -355,15 +374,15 @@ ifeq ($(strip $(USE_QDPJIT)), yes)
   INC += -I$(QDP_INSTALL_PATH)/include
 
   CFLAGS = -Wall -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall $(COPT) $(INC) $(QDPXX_CXXFLAGS)
-  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-  NVCCFLAGS = $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  CXXFLAGS = -Wall -std=c++11 $(COPT) $(INC) $(QDPXX_CXXFLAGS)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
+  NVCCFLAGS = -std=c++11 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 else
   CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall -O3 $(COPT) $(INC)
-  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-  NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  CXXFLAGS = -Wall -std=c++11 -O3 $(COPT) $(INC)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
+  NVCCFLAGS = -std=c++11 -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 endif
 

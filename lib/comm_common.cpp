@@ -1,4 +1,5 @@
 #include <unistd.h> // for gethostname()
+#include <assert.h>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -226,20 +227,69 @@ int comm_coord(int dim)
 /**
  * Send to the "dir" direction in the "dim" dimension
  */
-MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t nbytes)
+MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line,
+				       void *buffer, int dim, int dir, size_t nbytes)
 {
+#ifdef HOST_DEBUG
+  cudaPointerAttributes attributes;
+  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
+  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+    // test this memory allocation is ok by doing a memcpy from it
+    void *tmp = safe_malloc(nbytes);
+    try {
+      std::copy(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, static_cast<char*>(tmp));
+    } catch(std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("aborting");
+    }
+    if (err != cudaSuccess) cudaGetLastError();
+    host_free(tmp);
+  } else {
+    // test this memory allocation is ok by doing a memcpy from it
+    void *tmp = device_malloc(nbytes);
+    cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
+    device_free(tmp);
+  }
+#endif
+
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
 
   return comm_declare_send_displaced(buffer, disp, nbytes);
 }
 
-
 /**
  * Receive from the "dir" direction in the "dim" dimension
  */
-MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t nbytes)
+MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line,
+					  void *buffer, int dim, int dir, size_t nbytes)
 {
+#ifdef HOST_DEBUG
+  cudaPointerAttributes attributes;
+  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
+  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+    // test this memory allocation is ok by filling it
+    try {
+      std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
+    } catch(std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("aborting");
+    }
+    if (err != cudaSuccess) cudaGetLastError();
+  } else {
+    // test this memory allocation is ok by doing a memset
+    cudaError_t err = cudaMemset(buffer, 0, nbytes);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
+  }
+#endif
+
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
 
@@ -249,9 +299,38 @@ MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t 
 /**
  * Strided send to the "dir" direction in the "dim" dimension
  */
-MsgHandle *comm_declare_strided_send_relative(void *buffer, int dim, int dir, 
-					      size_t blksize, int nblocks, size_t stride)
+MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line,
+					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
+#ifdef HOST_DEBUG
+  cudaPointerAttributes attributes;
+  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
+  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+    // test this memory allocation is ok by doing a memcpy from it
+    void *tmp = safe_malloc(blksize*nblocks);
+    try {
+      for (int i=0; i<nblocks; i++)
+	std::copy(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, static_cast<char*>(tmp));
+    } catch(std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
+		 file, line, func, dim, dir, blksize, nblocks, stride);
+      errorQuda("aborting");
+      }
+    host_free(tmp);
+    if (err != cudaSuccess) cudaGetLastError();
+  } else {
+    // test this memory allocation is ok by doing a memcpy from it
+    void *tmp = device_malloc(blksize*nblocks);
+    cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
+		 file, line, func, dim, dir, blksize, nblocks, stride);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
+    device_free(tmp);
+  }
+#endif
+
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
 
@@ -262,9 +341,34 @@ MsgHandle *comm_declare_strided_send_relative(void *buffer, int dim, int dir,
 /**
  * Strided receive from the "dir" direction in the "dim" dimension
  */
-MsgHandle *comm_declare_strided_receive_relative(void *buffer, int dim, int dir, 
-						 size_t blksize, int nblocks, size_t stride)
+MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line,
+						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
+#ifdef HOST_DEBUG
+  cudaPointerAttributes attributes;
+  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
+  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+    // test this memory allocation is ok by filling it
+    try {
+      for (int i=0; i<nblocks; i++)
+	std::fill(static_cast<char*>(buffer)+i*stride, static_cast<char*>(buffer)+i*stride+blksize, 0);
+    } catch(std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
+		 file, line, func, dim, dir, blksize, nblocks, stride);
+      errorQuda("aborting");
+    }
+    if (err != cudaSuccess) cudaGetLastError();
+  } else {
+    // test this memory allocation is ok by doing a memset
+    cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
+		 file, line, func, dim, dir, blksize, nblocks, stride);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
+  }
+#endif
+
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
 

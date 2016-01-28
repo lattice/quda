@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -145,7 +145,8 @@ private:
         WARP_TIME_SLICED_ITEMS      = WARP_TIME_SLICED_THREADS * ITEMS_PER_THREAD,
 
         // Insert padding if the number of items per thread is a power of two
-        INSERT_PADDING              = 0, // Mooch PowerOfTwo<ITEMS_PER_THREAD>::VALUE,
+//        INSERT_PADDING              = PowerOfTwo<ITEMS_PER_THREAD>::VALUE,
+        INSERT_PADDING              = 0,
         PADDING_ITEMS               = (INSERT_PADDING) ? (TIME_SLICED_ITEMS >> LOG_SMEM_BANKS) : 0,
     };
 
@@ -1022,6 +1023,8 @@ template <
     int         PTX_ARCH                = CUB_PTX_ARCH>
 class WarpExchange
 {
+private:
+
     /******************************************************************************
      * Constants
      ******************************************************************************/

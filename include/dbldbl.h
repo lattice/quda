@@ -288,9 +288,7 @@ struct doubledouble {
   __device__ __host__ doubledouble(const doubledouble &a) : a(a.a) { }
   __device__ __host__ doubledouble(const dbldbl &a) : a(a) { }
   __device__ __host__ doubledouble(const double &head, const double &tail) { a.y = head; a.x = tail; }
-  __device__ doubledouble(const double &head) {  
-    a = add_double_to_dbldbl(head, 0.0);
-  }
+  __device__ __host__ doubledouble(const double &head) { a.y = head; a.x = 0.0; } 
 
   __device__ __host__ doubledouble& operator=(const double &head) {
     this->a.y = head;
@@ -337,9 +335,6 @@ __device__ inline doubledouble mul_double_to_doubledouble(const double &a, const
   return doubledouble(mul_double_to_dbldbl(a,b));
 }
  
-__host__ __device__ double2 operator+(const double2 &a, const double2 &b) { return make_double2(a.x + b.x, a.y + b.y); }
-__host__ __device__ double3 operator+(const double3 &a, const double3 &b) { return make_double3(a.x + b.x, a.y + b.y, a.z + b.z); }
-
 struct doubledouble2 {
   doubledouble x;
   doubledouble y;
@@ -383,20 +378,5 @@ __device__ doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &
 
 __device__ doubledouble3 operator+(const doubledouble3 &a, const doubledouble3 &b)
 { return doubledouble3(a.x + b.x, a.y + b.y, a.z + b.z); }
-
-template<typename> struct ScalarType { };
-
-template<> struct ScalarType<double> { typedef double type; };
-template<> struct ScalarType<double2> { typedef double type; };
-template<> struct ScalarType<double3> { typedef double type; };
-
-template<> struct ScalarType<doubledouble> { typedef doubledouble type; };
-template<> struct ScalarType<doubledouble2> { typedef doubledouble type; };
-template<> struct ScalarType<doubledouble3> { typedef doubledouble type; };
-
-template<typename> struct Vec2Type { };
-
-template<> struct Vec2Type<double> { typedef double2 type; };
-template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 
 #endif /* DBLDBL_H_ */

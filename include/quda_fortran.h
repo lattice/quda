@@ -157,8 +157,6 @@ extern "C" {
    */
   void invert_quda_(void *h_x, void *h_b, QudaInvertParam *param);
 
-  void invert_md_quda_(void *hp_x, void *hp_b, QudaInvertParam *param);
-
   /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
@@ -211,6 +209,12 @@ extern "C" {
    * Remove the staggered phase factors to the resident gauge field
    */
   void remove_staggered_phase_quda_();
+
+  /**
+   * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+   * @param Array for storing the averages (total, spatial, temporal)
+   */
+  void plaq_quda_(double plaq[3]);
 
   /**
    * Temporary function exposed for TIFR benchmarking

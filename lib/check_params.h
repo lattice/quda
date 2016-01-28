@@ -92,6 +92,16 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 
 
 #if defined INIT_PARAM
+  P(staggered_phase_type, QUDA_MILC_STAGGERED_PHASE);
+  P(staggered_phase_applied, 0);
+  P(i_mu, 0.0);
+#else
+  P(staggered_phase_type, QUDA_INVALID_STAGGERED_PHASE);
+  P(staggered_phase_applied, INVALID_INT);
+  P(i_mu, INVALID_DOUBLE);
+#endif
+
+#if defined INIT_PARAM
   P(overlap, 0);
   P(preserve_gauge, 0);
 #else
@@ -103,11 +113,15 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(use_resident_mom, 0);
   P(make_resident_gauge, 0);
   P(make_resident_mom, 0);
+  P(return_gauge, 1);
+  P(return_mom, 1);
 #else
   P(use_resident_gauge, INVALID_INT);
   P(use_resident_mom, INVALID_INT);
   P(make_resident_gauge, INVALID_INT);
   P(make_resident_mom, INVALID_INT);
+  P(return_gauge, INVALID_INT);
+  P(return_mom, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -214,10 +228,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
-#else
+  P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
+ #else
   P(use_sloppy_partial_accumulator, INVALID_INT);
   P(max_res_increase, INVALID_INT);
   P(max_res_increase_total, INVALID_INT);
+  P(heavy_quark_check, INVALID_INT);
 #endif
 
 #ifndef CHECK_PARAM
@@ -234,6 +250,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 	P(tol_hq_offset[i], INVALID_DOUBLE);
 #ifndef CHECK_PARAM
       P(true_res_offset[i], INVALID_DOUBLE); 
+      P(iter_res_offset[i], INVALID_DOUBLE);
 #endif
     }
   }
@@ -295,6 +312,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   //P(inv_type_sloppy, QUDA_INVALID_INVERTER); // disable since invalid means no preconditioner
 #if defined INIT_PARAM
   P(inv_type_precondition, QUDA_INVALID_INVERTER);
+  P(preconditioner, 0);
   P(tol_precondition, INVALID_DOUBLE);
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
@@ -317,9 +335,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
   
 #ifdef INIT_PARAM
   P(use_init_guess, QUDA_USE_INIT_GUESS_NO); //set the default to no
+  //P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_NO); //set the default to no
   P(omega, 1.0); // set default to no relaxation
 #else
   P(use_init_guess, QUDA_USE_INIT_GUESS_INVALID);
+  //P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
   P(omega, INVALID_DOUBLE);
 #endif
 
@@ -375,14 +395,34 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(max_search_dim, 0);
   P(rhs_idx, 0);
   P(deflation_grid, 0);
+
+  P(use_reduced_vector_set, true);
+  P(use_cg_updates, false);
+  P(cg_iterref_tol, 5e-2);
+  P(eigcg_max_restarts, 2);
+  P(max_restart_num, 3);
+  P(inc_tol, 1e-2);
+  P(eigenval_tol, 1e-1);
 #else
   //P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
   P(nev, INVALID_INT);
   P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
   P(deflation_grid, INVALID_INT);
+  P(cg_iterref_tol, INVALID_DOUBLE);
+  P(eigcg_max_restarts, INVALID_INT);
+  P(max_restart_num, INVALID_INT);
+  P(inc_tol, INVALID_DOUBLE);
+  P(eigenval_tol, INVALID_DOUBLE);
 #endif
 
+#if defined INIT_PARAM
+  P(use_resident_solution, 0);
+  P(make_resident_solution, 0);
+#else
+  P(use_resident_solution, INVALID_INT);
+  P(make_resident_solution, INVALID_INT);
+#endif
 
 
 #ifdef INIT_PARAM

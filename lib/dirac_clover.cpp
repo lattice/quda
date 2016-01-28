@@ -17,13 +17,19 @@ namespace quda {
   {
     clover::initConstants(*param.gauge, profile);
     asym_clover::initConstants(*param.gauge, profile);
+#ifdef DYNAMIC_CLOVER
+    warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
+#endif
   }
 
   DiracClover::DiracClover(const DiracClover &dirac) 
     : DiracWilson(dirac), clover(dirac.clover)
   {
-    clover::initConstants(dirac.gauge, profile);
-    asym_clover::initConstants(dirac.gauge, profile);
+    clover::initConstants(*dirac.gauge, profile);
+    asym_clover::initConstants(*dirac.gauge, profile);
+#ifdef DYNAMIC_CLOVER
+    warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
+#endif
   }
 
   DiracClover::~DiracClover() { }
@@ -37,7 +43,7 @@ namespace quda {
     return *this;
   }
 
-  void DiracClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracClover::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     Dirac::checkParitySpinor(out, in);
 
@@ -48,41 +54,78 @@ namespace quda {
   }
 
   /** Applies the operator (A + k D) */
-  void DiracClover::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			       const QudaParity parity, const cudaColorSpinorField &x,
+  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			       const QudaParity parity, const ColorSpinorField &x,
 			       const double &k) const
   {
-    asym_clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-
-    FullClover cs(clover);
-    asymCloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim, profile);
+      
+    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+      asym_clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+      
+      FullClover cs(clover);
+      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
+			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
+			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+    } else {
+      errorQuda("Not implemented");
+    }
 
     flops += 1872ll*in.Volume();
   }
 
   // Public method to apply the clover term only
-  void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
+  void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
 
-    // regular clover term
-    FullClover cs(clover);
-    cloverCuda(&out, gauge, cs, &in, parity);
+    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+      FullClover cs(clover);     // regular clover term
+      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
+		 &static_cast<const cudaColorSpinorField&>(in), parity);
+    } else {
+      errorQuda("Not implemented");
+    }
 
     flops += 504ll*in.Volume();
   }
 
-  void DiracClover::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    checkFullSpinor(out, in);
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
+    ColorSpinorField *In = &const_cast<ColorSpinorField&>(in);
+    if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
+      ColorSpinorParam param(in);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+        (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
+      param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      In = ColorSpinorField::Create(param);
+      *In = in;
+    }
+
+    ColorSpinorField *Out = &out;
+    if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
+      ColorSpinorParam param(out);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+        (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
+      param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      Out = ColorSpinorField::Create(param);
+    }
+
+    checkFullSpinor(*Out, *In);
+    DslashXpay(Out->Odd(), In->Even(), QUDA_ODD_PARITY, In->Odd(), -kappa);
+    DslashXpay(Out->Even(), In->Odd(), QUDA_EVEN_PARITY, In->Even(), -kappa);
+
+    if (in.Location() == QUDA_CPU_FIELD_LOCATION) delete In;
+    if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
+      out = *Out;
+      delete Out;
+    }
   }
 
-  void DiracClover::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
 
@@ -95,8 +138,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracClover::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-			    cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracClover::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			    ColorSpinorField &x, ColorSpinorField &b, 
 			    const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -107,10 +150,14 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracClover::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				const QudaSolutionType solType) const
   {
     // do nothing
+  }
+
+  void DiracClover::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
+    CoarseOp(T, Y, X, *gauge, &clover, kappa);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
@@ -133,14 +180,19 @@ namespace quda {
   }
 
   // Public method
-  void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void DiracCloverPC::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, 
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
 
-    // needs to be cloverinv
-    FullClover cs(clover, true);
-    cloverCuda(&out, gauge, cs, &in, parity);
+    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+      // needs to be cloverinv
+      FullClover cs(clover, true);
+      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
+		 &static_cast<const cudaColorSpinorField&>(in), parity);
+    } else {
+      errorQuda("Not supported");
+    }
 
     flops += 504ll*in.Volume();
   }
@@ -148,38 +200,49 @@ namespace quda {
   // apply hopping term, then clover: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
   // and likewise for dagger: (A_ee^-1 D^dagger_eo) or (A_oo^-1 D^dagger_oe)
   // NOTE - this isn't Dslash dagger since order should be reversed!
-  void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void DiracCloverPC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			     const QudaParity parity) const
   {
-    clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    FullClover cs(clover, true);
-    cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, 0, 0.0, commDim, profile);
+    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+      clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+      
+      FullClover cs(clover, true);
+      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
+		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
+    } else {
+      errorQuda("Not supported");
+    }
 
     flops += 1824ll*in.Volume();
   }
 
   // xpay version of the above
-  void DiracCloverPC::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				 const QudaParity parity, const cudaColorSpinorField &x,
+  void DiracCloverPC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+				 const QudaParity parity, const ColorSpinorField &x,
 				 const double &k) const
   {
-    clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    FullClover cs(clover, true);
-    cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim, profile);
+    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+      clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+      
+      FullClover cs(clover, true);
+      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
+		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
+		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+    } else {
+      errorQuda("Not supported");
+    }
 
     flops += 1872ll*in.Volume();
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
-  void DiracCloverPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
     bool reset1 = newTmp(&tmp1, in);
@@ -221,7 +284,7 @@ namespace quda {
     deleteTmp(&tmp1, reset1);
   }
 
-  void DiracCloverPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracCloverPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
     // and for multi-gpu the input and output fields cannot alias
@@ -231,8 +294,8 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracCloverPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol, 
-			      cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracCloverPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol, 
+			      ColorSpinorField &x, ColorSpinorField &b, 
 			      const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
@@ -282,7 +345,7 @@ namespace quda {
 
   }
 
-  void DiracCloverPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracCloverPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				  const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {

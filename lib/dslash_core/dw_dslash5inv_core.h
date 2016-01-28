@@ -139,6 +139,13 @@ xs = X/(X1*X2*X3*X4);
  o31_re = 0; o31_im = 0;
  o32_re = 0; o32_im = 0;
 
+// workaround for C++11 bug in CUDA 6.5/7.0
+#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
+#define POW(a, b) pow(a, (spinorFloat)b)
+#else
+#define POW(a, b) pow(a, b)
+#endif
+
 VOLATILE spinorFloat kappa;
 
 #ifdef MDWF_mode   // Check whether MDWF option is enabled
@@ -163,13 +170,13 @@ VOLATILE spinorFloat kappa;
 // s' = input vector index and
 // 'a'= kappa5
 
-  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.Ls)*mferm);
+  spinorFloat inv_d_n = 1.0 / ( 1.0 + POW(kappa,param.Ls)*mferm);
   spinorFloat factorR;
   spinorFloat factorL;
 
   for(int s = 0; s < param.Ls; s++)
   {
-    factorR = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;
+    factorR = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;
 
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
@@ -200,7 +207,7 @@ VOLATILE spinorFloat kappa;
     o32_re += factorR*(i12_re + i32_re);
     o32_im += factorR*(i12_im + i32_im);
 
-    factorL = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;
+    factorL = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;
 
     o00_re += factorL*(i00_re - i20_re);
     o00_im += factorL*(i00_im - i20_im);
@@ -229,6 +236,7 @@ VOLATILE spinorFloat kappa;
   }
 } // end of M5inv dimension
 
+#undef POW
 {
 
 #ifdef DSLASH_XPAY

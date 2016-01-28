@@ -26,18 +26,16 @@ namespace quda {
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
+    else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = param.siteDim;
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
-
       gauge = (void**) safe_malloc(siteDim * sizeof(void*));
 
       for (int d=0; d<siteDim; d++) {
-	size_t nbytes = volume * reconstruct * precision;
+	size_t nbytes = volume * nInternal * precision;
 	if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
 	  gauge[d] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
-	  if (create == QUDA_ZERO_FIELD_CREATE){
-	    memset(gauge[d], 0, nbytes);
-	  }
+	  if (create == QUDA_ZERO_FIELD_CREATE) memset(gauge[d], 0, nbytes);
 	} else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	  gauge[d] = ((void**)param.gauge)[d];
 	} else {
@@ -49,11 +47,9 @@ namespace quda {
 	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER) {
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	size_t nbytes = siteDim * volume * reconstruct * precision;
+	size_t nbytes = siteDim * volume * nInternal * precision;
 	gauge = (void **) (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
-	if(create == QUDA_ZERO_FIELD_CREATE){
-	  memset(gauge, 0, nbytes);
-	}
+	if(create == QUDA_ZERO_FIELD_CREATE) memset(gauge, 0, nbytes);
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge = (void**) param.gauge;
       } else {
@@ -68,8 +64,8 @@ namespace quda {
     if (link_type != QUDA_ASQTAD_MOM_LINKS) {
       // Ghost zone is always 2-dimensional    
       for (int i=0; i<nDim; i++) {
-	size_t nbytes = nFace * surface[i] * reconstruct * precision;
-	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
+	size_t nbytes = nFace * surface[i] * nInternal * precision;
+	ghost[i] = nbytes ? safe_malloc(nbytes) : 0; // no need to use pinned memory for this
       }  
 
       if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
@@ -87,6 +83,7 @@ namespace quda {
 
   cpuGaugeField::~cpuGaugeField()
   {
+    
     int siteDim = 0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
@@ -118,14 +115,13 @@ namespace quda {
   // into the ghost array.
   void cpuGaugeField::exchangeGhost() {
     void *send[QUDA_MAX_DIM];
-    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*reconstruct*precision);
+    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
 
     // get the links into contiguous buffers
     extractGaugeGhost(*this, send);
 
     // communicate between nodes
-    FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
-    faceBuf.exchangeLink(ghost, send, QUDA_CPU_FIELD_LOCATION);
+    exchange(ghost, send);
 
     for (int d=0; d<nDim; d++) host_free(send[d]);
   }
@@ -138,7 +134,7 @@ namespace quda {
     // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d) && !no_comms_fill) continue;
-      bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
+      bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
       send[d] = safe_malloc(2 * bytes[d]);
       recv[d] = safe_malloc(2 * bytes[d]);
     }
@@ -198,6 +194,10 @@ namespace quda {
 		"QUDA_REFERENCE_FIELD_CREATE type\n");
     }
     gauge = gauge_;
+  }
+
+  void cpuGaugeField::zero() {
+    memset(gauge, 0, bytes);
   }
 
 /*template <typename Float>
