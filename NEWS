@@ -1,16 +1,17 @@
-Version 0.8.0 - xxth December 2015
+Version 0.8.0 - 29th January 2016
 
 - Removed all Tesla-generation GPU support from QUDA (sm_1x).  As a
   result, QUDA now requires a minimum of the Fermi-generation GPUs.
 
 - Added support for building QUDA using cmake.  This gives a much more
   flexible and extensible build system as well as allowing
-  out-of-source-directory building.
+  out-of-source-directory building. For details see:
+  https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake
 
 - Improved strong scaling of the multi-shift solver by overlapping the
   shift updates with the subsequent iteration's dslash comms waiting.
 
-- Improved performance of multi-shift solver by preventing unecessary
+- Improved performance of multi-shift solver by preventing unnecessary
   refinement of shifted solutions once the residual falls below
   floating point precision.
 
@@ -45,9 +46,9 @@ Version 0.8.0 - xxth December 2015
   force kernels.  This also improves compilation time and reduces
   library size.
 
-- Added support for imaginary chemical potential to the staggeed phase
+- Added support for imaginary chemical potential to the staggered phase
   application / removal kernel, as well as fixing bugs in this
-  reoutine.
+  routine.
 
 - Algorithms that previously used double-precision atomics now use a
   cub reduction.  This drastically improves performance of such
