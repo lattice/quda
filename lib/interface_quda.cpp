@@ -349,7 +349,6 @@ static void init_default_comms()
  * Set the device that QUDA uses.
  */
 void initQudaDevice(int dev) {
-
   //static bool initialized = false;
   if (initialized) return;
   initialized = true;
@@ -415,6 +414,8 @@ void initQudaDevice(int dev) {
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
+
+  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 /*
@@ -422,6 +423,8 @@ void initQudaDevice(int dev) {
  */
 void initQudaMemory()
 {
+  profileInit.TPSTART(QUDA_PROFILE_TOTAL);
+
   if (!comms_initialized) init_default_comms();
 
   streams = new cudaStream_t[Nstream];
@@ -451,6 +454,8 @@ void initQudaMemory()
   cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
   loadTuneCache(getVerbosity());
+
+  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 #define STR_(x) #x
@@ -490,8 +495,6 @@ void initQuda(int dev)
   pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_RECURSIVE);
   pthread_mutex_init(&pthread_mutex, &mutex_attr);
 #endif
-
-  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 
@@ -5064,7 +5067,8 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.gauge = gauge;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cpuGaugeField *cpuGauge = !param->use_resident_gauge ? new cpuGaugeField(gParam) : NULL;
+  bool need_cpu = !param->use_resident_gauge || param->return_gauge;
+  cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
   gParam.reconstruct = gParam.order == QUDA_TIFR_GAUGE_ORDER ? 
    QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
