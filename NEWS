@@ -1,4 +1,4 @@
-Version 0.8.0 - 29th January 2016
+Version 0.8.0 - 1st February 2016
 
 - Removed all Tesla-generation GPU support from QUDA (sm_1x).  As a
   result, QUDA now requires a minimum of the Fermi-generation GPUs.
