@@ -68,12 +68,14 @@ extern "C" {
 
     int overlap; /**< Width of overlapping domains */
 
-    int use_resident_gauge;  /**< Use the resident gauge field */
-    int use_resident_mom;    /**< Use the resident mom field */
-    int make_resident_gauge; /**< Make the gauge field resident */
-    int make_resident_mom;   /**< Make the mom field resident */
-    int return_gauge;        /**< Return the new gauge field */
-    int return_mom;          /**< Return the new mom field */
+    int overwrite_mom; /**< When computing momentum, should we overwrite it or accumulate to to */
+
+    int use_resident_gauge;  /**< Use the resident gauge field as input */
+    int use_resident_mom;    /**< Use the resident momentum field as input*/
+    int make_resident_gauge; /**< Make the result gauge field resident */
+    int make_resident_mom;   /**< Make the result momentum field resident */
+    int return_result_gauge; /**< Return the result gauge field */
+    int return_result_mom;   /**< Return the result momentum field */
 
   } QudaGaugeParam;
 
@@ -1030,7 +1032,7 @@ extern "C" {
   * Clean deflation solver resources.
   *
   **/
-  void destroyDeflationQuda(QudaInvertParam *param, const int *X = NULL, void *_h_u = NULL, double *inv_eigenvals = NULL);
+  void destroyDeflationQuda(QudaInvertParam *param, const int *X, void *_h_u, double *inv_eigenvals);
 
 #ifdef __cplusplus
 }

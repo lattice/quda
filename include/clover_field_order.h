@@ -259,7 +259,7 @@ namespace quda {
 
 	const bool twisted;
 	const Float mu2;
-
+	
       FloatNOrder(const CloverField &clover, bool inverse, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()),
 	  twisted(clover.Twisted()), mu2(clover.Mu2()) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
@@ -279,7 +279,7 @@ namespace quda {
 		int intIdx = (chirality*M + i)*N + j; // internal dof index
 		int padIdx = intIdx / N;
 		copy(v[(chirality*M+i)*N+j], clover[parity][(padIdx*stride + x)*N + intIdx%N]);
-		if (sizeof(Float)==sizeof(short)) v[(chirality*M+i)*N+j] *= norm[parity][chirality*volumeCB + x];
+		if (sizeof(Float)==sizeof(short)) v[(chirality*M+i)*N+j] *= norm[parity][chirality*stride + x];
 	      }
 	    }
 	  }
@@ -294,7 +294,7 @@ namespace quda {
 	      scale[chi] = 0.0;
 	      for (int i=0; i<M; i++) 
 		scale[chi] = fabs(v[chi*M+i]) > scale[chi] ? fabs(v[chi*M+i]) : scale[chi];
-	      norm[parity][chi*volumeCB + x] = scale[chi];
+	      norm[parity][chi*stride + x] = scale[chi];
 	    }
 	  }
 

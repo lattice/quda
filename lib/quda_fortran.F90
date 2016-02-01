@@ -59,12 +59,21 @@ module quda_fortran
      ! Whether the staggered phase has already been applied to the links
      integer(4) :: staggered_phase_applied
 
+     ! Imaginary chemical potential
+     real(8) :: i_mu
+
      integer(4) :: overlap ! width of domain overlap
 
+     ! When computing momentum, should we overwrite it or accumulate
+     ! to it (only presenty support in gauge-force)
+     integer(4) :: overwrite_mom
+
      integer(4) :: use_resident_gauge  ! Use the resident gauge field
-     integer(4) :: use_resident_mom    ! Use the resident mom field
-     integer(4) :: make_resident_gauge ! Make the gauge field resident
-     integer(4) :: make_resident_mom   ! Make the mom field resident
+     integer(4) :: use_resident_mom    ! Use the resident momentume field
+     integer(4) :: make_resident_gauge ! Make the result gauge field resident
+     integer(4) :: make_resident_mom   ! Make the result momentum field resident
+     integer(4) :: return_result_gauge ! Return the result gauge field
+     integer(4) :: return_result_mom   ! Return the result momentum field
 
   end type quda_gauge_param
 
@@ -113,6 +122,9 @@ module quda_fortran
 
      ! Actual L2 residual norm achieved in solver for each offset
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_offset
+
+     ! Iterated L2 residual achieved in multi shift solver for each offset
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: iter_res_offset
 
      ! Actual heavy quark residual norm achieved in solver for each offset
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset
@@ -206,6 +218,18 @@ module quda_fortran
      integer(4)::max_search_dim ! for magma library this parameter must be multiple 16?
      integer(4)::rhs_idx
      integer(4)::deflation_grid !total deflation space is nev*deflation_grid
+     integer(4)::use_reduced_vector_set ! eigCG: specifies whether to use reduced eigenvector set
+     real(8):: eigenval_tol ! eigCG: selection criterion for the reduced eigenvector set
+     integer(4)::use_cg_updates ! mixed precision eigCG:whether to use cg refinement corrections in the incremental stage
+     real(8)::cg_iterref_tol ! mixed precision eigCG:  tolerance for cg refinement corrections in the incremental stage
+     integer(4)::eigcg_max_restarts ! mixed precision eigCG tuning parameter:  minimum search vector space restarts
+     integer(4)::max_restart_num     ! initCG tuning parameter:  maximum restarts
+     real(8)::inc_tol     ! initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle
+
+     ! Parameters for setting data residency of the solver
+     integer(8)::make_resident_solution ! Whether to make the solution vector(s) after the solve
+     integer(8)::use_resident_solution  ! Whether to use the resident solution vector(s)
+
   end type quda_invert_param
 
 end module quda_fortran

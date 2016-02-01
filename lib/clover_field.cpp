@@ -24,10 +24,10 @@ namespace quda {
     length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
     bytes = length*precision;
-    bytes = ALIGNMENT_ADJUST(bytes);
+    bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
-      norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
+      norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
 //for twisted mass only:
     twisted = false;//param.twisted;
@@ -63,10 +63,10 @@ namespace quda {
       }
 
       even = clover;
-      odd = (char*)clover + bytes/2;
+      odd = static_cast<char*>(clover) + bytes/2;
     
       evenNorm = norm;
-      oddNorm = (char*)norm + norm_bytes/2;
+      oddNorm = static_cast<char*>(norm) + norm_bytes/2;
 
       total_bytes += bytes + norm_bytes;
 
@@ -91,10 +91,10 @@ namespace quda {
       }
 
       evenInv = cloverInv;
-      oddInv = (char*)cloverInv + bytes/2;
+      oddInv = static_cast<char*>(cloverInv) + bytes/2;
     
       evenInvNorm = invNorm;
-      oddInvNorm = (char*)invNorm + norm_bytes/2;
+      oddInvNorm = static_cast<char*>(invNorm) + norm_bytes/2;
 
       total_bytes += bytes + norm_bytes;
 
@@ -304,7 +304,7 @@ namespace quda {
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
 
-    if(create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
+    if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
       //printfQuda("Allocating clover field of size %lu with precision %lu\n", bytes, precision);
       if(order != QUDA_PACKED_CLOVER_ORDER) {errorQuda("cpuCloverField only supports QUDA_PACKED_CLOVER_ORDER");}
       clover = (void *) safe_malloc(bytes);
@@ -320,16 +320,16 @@ namespace quda {
 	if(precision == QUDA_HALF_PRECISION) memset(norm, '\0', norm_bytes);
 	if(param.inverse && precision ==QUDA_HALF_PRECISION) memset(invNorm, '\0', norm_bytes);
       }
-    }
-    else if (create == QUDA_REFERENCE_FIELD_CREATE) {
+    } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
       clover = param.clover;
       norm = param.norm;
       cloverInv = param.cloverInv;
       invNorm = param.invNorm;
-    }
-    else {
+    } else {
       errorQuda("Create type %d not supported", create);
     }
+
+    if (param.pad != 0) errorQuda("%s pad must be zero", __func__);
   }
 
   cpuCloverField::~cpuCloverField() { 
