@@ -293,11 +293,11 @@ void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coe
   if (!invalidate_quda_mom) {
     gParam.use_resident_mom = true;
     gParam.make_resident_mom = true;
-    gParam.return_mom = false;
+    gParam.return_result_mom = false;
   } else {
     gParam.use_resident_mom = false;
     gParam.make_resident_mom = false;
-    gParam.return_mom = true;
+    gParam.return_result_mom = true;
   }
 
   long long flops;
@@ -546,11 +546,20 @@ void qudaGaugeForce( int precision,
   if (!invalidate_quda_mom) {
     qudaGaugeParam.use_resident_mom = true;
     qudaGaugeParam.make_resident_mom = true;
-    qudaGaugeParam.return_mom = false;
+    qudaGaugeParam.return_result_mom = false;
+
+    // this means when we compute the momentum, we acummulate to the
+    // preexisting resident momentum instead of overwriting it
+    qudaGaugeParam.overwrite_mom = false;
   } else {
     qudaGaugeParam.use_resident_mom = false;
     qudaGaugeParam.make_resident_mom = false;
-    qudaGaugeParam.return_mom = true;
+    qudaGaugeParam.return_result_mom = true;
+
+    // this means we compute momentum into a fresh field, copy it back
+    // and sum to current momentum in MILC.  This saves an initial
+    // CPU->GPU download of the current momentum.
+    qudaGaugeParam.overwrite_mom = true;
   }
 
   int max_length = 6;
