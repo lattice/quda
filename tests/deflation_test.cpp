@@ -202,7 +202,7 @@ int main(int argc, char **argv)
     inv_param.use_reduced_vector_set = true;
     inv_param.use_cg_updates = false;
     inv_param.cg_iterref_tol = 5e-2;
-    inv_param.eigcg_min_restarts = 3;
+    inv_param.eigcg_max_restarts = 3;
     inv_param.max_restart_num = 3;
     inv_param.inc_tol = 1e-2;
     inv_param.eigenval_tol = 1e-2;
@@ -462,7 +462,7 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  destroyDeflationQuda(&inv_param);
+  destroyDeflationQuda(&inv_param, NULL, NULL, NULL);
 
   closeMagma();
     

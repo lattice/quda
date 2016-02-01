@@ -43,7 +43,7 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-//new!
+
     bool twisted; 
     double mu2;
 

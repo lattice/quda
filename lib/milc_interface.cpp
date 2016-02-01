@@ -293,11 +293,11 @@ void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coe
   if (!invalidate_quda_mom) {
     gParam.use_resident_mom = true;
     gParam.make_resident_mom = true;
-    gParam.return_mom = false;
+    gParam.return_result_mom = false;
   } else {
     gParam.use_resident_mom = false;
     gParam.make_resident_mom = false;
-    gParam.return_mom = true;
+    gParam.return_result_mom = true;
   }
 
   long long flops;
@@ -546,11 +546,20 @@ void qudaGaugeForce( int precision,
   if (!invalidate_quda_mom) {
     qudaGaugeParam.use_resident_mom = true;
     qudaGaugeParam.make_resident_mom = true;
-    qudaGaugeParam.return_mom = false;
+    qudaGaugeParam.return_result_mom = false;
+
+    // this means when we compute the momentum, we acummulate to the
+    // preexisting resident momentum instead of overwriting it
+    qudaGaugeParam.overwrite_mom = false;
   } else {
     qudaGaugeParam.use_resident_mom = false;
     qudaGaugeParam.make_resident_mom = false;
-    qudaGaugeParam.return_mom = true;
+    qudaGaugeParam.return_result_mom = true;
+
+    // this means we compute momentum into a fresh field, copy it back
+    // and sum to current momentum in MILC.  This saves an initial
+    // CPU->GPU download of the current momentum.
+    qudaGaugeParam.overwrite_mom = true;
   }
 
   int max_length = 6;
@@ -1646,75 +1655,6 @@ void qudaCloverMultishiftInvert(int external_precision,
 } // qudaCloverMultishiftInvert
 
 #endif
-
-#ifdef GPU_GAUGE_ALG
-
-void qudaGaugeFixingOVR( int precision,
-    unsigned int gauge_dir,
-    int Nsteps,
-    int verbose_interval,
-    double relax_boost,
-    double tolerance,
-    unsigned int reunit_interval,
-    unsigned int stopWtheta,
-    void* milc_sitelink
-    )
-{
-
-
-  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_SU3_LINKS);
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
-
-
-  double timeinfo[3];
-  computeGaugeFixingOVRQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, \
-    &qudaGaugeParam, timeinfo);
-
-  printfQuda("Time H2D: %lf\n", timeinfo[0]);
-  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
-  printfQuda("Time D2H: %lf\n", timeinfo[2]);
-  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
-
-  return;
-}
-
-void qudaGaugeFixingFFT( int precision,
-    unsigned int gauge_dir,
-    int Nsteps,
-    int verbose_interval,
-    double alpha,
-    unsigned int autotune,
-    double tolerance,
-    unsigned int stopWtheta,
-    void* milc_sitelink
-    )
-{
-
-
-  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
-
-
-  double timeinfo[3];
-  computeGaugeFixingFFTQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta, \
-    &qudaGaugeParam, timeinfo);
-
-  printfQuda("Time H2D: %lf\n", timeinfo[0]);
-  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
-  printfQuda("Time D2H: %lf\n", timeinfo[2]);
-  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
-
-  return;
-}
-#endif // BUILD_GAUGE_ALG
-
-
 
 #ifdef GPU_GAUGE_ALG
 

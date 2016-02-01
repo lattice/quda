@@ -109,19 +109,21 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(overwrite_mom, 0);
   P(use_resident_gauge, 0);
   P(use_resident_mom, 0);
   P(make_resident_gauge, 0);
   P(make_resident_mom, 0);
-  P(return_gauge, 1);
-  P(return_mom, 1);
+  P(return_result_gauge, 1);
+  P(return_result_mom, 1);
 #else
+  P(overwrite_mom, INVALID_INT);
   P(use_resident_gauge, INVALID_INT);
   P(use_resident_mom, INVALID_INT);
   P(make_resident_gauge, INVALID_INT);
   P(make_resident_mom, INVALID_INT);
-  P(return_gauge, INVALID_INT);
-  P(return_mom, INVALID_INT);
+  P(return_result_gauge, INVALID_INT);
+  P(return_result_mom, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -399,7 +401,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(use_reduced_vector_set, true);
   P(use_cg_updates, false);
   P(cg_iterref_tol, 5e-2);
-  P(eigcg_min_restarts, 2);
+  P(eigcg_max_restarts, 2);
   P(max_restart_num, 3);
   P(inc_tol, 1e-2);
   P(eigenval_tol, 1e-1);
@@ -410,7 +412,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(rhs_idx, INVALID_INT);
   P(deflation_grid, INVALID_INT);
   P(cg_iterref_tol, INVALID_DOUBLE);
-  P(eigcg_min_restarts, INVALID_INT);
+  P(eigcg_max_restarts, INVALID_INT);
   P(max_restart_num, INVALID_INT);
   P(inc_tol, INVALID_DOUBLE);
   P(eigenval_tol, INVALID_DOUBLE);
