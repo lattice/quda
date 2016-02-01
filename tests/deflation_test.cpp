@@ -461,7 +461,7 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  destroyDeflationQuda(&inv_param);
+  destroyDeflationQuda(&inv_param, NULL, NULL, NULL);
 
   closeMagma();
     
