@@ -64,12 +64,16 @@ module quda_fortran
 
      integer(4) :: overlap ! width of domain overlap
 
+     ! When computing momentum, should we overwrite it or accumulate
+     ! to it (only presenty support in gauge-force)
+     integer(4) :: overwrite_mom
+
      integer(4) :: use_resident_gauge  ! Use the resident gauge field
-     integer(4) :: use_resident_mom    ! Use the resident mom field
-     integer(4) :: make_resident_gauge ! Make the gauge field resident
-     integer(4) :: make_resident_mom   ! Make the mom field resident
-     integer(4) :: return_gauge        ! Return the new gauge field
-     integer(4) :: return_mom          ! Return the new mom field
+     integer(4) :: use_resident_mom    ! Use the resident momentume field
+     integer(4) :: make_resident_gauge ! Make the result gauge field resident
+     integer(4) :: make_resident_mom   ! Make the result momentum field resident
+     integer(4) :: return_result_gauge ! Return the result gauge field
+     integer(4) :: return_result_mom   ! Return the result momentum field
 
   end type quda_gauge_param
 
