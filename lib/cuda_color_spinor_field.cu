@@ -177,7 +177,7 @@ namespace quda {
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
       if(comm_dslash_peer2peer_enabled(1,dim)){
-        int dummy;
+        int dummy; // **ULTRA FIXME!!** - this reference will die due to scope
 	// send to processor in forward direction 
 	mh_send_p2p_fwd[dim] = comm_declare_send_relative(&dummy,dim,+1,sizeof(int));
 	// receive from processor in forward directin
