@@ -505,6 +505,15 @@ extern "C" {
   QudaInvertParam newQudaInvertParam(void);
 
   /**
+   * A new QudaMultigridParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaMultigridParam mg_param = newQudaMultigridParam();
+   */
+  QudaMultigridParam newQudaMultigridParam(void);
+
+  /**
    * A new QudaEigParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
    * using this function.  Typical usage is as follows:

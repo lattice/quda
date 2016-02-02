@@ -354,7 +354,7 @@ int main(int argc, char **argv)
   setGaugeParam(gauge_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaMultigridParam mg_param;
+  QudaMultigridParam mg_param = newQudaMultigridParam();
   mg_param.invert_param = &mg_inv_param;
   setMultigridParam(mg_param);
 
