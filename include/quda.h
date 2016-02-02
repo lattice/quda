@@ -68,12 +68,14 @@ extern "C" {
 
     int overlap; /**< Width of overlapping domains */
 
-    int use_resident_gauge;  /**< Use the resident gauge field */
-    int use_resident_mom;    /**< Use the resident mom field */
-    int make_resident_gauge; /**< Make the gauge field resident */
-    int make_resident_mom;   /**< Make the mom field resident */
-    int return_gauge;        /**< Return the new gauge field */
-    int return_mom;          /**< Return the new mom field */
+    int overwrite_mom; /**< When computing momentum, should we overwrite it or accumulate to to */
+
+    int use_resident_gauge;  /**< Use the resident gauge field as input */
+    int use_resident_mom;    /**< Use the resident momentum field as input*/
+    int make_resident_gauge; /**< Make the result gauge field resident */
+    int make_resident_mom;   /**< Make the result momentum field resident */
+    int return_result_gauge; /**< Return the result gauge field */
+    int return_result_mom;   /**< Return the result momentum field */
 
   } QudaGaugeParam;
 
@@ -328,15 +330,6 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
-    /** Number of pre-smoother applications on each level */
-    int nu_pre[QUDA_MAX_MG_LEVEL];
-
-    /** Number of post-smoother applications on each level */
-    int nu_post[QUDA_MAX_MG_LEVEL];
-
-    /** Oeer/under relaation factor for the smoother at each level */
-    double omega[QUDA_MAX_MG_LEVEL];
-
     /** Smoother / solver to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
 
@@ -346,6 +339,22 @@ extern "C" {
 
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
     QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of pre-smoother applications on each level */
+    int nu_pre[QUDA_MAX_MG_LEVEL];
+
+    /** Number of post-smoother applications on each level */
+    int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use for the smoother / solver on each level.  Currently this
+	will only set the tolerance for the bottom solve */
+    double smoother_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Over/under relaxation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use global reductions or not for the smoother / solver at each level */
+    QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
 
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
@@ -497,6 +506,15 @@ extern "C" {
    *   QudaInvertParam invert_param = newQudaInvertParam();
    */
   QudaInvertParam newQudaInvertParam(void);
+
+  /**
+   * A new QudaMultigridParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaMultigridParam mg_param = newQudaMultigridParam();
+   */
+  QudaMultigridParam newQudaMultigridParam(void);
 
   /**
    * A new QudaEigParam should always be initialized immediately
@@ -1030,7 +1048,7 @@ extern "C" {
   * Clean deflation solver resources.
   *
   **/
-  void destroyDeflationQuda(QudaInvertParam *param, const int *X = NULL, void *_h_u = NULL, double *inv_eigenvals = NULL);
+  void destroyDeflationQuda(QudaInvertParam *param, const int *X, void *_h_u, double *inv_eigenvals);
 
 #ifdef __cplusplus
 }

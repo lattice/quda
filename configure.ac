@@ -291,6 +291,12 @@ AC_ARG_ENABLE(magma,
   [ build_magma="no" ]
 )
 
+AC_ARG_ENABLE(magma-vars,
+ AC_HELP_STRING([--enable-magma-vars], [ Build with MAGMA using env vars: MAGMA_INC and MAGMA_LIB ]),
+  [ build_magma_vars=${enableval}],
+  [ build_magma_vars="no" ]
+)
+
 AC_ARG_VAR(NVCCFLAGS, [ Extra flags for NVCC ])
 AC_MSG_NOTICE([User supplied NVCCFLAGS: ${NVCCFLAGS} ])
 if test "X${build_qdpjit}X" = "XyesX" ; then
@@ -865,6 +871,9 @@ AC_SUBST( QDP_INSTALL_PATH, [${qdp_home} ])
 
 AC_MSG_NOTICE([Setting BUILD_MAGMA = ${build_magma}])
 AC_SUBST( BUILD_MAGMA, [${build_magma}])
+
+AC_MSG_NOTICE([Setting BUILD_MAGMA_VARS = ${build_magma_vars}])
+AC_SUBST( BUILD_MAGMA_VARS, [${build_magma_vars}])
 
 if test "X${force_ac}X" = "XnoX";
   then

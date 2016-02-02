@@ -109,19 +109,21 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
 #if defined INIT_PARAM
+  P(overwrite_mom, 0);
   P(use_resident_gauge, 0);
   P(use_resident_mom, 0);
   P(make_resident_gauge, 0);
   P(make_resident_mom, 0);
-  P(return_gauge, 1);
-  P(return_mom, 1);
+  P(return_result_gauge, 1);
+  P(return_result_mom, 1);
 #else
+  P(overwrite_mom, INVALID_INT);
   P(use_resident_gauge, INVALID_INT);
   P(use_resident_mom, INVALID_INT);
   P(make_resident_gauge, INVALID_INT);
   P(make_resident_mom, INVALID_INT);
-  P(return_gauge, INVALID_INT);
-  P(return_mom, INVALID_INT);
+  P(return_result_gauge, INVALID_INT);
+  P(return_result_mom, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -453,6 +455,9 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(n_level, INVALID_INT);
 
   for (int i=0; i<param->n_level; i++) {
+    P(smoother[i], QUDA_INVALID_INVERTER);
+    P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+
     // these parameters are not set for the bottom grid
     if (i<param->n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
@@ -463,8 +468,15 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
 
-    P(smoother[i], QUDA_INVALID_INVERTER);
-    P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+    if (i<param->n_level) {
+      P(smoother_tol[i], INVALID_DOUBLE);
+#ifdef INIT_PARAM
+      P(global_reduction[i], QUDA_BOOLEAN_YES);
+#else
+      P(global_reduction[i], QUDA_BOOLEAN_INVALID);
+#endif
+    }
+
     P(omega[i], INVALID_DOUBLE);
 
     P(location[i], QUDA_INVALID_FIELD_LOCATION);

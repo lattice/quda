@@ -44,11 +44,103 @@ endif()
 #
 project("QUDA")
 
-###### Local configuration:
+#######################################################################
+# QUDA OPTIONS
+# likely to be changed by users
+#######################################################################
+set(QUDA_GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
 
-##CMAKE we need to support this
-set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
-set(CPU_ARCH x86_64 CACHE STRING "set the CPU architecture (currently only x86_64 supported)")
+# build options
+set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
+set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
+set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
+set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
+set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
+set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
+set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted mass Dirac operators")
+set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
+set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
+set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
+set(QUDA_FORCE_ASQTAD OFF CACHE BOOL "build code for asqtad fermion force")
+set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
+set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
+set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
+set(QUDA_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
+# Dynamic inversion saves memory but decreases the flops
+set(QUDA_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
+set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
+
+# Multi-GPU options
+set(QUDA_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
+set(QUDA_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
+set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
+
+#BLAS library
+set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
+
+
+# Interface options
+set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
+set(QUDA_INTERFACE_MILC ON CACHE BOOL "build milc interface")
+set(QUDA_INTERFACE_CPS OFF CACHE BOOL "build cps interface")
+set(QUDA_INTERFACE_QDPJIT OFF CACHE BOOL "build qdpjit interface")
+set(QUDA_INTERFACE_BQCD OFF CACHE BOOL "build bqcd interface")
+set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
+
+# QDPJIT
+set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
+
+# Locations for QIO / QMP
+set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
+set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
+
+#######################################################################
+#QUDA ADVANCED OPTIONS
+# that ususally should not be changed by users
+#######################################################################
+set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
+set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
+set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
+set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
+
+# NVTX options
+set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
+set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
+
+# GPUdirect options
+set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
+set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
+
+# Packing option
+set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
+
+# features in development
+set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
+set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
+
+mark_as_advanced(QUDA_BLAS_TEX)
+mark_as_advanced(QUDA_FERMI_DBLE_TEX)
+mark_as_advanced(QUDA_NUMA_AFFINITY)
+mark_as_advanced(QUDA_VERBOSE_BUILD)
+
+mark_as_advanced(QUDA_MPI_NVTX)
+mark_as_advanced(QUDA_INTERFACE_NVTX)
+
+mark_as_advanced(QUDA_GPU_DIRECT)
+mark_as_advanced(QUDA_GPU_COMMS)
+
+mark_as_advanced(QUDA_DEVICE_PACK)
+
+mark_as_advanced(QUDA_SSTEP)
+
+#######################################################################
+# options that are not exposed at all because only one option exists
+set(CPU_ARCH x86_64)
+
+
+#######################################################################
+# everything below here is processing the setup
+#######################################################################
 
 # we need to check for some packages
 find_package(PythonInterp)
@@ -56,90 +148,23 @@ find_package(PythonInterp)
 find_package(CUDA REQUIRED)
 find_package(Threads REQUIRED)
 
-
-set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
-set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
-set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
-set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
-
-# build options
-set(BUILD_WILSON_DIRAC ON CACHE BOOL "build Wilson Dirac operators")
-set(BUILD_CLOVER_DIRAC ON CACHE BOOL "build clover Dirac operators")
-set(BUILD_DOMAIN_WALL_DIRAC ON CACHE BOOL "build domain wall Dirac operators")
-set(BUILD_STAGGERED_DIRAC ON CACHE BOOL "build staggered Dirac operators")
-set(BUILD_TWISTED_MASS_DIRAC ON CACHE BOOL "build twisted mass Dirac operators")
-set(BUILD_TWISTED_CLOVER_DIRAC ON CACHE BOOL "build twisted clover Dirac operators")
-set(BUILD_NDEG_TWISTED_MASS_DIRAC OFF CACHE BOOL "build non-degenerate twisted mass Dirac operators")
-set(BUILD_FATLINK OFF CACHE BOOL "build code for computing asqtad fat links")
-set(BUILD_HISQLINK OFF CACHE BOOL "build code for computing hisq fat links")
-set(BUILD_GAUGE_FORCE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
-set(BUILD_FERMION_FORCE OFF CACHE BOOL "build code for asqtad fermion force")
-set(BUILD_HISQ_FORCE OFF CACHE BOOL "build code for hisq fermion force")
-set(BUILD_GAUGE_TOOLS OFF CACHE BOOL "build auxilary gauge-field tools")
-set(BUILD_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
-set(BUILD_SSTEP OFF CACHE BOOL "build s-step linear solvers")
-set(BUILD_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
-set(BUILD_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
-# Dynamic inversion saves memory but decreases the flops
-set(BUILD_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
-set(BUILD_QIO OFF CACHE BOOL "build QIO code for binary I/O")
-
-# Multi-GPU options
-set(BUILD_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
-set(BUILD_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
-set(POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
-
-#BLAS library
-set(BUILD_MAGMA OFF CACHE BOOL "build magma interface")
-
-# GPUdirect options
-set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
-set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
-
-# NVTX options
-set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
-set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
-
-# Interface options
-set(BUILD_QDP_INTERFACE ON CACHE BOOL "build qdp interface")
-set(BUILD_MILC_INTERFACE ON CACHE BOOL "build milc interface")
-set(BUILD_CPS_INTERFACE OFF CACHE BOOL "build cps interface")
-set(BUILD_QDPJIT_INTERFACE OFF CACHE BOOL "build qdpjit interface")
-set(BUILD_BQCD_INTERFACE OFF CACHE BOOL "build bqcd interface")
-set(BUILD_TIFR_INTERFACE OFF CACHE BOOL "build tifr interface")
-
-# Packing option
-set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
-
-# QDPJIT
-set(QUDA_USE_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
-
-set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
-set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
-
-
-#########################################################
-# everything below here is processing the setup
-#
-
-
 # do all the build definitions
 #
 
-if(${BUILD_MPI} OR ${BUILD_QMP})
+if(${QUDA_MPI} OR ${QUDA_QMP})
   add_definitions(-DMULTI_GPU)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
-if(${BUILD_MPI})
+if(${QUDA_MPI})
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(${MPI_CXX_INCLUDE_PATH})
 endif()
 
-if (${BUILD_QMP})
+if (${QUDA_QMP})
   add_definitions(-DQMP_COMMS)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -149,7 +174,7 @@ if (${BUILD_QMP})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
-if (${BUILD_QIO})
+if (${QUDA_QIO})
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
@@ -157,89 +182,89 @@ if (${BUILD_QIO})
   include_directories(${QUDA_QIOHOME}/include)
 endif()
 
-if(BUILD_MAGMA)
+if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(MAGMA  magma)
   include_directories(${MAGMA_INCLUDEDIR})
   message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
-endif(BUILD_MAGMA)
+endif(QUDA_MAGMA)
 
-if(BUILD_SSTEP)
+if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
 
-if (BUILD_MULTIGRID)
+if (QUDA_MULTIGRID)
   add_definitions(-DGPU_MULTIGRID)
-endif(BUILD_MULTIGRID)
+endif(QUDA_MULTIGRID)
 
-if(POSIX_THREADS)
+if(QUDA_POSIX_THREADS)
   add_definitions(-DPTHREADS)
 endif()
 
-if(BUILD_WILSON_DIRAC)
+if(QUDA_DIRAC_WILSON)
   add_definitions(-DGPU_WILSON_DIRAC)
-endif(BUILD_WILSON_DIRAC)
+endif(QUDA_DIRAC_WILSON)
 
-if(BUILD_DOMAIN_WALL_DIRAC)
+if(QUDA_DIRAC_DOMAIN_WALL)
   add_definitions(-DGPU_DOMAIN_WALL_DIRAC)
-endif(BUILD_DOMAIN_WALL_DIRAC)
+endif(QUDA_DIRAC_DOMAIN_WALL)
 
-if (BUILD_STAGGERED_DIRAC)
+if (QUDA_DIRAC_STAGGERED)
   add_definitions(-DGPU_STAGGERED_DIRAC)
-endif(BUILD_STAGGERED_DIRAC)
+endif(QUDA_DIRAC_STAGGERED)
 
-if(BUILD_CLOVER_DIRAC)
+if(QUDA_DIRAC_CLOVER)
   add_definitions(-DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
-endif(BUILD_CLOVER_DIRAC)
+endif(QUDA_DIRAC_CLOVER)
 
-if(BUILD_TWISTED_MASS_DIRAC)
+if(QUDA_DIRAC_TWISTED_MASS)
   add_definitions(-DGPU_TWISTED_MASS_DIRAC)
-endif(BUILD_TWISTED_MASS_DIRAC)
+endif(QUDA_DIRAC_TWISTED_MASS)
 
-if(BUILD_TWISTED_CLOVER_DIRAC)
+if(QUDA_DIRAC_TWISTED_CLOVER)
   add_definitions(-DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
-endif(BUILD_TWISTED_CLOVER_DIRAC)
+endif(QUDA_DIRAC_TWISTED_CLOVER)
 
-if(BUILD_NDEG_TWISTED_MASS_DIRAC)
+if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
-endif(BUILD_NDEG_TWISTED_MASS_DIRAC)
+endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(BUILD_FATLINK)
+if(QUDA_LINK_ASQTAD)
   add_definitions(-DGPU_FATLINK -DGPU_GAUGE_TOOLS)
-endif(BUILD_FATLINK)
+endif(QUDA_LINK_ASQTAD)
 
-if(BUILD_HISQLINK)
+if(QUDA_LINK_HISQ)
   add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS)
-endif(BUILD_HISQLINK)
+endif(QUDA_LINK_HISQ)
 
-if(BUILD_GAUGE_FORCE)
+if(QUDA_FORCE_GAUGE)
   add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
-endif(BUILD_GAUGE_FORCE)
+endif(QUDA_FORCE_GAUGE)
 
-if(BUILD_FERMION_FORCE)
+if(QUDA_FORCE_ASQTAD)
   add_definitions(-DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS)
-endif(BUILD_FERMION_FORCE)
+endif(QUDA_FORCE_ASQTAD)
 
-if(BUILD_HISQ_FORCE)
+if(QUDA_FORCE_HISQ)
   add_definitions(-DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS)
-endif(BUILD_HISQ_FORCE)
+endif(QUDA_FORCE_HISQ)
 
-if(BUILD_GAUGE_TOOLS)
+if(QUDA_GAUGE_TOOLS)
   add_definitions(-DGPU_GAUGE_TOOLS)
-endif(BUILD_GAUGE_TOOLS)
+endif(QUDA_GAUGE_TOOLS)
 
-if(BUILD_GAUGE_ALG)
+if(QUDA_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_TOOLS)
   add_definitions(-DGPU_UNITARIZE)
   LIST(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
-endif(BUILD_GAUGE_ALG)
+endif(QUDA_GAUGE_ALG)
 
-if(BUILD_DYNAMIC_CLOVER)
+if(QUDA_DYNAMIC_CLOVER)
   add_definitions(-DDYNAMIC_CLOVER)
-endif(BUILD_DYNAMIC_CLOVER)
+endif(QUDA_DYNAMIC_CLOVER)
 
 if(QUDA_MPI_NVTX)
   LIST(APPEND COMM_OBJS nvtx_pmpi.c)
@@ -273,32 +298,32 @@ if(GPU_COMMS)
   add_definitions(-DGPU_COMMS)
 endif(GPU_COMMS)
 
-if(BUILD_QDP_INTERFACE)
+if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
-endif(BUILD_QDP_INTERFACE)
+endif(QUDA_INTERFACE_QDP)
 
-if(BUILD_MILC_INTERFACE)
+if(QUDA_INTERFACE_MILC)
   add_definitions(-DBUILD_MILC_INTERFACE)
-endif(BUILD_MILC_INTERFACE)
+endif(QUDA_INTERFACE_MILC)
 
-if(BUILD_CPS_INTERFACE)
+if(QUDA_INTERFACE_CPS)
   add_definitions(-DBUILD_CPS_INTERFACE)
-endif(BUILD_CPS_INTERFACE)
+endif(QUDA_INTERFACE_CPS)
 
-if(BUILD_QDPJIT_INTERFACE)
+if(QUDA_INTERFACE_QDPJIT)
 add_definitions(-DBUILD_QDPJIT_INTERFACE)
-endif(BUILD_QDPJIT_INTERFACE)
+endif(QUDA_INTERFACE_QDPJIT)
 
-if(BUILD_BQCD_INTERFACE)
+if(QUDA_INTERFACE_BQCD)
   add_definitions(-DBUILD_BQCD_INTERFACE)
-endif(BUILD_BQCD_INTERFACE)
+endif(QUDA_INTERFACE_BQCD)
 
-if(BUILD_TIFR_INTERFACE)
+if(QUDA_INTERFACE_TIFR)
   add_definitions(-DBUILD_TIFR_INTERFACE)
-endif(BUILD_TIFR_INTERFACE)
+endif(QUDA_INTERFACE_TIFR)
 
 # derive whether we need to build the fortran interface
-if(BUILD_TIFR_INTERFACE OR BUILD_BQCD_INTERFACE)
+if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
   SET(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()
@@ -314,9 +339,9 @@ if(NOT ${APPLE})
   endif(QUDA_NUMA_AFFINITY)
 endif(NOT ${APPLE})
 
-if(BUILD_CONTRACT)
+if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)
-endif(BUILD_CONTRACT)
+endif(QUDA_CONTRACT)
 
 
 # COMPILER OPTIONS and BUILD types
@@ -329,7 +354,7 @@ include_directories(lib)
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
-set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
+set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
 add_definitions(-DQUDA_HASH=${HASH})
 
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
@@ -349,13 +374,13 @@ IF(GITVERSION)
 ENDIF()
 
 # GPU ARCH
-STRING(REGEX REPLACE sm_ "" COMP_CAP ${GPU_ARCH})
+STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 SET(COMP_CAP "${COMP_CAP}0")
 add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
-# NVCC FLAGS independent off build type
-set(QUDA_NVCC_FLAGS -std=c++11 -arch=${GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+# NVCC FLAGS independet off build type
+set(QUDA_NVCC_FLAGS -std=c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
@@ -380,6 +405,10 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     FORCE )
 
 LIST(APPEND OpenMP_CXX_FLAGS -std=c++11)
+
+# to remain consistent with other build types
+mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
+mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
 
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."

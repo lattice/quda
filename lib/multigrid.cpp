@@ -21,7 +21,7 @@ namespace quda {
 
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
 
-    if (param.level == 0) { // null space generation only on level 1 currently
+    if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
 	generateNullVectors(param.B);
       } else {
@@ -44,12 +44,14 @@ namespace quda {
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
+    param_presmooth->tol = param.smoother_tol;
+    param_presmooth->global_reduction = param.global_reduction;
+
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 20;
-      param_presmooth->maxiter = 500;
-      param_presmooth->tol = 2e-1;
+      param_presmooth->maxiter = 1000;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-2;
+      param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
     }
 
@@ -180,6 +182,11 @@ namespace quda {
 
     // now we can run through the verification if requested
     if (param.level == 0 && param.mg_global.run_verify) verify();
+
+    // print out profiling information for the adaptive setup
+    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
+    // Reset the profile for accurate solver timing
+    profile.TPRESET();
 
     setOutputPrefix("");
   }

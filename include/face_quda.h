@@ -126,6 +126,8 @@ int commDim(int);
 int commCoords(int);
 int commDimPartitioned(int dir);
 void commDimPartitionedSet(int dir);
+bool commGlobalReduction();
+void commGlobalReductionSet(bool global_reduce);
 
 #ifdef __cplusplus
   extern "C" {
@@ -147,8 +149,6 @@ void commDimPartitionedSet(int dir);
 			     QudaPrecision gPrecision);
     void exchange_llfat_init(QudaPrecision prec);
     void exchange_llfat_cleanup(void);
-
-    extern bool globalReduce;
 
 #ifdef __cplusplus
   }

@@ -116,6 +116,9 @@ namespace quda {
     } else  if (in.Ncolor() == 48) {
       const int Nc = 48;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type); 
+    } else  if (in.Ncolor() == 64) {
+      const int Nc = 64;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else  if (in.Ncolor() == 96) {
       const int Nc = 96;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
@@ -133,6 +136,7 @@ namespace quda {
   void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			  void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
 	copyGaugeMG(out, in, location, (double*)Out, (double*)In, (double**)ghostOut, (double**)ghostIn, type);
       } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
@@ -140,9 +144,16 @@ namespace quda {
       } else {
 	errorQuda("Precision %d not supported", in.Precision());
       }
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
 	copyGaugeMG(out, in, location, (float*)Out, (double*)In, (float**)ghostOut, (double**)ghostIn, type);
+#else
+	errorQuda("Double precision multigrid has not been enabled");
+#endif
       } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
 	copyGaugeMG(out, in, location, (float*)Out, (float*)In, (float**)ghostOut, (float**)ghostIn, type);
       } else {

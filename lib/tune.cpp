@@ -345,8 +345,8 @@ namespace quda {
 
 
     // We must switch off the global sum when tuning in case of process divergence
-    bool reduceState = globalReduce;
-    globalReduce = false;
+    bool reduceState = commGlobalReduction();
+    commGlobalReductionSet(false);
 
     static bool tuning = false; // tuning in progress?
     static const Tunable *active_tunable; // for error checking
@@ -442,7 +442,7 @@ namespace quda {
     }
 
     // restore the original reduction state
-    globalReduce = reduceState;
+    commGlobalReductionSet(reduceState);
 
 #ifdef PTHREADS
 //    pthread_mutex_unlock(&pthread_mutex);

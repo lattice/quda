@@ -49,6 +49,8 @@ namespace quda {
       extractGhostMG<Float, 32>(u, Ghost, extract);
     } else if (u.Ncolor() == 48) {
       extractGhostMG<Float, 48>(u, Ghost, extract);
+    } else if (u.Ncolor() == 64) {
+      extractGhostMG<Float, 64>(u, Ghost, extract);
     } else if (u.Ncolor() == 96) {
       extractGhostMG<Float, 96>(u, Ghost, extract);
     } else if (u.Ncolor() == 192) {
@@ -61,7 +63,11 @@ namespace quda {
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract) {
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       extractGhostMG(u, (double**)ghost, extract);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
       extractGhostMG(u, (float**)ghost, extract);
     } else {

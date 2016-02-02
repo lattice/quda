@@ -248,8 +248,12 @@ namespace quda {
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
 		      sqrt(r2), r0Norm, resIncreaseTotal);
 	  if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
-            if (use_heavy_quark_res) L2breakdown = true;
-            else break;
+            if (use_heavy_quark_res) {
+	      L2breakdown = true;
+            } else {
+	      warningQuda("CG: solver exiting due to too many true residual norm increases");
+	      break;
+	    }
 	  }
 	} else {
 	  resIncrease = 0;
@@ -263,7 +267,10 @@ namespace quda {
 	    hqresIncrease++;
 	    warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
 	    // break out if we do not improve here anymore
-	    if (hqresIncrease > hqmaxresIncrease) break;
+	    if (hqresIncrease > hqmaxresIncrease) {
+	      warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
+	      break;
+	    }
 	  }
 	}
 
@@ -298,11 +305,11 @@ namespace quda {
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
       converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
       
-      // check for recent enough relibale updates of the HQ residual if we use it
+      // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
         // L2 is concverged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
-        // HQ is converged and if we do reliable update the HQ residual has been caclculated using a reliable update
+        // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
         bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
         converged = L2done and HQdone;
       }
@@ -327,7 +334,7 @@ namespace quda {
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals
-    mat(r, x, y);
+    mat(r, x, y, tmp3);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 

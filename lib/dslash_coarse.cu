@@ -400,7 +400,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 	  if (param.block.z <= 2 * 2 * (Nc/Mc) && param.block.z <= 64 ) { //
 	    return true;
 	  } else { // we have run off the end so let's reset
-	    param.block.z = 1;
+	    param.block.z = 2;
 	    param.grid.z = 2 * (Nc/Mc);
 	    return false;
 	  }
@@ -549,6 +549,8 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 48) {
       ApplyCoarse<Float,csOrder,gOrder,48,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
+    } else if (inA.Ncolor() == 32) {
+      ApplyCoarse<Float,csOrder,gOrder,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 96) {
       ApplyCoarse<Float,csOrder,gOrder,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else {
@@ -597,7 +599,11 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
     inA.exchangeGhost((QudaParity)(1-parity), dummy);
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else {

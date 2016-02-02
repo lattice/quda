@@ -59,6 +59,8 @@ namespace quda {
       calculateYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,16,coarseSpin>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
     } else if (coarseColor == 24) {
       calculateYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
+    } else if (coarseColor == 32) {
+      calculateYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,32,coarseSpin>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -81,14 +83,16 @@ namespace quda {
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
 			const GaugeField &cloverInv, double kappa, QudaDiracType dirac, QudaMatPCType matpc) {
-    if (g.Ncolor()/T.Vectors().Nspin() == 24) {
-      calculateYcoarse<Float,csOrder,gOrder,24>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
-    } else if (g.Ncolor()/T.Vectors().Nspin() == 2) {
+    if (g.Ncolor()/T.Vectors().Nspin() == 2) {
       calculateYcoarse<Float,csOrder,gOrder,2>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 8) {
       calculateYcoarse<Float,csOrder,gOrder,8>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 16) {
       calculateYcoarse<Float,csOrder,gOrder,16>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
+    } else if (g.Ncolor()/T.Vectors().Nspin() == 24) {
+      calculateYcoarse<Float,csOrder,gOrder,24>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
+    } else if (g.Ncolor()/T.Vectors().Nspin() == 32) {
+      calculateYcoarse<Float,csOrder,gOrder,32>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }
@@ -126,7 +130,11 @@ namespace quda {
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       calculateYcoarse<double>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       calculateYcoarse<float>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, dirac, matpc);
     } else {

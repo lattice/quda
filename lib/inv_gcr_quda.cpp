@@ -40,6 +40,8 @@ namespace quda {
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // tell inner solver it is a preconditionis_re
 
+    inner.global_reduction = false;
+
     if (outer.inv_type == QUDA_GCR_INVERTER && outer.precision_sloppy != outer.precision_precondition) 
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
     else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
@@ -431,7 +433,10 @@ namespace quda {
 	  resIncreaseTotal++;
 	  warningQuda("GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
 		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
-	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
+	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+	    warningQuda("GCR: solver exiting due to too many true residual norm increases");
+	    break;
+	  }
 	} else {
 	  resIncrease = 0;
 	}

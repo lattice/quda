@@ -37,8 +37,8 @@ namespace quda {
 
   void SD::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    commGlobalReductionSet(param.global_reduction);
 
-    globalReduce = false;
     if(!init){
       r = new cudaColorSpinorField(b);
       Ar = new cudaColorSpinorField(b);
@@ -87,7 +87,8 @@ namespace quda {
       double true_r2 = xmyNorm(b,*r);
       printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
     } // >= QUDA_DEBUG_VERBOSITY
-    globalReduce = true;
+
+    commGlobalReductionSet(true);
     return;
   }
 

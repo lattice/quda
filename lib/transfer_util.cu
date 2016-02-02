@@ -51,6 +51,8 @@ namespace quda {
       FillV<Float,nSpin,nColor,20,order>(V,B);
     } else if (Nvec == 24) {
       FillV<Float,nSpin,nColor,24,order>(V,B);
+    } else if (Nvec == 32) {
+      FillV<Float,nSpin,nColor,32,order>(V,B);
     } else if (Nvec == 48) {
       FillV<Float,nSpin,nColor,48,order>(V,B);
     } else if (Nvec == 96) {
@@ -76,6 +78,8 @@ namespace quda {
       FillV<Float,nSpin,16,order>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 24) {
       FillV<Float,nSpin,24,order>(V,B,Nvec);
+    } else if(B[0]->Ncolor() == 32) {
+      FillV<Float,nSpin,32,order>(V,B,Nvec);
     } else {
       errorQuda("Unsupported nColor %d", B[0]->Ncolor());
     }
@@ -109,7 +113,11 @@ namespace quda {
 
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       FillV<double>(V,B,Nvec);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (V.Precision() == QUDA_SINGLE_PRECISION) {
       FillV<float>(V,B,Nvec);
     } else {
@@ -360,6 +368,8 @@ namespace quda {
       BlockOrthogonalize<Float,nSpin,nColor,20,order>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 24) {
       BlockOrthogonalize<Float,nSpin,nColor,24,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 32) {
+      BlockOrthogonalize<Float,nSpin,nColor,32,order>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 48) {
       BlockOrthogonalize<Float,nSpin,nColor,48,order>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 96) {
@@ -386,6 +396,9 @@ namespace quda {
     }
     else if (V.Ncolor()/Nvec == 24) {
       BlockOrthogonalize<Float,nSpin,24,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    }
+    else if (V.Ncolor()/Nvec == 32) {
+      BlockOrthogonalize<Float,nSpin,32,order>(V, Nvec, geo_bs, geo_map, spin_bs);
     }
     else if (V.Ncolor()/Nvec == 48) {
       BlockOrthogonalize<Float,nSpin,48,order>(V, Nvec, geo_bs, geo_map, spin_bs); //for staggered, even-odd blocking presumed
@@ -425,7 +438,11 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       BlockOrthogonalize<double>(V, Nvec, geo_bs, geo_map, spin_bs);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (V.Precision() == QUDA_SINGLE_PRECISION) {
       BlockOrthogonalize<float>(V, Nvec, geo_bs, geo_map, spin_bs);
     } else {
