@@ -21,7 +21,7 @@ namespace quda {
 
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
 
-    if (param.level == 0) { // null space generation only on level 1 currently
+    if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
 	generateNullVectors(param.B);
       } else {
