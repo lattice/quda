@@ -178,6 +178,11 @@ namespace quda {
     // now we can run through the verification if requested
     if (param.level == 0 && param.mg_global.run_verify) verify();
 
+    // print out profiling information for the adaptive setup
+    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
+    // Reset the profile for accurate solver timing
+    profile.TPRESET();
+
     setOutputPrefix("");
   }
 

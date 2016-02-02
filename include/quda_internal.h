@@ -147,6 +147,16 @@ namespace quda {
 
     double Last() { return last; }
 
+    void Reset(const char *func, const char *file, int line) {
+      if (running) {
+	printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())\n", file, line, func);
+	errorQuda("Aborting");
+      }
+      time = 0.0;
+      last = 0.0;
+      count = 0;
+    }
+
   };
 
   /**< Enumeration type used for writing a simple but extensible profiling framework. */
@@ -279,11 +289,14 @@ namespace quda {
       if (use_global) StopGlobal(func,file,line,idx);
     }
 
+    void Reset_(const char *func, const char *file, int line) {
+      for (int idx=0; idx<QUDA_PROFILE_COUNT; idx++)
+	profile[idx].Reset(func, file, line);
+    }
+
     double Last(QudaProfileType idx) { 
       return profile[idx].last;
     }
-
-
 
     static void PrintGlobal();
 
@@ -291,6 +304,7 @@ namespace quda {
 
 #define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
 #define TPSTOP(idx) Stop_(__func__, __FILE__, __LINE__, idx)
+#define TPRESET() Reset_(__func__, __FILE__, __LINE__)
 
 #undef PUSH_RANGE
 #undef POP_RANGE
