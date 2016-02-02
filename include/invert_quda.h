@@ -181,6 +181,8 @@ namespace quda {
 
     bool is_preconditioner; //! whether the solver acting as a preconditioner for another solver
 
+    bool global_reduction; //! whether to use a global or local (node) reduction for this solver
+
     /**
        Default constructor
      */
@@ -212,7 +214,7 @@ namespace quda {
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition), compute_true_res(true),
-      is_preconditioner(false)
+      is_preconditioner(false), global_reduction(true)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -250,7 +252,7 @@ namespace quda {
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition), compute_true_res(param.compute_true_res),
-      is_preconditioner(param.is_preconditioner)
+      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];

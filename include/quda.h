@@ -350,8 +350,11 @@ extern "C" {
 	will only set the tolerance for the bottom solve */
     double smoother_tol[QUDA_MAX_MG_LEVEL];
 
-    /** Oeer/under relaation factor for the smoother at each level */
+    /** Over/under relaxation factor for the smoother at each level */
     double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use global reductions or not for the smoother / solver at each level */
+    QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
 
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];

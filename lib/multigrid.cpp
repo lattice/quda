@@ -45,6 +45,7 @@ namespace quda {
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
     param_presmooth->tol = param.smoother_tol;
+    param_presmooth->global_reduction = param.global_reduction;
 
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 20;

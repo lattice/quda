@@ -62,6 +62,9 @@ namespace quda {
     /** Tolerance to use for the solver / smoother (if applicable) */
     double smoother_tol;
 
+    /** Whether to use global or local (node) reductions */
+    QudaBoolean global_reduction;
+
     /** The Dirac operator to use for residual computation */
     DiracMatrix &matResidual;
 
@@ -102,6 +105,7 @@ namespace quda {
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
       smoother_tol(param.smoother_tol[level]),
+      global_reduction(param.global_reduction[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.smoother[level]),
@@ -133,6 +137,7 @@ namespace quda {
       nu_pre(param.mg_global.nu_pre[level]),
       nu_post(param.mg_global.nu_post[level]),
       smoother_tol(param.mg_global.smoother_tol[level]),
+      global_reduction(param.mg_global.global_reduction[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.mg_global.smoother[level]),

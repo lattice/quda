@@ -36,7 +36,7 @@ namespace quda {
 
   void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    globalReduce = false; // use local reductions for DD solver
+    commGlobalReductionSet(param.global_reduction); // use local reductions for DD solver
 
     if (!init) {
       ColorSpinorParam csParam(x);
@@ -120,7 +120,7 @@ namespace quda {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	double x2 = blas::norm2(x);
 	double r2 = blas::norm2(r);
-	printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e,%e) x2 = %e\n", 
+	printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e,%e) x2 = %e\n",
 		   k+1, r2, Ar3.x, Ar3.y, x2);
       } else if (getVerbosity() >= QUDA_VERBOSE) {
 	printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, Ar3.x, Ar3.y);
@@ -171,7 +171,7 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    globalReduce = true; // renable global reductions for outer solver
+    commGlobalReductionSet(true); // renable global reductions for outer solver
     return;
   }
 

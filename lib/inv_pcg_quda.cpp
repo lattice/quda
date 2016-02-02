@@ -143,9 +143,9 @@ namespace quda {
       rPre = new cudaColorSpinorField(rSloppy,csParam);
       // Create minvrPre 
       minvrPre = new cudaColorSpinorField(*rPre);
-      globalReduce = false;
+      commGlobalReductionSet(false);
       (*K)(*minvrPre, *rPre);  
-      globalReduce = true;
+      commGlobalReductionSet(true);
       *minvrSloppy = *minvrPre;
       p = new cudaColorSpinorField(*minvrSloppy);
     }else{
@@ -228,9 +228,9 @@ namespace quda {
         if(K){
           r_new_Minvr_old = reDotProduct(rSloppy,*minvrSloppy);
           *rPre = rSloppy;
-          globalReduce = false;
+	  commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
-          globalReduce = true;
+	  commGlobalReductionSet(true);
       
 
           *minvrSloppy = *minvrPre;
@@ -275,9 +275,9 @@ namespace quda {
 
         if(K){
           *rPre = rSloppy;
-          globalReduce = false;
+	  commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
-          globalReduce = true;
+	  commGlobalReductionSet(true);
 
           *minvrSloppy = *minvrPre;
 
