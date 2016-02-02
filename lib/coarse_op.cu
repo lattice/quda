@@ -64,6 +64,8 @@ namespace quda {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,20,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, dirac, matpc);
     } else if (coarseColor == 24) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, dirac, matpc);
+    } else if (coarseColor == 32) {
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,32,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, dirac, matpc);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -132,7 +134,11 @@ namespace quda {
     printfQuda("Computing Y field......\n");
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       calculateY<double>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, dirac, matpc);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       calculateY<float>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, dirac, matpc);
     } else {

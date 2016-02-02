@@ -100,6 +100,8 @@ namespace quda {
       genericSource<Float,nSpin,20,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 24) {
       genericSource<Float,nSpin,24,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 32) {
+      genericSource<Float,nSpin,32,order>(a,sourceType, x, s, c);
     } else {
       errorQuda("Unsupported nColor=%d\n", a.Ncolor());
     }

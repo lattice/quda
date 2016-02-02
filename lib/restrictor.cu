@@ -344,6 +344,8 @@ namespace quda {
       Restrict<Float,fineSpin,fineColor,coarseSpin,20,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 24) {
       Restrict<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+    } else if (nVec == 32) {
+      Restrict<Float,fineSpin,fineColor,coarseSpin,32,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 48) {
       Restrict<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else {
@@ -367,6 +369,8 @@ namespace quda {
       Restrict<Float,fineSpin,16, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Ncolor() == 24) {
       Restrict<Float,fineSpin,24, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+    } else if (in.Ncolor() == 32) {
+      Restrict<Float,fineSpin,32, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Ncolor() == 48) {
       Restrict<Float,fineSpin,48, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else {
@@ -421,7 +425,11 @@ namespace quda {
       errorQuda("Precision mismatch out=%d in=%d v=%d", out.Precision(), in.Precision(), v.Precision());
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       Restrict<double>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
       Restrict<float>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else {

@@ -185,6 +185,8 @@ template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int write
     genericBlas<Float,nSpin,20,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 24) {
     genericBlas<Float,nSpin,24,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 32) {
+    genericBlas<Float,nSpin,32,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
   }

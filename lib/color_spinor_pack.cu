@@ -248,14 +248,20 @@ namespace quda {
       genericPackGhost<Float,order,Ns,20>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 24) {
       genericPackGhost<Float,order,Ns,24>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 32) {
+      genericPackGhost<Float,order,Ns,32>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 48) {
       genericPackGhost<Float,order,Ns,48>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 72) {
       genericPackGhost<Float,order,Ns,72>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 96) {
+      genericPackGhost<Float,order,Ns,96>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 256) {
       genericPackGhost<Float,order,Ns,256>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 576) {
       genericPackGhost<Float,order,Ns,576>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 1024) {
+      genericPackGhost<Float,order,Ns,1024>(ghost, a, parity, dagger);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
     }

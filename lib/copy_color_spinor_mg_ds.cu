@@ -6,10 +6,14 @@ namespace quda {
 				  QudaFieldLocation location, void *Dst, void *Src, 
 				  void *dstNorm, void *srcNorm) {
 
+#ifdef GPU_MULTIGRID_DOUBLE
     double *dst_ptr = static_cast<double*>(Dst);
     float *src_ptr = static_cast<float*>(Src);
 
     INSTANTIATE_COLOR;
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
 
   }
 

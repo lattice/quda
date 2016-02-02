@@ -449,6 +449,8 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       ApplyCoarse<Float,csOrder,gOrder,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
+    } else if (inA.Ncolor() == 32) {
+      ApplyCoarse<Float,csOrder,gOrder,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -496,7 +498,11 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
     inA.exchangeGhost((QudaParity)(1-parity), dummy);
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
       ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
+#else
+      errorQuda("Double precision multigrid has not been enabled");
+#endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else {
