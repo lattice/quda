@@ -242,7 +242,7 @@ namespace quda {
 	size_t Bytes() const {
 	  constexpr int n = (nSpin * nColor) / 2;
 	  constexpr int chiral_block = n * n / 2;
-	  return volumeCB * chiral_block * 2 * 2 * sizeof(Float); // 2 from complex, 2 from chirality
+	  return static_cast<size_t>(volumeCB) * chiral_block * 2ll * 2ll * sizeof(Float); // 2 from complex, 2 from chirality
 	}
       };
 

@@ -292,7 +292,7 @@ namespace quda {
 	}
 
 	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-	size_t Bytes() const { return volumeCB * nColor * nColor * 2 * sizeof(Float); }
+	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(Float); }
       };
 
 

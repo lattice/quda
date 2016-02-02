@@ -279,7 +279,7 @@ namespace quda {
 	return nrm2;
       }
 
-      size_t Bytes() const { return nParity * volumeCB * nColor * nSpin * nVec * 2 * sizeof(Float); }
+      size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(Float); }
     };
 
     template <typename Float, int Ns, int Nc, int N>
