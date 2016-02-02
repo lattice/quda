@@ -44,12 +44,13 @@ namespace quda {
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
+    param_presmooth->tol = param.smoother_tol;
+
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 20;
       param_presmooth->maxiter = 1000;
-      param_presmooth->tol = 2e-1;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-2;
+      param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
     }
 

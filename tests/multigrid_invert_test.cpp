@@ -196,6 +196,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.smoother[i] = precon_type;
 
+    // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
+    mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
+
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
     mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD

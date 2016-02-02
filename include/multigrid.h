@@ -20,6 +20,65 @@ namespace quda {
    */
   struct MGParam : SolverParam {
 
+    /** This points to the parameter struct that is passed into QUDA.
+	We use this to set per-level parameters */
+    QudaMultigridParam  &mg_global;
+
+    /** What is the level of this instance */
+    int level;
+
+    /** Number of levels in the solver */
+    int Nlevel;
+
+    /** Geometric block size */
+    int geoBlockSize[QUDA_MAX_DIM];
+
+    /** Spin block size */
+    int spinBlockSize;
+
+    /** Number of vectors used to define coarse space */
+    int Nvec;
+
+    /** This is the next lower level */
+    MG *coarse;
+
+    /** This is the immediate finer level */
+    MG *fine;
+
+    /** The null space vectors */
+    std::vector<ColorSpinorField*> &B;
+
+    /** Number of pre-smoothing applications to perform */
+    int nu_pre;
+
+    /** Number of pre-smoothing applications to perform */
+    int nu_post;
+
+    /** Tolerance to use for the solver / smoother (if applicable) */
+    double smoother_tol;
+
+    /** The Dirac operator to use for residual computation */
+    DiracMatrix &matResidual;
+
+    /** The Dirac operator to use for smoothing */
+    DiracMatrix &matSmooth;
+
+    /** What type of smoother to use */
+    QudaInverterType smoother;
+
+    /** The type of residual to send to the next coarse grid, and thus the
+	type of solution to receive back from this coarse grid */
+    QudaSolutionType coarse_grid_solution_type;
+
+    /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
+    QudaSolveType smoother_solve_type;
+
+    /** Where to compute this level of multigrid */
+    QudaFieldLocation location;
+
+    /** Filename for where to load/store the null space */
+    char filename[100];
+
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
@@ -37,6 +96,7 @@ namespace quda {
       B(B), 
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
+      smoother_tol(param.smoother_tol[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.smoother[level]),
@@ -67,6 +127,7 @@ namespace quda {
       B(B),
       nu_pre(param.mg_global.nu_pre[level]),
       nu_post(param.mg_global.nu_post[level]),
+      smoother_tol(param.mg_global.smoother_tol[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.mg_global.smoother[level]),
@@ -81,61 +142,6 @@ namespace quda {
 	omega = param.mg_global.omega[level];
       }
 
-    /** This points to the parameter struct that is passed into QUDA.
-	We use this to set per-level parameters */
-    QudaMultigridParam  &mg_global;
-
-    /** What is the level of this instance */
-    int level; 
-
-    /** Number of levels in the solver */
-    int Nlevel; 
-
-    /** Geometric block size */
-    int geoBlockSize[QUDA_MAX_DIM];
-
-    /** Spin block size */
-    int spinBlockSize;
-
-    /** Number of vectors used to define coarse space */
-    int Nvec;
-
-    /** This is the next lower level */
-    MG *coarse;
-
-    /** This is the immediate finer level */
-    MG *fine;
-
-    /** The null space vectors */
-    std::vector<ColorSpinorField*> &B;
-
-    /** Number of pre-smoothing applications to perform */
-    int nu_pre;
-
-    /** Number of pre-smoothing applications to perform */
-    int nu_post;
-
-    /** The Dirac operator to use for residual computation */
-    DiracMatrix &matResidual;
-
-    /** The Dirac operator to use for smoothing */
-    DiracMatrix &matSmooth;
-
-    /** What type of smoother to use */
-    QudaInverterType smoother;
-
-    /** The type of residual to send to the next coarse grid, and thus the
-	type of solution to receive back from this coarse grid */
-    QudaSolutionType coarse_grid_solution_type;
-
-    /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
-    QudaSolveType smoother_solve_type;
-
-    /** Where to compute this level of multigrid */
-    QudaFieldLocation location;
-
-    /** Filename for where to load/store the null space */
-    char filename[100];
   };
 
   /**

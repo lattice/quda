@@ -455,6 +455,9 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(n_level, INVALID_INT);
 
   for (int i=0; i<param->n_level; i++) {
+    P(smoother[i], QUDA_INVALID_INVERTER);
+    P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+
     // these parameters are not set for the bottom grid
     if (i<param->n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
@@ -465,8 +468,8 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
 
-    P(smoother[i], QUDA_INVALID_INVERTER);
-    P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+    if (i<param->n_level) P(smoother_tol[i], INVALID_DOUBLE);
+
     P(omega[i], INVALID_DOUBLE);
 
     P(location[i], QUDA_INVALID_FIELD_LOCATION);
