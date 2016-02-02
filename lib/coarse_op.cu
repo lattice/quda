@@ -150,7 +150,7 @@ namespace quda {
     //First make a cpu gauge field from the cuda gauge field
 
     int pad = 0;
-    GaugeFieldParam gf_param(gauge.X(), precision, gauge.Reconstruct(), pad, gauge.Geometry());
+    GaugeFieldParam gf_param(gauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
     gf_param.order = QUDA_QDP_GAUGE_ORDER;
     gf_param.fixed = gauge.GaugeFixed();
     gf_param.link_type = gauge.LinkType();
