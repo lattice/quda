@@ -235,6 +235,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
     mg_param->omega[i] = 0.85; // over/under relaxation factor
 
     mg_param->location[i] = QUDA_CUDA_FIELD_LOCATION;
+    mg_param->global_reduction[i] = QUDA_BOOLEAN_YES;
   }
  
   //mg_param->smoother_solve_type[0] = QUDA_NORMOP_PC_SOLVE; //or choose QUDA_DIRECT_SOLVE;
@@ -266,7 +267,7 @@ void mg_test(void)
 {
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
-  QudaMultigridParam mg_param;
+  QudaMultigridParam mg_param = newQudaMultigridParam();
 
   set_params(&gaugeParam, &inv_param, &mg_param,
       xdim, ydim, zdim, tdim,
