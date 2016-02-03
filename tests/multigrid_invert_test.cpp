@@ -194,6 +194,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
 
+    mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
+
     mg_param.smoother[i] = precon_type;
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
@@ -240,8 +242,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.reliable_delta = 1e-10;
   inv_param.gcrNkrylov = 10;
 
-  inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_VERBOSE;
+  inv_param.verbosity = QUDA_SUMMARIZE;
+  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -358,8 +360,8 @@ int main(int argc, char **argv)
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   mg_param.invert_param = &mg_inv_param;
-  setMultigridParam(mg_param);
 
+  setMultigridParam(mg_param);
 
 
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -434,8 +436,6 @@ int main(int argc, char **argv)
 
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
-
-
 
   // setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);

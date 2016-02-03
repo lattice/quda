@@ -143,6 +143,14 @@ extern "C" {
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
 
+  typedef enum QudaMultigridCycleType_s {
+    QUDA_MG_CYCLE_VCYCLE,
+    QUDA_MG_CYCLE_FCYCLE,
+    QUDA_MG_CYCLE_WCYCLE,
+    QUDA_MG_CYCLE_RECURSIVE,
+    QUDA_MG_CYCLE_INVALID = QUDA_INVALID_ENUM
+  } QudaMultigridCycleType;
+
   typedef enum QudaSchwarzType_s {
     QUDA_ADDITIVE_SCHWARZ,
     QUDA_MULTIPLICATIVE_SCHWARZ,

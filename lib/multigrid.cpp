@@ -8,11 +8,11 @@ namespace quda {
 
   static bool debug = false;
 
-  MG::MG(MGParam &param, TimeProfile &profile_global) 
+  MG::MG(MGParam &param, TimeProfile &profile_global)
     : Solver(param, profile), param(param), transfer(0), presmoother(0), postsmoother(0),
       profile_global(profile_global),
       profile( "MG level " + std::to_string(param.level+1), false ),
-      coarse(0), fine(param.fine), param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), 
+      coarse(0), fine(param.fine), coarse_solver(0), param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0),
       diracCoarseResidual(0), diracCoarseSmoother(0), matCoarseResidual(0), matCoarseSmoother(0) {
 
     // for reporting level 1 is the fine level but internally use level 0 for indexing
@@ -171,7 +171,37 @@ namespace quda {
       param_coarse->delta = 1e-20;
 
       coarse = new MG(*param_coarse, profile_global);
+
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
+
+      // if on the second to bottom level then we can just use the coarse solver as is
+      if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE || param.level == param.Nlevel-2) {
+	coarse_solver = coarse;
+	printfQuda("Assigned coarse solver to coarse MG operator\n");
+      } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
+	param_coarse_solver = new SolverParam(param);
+
+	param_coarse_solver->inv_type = QUDA_GCR_INVERTER;
+	param_coarse_solver->inv_type_precondition = QUDA_MG_INVERTER;
+	param_coarse_solver->preconditioner = coarse;
+
+	param_coarse_solver->is_preconditioner = false;
+	param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
+	param_coarse_solver->maxiter = 11; // FIXME - dirty hack
+	param_coarse_solver->Nkrylov = 10;
+	param_coarse_solver->tol = param.mg_global.smoother_tol[param.level+1];
+	param_coarse_solver->global_reduction = true;
+	param_coarse_solver->compute_true_res = false;
+	param_coarse_solver->delta = 1e-8;
+	param_coarse_solver->verbosity_precondition = QUDA_SILENT;
+
+	coarse_solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+	printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
+      } else {
+	errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
+      }
+
     }
 
     printfQuda("setup completed\n");
@@ -180,7 +210,7 @@ namespace quda {
     if (param.level == 0 && param.mg_global.run_verify) verify();
 
     // print out profiling information for the adaptive setup
-    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
+    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
     // Reset the profile for accurate solver timing
     profile.TPRESET();
 
@@ -189,6 +219,11 @@ namespace quda {
 
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
+      if (param.level < param.Nlevel-2 && param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
+	delete coarse_solver;
+	delete param_coarse_solver;
+      }
+
       if (B_coarse) {
 	for (int i=0; i<param.Nvec; i++) if ((*B_coarse)[i]) delete (*B_coarse)[i];
 	delete B_coarse;
@@ -212,7 +247,7 @@ namespace quda {
     if (param_presmooth) delete param_presmooth;
     if (param_postsmooth) delete param_postsmooth;
 
-    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
+    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
   }
 
   double MG::flops() const {
@@ -421,7 +456,7 @@ namespace quda {
       if ( debug ) printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", norm2(x), r2, norm2(*r_coarse));
 
       // recurse to the next lower level
-      (*coarse)(*x_coarse, *r_coarse);
+      (*coarse_solver)(*x_coarse, *r_coarse);
 
       setOutputPrefix(prefix); // restore prefix after return from coarse grid
 

@@ -32,7 +32,10 @@ namespace quda {
       break;
     case QUDA_GCR_INVERTER:
       report("GCR");
-      if (param.preconditioner) {
+      if (param.preconditioner && param.maxiter == 11) { // FIXME - dirty hack
+	MG *mg = static_cast<MG*>(param.preconditioner);
+	solver = new GCR(mat, *(mg), matSloppy, matPrecon, param, profile);
+      } else if (param.preconditioner) {
 	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
 	solver = new GCR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
       } else {

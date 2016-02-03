@@ -330,7 +330,7 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
-    /** Smoother / solver to use on each level */
+    /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
@@ -340,14 +340,16 @@ extern "C" {
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
     QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL];
 
+    /** The type of multigrid cycle to perform at each level */
+    QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
+
     /** Number of pre-smoother applications on each level */
     int nu_pre[QUDA_MAX_MG_LEVEL];
 
     /** Number of post-smoother applications on each level */
     int nu_post[QUDA_MAX_MG_LEVEL];
 
-    /** Tolerance to use for the smoother / solver on each level.  Currently this
-	will only set the tolerance for the bottom solve */
+    /** Tolerance to use for the smoother / solver on each level */
     double smoother_tol[QUDA_MAX_MG_LEVEL];
 
     /** Over/under relaxation factor for the smoother at each level */
@@ -532,10 +534,16 @@ extern "C" {
   void printQudaGaugeParam(QudaGaugeParam *param);
 
   /**
-   * Print the members of QudaGaugeParam.
-   * @param param The QudaGaugeParam whose elements we are to print.
+   * Print the members of QudaInvertParam.
+   * @param param The QudaInvertParam whose elements we are to print.
    */
   void printQudaInvertParam(QudaInvertParam *param);
+
+  /**
+   * Print the members of QudaMultigridParam.
+   * @param param The QudaMultigridParam whose elements we are to print.
+   */
+  void printQudaMultigridParam(QudaMultigridParam *param);
 
   /**
    * Print the members of QudaEigParam.
