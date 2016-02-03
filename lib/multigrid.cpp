@@ -196,7 +196,16 @@ namespace quda {
 	param_coarse_solver->delta = 1e-8;
 	param_coarse_solver->verbosity_precondition = QUDA_SILENT;
 
-	coarse_solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+	if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
+	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
+	} else {
+	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
+	}
+
 	printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
       } else {
 	errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
@@ -391,7 +400,7 @@ namespace quda {
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    setOutputPrefix(prefix);
+    char prefix_bkup[100];  strncpy(prefix_bkup, prefix, 100);  setOutputPrefix(prefix);
 
     // if input vector is single parity then we must be solving the
     // preconditioned system in general this can only happen on the
@@ -399,7 +408,7 @@ namespace quda {
     QudaSolutionType outer_solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
     QudaSolutionType inner_solution_type = param.coarse_grid_solution_type;
 
-    if (debug) printfQuda("outer_solve_type = %d, inner_solver_type = %d\n", outer_solution_type, inner_solution_type);
+    if (debug) printfQuda("outer_solution_type = %d, inner_solution_type = %d\n", outer_solution_type, inner_solution_type);
 
     if ( outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
@@ -417,7 +426,7 @@ namespace quda {
 
       ColorSpinorField *out=nullptr, *in=nullptr;
 
-      ColorSpinorField &residual = outer_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even();
+      ColorSpinorField &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *r : r->Even();
 
       // FIXME only need to make a copy if not preconditioning
       residual = b; // copy source vector since we will overwrite source with iterated residual
@@ -504,7 +513,7 @@ namespace quda {
       printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
     }
 
-    setOutputPrefix("");
+    setOutputPrefix(param.level == 0 ? "" : prefix_bkup);
   }
 
   //supports seperate reading or single file read
