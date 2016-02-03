@@ -20,13 +20,29 @@ namespace quda {
     setOutputPrefix(prefix);
 
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
+    
+    if( param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES ) {
+ 
+       if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
+           if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+	      generateNullVectors(param.B);
+      	   } else {
+		loadVectors(param.B);
+      	   }
+        }
 
-    if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
-      if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-	generateNullVectors(param.B);
-      } else {
-	loadVectors(param.B);
-      }
+    } else if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO ) {
+
+       if (param.level == 0 ) { // null space generation only on level 1 currently
+           if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+              generateNullVectors(param.B);
+           } else {
+                loadVectors(param.B);
+           }
+       }
+    }
+    else {
+	errorQuda("In MG Global. generate_all_levels is neither QUDA_BOOLEAN_YES, nor QUDA_BOOLEAN_NO");
     }
 
     if (param.level >= QUDA_MAX_MG_LEVEL)
@@ -626,7 +642,7 @@ namespace quda {
 
     // set null-space generation options - need to expose these
     solverParam.maxiter = 500;
-    solverParam.tol = 5e-5;
+    solverParam.tol = 5e-6;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7;
     solverParam.inv_type = QUDA_BICGSTAB_INVERTER;

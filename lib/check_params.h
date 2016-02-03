@@ -486,6 +486,13 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   }
 
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
+
+#ifdef INIT_PARAM
+  P(generate_all_levels, QUDA_BOOLEAN_YES);
+#else
+  P(generate_all_levels, QUDA_BOOLEAN_INVALID);
+#endif
+
   P(run_verify, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM

@@ -51,6 +51,7 @@ extern int nvec;
 extern int mg_levels;
 
 extern bool generate_nullspace;
+extern bool generate_all_levels;
 extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[];
@@ -227,6 +228,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
+
+  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES 
+   :  QUDA_BOOLEAN_NO;
 
   mg_param.run_verify = QUDA_BOOLEAN_YES;
 
