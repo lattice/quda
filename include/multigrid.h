@@ -62,6 +62,9 @@ namespace quda {
     /** Tolerance to use for the solver / smoother (if applicable) */
     double smoother_tol;
 
+    /** Multigrid cycle type */
+    QudaMultigridCycleType cycle_type;
+
     /** Whether to use global or local (node) reductions */
     QudaBoolean global_reduction;
 
@@ -105,6 +108,7 @@ namespace quda {
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
       smoother_tol(param.smoother_tol[level]),
+      cycle_type(param.cycle_type[level]),
       global_reduction(param.global_reduction[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
@@ -137,6 +141,7 @@ namespace quda {
       nu_pre(param.mg_global.nu_pre[level]),
       nu_post(param.mg_global.nu_post[level]),
       smoother_tol(param.mg_global.smoother_tol[level]),
+      cycle_type(param.mg_global.cycle_type[level]),
       global_reduction(param.mg_global.global_reduction[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
@@ -184,6 +189,9 @@ namespace quda {
     /** This is the next coarser level */
     MG *fine;
 
+    /** The coarse grid solver - this either points at "coarse" or a solver preconditioned by "coarse" */
+    Solver *coarse_solver;
+
     /** Storage for the parameter struct for the coarse grid */
     MGParam *param_coarse;
 
@@ -192,6 +200,9 @@ namespace quda {
 
     /** Storage for the parameter struct for the post-smoother */
     SolverParam *param_postsmooth;
+
+    /** Storage for the parameter struct for the coarse solver */
+    SolverParam *param_coarse_solver;
 
     /** The fine-grid representation of the null space vectors */
     std::vector<ColorSpinorField*> *B;

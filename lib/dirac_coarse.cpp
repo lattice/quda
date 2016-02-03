@@ -253,6 +253,9 @@ namespace quda {
 
   void DiracCoarsePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+    if (in.SiteSubset() == QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot apply preconditioned operator to full field");
+
     if (dagger != QUDA_DAG_NO) errorQuda("Dagger operator not implemented");
     bool reset1 = newTmp(&tmp1, in);
 

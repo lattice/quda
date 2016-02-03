@@ -133,6 +133,14 @@
 #define QUDA_NORMEQ_PC_SOLVE QUDA_NORMOP_PC_SOLVE // deprecated
 #define QUDA_INVALID_SOLVE QUDA_INVALID_ENUM
 
+#define QudaMultigridCycleType integer(4)
+#define QUDA_MG_CYCLE_VCYCLE 0
+#define QUDA_MG_CYCLE_FCYCLE 1
+#define QUDA_MG_CYCLE_WCYCLE 2
+#define QUDA_MG_CYCLE_RECURSIVE 3
+#define QUDA_MG_CYCLE_INVALID QUDA_INVALID_ENUM
+
+  typedef enum QudaSchwarzType_s {
 #define QudaSchwarzType integer(4)
 #define QUDA_ADDITIVE_SCHWARZ 0 
 #define QUDA_MULTIPLICATIVE_SCHWARZ 1

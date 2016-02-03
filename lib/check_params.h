@@ -436,7 +436,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
  QudaMultigridParam newQudaMultigridParam(void) {
    QudaMultigridParam ret;
-   QudaMultigridParam *param = &ret;
 #elif defined CHECK_PARAM
    static void checkMultigridParam(QudaMultigridParam *param) {
 #else
@@ -454,31 +453,35 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
   P(n_level, INVALID_INT);
 
-  for (int i=0; i<param->n_level; i++) {
+#ifdef INIT_PARAM
+  int n_level = QUDA_MAX_MG_LEVEL;
+#else
+  int n_level = param->n_level;
+#endif
+
+  for (int i=0; i<n_level; i++) {
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
 
     // these parameters are not set for the bottom grid
-    if (i<param->n_level-1) {
+    if (i<n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
       P(spin_block_size[i], INVALID_INT);
       P(n_vec[i], INVALID_INT);
+      P(cycle_type[i], QUDA_MG_CYCLE_INVALID);
       P(nu_pre[i], INVALID_INT);
       P(nu_post[i], INVALID_INT);
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
 
-    if (i<param->n_level) {
-      P(smoother_tol[i], INVALID_DOUBLE);
+    P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
-      P(global_reduction[i], QUDA_BOOLEAN_YES);
+    P(global_reduction[i], QUDA_BOOLEAN_YES);
 #else
-      P(global_reduction[i], QUDA_BOOLEAN_INVALID);
+    P(global_reduction[i], QUDA_BOOLEAN_INVALID);
 #endif
-    }
 
     P(omega[i], INVALID_DOUBLE);
-
     P(location[i], QUDA_INVALID_FIELD_LOCATION);
   }
 

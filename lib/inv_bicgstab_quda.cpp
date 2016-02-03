@@ -83,7 +83,6 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      warningQuda("using init guess...");
       mat(r, x, y);
       r2 = blas::xmyNorm(b, r);
       blas::copy(y, x);
@@ -95,24 +94,18 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      warningQuda("inverting on zero-field source\n");
-      if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
-      {
-        warningQuda("inverting on zero-field source\n");
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+        warningQuda("inverting on zero-field source");
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
 	profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
-      }
-      else if(param.use_init_guess == QUDA_USE_INIT_GUESS_YES)
-      {
-        warningQuda("Computing null vector\n");
+      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        printfQuda("BiCGstab: Computing null vector\n");
         b2 = r2;
-      }
-      else
-      {
-        errorQuda("Null vector computing requires non-zero guess!\n");
+      } else {
+        errorQuda("Null vector computing requires non-zero guess!");
       }
     }
 
@@ -163,8 +156,6 @@ namespace quda {
     fillInnerSolveParam(solve_param_inner, param);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
-
-    printfQuda("\nStopping criterio : %le\n", stop);
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
