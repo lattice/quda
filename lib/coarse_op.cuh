@@ -934,19 +934,15 @@ namespace quda {
       y.apply(0);
 
       printfQuda("AV2 = %e\n", AV.norm2());
-
-      int dummy = 0;
-      av.exchangeGhost(QUDA_INVALID_PARITY, dummy);
-      arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
     }
 
-    // Now compute the coarse links
-    for(int d = 0; d < nDim; d++) {
-      y.setDimension(d);
-      printfQuda("Computing %d UV and VUV\n", d);
+    // First compute the coarse forward links if needed
+    if (bidirectional_links) {
+      for (int d = 0; d < nDim; d++) {
+	y.setDimension(d);
+	y.setDirection(QUDA_FORWARDS);
+	printfQuda("Computing forward %d UV and VUV\n", d);
 
-      if (bidirectional_links) {
-	y.setDirection(QUDA_FORWARDS); // what does this mean for the preconditioned coarse operator?
 	y.setComputeType(COMPUTE_UV);  // compute U*V product
 	y.apply(0);
 	printfQuda("UV2[%d] = %e\n", d, UV.norm2());
@@ -955,8 +951,23 @@ namespace quda {
 	y.apply(0);
 	printfQuda("Y2[%d] = %e\n", d, Y.norm2(4+d));
       }
+    }
 
+    // We delay doing the AV exchange until after we've done the
+    // forward links, since doing the AV exchange will overwrite the V
+    // ghost which we need for the forward links
+    if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
+      int dummy = 0;
+      av.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+      arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
+    }
+
+    // Now compute the backward links
+    for (int d = 0; d < nDim; d++) {
+      y.setDimension(d);
       y.setDirection(QUDA_BACKWARDS);
+	printfQuda("Computing forward %d UV and VUV\n", d);
+
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
       y.apply(0);
       printfQuda("UAV2[%d] = %e\n", d, UV.norm2());
