@@ -349,14 +349,32 @@ static void init_default_comms()
 }
 
 
+#define STR_(x) #x
+#define STR(x) STR_(x)
+  static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
+#undef STR
+#undef STR_
+
+extern char* gitversion;
+
 /*
  * Set the device that QUDA uses.
  */
 void initQudaDevice(int dev) {
-
   //static bool initialized = false;
   if (initialized) return;
   initialized = true;
+
+  profileInit2End.TPSTART(QUDA_PROFILE_TOTAL);
+  profileInit.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+#ifdef GITVERSION
+    printfQuda("QUDA %s (git %s)\n",quda_version.c_str(),gitversion);
+#else
+    printfQuda("QUDA %s\n",quda_version.c_str());
+#endif
+  }
 
 #if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
@@ -419,6 +437,8 @@ void initQudaDevice(int dev) {
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
+
+  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 /*
@@ -426,6 +446,8 @@ void initQudaDevice(int dev) {
  */
 void initQudaMemory()
 {
+  profileInit.TPSTART(QUDA_PROFILE_TOTAL);
+
   if (!comms_initialized) init_default_comms();
 
   streams = new cudaStream_t[Nstream];
@@ -455,30 +477,12 @@ void initQudaMemory()
   cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
   loadTuneCache(getVerbosity());
+
+  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
-#define STR_(x) #x
-#define STR(x) STR_(x)
-  static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
-#undef STR
-#undef STR_
-
-extern char* gitversion;
 
 void initQuda(int dev)
 {
-  profileInit2End.TPSTART(QUDA_PROFILE_TOTAL);
-  profileInit.TPSTART(QUDA_PROFILE_TOTAL);
-
-
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-#ifdef GITVERSION
-    printfQuda("QUDA %s (git %s)\n",quda_version.c_str(),gitversion);
-#else
-    printfQuda("QUDA %s\n",quda_version.c_str());
-#endif
-  }
-
   // initialize communications topology, if not already done explicitly via initCommsGridQuda()
   if (!comms_initialized) init_default_comms();
 
@@ -494,8 +498,6 @@ void initQuda(int dev)
   pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_RECURSIVE);
   pthread_mutex_init(&pthread_mutex, &mutex_attr);
 #endif
-
-  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 
@@ -2018,10 +2020,11 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
+  checkInvertParam(param);
+
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
 
-  checkInvertParam(param);
   checkEigParam(eig_param);
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_DAG_SOLUTION) ||
@@ -2224,10 +2227,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
+  checkInvertParam(param);
+
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
-
-  checkInvertParam(param);
 
   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
@@ -2483,9 +2486,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
 
   if (!initialized) errorQuda("QUDA not initialized");
+
+  checkInvertParam(param);
+
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
-  checkInvertParam(param);
 
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT)
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d",
@@ -2807,10 +2812,10 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
+  checkInvertParam(param);
+
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
-
-  checkInvertParam(param);
 
   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
@@ -3429,15 +3434,17 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   if (qudaGaugeParam->use_resident_mom) {
     if (!gaugePrecise) errorQuda("No resident momentum field to use");
     cudaMom = momResident;
+    if (qudaGaugeParam->overwrite_mom) cudaMom->zero();
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
   } else {
-    gParamMom.create = QUDA_ZERO_FIELD_CREATE;
+    gParamMom.create = qudaGaugeParam->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
     gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
     gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
     gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
     gParamMom.precision = qudaGaugeParam->cuda_prec;
     gParamMom.create = QUDA_ZERO_FIELD_CREATE;
     cudaMom = new cudaGaugeField(gParamMom);
+    if (!qudaGaugeParam->overwrite_mom) cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -3447,7 +3454,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
       path_length, loop_coeff, num_paths, max_length);
   profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  if (qudaGaugeParam->return_mom) {
+  if (qudaGaugeParam->return_result_mom) {
     profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
     cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
@@ -4356,10 +4363,10 @@ computeHISQForceQuda(void* const milc_momentum,
     updateMomentum(*momResident, 1.0, *cudaMom);
   }
 
-  if (gParam->return_mom) {
+  if (gParam->return_result_mom) {
     profileHISQForce.TPSTART(QUDA_PROFILE_D2H);
     // Close the paths, make anti-hermitian, and store in compressed format
-    if (gParam->return_mom) cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+    if (gParam->return_result_mom) cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
     profileHISQForce.TPSTOP(QUDA_PROFILE_D2H);
   }
 
@@ -4403,7 +4410,7 @@ void computeStaggeredOprodQuda(void** oprod,
 
 #ifdef  GPU_STAGGERED_OPROD
 #ifndef BUILD_QDP_INTERFACE
-#error "Staggerd oprod requires BUILD_QDP_INTERFACE";
+#error "Staggered oprod requires BUILD_QDP_INTERFACE";
 #endif
   using namespace quda;
   profileStaggeredOprod.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4863,7 +4870,8 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.gauge = gauge;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cpuGaugeField *cpuGauge = !param->use_resident_gauge ? new cpuGaugeField(gParam) : NULL;
+  bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
+  cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
   gParam.reconstruct = gParam.order == QUDA_TIFR_GAUGE_ORDER ?
    QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
@@ -4913,7 +4921,7 @@ void updateGaugeFieldQuda(void* gauge,
       (bool)conj_mom, (bool)exact);
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  if (param->return_gauge) {
+  if (param->return_result_gauge) {
     // copy the gauge field back to the host
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_D2H);
     cudaOutGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
@@ -4961,7 +4969,7 @@ void updateGaugeFieldQuda(void* gauge,
    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
    gParam.link_type = QUDA_GENERAL_LINKS;
    gParam.gauge = gauge_h;
-   bool need_cpu = !param->use_resident_gauge || param->return_gauge;
+   bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
    cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
    // create the device fields
@@ -4992,7 +5000,7 @@ void updateGaugeFieldQuda(void* gauge,
      errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
 
    profileProject.TPSTART(QUDA_PROFILE_D2H);
-   if (param->return_gauge) cudaGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+   if (param->return_result_gauge) cudaGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
    profileProject.TPSTOP(QUDA_PROFILE_D2H);
 
    if (param->make_resident_gauge) {
@@ -5023,7 +5031,7 @@ void updateGaugeFieldQuda(void* gauge,
    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
    gParam.link_type = QUDA_GENERAL_LINKS;
    gParam.gauge = gauge_h;
-   bool need_cpu = !param->use_resident_gauge || param->return_gauge;
+   bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
    cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
    // create the device fields
@@ -5052,7 +5060,7 @@ void updateGaugeFieldQuda(void* gauge,
    profilePhase.TPSTOP(QUDA_PROFILE_COMPUTE);
 
    profilePhase.TPSTART(QUDA_PROFILE_D2H);
-   if (param->return_gauge) cudaGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+   if (param->return_result_gauge) cudaGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
    profilePhase.TPSTOP(QUDA_PROFILE_D2H);
 
    if (param->make_resident_gauge) {
@@ -5154,8 +5162,8 @@ void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatDagMatQuda(h_out, h_in, inv_param); }
-void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param)
-{ invertQuda(hp_x, hp_b, param); }
+void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
+{ invertQuda(hp_x, hp_b, param); }    
 void invert_multishift_quda_(void *hp_x[QUDA_MAX_MULTI_SHIFT], void *hp_b, QudaInvertParam *param)
 { invertMultiShiftQuda(hp_x, hp_b, param); }
 void new_quda_gauge_param_(QudaGaugeParam *param) {
