@@ -66,6 +66,8 @@ extern char vec_outfile[];
 
 extern void usage(char** );
 
+double clover_coeff = 1.0;
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -176,6 +178,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
 
+  inv_param.clover_coeff = clover_coeff;
+
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
@@ -282,6 +286,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
   //Free field!
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+
+  inv_param.clover_coeff = clover_coeff;
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
@@ -399,7 +405,7 @@ int main(int argc, char **argv)
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    double norm = 0.001; // clover components are random numbers in the range (-norm, norm)
+    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

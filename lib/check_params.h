@@ -346,7 +346,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifndef INIT_PARAM
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
+      param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 #endif
     P(clover_cpu_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec, QUDA_INVALID_PRECISION);
@@ -360,6 +361,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
+
+    P(clover_coeff, INVALID_DOUBLE);
 #ifndef INIT_PARAM
   }
 #endif
