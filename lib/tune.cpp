@@ -559,7 +559,7 @@ namespace quda {
 //    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
 #endif
 
-    param.n_calls++;
+    param.n_calls=1;
 
     return param;
   }
