@@ -1227,6 +1227,7 @@ void endQuda(void)
 #endif
 
   saveTuneCache(getVerbosity());
+  saveProfile(getVerbosity());
 
 #if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
   // end this CUDA context
