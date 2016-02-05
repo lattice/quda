@@ -357,11 +357,25 @@ namespace quda {
       int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
-      profile_path = resource_path + "/profile.tsv";
+      char *profile_fname = getenv("QUDA_PROFILE_OUTPUT");
+
+      if (!profile_fname) {
+	warningQuda("Environment variable QUDA_PROFILE_OUTPUT is not set; writing to profile.tsv");
+	profile_path = resource_path + "/profile.tsv";
+      } else {
+	profile_path = resource_path + "/" + profile_fname;
+      }
       profile_file.open(profile_path.c_str());
 
       if (verbosity >= QUDA_SUMMARIZE) {
-	printfQuda("Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), profile_path.c_str());
+	// compute number of non-zero entries that will be output in the profile
+	int n_entry = 0;
+	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+	  TuneParam param = entry->second;
+	  if (param.n_calls > 0) n_entry++;
+	}
+
+	printfQuda("Saving %d sets of cached parameters to %s\n", n_entry, profile_path.c_str());
       }
 
       time(&now);
