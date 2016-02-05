@@ -134,8 +134,9 @@ namespace quda {
       if (param.n_calls > 0) {
 	double time = param.n_calls * param.time;
 
-	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t" << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(15) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
-	out << param.shared_bytes << "\t" << param.comment; // param.comment ends with a newline
+	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
+	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(15) << key.volume << "\t";
+	out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
       }
 
       q.pop();
