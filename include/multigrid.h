@@ -183,6 +183,9 @@ namespace quda {
     /** Prefix label used for printf at this level */
     char prefix[128];
 
+    /** Prefix label used for printf on next coarse level */
+    char coarse_prefix[128];
+
     /** This is the next lower level */
     MG *coarse;
 

@@ -363,6 +363,9 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
+ 
+    /** Whether to generate on all levels or just on level 0 */
+    QudaBoolean generate_all_levels; 
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
