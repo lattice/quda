@@ -39,7 +39,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
     }
 
     blasStrings.vol_str = x.VolString();
-    blasStrings.aux_str = x.AuxString();
+    strcpy(blasStrings.aux_tmp, x.AuxString());
 
     // FIXME this condition should be outside of the Location test but
     // Even and Odd must be implemented for cpu fields first

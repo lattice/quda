@@ -223,6 +223,7 @@ template <template <typename Float, typename FloatN> class Functor,
   void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 		ColorSpinorField &x, ColorSpinorField &y, 
 		ColorSpinorField &z, ColorSpinorField &w) {
+
   checkSpinor(x, y);
   checkSpinor(x, z);
   checkSpinor(x, w);

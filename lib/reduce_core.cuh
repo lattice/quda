@@ -34,8 +34,9 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
 	  typename FloatN, int M, typename SpinorX, typename SpinorY, 
 	  typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
+
   unsigned int tid = threadIdx.x;
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
 
   ReduceType sum;
@@ -145,7 +146,7 @@ public:
   virtual ~ReduceCuda() { }
 
   inline TuneKey tuneKey() const { 
-    return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_str);
+    return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_tmp);
   }
 
   void apply(const cudaStream_t &stream) {
