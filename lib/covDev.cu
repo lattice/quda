@@ -387,7 +387,7 @@ namespace quda
           comm_free (mh_from);
 
           // Send buffers to GPU:
-          cudaMemcpy(ghostBuffer, recv, ghostBytes, cudaMemcpyHostToDevice);
+          qudaMemcpy(ghostBuffer, recv, ghostBytes, cudaMemcpyHostToDevice);
           cudaDeviceSynchronize();
 
           host_free(send);

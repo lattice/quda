@@ -388,7 +388,7 @@ namespace quda {
 		       static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
-      cudaMemcpy(gauge, bufferPinned[0], bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(gauge, bufferPinned[0], bytes, cudaMemcpyHostToDevice);
     } else {
       errorQuda("Invalid gauge field type");
     }
@@ -496,7 +496,7 @@ namespace quda {
       resizeBufferPinned(bytes,0);
 
       // this copies over both even and odd
-      cudaMemcpy(bufferPinned[0], gauge, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(bufferPinned[0], gauge, bytes, cudaMemcpyDeviceToHost);
       checkCudaError();
 
       copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, bufferPinned[0]);

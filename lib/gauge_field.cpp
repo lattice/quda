@@ -176,9 +176,9 @@ namespace quda {
 	if (comm_dim_partitioned(i)) {
 	  send[i] = allocatePinned(bytes[i]);
 	  receive[i] = allocatePinned(bytes[i]);
-	  cudaMemcpy(send[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToHost);
+	  qudaMemcpy(send[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToHost);
 	} else {
-	  if (no_comms_fill) cudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
+	  if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
 	}
       }
     }
@@ -212,7 +212,7 @@ namespace quda {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
-	cudaMemcpy(ghost_link[i], receive[i], bytes[i], cudaMemcpyHostToDevice);
+	qudaMemcpy(ghost_link[i], receive[i], bytes[i], cudaMemcpyHostToDevice);
 	freePinned(send[i]);
 	freePinned(receive[i]);
       }

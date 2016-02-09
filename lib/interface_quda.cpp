@@ -970,7 +970,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
     // copy the odd components into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
-    cudaMemcpy((char*)(in->V(false))+in->Bytes()/2, (char*)(hack.V(true))+hack.Bytes()/2,
+    qudaMemcpy((char*)(in->V(false))+in->Bytes()/2, (char*)(hack.V(true))+hack.Bytes()/2,
         in->Bytes()/2, cudaMemcpyDeviceToHost);
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
 

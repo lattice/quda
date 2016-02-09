@@ -251,15 +251,15 @@ namespace quda {
       }
     }
 
-    cudaMemcpy(input_path_d, input_path_h, bytes, cudaMemcpyHostToDevice); 
+    qudaMemcpy(input_path_d, input_path_h, bytes, cudaMemcpyHostToDevice);
     
     //length
     int* length_d = (int *) device_malloc(num_paths*sizeof(int));
-    cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice);
+    qudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice);
     
     //path_coeff
     void* path_coeff_d = device_malloc(num_paths*sizeof(double));
-    cudaMemcpy(path_coeff_d, path_coeff, num_paths*sizeof(double), cudaMemcpyHostToDevice);
+    qudaMemcpy(path_coeff_d, path_coeff, num_paths*sizeof(double), cudaMemcpyHostToDevice);
 
     for(int i=0; i<4; i++) {
       arg.X[i] = cudaMom.X()[i];
