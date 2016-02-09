@@ -92,7 +92,7 @@ namespace quda {
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      out << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
+      out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
       out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
       out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
       out << param.shared_bytes << "\t" << param.time << "\t" << param.comment; // param.comment ends with a newline
@@ -135,7 +135,7 @@ namespace quda {
 	double time = param.n_calls * param.time;
 
 	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
-	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(15) << key.volume << "\t";
+	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16) << key.volume << "\t";
 	out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
       }
 
@@ -310,7 +310,7 @@ namespace quda {
        cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
-      cache_file << "volume\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\ttime\tcomment" << std::endl;
+      cache_file << std::setw(16) << "volume" << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\ttime\tcomment" << std::endl;
       serializeTuneCache(cache_file);
       cache_file.close();
 
@@ -387,7 +387,7 @@ namespace quda {
        profile_file << "\t" << quda_version;
 #endif
       profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
-      profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(15) << "volume" << "\tname\taux\tcomment" << std::endl;
+      profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(16) << "volume" << "\tname\taux\tcomment" << std::endl;
       serializeProfile(profile_file);
       profile_file.close();
 

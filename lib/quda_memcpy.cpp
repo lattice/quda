@@ -8,6 +8,7 @@ namespace quda {
     const void *src;
     const size_t count;
     const cudaMemcpyKind kind;
+    const char *name;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -19,21 +20,21 @@ namespace quda {
 
       switch(kind) {
       case cudaMemcpyDeviceToHost:
-	sprintf(aux, "cudaMemcpyDeviceToHost");
+	name = "cudaMemcpyDeviceToHost";
 	break;
       case cudaMemcpyHostToDevice:
-	sprintf(aux, "cudaMemcpyHostToDevice");
+	name = "cudaMemcpyHostToDevice";
 	break;
       case cudaMemcpyHostToHost:
-	sprintf(aux, "cudaMemcpyHostToHost");
+	name = "cudaMemcpyHostToHost";
 	break;
       case cudaMemcpyDeviceToDevice:
-	sprintf(aux, "cudaMemcpyDeviceToDevice");
+	name = "cudaMemcpyDeviceToDevice";
 	break;
       default:
 	errorQuda("Unsupported cudaMemcpyType %d", kind);
       }
-      sprintf(aux, "%s,%s,%s:%d", aux, func, file, line);
+      sprintf(aux, "%s,%s:%d", func, file, line);
     }
 
     virtual ~QudaMemCopy() { }
@@ -48,7 +49,7 @@ namespace quda {
     TuneKey tuneKey() const {
       char vol[128];
       sprintf(vol, "bytes=%u", (unsigned int)count);
-      return TuneKey(vol, "cudaMemcpy", aux);
+      return TuneKey(vol, name, aux);
     }
 
     long long flops() const { return 0; }
