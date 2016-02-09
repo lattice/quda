@@ -66,12 +66,6 @@ namespace quda {
   }
 
   void orthoDir(Complex **beta, std::vector<ColorSpinorField*> Ap, int k, int pipeline) {
-    // Vectorized dot product only has limited support so work around
-    if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION ||
-	Ap[0]->Nspin() == 2 || pipeline == 0) pipeline = 1;
-
-    if (pipeline > 1)
-      warningQuda("GCR with pipeline length %d is experimental", pipeline);
 
     switch (pipeline) {
     case 0: // no kernel fusion
@@ -375,6 +369,14 @@ namespace quda {
     double r2_old = r2;
     bool l2_converge = false;
 
+    int pipeline = param.pipeline;
+    // Vectorized dot product only has limited support so work around
+    if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION ||
+	Ap[0]->Nspin() == 2 || pipeline == 0) pipeline = 1;
+
+    if (pipeline > 1)
+      warningQuda("GCR with pipeline length %d is experimental", pipeline);
+
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -415,7 +417,7 @@ namespace quda {
 		     total_iter, blas::norm2(*Ap[k]), blas::norm2(*p[k]), blas::norm2(rPre));
       }
 
-      orthoDir(beta, Ap, k, param.pipeline);
+      orthoDir(beta, Ap, k, pipeline);
 
       double3 Apr = blas::cDotProductNormA(*Ap[k], rSloppy);
 
