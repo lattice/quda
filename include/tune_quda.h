@@ -8,6 +8,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cstring>
+#include <cfloat>
 #include <stdarg.h>
 #include <tune_key.h>
 
@@ -20,16 +21,22 @@ namespace quda {
     dim3 grid;
     int shared_bytes;
     std::string comment;
+    float time;
+    long long n_calls;
 
-  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0) { }
-  TuneParam(const TuneParam &param)
-    : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), comment(param.comment) { }
+    TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), time(FLT_MAX), n_calls(0) { }
+
+    TuneParam(const TuneParam &param)
+      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
+
     TuneParam& operator=(const TuneParam &param) {
       if (&param != this) {
 	block = param.block;
 	grid = param.grid;
 	shared_bytes = param.shared_bytes;
 	comment = param.comment;
+	time = param.time;
+	n_calls = param.n_calls;
       }
       return *this;
     }
@@ -346,6 +353,8 @@ namespace quda {
 
   void loadTuneCache(QudaVerbosity verbosity);
   void saveTuneCache(QudaVerbosity verbosity);
+  void saveProfile(QudaVerbosity verbosity);
+
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
 } // namespace quda

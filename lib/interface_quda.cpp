@@ -1226,6 +1226,7 @@ void endQuda(void)
 #endif
 
   saveTuneCache(getVerbosity());
+  saveProfile(getVerbosity());
 
   initialized = false;
 
