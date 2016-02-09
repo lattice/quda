@@ -125,7 +125,6 @@ namespace quda {
     QudaFieldLocation location;
     char vol[TuneKey::volume_n];
 
-    long long flops() const { return 0; }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -213,6 +212,8 @@ namespace quda {
       param.grid.z = fineColor / fine_colors_per_thread;
     }
 
+    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * arg.nParity*arg.out.VolumeCB(); }
+
     long long bytes() const {
       return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.nParity*arg.out.VolumeCB()*sizeof(int);
     }
@@ -232,8 +233,8 @@ namespace quda {
     coarseSpinor In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
-    // for fine grid we keep 3 colors per thread else use fine grained
-    constexpr int fine_colors_per_thread = 1;//fineColor == 3 ? fineColor : 1;
+    // for all grids use 1 color per thread
+    constexpr int fine_colors_per_thread = 1;
 
     Arg arg(Out, In, V, fine_to_coarse, parity, out);
     ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, fine_colors_per_thread, Arg>

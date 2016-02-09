@@ -206,7 +206,6 @@ namespace quda {
     const int block_size;
     char vol[TuneKey::volume_n];
 
-    long long flops() const { return 0; }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -241,6 +240,9 @@ namespace quda {
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 27) {  // for 3x3x3x2 aggregates
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,27>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 36) {  // for 3x3x2x4 aggregates
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,36>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 128) { // for 4x4x4x4 aggregates
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,128>
@@ -300,6 +302,8 @@ namespace quda {
       param.block.z = 1;
       param.grid.z = coarseColor / coarse_colors_per_thread;
     }
+
+    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * arg.nParity*arg.in.VolumeCB(); }
 
     long long bytes() const {
       return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.nParity*arg.in.VolumeCB()*sizeof(int);
