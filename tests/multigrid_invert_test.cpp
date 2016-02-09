@@ -54,7 +54,7 @@ extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern int nu_pre;
 extern int nu_post;
-extern int geo_block_size[];
+extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
 extern QudaInverterType precon_type;
 
@@ -192,7 +192,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
     for (int j=0; j<QUDA_MAX_DIM; j++) {
-      mg_param.geo_block_size[i][j] = geo_block_size[j];
+      // if not defined use 4
+      mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec;
