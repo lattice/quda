@@ -542,20 +542,10 @@ namespace quda {
         reduce::multiReduceCuda<3,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
 	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
-#ifdef SSTEP
-      case 6:
-        reduce::multiReduceCuda<6,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+      case 4:
+        reduce::multiReduceCuda<4,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
 	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
-      case 10:
-        reduce::multiReduceCuda<10,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
-	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 14:
-        reduce::multiReduceCuda<14,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
-	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-#endif // SSTEP
       default:
         errorQuda("Unsupported vector size\n");
         break;

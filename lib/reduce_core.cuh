@@ -93,9 +93,6 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 
   doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
 
-  const int Nreduce = sizeof(doubleN) / sizeof(double);
-  reduceDoubleArray((double*)&cpu_sum, Nreduce);
-
   return cpu_sum;
 }
 

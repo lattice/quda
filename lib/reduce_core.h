@@ -195,13 +195,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
     }
   }
 
-  const int Nreduce = sizeof(doubleN) / sizeof(double);
-  reduceDoubleArray((double*)&value, Nreduce);
-
   blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
   blas::flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x.RealLength();
     
   checkCudaError();
+
+  const int Nreduce = sizeof(doubleN) / sizeof(double);
+  reduceDoubleArray((double*)&value, Nreduce);
 
   return value;
 }
