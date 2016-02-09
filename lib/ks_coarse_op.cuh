@@ -57,7 +57,7 @@ namespace quda {
     coord[4] = 0;
     getCoords(coord, x_cb, arg.x_size, parity);
 
-    constexpr int uvSpin = from_coarse ? fineSpin * 2 : 1;
+    const int uvSpin = from_coarse ? fineSpin * 2 : 1;
 
     const int stag_sp = 0;
 
@@ -75,47 +75,49 @@ namespace quda {
       int ghost_idx    = ghostFaceIndex<1>(coord, arg.x_size, dim, 1);//must be 1
       int ghost_idx_3d = (arg.LL && !from_coarse) ghostFaceIndex<3>(coord, arg.x_size, dim, arg.nFace) : 0;
 
-      for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      if (from_coarse){
-		(*arg.UV)(parity, x_cb, s, ic, ic_c) +=
-		  (*arg.FL)(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
-              } else {
-		  // on the coarse lattice if forwards then use the forwards links
-		  (*arg.UV)(parity, x_cb, stag_sp, ic, ic_c) +=
-		    (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) *
-		    arg.V..Ghost(dim, 1, (parity+1)&1, ghost_idx, jc, ic_c);
-                  if( arg.LL ) (*arg.UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*arg.LL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) * arg.V(dim, 3, (parity+1)&1, ghost_idx_3d, stag_sp, jc, ic_c);
-	      } // which chiral block
-	    }  //Fine color columns
-	  }  //Fine color rows
-	}  //Coarse color
-      }  //Fine Spin
+      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+	    if(!from_coarse){
+	      (*arg.UV)(parity, x_cb, stag_sp, ic, ic_c) +=
+	      (*arg.FL)(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, jc, ic_c);
+              if( arg.LL ) (*arg.UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*arg.LL)(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 3, (parity+1)&1, ghost_idx_3d, stag_sp, jc, ic_c);
+            } else {
+              for(int s = 0; s < fineSpin; s++) {  //Fine Spin
+                for (int s_col=0; s_col<fineSpin; s_col++) {
+	            // on the coarse lattice if forwards then use the forwards links
+		    (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
+                } //which chiral block
+              } //Fine Spin
+            } // from coarse? 
+	  }  //Fine color columns
+	}  //Fine color rows
+      }  //Coarse color
 #endif
     } else {
       int y_cb = linkIndexP1(coord, arg.x_size, dim);
       int y3_cb = (arg.LL && !from_coarse) ? linkIndexP3(coord, arg.x_size, dim) : 0;
 
-      for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      if (from_coarse){
-		(*arg.UV)(parity, x_cb, s, ic, ic_c) += (*arg.FL)(dim, parity, x_cb, ic, jc) * arg.V((parity+1)&1, y_cb, s, jc, ic_c);
-	      } else {
-	        // on the coarse lattice if forwards then use the forwards links
-		(*arg.UV)(parity, x_cb, stag_sp, ic, ic_c) +=  (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) *  arg.V((parity+1)&1, y_cb, stag_sp, jc, ic_c);
-                if( arg.LL ) (*arg.UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*arg.LL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) * arg.V((parity+1)&1, y3_cb, stag_sp, jc, ic_c);
-	      } // which chiral block
-	    }  //Fine color columns
-	  }  //Fine color rows
-	}  //Coarse color
-      }  //Fine Spin
-
+      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+	    if(!from_coarse){
+	      (*arg.UV)(parity, x_cb, stag_sp, ic, ic_c) +=  (*arg.FL)(dim , parity, x_cb, ic, jc) *  arg.V((parity+1)&1, y_cb, stag_sp, jc, ic_c);
+              if( arg.LL ) (*arg.UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*arg.LL)(dim , parity, x_cb, ic, jc) * arg.V((parity+1)&1, y3_cb, stag_sp, jc, ic_c);
+	    } else {
+              for(int s = 0; s < fineSpin; s++) {  //Fine Spin
+                 for (int s_col=0; s_col<fineSpin; s_col++) {
+	           // on the coarse lattice if forwards then use the forwards links
+		   (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) * arg.V((parity+1)&1, y_cb, s, jc, ic_c);
+                 } // which chiral block
+              } //Fine spin rows 
+	    } // from coarse?
+	  }  //Fine color columns
+	}  //Fine color rows
+      }  //Coarse color
     }
-
+    
+    return;
   } // computeUV
 
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
@@ -182,7 +184,8 @@ namespace quda {
 	} //Fine spin
       }
     } // from_coarse
-
+    
+    return;
   }
 //TROUBLE HERE!
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
@@ -274,8 +277,9 @@ namespace quda {
 	  } //Color column
 	} //Color row
       } //Spin row
-
     } // dimension
+
+    return;
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
@@ -323,9 +327,6 @@ namespace quda {
 
     for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
       for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-
-	const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
-
 	for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
 	  for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
              if(s_row == s_col){
@@ -347,7 +348,8 @@ namespace quda {
 	} //Color row
       } //Spin column
     } //Spin row
-
+    
+    return; 
   }
 
   template<bool bidirectional, typename Float, int nSpin, int nColor, typename Arg>

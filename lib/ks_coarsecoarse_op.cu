@@ -148,7 +148,7 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseCoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,
-		      const Transfer &T, const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
+		      const Transfer &T, const cpuGaugeField &coarse_links, const cpuGaugeField &coarse_clover, const cpuGaugeField &coarse_cloverInv,
 		      double mass, QudaDiracType dirac, QudaMatPCType matpc) {
 
     QudaPrecision precision = Y.Precision();
@@ -163,7 +163,7 @@ namespace quda {
     UVparam.nSpin *= 2; // so nSpin == 4
     cpuColorSpinorField uv(UVparam);
 
-    calculateKSYcoarse(Y, X, Xinv, Yhat, uv, T, gauge, clover, cloverInv, mass, dirac, matpc);
+    calculateKSYcoarse(Y, X, Xinv, Yhat, uv, T, coarse_links, coarse_clover, coarse_cloverInv, mass, dirac, matpc);
 
   }
   

@@ -327,7 +327,7 @@ namespace quda {
      @param k[in] K parameter
    */
 
-  void CoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);
+  void CoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double mass, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
@@ -348,6 +348,13 @@ namespace quda {
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		      const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
 		      double kappa, QudaDiracType dirac, QudaMatPCType matpc);
+
+  /**
+     KS version of the above, in fact, just identical function
+  */
+  void CoarseCoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
+                      const cpuGaugeField &coarse_links, const cpuGaugeField &coarse_clover, const cpuGaugeField &coarse_cloverInv,
+                      double mass, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      This is an object that captures an entire MG preconditioner

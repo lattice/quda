@@ -83,7 +83,6 @@ namespace quda {
 
     if (coarseColor == 2) {
       calculateKSY<Float,csOrder,gOrder,fineColor,2, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, mass, dirac, matpc);
-/*
     } else if (coarseColor == 4) {
       calculateKSY<Float,csOrder,gOrder,fineColor,4, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, mass, dirac, matpc);
     } else if (coarseColor == 8) {
@@ -100,7 +99,6 @@ namespace quda {
       calculateKSY<Float,csOrder,gOrder,fineColor,48, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, mass, dirac, matpc);
     } else if (coarseColor == 96) {
       calculateKSY<Float,csOrder,gOrder,fineColor,96, coarseSpin>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, mass, dirac, matpc);
-*/
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

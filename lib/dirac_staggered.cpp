@@ -139,7 +139,7 @@ namespace quda {
   */
 
   void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    CoarseKSOp(Y, X, Xinv, Yhat, T, gauge, nullptr,  2*mass);//
+    CoarseKSOp(Y, X, Xinv, Yhat, T, gauge, nullptr,  2*mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);//
   }
 
 

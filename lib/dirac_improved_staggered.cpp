@@ -150,7 +150,7 @@ namespace quda {
   */
 
   void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    CoarseKSOp(Y, X, Xinv, Yhat, T, &fatGauge, &longGauge,  2*mass);//
+    CoarseKSOp(Y, X, Xinv, Yhat, T, &fatGauge, &longGauge,  2*mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);//
   }
 
   DiracImprovedStaggeredPC::DiracImprovedStaggeredPC(const DiracParam &param)
