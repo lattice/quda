@@ -51,9 +51,16 @@ namespace quda {
     for (int j=0; j<N; j++) {
       a[j] = static_cast<cudaColorSpinorField*>(Ap[i+j]);
       b[j] = static_cast<cudaColorSpinorField*>(Ap[k]);
-      printfQuda("i=%d k=%d j=%d a=%d b=%d \n", i, k, j, a[j]->Precision(), b[j]->Precision());
+      Beta[j] = 0;
     }
     blas::cDotProduct(Beta, a, b); // vectorized dot product
+#if 0
+    for (int j=0; j<N; j++) {
+      printfQuda("%d/%d vectorized %e %e, regular %e %e\n", j+1, N, Beta[j].real(), Beta[j].imag(),
+		 blas::cDotProduct(*a[j], *b[j]).real(), blas::cDotProduct(*a[j], *b[j]).imag());
+      }
+#endif
+
     for (int j=0; j<N; j++) beta[i+j][k] = Beta[j];
     delete [] Beta;
   }
@@ -63,7 +70,8 @@ namespace quda {
     if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION ||
 	Ap[0]->Nspin() == 2 || pipeline == 0) pipeline = 1;
 
-    pipeline = 1; // FIXME vectorized dot product seems unreliable so disable for now
+    if (pipeline > 1)
+      warningQuda("GCR with pipeline length %d is experimental", pipeline);
 
     switch (pipeline) {
     case 0: // no kernel fusion
@@ -84,7 +92,6 @@ namespace quda {
       {
 	const int N = 2;
 	for (int i=0; i<k-(N-1); i+=N) {
-	  printf("pre 2-way\n");
 	  computeBeta(beta, Ap, i, N, k);
 	  blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
 	}
@@ -99,7 +106,6 @@ namespace quda {
       {
 	const int N = 3;
 	for (int i=0; i<k-(N-1); i+=N) { // 5 (k-1) memory transactions here
-	  printf("pre 3-way\n");
 	  computeBeta(beta, Ap, i, N, k);
 	  blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
 	}
@@ -113,6 +119,30 @@ namespace quda {
 	    blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
 	  }
 	}
+      }
+      break;
+    case 4: // four-way pipelining
+      {
+	const int N = 4;
+	for (int i=0; i<k-(N-1); i+=N) {
+	  computeBeta(beta, Ap, i, N, k);
+	  blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
+	  blas::caxpbypz(-beta[i+2][k], *Ap[i+2], -beta[i+3][k], *Ap[i+3], *Ap[k]);
+	}
+
+	if (k%N != 0) { // need to update the remainder
+	  if ((k%N) % 3 == 0) {
+	    computeBeta(beta, Ap, k-3, 3, k);
+	    blas::caxpbypczpw(-beta[k-3][k], *Ap[k-3], -beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  } else if ((k%N) % 2 == 0) {
+	    computeBeta(beta, Ap, k-2, 2, k);
+	    blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  } else {
+	    beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	    blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  }
+	}
+
       }
       break;
     default:
