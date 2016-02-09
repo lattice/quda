@@ -74,7 +74,7 @@ namespace quda {
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    gParam.nFace = 1;
+    gParam.nFace = (transfer->Vectors().Nspin() == 1) ? 3 : 1; //1 for naive staggered
 
     gParam.geometry = QUDA_COARSE_GEOMETRY;
 
@@ -211,8 +211,15 @@ namespace quda {
   void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
   {
 
-    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) errorQuda("\nCoarseCoarse operator is not implemented!\n");
-    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) 
+    {
+      CoarseCoarseKSOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), mass, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      //errorQuda("\nCoarseCoarse staggered is not implemented.\n");
+    }
+    else
+    {
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+    }
   }
 
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu) : DiracCoarse(param, enable_gpu)
@@ -229,11 +236,15 @@ namespace quda {
 
   void DiracCoarsePC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
+
+    bool is_staggered = false;
+    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
+
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false);
+      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, is_staggered);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false);
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, is_staggered);
     }
 
     int n = in.Nspin()*in.Ncolor();
@@ -380,7 +391,15 @@ namespace quda {
   //pass the fine clover fields, though they are actually ignored.
   void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
   {
-    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSEPC_DIRAC, matpcType);
+    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) 
+    {
+      CoarseCoarseKSOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), mass, QUDA_COARSEPC_DIRAC, QUDA_MATPC_INVALID);
+      //errorQuda("\nCoarseCoarse staggered is not implemented.\n");
+    }
+    else
+    {
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSEPC_DIRAC, matpcType);
+    }
   }
 
 }

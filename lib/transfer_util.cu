@@ -170,8 +170,8 @@ namespace quda {
 	  for (int s=0; s<in.Nspin(); s++) {
 	    for (int c=0; c<in.Ncolor(); c++) {
 	      
-	      int chirality = s / spin_bs; // chirality is the coarse spin
-	      int blockSpin = s % spin_bs; // the remaining spin dof left in each block
+	      int chirality =  in.Nspin() != 1 ?  s / spin_bs : 1; // chirality is the coarse spin
+	      int blockSpin =  in.Nspin() != 1 ?  s % spin_bs : 1; // the remaining spin dof left in each block
 	      
 	      int index = offset +                                              // geo block
 		chirality * nVec * geoBlockSize * spin_bs * in.Ncolor() + // chiral block
@@ -331,7 +331,9 @@ namespace quda {
     int chiralBlocks = V.Nspin() != 1 ? vOrder.Nspin() / spin_bs : 2 ; 
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
 
-    if(V.Nspin() != 1){//FIXME : this is not good, think about a separate parameter to distinguish staggered stuff!
+    if(V.Nspin() == 1) spin_bs = 1;//just to be safe
+
+    if(V.Nspin() != 1 || (V.Nspin() == 1 && V.Nparity() == 1)){//FIXME : this is not good, think about a separate parameter to distinguish staggered stuff!
       int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
     
