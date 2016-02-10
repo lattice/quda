@@ -82,7 +82,8 @@ __device__ __forceinline__ void LoadDirectBlocked(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        items[ITEM] = block_itr[(linear_tid * ITEMS_PER_THREAD) + ITEM];
+//        items[ITEM] = block_itr[(linear_tid * ITEMS_PER_THREAD) + ITEM];
+        items[ITEM] = *(block_itr + (linear_tid * ITEMS_PER_THREAD) + ITEM);
     }
 }
 
@@ -109,9 +110,10 @@ __device__ __forceinline__ void LoadDirectBlocked(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        int offset = (linear_tid * ITEMS_PER_THREAD) + ITEM;
-        offset = CUB_MIN(offset, valid_items - 1);
-        items[ITEM] = block_itr[offset];
+//        int offset = (linear_tid * ITEMS_PER_THREAD) + ITEM;
+//        offset = CUB_MIN(offset, valid_items - 1);
+//        items[ITEM] = block_itr[offset];
+        items[ITEM] = *(block_itr + CUB_MIN((linear_tid * ITEMS_PER_THREAD) + ITEM, valid_items - 1));
     }
 }
 
@@ -139,8 +141,11 @@ __device__ __forceinline__ void LoadDirectBlocked(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        int offset = (linear_tid * ITEMS_PER_THREAD) + ITEM;
-        items[ITEM] = (offset < valid_items) ? block_itr[offset] : oob_default;
+//        int offset = (linear_tid * ITEMS_PER_THREAD) + ITEM;
+//        items[ITEM] = (offset < valid_items) ? block_itr[offset] : oob_default;
+        items[ITEM] = ((linear_tid * ITEMS_PER_THREAD) + ITEM < valid_items) ?
+            *(block_itr + (linear_tid * ITEMS_PER_THREAD) + ITEM) :
+            oob_default;
     }
 }
 
@@ -195,7 +200,8 @@ __device__ __forceinline__ void InternalLoadDirectBlockedVectorized(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        items[ITEM] = reinterpret_cast<T*>(vec_items)[ITEM];
+//        items[ITEM] = reinterpret_cast<T*>(vec_items)[ITEM];
+        items[ITEM] = *(reinterpret_cast<T*>(vec_items) + ITEM);
     }
 }
 
@@ -282,12 +288,11 @@ __device__ __forceinline__ void LoadDirectStriped(
     InputIteratorT  block_itr,                  ///< [in] The thread block's base input iterator for loading from
     T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
 {
-
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        int offset = linear_tid + (ITEM * BLOCK_THREADS);
-        items[ITEM] = block_itr[offset];
+//        items[ITEM] = block_itr[linear_tid + (ITEM * BLOCK_THREADS)];
+        items[ITEM] = *(block_itr + linear_tid + (ITEM * BLOCK_THREADS));
     }
 
 //    LoadDirectStriped<BLOCK_THREADS>(linear_tid, block_itr, items, Int2Type<0>());
@@ -318,9 +323,10 @@ __device__ __forceinline__ void LoadDirectStriped(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        int offset = linear_tid + (ITEM * BLOCK_THREADS);
-        offset = CUB_MIN(offset, valid_items - 1);
-        items[ITEM] = block_itr[offset];
+//        int offset = linear_tid + (ITEM * BLOCK_THREADS);
+//        offset = CUB_MIN(offset, valid_items - 1);
+//        items[ITEM] = block_itr[offset];
+        items[ITEM] = *(block_itr + CUB_MIN(linear_tid + (ITEM * BLOCK_THREADS), valid_items - 1));
     }
 }
 
@@ -350,8 +356,11 @@ __device__ __forceinline__ void LoadDirectStriped(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        int offset = linear_tid + (ITEM * BLOCK_THREADS);
-        items[ITEM] = (offset < valid_items) ? block_itr[offset] : oob_default;
+//        int offset = linear_tid + (ITEM * BLOCK_THREADS);
+//        items[ITEM] = (offset < valid_items) ? block_itr[offset] : oob_default;
+        items[ITEM] = (linear_tid + (ITEM * BLOCK_THREADS) < valid_items) ?
+            *(block_itr + linear_tid + (ITEM * BLOCK_THREADS)) :
+            oob_default;
     }
 }
 
@@ -393,7 +402,8 @@ __device__ __forceinline__ void LoadDirectWarpStriped(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        items[ITEM] = block_itr[warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS)];
+//        items[ITEM] = block_itr[warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS)];
+        items[ITEM] = *(block_itr + warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS));
     }
 }
 
@@ -428,9 +438,10 @@ __device__ __forceinline__ void LoadDirectWarpStriped(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        int offset = warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS);
-        offset = CUB_MIN(offset, valid_items - 1);
-        items[ITEM] = block_itr[offset];
+//        int offset = warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS);
+//        offset = CUB_MIN(offset, valid_items - 1);
+//        items[ITEM] = block_itr[offset];
+        items[ITEM] = *(block_itr + CUB_MIN(warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS), valid_items - 1));
     }
 }
 
@@ -466,8 +477,12 @@ __device__ __forceinline__ void LoadDirectWarpStriped(
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        int offset = warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS);
-        items[ITEM] = (offset < valid_items) ? block_itr[offset] : oob_default;
+//        int offset = warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS);
+//        items[ITEM] = (offset < valid_items) ? block_itr[offset] : oob_default;.
+
+        items[ITEM] = (warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS) < valid_items) ?
+            *(block_itr + warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS)) :
+            oob_default;
     }
 }
 
