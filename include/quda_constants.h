@@ -32,6 +32,13 @@
 /**
  * @def QUDA_MAX_MG_LEVEL
  * @brief Maximum number of multi-grid levels.  This number may be
- * changed if need be.
+ * increased if needed.
  */
 #define QUDA_MAX_MG_LEVEL 4
+
+/**
+ * @def QUDA_MAX_MULTI_REDUCE
+ * @brief Maximum number of simultaneous reductions that can take
+ * place.  This number may be increased if needed.
+ */
+#define QUDA_MAX_MULTI_REDUCE 16

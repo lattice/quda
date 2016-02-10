@@ -29,7 +29,7 @@
 
 /**
  * \file
- * cub::DeviceScan provides device-wide, parallel operations for computing a prefix scan across a sequence of data items residing within global memory.
+ * cub::DeviceScan provides device-wide, parallel operations for computing a prefix scan across a sequence of data items residing within device-accessible memory.
  */
 
 #pragma once
@@ -48,8 +48,8 @@ namespace cub {
 
 
 /**
- * \brief DeviceScan provides device-wide, parallel operations for computing a prefix scan across a sequence of data items residing within global memory. ![](device_scan.png)
- * \ingroup DeviceModule
+ * \brief DeviceScan provides device-wide, parallel operations for computing a prefix scan across a sequence of data items residing within device-accessible memory. ![](device_scan.png)
+ * \ingroup SingleModule
  *
  * \par Overview
  * Given a sequence of input elements and a binary reduction operator, a [<em>prefix scan</em>](http://en.wikipedia.org/wiki/Prefix_sum)
@@ -87,7 +87,6 @@ struct DeviceScan
      * \par
      * - Supports non-commutative sum operators.
      * - \devicestorage
-     * - \cdp
      *
      * \par Performance
      * The following charts illustrate saturated exclusive sum performance across different
@@ -102,7 +101,7 @@ struct DeviceScan
      * \code
      * #include <cub/cub.cuh>   // or equivalently <cub/device/device_scan.cuh>
      *
-     * // Declare, allocate, and initialize device pointers for input and output
+     * // Declare, allocate, and initialize device-accessible pointers for input and output
      * int  num_items;      // e.g., 7
      * int  *d_in;          // e.g., [8, 6, 7, 5, 3, 0, 9]
      * int  *d_out;         // e.g., [ ,  ,  ,  ,  ,  ,  ]
@@ -131,7 +130,7 @@ struct DeviceScan
         typename        OutputIteratorT>
     CUB_RUNTIME_FUNCTION
     static cudaError_t ExclusiveSum(
-        void            *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void            *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t          &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT  d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT d_out,                              ///< [out] Pointer to the output sequence of data items
@@ -164,10 +163,6 @@ struct DeviceScan
      * \par
      * - Supports non-commutative scan operators.
      * - \devicestorage
-     * - \cdp
-     *
-     * \par Performance
-     * Performance is typically similar to DeviceScan::ExclusiveSum.
      *
      * \par Snippet
      * The code snippet below illustrates the exclusive prefix min-scan of an \p int device vector
@@ -185,7 +180,7 @@ struct DeviceScan
      *     }
      * };
      *
-     * // Declare, allocate, and initialize device pointers for input and output
+     * // Declare, allocate, and initialize device-accessible pointers for input and output
      * int          num_items;      // e.g., 7
      * int          *d_in;          // e.g., [8, 6, 7, 5, 3, 0, 9]
      * int          *d_out;         // e.g., [ ,  ,  ,  ,  ,  ,  ]
@@ -219,11 +214,11 @@ struct DeviceScan
         typename        Identity>
     CUB_RUNTIME_FUNCTION
     static cudaError_t ExclusiveScan(
-        void            *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void            *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t          &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT  d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT d_out,                              ///< [out] Pointer to the output sequence of data items
-        ScanOp          scan_op,                            ///< [in] Binary scan functor (e.g., an instance of cub::Sum, cub::Min, cub::Max, etc.)
+        ScanOp          scan_op,                            ///< [in] Binary scan functor 
         Identity        identity,                           ///< [in] Identity element
         int             num_items,                          ///< [in] Total number of input items (i.e., the length of \p d_in)
         cudaStream_t    stream              = 0,            ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
@@ -258,10 +253,6 @@ struct DeviceScan
      * \par
      * - Supports non-commutative sum operators.
      * - \devicestorage
-     * - \cdp
-     *
-     * \par Performance
-     * Performance is typically similar to DeviceScan::ExclusiveSum.
      *
      * \par Snippet
      * The code snippet below illustrates the inclusive prefix sum of an \p int device vector.
@@ -269,7 +260,7 @@ struct DeviceScan
      * \code
      * #include <cub/cub.cuh>   // or equivalently <cub/device/device_scan.cuh>
      *
-     * // Declare, allocate, and initialize device pointers for input and output
+     * // Declare, allocate, and initialize device-accessible pointers for input and output
      * int  num_items;      // e.g., 7
      * int  *d_in;          // e.g., [8, 6, 7, 5, 3, 0, 9]
      * int  *d_out;         // e.g., [ ,  ,  ,  ,  ,  ,  ]
@@ -298,7 +289,7 @@ struct DeviceScan
         typename            OutputIteratorT>
     CUB_RUNTIME_FUNCTION
     static cudaError_t InclusiveSum(
-        void*               d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void*               d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&             temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT      d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT     d_out,                              ///< [out] Pointer to the output sequence of data items
@@ -328,10 +319,6 @@ struct DeviceScan
      * \par
      * - Supports non-commutative scan operators.
      * - \devicestorage
-     * - \cdp
-     *
-     * \par Performance
-     * Performance is typically similar to DeviceScan::ExclusiveSum.
      *
      * \par Snippet
      * The code snippet below illustrates the inclusive prefix min-scan of an \p int device vector.
@@ -349,7 +336,7 @@ struct DeviceScan
      *     }
      * };
      *
-     * // Declare, allocate, and initialize device pointers for input and output
+     * // Declare, allocate, and initialize device-accessible pointers for input and output
      * int          num_items;      // e.g., 7
      * int          *d_in;          // e.g., [8, 6, 7, 5, 3, 0, 9]
      * int          *d_out;         // e.g., [ ,  ,  ,  ,  ,  ,  ]
@@ -381,11 +368,11 @@ struct DeviceScan
         typename        ScanOp>
     CUB_RUNTIME_FUNCTION
     static cudaError_t InclusiveScan(
-        void            *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void            *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t          &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT  d_in,                               ///< [in] Pointer to the input sequence of data items
         OutputIteratorT d_out,                              ///< [out] Pointer to the output sequence of data items
-        ScanOp          scan_op,                            ///< [in] Binary scan functor (e.g., an instance of cub::Sum, cub::Min, cub::Max, etc.)
+        ScanOp          scan_op,                            ///< [in] Binary scan functor 
         int             num_items,                          ///< [in] Total number of input items (i.e., the length of \p d_in)
         cudaStream_t    stream             = 0,             ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool            debug_synchronous  = false)         ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.

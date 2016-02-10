@@ -75,7 +75,6 @@ template <
     bool                        _MEMOIZE_OUTER_SCAN,        ///< Whether or not to buffer outer raking scan partials to incur fewer shared memory reads at the expense of higher register pressure.  See BlockScanAlgorithm::BLOCK_SCAN_RAKING_MEMOIZE for more details.
     BlockScanAlgorithm          _INNER_SCAN_ALGORITHM,      ///< The BlockScan algorithm algorithm to use
     RadixSortScatterAlgorithm   _SCATTER_ALGORITHM,         ///< The scattering strategy to use
-    cudaSharedMemConfig         _SMEM_CONFIG,               ///< Shared memory bank mode
     int                         _RADIX_BITS>                ///< The number of radix bits, i.e., log2(bins)
 struct AgentRadixSortDownsweepPolicy
 {
@@ -91,7 +90,6 @@ struct AgentRadixSortDownsweepPolicy
     static const CacheLoadModifier          LOAD_MODIFIER           = _LOAD_MODIFIER;           ///< Cache load modifier for reading keys (and values)
     static const BlockScanAlgorithm         INNER_SCAN_ALGORITHM    = _INNER_SCAN_ALGORITHM;    ///< The BlockScan algorithm algorithm to use
     static const RadixSortScatterAlgorithm  SCATTER_ALGORITHM       = _SCATTER_ALGORITHM;       ///< The scattering strategy to use
-    static const cudaSharedMemConfig        SMEM_CONFIG             = _SMEM_CONFIG;             ///< Shared memory bank mode
 };
 
 
@@ -103,11 +101,11 @@ struct AgentRadixSortDownsweepPolicy
  * \brief AgentRadixSortDownsweep implements a stateful abstraction of CUDA thread blocks for participating in device-wide radix sort downsweep .
  */
 template <
-    typename AgentRadixSortDownsweepPolicy,             ///< Parameterized AgentRadixSortDownsweepPolicy tuning policy type
-    bool     DESCENDING,                                ///< Whether or not the sorted-order is high-to-low
-    typename KeyT,                                       ///< KeyT type
-    typename ValueT,                                     ///< ValueT type
-    typename OffsetT>                                   ///< Signed integer type for global offsets
+    typename AgentRadixSortDownsweepPolicy,     ///< Parameterized AgentRadixSortDownsweepPolicy tuning policy type
+    bool     IS_DESCENDING,                        ///< Whether or not the sorted-order is high-to-low
+    typename KeyT,                              ///< KeyT type
+    typename ValueT,                            ///< ValueT type
+    typename OffsetT>                           ///< Signed integer type for global offsets
 struct AgentRadixSortDownsweep
 {
     //---------------------------------------------------------------------
@@ -117,14 +115,13 @@ struct AgentRadixSortDownsweep
     // Appropriate unsigned-bits representation of KeyT
     typedef typename Traits<KeyT>::UnsignedBits UnsignedBits;
 
-    static const UnsignedBits MIN_KEY = Traits<KeyT>::MIN_KEY;
+    static const UnsignedBits LOWEST_KEY = Traits<KeyT>::LOWEST_KEY;
     static const UnsignedBits MAX_KEY = Traits<KeyT>::MAX_KEY;
 
     static const BlockLoadAlgorithm         LOAD_ALGORITHM          = AgentRadixSortDownsweepPolicy::LOAD_ALGORITHM;
     static const CacheLoadModifier          LOAD_MODIFIER           = AgentRadixSortDownsweepPolicy::LOAD_MODIFIER;
     static const BlockScanAlgorithm         INNER_SCAN_ALGORITHM    = AgentRadixSortDownsweepPolicy::INNER_SCAN_ALGORITHM;
     static const RadixSortScatterAlgorithm  SCATTER_ALGORITHM       = AgentRadixSortDownsweepPolicy::SCATTER_ALGORITHM;
-    static const cudaSharedMemConfig        SMEM_CONFIG             = AgentRadixSortDownsweepPolicy::SMEM_CONFIG;
 
     enum
     {
@@ -161,10 +158,9 @@ struct AgentRadixSortDownsweep
     typedef BlockRadixRank<
         BLOCK_THREADS,
         RADIX_BITS,
-        DESCENDING,
+        IS_DESCENDING,
         MEMOIZE_OUTER_SCAN,
-        INNER_SCAN_ALGORITHM,
-        SMEM_CONFIG> BlockRadixRank;
+        INNER_SCAN_ALGORITHM> BlockRadixRank;
 
     // BlockLoad type (keys)
     typedef BlockLoad<
@@ -238,11 +234,6 @@ struct AgentRadixSortDownsweep
     // Number of bits in current digit
     int             num_bits;
 
-    // Whether to short-ciruit
-    bool            short_circuit;
-
-
-
     //---------------------------------------------------------------------
     // Utility methods
     //---------------------------------------------------------------------
@@ -266,7 +257,7 @@ struct AgentRadixSortDownsweep
 
 
     /**
-     * Scatter ranked items to global memory
+     * Scatter ranked items to device-accessible memory
      */
     template <bool FULL_TILE, typename T>
     __device__ __forceinline__ void ScatterItems(
@@ -289,7 +280,7 @@ struct AgentRadixSortDownsweep
 
 
     /**
-     * Scatter ranked keys directly to global memory
+     * Scatter ranked keys directly to device-accessible memory
      */
     template <bool FULL_TILE>
     __device__ __forceinline__ void ScatterKeys(
@@ -317,7 +308,7 @@ struct AgentRadixSortDownsweep
 
 
     /**
-     * Scatter ranked keys through shared memory, then to global memory
+     * Scatter ranked keys through shared memory, then to device-accessible memory
      */
     template <bool FULL_TILE>
     __device__ __forceinline__ void ScatterKeys(
@@ -350,7 +341,7 @@ struct AgentRadixSortDownsweep
 
 
     /**
-     * Scatter ranked values directly to global memory
+     * Scatter ranked values directly to device-accessible memory
      */
     template <bool FULL_TILE>
     __device__ __forceinline__ void ScatterValues(
@@ -366,7 +357,7 @@ struct AgentRadixSortDownsweep
 
 
     /**
-     * Scatter ranked values through shared memory, then to global memory
+     * Scatter ranked values through shared memory, then to device-accessible memory
      */
     template <bool FULL_TILE>
     __device__ __forceinline__ void ScatterValues(
@@ -519,7 +510,7 @@ struct AgentRadixSortDownsweep
         OffsetT         relative_bin_offsets[ITEMS_PER_THREAD];     // For each key, the global scatter base offset of the corresponding digit
 
         // Assign default (min/max) value to all keys
-        UnsignedBits default_key = (DESCENDING) ? MIN_KEY : MAX_KEY;
+        UnsignedBits default_key = (IS_DESCENDING) ? LOWEST_KEY : MAX_KEY;
 
         // Load tile of keys
         BlockLoadKeys loader(temp_storage.load_keys);
@@ -555,7 +546,7 @@ struct AgentRadixSortDownsweep
             int exclusive_digit_prefix;
 
             // Get exclusive digit prefix from inclusive prefix
-            if (DESCENDING)
+            if (IS_DESCENDING)
             {
                 // Get the prefix from the next thread (higher bins come first)
 #if CUB_PTX_ARCH >= 300
@@ -662,7 +653,8 @@ struct AgentRadixSortDownsweep
      */
     __device__ __forceinline__ AgentRadixSortDownsweep(
         TempStorage &temp_storage,
-        OffsetT      bin_offset,
+        OffsetT     num_items,
+        OffsetT     bin_offset,
         KeyT        *d_keys_in,
         KeyT        *d_keys_out,
         ValueT      *d_values_in,
@@ -677,9 +669,17 @@ struct AgentRadixSortDownsweep
         d_values_in(d_values_in),
         d_values_out(d_values_out),
         current_bit(current_bit),
-        num_bits(num_bits),
-        short_circuit(false)
-    {}
+        num_bits(num_bits)
+    {
+        if (threadIdx.x < RADIX_DIGITS)
+        {
+            // Short circuit if the histogram has only bin counts of only zeros or problem-size
+            int predicate = ((bin_offset == 0) || (bin_offset == num_items));
+            this->temp_storage.short_circuit = WarpAll(predicate);
+        }
+
+        __syncthreads();
+    }
 
 
     /**
@@ -707,7 +707,7 @@ struct AgentRadixSortDownsweep
         // Load digit bin offsets (each of the first RADIX_DIGITS threads will load an offset for that digit)
         if (threadIdx.x < RADIX_DIGITS)
         {
-            int bin_idx = (DESCENDING) ?
+            int bin_idx = (IS_DESCENDING) ?
                 RADIX_DIGITS - threadIdx.x - 1 :
                 threadIdx.x;
 
@@ -721,8 +721,6 @@ struct AgentRadixSortDownsweep
         }
 
         __syncthreads();
-
-        short_circuit = this->temp_storage.short_circuit;
     }
 
 
@@ -730,10 +728,10 @@ struct AgentRadixSortDownsweep
      * Distribute keys from a segment of input tiles.
      */
     __device__ __forceinline__ void ProcessRegion(
-        OffsetT         block_offset,
-        const OffsetT   &block_end)
+        OffsetT   block_offset,
+        OffsetT   block_end)
     {
-        if (short_circuit)
+        if (temp_storage.short_circuit)
         {
             // Copy keys
             Copy(d_keys_in, d_keys_out, block_offset, block_end);

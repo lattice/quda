@@ -155,7 +155,7 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define a uint4 (16B) ThreadStore specialization for the given Cache load modifier
  */
-#define CUB_STORE_16(cub_modifier, ptx_modifier)                                            \
+#define _CUB_STORE_16(cub_modifier, ptx_modifier)                                            \
     template<>                                                                              \
     __device__ __forceinline__ void ThreadStore<cub_modifier, uint4*, uint4>(uint4* ptr, uint4 val)                         \
     {                                                                                       \
@@ -179,7 +179,7 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define a uint2 (8B) ThreadStore specialization for the given Cache load modifier
  */
-#define CUB_STORE_8(cub_modifier, ptx_modifier)                                             \
+#define _CUB_STORE_8(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
     __device__ __forceinline__ void ThreadStore<cub_modifier, ushort4*, ushort4>(ushort4* ptr, ushort4 val)                 \
     {                                                                                       \
@@ -209,7 +209,7 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define a unsigned int (4B) ThreadStore specialization for the given Cache load modifier
  */
-#define CUB_STORE_4(cub_modifier, ptx_modifier)                                             \
+#define _CUB_STORE_4(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
     __device__ __forceinline__ void ThreadStore<cub_modifier, unsigned int*, unsigned int>(unsigned int* ptr, unsigned int val)                             \
     {                                                                                       \
@@ -222,7 +222,7 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define a unsigned short (2B) ThreadStore specialization for the given Cache load modifier
  */
-#define CUB_STORE_2(cub_modifier, ptx_modifier)                                             \
+#define _CUB_STORE_2(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
     __device__ __forceinline__ void ThreadStore<cub_modifier, unsigned short*, unsigned short>(unsigned short* ptr, unsigned short val)                     \
     {                                                                                       \
@@ -235,7 +235,7 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define a unsigned char (1B) ThreadStore specialization for the given Cache load modifier
  */
-#define CUB_STORE_1(cub_modifier, ptx_modifier)                                             \
+#define _CUB_STORE_1(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
     __device__ __forceinline__ void ThreadStore<cub_modifier, unsigned char*, unsigned char>(unsigned char* ptr, unsigned char val)                         \
     {                                                                                       \
@@ -252,37 +252,37 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define powers-of-two ThreadStore specializations for the given Cache load modifier
  */
-#define CUB_STORE_ALL(cub_modifier, ptx_modifier)                                           \
-    CUB_STORE_16(cub_modifier, ptx_modifier)                                                \
-    CUB_STORE_8(cub_modifier, ptx_modifier)                                                 \
-    CUB_STORE_4(cub_modifier, ptx_modifier)                                                 \
-    CUB_STORE_2(cub_modifier, ptx_modifier)                                                 \
-    CUB_STORE_1(cub_modifier, ptx_modifier)                                                 \
+#define _CUB_STORE_ALL(cub_modifier, ptx_modifier)                                           \
+    _CUB_STORE_16(cub_modifier, ptx_modifier)                                                \
+    _CUB_STORE_8(cub_modifier, ptx_modifier)                                                 \
+    _CUB_STORE_4(cub_modifier, ptx_modifier)                                                 \
+    _CUB_STORE_2(cub_modifier, ptx_modifier)                                                 \
+    _CUB_STORE_1(cub_modifier, ptx_modifier)                                                 \
 
 
 /**
  * Define ThreadStore specializations for the various Cache load modifiers
  */
 #if CUB_PTX_ARCH >= 200
-    CUB_STORE_ALL(STORE_WB, ca)
-    CUB_STORE_ALL(STORE_CG, cg)
-    CUB_STORE_ALL(STORE_CS, cs)
-    CUB_STORE_ALL(STORE_WT, wt)
+    _CUB_STORE_ALL(STORE_WB, ca)
+    _CUB_STORE_ALL(STORE_CG, cg)
+    _CUB_STORE_ALL(STORE_CS, cs)
+    _CUB_STORE_ALL(STORE_WT, wt)
 #else
-    CUB_STORE_ALL(STORE_WB, global)
-    CUB_STORE_ALL(STORE_CG, global)
-    CUB_STORE_ALL(STORE_CS, global)
-    CUB_STORE_ALL(STORE_WT, volatile.global)
+    _CUB_STORE_ALL(STORE_WB, global)
+    _CUB_STORE_ALL(STORE_CG, global)
+    _CUB_STORE_ALL(STORE_CS, global)
+    _CUB_STORE_ALL(STORE_WT, volatile.global)
 #endif
 
 
 // Macro cleanup
-#undef CUB_STORE_ALL
-#undef CUB_STORE_1
-#undef CUB_STORE_2
-#undef CUB_STORE_4
-#undef CUB_STORE_8
-#undef CUB_STORE_16
+#undef _CUB_STORE_ALL
+#undef _CUB_STORE_1
+#undef _CUB_STORE_2
+#undef _CUB_STORE_4
+#undef _CUB_STORE_8
+#undef _CUB_STORE_16
 
 
 /**
@@ -342,14 +342,18 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
 
 #else
 
-    typedef typename UnitWord<T>::VolatileWord VolatileWord;   // Word type for memcopying
+    // Create a temporary using shuffle-words, then store using volatile-words
+    typedef typename UnitWord<T>::VolatileWord  VolatileWord;  
+    typedef typename UnitWord<T>::ShuffleWord   ShuffleWord;
 
     const int VOLATILE_MULTIPLE = sizeof(T) / sizeof(VolatileWord);
-
+    const int SHUFFLE_MULTIPLE  = sizeof(T) / sizeof(ShuffleWord);
+    
     VolatileWord words[VOLATILE_MULTIPLE];
-    *reinterpret_cast<T*>(words) = val;
 
-//    VolatileWord *words = reinterpret_cast<VolatileWord*>(&val);
+    #pragma unroll
+    for (int i = 0; i < SHUFFLE_MULTIPLE; ++i)
+        reinterpret_cast<ShuffleWord*>(words)[i] = reinterpret_cast<ShuffleWord*>(&val)[i];
 
     IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
         reinterpret_cast<volatile VolatileWord*>(ptr),
@@ -384,13 +388,18 @@ __device__ __forceinline__ void ThreadStore(
     Int2Type<MODIFIER>          modifier,
     Int2Type<true>              is_pointer)
 {
-    typedef typename UnitWord<T>::DeviceWord DeviceWord;   // Word type for memcopying
+    // Create a temporary using shuffle-words, then store using device-words
+    typedef typename UnitWord<T>::DeviceWord    DeviceWord;  
+    typedef typename UnitWord<T>::ShuffleWord   ShuffleWord;
 
-    const int DEVICE_MULTIPLE = sizeof(T) / sizeof(DeviceWord);
-
+    const int DEVICE_MULTIPLE   = sizeof(T) / sizeof(DeviceWord);
+    const int SHUFFLE_MULTIPLE  = sizeof(T) / sizeof(ShuffleWord);
+    
     DeviceWord words[DEVICE_MULTIPLE];
 
-    *reinterpret_cast<T*>(words) = val;
+    #pragma unroll
+    for (int i = 0; i < SHUFFLE_MULTIPLE; ++i)
+        reinterpret_cast<ShuffleWord*>(words)[i] = reinterpret_cast<ShuffleWord*>(&val)[i];
 
     IterateThreadStore<0, DEVICE_MULTIPLE>::template Store<CacheStoreModifier(MODIFIER)>(
         reinterpret_cast<DeviceWord*>(ptr),
