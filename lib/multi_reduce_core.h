@@ -27,7 +27,6 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
   typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg){
 
-    unsigned int tid = threadIdx.x;
     unsigned int gridSize = gridDim.x*blockDim.x;
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
@@ -117,14 +116,8 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
       char *X_h[N], *Y_h[N], *Z_h[N], *W_h[N], *V_h[N];
       char *Xnorm_h[N], *Ynorm_h[N], *Znorm_h[N], *Wnorm_h[N], *Vnorm_h[N];
 
-      unsigned int sharedBytesPerThread() const { return sizeof(ReduceType); }
-
-      // When there is only one warp per block, we need to allocate two warps
-      // worth of shared memory so that we don't index shared memory out of bounds  
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-        int warpSize = 32;
-        return 2*warpSize*sizeof(ReduceType);
-      }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       virtual bool advanceSharedBytes(TuneParam &param) const
       {
@@ -139,8 +132,8 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
       MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], SpinorV V[],
 		      Reducer &r, int length) :
       arg(X, Y, Z, W, V, r, length), result(result),
-	X_h({ }), Y_h({ }), Z_h({ }), W_h({ }), V_h({ }),
-	Xnorm_h({ }), Ynorm_h({ }), Znorm_h({ }), Wnorm_h({ }), Vnorm_h({ }) { }
+	X_h(), Y_h(), Z_h(), W_h(), V_h(), Xnorm_h(),
+	Ynorm_h(), Znorm_h(), Wnorm_h(), Vnorm_h() { }
 
       virtual ~MultiReduceCuda(){}
 

@@ -112,14 +112,8 @@ private:
   const size_t *bytes_;
   const size_t *norm_bytes_;
 
-  unsigned int sharedBytesPerThread() const { return sizeof(ReduceType); }
-
-  // when there is only one warp per block, we need to allocate two warps
-  // worth of shared memory so that we don't index shared memory out of bounds
-  unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-    int warpSize = 32; // FIXME - use device property query
-    return 2*warpSize*sizeof(ReduceType);
-  }
+  unsigned int sharedBytesPerThread() const { return 0; }
+  unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
   virtual bool advanceSharedBytes(TuneParam &param) const
   {
