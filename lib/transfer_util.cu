@@ -333,7 +333,7 @@ namespace quda {
 
     if(V.Nspin() == 1) spin_bs = 1;//just to be safe
 
-    if(V.Nspin() != 1 || (V.Nspin() == 1 && V.Nparity() == 1)){//FIXME : this is not good, think about a separate parameter to distinguish staggered stuff!
+    if(V.Nspin() != 1 || (V.Nspin() == 1 && V.SiteSubset() == QUDA_PARITY_SITE_SUBSET)){//FIXME : this is not good, think about a separate parameter to distinguish staggered stuff!
       int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
     
