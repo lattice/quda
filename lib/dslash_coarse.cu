@@ -4,6 +4,8 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 
+//#define DIM_SPLIT
+
 namespace quda {
 
 #ifdef GPU_MULTIGRID
@@ -15,25 +17,21 @@ namespace quda {
     const F inB;
     const G Y;
     const G X;
-    Float kappa;
-    int parity; // only use this for single parity fields
-    int nParity; // number of parities we're working on
-    int volumeCB;
-    int dim[5];   // full lattice dimensions
-    int commDim[4]; // whether a given dimension is partitioned or not
-    int nFace;  // hard code to 1 for now
+    const Float kappa;
+    const int parity; // only use this for single parity fields
+    const int nParity; // number of parities we're working on
+    const int volumeCB;
+    const int nFace;  // hard code to 1 for now
+    const int dim[5];   // full lattice dimensions (ghost indexer expects a fifth dimension)
+    const int commDim[4]; // whether a given dimension is partitioned or not
 
     CoarseDslashArg(F &out, const F &inA, const F &inB, const G &Y, const G &X,
 		    Float kappa, int parity, const ColorSpinorField &meta)
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
-	nParity(meta.SiteSubset()), volumeCB(meta.VolumeCB()), nFace(1) {
-      for (int i=0; i<4; i++) {
-	dim[i] = meta.X(i);
-	commDim[i] = comm_dim_partitioned(i);
-      }
-      dim[0] = (nParity == 1) ? 2 * dim[0] : dim[0];
-      dim[4] = 1; // ghost index expects a fifth dimension
-    }
+	nParity(meta.SiteSubset()), volumeCB(meta.VolumeCB()), nFace(1),
+	dim{ (3-nParity) * meta.X(0), meta.X(1), meta.X(2), meta.X(3), 1 },
+        commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)}
+    {  }
   };
 
   /**
@@ -47,9 +45,8 @@ namespace quda {
      @param x_cb The checkerboarded site index
    */
   extern __shared__ float s[];
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
-  __device__ __host__ inline void applyDslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block, int dir) {
-
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, int thread_dir, int thread_dim>
+  __device__ __host__ inline void applyDslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
     int coord[5];
@@ -58,13 +55,19 @@ namespace quda {
 
 #ifdef __CUDA_ARCH__
     complex<Float> *shared_sum = (complex<Float>*)s;
-    if (!dir) {
+    if (!thread_dir) {
 #endif
 
       //Forward gather - compute fwd offset for spinor fetch
+#if defined(__CUDA_ARCH__) && defined(DIM_SPLIT)
+      constexpr int d = thread_dim;
+#else
 #pragma unroll
-      for(int d = 0; d < nDim; d++) { //Ndim
+      for(int d = 0; d < nDim; d++) // loop over dimension
+#endif
+      {
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+
 	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	  int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
@@ -97,6 +100,13 @@ namespace quda {
 	  }
 	}
 
+#if defined(__CUDA_ARCH__) && defined(DIM_SPLIT)
+#pragma unroll
+	for (int color_local=0; color_local < Mc; color_local++) {
+	  shared_sum[((color_local * blockDim.z + threadIdx.z )*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x] = out[color_local];
+	}
+#endif
+
       } // nDim
 
 #ifdef __CUDA_ARCH__
@@ -104,9 +114,13 @@ namespace quda {
 #endif
 
       //Backward gather - compute back offset for spinor and gauge fetch
+#if defined(__CUDA_ARCH__) && defined(DIM_SPLIT)
+      constexpr int d = thread_dim;
+#else
 #pragma unroll
-      for(int d = 0; d < nDim; d++) { //Ndim
-
+      for(int d = 0; d < nDim; d++)//Ndim
+#endif
+	{
 	const int back_idx = linkIndexM1(coord, arg.dim, d);
 	const int gauge_idx = back_idx;
 	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
@@ -140,10 +154,19 @@ namespace quda {
 
       } //nDim
 
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__)
+
+#ifdef DIM_SPLIT
+#pragma unroll
+      for (int color_local=0; color_local < Mc; color_local++) {
+	shared_sum[ ((color_local * blockDim.z + threadIdx.z )*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x] = out[color_local];
+      }
+#else
+#pragma unroll
       for (int color_local=0; color_local < Mc; color_local++) {
 	shared_sum[ ((color_local * (blockDim.z>>1) + (threadIdx.z>>1) ) * blockDim.y + threadIdx.y ) * blockDim.x + threadIdx.x] = out[color_local];
       }
+#endif
 
     } // forwards / backwards thread split
 #endif
@@ -151,20 +174,54 @@ namespace quda {
 #ifdef __CUDA_ARCH__ // CUDA path has to recombine the foward and backward results
     __syncthreads();
 
-    if (dir == 0) {
+    // (colorspin * 8 + dim * 2 + dir)
+
+#ifdef DIM_SPLIT
+    // full split over dimension and direction
+    if (thread_dir == 0 && thread_dim == 0) {
+#pragma unroll
+      for (int d=1; d<nDim; d++) { // get remaining forward fathers
+#pragma unroll
+	for (int color_local=0; color_local < Mc; color_local++) {
+	  out[color_local] +=
+	    shared_sum[(((color_local*blockDim.z/8 + threadIdx.z/8) * 8 + d * 2 + 0)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x];
+	}
+      }
+
+#pragma unroll
+      for (int d=0; d<nDim; d++) { // get all backward gathers
+#pragma unroll
+	for (int color_local=0; color_local < Mc; color_local++) {
+	  out[color_local] +=
+	    shared_sum[(((color_local*blockDim.z/8 + threadIdx.z/8) * 8 + d * 2 + 1)*blockDim.y+threadIdx.y)*blockDim.x+threadIdx.x];
+	}
+      }
+
+      // apply kappa
+      #pragma unroll
+      for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
+    }
+
+#else
+    // just splitting direction
+    if (thread_dir == 0) {
+#pragma unroll
       for (int color_local=0; color_local < Mc; color_local++) {
-	out[color_local] += shared_sum[ ((color_local * (blockDim.z>>1) + (threadIdx.z>>1) ) * blockDim.y + threadIdx.y ) * blockDim.x + threadIdx.x];
+        out[color_local] += shared_sum[ ((color_local * (blockDim.z>>1) + (threadIdx.z>>1) ) * blockDim.y + threadIdx.y ) * blockDim.x + threadIdx.x];
       }
 
       // apply kappa
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
     }
-#else
+
+#endif
+
+#else // !__CUDA_ARCH__
     for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
 #endif
 
-  }
+    }
 
   /**
      Applies the coarse clover matrix on a given parity and
@@ -198,16 +255,16 @@ namespace quda {
   }
 
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover>
-  __device__ __host__ inline void coarseDslash(CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block, int dir)
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, int dir, int dim>
+    __device__ __host__ inline void coarseDslash(CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block)
   {
     complex <Float> out[Mc];
 #pragma unroll
     for (int c=0; c<Mc; c++) out[c] = 0.0;
-    if (dslash) applyDslash<Float,F,G,nDim,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block, dir);
-    if (clover && dir==0) applyClover<Float,F,G,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
+    if (dslash) applyDslash<Float,F,G,nDim,Ns,Nc,Mc,dir,dim>(out, arg, x_cb, parity, s, color_block);
+    if (clover && dir==0 && dim==0) applyClover<Float,F,G,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
 
-    if (dir==0) {
+    if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
@@ -229,7 +286,7 @@ namespace quda {
       for(int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { //Volume
 	for (int s=0; s<2; s++) {
 	  for (int color_block=0; color_block<Nc; color_block+=Mc) { // Mc=Nc means all colors in a thread
-	    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover>(arg, x_cb, parity, s, color_block, 0);
+	    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,0,0>(arg, x_cb, parity, s, color_block);
 	  }
 	}
       }//VolumeCB
@@ -239,6 +296,7 @@ namespace quda {
 
   // GPU Kernel for applying the coarse Dslash to a vector
 template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover>
+__launch_bounds__(512)
   __global__ void coarseDslashKernel(CoarseDslashArg<Float,F,G> arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -249,11 +307,28 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 
     int sMd = blockDim.z*blockIdx.z + threadIdx.z;
     int dir = sMd & 1;
+#ifdef DIM_SPLIT
+    int sMdim = sMd >> 1;
+    int dim = sMdim % 4;
+    int sM = sMdim / 4;
+#else
+    int dim = 0;
     int sM = sMd >> 1;
+#endif
     int s = sM / (Nc/Mc);
     int color_block = (sM % (Nc/Mc)) * Mc;
 
-    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover>(arg, x_cb, parity, s, color_block, dir);
+           if (dir == 0) {
+           if (dim == 0) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,0,0>(arg, x_cb, parity, s, color_block);
+      else if (dim == 1) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,0,1>(arg, x_cb, parity, s, color_block);
+      else if (dim == 2) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,0,2>(arg, x_cb, parity, s, color_block);
+      else if (dim == 3) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,0,3>(arg, x_cb, parity, s, color_block);
+    } else if (dir == 1) {
+           if (dim == 0) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,1,0>(arg, x_cb, parity, s, color_block);
+      else if (dim == 1) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,1,1>(arg, x_cb, parity, s, color_block);
+      else if (dim == 2) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,1,2>(arg, x_cb, parity, s, color_block);
+      else if (dim == 3) coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,1,3>(arg, x_cb, parity, s, color_block);
+    }
   }
 
 template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover>
@@ -262,6 +337,12 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
   protected:
     CoarseDslashArg<Float,F,G> &arg;
     const ColorSpinorField &meta;
+
+#ifdef DIM_SPLIT
+    int gather_threads = 8;
+#else
+    int gather_threads = 2;
+#endif
 
     long long flops() const
     {
@@ -272,10 +353,11 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       return (dslash||clover) * arg.out.Bytes() + dslash*8*arg.inA.Bytes() + clover*arg.inB.Bytes() +
 	arg.nParity*(dslash*8*arg.Y.Bytes() + clover*arg.X.Bytes());
     }
-    unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc)/2; }
+    unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc)/ (gather_threads == 8 ? 1 : 2); }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions
     unsigned int minThreads() const { return arg.volumeCB; }
+    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / (gather_threads * arg.nParity); }
 
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -299,19 +381,19 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 	  param.grid.y = arg.nParity;
 
 	  // let's try to advance spin/block-color
-	  while(param.block.z <= 2 * 2 * (Nc/Mc)) {
-	    param.block.z+=2;
-	    if ( (2*2*(Nc/Mc)) % param.block.z == 0) {
-	      param.grid.z = (2 * 2 * (Nc/Mc)) / param.block.z;
+	  while(param.block.z <= gather_threads * 2 * (Nc/Mc)) {
+	    param.block.z+=gather_threads;
+	    if ( (gather_threads*2*(Nc/Mc)) % param.block.z == 0) {
+	      param.grid.z = (gather_threads * 2 * (Nc/Mc)) / param.block.z;
 	      break;
 	    }
 	  }
 
 	  // we can advance spin/block-color since this is valid
-	  if (param.block.z <= 2 * 2 * (Nc/Mc) && param.block.z <= 64 ) { //
+	  if (param.block.z <= gather_threads * 2 * (Nc/Mc) && param.block.z <= deviceProp.maxThreadsDim[2] ) { //
 	    return true;
 	  } else { // we have run off the end so let's reset
-	    param.block.z = 2;
+	    param.block.z = gather_threads;
 	    param.grid.z = 2 * (Nc/Mc);
 	    return false;
 	  }
@@ -320,18 +402,12 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       }
     }
 
-    bool advanceTuneParam(TuneParam &param) const 
-    {
-      bool rtn = Tunable::advanceTuneParam(param);
-      return rtn;
-    }
-
     virtual void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
       param.block.y = 1;
       param.grid.y = arg.nParity;
-      param.block.z = 2;
+      param.block.z = gather_threads;
       param.grid.z = 2*(Nc/Mc);
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z > sharedBytesPerBlock(param) ?
 	sharedBytesPerThread()*param.block.x*param.block.y*param.block.z : sharedBytesPerBlock(param);
@@ -343,7 +419,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       Tunable::defaultTuneParam(param);
       param.block.y = 1;
       param.grid.y = arg.nParity;
-      param.block.z = 2;
+      param.block.z = gather_threads;
       param.grid.z = 2*(Nc/Mc);
       param.shared_bytes = sharedBytesPerThread()*param.block.x*param.block.y*param.block.z > sharedBytesPerBlock(param) ?
 	sharedBytesPerThread()*param.block.x*param.block.y*param.block.z : sharedBytesPerBlock(param);
@@ -371,7 +447,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover>(arg);
       } else {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	coarseDslashKernel<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
@@ -449,6 +525,8 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       ApplyCoarse<Float,csOrder,gOrder,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
+    } else if (inA.Ncolor() == 28) {
+      ApplyCoarse<Float,csOrder,gOrder,28,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,csOrder,gOrder,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else {
