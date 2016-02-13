@@ -203,9 +203,8 @@ namespace quda {
     for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/arg.geo_bs[d];
 
 
-    bool isDiagonal = (((coord[dir]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
-    //
-    bool isDiagonal_long = (arg.UVL == nullptr) ? false : (((coord[dir]+3)%arg.x_size[dir])/arg.geo_bs[dir] == coord_coarse[dir]) ? true : false;
+    bool isDiagonal = (((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
+    bool isDiagonal_long = (arg.UVL == nullptr) ? false : (((coord[dim]+3)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
     
     auto *M =   isDiagonal ? (dir == QUDA_BACKWARDS ? &arg.X : &arg.Xinv) : &arg.Y;
     auto *M_L = (arg.UVL == nullptr) ? nullptr : (isDiagonal_long ? (dir == QUDA_BACKWARDS ? &arg.X : &arg.Xinv) : &arg.Y);
@@ -330,7 +329,7 @@ namespace quda {
 	for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
 	  for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
              if(s_row == s_col){
-                arg.X(0,parity,x_cb, s_row, s_col, ic_c,ic_c) = 2*arg.mass;
+                arg.X(0,parity,x_cb, s_row, s_col, ic_c,ic_c) = arg.mass;//in fact, 2*mass
              }else{
 	       if (bidirectional) {
 	         // here we have forwards links in Xinv and backwards links in X

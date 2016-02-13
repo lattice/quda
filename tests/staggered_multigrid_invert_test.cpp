@@ -223,6 +223,10 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
 
     mg_param->smoother[i] = precon_type;
 
+    mg_param->smoother_tol[i] = 1e-4; // repurpose heavy-quark tolerance for now
+
+    mg_param->global_reduction[i] = QUDA_BOOLEAN_YES;
+
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     mg_param->smoother_solve_type[i] = QUDA_DIRECT_SOLVE;
     //mg_param->smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
@@ -231,6 +235,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
 //    mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION; // EVEN-ODD, not supported for the staggered
     mg_param->coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION; 
+
+    mg_param->cycle_type[i] = QUDA_MG_CYCLE_VCYCLE;
 
     mg_param->omega[i] = 0.85; // over/under relaxation factor
 

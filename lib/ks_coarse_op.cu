@@ -154,10 +154,8 @@ namespace quda {
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
       calculateKSY<double>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, mass, dirac, matpc);
-/*
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       calculateKSY<float>(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, mass, dirac, matpc);
-*/
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
