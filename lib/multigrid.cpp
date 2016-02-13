@@ -22,27 +22,23 @@ namespace quda {
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
     
     if( param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES ) {
- 
-       if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
-           if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-	      generateNullVectors(param.B);
-      	   } else {
-		loadVectors(param.B);
-      	   }
-        }
-
+      if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
+	if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+	  generateNullVectors(param.B);
+	} else {
+	  loadVectors(param.B);
+	}
+      }
     } else if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO ) {
-
-       if (param.level == 0 ) { // null space generation only on level 1 currently
-           if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-              generateNullVectors(param.B);
-           } else {
-                loadVectors(param.B);
-           }
-       }
-    }
-    else {
-	errorQuda("In MG Global. generate_all_levels is neither QUDA_BOOLEAN_YES, nor QUDA_BOOLEAN_NO");
+      if (param.level == 0 ) { // null space generation only on level 1 currently
+	if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+	  generateNullVectors(param.B);
+	} else {
+	  loadVectors(param.B);
+	}
+      }
+    } else {
+      errorQuda("In MG Global. generate_all_levels is neither QUDA_BOOLEAN_YES, nor QUDA_BOOLEAN_NO");
     }
 
     if (param.level >= QUDA_MAX_MG_LEVEL)
@@ -370,7 +366,7 @@ namespace quda {
       if (param.level==0) {
 	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
 	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
-      } else { // this is a hack since the coarse Dslash doesn't proerly use the same xpay conventions yet
+      } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
 	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
 	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
       }

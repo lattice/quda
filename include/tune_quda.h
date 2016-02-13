@@ -20,20 +20,23 @@ namespace quda {
     dim3 block;
     dim3 grid;
     int shared_bytes;
+    dim3 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+
     std::string comment;
     float time;
     long long n_calls;
 
-    TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), time(FLT_MAX), n_calls(0) { }
+  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(1, 1, 1), time(FLT_MAX), n_calls(0) { }
 
     TuneParam(const TuneParam &param)
-      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
+      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
 
     TuneParam& operator=(const TuneParam &param) {
       if (&param != this) {
 	block = param.block;
 	grid = param.grid;
 	shared_bytes = param.shared_bytes;
+	aux = param.aux;
 	comment = param.comment;
 	time = param.time;
 	n_calls = param.n_calls;
@@ -89,7 +92,8 @@ namespace quda {
       bool ret;
 
       param.block.x += step;
-      if (param.block.x > max_threads || sharedBytesPerThread()*param.block.x > max_shared) {
+      int nthreads = param.block.x*param.block.y*param.block.z;
+      if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared) {
 
 	if (tuneGridDim()) {
 	  param.block.x = step;
@@ -142,6 +146,8 @@ namespace quda {
       }
     }
 
+    virtual bool advanceAux(TuneParam &param) const { return false; }
+
     char aux[TuneKey::aux_n];
 
     void writeAuxString(const char *format, ...) {
@@ -167,7 +173,8 @@ namespace quda {
 	std::stringstream ps;
 	ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
 	ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-	ps << "shared=" << param.shared_bytes;
+	ps << "shared=" << param.shared_bytes << ", ";
+	ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << ")";
 	return ps.str();
       }
 
@@ -213,7 +220,7 @@ namespace quda {
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
-      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
+      return advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param) || advanceAux(param);
     }
 
     /**
