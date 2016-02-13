@@ -29,11 +29,11 @@ extern int niter;
 extern bool tune;
 extern bool verify_results;
 
+extern int test_type;
+
 extern QudaPrecision prec;
 
 extern void usage(char** );
-
-const int Nkernels = 1;
 
 using namespace quda;
 
@@ -69,9 +69,8 @@ void initFields(QudaPrecision prec)
   param.nDim = 4; // number of spacetime dimensions
 
   param.pad = 0; // padding must be zero for cpu fields
-  param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) param.x[0] = xdim/2;
-  else param.x[0] = xdim;
+  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.x[0] = xdim;
   param.x[1] = ydim;
   param.x[2] = zdim;
   param.x[3] = tdim;
@@ -171,7 +170,7 @@ void freeFields()
   delete Yhat_d;
 }
 
-Dirac *dirac;
+DiracCoarse *dirac;
 
 double benchmark(int test, const int niter) {
 
@@ -182,13 +181,13 @@ double benchmark(int test, const int niter) {
 
   switch(test) {
   case 0:
-    for (int i=0; i < niter; ++i) dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
+    for (int i=0; i < niter; ++i) dirac->Dslash(xD->Even(), yD->Odd(), QUDA_EVEN_PARITY);
     break;
   case 1:
-    for (int i=0; i < niter; ++i) {
-      dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
-      dirac->Dslash(*yD, *xD, QUDA_ODD_PARITY);
-    }
+    for (int i=0; i < niter; ++i) dirac->M(*xD, *yD);
+    break;
+  case 2:
+    for (int i=0; i < niter; ++i) dirac->Clover(xD->Even(), yD->Even(), QUDA_EVEN_PARITY);
     break;
   default:
     errorQuda("Undefined test %d", test);
@@ -207,7 +206,9 @@ double benchmark(int test, const int niter) {
 
 
 const char *names[] = {
-  "Dslash"
+  "Dslash",
+  "Mat",
+  "Clover"
 };
 
 int main(int argc, char** argv)
@@ -231,7 +232,7 @@ int main(int argc, char** argv)
   Nspin = 2;
 
   printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", get_prec_str(prec), niter);
-  for (int c=4; c<=24; c+=4) {
+  for (int c=4; c<=32; c+=4) {
     Ncolor = c;
 
     initFields(prec);
@@ -239,18 +240,16 @@ int main(int argc, char** argv)
     DiracParam param;
     dirac = new DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d);
 
-    for (int kernel = 0; kernel < Nkernels; kernel++) {
-      // do the initial tune
-      benchmark(kernel, 1);
+    // do the initial tune
+    benchmark(test_type, 1);
 
-      // now rerun with more iterations to get accurate speed measurements
-      dirac->Flops(); // reset flops counter
+    // now rerun with more iterations to get accurate speed measurements
+    dirac->Flops(); // reset flops counter
 
-      double secs = benchmark(kernel, niter);
-      double gflops = (dirac->Flops()*1e-9)/(secs);
+    double secs = benchmark(test_type, niter);
+    double gflops = (dirac->Flops()*1e-9)/(secs);
 
-      printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[kernel], gflops);
-    }
+    printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[test_type], gflops);
 
     delete dirac;
     freeFields();
