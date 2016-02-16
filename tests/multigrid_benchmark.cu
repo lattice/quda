@@ -122,7 +122,7 @@ void initFields(QudaPrecision prec)
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   gParam.nFace = 1;
 
-  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam.geometry = QUDA_COARSE_GEOMETRY;
   Y_h = new cpuGaugeField(gParam);
   Yhat_h = new cpuGaugeField(gParam);
 
@@ -131,7 +131,7 @@ void initFields(QudaPrecision prec)
   Xinv_h = new cpuGaugeField(gParam);
 
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam.geometry = QUDA_COARSE_GEOMETRY;
   int pad = std::max( { (gParam.x[0]*gParam.x[1]*gParam.x[2])/2,
 	(gParam.x[1]*gParam.x[2]*gParam.x[3])/2,
 	(gParam.x[0]*gParam.x[2]*gParam.x[3])/2,
