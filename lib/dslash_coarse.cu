@@ -613,6 +613,7 @@ namespace quda {
 
     if (inA.Ncolor() == 2) {
       ApplyCoarse<Float,csOrder,gOrder,2,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
+#if 0
     } else if (inA.Ncolor() == 4) {
       ApplyCoarse<Float,csOrder,gOrder,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else if (inA.Ncolor() == 8) {
@@ -623,10 +624,13 @@ namespace quda {
       ApplyCoarse<Float,csOrder,gOrder,16,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else if (inA.Ncolor() == 20) {
       ApplyCoarse<Float,csOrder,gOrder,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
+#endif
     } else if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
+#if 0
     } else if (inA.Ncolor() == 28) {
       ApplyCoarse<Float,csOrder,gOrder,28,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
+#endif
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,csOrder,gOrder,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover);
     } else {
