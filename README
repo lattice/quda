@@ -129,6 +129,15 @@ between jobs running on different systems (e.g., two clusters
 with different GPUs installed).  Attempting to use parameters tuned
 for one card on a different card may lead to unexpected errors.
 
+This autotuning information can also be used to build up a first-order
+kernel profile: since the autotuner measures how long a kernel takes
+to run, if we simply keep track of the number of kernel calls, from
+the product of these two quantities we have a time profile of a given
+job run.  If QUDA_RESOURCE_PATH is set, then this profiling
+information is output to the file "profile.tsv" in this specified
+directory.  Optionally, the output filename can be specified using the
+QUDA_PROFILE_OUTPUT environment variable, to avoid overwriting
+previously generated profile outputs.
 
 Using the Library:
 

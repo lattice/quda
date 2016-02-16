@@ -75,6 +75,7 @@ namespace quda {
 #include <blas_core.h>
 #include <blas_mixed_core.h>
 
+
     /**
        Functor to perform the operation y = a*x + b*y
     */

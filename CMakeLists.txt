@@ -404,25 +404,28 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
-LIST(APPEND OpenMP_CXX_FLAGS -std=c++11)
+
 
 # to remain consistent with other build types
 mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
 mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
 
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall" CACHE STRING
+# we might use:
+# set_property(TARGET tgt PROPERTY CXX_STANDARD 11) in the future but need to check support in older cmake version
+
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -Wall" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
+set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
