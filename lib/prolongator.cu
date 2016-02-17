@@ -64,6 +64,7 @@ namespace quda {
   __device__ __host__ inline void rotateFineColor(FineColor &out, const complex<Float> in[fineSpin*coarseColor],
 						  const Rotator &V, int parity, int nParity, int x_cb, int fine_color_block) {
     const int spinor_parity = (nParity == 2) ? parity : 0;
+    constexpr int color_unroll = 2;
 
 #pragma unroll
     for (int s=0; s<fineSpin; s++)
@@ -76,11 +77,21 @@ namespace quda {
 #pragma unroll
       for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) {
 	int i = fine_color_block + fine_color_local; // global fine color index
+
+	complex<Float> partial[color_unroll];
 #pragma unroll
-	for (int j=0; j<coarseColor; j++) {
+	for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
+
+#pragma unroll
+	for (int j=0; j<coarseColor; j+=color_unroll) {
 	  // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
-	  out(spinor_parity, x_cb, s, i) += V(parity, x_cb, s, i, j) * in[s*coarseColor + j];
+#pragma unroll
+	  for (int k=0; k<color_unroll; k++)
+	    partial[k] += V(parity, x_cb, s, i, j+k) * in[s*coarseColor + j + k];
 	}
+
+#pragma unroll
+	for (int k=0; k<color_unroll; k++) out(spinor_parity, x_cb, s, i) += partial[k];
       }
     }
 
