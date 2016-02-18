@@ -95,11 +95,10 @@ namespace quda {
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel-1) {
       QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
-      QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
 
       // create transfer operator
       printfQuda("start creating transfer operator\n");
-      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize, parity,
+      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -206,12 +205,23 @@ namespace quda {
     // now we can run through the verification if requested
     if (param.level == 0 && param.mg_global.run_verify) verify();
 
+    if (param.level == 0) reset();
+
     // print out profiling information for the adaptive setup
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
     // Reset the profile for accurate solver timing
     profile.TPRESET();
 
     setOutputPrefix("");
+  }
+
+  void MG::reset() {
+    QudaSiteSubset site_subset = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
+    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+    QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+    transfer->setSiteSubset(site_subset, parity); // use this to force location of transfer
+
+    if (param.level < param.Nlevel-2) coarse->reset();
   }
 
   MG::~MG() {
@@ -569,7 +579,7 @@ namespace quda {
     vec_outfile += "_level_";
     vec_outfile += std::to_string(param.level);
 
-    if (strcmp(vec_outfile.c_str(),"")!=0) {
+    if (strcmp(param.mg_global.vec_outfile,"")!=0) {
       const int Nvec = B.size();
       printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
 

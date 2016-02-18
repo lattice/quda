@@ -64,6 +64,8 @@ namespace quda {
   __device__ __host__ inline void rotateFineColor(FineColor &out, const complex<Float> in[fineSpin*coarseColor],
 						  const Rotator &V, int parity, int nParity, int x_cb, int fine_color_block) {
     const int spinor_parity = (nParity == 2) ? parity : 0;
+    const int v_parity = (V.Nparity() == 2) ? parity : 0;
+
     constexpr int color_unroll = 2;
 
 #pragma unroll
@@ -87,7 +89,7 @@ namespace quda {
 	  // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 #pragma unroll
 	  for (int k=0; k<color_unroll; k++)
-	    partial[k] += V(parity, x_cb, s, i, j+k) * in[s*coarseColor + j + k];
+	    partial[k] += V(v_parity, x_cb, s, i, j+k) * in[s*coarseColor + j + k];
 	}
 
 #pragma unroll
@@ -226,7 +228,8 @@ namespace quda {
     long long flops() const { return 8 * fineSpin * fineColor * coarseColor * arg.nParity*arg.out.VolumeCB(); }
 
     long long bytes() const {
-      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.nParity*arg.out.VolumeCB()*sizeof(int);
+      size_t v_bytes = arg.V.Bytes() / (arg.V.Nparity() == arg.out.Nparity() ? 1 : 2);
+      return arg.in.Bytes() + arg.out.Bytes() + v_bytes + arg.nParity*arg.out.VolumeCB()*sizeof(int);
     }
 
   };
