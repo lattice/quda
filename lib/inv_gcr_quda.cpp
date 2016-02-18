@@ -374,8 +374,7 @@ namespace quda {
 
     int pipeline = param.pipeline;
     // Vectorized dot product only has limited support so work around
-    if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION ||
-	Ap[0]->Nspin() == 2 || pipeline == 0) pipeline = 1;
+    if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION || pipeline == 0) pipeline = 1;
 
     if (pipeline > 1)
       warningQuda("GCR with pipeline length %d is experimental", pipeline);
