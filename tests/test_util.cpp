@@ -1578,7 +1578,7 @@ char latfile[256] = "";
 bool tune = true;
 int niter = 100;
 int test_type = 0;
-int nvec  = 1;
+int nvec[QUDA_MAX_MG_LEVEL] = { };
 char vec_infile[256] = "";
 char vec_outfile[256] = "";
 QudaInverterType inv_type;
@@ -1602,7 +1602,7 @@ int nu_post = 2;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 
-int geo_block_size[] = {4, 4, 4, 4, 4};
+int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1659,12 +1659,12 @@ void usage(char** argv )
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
-  printf("    --mg-nvec                                 # Number of null-space vectors to define the multigrid transfer operator at each level\n");
+  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-block-size <x y z t>                 # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
+  printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
@@ -2208,9 +2208,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    nvec= atoi(argv[i+1]);
-    if (nvec < 0 || nvec > 128){
-      printf("ERROR: invalid number of vectors (%d)\n", nvec);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    nvec[level] = atoi(argv[i+1]);
+    if (nvec[level] < 0 || nvec[level] > 128){
+      printf("ERROR: invalid number of vectors (%d)\n", nvec[level]);
       usage(argv);
     }
     i++;
@@ -2264,12 +2271,19 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){ 
       usage(argv);
     }     
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
       printf("ERROR: invalid X block size");
       usage(argv);
     }
-    geo_block_size[0] = xsize;
+    geo_block_size[level][0] = xsize;
     i++;
 
     int ysize =  atoi(argv[i+1]);
@@ -2277,7 +2291,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid Y block size");
       usage(argv);
     }
-    geo_block_size[1] = ysize;
+    geo_block_size[level][1] = ysize;
     i++;
 
     int zsize =  atoi(argv[i+1]);
@@ -2285,7 +2299,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid Z block size");
       usage(argv);
     }
-    geo_block_size[2] = zsize;
+    geo_block_size[level][2] = zsize;
     i++;
 
     int tsize =  atoi(argv[i+1]);
@@ -2293,7 +2307,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid T block size");
       usage(argv);
     }
-    geo_block_size[3] = tsize;
+    geo_block_size[level][3] = tsize;
     i++;
 
     ret = 0;

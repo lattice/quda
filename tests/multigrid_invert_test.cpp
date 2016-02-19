@@ -47,14 +47,14 @@ extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
 extern int niter;
-extern int nvec;
+extern int nvec[];
 extern int mg_levels;
 
 extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern int nu_pre;
 extern int nu_post;
-extern int geo_block_size[];
+extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
 extern QudaInverterType precon_type;
 
@@ -85,7 +85,7 @@ display_test_info()
 
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
-  printfQuda(" - number of null-space vectors %d\n", nvec);
+  for (int i=0; i<mg_levels-1; i++) printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
   printfQuda(" - number of pre-smoother applications %d\n", nu_pre);
   printfQuda(" - number of post-smoother applications %d\n", nu_post);
 
@@ -192,10 +192,11 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
     for (int j=0; j<QUDA_MAX_DIM; j++) {
-      mg_param.geo_block_size[i][j] = geo_block_size[j];
+      // if not defined use 4
+      mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec;
+    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
 
@@ -233,8 +234,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
 
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES 
-   :  QUDA_BOOLEAN_NO;
+  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
   mg_param.run_verify = QUDA_BOOLEAN_YES;
 

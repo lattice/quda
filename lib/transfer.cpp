@@ -18,12 +18,11 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
 
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaParity parity,
-		     bool enable_gpu, TimeProfile &profile)
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu, TimeProfile &profile)
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0), parity(parity),
+      spin_bs(spin_bs), spin_map(0), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
       flops_(0), profile(profile)
   {
@@ -161,6 +160,48 @@ namespace quda {
     if (geo_bs) delete []geo_bs;
   }
 
+  void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_) {
+    if (parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
+    parity = parity_;
+
+    if (site_subset == site_subset_) return;
+    site_subset = site_subset_;
+
+    // this function only does something non-trivial if the operator is on the GPU
+    if (!enable_gpu) return;
+
+    if (site_subset == QUDA_PARITY_SITE_SUBSET) {
+      // if doing single-parity then delete full field V and replace with single parity
+
+      delete V_d;
+
+      ColorSpinorParam param(*V_h);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      param.x[0] /= 2;
+      param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+
+      V_d = ColorSpinorField::Create(param);
+      *V_d = parity == QUDA_EVEN_PARITY ? V_h->Even() : V_h->Odd();
+
+    } else if (site_subset == QUDA_FULL_SITE_SUBSET) {
+      // if doing full field then delete single parity V and replace with single parity
+
+      delete V_d;
+
+      ColorSpinorParam param(*V_h);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+
+      V_d = ColorSpinorField::Create(param);
+      *V_d = *V_h;
+
+    } else {
+      errorQuda("Undefined site_subset %d", site_subset_);
+    }
+
+  }
+
   void Transfer::fillV(ColorSpinorField &V) { 
     FillV(V, B, Nvec);  //printfQuda("V fill check %e\n", norm2(*V));
   }
@@ -209,8 +250,8 @@ namespace quda {
     for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine_h[i] = geo_sort[i].y;
 
     if (enable_gpu) {
-      cudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
-      cudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
       checkCudaError();
     }
 
@@ -248,6 +289,9 @@ namespace quda {
 
     *input = in; // copy result to input field (aliasing handled automatically)
     
+    if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
+
     if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))){
       errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
@@ -284,6 +328,9 @@ namespace quda {
     }
 
     *input = in;
+
+    if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
     if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",

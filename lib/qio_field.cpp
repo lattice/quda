@@ -185,6 +185,11 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
     break;
   case 6:
     status = read_field<6>(infile, count, field_in, cpu_prec);
+  case 96:
+    status = read_field<96>(infile, count, field_in, cpu_prec);
+    break;
+  case 128:
+    status = read_field<128>(infile, count, field_in, cpu_prec);
     break;
   default:
     errorQuda("Undefined %d", Ninternal);
@@ -289,6 +294,11 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
     break;
   case 6: //staggered fields
     status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+  case 96:
+    status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+    break;
+  case 128:
+    status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
     break;
   default:
     errorQuda("Undefined %d", Ninternal);

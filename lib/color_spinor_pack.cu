@@ -248,6 +248,8 @@ namespace quda {
       genericPackGhost<Float,order,Ns,20>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 24) {
       genericPackGhost<Float,order,Ns,24>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 28) {
+      genericPackGhost<Float,order,Ns,28>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 32) {
       genericPackGhost<Float,order,Ns,32>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 48) {
@@ -264,6 +266,8 @@ namespace quda {
       genericPackGhost<Float,order,Ns,288>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 576) {
       genericPackGhost<Float,order,Ns,576>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 768) {
+      genericPackGhost<Float,order,Ns,768>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 1024) {
       genericPackGhost<Float,order,Ns,1024>(ghost, a, parity, dagger);
     } else {

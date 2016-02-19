@@ -50,6 +50,7 @@ namespace quda {
 						    const FineColor &in, const Rotator &V,
 						    int parity, int nParity, int x_cb, int coarse_color_block) {
     const int spinor_parity = (nParity == 2) ? parity : 0;
+    const int v_parity = (V.Nparity() == 2) ? parity : 0;
 
     for (int s=0; s<fineSpin; s++)
       for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
@@ -60,7 +61,7 @@ namespace quda {
       int i = coarse_color_block + coarse_color_local;
       for (int s=0; s<fineSpin; s++) {
 	for (int j=0; j<fineColor; j++) {
-	  out[s*coarse_colors_per_thread + coarse_color_local] += conj(V(parity, x_cb, s, j, i)) * in(spinor_parity, x_cb, s, j);
+	  out[s*coarse_colors_per_thread + coarse_color_local] += conj(V(v_parity, x_cb, s, j, i)) * in(spinor_parity, x_cb, s, j);
 	}
       }
     }
@@ -247,7 +248,6 @@ namespace quda {
     const int block_size;
     char vol[TuneKey::volume_n];
 
-    long long flops() const { return 0; }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -282,6 +282,12 @@ namespace quda {
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 27) {  // for 3x3x3x2 aggregates
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,27>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 36) {  // for 3x3x2x4 aggregates
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,36>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 54) {  // for 3x3x3x4 aggregates
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,54>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 128) { // for 4x4x4x4 aggregates
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,128>
@@ -342,8 +348,11 @@ namespace quda {
       param.grid.z = coarseColor / coarse_colors_per_thread;
     }
 
+    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * arg.nParity*arg.in.VolumeCB(); }
+
     long long bytes() const {
-      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.nParity*arg.in.VolumeCB()*sizeof(int);
+      size_t v_bytes = arg.V.Bytes() / (arg.V.Nparity() == arg.in.Nparity() ? 1 : 2);
+      return arg.in.Bytes() + arg.out.Bytes() + v_bytes + arg.nParity*arg.in.VolumeCB()*sizeof(int);
     }
 
   };

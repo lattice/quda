@@ -88,6 +88,9 @@ namespace quda {
         and is trivial one-to-one for the other levels*/
     int *spin_map;
 
+    /** Whether the transfer operator is to be applied to full fields or single parity fields */
+    QudaSiteSubset site_subset;
+
     /** The parity of any single-parity fine-grid fields that are passed into the transfer operator */
     QudaParity parity;
 
@@ -172,7 +175,7 @@ namespace quda {
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaParity parity,
+    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
 	     bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */
@@ -221,6 +224,23 @@ namespace quda {
      * @param location Location where the transfer operator should be computed
      */
     void setTransferGPU(bool use_gpu) const { this->use_gpu = use_gpu; }
+
+    /**
+     * @brief Sets whether the transfer operator is to act on full
+     * fields or single parity fields, and if single-parity which
+     * parity.  If site_subset is QUDA_FULL_SITE_SUBSET, the transfer
+     * operator can still be applied to single-parity fields, however,
+     * if site_subset is QUDA_PARITY_SITE_SUBSET, then the transfer
+     * operator cannot be applied to full fields, and setSiteSubset
+     * will need to be called first to reset to QUDA_FULL_SITE_SUBSET.
+     * This method exists to reduce GPU memory overhead - if only
+     * transfering single-parity fine fields then we only store a
+     * single-parity copy of the null space components on the device.
+     * @param[in] site_subset The site_subset of the fine-grid fields
+     * @param[in] parity The parity of the single-parity fields (if
+     * applicable)
+     */
+    void setSiteSubset(QudaSiteSubset site_subset, QudaParity parity);
 
     /**
      * Return flops

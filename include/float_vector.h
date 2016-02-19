@@ -26,9 +26,7 @@ namespace quda {
   }
 
   __host__ __device__ inline double3 operator+(const double3& x, const double3 &y) {
-    double3 z;
-    z.x = x.x + y.x; z.y = x.y + y.y; z.z = x.z + y.z;
-    return z;
+    return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
   }
 
   __host__ __device__ inline float4 operator*(const float a, const float4 x) {

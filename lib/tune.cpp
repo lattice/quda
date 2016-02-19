@@ -9,6 +9,10 @@
 #include <typeinfo>
 #include <map>
 #include <unistd.h>
+
+#include <deque>
+#include <queue>
+#include <functional>
 #ifdef PTHREADS
 #include <pthread.h>
 #endif
@@ -68,7 +72,7 @@ namespace quda {
       if (check < 0 || check >= key.name_n) errorQuda("Error writing name string");
       check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
       if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string");
-      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes;
+      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y >> param.aux.z >> param.time;
       ls.ignore(1); // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
       param.comment += "\n"; // our convention is to include the newline, since ctime() likes to do this
@@ -88,11 +92,58 @@ namespace quda {
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      out << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
+      out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
       out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
       out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
-      out << param.shared_bytes << "\t" << param.comment; // param.comment ends with a newline
+      out << param.shared_bytes << "\t" << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t";
+      out << param.time << "\t" << param.comment; // param.comment ends with a newline
     }
+  }
+
+
+  template <class T>
+  struct less_significant : std::binary_function<T,T,bool> {
+    inline bool operator()(const T &lhs, const T &rhs) {
+      return lhs.second.time * lhs.second.n_calls < rhs.second.time * rhs.second.n_calls;
+    }
+  };
+
+  /**
+   * Serialize tunecache to an ostream, useful for writing to a file or sending to other nodes.
+   */
+  static void serializeProfile(std::ostream &out)
+  {
+    map::iterator entry;
+    double total_time = 0.0;
+
+    // first let's sort the entries in decreasing order of significance
+    typedef std::pair<TuneKey, TuneParam> profile_t;
+    typedef std::priority_queue<profile_t, std::deque<profile_t>, less_significant<profile_t> > queue_t;
+    queue_t q(tunecache.begin(), tunecache.end());
+
+    // now compute total time spent in kernels so we can give each kernel a significance
+    for (entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+      TuneParam param = entry->second;
+      if (param.n_calls > 0) total_time += param.n_calls * param.time;
+    }
+
+
+    while ( !q.empty() ) {
+      TuneKey key = q.top().first;
+      TuneParam param = q.top().second;
+
+      if (param.n_calls > 0) {
+	double time = param.n_calls * param.time;
+
+	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
+	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16) << key.volume << "\t";
+	out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
+      }
+
+      q.pop();
+    }
+
+    out << std::endl << "# Total time spent in kernels = " << total_time << " seconds" << std::endl;
   }
 
 
@@ -170,12 +221,12 @@ namespace quda {
 	ls >> token;
 	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 	ls >> token;
-  #ifdef GITVERSION
+#ifdef GITVERSION
 	if (token.compare(gitversion)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
-  #else
-  if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
-  #endif
-  ls >> token;
+#else
+	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+#endif
+	ls >> token;
 	if (token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 
 
@@ -260,7 +311,7 @@ namespace quda {
        cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
-      cache_file << "volume\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tcomment" << std::endl;
+      cache_file << std::setw(16) << "volume" << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\taux.x\taux.y\taux.z\ttime\tcomment" << std::endl;
       serializeTuneCache(cache_file);
       cache_file.close();
 
@@ -274,6 +325,82 @@ namespace quda {
     }
 #endif
   }
+
+
+  /**
+   * Write profile to disk.
+   */
+  void saveProfile(QudaVerbosity verbosity)
+  {
+    time_t now;
+    int lock_handle;
+    std::string lock_path, profile_path;
+    std::ofstream profile_file;
+
+    if (resource_path.empty()) return;
+
+#ifdef MULTI_GPU
+    if (comm_rank() == 0) {
+#endif
+
+      // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
+      // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
+      lock_path = resource_path + "/profile.lock";
+      lock_handle = open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
+      if (lock_handle == -1) {
+	warningQuda("Unable to lock profile file.  Profile will not be saved to disk.  "
+		    "If you are certain that no other instances of QUDA are accessing this filesystem, "
+		    "please manually remove %s", lock_path.c_str());
+	return;
+      }
+      char msg[] = "If no instances of applications using QUDA are running,\n"
+	"this lock file shouldn't be here and is safe to delete.";
+      int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
+      if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
+
+      char *profile_fname = getenv("QUDA_PROFILE_OUTPUT");
+
+      if (!profile_fname) {
+	warningQuda("Environment variable QUDA_PROFILE_OUTPUT is not set; writing to profile.tsv");
+	profile_path = resource_path + "/profile.tsv";
+      } else {
+	profile_path = resource_path + "/" + profile_fname;
+      }
+      profile_file.open(profile_path.c_str());
+
+      if (verbosity >= QUDA_SUMMARIZE) {
+	// compute number of non-zero entries that will be output in the profile
+	int n_entry = 0;
+	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+	  TuneParam param = entry->second;
+	  if (param.n_calls > 0) n_entry++;
+	}
+
+	printfQuda("Saving %d sets of cached parameters to %s\n", n_entry, profile_path.c_str());
+      }
+
+      time(&now);
+
+      profile_file << "profile\t" << quda_version;
+#ifdef GITVERSION
+       profile_file << "\t" << gitversion;
+#else
+       profile_file << "\t" << quda_version;
+#endif
+      profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
+      profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(16) << "volume" << "\tname\taux\tcomment" << std::endl;
+      serializeProfile(profile_file);
+      profile_file.close();
+
+      // Release lock.
+      close(lock_handle);
+      remove(lock_path.c_str());
+
+#ifdef MULTI_GPU
+    }
+#endif
+  }
+
 
   static TimeProfile launchTimer("tuneLaunch");
 
@@ -315,15 +442,14 @@ namespace quda {
       launchTimer.TPSTART(QUDA_PROFILE_COMPUTE);
 #endif
 
-      //param = tunecache[key];
-      TuneParam param = it->second;
+      TuneParam &param = it->second;
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_COMPUTE);
       launchTimer.TPSTART(QUDA_PROFILE_EPILOGUE);
 #endif
 
-      tunable.checkLaunchParam(it->second);
+      tunable.checkLaunchParam(param);
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
@@ -335,7 +461,9 @@ namespace quda {
       //tally--;
       //printfQuda("pthread_mutex_unlock a complete %d\n",tally);
 #endif
-      return it->second;
+      param.n_calls++;
+
+      return param;
     }
 
 #ifdef LAUNCH_TIMER
@@ -384,10 +512,11 @@ namespace quda {
 	cudaEventRecord(start, 0);
 	for (int i=0; i<tunable.tuningIter(); i++) {
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d\n",
+	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
 		       param.block.x, param.block.y, param.block.z,
 		       param.grid.x, param.grid.y, param.grid.z,
-		       param.shared_bytes);
+		       param.shared_bytes,
+		       param.aux.x, param.aux.y, param.aux.z);
 	  }
 	  tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	}
@@ -429,6 +558,8 @@ namespace quda {
       best_param.comment = "# " + tunable.perfString(best_time) + ", tuned ";
       best_param.comment += ctime(&now); // includes a newline
 
+      best_param.time = best_time;
+
       cudaEventDestroy(start);
       cudaEventDestroy(end);
 
@@ -449,6 +580,9 @@ namespace quda {
 //    tally--;
 //    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
 #endif
+
+    param.n_calls=1;
+
     return param;
   }
 

@@ -252,6 +252,15 @@ namespace quda {
     virtual ~MG();
 
     /**
+       This method is a placeholder for reseting the solver, e.g.,
+       when a parameter has changed such as the mass.  For now, all it
+       does is call Transfer::setSiteSubset to resize the on-GPU
+       null-space components to single-parity if we're doing a
+       single-parity solve (memory saving technique).
+     */
+    void reset();
+
+    /**
        This method verifies the correctness of the MG method.  It checks:
        1. Null-space vectors are exactly preserved: v_k = P R v_k
        2. Any coarse vector is exactly preserved on the fine grid: eta_c = R P eta_c

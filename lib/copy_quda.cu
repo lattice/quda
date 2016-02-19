@@ -124,9 +124,9 @@ namespace quda {
       
 	if (dst.Precision() == src.Precision()) {
 	  if (src.Bytes() != dst.Bytes()) errorQuda("Precisions match, but bytes do not");
-	  cudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
+	  qudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
 	  if (dst.Precision() == QUDA_HALF_PRECISION) {
-	    cudaMemcpy(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice);
+	    qudaMemcpy(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice);
 	    blas::bytes += 2*(unsigned long long)dst.RealLength()*sizeof(float);
 	  }
 	} else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {

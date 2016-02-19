@@ -115,7 +115,10 @@ namespace quda {
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else  if (in.Ncolor() == 48) {
       const int Nc = 48;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type); 
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 56) {
+      const int Nc = 56;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else  if (in.Ncolor() == 64) {
       const int Nc = 64;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
