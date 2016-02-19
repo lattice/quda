@@ -204,7 +204,7 @@ namespace quda {
 #pragma unroll
 	    for(int c_col = 0; c_col < Nc; c_col++){ //Color column
                int col = s_col*Nc + c_col;
-	       out[color_local] -= (arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+	       out[color_local] += (arg.Y(d+4, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
             }
           }
         }

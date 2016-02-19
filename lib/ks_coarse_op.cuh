@@ -187,7 +187,7 @@ namespace quda {
     
     return;
   }
-//TROUBLE HERE!
+
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __device__ __host__ void computeKSVUV(Arg &arg, int parity, int x_cb) {
 
