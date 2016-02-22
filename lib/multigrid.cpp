@@ -6,7 +6,7 @@ namespace quda {
 
   using namespace blas;
 
-  static bool debug = false;
+  static bool debug = true;
 
   MG::MG(MGParam &param, TimeProfile &profile_global)
     : Solver(param, profile), param(param), transfer(0), presmoother(0), postsmoother(0),
@@ -20,13 +20,29 @@ namespace quda {
     setOutputPrefix(prefix);
 
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
+    
+    if( param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES ) {
+ 
+       if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
+           if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+	      generateNullVectors(param.B);
+      	   } else {
+		loadVectors(param.B);
+      	   }
+        }
 
-    if (param.level < param.Nlevel-1) {
-      if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-	if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) generateNullVectors(param.B);
-      } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only laod if infile is defined and not computing
-	loadVectors(param.B);
-      }
+    } else if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO ) {
+
+       if (param.level == 0 ) { // null space generation only on level 1 currently
+           if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+              generateNullVectors(param.B);
+           } else {
+                loadVectors(param.B);
+           }
+       }
+    }
+    else {
+	errorQuda("In MG Global. generate_all_levels is neither QUDA_BOOLEAN_YES, nor QUDA_BOOLEAN_NO");
     }
 
     if (param.level >= QUDA_MAX_MG_LEVEL)
@@ -53,7 +69,6 @@ namespace quda {
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
-      param_presmooth->pipeline = 1;
     }
 
     presmoother = Solver::create(*param_presmooth, param.matSmooth,
@@ -86,7 +101,7 @@ namespace quda {
       r = ColorSpinorField::Create(csParam);
 
       // if we're using preconditioning then allocate storate for the preconditioned source vector
-      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) {
 	csParam.x[0] /= 2;
 	csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 	b_tilde = ColorSpinorField::Create(csParam);
@@ -96,10 +111,11 @@ namespace quda {
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel-1) {
       QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+      QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
 
       // create transfer operator
       printfQuda("start creating transfer operator\n");
-      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
+      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize, parity,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -139,20 +155,33 @@ namespace quda {
       matCoarseSmoother = new DiracM(*diracCoarseSmoother);
 
 
+      // coarse null space vectors (dummy for now)
       printfQuda("Creating coarse null-space vectors\n");
       B_coarse = new std::vector<ColorSpinorField*>();
-      int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level+1]);
-      B_coarse->resize(nVec_coarse);
+      B_coarse->resize(param.Nvec);
 
-      for (int i=0; i<nVec_coarse; i++)
+      for (int i=0; i<param.Nvec; i++) {
 	(*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
-
-      // if we're not generating on all levels then we need to propagate the vectors down
-      if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO) {
-	for (int i=0; i<param.Nvec; i++) {
-	  zero(*(*B_coarse)[i]);
-	  transfer->R(*(*B_coarse)[i], *(param.B[i]));
+	zero(*(*B_coarse)[i]);
+	transfer->R(*(*B_coarse)[i], *(param.B[i]));
+#if 0
+	if (param.level != 99) {
+	  ColorSpinorParam csParam2(*(*B_coarse)[i]);
+	  csParam2.create = QUDA_ZERO_FIELD_CREATE;
+	  ColorSpinorField *tmp = ColorSpinorField::Create(csParam2);
+	  for (int s=i; s<(*B_coarse)[i]->Nspin(); s+=2) {
+	    for (int c=0; c<(*B_coarse)[i]->Ncolor(); c++) {
+	      tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
+	      //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, 2);                                                                                       
+	      //xpy(*tmp,*(*B_coarse)[i]);
+	    }
+	  }
+	  delete tmp;
+          (*B_coarse)[i]->Source(QUDA_RANDOM_SOURCE);                                                                                      
+          printfQuda("B_coarse[%d]\n", i);
 	}
+#endif
+
       }
 
       // create the next multigrid level
@@ -209,23 +238,12 @@ namespace quda {
     // now we can run through the verification if requested
     if (param.level == 0 && param.mg_global.run_verify) verify();
 
-    if (param.level == 0) reset();
-
     // print out profiling information for the adaptive setup
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
     // Reset the profile for accurate solver timing
     profile.TPRESET();
 
     setOutputPrefix("");
-  }
-
-  void MG::reset() {
-    QudaSiteSubset site_subset = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
-    QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
-    transfer->setSiteSubset(site_subset, parity); // use this to force location of transfer
-
-    if (param.level < param.Nlevel-2) coarse->reset();
   }
 
   MG::~MG() {
@@ -236,8 +254,7 @@ namespace quda {
       }
 
       if (B_coarse) {
-	int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level+1]);
-	for (int i=0; i<nVec_coarse; i++) if ((*B_coarse)[i]) delete (*B_coarse)[i];
+	for (int i=0; i<param.Nvec; i++) if ((*B_coarse)[i]) delete (*B_coarse)[i];
 	delete B_coarse;
       }
       if (coarse) delete coarse;
@@ -250,7 +267,7 @@ namespace quda {
     }
     if (presmoother) delete presmoother;
 
-    if (b_tilde && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) delete b_tilde;
+    if (b_tilde && (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE)) delete b_tilde;
     if (r) delete r;
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
@@ -359,7 +376,7 @@ namespace quda {
       if (param.level==0) {
 	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
 	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
-      } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
+      } else { // this is a hack since the coarse Dslash doesn't proerly use the same xpay conventions yet
 	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
 	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
       }
@@ -413,7 +430,7 @@ namespace quda {
     QudaSolutionType outer_solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
     QudaSolutionType inner_solution_type = param.coarse_grid_solution_type;
 
-    if (debug) printfQuda("outer_solution_type = %d, inner_solution_type = %d\n", outer_solution_type, inner_solution_type);
+    if ( debug ) printfQuda("outer_solution_type = %d, inner_solution_type = %d\n", outer_solution_type, inner_solution_type);
 
     if ( outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
@@ -440,7 +457,7 @@ namespace quda {
       dirac.prepare(in, out, x, residual, outer_solution_type);
 
       // b_tilde holds either a copy of preconditioned source or a pointer to original source
-      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
+      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) *b_tilde = *in;
       else b_tilde = &b;
 
       (*presmoother)(*out, *in);
@@ -489,17 +506,15 @@ namespace quda {
 
       // do the post smoothing
       //residual = outer_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // refine for outer solution type
-      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) {
 	in = b_tilde;
       } else { // this incurs unecessary copying
 	*r = b;
 	in = r;
       }
-
       //dirac.prepare(in, out, solution, residual, inner_solution_type);
       // we should keep a copy of the prepared right hand side as we've already destroyed it
       (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
-
       dirac.reconstruct(x, b, outer_solution_type);
 
     } else { // do the coarse grid solve
@@ -524,13 +539,10 @@ namespace quda {
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
-
-    std::string vec_infile(param.mg_global.vec_infile);
-    vec_infile += "_level_";
-    vec_infile += std::to_string(param.level);
+    const char *vec_infile = param.mg_global.vec_infile;
 
     const int Nvec = B.size();
-    printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
+    printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile);
 
     void **V = new void*[Nvec];
     for (int i=0; i<Nvec; i++) { 
@@ -539,10 +551,20 @@ namespace quda {
 	printfQuda("Could not allocate V[%d]\n", i);
       }
     }
-
-    if (strcmp(vec_infile.c_str(),"")!=0) {
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+    
+    if (strcmp(vec_infile,"")!=0) {
+#if 1
+      read_spinor_field(vec_infile, &V[0], B[0]->Precision(), B[0]->X(), 
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+#else 
+      for (int i=0; i<Nvec; i++) {
+	char filename[256];
+	sprintf(filename, "%s.%d", vec_infile, i);
+	printfQuda("Reading vector %d from file %s\n", i, filename);
+	read_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(), 
+			  B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
+      }
+#endif
     } else {
       printfQuda("Using %d constant nullvectors\n", Nvec);
       //errorQuda("No nullspace file defined");
@@ -580,13 +602,11 @@ namespace quda {
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
-    std::string vec_outfile(param.mg_global.vec_outfile);
-    vec_outfile += "_level_";
-    vec_outfile += std::to_string(param.level);
+    const char *vec_outfile = param.mg_global.vec_outfile;
 
-    if (strcmp(param.mg_global.vec_outfile,"")!=0) {
+    if (strcmp(vec_outfile,"")!=0) {
       const int Nvec = B.size();
-      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
+      printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
 
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
       for (int i=0; i<Nvec; i++) {
@@ -596,8 +616,18 @@ namespace quda {
 	}
       }
 
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+#if 1
+      write_spinor_field(vec_outfile, &V[0], B[0]->Precision(), B[0]->X(),
 			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+#else
+      for (int i=0; i<Nvec; i++) {
+	char filename[256];
+	sprintf(filename, "%s.%d", vec_outfile, i);
+	printf("Saving vector %d to file %s\n", i, filename);
+	write_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(),
+			   B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
+      }
+#endif
 
       host_free(V);
       printfQuda("Done saving vectors\n");

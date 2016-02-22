@@ -142,6 +142,7 @@ namespace quda {
     static Dirac* create(const DiracParam &param);
 
     double Kappa() const { return kappa; }
+    double Mass() const { return mass; }
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 

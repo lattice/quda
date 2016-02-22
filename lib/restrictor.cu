@@ -204,14 +204,14 @@ namespace quda {
     else//staggered block (temporary hack)
     {
       
-      for (int s=0; s<coarseSpin; s++) {
-        for (int v=0; v<coarse_colors_per_thread; v++) {
-	  reduced[s*coarse_colors_per_thread+v] += (s == parity) ? tmp[v] : 0.0;
-        }
-      }
-
       // now lets coarsen geometry across threads
       if (arg.nParity == 2) {
+        for (int s=0; s<coarseSpin; s++) {
+          for (int v=0; v<coarse_colors_per_thread; v++) {
+            reduced[s*coarse_colors_per_thread+v] += (s == parity) ? tmp[v] : 0.0;
+          }
+        }
+
         typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
         __shared__ typename BlockReduce::TempStorage temp_storage;
         reduce<vector> reducer; // reduce functor
@@ -219,12 +219,25 @@ namespace quda {
         // note this is not safe for blockDim.z > 1
         reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
       } else {
+        for (int v=0; v<coarse_colors_per_thread; v++) reduced[v] += tmp[v];
+
         typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS> BlockReduce;
         __shared__ typename BlockReduce::TempStorage temp_storage;
         reduce<vector> reducer; // reduce functor
 
         // note this is not safe for blockDim.z > 1
         reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
+
+        if (threadIdx.x==0 && threadIdx.y == 0) {
+          for (int s=0; s<coarseSpin; s++) {
+            for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+                int v = coarse_color_block + coarse_color_local;
+                arg.out(parity_coarse, x_coarse_cb, s, v) = (s == parity) ? reduced[coarse_color_local] : 0.0 ;
+            }
+          }
+        }
+
+        return;
       }
     }
 

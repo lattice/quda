@@ -78,11 +78,11 @@ namespace quda {
   template <typename Float, int coarseSpin, int fineColor, int coarseColor, int fine_colors_per_thread, class FineColor, class Rotator>
   __device__ __host__ inline void rotateFineColorTopLevelStaggered(FineColor &out, const complex<Float> in[coarseSpin*coarseColor],
 						  const Rotator &V, int parity, int nParity, int x_cb, int fine_color_block) {
-     for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) 
-       out(parity, x_cb, 0, fine_color_block+fine_color_local) = 0.0;
-
     const int staggered_coarse_spin = parity;
     const int fine_spinor_parity = (nParity == 2) ? parity : 0;
+
+     for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) 
+       out(parity, x_cb, 0, fine_color_block+fine_color_local) = 0.0;
 
     for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) {
       int i = fine_color_block + fine_color_local; // global fine color index
