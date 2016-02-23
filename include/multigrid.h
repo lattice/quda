@@ -74,6 +74,9 @@ namespace quda {
     /** The Dirac operator to use for smoothing */
     DiracMatrix &matSmooth;
 
+    /** The sloppy Dirac operator to use for smoothing */
+    DiracMatrix &matSmoothSloppy;
+
     /** What type of smoother to use */
     QudaInverterType smoother;
 
@@ -97,6 +100,7 @@ namespace quda {
 	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix &matResidual, 
 	    DiracMatrix &matSmooth,
+	    DiracMatrix &matSmoothSloppy,
 	    int level=0) :
       SolverParam(*(param.invert_param)), 
       mg_global(param), 
@@ -112,6 +116,7 @@ namespace quda {
       global_reduction(param.global_reduction[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
+      matSmoothSloppy(matSmoothSloppy),
       smoother(param.smoother[level]),
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
@@ -128,6 +133,7 @@ namespace quda {
 	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix &matResidual, 
 	    DiracMatrix &matSmooth,
+	    DiracMatrix &matSmoothSloppy,
 	    int level=0) :
       SolverParam(param),
       mg_global(param.mg_global),
@@ -145,6 +151,7 @@ namespace quda {
       global_reduction(param.mg_global.global_reduction[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
+      matSmoothSloppy(matSmoothSloppy),
       smoother(param.mg_global.smoother[level]),
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
@@ -231,11 +238,17 @@ namespace quda {
     /** The coarse operator used for doing smoothing */
     Dirac *diracCoarseSmoother;
 
+    /** The coarse operator used for doing sloppy smoothing */
+    Dirac *diracCoarseSmootherSloppy;
+
     /** Wrapper for the residual coarse grid operator */
     DiracMatrix *matCoarseResidual;
 
     /** Wrapper for the smoothing coarse grid operator */
     DiracMatrix *matCoarseSmoother;
+
+    /** Wrapper for the sloppy smoothing coarse grid operator */
+    DiracMatrix *matCoarseSmootherSloppy;
 
   public:
     /** 
@@ -352,9 +365,11 @@ namespace quda {
   struct multigrid_solver {
     Dirac *d;
     Dirac *dSmooth;
+    Dirac *dSmoothSloppy;
 
     DiracM *m;
     DiracM *mSmooth;
+    DiracM *mSmoothSloppy;
 
     std::vector<ColorSpinorField*> B;
 
@@ -376,9 +391,11 @@ namespace quda {
 
       if (m) delete m;
       if (mSmooth) delete mSmooth;
+      if (mSmoothSloppy) delete mSmoothSloppy;
 
       if (d) delete d;
       if (dSmooth) delete dSmooth;
+      if (dSmoothSloppy && dSmoothSloppy != dSmooth) delete dSmoothSloppy;
       profile.TPSTOP(QUDA_PROFILE_FREE);
     }
   };

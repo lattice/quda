@@ -46,6 +46,10 @@ namespace quda {
     param_presmooth->Nkrylov = 4;
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
+    if (param.level == 0) {
+       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
+       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+    }
 
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 20;
@@ -57,14 +61,14 @@ namespace quda {
     }
 
     presmoother = Solver::create(*param_presmooth, param.matSmooth,
-				 param.matSmooth, param.matSmooth, profile);
+				 param.matSmoothSloppy, param.matSmoothSloppy, profile);
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       param_postsmooth->maxiter = param.nu_post;
       postsmoother = Solver::create(*param_postsmooth, param.matSmooth,
-				    param.matSmooth, param.matSmooth, profile);
+				    param.matSmoothSloppy, param.matSmoothSloppy, profile);
     }
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
@@ -132,8 +136,10 @@ namespace quda {
       diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
 	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
 	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
-      matCoarseSmoother = new DiracM(*diracCoarseSmoother);
+      diracCoarseSmootherSloppy = diracCoarseSmoother;  // for coarse grids these always alias for now (FIXME half precision support for coarse op)
 
+      matCoarseSmoother = new DiracM(*diracCoarseSmoother);
+      matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
 
       printfQuda("Creating coarse null-space vectors\n");
       B_coarse = new std::vector<ColorSpinorField*>();
@@ -153,7 +159,7 @@ namespace quda {
 
       // create the next multigrid level
       printfQuda("Creating next multigrid level\n");
-      param_coarse = new MGParam(param, *B_coarse, *matCoarseResidual, *matCoarseSmoother, param.level+1);
+      param_coarse = new MGParam(param, *B_coarse, *matCoarseResidual, *matCoarseSmoother, *matCoarseSmootherSloppy, param.level+1);
       param_coarse->fine = this;
       param_coarse->delta = 1e-20;
 
@@ -182,6 +188,9 @@ namespace quda {
 	param_coarse_solver->compute_true_res = false;
 	param_coarse_solver->delta = 1e-8;
 	param_coarse_solver->verbosity_precondition = QUDA_SILENT;
+
+	// need this to ensure we don't use half precision on the preconditioner in GCR
+	param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
 	if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
 	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
@@ -238,6 +247,8 @@ namespace quda {
       }
       if (coarse) delete coarse;
       if (transfer) delete transfer;
+      if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
+      if (diracCoarseSmootherSloppy && diracCoarseSmootherSloppy != diracCoarseSmoother) delete diracCoarseSmootherSloppy;
       if (matCoarseSmoother) delete matCoarseSmoother;
       if (diracCoarseSmoother) delete diracCoarseSmoother;
       if (matCoarseResidual) delete matCoarseResidual;
@@ -614,6 +625,11 @@ namespace quda {
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7;
     solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
+    if (param.level == 0) { // this enables half precision on the fine grid only if set
+      solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
+      solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+      if (solverParam.precision_sloppy == QUDA_HALF_PRECISION) solverParam.delta = 1e-1;
+    }
     // end setting null-space generation options
 
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
@@ -643,7 +659,7 @@ namespace quda {
 
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
 
-	Solver *solve = Solver::create(solverParam, param.matSmooth, param.matSmooth, param.matSmooth, profile);
+	Solver *solve = Solver::create(solverParam, param.matSmooth, param.matSmoothSloppy, param.matSmoothSloppy, profile);
 
 	const Dirac &dirac = *(param.matSmooth.Expose());
 	ColorSpinorField *out=nullptr, *in=nullptr;

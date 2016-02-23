@@ -37,6 +37,8 @@ namespace quda {
 	solver = new GCR(mat, *(mg), matSloppy, matPrecon, param, profile);
       } else if (param.preconditioner) {
 	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
+	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
+	param.precision_precondition = param.precision_sloppy;
 	solver = new GCR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
       } else {
 	solver = new GCR(mat, matSloppy, matPrecon, param, profile);
