@@ -44,7 +44,7 @@ namespace quda {
       break;
     case QUDA_MR_INVERTER:
       report("MR");
-      solver = new MR(mat, param, profile);
+      solver = new MR(mat, matSloppy, param, profile);
       break;
     case QUDA_SD_INVERTER:
       report("SD");

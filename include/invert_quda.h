@@ -535,6 +535,7 @@ namespace quda {
 
   private:
     const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
     ColorSpinorField *rp;
     ColorSpinorField *Arp;
     ColorSpinorField *tmpp;
@@ -544,7 +545,7 @@ namespace quda {
     bool allocate_y;
 
   public:
-    MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    MR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);

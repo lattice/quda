@@ -16,8 +16,8 @@
 
 namespace quda {
 
-  MR::MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), init(false), allocate_r(false), allocate_y(false)
+  MR::MR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false), allocate_r(false), allocate_y(false)
   {
  
   }
@@ -41,43 +41,49 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.precision = param.precision_sloppy;
       Arp = ColorSpinorField::Create(csParam);
       tmpp = ColorSpinorField::Create(csParam); //temporary for mat-vec
       init = true;
     }
 
-      //Source needs to be preserved if initial guess is used.
-    if(!allocate_r && ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES))) {
+      //Source needs to be preserved if initial guess is used or if different precision is requested
+    if(!allocate_r &&
+       ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) || (param.precision_sloppy != b.Precision()) )) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.precision = param.precision_sloppy;
       rp = ColorSpinorField::Create(csParam);
       allocate_r = true;
     }
 
-    if (!allocate_y && (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)) {
+    // y is the (sloppy) iterated solution vector
+    if (!allocate_y) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.precision = param.precision_sloppy;
       yp = ColorSpinorField::Create(csParam);
       allocate_y = true;
     }
-    ColorSpinorField &r = 
-      ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)) ? *rp : b;
+
+    ColorSpinorField &r = allocate_r ? *rp : b;
     ColorSpinorField &Ar = *Arp;
     ColorSpinorField &tmp = *tmpp;
-    //y is used to store initial guess, otherwise it is unused.
-    ColorSpinorField &y = (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) ? *yp : *tmpp;  
+    ColorSpinorField &y = *yp;
+
     double r2=0.0; // if zero source then we will exit immediately doing no work
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(y, x, tmp);    
-      r2 = blas::xmyNorm(b, y);   //y = b - Ax
-      blas::copy(r, y);            //Copy y to r
-      blas::copy(y, x);           //Save initial guess
+      blas::copy(tmp, x);
+      matSloppy(r, tmp, Ar);
+      blas::copy(y, b);
+      r2 = blas::xmyNorm(y, r);   //r = b - Ax0
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = blas::norm2(r);
     }
+
     // set initial guess to zero and thus the residual is just the source
-    blas::zero(x);  // can get rid of this for a special first update kernel  
+    blas::zero(y);  // can get rid of this for a special first update kernel
     double b2 = blas::norm2(b);  //Save norm of b
     double c2 = r2;  //c2 holds the initial r2 after (possible) subtraction of initial guess
    
@@ -96,7 +102,7 @@ namespace quda {
 
     int k = 0;
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      double x2 = blas::norm2(x);
+      double x2 = blas::norm2(y);
       double3 Ar3 = blas::cDotProductNormB(Ar, r);
       printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e, %e), x2 = %e\n", 
 		 k, Ar3.z, Ar3.x, Ar3.y, x2);
@@ -106,19 +112,19 @@ namespace quda {
 
     while (k < param.maxiter && r2 > 0.0) {
     
-      mat(Ar, r, tmp);
+      matSloppy(Ar, r, tmp);
 
       double3 Ar3 = blas::cDotProductNormA(Ar, r);
       Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
 
       // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = blas::norm2(r)
       //r2 = blas::caxpyXmazNormX(omega*alpha, r, x, Ar);
-      blas::caxpyXmaz(omega*alpha, r, x, Ar);
+      blas::caxpyXmaz(omega*alpha, r, y, Ar);
 
       k++;
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	double x2 = blas::norm2(x);
+	double x2 = blas::norm2(y);
 	double r2 = blas::norm2(r);
 	printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e,%e) x2 = %e\n",
 		   k+1, r2, Ar3.x, Ar3.y, x2);
@@ -130,18 +136,23 @@ namespace quda {
     //Add back initial guess (if appropriate) and scale if necessary
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       double scale = c2 > 0.0 ? sqrt(c2) : 1.0;
-      blas::xpay(y,scale,x);
+      blas::axpy(scale,y,x);
     } else {
-      if (c2 > 0.0) blas::ax(sqrt(c2), x);
+      if (c2 > 0.0) blas::axpby(sqrt(c2), y, 0.0, x);
     }
-    if (c2 > 0.0) blas::ax(sqrt(c2), r);
+    // if not preserving source then overide source with residual
+    if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && &r != &b) {
+      if (c2 > 0.0) blas::axpby(sqrt(c2), r, 0.0, b);
+    } else {
+      if (c2 > 0.0) blas::ax(sqrt(c2), r);
+    }
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       profile.TPSTART(QUDA_PROFILE_EPILOGUE);
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
-      double gflops = (blas::flops + mat.flops())*1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
 
       param.gflops += gflops;
       param.iter += k;
@@ -149,7 +160,7 @@ namespace quda {
       // compute the iterated relative residual
       if (getVerbosity() >= QUDA_SUMMARIZE) r2 = blas::norm2(r) / b2;
 
-      // calculate the true residual
+      // calculate the true sloppy residual
       if (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
 	mat(r, x, tmp);
 	double true_res = blas::xmyNorm(b, r);
