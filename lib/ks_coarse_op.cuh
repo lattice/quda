@@ -86,7 +86,7 @@ namespace quda {
               for(int s = 0; s < fineSpin; s++) {  //Fine Spin
                 for (int s_col=0; s_col<fineSpin; s_col++) {
 	            // on the coarse lattice if forwards then use the forwards links
-		    (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
+		    (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c);
                 } //which chiral block
               } //Fine Spin
             } // from coarse? 
@@ -108,7 +108,7 @@ namespace quda {
               for(int s = 0; s < fineSpin; s++) {  //Fine Spin
                  for (int s_col=0; s_col<fineSpin; s_col++) {
 	           // on the coarse lattice if forwards then use the forwards links
-		   (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, ic, jc) * arg.V((parity+1)&1, y_cb, s, jc, ic_c);
+		   (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) * arg.V((parity+1)&1, y_cb, s_col, jc, ic_c);
                  } // which chiral block
               } //Fine spin rows 
 	    } // from coarse?
@@ -151,8 +151,7 @@ namespace quda {
    */
   template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __device__ __host__ inline void multiplyKSVUV(complex<Float> vuv[], Arg &arg, int parity, int x_cb, const int factor) {
-
-    for (int i = 0; i < factor*coarseColor*coarseColor; i++) vuv[i] = 0.0;
+    //for (int i = 0; i < factor*coarseColor*coarseColor; i++) vuv[i] = 0.0;
 
     if (!from_coarse) { // fine grid is top level
 
@@ -226,8 +225,9 @@ namespace quda {
     int s_col = (1 - s_row);
 
     const int factor = (arg.UVL == nullptr) ? 1 : 2;
+    const int elements = !from_coarse ? factor*coarseColor*coarseColor : coarseSpin*coarseSpin*coarseColor*coarseColor;
 
-    complex<Float> vuv[2*coarseColor*coarseColor];//[factor*coarseColor*coarseColor]
+    complex<Float> *vuv = new complex<Float>[elements];//[factor*coarseColor*coarseColor]
     multiplyKSVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, factor);
 
     for(int c_row = 0; c_row < coarseColor; c_row++) { // Coarse Color row
@@ -237,6 +237,7 @@ namespace quda {
       }
     }
 
+    delete vuv;
   }
 
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>

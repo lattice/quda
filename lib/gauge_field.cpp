@@ -92,7 +92,8 @@ namespace quda {
       phase_bytes = half_phase_bytes*2;
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
     }else{
-      bytes = length*precision;
+      //bytes = length*precision;
+      bytes = static_cast<unsigned long long>(length)*static_cast<unsigned long long>(precision);//temporary fix for MG
       bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;

@@ -6,7 +6,7 @@ namespace quda {
 
   using namespace blas;
 
-  static bool debug = true;
+  static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global)
     : Solver(param, profile), param(param), transfer(0), presmoother(0), postsmoother(0),
@@ -82,7 +82,7 @@ namespace quda {
 				    param.matSmooth, param.matSmooth, profile);
     }
 
-    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && (param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type != QUDA_NORMOP_PC_SOLVE))
       errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
 
     // create residual vectors
@@ -128,7 +128,7 @@ namespace quda {
       x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
       // check if we are coarsening the preconditioned system then
-      bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
+      bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE));
 
       // create coarse grid operator
       DiracParam diracParam;
@@ -149,7 +149,7 @@ namespace quda {
 
       // create smoothing operators
       diracParam.dirac = const_cast<Dirac*>(param.matSmooth.Expose());
-      diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
+      diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE || param.mg_global.smoother_solve_type[param.level+1] == QUDA_NORMOP_PC_SOLVE) ?
 	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
 	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
       matCoarseSmoother = new DiracM(*diracCoarseSmoother);
@@ -316,7 +316,7 @@ namespace quda {
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
     double tol = std::pow(10.0, 4-2*csParam.precision);
-
+#if 0
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
@@ -334,6 +334,7 @@ namespace quda {
       printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("failed");
     }
+#endif 
 #if 1
     printfQuda("Checking 1 > || (1 - P (P^\\dagger D P) P^\\dagger D v_k || / || v_k || for %d vectors\n", 
 	       param.Nvec);
@@ -681,6 +682,10 @@ namespace quda {
 
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
 #if 1 //for debug only!
+        Dirac &dirac_tmp = const_cast<Dirac&>(dirac);
+        double init_mass = dirac_tmp.Mass();
+        dirac_tmp.setMass((0.001*init_mass));//0.001=>0.0001
+
 	Solver *solve = Solver::create(solverParam, param.matSmooth, param.matSmooth, param.matSmooth, profile);
 	ColorSpinorField *out=nullptr, *in=nullptr;
 
@@ -688,6 +693,7 @@ namespace quda {
         (*solve)(*out, *in);
         dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
+        dirac_tmp.setMass(init_mass);
 	delete solve;
 #endif
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution norm squared = %g\n", norm2(*x));

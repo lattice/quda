@@ -575,7 +575,7 @@ namespace quda {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 2) {
 	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-      } else if (nSpin == 1) {
+      } else if ( nSpin == 1 && nColor == 3 ) {//temporary fix for MG
 	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
       }
     }

@@ -114,6 +114,12 @@ namespace quda {
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/2 : (bytes-phase_bytes)/2;
 
+      if( resDesc.res.linear.sizeInBytes  >= 536870912) 
+      {
+         warningQuda("\nWarning: gauge field texture object was not created. \n");
+         return;
+      }
+
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
@@ -126,6 +132,12 @@ namespace quda {
 
   void cudaGaugeField::destroyTexObject() {
     if( isNative() ){
+      size_t sizeInBytes = (bytes-phase_bytes)/2;
+      if( sizeInBytes  >= 536870912 )
+      {
+         return;
+      }
+
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
       if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13){

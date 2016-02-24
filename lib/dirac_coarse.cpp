@@ -74,7 +74,8 @@ namespace quda {
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    gParam.nFace = (transfer->Vectors().Nspin() == 1) ? 3 : 1; //1 for naive staggered
+    //gParam.nFace = (transfer->Vectors().Nspin() == 1) ? 3 : 1; //for long links
+    gParam.nFace = 1; //for fat links
 
     gParam.geometry = QUDA_COARSE_GEOMETRY;
 

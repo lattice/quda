@@ -210,7 +210,7 @@ namespace quda {
       long_param.create = QUDA_NULL_FIELD_CREATE;
       long_param.siteSubset = QUDA_FULL_SITE_SUBSET;
       //
-      l = new cpuGaugeField(fat_param);
+      l = new cpuGaugeField(long_param);
       //
       uv_long = ColorSpinorField::Create(UVparam);
       //Copy the cuda gauge field to the cpu
