@@ -12,8 +12,10 @@ namespace quda {
     : Solver(param, profile), param(param), transfer(0), presmoother(0), postsmoother(0),
       profile_global(profile_global),
       profile( "MG level " + std::to_string(param.level+1), false ),
-      coarse(0), fine(param.fine), coarse_solver(0), param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0),
-      diracCoarseResidual(0), diracCoarseSmoother(0), matCoarseResidual(0), matCoarseSmoother(0) {
+      coarse(nullptr), fine(param.fine), coarse_solver(nullptr),
+      param_coarse(nullptr), param_presmooth(nullptr), param_postsmooth(nullptr),
+      r(nullptr), r_coarse(nullptr), x_coarse(nullptr), tmp_coarse(nullptr),
+      diracCoarseResidual(nullptr), diracCoarseSmoother(nullptr), matCoarseResidual(nullptr), matCoarseSmoother(nullptr) {
 
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
@@ -115,6 +117,9 @@ namespace quda {
       // create coarse solution vector
       x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
+      // create coarse temporary vector
+      tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
+
       // check if we are coarsening the preconditioned system then
       bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
 
@@ -126,6 +131,7 @@ namespace quda {
       diracParam.kappa = param.matResidual.Expose()->Kappa();
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
+      diracParam.tmp1 = &(tmp_coarse->Even());
       printfQuda("Kappa = %e\n", diracParam.kappa);
       // use even-odd preconditioning for the coarse grid solver
       diracCoarseResidual = new DiracCoarse(diracParam);
@@ -261,6 +267,7 @@ namespace quda {
     if (r) delete r;
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
+    if (tmp_coarse) delete tmp_coarse;
 
     if (param_coarse) delete param_coarse;
     if (param_presmooth) delete param_presmooth;

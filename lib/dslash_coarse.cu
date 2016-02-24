@@ -1,4 +1,3 @@
-#include <multigrid.h>
 #include <transfer.h>
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>

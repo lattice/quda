@@ -232,6 +232,9 @@ namespace quda {
     /** Coarse solution vector */
     ColorSpinorField *x_coarse;
 
+    /** Coarse temporary vector */
+    ColorSpinorField *tmp_coarse;
+
     /** The coarse operator used for computing inter-grid residuals */
     Dirac *diracCoarseResidual;
 
