@@ -58,7 +58,6 @@ using namespace quda;
 using namespace quda::fermion_force;
 
 
-
 #define QUDAMILC_VERBOSE 1
 template <bool start>
 void  inline qudamilc_called(const char* func, QudaVerbosity verb){
@@ -970,7 +969,7 @@ void qudaInvert(int external_precision,
   const int long_pad = 3*fat_pad;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1) {
+  if (*num_iters == -1  || !canReuseResidentGauge(&invertParam) ) {
     invalidateGaugeQuda();
   }
 
