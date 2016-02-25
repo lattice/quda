@@ -1331,7 +1331,7 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
     output[k] = 0.0;
   //------------------------------------------
   
-  if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+  if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
     dslash_4_4d(tmp, gauge, in, 0, dagger_bit, precision, gauge_param, mferm);
     dslash_5_inv(out, gauge, tmp, 1, dagger_bit, precision, gauge_param, mferm, kappa5);
     dslash_4_4d(tmp, gauge, out, 1, dagger_bit, precision, gauge_param, mferm);
@@ -1340,7 +1340,7 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
     dw_dslash_5_4d(out, gauge, in, 1, dagger_bit, precision, gauge_param, mferm);
     if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)tmp, -kappa, (double*)out, V5h*spinorSiteSize);
     else xpay((float*)tmp, -(float)kappa, (float*)out, V5h*spinorSiteSize);
-  } else {
+  } else if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     dslash_4_4d(tmp, gauge, in, 1, dagger_bit, precision, gauge_param, mferm);
     dslash_5_inv(out, gauge, tmp, 0, dagger_bit, precision, gauge_param, mferm, kappa5);
     dslash_4_4d(tmp, gauge, out, 0, dagger_bit, precision, gauge_param, mferm);
@@ -1349,6 +1349,8 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
     dw_dslash_5_4d(out, gauge, in, 0, dagger_bit, precision, gauge_param, mferm);
     if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)tmp, -kappa, (double*)out, V5h*spinorSiteSize);
     else xpay((float*)tmp, -(float)kappa, (float*)out, V5h*spinorSiteSize);
+  } else {
+    errorQuda("Unsuuported matpc_type=%d", matpc_type);
   }
   free(tmp);
   free(kappa5);
@@ -1369,7 +1371,7 @@ void mdw_matpc(void *out, void **gauge, void *in, double *kappa_b, double *kappa
 
   if(dagger_bit == 0)
   {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       mdw_dslash_4_pre(out, gauge, in, 1, dagger_bit, precision, gauge_param, mferm, b5, c5);
       dslash_4_4d(tmp, gauge, out, 0, dagger_bit, precision, gauge_param, mferm);
       dslash_5_inv(out, gauge, tmp, 1, dagger_bit, precision, gauge_param, mferm, kappa_mdwf);
@@ -1381,8 +1383,7 @@ void mdw_matpc(void *out, void **gauge, void *in, double *kappa_b, double *kappa
         if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)tmp  + Vh*spinorSiteSize*xs, kappa2[xs], (double*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
         else xpay((float*)tmp  + Vh*spinorSiteSize*xs, (float)kappa2[xs], (float*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
       }
-    } 
-    else {
+    } else if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       mdw_dslash_4_pre(out, gauge, in, 0, dagger_bit, precision, gauge_param, mferm, b5, c5);
       dslash_4_4d(tmp, gauge, out, 1, dagger_bit, precision, gauge_param, mferm);
       dslash_5_inv(out, gauge, tmp, 0, dagger_bit, precision, gauge_param, mferm, kappa_mdwf);
@@ -1394,10 +1395,12 @@ void mdw_matpc(void *out, void **gauge, void *in, double *kappa_b, double *kappa
         if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)tmp  + Vh*spinorSiteSize*xs, kappa2[xs], (double*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
         else xpay((float*)tmp  + Vh*spinorSiteSize*xs, (float)kappa2[xs], (float*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
       }
+    } else {
+      errorQuda("Unsuuported matpc_type=%d", matpc_type);
     }
   } else
   {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+    if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       dslash_4_4d(out, gauge, in, 0, dagger_bit, precision, gauge_param, mferm);
       mdw_dslash_4_pre(tmp, gauge, out, 1, dagger_bit, precision, gauge_param, mferm, b5, c5);
       dslash_5_inv(out, gauge, tmp, 0, dagger_bit, precision, gauge_param, mferm, kappa_mdwf);
@@ -1409,8 +1412,7 @@ void mdw_matpc(void *out, void **gauge, void *in, double *kappa_b, double *kappa
         if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)tmp  + Vh*spinorSiteSize*xs, kappa2[xs], (double*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
         else xpay((float*)tmp  + Vh*spinorSiteSize*xs, (float)kappa2[xs], (float*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
       }
-    } 
-    else {
+    } else if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       dslash_4_4d(out, gauge, in, 1, dagger_bit, precision, gauge_param, mferm);
       mdw_dslash_4_pre(tmp, gauge, out, 0, dagger_bit, precision, gauge_param, mferm, b5, c5);
       dslash_5_inv(out, gauge, tmp, 1, dagger_bit, precision, gauge_param, mferm, kappa_mdwf);
@@ -1422,6 +1424,8 @@ void mdw_matpc(void *out, void **gauge, void *in, double *kappa_b, double *kappa
         if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)tmp  + Vh*spinorSiteSize*xs, kappa2[xs], (double*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
         else xpay((float*)tmp  + Vh*spinorSiteSize*xs, (float)kappa2[xs], (float*)out + Vh*spinorSiteSize*xs, Vh*spinorSiteSize);
       }
+    } else {
+      errorQuda("Unsuuported matpc_type=%d", matpc_type);
     }
   }
   free(tmp);

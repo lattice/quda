@@ -138,16 +138,16 @@ namespace quda {
 
     //QUDA_MATPC_EVEN_EVEN : 1 - k D5 - k^2 D4_eo D5inv D4_oe
     //QUDA_MATPC_ODD_ODD : 1 - k D5 - k^2 D4_oe D5inv D4_eo
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      Dslash4(*tmp1, in, QUDA_EVEN_PARITY);
-      Dslash5inv(out, *tmp1, QUDA_ODD_PARITY, kappa5);
-      Dslash4Xpay(*tmp1, out, QUDA_ODD_PARITY, in, kappa2); 
-      Dslash5Xpay(out, in, QUDA_EVEN_PARITY,*tmp1, -kappa5); 
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+    if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       Dslash4(*tmp1, in, QUDA_ODD_PARITY);
+      Dslash5inv(out, *tmp1, QUDA_ODD_PARITY, kappa5);
+      Dslash4Xpay(*tmp1, out, QUDA_EVEN_PARITY, in, kappa2);
+      Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, -kappa5);
+    } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      Dslash4(*tmp1, in, QUDA_EVEN_PARITY);
       Dslash5inv(out, *tmp1, QUDA_EVEN_PARITY, kappa5);
-      Dslash4Xpay(*tmp1, out, QUDA_EVEN_PARITY, in, kappa2); 
-      Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, -kappa5); 
+      Dslash4Xpay(*tmp1, out, QUDA_ODD_PARITY, in, kappa2);
+      Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, -kappa5);
     } else {
       errorQuda("MatPCType %d not valid for DiracDomainWall4DPC", matpcType);
     }
@@ -174,16 +174,16 @@ namespace quda {
       sol = &x;
     } else {  
       // we desire solution to full system
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D4_eo*D5inv b_o
         Dslash5inv(*tmp1, b.Odd(), QUDA_ODD_PARITY, kappa5);
-        Dslash4Xpay(x.Odd(), *tmp1, QUDA_ODD_PARITY, b.Even(), kappa5);
+        Dslash4Xpay(x.Odd(), *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa5);
         src = &(x.Odd());
         sol = &(x.Even());
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // src = b_o + k D4_oe*D5inv b_e
         Dslash5inv(*tmp1, b.Even(), QUDA_EVEN_PARITY, kappa5);
-        Dslash4Xpay(x.Even(), *tmp1, QUDA_EVEN_PARITY, b.Odd(), kappa5);
+        Dslash4Xpay(x.Even(), *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa5);
         src = &(x.Even());
         sol = &(x.Odd());
       } else {
@@ -207,14 +207,16 @@ namespace quda {
     // create full solution
 
     checkFullSpinor(x, b);
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+    if (matpcType == QUDA_MATPC_EVEN_EVEN ||
+	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // x_o = D5inv b_o - k D5inv D4_oe x_e
-      Dslash4Xpay(*tmp1, x.Even(), QUDA_EVEN_PARITY, b.Odd(), -kappa5);
-      Dslash5inv(x.Odd(), *tmp1, QUDA_EVEN_PARITY, kappa5);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      Dslash4Xpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), -kappa5);
+      Dslash5inv(x.Odd(), *tmp1, QUDA_ODD_PARITY, kappa5);
+    } else if (matpcType == QUDA_MATPC_ODD_ODD ||
+	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       // x_e = D5inv b_e - k D5inv D4_eo x_o
-      Dslash4Xpay(*tmp1, x.Odd(), QUDA_ODD_PARITY, b.Even(), -kappa5);
-      Dslash5inv(x.Even(), *tmp1, QUDA_ODD_PARITY, kappa5);
+      Dslash4Xpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), -kappa5);
+      Dslash5inv(x.Even(), *tmp1, QUDA_EVEN_PARITY, kappa5);
     } else {
       errorQuda("MatPCType %d not valid for DiracDomainWall4DPC", matpcType);
     }
