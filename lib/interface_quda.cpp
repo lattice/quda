@@ -1900,9 +1900,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
 namespace quda{
 bool canReuseResidentGauge(QudaInvertParam *param){
-
-  if (gaugePrecise == NULL) errorQuda("Precise gauge field doesn't exist");
-  return param->cuda_prec == gaugePrecise->Precision();
+  return (gaugePrecise != NULL) and param->cuda_prec == gaugePrecise->Precision();
 }
 }
 
