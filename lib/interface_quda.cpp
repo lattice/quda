@@ -1898,6 +1898,12 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   popVerbosity();
 }
 
+namespace quda{
+bool canReuseResidentGauge(QudaInvertParam *param){
+  return (gaugePrecise != NULL) and param->cuda_prec == gaugePrecise->Precision();
+}
+}
+
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
 
   if (param->cuda_prec != gaugePrecise->Precision()) {

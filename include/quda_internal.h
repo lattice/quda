@@ -306,8 +306,16 @@ namespace quda {
   const int Nstream = 1;
 #endif
 
+
+
 } // namespace quda
 
-
+namespace quda{
+  /**
+     * Check that the resident gauge field is compatible with the requested inv_param
+     * @param inv_param   Contains all metadata regarding host and device storage
+     */
+bool canReuseResidentGauge(QudaInvertParam *inv_param);
+}
 
 #endif // _QUDA_INTERNAL_H
