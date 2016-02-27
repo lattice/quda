@@ -71,6 +71,7 @@ namespace quda {
     flops += 96LL*bulk + 120LL*wall;
   }
 
+  // I think this is misnamed and should be M5inv
   void DiracDomainWall4DPC::Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, \
 				       const QudaParity parity, const double &k) const
   {
@@ -136,20 +137,30 @@ namespace quda {
 
     bool reset1 = newTmp(&tmp1, in);
 
-    //QUDA_MATPC_EVEN_EVEN : 1 - k D5 - k^2 D4_eo D5inv D4_oe
-    //QUDA_MATPC_ODD_ODD : 1 - k D5 - k^2 D4_oe D5inv D4_eo
-    if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      Dslash4(*tmp1, in, QUDA_ODD_PARITY);
-      Dslash5inv(out, *tmp1, QUDA_ODD_PARITY, kappa5);
-      Dslash4Xpay(*tmp1, out, QUDA_EVEN_PARITY, in, kappa2);
-      Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, -kappa5);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      Dslash4(*tmp1, in, QUDA_EVEN_PARITY);
-      Dslash5inv(out, *tmp1, QUDA_EVEN_PARITY, kappa5);
-      Dslash4Xpay(*tmp1, out, QUDA_ODD_PARITY, in, kappa2);
-      Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, -kappa5);
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+    if (symmetric && !dagger) {
+      // 1 - k^2 M5^-1 D4 M5^-1 D4
+      Dslash4(*tmp1, in, parity[0]);
+      Dslash5inv(out, *tmp1, parity[0], kappa5);
+      Dslash4(*tmp1, out, parity[1]);
+      Dslash5inv(out, *tmp1, parity[1], kappa5);
+      blas::xpay(const_cast<ColorSpinorField&>(in), -kappa2, out);
+    } else if (symmetric && dagger) {
+      // 1 - k^2 D4 M5^-1 D4 M5^-1
+      Dslash5inv(*tmp1, in, parity[1], kappa5);
+      Dslash4(out, *tmp1, parity[0]);
+      Dslash5inv(*tmp1, out, parity[0], kappa5);
+      Dslash4(out, *tmp1, parity[1]);
+      blas::xpay(const_cast<ColorSpinorField&>(in), -kappa2, out);
     } else {
-      errorQuda("MatPCType %d not valid for DiracDomainWall4DPC", matpcType);
+      // 1 - k D5 - k^2 D4 M5^-1 D4_oe
+      Dslash4(*tmp1, in, parity[0]);
+      Dslash5inv(out, *tmp1, parity[0], kappa5);
+      Dslash4Xpay(*tmp1, out, parity[1], in, kappa2);
+      Dslash5Xpay(out, in, parity[1], *tmp1, -kappa5);
     }
 
     deleteTmp(&tmp1, reset1);
@@ -167,32 +178,47 @@ namespace quda {
 				    ColorSpinorField &x, ColorSpinorField &b, 
 				    const QudaSolutionType solType) const
   {
-    bool reset = newTmp(&tmp1, b);
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
       sol = &x;
-    } else {  
-      // we desire solution to full system
-      if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        // src = b_e + k D4_eo*D5inv b_o
-        Dslash5inv(*tmp1, b.Odd(), QUDA_ODD_PARITY, kappa5);
-        Dslash4Xpay(x.Odd(), *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa5);
+    } else {  // we desire solution to full system
+      bool reset = newTmp(&tmp1, b.Even());
+
+      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+        // src = D5^-1 (b_e + k D4_eo*D5^-1 b_o)
         src = &(x.Odd());
+        Dslash5inv(*src, b.Odd(), QUDA_ODD_PARITY, kappa5);
+        Dslash4Xpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa5);
+	Dslash5inv(*src, *tmp1, QUDA_EVEN_PARITY, kappa5);
+        sol = &(x.Even());
+      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+        // src = D5^-1 (b_o + k D4_oe*D5^-1 b_e)
+        src = &(x.Even());
+        Dslash5inv(*src, b.Even(), QUDA_EVEN_PARITY, kappa5);
+        Dslash4Xpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa5);
+	Dslash5inv(*src, *tmp1, QUDA_ODD_PARITY, kappa5);
+        sol = &(x.Odd());
+      } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+        // src = b_e + k D4_eo*D5^-1 b_o
+        src = &(x.Odd());
+        Dslash5inv(*tmp1, b.Odd(), QUDA_ODD_PARITY, kappa5);
+        Dslash4Xpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa5);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // src = b_o + k D4_oe*D5inv b_e
-        Dslash5inv(*tmp1, b.Even(), QUDA_EVEN_PARITY, kappa5);
-        Dslash4Xpay(x.Even(), *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa5);
+        // src = b_o + k D4_oe*D5^-1 b_e
         src = &(x.Even());
+        Dslash5inv(*tmp1, b.Even(), QUDA_EVEN_PARITY, kappa5);
+        Dslash4Xpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa5);
         sol = &(x.Odd());
       } else {
         errorQuda("MatPCType %d not valid for DiracDomainWall4DPC", matpcType);
       }
       // here we use final solution to store parity solution and parity source
       // b is now up for grabs if we want
+
+      deleteTmp(&tmp1, reset);
     }
-    deleteTmp(&tmp1, reset);
   }
 
   void DiracDomainWall4DPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
@@ -202,24 +228,26 @@ namespace quda {
       return;
     }				
 
-    bool reset1 = newTmp(&tmp1, x);
+    checkFullSpinor(x, b);
+
+    bool reset1 = newTmp(&tmp1, b.Even());
 
     // create full solution
 
-    checkFullSpinor(x, b);
     if (matpcType == QUDA_MATPC_EVEN_EVEN ||
 	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      // x_o = D5inv b_o - k D5inv D4_oe x_e
-      Dslash4Xpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), -kappa5);
+      // x_o = D5^-1 (b_o + k D4_oe x_e)
+      Dslash4Xpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa5);
       Dslash5inv(x.Odd(), *tmp1, QUDA_ODD_PARITY, kappa5);
     } else if (matpcType == QUDA_MATPC_ODD_ODD ||
 	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      // x_e = D5inv b_e - k D5inv D4_eo x_o
-      Dslash4Xpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), -kappa5);
+      // x_e = D5^-1 (b_e + k D4_eo x_o)
+      Dslash4Xpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa5);
       Dslash5inv(x.Even(), *tmp1, QUDA_EVEN_PARITY, kappa5);
     } else {
       errorQuda("MatPCType %d not valid for DiracDomainWall4DPC", matpcType);
     }
+
     deleteTmp(&tmp1, reset1);
   }
 

@@ -223,13 +223,14 @@ namespace quda {
       ColorSpinorField &x, ColorSpinorField &b, 
       const QudaSolutionType solType) const
   {
-    // prepare function in MDWF is not tested yet.
-    bool reset = newTmp(&tmp1, b);
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
       sol = &x;
     } else {  
+      // prepare function in MDWF is not tested yet.
+      bool reset = newTmp(&tmp1, b.Even());
+
       // we desire solution to full system
       if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D4_eo * D4pre * D5inv b_o
@@ -250,8 +251,9 @@ namespace quda {
       }
       // here we use final solution to store parity solution and parity source
       // b is now up for grabs if we want
+
+      deleteTmp(&tmp1, reset);
     }
-    deleteTmp(&tmp1, reset);
   }
 
   void DiracMobiusDomainWallPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
@@ -262,7 +264,7 @@ namespace quda {
       return;
     }				
 
-    bool reset1 = newTmp(&tmp1, x);
+    bool reset1 = newTmp(&tmp1, x.Even());
 
     // TODO check -1.0 factor here is correct
 
