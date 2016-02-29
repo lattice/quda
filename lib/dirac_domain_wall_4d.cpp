@@ -133,7 +133,7 @@ namespace quda {
   void DiracDomainWall4DPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    double kappa2 = -kappa5*kappa5;
+    double kappa2 = kappa5*kappa5;
 
     bool reset1 = newTmp(&tmp1, in);
 
@@ -159,7 +159,7 @@ namespace quda {
       // 1 - k D5 - k^2 D4 M5^-1 D4_oe
       Dslash4(*tmp1, in, parity[0]);
       Dslash5inv(out, *tmp1, parity[0], kappa5);
-      Dslash4Xpay(*tmp1, out, parity[1], in, kappa2);
+      Dslash4Xpay(*tmp1, out, parity[1], in, -kappa2);
       Dslash5Xpay(out, in, parity[1], *tmp1, -kappa5);
     }
 
