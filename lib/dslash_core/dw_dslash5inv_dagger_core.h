@@ -12,6 +12,13 @@
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
+// workaround for C++11 bug in CUDA 6.5/7.0
+#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
+#define POW(a, b) pow(a, (spinorFloat)b)
+#else
+#define POW(a, b) pow(a, b)
+#endif
+
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -41,6 +48,12 @@
 #define mdwf_c5 mdwf_c5_d
 #else
 #define spinorFloat float
+#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
+#define POW(a, b) powf(a, (spinorFloat)b)
+#else
+#define POW(a, b) powf(a, b)
+#endif
+
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -138,13 +151,6 @@ xs = X/(X1*X2*X3*X4);
  o30_re = 0; o30_im = 0;
  o31_re = 0; o31_im = 0;
  o32_re = 0; o32_im = 0;
-
-// workaround for C++11 bug in CUDA 6.5/7.0
-#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
-#define POW(a, b) pow(a, (spinorFloat)b)
-#else
-#define POW(a, b) pow(a, b)
-#endif
 
 VOLATILE spinorFloat kappa;
 
@@ -303,6 +309,7 @@ WRITE_SPINOR(param.sp_stride);
 #undef mdwf_b5
 #undef mdwf_c5
 #undef spinorFloat
+#undef POW
 #undef SHARED_STRIDE
 
 #undef i00_re

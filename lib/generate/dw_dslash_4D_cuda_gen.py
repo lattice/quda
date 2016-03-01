@@ -148,6 +148,12 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
+    str += "// workaround for C++11 bug in CUDA 6.5/7.0\n"
+    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
+    str += "#define POW(a, b) pow(a, (spinorFloat)b)\n"
+    str += "#else\n"
+    str += "#define POW(a, b) pow(a, b)\n"
+    str += "#endif\n\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -158,6 +164,11 @@ def def_input_spinor():
     str += "#define mdwf_c5 mdwf_c5_d\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
+    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
+    str += "#define POW(a, b) powf(a, (spinorFloat)b)\n"
+    str += "#else\n"
+    str += "#define POW(a, b) powf(a, b)\n"
+    str += "#endif\n\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -915,12 +926,6 @@ def gen_dw():
 def gen_dw_inv():
 
     str = "\n"
-    str += "// workaround for C++11 bug in CUDA 6.5/7.0\n"
-    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
-    str += "#define POW(a, b) pow(a, (spinorFloat)b)\n"
-    str += "#else\n"
-    str += "#define POW(a, b) pow(a, b)\n"
-    str += "#endif\n\n"
     str += "VOLATILE spinorFloat kappa;\n\n"
     str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
     str += "  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));\n"
@@ -1303,6 +1308,7 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
     str += "#undef mdwf_b5\n"
     str += "#undef mdwf_c5\n"
     str += "#undef spinorFloat\n"
+    str += "#undef POW\n"
     str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:
