@@ -32,7 +32,39 @@ void xpay(void *x, double a, void *y, int length, QudaPrecision precision) {
 // displacements of magnitude one always interchange odd and even lattices.
 //
 //
-template<QudaDWFPCType type = QUDA_5D_PC>
+int neighborIndex_4d(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
+  // On input i should be in the range [0 , ... , Z[0]*Z[1]*Z[2]*Z[3]/2-1].
+  if (i < 0 || i >= (Z[0]*Z[1]*Z[2]*Z[3]/2))
+    { printf("i out of range in neighborIndex_4d\n"); exit(-1); }
+  // Compute the linear index.  Then dissect.
+  // fullLatticeIndex_4d is in util_quda.cpp.
+  // The gauge fields live on a 4d sublattice.
+  int X = fullLatticeIndex_4d(i, oddBit);
+  int x4 = X/(Z[2]*Z[1]*Z[0]);
+  int x3 = (X/(Z[1]*Z[0])) % Z[2];
+  int x2 = (X/Z[0]) % Z[1];
+  int x1 = X % Z[0];
+
+  x4 = (x4+dx4+Z[3]) % Z[3];
+  x3 = (x3+dx3+Z[2]) % Z[2];
+  x2 = (x2+dx2+Z[1]) % Z[1];
+  x1 = (x1+dx1+Z[0]) % Z[0];
+
+  return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+}
+
+
+// i represents a "half index" into an even or odd "half lattice".
+// when oddBit={0,1} the half lattice is {even,odd}.
+// 
+// the displacements, such as dx, refer to the full lattice coordinates. 
+//
+// neighborIndex() takes a "half index", displaces it, and returns the
+// new "half index", which can be an index into either the even or odd lattices.
+// displacements of magnitude one always interchange odd and even lattices.
+//
+//
+template<QudaDWFPCType type>
 int neighborIndex_5d(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1) {
   // fullLatticeIndex was modified for fullLatticeIndex_4d.  It is in util_quda.cpp.
   // This code bit may not properly perform 5dPC.
@@ -57,40 +89,7 @@ int neighborIndex_5d(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int 
   return (xs*(Z[3]*Z[2]*Z[1]*Z[0]) + x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
 }
 
-// i represents a "half index" into an even or odd "half lattice".
-// when oddBit={0,1} the half lattice is {even,odd}.
-// 
-// the displacements, such as dx, refer to the full lattice coordinates. 
-//
-// neighborIndex() takes a "half index", displaces it, and returns the
-// new "half index", which can be an index into either the even or odd lattices.
-// displacements of magnitude one always interchange odd and even lattices.
-//
-//
-int neighborIndex_4d(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
-  // On input i should be in the range [0 , ... , Z[0]*Z[1]*Z[2]*Z[3]/2-1].
-  if (i < 0 || i >= (Z[0]*Z[1]*Z[2]*Z[3]/2)) 
-    { printf("i out of range in neighborIndex_4d\n"); exit(-1); }
-  // Compute the linear index.  Then dissect.
-  // fullLatticeIndex_4d is in util_quda.cpp.
-  // The gauge fields live on a 4d sublattice.  
-  int X = fullLatticeIndex_4d(i, oddBit);
-  int x4 = X/(Z[2]*Z[1]*Z[0]);
-  int x3 = (X/(Z[1]*Z[0])) % Z[2];
-  int x2 = (X/Z[0]) % Z[1];
-  int x1 = X % Z[0];
-  
-  x4 = (x4+dx4+Z[3]) % Z[3];
-  x3 = (x3+dx3+Z[2]) % Z[2];
-  x2 = (x2+dx2+Z[1]) % Z[1];
-  x1 = (x1+dx1+Z[0]) % Z[0];
-  
-  return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
-}
-
-//BEGIN NEW
-//#ifdef MULTI_GPU
-template<QudaDWFPCType type = QUDA_5D_PC>
+template<QudaDWFPCType type>
 int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)
 {
   int ret;
@@ -111,7 +110,7 @@ int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2,
   x2 = (x2+dx2+Z[1]) % Z[1];
   x1 = (x1+dx1+Z[0]) % Z[0];
   
-  if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
+  if ( (ghost_x4 >= 0 && ghost_x4) < Z[3] || !comm_dim_partitioned(3)){
     ret = (xs*Z[3]*Z[2]*Z[1]*Z[0] + x4*Z[2]*Z[1]*Z[0] + x3*Z[1]*Z[0] + x2*Z[0] + x1) >> 1;
   }else{
     ret = (xs*Z[2]*Z[1]*Z[0] + x3*Z[1]*Z[0] + x2*Z[0] + x1) >> 1;    
@@ -120,7 +119,7 @@ int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2,
   return ret;
 }
 
-template <QudaDWFPCType type = QUDA_5D_PC>
+template <QudaDWFPCType type>
 int x4_5d_mgpu(int i, int oddBit)
 {
   int Y = (type == QUDA_5D_PC) ? fullLatticeIndex_5d(i, oddBit) : fullLatticeIndex_5d_4dpc(i, oddBit);
@@ -189,7 +188,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
     case 1:
       { //-X direction
         int new_x1 = (x1 - d + X1 )% X1;
-        if (x1 -d < 0){
+        if (x1 -d < 0 && comm_dim_partitioned(0)){
 	  ghostGaugeField = (oddBit?ghostGaugeEven[0]: ghostGaugeOdd[0]);
 	  int offset = (n_ghost_faces + x1 -d)*X4*X3*X2/2 + (x4*X3*X2 + x3*X2+x2)/2;
 	  return &ghostGaugeField[offset*(3*3*2)];
@@ -200,7 +199,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
     case 3:
       { //-Y direction
         int new_x2 = (x2 - d + X2 )% X2;
-        if (x2 -d < 0){
+        if (x2 -d < 0 && comm_dim_partitioned(1)){
           ghostGaugeField = (oddBit?ghostGaugeEven[1]: ghostGaugeOdd[1]);
           int offset = (n_ghost_faces + x2 -d)*X4*X3*X1/2 + (x4*X3*X1 + x3*X1+x1)/2;
           return &ghostGaugeField[offset*(3*3*2)];
@@ -212,7 +211,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
     case 5:
       { //-Z direction
         int new_x3 = (x3 - d + X3 )% X3;
-        if (x3 -d < 0){
+        if (x3 -d < 0 && comm_dim_partitioned(2)){
           ghostGaugeField = (oddBit?ghostGaugeEven[2]: ghostGaugeOdd[2]);
           int offset = (n_ghost_faces + x3 -d)*X4*X2*X1/2 + (x4*X2*X1 + x2*X1+x1)/2;
           return &ghostGaugeField[offset*(3*3*2)];
@@ -223,7 +222,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
     case 7:
       { //-T direction
         int new_x4 = (x4 - d + X4)% X4;
-        if (x4 -d < 0){
+        if (x4 -d < 0 && comm_dim_partitioned(3)){
           ghostGaugeField = (oddBit?ghostGaugeEven[3]: ghostGaugeOdd[3]);
           int offset = (n_ghost_faces + x4 -d)*X1*X2*X3/2 + (x3*X2*X1 + x2*X1+x1)/2;
           return &ghostGaugeField[offset*(3*3*2)];
@@ -241,7 +240,7 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
   return &gaugeField[dir/2][j*(3*3*2)];
 }
 
-template <typename Float, QudaDWFPCType type>
+template <QudaDWFPCType type, typename Float>
 Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float** fwd_nbr_spinor, Float** back_nbr_spinor, int neighbor_distance, int nFace)
 {
   int j;
@@ -264,7 +263,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 0://+X
     {
       int new_x1 = (x1 + nb)% X1;
-      if(x1+nb >=X1){
+      if(x1+nb >=X1 && comm_dim_partitioned(0)){
         int offset = ((x1 + nb -X1)*Ls*X4*X3*X2+xs*X4*X3*X2+x4*X3*X2 + x3*X2+x2) >> 1;
         return fwd_nbr_spinor[0] + offset*mySpinorSiteSize;
       }
@@ -275,7 +274,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 1://-X
     {
       int new_x1 = (x1 - nb + X1)% X1;
-      if(x1 - nb < 0){ 
+      if(x1 - nb < 0 && comm_dim_partitioned(0)){
         int offset = (( x1+nFace- nb)*Ls*X4*X3*X2 + xs*X4*X3*X2 + x4*X3*X2 + x3*X2 + x2) >> 1;
         return back_nbr_spinor[0] + offset*mySpinorSiteSize;
       } 
@@ -285,7 +284,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 2://+Y
     {
       int new_x2 = (x2 + nb)% X2;
-      if(x2+nb >=X2){
+      if(x2+nb >=X2 && comm_dim_partitioned(1)){
         int offset = (( x2 + nb -X2)*Ls*X4*X3*X1+xs*X4*X3*X1+x4*X3*X1 + x3*X1+x1) >> 1;
         return fwd_nbr_spinor[1] + offset*mySpinorSiteSize;
       } 
@@ -295,7 +294,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 3:// -Y
     {
       int new_x2 = (x2 - nb + X2)% X2;
-      if(x2 - nb < 0){ 
+      if(x2 - nb < 0 && comm_dim_partitioned(1)){
         int offset = (( x2 + nFace -nb)*Ls*X4*X3*X1+xs*X4*X3*X1+ x4*X3*X1 + x3*X1+x1) >> 1;
         return back_nbr_spinor[1] + offset*mySpinorSiteSize;
       } 
@@ -305,7 +304,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 4://+Z
     {
       int new_x3 = (x3 + nb)% X3;
-      if(x3+nb >=X3){
+      if(x3+nb >=X3 && comm_dim_partitioned(2)){
         int offset = (( x3 + nb -X3)*Ls*X4*X2*X1+xs*X4*X2*X1+x4*X2*X1 + x2*X1+x1) >> 1;
         return fwd_nbr_spinor[2] + offset*mySpinorSiteSize;
       } 
@@ -315,7 +314,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   case 5://-Z
     {
       int new_x3 = (x3 - nb + X3)% X3;
-      if(x3 - nb < 0){ 
+      if(x3 - nb < 0 && comm_dim_partitioned(2)){
         int offset = (( x3 + nFace -nb)*Ls*X4*X2*X1+xs*X4*X2*X1+x4*X2*X1+x2*X1+x1) >> 1;
         return back_nbr_spinor[2] + offset*mySpinorSiteSize;
       }
@@ -326,7 +325,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
     {
       j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, +nb, 0, 0, 0);
       int x4 = x4_5d_mgpu<type>(i, oddBit);
-      if ( (x4 + nb) >= Z[3])
+      if ( (x4 + nb) >= Z[3] && comm_dim_partitioned(3))
       {
         int offset = (x4+nb - Z[3])*Vsh_t;//?
         return &fwd_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
@@ -337,7 +336,7 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
     {
       j = neighborIndex_5d_mgpu<type>(i, oddBit, 0, -nb, 0, 0, 0);
       int x4 = x4_5d_mgpu<type>(i, oddBit);
-      if ( (x4 - nb) < 0){
+      if ( (x4 - nb) < 0 && comm_dim_partitioned(3)) {
         int offset = ( x4 - nb +nFace)*Vsh_t;//?
         return &back_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
       }
@@ -536,7 +535,6 @@ template <QudaDWFPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
 			     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  
   int mySpinorSiteSize = 24;		    
   for (int i=0; i<V5h*mySpinorSiteSize; i++) res[i] = 0.0;
   
@@ -559,7 +557,7 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
       sp_idx = i + Vh*xs;
       for (int dir = 0; dir < 8; dir++) 
       {
-	int gaugeOddBit = (xs % 2 == 0 || type == QUDA_4D_PC) ? oddBit : (oddBit + 1) % 2;
+	int gaugeOddBit = (xs%2 == 0 || type == QUDA_4D_PC) ? oddBit : (oddBit + 1) % 2;
 	
 	gFloat *gauge = gaugeLink_mgpu(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);//this is unchanged from MPi version
 	sFloat *spinor = spinorNeighbor_5d_mgpu<type>(sp_idx, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
@@ -747,14 +745,13 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
     void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
     void** back_nbr_spinor = inField.backGhostFaceBuffer;
   //NOTE: hopping  in 5th dimension does not use MPI. 
-    if (precision == QUDA_DOUBLE_PRECISION) 
-    {
-      dslashReference_4d_mgpu((double*)out, (double**)gauge, (double**)ghostGauge, (double*)in,(double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      dslashReference_4d_mgpu<QUDA_5D_PC>((double*)out, (double**)gauge, (double**)ghostGauge, (double*)in,(double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+      //dslashReference_4d_sgpu<QUDA_5D_PC>((double*)out, (double**)gauge, (double*)in, oddBit, daggerBit);
       dslashReference_5th<QUDA_5D_PC>((double*)out, (double*)in, oddBit, daggerBit, mferm);
-    } else
-    {
-      dslashReference_4d_mgpu((float*)out, (float**)gauge, (float**)ghostGauge, (float*)in, 
-		    (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+    } else {
+      dslashReference_4d_mgpu<QUDA_5D_PC>((float*)out, (float**)gauge, (float**)ghostGauge, (float*)in,
+					  (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
       dslashReference_5th<QUDA_5D_PC>((float*)out, (float*)in, oddBit, daggerBit, (float)mferm);
     }
 
@@ -807,14 +804,11 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
     }
     void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
     void** back_nbr_spinor = inField.backGhostFaceBuffer;
-  //NOTE: hopping  in 5th dimension does not use MPI. 
-    if (precision == QUDA_DOUBLE_PRECISION) 
-    {
-      dslashReference_4d_4dpc_mgpu((double*)out, (double**)gauge, (double**)ghostGauge, (double*)in,(double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
-    } else
-    {
-      dslashReference_4d_4dpc_mgpu((float*)out, (float**)gauge, (float**)ghostGauge, (float*)in, 
-		    (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      dslashReference_4d_mgpu<QUDA_4D_PC>((double*)out, (double**)gauge, (double**)ghostGauge, (double*)in,(double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+    } else {
+      dslashReference_4d_mgpu<QUDA_4D_PC>((float*)out, (float**)gauge, (float**)ghostGauge, (float*)in,
+					  (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
     }
 
 #endif
