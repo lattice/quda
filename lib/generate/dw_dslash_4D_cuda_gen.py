@@ -165,9 +165,9 @@ def def_input_spinor():
     str += "#else\n"
     str += "#define spinorFloat float\n"
     str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
-    str += "#define POW(a, b) powf(a, (spinorFloat)b)\n"
+    str += "#define POW(a, b) __powf(a, (spinorFloat)b)\n"
     str += "#else\n"
-    str += "#define POW(a, b) powf(a, b)\n"
+    str += "#define POW(a, b) __powf(a, b)\n"
     str += "#endif\n\n"
     for s in range(0,4):
         for c in range(0,3):
@@ -945,15 +945,17 @@ def gen_dw_inv():
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + POW(kappa,param.Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = 0.5 / ( 1.0 + POW(kappa,param.Ls)*mferm);\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
     str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;\n\n"
+        str += "    int exponent = xs > s ? param.Ls-xs+s : s-xs;\n"
+        str += "    factorR = inv_d_n * POW(kappa,exponent) * ( xs > s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;\n\n"
+        str += "    int exponent = xs < s ? param.Ls-s+xs : xs-s;\n"
+        str += "    factorR = inv_d_n * POW(kappa,exponent) * ( xs < s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));\n\n"
     str += "    sp_idx = base_idx + s*Vh;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
@@ -983,9 +985,11 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;\n\n"
+        str += "    int exponent2 = xs < s ? param.Ls-s+xs : xs-s;\n"
+        str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( xs < s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));\n\n"
     else : 
-        str += "    factorL = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;\n\n"
+        str += "    int exponent2 = xs > s ? param.Ls-xs+s : s-xs;\n"
+        str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( xs > s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"

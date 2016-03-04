@@ -49,9 +49,9 @@
 #else
 #define spinorFloat float
 #if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
-#define POW(a, b) powf(a, (spinorFloat)b)
+#define POW(a, b) __powf(a, (spinorFloat)b)
 #else
-#define POW(a, b) powf(a, b)
+#define POW(a, b) __powf(a, b)
 #endif
 
 #define i00_re I0.x

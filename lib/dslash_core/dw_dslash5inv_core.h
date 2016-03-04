@@ -49,9 +49,9 @@
 #else
 #define spinorFloat float
 #if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
-#define POW(a, b) powf(a, (spinorFloat)b)
+#define POW(a, b) __powf(a, (spinorFloat)b)
 #else
-#define POW(a, b) powf(a, b)
+#define POW(a, b) __powf(a, b)
 #endif
 
 #define i00_re I0.x
@@ -176,13 +176,14 @@ VOLATILE spinorFloat kappa;
 // s' = input vector index and
 // 'a'= kappa5
 
-  spinorFloat inv_d_n = 1.0 / ( 1.0 + POW(kappa,param.Ls)*mferm);
+  spinorFloat inv_d_n = 0.5 / ( 1.0 + POW(kappa,param.Ls)*mferm);
   spinorFloat factorR;
   spinorFloat factorL;
 
   for(int s = 0; s < param.Ls; s++)
   {
-    factorR = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;
+    int exponent = xs < s ? param.Ls-s+xs : xs-s;
+    factorR = inv_d_n * POW(kappa,exponent) * ( xs < s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));
 
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
@@ -213,7 +214,8 @@ VOLATILE spinorFloat kappa;
     o32_re += factorR*(i12_re + i32_re);
     o32_im += factorR*(i12_im + i32_im);
 
-    factorL = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;
+    int exponent2 = xs > s ? param.Ls-xs+s : s-xs;
+    factorL = inv_d_n * POW(kappa,exponent2) * ( xs > s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));
 
     o00_re += factorL*(i00_re - i20_re);
     o00_im += factorL*(i00_im - i20_im);
