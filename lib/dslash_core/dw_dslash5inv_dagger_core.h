@@ -14,7 +14,7 @@
 #define spinorFloat double
 // workaround for C++11 bug in CUDA 6.5/7.0
 #if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
-#define POW(a, b) pow(a, (spinorFloat)b)
+#define POW(a, b) pow(a, static_cast<spinorFloat>(b))
 #else
 #define POW(a, b) pow(a, b)
 #endif
@@ -49,7 +49,7 @@
 #else
 #define spinorFloat float
 #if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
-#define POW(a, b) __powf(a, (spinorFloat)b)
+#define POW(a, b) __powf(a, static_cast<spinorFloat>(b))
 #else
 #define POW(a, b) __powf(a, b)
 #endif
@@ -155,9 +155,9 @@ xs = X/(X1*X2*X3*X4);
 VOLATILE spinorFloat kappa;
 
 #ifdef MDWF_mode   // Check whether MDWF option is enabled
-  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));
+  kappa = -(mdwf_c5[xs]*(static_cast<spinorFloat>(4.0) + m5) - static_cast<spinorFloat>(1.0))/(mdwf_b5[xs]*(static_cast<spinorFloat>(4.0) + m5) + static_cast<spinorFloat>(1.0));
 #else
-  kappa = 2.0*a;
+  kappa = static_cast<spinorFloat>(2.0)*a;
 #endif  // select MDWF mode
 
 // M5_inv operation -- NB: not partitionable!
@@ -176,14 +176,14 @@ VOLATILE spinorFloat kappa;
 // s' = input vector index and
 // 'a'= kappa5
 
-  spinorFloat inv_d_n = 0.5 / ( 1.0 + POW(kappa,param.Ls)*mferm);
+  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.Ls)*mferm );
   spinorFloat factorR;
   spinorFloat factorL;
 
   for(int s = 0; s < param.Ls; s++)
   {
     int exponent = xs > s ? param.Ls-xs+s : s-xs;
-    factorR = inv_d_n * POW(kappa,exponent) * ( xs > s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));
+    factorR = inv_d_n * POW(kappa,exponent) * ( xs > s ? -mferm : static_cast<spinorFloat>(1.0) );
 
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
@@ -215,7 +215,7 @@ VOLATILE spinorFloat kappa;
     o32_im += factorR*(i12_im + i32_im);
 
     int exponent2 = xs < s ? param.Ls-s+xs : xs-s;
-    factorL = inv_d_n * POW(kappa,exponent2) * ( xs < s ? -static_cast<spinorFloat>(mferm) : static_cast<spinorFloat>(1.0));
+    factorL = inv_d_n * POW(kappa,exponent2) * ( xs < s ? -mferm : static_cast<spinorFloat>(1.0));
 
     o00_re += factorL*(i00_re - i20_re);
     o00_im += factorL*(i00_im - i20_im);
