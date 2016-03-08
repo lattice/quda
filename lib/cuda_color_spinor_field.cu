@@ -1783,7 +1783,7 @@ namespace quda {
 			  ghost_face_bytes[dim],
 			  cudaMemcpyDeviceToDevice,	
 			  *copy_stream); // copy to forward processor
-	    cudaDeviceSynchronize(); 
+	    cudaDeviceSynchronize();  // FIXME!!!!
 	    } else {
 	     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
 	     int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
@@ -2107,9 +2107,6 @@ namespace quda {
     int dim = dir/2;
     if(!commDimPartitioned(dim)) return 0;
 
-
-    if(!commDimPartitioned(dim)) return 0;
-
     int receive_complete=0;
     int send_complete=0;
 
@@ -2133,7 +2130,8 @@ namespace quda {
 
 #ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(0,dim)){
-	send_complete = ipcCopyComplete(0,dim);
+	send_complete = (comm_query(mh_send_p2p_back[dim])
+			 && ipcCopyComplete(0,dim));
       } else 
 #endif
       {
@@ -2153,7 +2151,8 @@ namespace quda {
 
 #ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)){
-	send_complete = ipcCopyComplete(1,dim);
+	send_complete = (comm_query(mh_send_p2p_fwd[dim])
+			 && ipcCopyComplete(1,dim));
       } else 
 #endif
       {
