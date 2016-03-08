@@ -714,7 +714,6 @@ namespace quda {
 
       // create the ghost texture object
      if(ghost_bytes){
-
         cudaResourceDesc resDesc;
         memset(&resDesc, 0, sizeof(resDesc));
         resDesc.resType = cudaResourceTypeLinear;
@@ -752,7 +751,6 @@ namespace quda {
           resDesc.res.linear.devPtr = ghost_field;
           resDesc.res.linear.desc = desc;
           resDesc.res.linear.sizeInBytes = ghost_bytes;                    
-      
 
 	  cudaCreateTextureObject(&ghostTexNorm, &resDesc, &texDesc, NULL);
         }

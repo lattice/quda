@@ -172,6 +172,8 @@ namespace quda {
 #endif // DYNAMIC_CLOVER
 #endif // MULTI_GPU
         break;
+      default:
+	errorQuda("Unsupported twisted-dslash type %d", dslashType);
       }
     }
 
@@ -201,7 +203,8 @@ namespace quda {
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cNorm, cloverInv, cNrm2,
 	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)x->V(), (float*)x->Norm());
 	break;
-      default: errorQuda("Invalid twisted clover dslash type");
+      default:
+	errorQuda("Invalid twisted clover dslash type");
       }
     }
 

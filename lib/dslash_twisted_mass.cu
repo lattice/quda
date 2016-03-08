@@ -105,6 +105,8 @@ namespace quda {
       case QUDA_DEG_DSLASH_TWIST_XPAY:
 	strcat(key.aux,",DslashTwist");
 	break;
+      default:
+	errorQuda("Unsupported twisted-dslash type %d", dslashType);
       }
       return key;
     }

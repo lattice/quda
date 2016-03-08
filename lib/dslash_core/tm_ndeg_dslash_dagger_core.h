@@ -185,10 +185,6 @@ VOLATILE spinorFloat o2_32_im;
 int x1, x2, x3, x4;
 int X;
 
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
-int sp_norm_idx;
-#endif // MULTI_GPU half precision
-
 int sid;
 
 #ifdef MULTI_GPU

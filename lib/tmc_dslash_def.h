@@ -422,7 +422,7 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
-#define SPINORTEX param.ghostTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
 #define GHOSTSPINORTEX ghostSpinorTexHalf

@@ -312,13 +312,6 @@ int sid;
 int dim;
 int face_idx;
 int Y[4] = {X1,X2,X3,X4};
-#if (DD_PREC==2)
-int faceVolume[4];
-faceVolume[0] = (X2*X3*X4)>>1;
-faceVolume[1] = (X1*X3*X4)>>1;
-faceVolume[2] = (X1*X2*X4)>>1;
-faceVolume[3] = (X1*X2*X3)>>1;
-#endif
 """)
         else:
             prolog_str += (
@@ -327,13 +320,6 @@ int dim;
 int face_idx;
 int face_num;
 int Y[4] = {X1,X2,X3,X4};
-#if (DD_PREC==2)
-int faceVolume[4];
-faceVolume[0] = (X2*X3*X4)>>1;
-faceVolume[1] = (X1*X3*X4)>>1;
-faceVolume[2] = (X1*X2*X4)>>1;
-faceVolume[3] = (X1*X2*X3)>>1;
-#endif
 """)
 
         prolog_str+= (
