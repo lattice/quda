@@ -6,7 +6,6 @@
 
 #include <fermion_force_quda.h>
 #include <force_common.h>
-#include <hw_quda.h>
 
 #if defined(GPU_FERMION_FORCE)
 namespace quda {
@@ -1189,23 +1188,23 @@ namespace quda {
 
 
 
-#define Pmu          tempvec[0] 
-#define Pnumu        tempvec[1]
-#define Prhonumu     tempvec[2]
-#define P7           tempvec[3]
-#define P7rho        tempvec[4]              
-#define P7rhonu      tempvec[5]
-#define P5           tempvec[6]
-#define P3           tempvec[7]
-#define P5nu         tempvec[3]
-#define P3mu         tempvec[3]
-#define Popmu        tempvec[4]
-#define Pmumumu      tempvec[4]
+#define Pmu          (*tempvec[0]) 
+#define Pnumu        (*tempvec[1])
+#define Prhonumu     (*tempvec[2])
+#define P7           (*tempvec[3])
+#define P7rho        (*tempvec[4])
+#define P7rhonu      (*tempvec[5])
+#define P5           (*tempvec[6])
+#define P3           (*tempvec[7])
+#define P5nu         (*tempvec[3])
+#define P3mu         (*tempvec[3])
+#define Popmu        (*tempvec[4])
+#define Pmumumu      (*tempvec[4])
 
   template<typename Real>
   static void
-  do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coeff, FullHw cudaHw, 
-			cudaGaugeField &siteLink, cudaGaugeField &cudaMom, FullHw tempvec[8], QudaGaugeParam* param)
+  do_fermion_force_cuda(Real eps, Real weight1, Real weight2,  Real* act_path_coeff, cudaColorSpinorField &cudaHw, 
+			cudaGaugeField &siteLink, cudaGaugeField &cudaMom, cudaColorSpinorField *tempvec[8], QudaGaugeParam* param)
   {
     
     int mu, nu, rho, sig;
@@ -1254,9 +1253,9 @@ namespace quda {
 	//3-link
 	//Kernel A: middle link
 	    
-	middle_link_kernel( (float2*)cudaHw.even.data, (float2*)cudaHw.odd.data,
-			    (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
-			    (float2*)P3.even.data, (float2*)P3.odd.data,
+	middle_link_kernel( (float2*)(cudaHw.Even().V()), (float2*)(cudaHw.Odd().V()),
+			    (float2*)(Pmu.Even().V()), (float2*)(Pmu.Odd().V()),
+			    (float2*)(P3.Even().V()), (float2*)(P3.Odd().V()),
 			    sig, mu, mThreeSt,
 			    (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(), siteLink, 
 			    (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(), 
@@ -1269,9 +1268,9 @@ namespace quda {
 	  }
 	  //5-link: middle link
 	  //Kernel B
-	  middle_link_kernel( (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
-			      (float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
-			      (float2*)P5.even.data, (float2*)P5.odd.data,
+	  middle_link_kernel( (float2*)(Pmu.Even().V()), (float2*)(Pmu.Odd().V()),
+			      (float2*)(Pnumu.Even().V()), (float2*)(Pnumu.Odd().V()),
+			      (float2*)(P5.Even().V()), (float2*)(P5.Odd().V()),
 			      sig, nu, FiveSt,
 			      (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(), siteLink, 
 			      (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(),
@@ -1289,11 +1288,11 @@ namespace quda {
 		    
 	    if(FiveSt.x != 0)coeff.x = SevenSt.x/FiveSt.x ; else coeff.x = 0;
 	    if(FiveSt.y != 0)coeff.y = SevenSt.y/FiveSt.y ; else coeff.y = 0;		    
-	    all_link_kernel((float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
-			    (float2*)Prhonumu.even.data, (float2*)Prhonumu.odd.data,
-			    (float2*)P7.even.data, (float2*)P7.odd.data,
-			    (float2*)P7rho.even.data, (float2*)P7rho.odd.data,
-			    (float2*)P5.even.data, (float2*)P5.odd.data,
+	    all_link_kernel((float2*)(Pnumu.Even().V()), (float2*)(Pnumu.Odd().V()),
+			    (float2*)(Prhonumu.Even().V()), (float2*)(Prhonumu.Odd().V()),
+			    (float2*)(P7.Even().V()), (float2*)(P7.Odd().V()),
+			    (float2*)(P7rho.Even().V()), (float2*)(P7rho.Odd().V()),
+			    (float2*)(P5.Even().V()), (float2*)(P5.Odd().V()),
 			    sig, rho, SevenSt,mSevenSt,coeff,
 			    (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(), siteLink,
 			    (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(),
@@ -1306,11 +1305,11 @@ namespace quda {
 	  //kernel B2
 	  if(ThreeSt.x != 0)coeff.x = FiveSt.x/ThreeSt.x ; else coeff.x = 0;
 	  if(ThreeSt.y != 0)coeff.y = FiveSt.y/ThreeSt.y ; else coeff.y = 0;
-	  side_link_kernel((float2*)P5.even.data, (float2*)P5.odd.data,
-			   (float2*)P5nu.even.data, (float2*)P5nu.odd.data,
-			   (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
-			   (float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
-			   (float2*)P3.even.data, (float2*)P3.odd.data,
+	  side_link_kernel((float2*)(P5.Even().V()), (float2*)(P5.Odd().V()),
+			   (float2*)(P5nu.Even().V()), (float2*)(P5nu.Odd().V()),
+			   (float2*)(Pmu.Even().V()), (float2*)(Pmu.Odd().V()),
+			   (float2*)(Pnumu.Even().V()), (float2*)(Pnumu.Odd().V()),
+			   (float2*)(P3.Even().V()), (float2*)(P3.Odd().V()),
 			   sig, nu, mFiveSt, coeff,
 			   (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(), siteLink,
 			   (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(),
@@ -1321,9 +1320,9 @@ namespace quda {
 	    
 	//lepage
 	//Kernel A2
-	middle_link_kernel( (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
-			    (float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
-			    (float2*)P5.even.data, (float2*)P5.odd.data,
+	middle_link_kernel( (float2*)(Pmu.Even().V()), (float2*)(Pmu.Odd().V()),
+			    (float2*)(Pnumu.Even().V()), (float2*)(Pnumu.Odd().V()),
+			    (float2*)(P5.Even().V()), (float2*)(P5.Odd().V()),
 			    sig, mu, Lepage,
 			    (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(), siteLink, 
 			    (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(),
@@ -1333,11 +1332,11 @@ namespace quda {
 	if(ThreeSt.x != 0)coeff.x = Lepage.x/ThreeSt.x ; else coeff.x = 0;
 	if(ThreeSt.y != 0)coeff.y = Lepage.y/ThreeSt.y ; else coeff.y = 0;
 	    
-	side_link_kernel((float2*)P5.even.data, (float2*)P5.odd.data,
-			 (float2*)P5nu.even.data, (float2*)P5nu.odd.data,
-			 (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
-			 (float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
-			 (float2*)P3.even.data, (float2*)P3.odd.data,
+	side_link_kernel((float2*)(P5.Even().V()), (float2*)(P5.Odd().V()),
+			 (float2*)(P5nu.Even().V()), (float2*)(P5nu.Odd().V()),
+			 (float2*)(Pmu.Even().V()), (float2*)(Pmu.Odd().V()),
+			 (float2*)(Pnumu.Even().V()), (float2*)(Pnumu.Odd().V()),
+			 (float2*)(P3.Even().V()), (float2*)(P3.Odd().V()),
 			 sig, mu, mLepage,coeff,
 			 (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(), siteLink,
 			 (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(),
@@ -1346,10 +1345,10 @@ namespace quda {
 	    
 	//3-link side link
 	coeff.x=coeff.y=0;
-	side_link_kernel((float2*)P3.even.data, (float2*)P3.odd.data,
-			 (float2*)P3mu.even.data, (float2*)P3mu.odd.data,
-			 (float2*)cudaHw.even.data, (float2*)cudaHw.odd.data,
-			 (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
+	side_link_kernel((float2*)(P3.Even().V()), (float2*)(P3.Odd().V()),
+			 (float2*)(P3mu.Even().V()), (float2*)(P3mu.Odd().V()),
+			 (float2*)(cudaHw.Even().V()), (float2*)(cudaHw.Odd().V()),
+			 (float2*)(Pmu.Even().V()), (float2*)(Pmu.Odd().V()),
 			 (float2*)NULL, (float2*)NULL,
 			 sig, mu, ThreeSt,coeff,
 			 (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(), siteLink,
@@ -1361,9 +1360,9 @@ namespace quda {
 	if (!DirectLinks[mu]){
 	  DirectLinks[mu]=1;
 	  //kernel Z	    
-	  one_and_naik_terms_kernel((float2*)cudaHw.even.data, (float2*)cudaHw.odd.data,
-				    (float2*)Pmu.even.data, (float2*)Pmu.odd.data,
-				    (float2*)Pnumu.even.data, (float2*)Pnumu.odd.data,
+	  one_and_naik_terms_kernel((float2*)(cudaHw.Even().V()), (float2*)(cudaHw.Odd().V()),
+				    (float2*)(Pmu.Even().V()), (float2*)(Pmu.Odd().V()),
+				    (float2*)(Pnumu.Even().V()), (float2*)(Pnumu.Odd().V()),
 				    mu, OneLink, Naik, mNaik, 
 				    (float4*)siteLink.Even_p(), (float4*)siteLink.Odd_p(),
 				    (float2*)cudaMom.Even_p(), (float2*)cudaMom.Odd_p(),
@@ -1396,10 +1395,9 @@ namespace quda {
 
   void
   fermion_force_cuda(double eps, double weight1, double weight2, void* act_path_coeff,
-		     FullHw cudaHw, cudaGaugeField &siteLink, cudaGaugeField &cudaMom, QudaGaugeParam* param)
+		     cudaColorSpinorField &cudaHw, cudaGaugeField &siteLink, cudaGaugeField &cudaMom, QudaGaugeParam* param)
   {
     int i;
-    FullHw tempvec[8];
   
     if (siteLink.Reconstruct() != QUDA_RECONSTRUCT_12) 
       errorQuda("Reconstruct type %d not supported for gauge field", siteLink.Reconstruct());
@@ -1407,8 +1405,10 @@ namespace quda {
     if (cudaMom.Reconstruct() != QUDA_RECONSTRUCT_10)
       errorQuda("Reconstruct type %d not supported for momentum field", cudaMom.Reconstruct());
 
-    for(i=0;i < 8;i++){
-      tempvec[i]  = createHwQuda(param->X, param->cuda_prec);
+    cudaColorSpinorField *tempvec[8];
+    ColorSpinorParam csParam(cudaHw);
+    for(i=0; i<8; i++){
+      tempvec[i]  = new cudaColorSpinorField(csParam);
     }
     
     if (param->cuda_prec == QUDA_DOUBLE_PRECISION){
@@ -1422,8 +1422,8 @@ namespace quda {
 			     cudaHw, siteLink, cudaMom, tempvec, param);	
     }
     
-    for(i=0;i < 8;i++){
-      freeHwQuda(tempvec[i]);
+    for(i=0; i<8; i++){
+      delete tempvec[i];
     }
    
 

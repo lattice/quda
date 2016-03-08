@@ -55,7 +55,13 @@ void initComms(int argc, char **argv, const int *commDims)
   QMP_declare_logical_topology(commDims, 4);
 
 #elif defined(MPI_COMMS)
+#ifdef PTHREADS
+  int provided;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+#else
   MPI_Init(&argc, &argv);
+#endif
+
 #endif
   initCommsGridQuda(4, commDims, NULL, NULL);
   initRand();
@@ -501,7 +507,7 @@ neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   x2 = (x2+dx2+Z[1]) % Z[1];
   x1 = (x1+dx1+Z[0]) % Z[0];
   
-  if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
+  if ( (ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)){
     ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
   }else{
     ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;    
@@ -720,7 +726,7 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 }
 
 template <typename Float>
-void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
+void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
 
   int X1h=param->X[0]/2;
@@ -730,9 +736,11 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
   int X4 =param->X[3];
 
   // rescale long links by the appropriate coefficient
-  for(int d=0; d<4; d++){
-    for(int i=0; i < V*gaugeSiteSize; i++){
-      gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    for(int d=0; d<4; d++){
+      for(int i=0; i < V*gaugeSiteSize; i++){
+	gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
+      }
     }
   }
 
@@ -747,7 +755,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
       int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
       int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
       int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
-      int sign=1;
+      int sign = 1;
 
       if (d == 0) {
 	if (i4 % 2 == 1){
@@ -777,17 +785,17 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
       int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
       int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
       int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
-      int sign=1;
+      int sign = 1;
 
       if (d == 0) {
 	if (i4 % 2 == 1){
-	  sign= -1;
+	  sign = -1;
 	}
       }
 
       if (d == 1){
 	if ((i4+i1) % 2 == 1){
-	  sign= -1;
+	  sign = -1;
 	}
       }
       if (d == 2){
@@ -807,8 +815,14 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
   if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
     for (int j = 0; j < Vh; j++) {
       int sign =1;
-      if (j >= (X4-3)*X1h*X2*X3 ){
-	sign= -1;
+      if (dslash_type == QUDA_ASQTAD_DSLASH) {
+	if (j >= (X4-3)*X1h*X2*X3 ){
+	  sign = -1;
+	}
+      } else {
+	if (j >= (X4-1)*X1h*X2*X3 ){
+	  sign = -1;
+	}
       }
 
       for (int i = 0; i < 6; i++) {
@@ -817,6 +831,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
       }
     }
   }
+
 }
 
 
@@ -862,7 +877,7 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
 }
 
 template <typename Float> 
-static void constructGaugeField(Float **res, QudaGaugeParam *param) {
+static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {  
     resEven[dir] = res[dir];
@@ -921,7 +936,7 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
   if (param->type == QUDA_WILSON_LINKS){  
     applyGaugeFieldScaling(res, Vh, param);
   } else if (param->type == QUDA_ASQTAD_LONG_LINKS){
-    applyGaugeFieldScaling_long(res, Vh, param);      
+    applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
   } else if (param->type == QUDA_ASQTAD_FAT_LINKS){
     for (int dir = 0; dir < 4; dir++){ 
       for (int i = 0; i < Vh; i++) {
@@ -1029,15 +1044,16 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     }
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) {
-      param->type = QUDA_ASQTAD_FAT_LINKS;
-      constructGaugeField((double**)fatlink, param);
+      // if doing naive staggered then set to long links so that the staggered phase is applied
+      param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+      constructGaugeField((double**)fatlink, param, dslash_type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((double**)longlink, param);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((double**)longlink, param, dslash_type);
     }else {
-      param->type = QUDA_ASQTAD_FAT_LINKS;
-      constructGaugeField((float**)fatlink, param);
+      param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+      constructGaugeField((float**)fatlink, param, dslash_type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((float**)longlink, param);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((float**)longlink, param, dslash_type);
     }
   }
 
@@ -1064,7 +1080,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     }
   }
 
-  if (dslash_type == QUDA_STAGGERED_DSLASH) { // set all links to zero to emulate the 1-link operator
+  // set all links to zero to emulate the 1-link operator (needed for host comparison)
+  if (dslash_type == QUDA_STAGGERED_DSLASH) { 
     for(int dir=0; dir<4; ++dir){
       for(int i=0; i<V; ++i){
 	for(int j=0; j<gaugeSiteSize; j+=2){
@@ -1079,7 +1096,6 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       }
     }
   }
-
 
 }
 
@@ -1560,19 +1576,31 @@ int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 bool tune = true;
-int niter = 10;
+int niter = 100;
 int test_type = 0;
+int nvec  = 1;
+char vec_infile[256] = "";
+char vec_outfile[256] = "";
 QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
+double anisotropy = 1.0;
 double tol = 1e-7;
 double tol_hq = 0.;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
+
+int mg_levels = 2;
+
+int nu_pre = 2;
+int nu_post = 2;
+bool generate_nullspace = true;
+
+int geo_block_size[] = {4, 4, 4, 4, 4};
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1595,12 +1623,14 @@ void usage(char** argv )
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n"); 
   printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n"); 
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
-  printf("    --sdim <n>                                # Set space dimention(X/Y/Z) size\n"); 
+  printf("    --dim <n>                                 # Set space-time dimension (X Y Z T)\n"); 
+  printf("    --sdim <n>                                # Set space dimension(X/Y/Z) size\n"); 
   printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
   printf("    --Lsdim <n>                               # Set Ls dimension size(default 16)\n");  
+  printf("    --gridsize <x y z t>                      # Set the grid size in all four dimension (default 1 1 1 1)\n");
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1614,9 +1644,11 @@ void usage(char** argv )
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
-  printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified))\n");
+  printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
+	 "                                                  For multigrid this sets the smoother type.\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
+  printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
@@ -1624,7 +1656,17 @@ void usage(char** argv )
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
+  printf("    --mg-nvec                                 # Number of null-space vectors to define the multigrid transfer operator at each level\n");
+  printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
+  printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
+  printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-block-size <x y z t>                 # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
+  printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
+  printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
+  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --help                                    # Print out this message\n"); 
+
   usage_extra(argv); 
 #ifdef MULTI_GPU
   char msg[]="multi";
@@ -1725,6 +1767,51 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--dim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    xdim= atoi(argv[i+1]);
+    if (xdim < 0 || xdim > 512){
+      printf("ERROR: invalid X dimension (%d)\n", xdim);
+      usage(argv);
+    }
+    i++;
+
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    ydim= atoi(argv[i+1]);
+    if (ydim < 0 || ydim > 512){
+      printf("ERROR: invalid Y dimension (%d)\n", ydim);
+      usage(argv);
+    }
+    i++;
+
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    zdim= atoi(argv[i+1]);
+    if (zdim < 0 || zdim > 512){
+      printf("ERROR: invalid Z dimension (%d)\n", zdim);
+      usage(argv);
+    }
+    i++;
+
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    tdim= atoi(argv[i+1]);
+    if (tdim < 0 || tdim > 512){
+      printf("ERROR: invalid T dimension (%d)\n", tdim);
+      usage(argv);
+    }
+    i++;
+
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--xdim") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -1774,7 +1861,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }	    
     tdim =  atoi(argv[i+1]);
     if (tdim < 0 || tdim > 512){
-      errorQuda("Error: invalid t dimension");
+      printf("Error: invalid t dimension");
+      usage(argv);
     }
     i++;
     ret = 0;
@@ -1787,7 +1875,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }	    
     int sdim =  atoi(argv[i+1]);
     if (sdim < 0 || sdim > 512){
-      printfQuda("ERROR: invalid S dimension\n");
+      printf("ERROR: invalid S dimension\n");
+      usage(argv);
     }
     xdim=ydim=zdim=sdim;
     i++;
@@ -1801,7 +1890,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }	    
     int Ls =  atoi(argv[i+1]);
     if (Ls < 0 || Ls > 128){
-      printfQuda("ERROR: invalid Ls dimension\n");
+      printf("ERROR: invalid Ls dimension\n");
+      usage(argv);
     }
     Lsdim=Ls;
     i++;
@@ -1880,13 +1970,54 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--gridsize") == 0){
+    if (i+1 >= argc){ 
+      usage(argv);
+    }     
+    int xsize =  atoi(argv[i+1]);
+    if (xsize <= 0 ){
+      printf("ERROR: invalid X grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[0] = xsize;
+    i++;
+
+    int ysize =  atoi(argv[i+1]);
+    if (ysize <= 0 ){
+      printf("ERROR: invalid Y grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[1] = ysize;
+    i++;
+
+    int zsize =  atoi(argv[i+1]);
+    if (zsize <= 0 ){
+      printf("ERROR: invalid Z grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[2] = zsize;
+    i++;
+
+    int tsize =  atoi(argv[i+1]);
+    if (tsize <= 0 ){
+      printf("ERROR: invalid T grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[3] = tsize;
+    i++;
+
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--xgridsize") == 0){
     if (i+1 >= argc){ 
       usage(argv);
     }     
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
-      errorQuda("ERROR: invalid X grid size");
+      printf("ERROR: invalid X grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[0] = xsize;
     i++;
@@ -1900,7 +2031,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }     
     int ysize =  atoi(argv[i+1]);
     if (ysize <= 0 ){
-      errorQuda("ERROR: invalid Y grid size");
+      printf("ERROR: invalid Y grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[1] = ysize;
     i++;
@@ -1914,7 +2046,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }     
     int zsize =  atoi(argv[i+1]);
     if (zsize <= 0 ){
-      errorQuda("ERROR: invalid Z grid size");
+      printf("ERROR: invalid Z grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[2] = zsize;
     i++;
@@ -1928,7 +2061,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }     
     int tsize =  atoi(argv[i+1]);
     if (tsize <= 0 ){
-      errorQuda("ERROR: invalid T grid size");
+      printf("ERROR: invalid T grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[3] = tsize;
     i++;
@@ -1981,6 +2115,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--anisotropy") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    anisotropy = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2046,6 +2190,151 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;	    
   }
     
+  if( strcmp(argv[i], "--mg-nvec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    nvec= atoi(argv[i+1]);
+    if (nvec < 0 || nvec > 128){
+      printf("ERROR: invalid number of vectors (%d)\n", nvec);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-levels") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mg_levels= atoi(argv[i+1]);
+    if (mg_levels < 2 || mg_levels > QUDA_MAX_MG_LEVEL){
+      printf("ERROR: invalid number of multigrid levels (%d)\n", mg_levels);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-nu-pre") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    nu_pre= atoi(argv[i+1]);
+    if (nu_pre < 0 || nu_pre > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_pre=%d)\n", nu_pre);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-nu-post") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    nu_post= atoi(argv[i+1]);
+    if (nu_post < 0 || nu_post > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-block-size") == 0){
+    if (i+1 >= argc){ 
+      usage(argv);
+    }     
+    int xsize =  atoi(argv[i+1]);
+    if (xsize <= 0 ){
+      printf("ERROR: invalid X block size");
+      usage(argv);
+    }
+    geo_block_size[0] = xsize;
+    i++;
+
+    int ysize =  atoi(argv[i+1]);
+    if (ysize <= 0 ){
+      printf("ERROR: invalid Y block size");
+      usage(argv);
+    }
+    geo_block_size[1] = ysize;
+    i++;
+
+    int zsize =  atoi(argv[i+1]);
+    if (zsize <= 0 ){
+      printf("ERROR: invalid Z block size");
+      usage(argv);
+    }
+    geo_block_size[2] = zsize;
+    i++;
+
+    int tsize =  atoi(argv[i+1]);
+    if (tsize <= 0 ){
+      printf("ERROR: invalid T block size");
+      usage(argv);
+    }
+    geo_block_size[3] = tsize;
+    i++;
+
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mass") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-generate-nullspace") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      generate_nullspace = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      generate_nullspace = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid generate nullspace type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-load-vec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    strcpy(vec_infile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-save-vec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    strcpy(vec_outfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);

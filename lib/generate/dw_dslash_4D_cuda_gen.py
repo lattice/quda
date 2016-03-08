@@ -908,6 +908,12 @@ def gen_dw():
 def gen_dw_inv():
 
     str = "\n"
+    str += "// workaround for C++11 bug in CUDA 6.5/7.0\n"
+    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
+    str += "#define POW(a, b) pow(a, (spinorFloat)b)\n"
+    str += "#else\n"
+    str += "#define POW(a, b) pow(a, b)\n"
+    str += "#endif\n\n"
     str += "VOLATILE spinorFloat kappa;\n\n"
     str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
     str += "  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));\n"
@@ -927,15 +933,15 @@ def gen_dw_inv():
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + POW(kappa,param.Ls)*mferm);\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
     str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorR = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    factorR = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;\n\n"
     str += "    sp_idx = base_idx + s*Vh;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
@@ -965,9 +971,9 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    factorL = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;\n\n"
     else : 
-        str += "    factorL = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorL = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"
@@ -995,6 +1001,7 @@ def gen_dw_inv():
     str += "    o32_im += factorL*(i32_im - i12_im);\n"
     str += "  }\n"
     str += "} // end of M5inv dimension\n\n"
+    str += "#undef POW\n"
 
     return str
 # end def gen_dw_inv

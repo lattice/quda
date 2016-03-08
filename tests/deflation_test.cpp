@@ -20,7 +20,7 @@
 #include <mpi.h>
 #endif
 
-#include <gauge_qio.h>
+#include <qio_field.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -43,6 +43,11 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern double tol; // tolerance for inverter
 
+extern QudaInverterType inv_type; // solver type
+
+extern double mass; // mass of Dirac operator
+extern double anisotropy;
+extern int niter; // max solver iterations
 
 extern char latfile[];
 
@@ -91,6 +96,9 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
+  // call srand() with a rank-dependent seed
+  initRand();
+
   display_test_info();
 
   // *** QUDA parameters begin here.
@@ -118,7 +126,7 @@ int main(int argc, char **argv)
   gauge_param.X[3] = tdim;
   inv_param.Ls = 1;
 
-  gauge_param.anisotropy = 1.0;
+  gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -134,7 +142,6 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.4086;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -161,6 +168,8 @@ int main(int argc, char **argv)
     //inv_param.solution_type = QUDA_MATPC_SOLUTION;
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
+    //inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+    //inv_param.solution_type = QUDA_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
@@ -169,16 +178,17 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
-  inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-
   inv_param.pipeline = 0;
 
   inv_param.gcrNkrylov = 10;
   inv_param.tol = tol;
 
-//! For deflated solvers only:
-  //inv_param.inv_type = QUDA_EIGCG_INVERTER;
-  inv_param.inv_type = QUDA_INC_EIGCG_INVERTER;
+  // set default solver type to incremental eigcg is not set at command line
+  if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
+    inv_type = QUDA_INC_EIGCG_INVERTER;
+
+  //! For deflated solvers only:
+  inv_param.inv_type = inv_type;
 
   inv_param.rhs_idx = 0;
 
@@ -187,29 +197,36 @@ int main(int argc, char **argv)
     inv_param.nev = 8; 
     inv_param.max_search_dim = 128;
     inv_param.deflation_grid = 24;//to test the stuff
-    inv_param.cuda_prec_ritz = cuda_prec;
+    inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
-  }else{
-    inv_param.nev = 0;
-    inv_param.max_search_dim = 0;
+    inv_param.use_reduced_vector_set = true;
+    inv_param.use_cg_updates = false;
+    inv_param.cg_iterref_tol = 5e-2;
+    inv_param.eigcg_max_restarts = 3;
+    inv_param.max_restart_num = 3;
+    inv_param.inc_tol = 1e-2;
+    inv_param.eigenval_tol = 1e-2;
+  }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    inv_param.nev = 31;
+    inv_param.max_search_dim = 95;
+    inv_param.deflation_grid = 320;//to test the stuff
+    inv_param.cuda_prec_ritz = cuda_prec_sloppy;
+//    inv_param.cuda_prec_ritz = cuda_prec_sloppy;//for the mixed precision uncomment this line, be sure that ((inv_param.nev + 1) % 16) = 0 is satisfied
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
-#if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
   inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
-#else
-  // Pre Fermi architecture only supports L2 relative residual norm
-  inv_param.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-#endif
+
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
 
-  inv_param.maxiter = 5000;
+  inv_param.maxiter = niter;
   inv_param.reliable_delta = 1e-1; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters
@@ -326,11 +343,13 @@ int main(int argc, char **argv)
 
   double *inverse_ritzVals = 0;
 
-  const int defl_dim  = inv_param.deflation_grid*inv_param.nev;
+  const int defl_dim  = (inv_param.inv_type != QUDA_GMRESDR_INVERTER && inv_param.inv_type != QUDA_GMRESDR_PROJ_INVERTER) ?  inv_param.deflation_grid*inv_param.nev : inv_param.nev;
 
-  ritzVects = malloc(defl_dim*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
+  size_t bytes = defl_dim*((long long)Vh)*spinorSiteSize*sSize*inv_param.Ls;
 
-  memset(ritzVects, 0, defl_dim*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+  ritzVects = malloc(bytes);
+
+  memset(ritzVects, 0, bytes);
 
   inverse_ritzVals = (double*)malloc(defl_dim*sizeof(double));
 
@@ -374,7 +393,8 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
   // perform the inversions
-  printfQuda("\nStart the incremental stage.\n");
+  if( inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) printfQuda("\nStart the incremental stage.\n");
+  //!
 
   for(int is = 0; is < inv_param.deflation_grid; is++)
   {
@@ -393,8 +413,7 @@ int main(int argc, char **argv)
 
     double time1 = -((double)clock());
 
-    inv_param.cuda_prec_sloppy = cuda_prec_sloppy; 
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, 0);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL);
 
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -403,17 +422,18 @@ int main(int argc, char **argv)
          inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time1);
      
     printfQuda("\n Current RHS : %d\n", inv_param.rhs_idx);
+
+    if(inv_param.inv_type == QUDA_GMRESDR_INVERTER || inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ||  inv_param.inv_type == QUDA_EIGCG_INVERTER) break;
   }
 
-  printfQuda("\n Total eigCG RHS : %d\n", inv_param.rhs_idx);
+
+  if( inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) printfQuda("\n Total number of RHS in the incremental stage: %d\n", inv_param.rhs_idx);
 //***
-  printfQuda("\nStart the initCG stage.\n");
+  const int projection_runs = (inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) ? 4 : 0;
 
-  const int initCGruns = 16; 
+  if(inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER) inv_param.max_search_dim = 96;//resize Krylov subspace dimension, not strictly necessary
 
-  int last_rhs  = 0;
-
-  for(int is = inv_param.deflation_grid; is < (inv_param.deflation_grid+initCGruns); is++)
+  for(int is = inv_param.deflation_grid; is < (inv_param.deflation_grid+projection_runs); is++)
   {
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
     {
@@ -425,15 +445,11 @@ int main(int argc, char **argv)
       memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
 
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-      //for (int i=0; i<inv_param.Ls*24*24*24*spinorSiteSize; i++) ((double*)spinorIn)[i] = comm_rank() == 0 ? rand() / (double)RAND_MAX: 0.0;
     }
-
-    if(is == (inv_param.deflation_grid+initCGruns-1)) last_rhs = 1;
 
     double time1 = -((double)clock());
 
-    inv_param.cuda_prec_sloppy = cuda_prec_precondition;//QUDA_HALF_PRECISION
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, inverse_ritzVals, last_rhs);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL);
   
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -441,11 +457,12 @@ int main(int argc, char **argv)
     printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time1);
   }
 
-  printfQuda("\nTotal  InitCG RHS : %d\n", inv_param.rhs_idx);
-
+  if(projection_runs != 0) printfQuda("\nTotal number of RHS after the projection stage: %d\n", inv_param.rhs_idx);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
+
+  destroyDeflationQuda(&inv_param, NULL, NULL, NULL);
 
   closeMagma();
     

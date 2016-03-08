@@ -17,10 +17,9 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
+#include <qio_field.h>
 // google test frame work
 #include <gtest.h>
-
-#include <gauge_qio.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -392,8 +391,8 @@ void init(int argc, char **argv) {
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
     
-    double cpu_norm = norm2(*spinor);
-    double cuda_norm = norm2(*cudaSpinor);
+    double cpu_norm = blas::norm2(*spinor);
+    double cuda_norm = blas::norm2(*cudaSpinor);
     printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
 
     bool pc;
@@ -419,7 +418,7 @@ void init(int argc, char **argv) {
       dirac = Dirac::create(diracParam);
     }
   } else {
-    double cpu_norm = norm2(*spinor);
+    double cpu_norm = blas::norm2(*spinor);
     printfQuda("Source: CPU = %e\n", cpu_norm);
   }
     
@@ -880,7 +879,10 @@ TEST(dslash, verify) {
 
 int main(int argc, char **argv)
 {
-
+  // initalize google test, includes command line options
+  ::testing::InitGoogleTest(&argc, argv);
+  // return code for google test
+  int test_rc = 0;
   for (int i =1;i < argc; i++){    
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -921,32 +923,24 @@ int main(int argc, char **argv)
     //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    int spinor_floats = test_type ? 2*(7*24+24)+24 : 7*24+24;
-    if (inv_param.cuda_prec == QUDA_HALF_PRECISION) 
-      spinor_floats += test_type ? 2*(7*2 + 2) + 2 : 7*2 + 2; // relative size of norm is twice a short
-    int gauge_floats = (test_type ? 2 : 1) * (gauge_param.gauge_fix ? 6 : 8) * gauge_param.reconstruct;
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-      gauge_floats += test_type ? 72*2 : 72;
-    }
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GB/s = %f\n\n", 
-	       (double)Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
     
-    double norm2_cpu = norm2(*spinorRef);
-    double norm2_cpu_cuda= norm2(*spinorOut);
+    double norm2_cpu = blas::norm2(*spinorRef);
+    double norm2_cpu_cuda= blas::norm2(*spinorOut);
     if (!transfer) {
-      double norm2_cuda= norm2(*cudaSpinorOut);
+      double norm2_cuda= blas::norm2(*cudaSpinorOut);
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
       printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
-  
+
     if (verify_results) {
-      ::testing::InitGoogleTest(&argc, argv);
-      if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+      test_rc = RUN_ALL_TESTS();
+      if (test_rc != 0) warningQuda("Tests failed");
     }
   }    
   end();
 
   finalizeComms();
+  return test_rc;
 }

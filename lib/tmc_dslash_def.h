@@ -67,16 +67,22 @@
 	#define DD_PARAMCLOVER const double2 *clover, const float *null2, const double2 *cloverInv, const float *null3
 	#if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
 		#define TMCLOVERTEX clover
-		#define TM_INV_CLOVERTEX cloverInv
+		#ifndef DYNAMIC_CLOVER
+			#define TM_INV_CLOVERTEX cloverInv
+		#endif
 		#define READ_CLOVER READ_CLOVER_DOUBLE_STR
 		#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_STR
 	#else
 		#ifdef USE_TEXTURE_OBJECTS
 			#define TMCLOVERTEX (param.cloverTex)
-			#define TM_INV_CLOVERTEX (param.cloverInvTex)
+			#ifndef DYNAMIC_CLOVER
+				#define TM_INV_CLOVERTEX (param.cloverInvTex)
+			#endif
 		#else
 			#define TMCLOVERTEX cloverTexDouble
-			#define TM_INV_CLOVERTEX cloverInvTexDouble
+			#ifndef DYNAMIC_CLOVER
+				#define TM_INV_CLOVERTEX cloverInvTexDouble
+			#endif
 		#endif
 		#define READ_CLOVER READ_CLOVER_DOUBLE_TEX
 		#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_TEX
@@ -86,16 +92,22 @@
 	#define DD_PARAMCLOVER const float4 *clover, const float *null2, const float4 *cloverInv,  const float *null3
 	#ifdef DIRECT_ACCESS_CLOVER
 		#define TMCLOVERTEX clover
-		#define TM_INV_CLOVERTEX cloverInv
+		#ifndef DYNAMIC_CLOVER
+			#define TM_INV_CLOVERTEX cloverInv
+		#endif
 		#define READ_CLOVER READ_CLOVER_SINGLE
 		#define ASSN_CLOVER ASSN_CLOVER_SINGLE
 	#else
 		#ifdef USE_TEXTURE_OBJECTS
 			#define TMCLOVERTEX (param.cloverTex)
-			#define TM_INV_CLOVERTEX (param.cloverInvTex)
+			#ifndef DYNAMIC_CLOVER
+				#define TM_INV_CLOVERTEX (param.cloverInvTex)
+			#endif
 		#else
 			#define TMCLOVERTEX cloverTexSingle
-			#define TM_INV_CLOVERTEX cloverInvTexSingle
+			#ifndef DYNAMIC_CLOVER
+				#define TM_INV_CLOVERTEX cloverInvTexSingle
+			#endif
 		#endif
 		#define READ_CLOVER READ_CLOVER_SINGLE_TEX
 		#define ASSN_CLOVER ASSN_CLOVER_SINGLE_TEX
@@ -104,20 +116,26 @@
 	#define DD_PARAMCLOVER const short4 *clover, const float *cNorm, const short4 *cloverInv, const float *cNrm2
 	#ifdef DIRECT_ACCESS_CLOVER
 		#define TMCLOVERTEX clover
-		#define TM_INV_CLOVERTEX cloverInv
+		#ifndef DYNAMIC_CLOVER
+			#define TM_INV_CLOVERTEX cloverInv
+		#endif
 		#define READ_CLOVER READ_CLOVER_HALF
 		#define ASSN_CLOVER ASSN_CLOVER_HALF
 	#else
 		#ifdef USE_TEXTURE_OBJECTS
 			#define TMCLOVERTEX (param.cloverTex)
 			#define TMCLOVERTEXNORM (param.cloverNormTex)
-			#define TM_INV_CLOVERTEX (param.cloverInvTex)
-			#define TM_INV_CLOVERTEXNORM (param.cloverInvNormTex)
+			#ifndef DYNAMIC_CLOVER
+				#define TM_INV_CLOVERTEX (param.cloverInvTex)
+				#define TM_INV_CLOVERTEXNORM (param.cloverInvNormTex)
+			#endif
 		#else
 			#define TMCLOVERTEX cloverTexHalf
 			#define TMCLOVERTEXNORM cloverTexNorm
-			#define TM_INV_CLOVERTEX cloverInvTexHalf
-			#define TM_INV_CLOVERTEXNORM cloverInvTexNorm
+			#ifndef DYNAMIC_CLOVER
+				#define TM_INV_CLOVERTEX cloverInvTexHalf
+				#define TM_INV_CLOVERTEXNORM cloverInvTexNorm
+			#endif
 		#endif
 		#define READ_CLOVER READ_CLOVER_HALF_TEX
 		#define ASSN_CLOVER ASSN_CLOVER_HALF_TEX
@@ -444,57 +462,44 @@
 
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
- #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
- #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
+#define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
+#define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
 // define the kernel
-//!051013
 template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+(DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
 
- #ifdef GPU_TWISTED_CLOVER_DIRAC
+#ifdef GPU_TWISTED_CLOVER_DIRAC
 
-  #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
-   #if DD_DAG
-    #include "tmc_dslash_dagger_fermi_core.h"
-   #else
-    #include "tmc_dslash_fermi_core.h"
-   #endif
+#if DD_DAG
+#include "tmc_dslash_dagger_fermi_core.h"
+#else
+#include "tmc_dslash_fermi_core.h"
+#endif
 
-  #elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
-   #if DD_DAG
-    #include "tmc_dslash_dagger_gt200_core.h"
-   #else
-    #include "tmc_dslash_gt200_core.h"
-   #endif
+#if DD_DAG
+#include "tmc_dslash_dagger_gt200_core.h"
+#else
+#include "tmc_dslash_gt200_core.h"
+#endif
 
-  #else  // fall-back is original G80 
-
-   #if DD_DAG
-    #include "tmc_dslash_dagger_g80_core.h"
-   #else
-    #include "tmc_dslash_g80_core.h"
-   #endif
-
-  #endif
-
- #endif
+#endif
 
 }
 
+#ifdef MULTI_GPU
 template <>
 __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
      (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_fermi_core.h"
@@ -502,7 +507,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tmc_fused_exterior_dslash_fermi_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
@@ -510,19 +515,12 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tmc_fused_exterior_dslash_gt200_core.h"
 #endif
 
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tmc_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "tmc_fused_exterior_dslash_g80_core.h"
-#endif
-
 #endif
 
 #endif
 
 }
+#endif // MULTI_GPU
 
 
 //NEW
@@ -539,7 +537,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tmc_dslash_dagger_fermi_core.h"
@@ -547,7 +545,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "tmc_dslash_fermi_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tmc_dslash_dagger_gt200_core.h"
@@ -555,27 +553,20 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "tmc_dslash_gt200_core.h"
 #endif
 
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tmc_dslash_dagger_g80_core.h"
-#else
-#include "tmc_dslash_g80_core.h"
-#endif
-
 #endif
 
 #endif
 
 }
 
+#ifdef MULTI_GPU
 template <>
 __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
      (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_fermi_core.h"
@@ -583,7 +574,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tmc_fused_exterior_dslash_fermi_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
@@ -591,19 +582,12 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tmc_fused_exterior_dslash_gt200_core.h"
 #endif
 
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tmc_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "tmc_fused_exterior_dslash_g80_core.h"
-#endif
-
 #endif
 
 #endif
 
 }
+#endif // MULTI_GPU
 
 #undef CLOVER_TWIST_XPAY
 #endif //(DD_XPAY==0) && (DD_TWIST==1)
@@ -671,8 +655,10 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef ASSN_CLOVER
 #undef TMCLOVERTEX
 #undef TMCLOVERTEXNORM
-#undef TM_INV_CLOVERTEX
-#undef TM_INV_CLOVERTEXNORM
+#ifndef DYNAMIC_CLOVER
+	#undef TM_INV_CLOVERTEX
+	#undef TM_INV_CLOVERTEXNORM
+#endif
 #undef CLOVER_DOUBLE
 
 #undef SPINOR_HOP

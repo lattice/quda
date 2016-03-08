@@ -1,111 +1,5 @@
-//
-// double2 contractCuda(float2 *x, float2 *y, float2 *result) {}
-//
-
-namespace quda
-{
-#include <gamma5.h>		// g5 kernel
-
-  /**
-     Class for the gamma5 kernels, sFloat is the typename of the spinor components (double2, float4...)
-  */
-
-  template <typename sFloat>
-  class Gamma5Cuda : public Tunable {
-
-  private:
-    cudaColorSpinorField *out;		//Output spinor
-    const cudaColorSpinorField *in;		//Input spinor
-
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
-
-    char *saveOut, *saveOutNorm;
-    
-  public:
-    Gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in) :
-      out(out), in(in) { bindSpinorTex<sFloat>(in, out); strcpy(aux,"gamma5");}
-
-    virtual ~Gamma5Cuda() { unbindSpinorTex<sFloat>(in, out); }
-
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in->VolString(), typeid(*this).name());
-    }
-
-    void apply(const cudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      gamma5Kernel<<<tp.grid, tp.block, tp.shared_bytes>>> ((sFloat*)out->V(), (float*)out->Norm(), (sFloat*)in->V(), (float*)in->Norm(), dslashParam, in->Stride());
-    }
-
-    void preTune()
-    {
-      saveOut = new char[out->Bytes()];
-      cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
-
-      if (typeid(sFloat) == typeid(short4))
-	{
-	  saveOutNorm = new char[out->NormBytes()];
-	  cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
-	}
-    }
-
-    void postTune()
-    {
-      cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-
-      if (typeid(sFloat) == typeid(short4))
-	{
-	  cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
-	  delete[] saveOutNorm;
-	}
-    }
-
-    std::string paramString(const TuneParam &param) const
-    {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-
-    long long flops() const { return 12ll * in->VolumeCB(); }
-    long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
-  };
-
-  /**
-     Applies a gamma5 matrix to a spinor, this is the function to be called in interfaces and it requires only
-     pointers to the output spinor (out) and the input spinor (in), in that order
-  */
-
-  void	gamma5Cuda	(cudaColorSpinorField *out, const cudaColorSpinorField *in)
-  {
-    dslashParam.threads = in->Volume();
-
-    Tunable *gamma5 = 0;
-
-    if		(in->Precision() == QUDA_DOUBLE_PRECISION)
-      {
-#if (__COMPUTE_CAPABILITY__ >= 130)
-	gamma5 = new Gamma5Cuda<double2>(out, in);
-#else
-	errorQuda("Double precision not supported on this GPU");
-#endif
-      } else if	(in->Precision() == QUDA_SINGLE_PRECISION) {
-      gamma5 = new Gamma5Cuda<float4>(out, in);
-    } else if	(in->Precision() == QUDA_HALF_PRECISION) {
-      errorQuda("Half precision not supported for gamma5 kernel yet");	// Support for half precision is very straightforward,
-    }										// but I doubt is useful
-
-    gamma5->apply(streams[Nstream-1]);
-    checkCudaError();
-
-    delete gamma5;
-  }
+namespace quda {
+#ifdef GPU_CONTRACT
 
 #include "contract_core.h"
 #include "contract_core_plus.h"
@@ -265,9 +159,15 @@ namespace quda
 	}
     }
 
-    void preTune()	{}
+    void preTune()      {
+      saveOut = new char[dslashParam.threads*sizeof(Float2)*32];
+      cudaMemcpy(saveOut, result, dslashParam.threads*sizeof(Float2)*32, cudaMemcpyDeviceToHost);
+    }
 
-    void postTune()	{}
+    void postTune()     {
+      cudaMemcpy(result, saveOut, dslashParam.threads*sizeof(Float2)*32, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+    }
 
     std::string paramString(const TuneParam &param) const
     {
@@ -280,76 +180,104 @@ namespace quda
     long long flops() const { return 120ll * x.VolumeCB(); }
     long long bytes() const { return x.Bytes() + x.NormBytes() + y.Bytes() + y.NormBytes(); }
   };
+#endif
 
   /**
-     Contracts the x and y spinors (x is daggered) and stores the result in the array result. One must specify the contract type (time-sliced or volumed contract, and whether we should include
-     a gamma5 in the middle), as well as the time-slice (see overloaded version of the same function) in case we don't want a volume contraction. The function works only with parity spinors,
-     and the parity must be specified.
+     Contracts the x and y spinors (x is daggered) and stores the result in the array result.
+     One must specify the contract type (time-sliced or volumed contract, and whether we should
+     include a gamma5 in the middle), as well as the time-slice (see overloaded version of the
+     same function) in case we don't want a volume contraction. The function works only with
+     parity spinors, and the parity must be specified.
   */
 
-  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const QudaParity parity)
+  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const QudaParity parity, TimeProfile &profile)
   {
+#ifdef GPU_CONTRACT
     if	((contract_type == QUDA_CONTRACT_TSLICE) || (contract_type == QUDA_CONTRACT_TSLICE_PLUS) || (contract_type == QUDA_CONTRACT_TSLICE_MINUS)) {
       errorQuda("No time-slice specified for contraction\n");
       return;
     }
 
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
     dslashParam.threads = x.Volume();
 
     Tunable *contract = 0;
 
-    if		(x.Precision() == QUDA_DOUBLE_PRECISION)
-      {
-#if (__COMPUTE_CAPABILITY__ >= 130)
-	contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type);
-#else
-	errorQuda("Double precision not supported on this GPU");
-#endif
-      } else if	(x.Precision() == QUDA_SINGLE_PRECISION) {
+    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+      contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type);
+    } else if	(x.Precision() == QUDA_SINGLE_PRECISION) {
       contract = new ContractCuda<float4,float2>(x, y, result, parity, contract_type);
     } else if	(x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
     }
+    profile.TPSTOP(QUDA_PROFILE_INIT);
 
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
+    cudaStreamSynchronize(streams[Nstream-1]);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
     checkCudaError();
 
     delete contract;
+
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
+#else
+    errorQuda("Contraction code has not been built");
+#endif
   }
 
   /**
-     Contracts the x and y spinors (x is daggered) and stores the result in the array result. One must specify the contract type (time-sliced or volumed contract, and whether we should include
-     a gamma5 in the middle), as well as the time-slice in case we don't want a volume contraction. The function works only with parity spinors, and the parity must be specified.
+     Contracts the x and y spinors (x is daggered) and stores the result in the array result.
+     One must specify the contract type (time-sliced or volumed contract, and whether we should
+     include a gamma5 in the middle), as well as the time-slice in case we don't want a volume
+     contraction. The function works only with parity spinors, and the parity must be specified.
   */
 
-  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const int nTSlice, const QudaParity parity)
+  void contractCuda(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type,
+		    const int nTSlice, const QudaParity parity, TimeProfile &profile)
   {
+#ifdef GPU_CONTRACT
     if	((contract_type != QUDA_CONTRACT_TSLICE) || (contract_type != QUDA_CONTRACT_TSLICE_PLUS) || (contract_type != QUDA_CONTRACT_TSLICE_MINUS)) {
       errorQuda("No time-slice input allowed for volume contractions\n");
       return;
     }
 
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
     dslashParam.threads = x.X(0)*x.X(1)*x.X(2);
 
     Tunable *contract = 0;
 
-    if		(x.Precision() == QUDA_DOUBLE_PRECISION)
-      {
-#if (__COMPUTE_CAPABILITY__ >= 130)
-	contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type, nTSlice);
-#else
-	errorQuda("Double precision not supported on this GPU");
-#endif
-      } else if	(x.Precision() == QUDA_SINGLE_PRECISION) {
+    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+      contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type, nTSlice);
+    } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       contract = new ContractCuda<float4,float2>(x, y, result, parity, contract_type, nTSlice);
-    } else if	(x.Precision() == QUDA_HALF_PRECISION) {
+    } else if (x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
     }
+    profile.TPSTOP(QUDA_PROFILE_INIT);
 
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    checkCudaError();
+    cudaStreamSynchronize(streams[Nstream-1]);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    checkCudaError();
     delete contract;
+
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
+#else
+    errorQuda("Contraction code has not been built");
+#endif
   }
-}
+  
+} // namespace quda
 

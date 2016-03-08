@@ -1,5 +1,5 @@
 #define QUDA_VERSION_MAJOR     0
-#define QUDA_VERSION_MINOR     7
+#define QUDA_VERSION_MINOR     8
 #define QUDA_VERSION_SUBMINOR  0
 
 /**
@@ -14,7 +14,7 @@
  * @brief Maximum number of dimensions supported by QUDA.  In practice, no
  *        routines make use of more than 5.
  */
-#define QUDA_MAX_DIM 5
+#define QUDA_MAX_DIM 6
 
 /**
  * @def QUDA_MAX_MULTI_SHIFT
@@ -29,3 +29,16 @@
  */
 #define QUDA_MAX_DWF_LS 128
 
+/**
+ * @def QUDA_MAX_MG_LEVEL
+ * @brief Maximum number of multi-grid levels.  This number may be
+ * increased if needed.
+ */
+#define QUDA_MAX_MG_LEVEL 4
+
+/**
+ * @def QUDA_MAX_MULTI_REDUCE
+ * @brief Maximum number of simultaneous reductions that can take
+ * place.  This number may be increased if needed.
+ */
+#define QUDA_MAX_MULTI_REDUCE 16

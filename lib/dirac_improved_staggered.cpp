@@ -20,7 +20,7 @@ namespace quda {
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac) 
   : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face1(dirac.face1), face2(dirac.face2)
   {
-    improvedstaggered::initConstants(dirac.gauge, profile);
+    improvedstaggered::initConstants(*dirac.gauge, profile);
     improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
@@ -38,7 +38,7 @@ namespace quda {
     return *this;
   }
 
-  void DiracImprovedStaggered::checkParitySpinor(const cudaColorSpinorField &in, const cudaColorSpinorField &out) const
+  void DiracImprovedStaggered::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
   {
     if (in.Precision() != out.Precision()) {
       errorQuda("Input and output spinor precisions don't match in dslash_quda");
@@ -60,63 +60,65 @@ namespace quda {
   }
 
 
-  void DiracImprovedStaggered::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			      const QudaParity parity) const
   {
     checkParitySpinor(in, out);
 
-    improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, profile);
-  
+    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+      improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
+				  &static_cast<const cudaColorSpinorField&>(in), parity, 
+				  dagger, 0, 0, commDim, profile);
+    } else {
+      errorQuda("Not supported");
+    }  
+
     flops += 1146ll*in.Volume();
   }
 
-  void DiracImprovedStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				  const QudaParity parity, const cudaColorSpinorField &x,
+  void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+				  const QudaParity parity, const ColorSpinorField &x,
 				  const double &k) const
   {    
     checkParitySpinor(in, out);
 
-    improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, profile);
-  
+    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+      improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
+			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
+			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+    } else {
+      errorQuda("Not supported");
+    }  
+
     flops += 1158ll*in.Volume();
   }
 
   // Full staggered operator
-  void DiracImprovedStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in.Even());
-
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp1, 2*mass);  
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp1, 2*mass);
-  
-    deleteTmp(&tmp1, reset);
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
+    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
   }
 
-  void DiracImprovedStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp1, in);
   
-    cudaColorSpinorField* mytmp = dynamic_cast<cudaColorSpinorField*>(&(tmp1->Even()));
-    cudaColorSpinorField* ineven = dynamic_cast<cudaColorSpinorField*>(&(in.Even()));
-    cudaColorSpinorField* inodd = dynamic_cast<cudaColorSpinorField*>(&(in.Odd()));
-    cudaColorSpinorField* outeven = dynamic_cast<cudaColorSpinorField*>(&(out.Even()));
-    cudaColorSpinorField* outodd = dynamic_cast<cudaColorSpinorField*>(&(out.Odd()));
-  
     //even
-    Dslash(*mytmp, *ineven, QUDA_ODD_PARITY);  
-    DslashXpay(*outeven, *mytmp, QUDA_EVEN_PARITY, *ineven, 4*mass*mass);
+    Dslash(tmp1->Even(), in.Even(), QUDA_ODD_PARITY);  
+    DslashXpay(out.Even(), tmp1->Even(), QUDA_EVEN_PARITY, in.Even(), 4*mass*mass);
   
     //odd
-    Dslash(*mytmp, *inodd, QUDA_EVEN_PARITY);  
-    DslashXpay(*outodd, *mytmp, QUDA_ODD_PARITY, *inodd, 4*mass*mass);    
+    Dslash(tmp1->Even(), in.Odd(), QUDA_EVEN_PARITY);  
+    DslashXpay(out.Odd(), tmp1->Even(), QUDA_ODD_PARITY, in.Odd(), 4*mass*mass);    
 
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracImprovedStaggered::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-			       cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracImprovedStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			       ColorSpinorField &x, ColorSpinorField &b, 
 			       const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -127,7 +129,7 @@ namespace quda {
     sol = &x;  
   }
 
-  void DiracImprovedStaggered::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracImprovedStaggered::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				   const QudaSolutionType solType) const
   {
     // do nothing
@@ -160,12 +162,12 @@ namespace quda {
     return *this;
   }
 
-  void DiracImprovedStaggeredPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracImprovedStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     errorQuda("DiracImprovedStaggeredPC::M() is not implemented\n");
   }
 
-  void DiracImprovedStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp1, in);
   
@@ -186,15 +188,15 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracImprovedStaggeredPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-				 cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracImprovedStaggeredPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+				 ColorSpinorField &x, ColorSpinorField &b, 
 				 const QudaSolutionType solType) const
   {
     src = &b;
     sol = &x;  
   }
 
-  void DiracImprovedStaggeredPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracImprovedStaggeredPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				     const QudaSolutionType solType) const
   {
     // do nothing

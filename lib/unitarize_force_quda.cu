@@ -386,10 +386,8 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 #define MAX_DET_ERROR HOST_MAX_DET_ERROR
 #endif
 	  if(fabs(gprod - determinant) > MAX_DET_ERROR){
-#if  (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__ >= 200))
 	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), MAX_DET_ERROR);
 	    printLink(q);
-#endif
 
 #ifdef __CUDA_ARCH__
 	    atomicAdd(unitarization_failed,1);
@@ -646,7 +644,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       void preTune() { ; }
       void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
       
-      long long flops() const { return 4*4528*gauge.Volume(); } // FIXME: add flops counter
+      long long flops() const { return 4ll*4528*gauge.Volume(); }
       
       TuneKey tuneKey() const { return TuneKey(gauge.VolString(), typeid(*this).name(), aux); }
     }; // UnitarizeForceCuda
@@ -656,6 +654,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
       unitarizeForce.apply(0);
+      cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       if(flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }

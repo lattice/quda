@@ -3,6 +3,8 @@
 
 namespace quda {
 
+  using namespace clover;
+
 #ifdef GPU_CLOVER_DIRAC
 
   /** 
@@ -98,7 +100,7 @@ namespace quda {
  void copyClover(OutOrder outOrder, const InOrder inOrder, const CloverField &out, QudaFieldLocation location) {
 
    CopyCloverArg<OutOrder,InOrder> arg(outOrder, inOrder, out.Volume());
-
+   
    if (location == QUDA_CPU_FIELD_LOCATION) {
      copyClover<FloatOut, FloatIn, length, OutOrder, InOrder>(arg);
    } else if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -112,12 +114,10 @@ namespace quda {
 
  template <typename FloatOut, typename FloatIn, int length, typename InOrder>
  void copyClover(const InOrder &inOrder, CloverField &out, bool inverse, QudaFieldLocation location, FloatOut *Out, float *outNorm) {
-    if (out.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
-      copyClover<FloatOut,FloatIn,length>
-	(FloatNOrder<FloatOut,length,2>(out, inverse, Out, outNorm), inOrder, out, location);
-    } else if (out.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
-      copyClover<FloatOut,FloatIn,length> 
-	(FloatNOrder<FloatOut,length,4>(out, inverse, Out, outNorm), inOrder, out, location);
+
+    if (out.isNative()) {
+      typedef typename clover_mapper<FloatOut>::type C;
+      copyClover<FloatOut,FloatIn,length>(C(out, inverse, Out, outNorm), inOrder, out, location);
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out, location);
@@ -143,12 +143,9 @@ namespace quda {
 		 FloatOut *Out, FloatIn *In, float *outNorm, float *inNorm) {
 
     // reconstruction only supported on FloatN fields currently
-    if (in.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
-      copyClover<FloatOut,FloatIn,length> 
-	(FloatNOrder<FloatIn,length,2>(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
-    } else if (in.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
-      copyClover<FloatOut,FloatIn,length> 
-	(FloatNOrder<FloatIn,length,4>(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
+   if (in.isNative()) {
+      typedef typename clover_mapper<FloatIn>::type C;
+      copyClover<FloatOut,FloatIn,length>(C(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
@@ -181,7 +178,6 @@ namespace quda {
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			void *Out, void *In, void *outNorm, void *inNorm) {
-
 #ifdef GPU_CLOVER_DIRAC
     if (out.Precision() == QUDA_HALF_PRECISION && out.Order() > 4) 
       errorQuda("Half precision not supported for order %d", out.Order());
@@ -216,7 +212,6 @@ namespace quda {
 #else
     errorQuda("Clover has not been built");
 #endif
-
   }
 
 

@@ -441,9 +441,6 @@
 
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
 #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
@@ -456,7 +453,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   // build Wilson or clover as appropriate
 #if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #ifdef DSLASH_CLOVER_XPAY
 
@@ -476,7 +473,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared-memory blocking
 
 #ifdef DSLASH_CLOVER_XPAY
 
@@ -496,35 +493,14 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #endif
 
-#else  // fall-back is original G80 
-
-#ifdef DSLASH_CLOVER_XPAY
-
-#if DD_DAG
-#include "asym_wilson_clover_dslash_dagger_g80_core.h"
-#else
-#include "asym_wilson_clover_dslash_g80_core.h"
-#endif
-
-#else
-
-#if DD_DAG
-#include "wilson_dslash_dagger_g80_core.h"
-#else
-#include "wilson_dslash_g80_core.h"
-#endif
-
-#endif // DSLASH_CLOVER_XPAY
-
-
-#endif // __COMPUTE_CAPABILITY
+#endif // SHARED_WILSON_DSLASH
 
 
 #endif // DD_CLOVER
 
 }
 
-
+#ifdef MULTI_GPU
 template <>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
   (DD_PARAM_OUT DD_PARAM_GAUGE DD_PARAM_CLOVER DD_PARAM_IN DD_PARAM_XPAY const DslashParam param) {
@@ -532,7 +508,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
   // build Wilson or clover as appropriate
 #if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #ifdef DSLASH_CLOVER_XPAY
 
@@ -552,7 +528,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared-memory blocking
 
 #ifdef DSLASH_CLOVER_XPAY
 
@@ -572,34 +548,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 
 #endif
 
-#else  // fall-back is original G80 
-
-#ifdef DSLASH_CLOVER_XPAY
-
-#if DD_DAG
-#include "asym_wilson_clover_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "asym_wilson_clover_fused_exterior_dslash_g80_core.h"
-#endif
-
-#else
-
-#if DD_DAG
-#include "wilson_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "wilson_fused_exterior_dslash_g80_core.h"
-#endif
-
-#endif // DSLASH_CLOVER_XPAY
-
-
-#endif // __COMPUTE_CAPABILITY
+#endif // SHARED_WILSON_DSLASH
 
 
 #endif // DD_CLOVER
 
 }
-#endif
+#endif // MULTI_GPU
 
 // clean up
 

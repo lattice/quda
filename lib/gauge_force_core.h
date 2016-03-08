@@ -1,8 +1,8 @@
 
-#define xcomm kparam.ghostDim[0]
-#define ycomm kparam.ghostDim[1]
-#define zcomm kparam.ghostDim[2]
-#define tcomm kparam.ghostDim[3]
+#define xcomm arg.ghostDim[0]
+#define ycomm arg.ghostDim[1]
+#define zcomm arg.ghostDim[2]
+#define tcomm arg.ghostDim[3]
 
 #if (N_IN_FLOATN == 4)
 #define linka00_re LINKA0.x
@@ -91,20 +91,20 @@
 #define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
     switch(mydir){							\
     case 0:								\
-      new_mem_idx = ((!xcomm) && (new_x1 == (X1+1)))?(idx - X1m1): idx+1; \
-      new_x1 = ((!xcomm)&& (new_x1 == (X1+1)))? (new_x1 - X1m1):(new_x1+1); \
+      new_mem_idx = ((!xcomm) && (new_x1 == (arg.X[0]+1)))?(idx - (arg.X[0]-1)): idx+1; \
+      new_x1 = ((!xcomm)&& (new_x1 == (arg.X[0]+1)))? (new_x1 - (arg.X[0]-1)):(new_x1+1); \
       break;								\
     case 1:								\
-      new_mem_idx = ((!ycomm) && (new_x2 == (X2+1)))?(idx - X2m1*E1): idx+E1; \
-      new_x2 = ((!ycomm)&& (new_x2 == (X2+1)))? (new_x2 - X2m1):(new_x2+1); \
+      new_mem_idx = ((!ycomm) && (new_x2 == (arg.X[1]+1)))?(idx - (arg.X[1]-1)*arg.E[0]): idx+arg.E[0]; \
+      new_x2 = ((!ycomm)&& (new_x2 == (arg.X[1]+1)))? (new_x2 - (arg.X[1]-1)):(new_x2+1); \
       break;								\
     case 2:								\
-      new_mem_idx = ((!zcomm) && (new_x3 == (X3+1)))?(idx - X3m1*E2E1): idx+E2E1; \
-      new_x3 = ((!zcomm)&& (new_x3 == (X3+1)))? (new_x3 - X3m1):(new_x3+1); \
+      new_mem_idx = ((!zcomm) && (new_x3 == (arg.X[2]+1)))?(idx - (arg.X[2]-1)*arg.E[1]*arg.E[0]): idx+arg.E[1]*arg.E[0]; \
+      new_x3 = ((!zcomm)&& (new_x3 == (arg.X[2]+1)))? (new_x3 - (arg.X[2]-1)):(new_x3+1); \
       break;								\
     case 3:								\
-      new_mem_idx = ((!tcomm) && (new_x4 == (X4+1)))?(idx - X4m1*E3E2E1): idx+E3E2E1; \
-      new_x4 = ((!tcomm)&& (new_x4 == (X4+1)))? (new_x4 - X4m1):(new_x4+1); \
+      new_mem_idx = ((!tcomm) && (new_x4 == (arg.X[3]+1)))?(idx - (arg.X[3]-1)*arg.E[2]*arg.E[1]*arg.E[0]): idx+arg.E[2]*arg.E[1]*arg.E[0]; \
+      new_x4 = ((!tcomm)&& (new_x4 == (arg.X[3]+1)))? (new_x4 - (arg.X[3]-1)):(new_x4+1); \
       break;								\
     }									\
   }while(0)
@@ -112,20 +112,20 @@
 #define COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx) do {		\
     switch(mydir){							\
     case 0:								\
-      new_mem_idx = ((!xcomm) && new_x1 == 2)?(idx+X1m1):(idx-1);	\
-      new_x1 = ((!xcomm) && new_x1 == 2)? (new_x1+X1m1): (new_x1-1);	\
+      new_mem_idx = ((!xcomm) && new_x1 == 2)?(idx+arg.X[0]-1):(idx-1);	\
+      new_x1 = ((!xcomm) && new_x1 == 2)? (new_x1+arg.X[0]-1): (new_x1-1);	\
       break;								\
     case 1:								\
-      new_mem_idx = ((!ycomm) && new_x2 == 2)?(idx+X2m1*E1):(idx-E1);	\
-      new_x2 = ((!ycomm) && new_x2 == 2)? (new_x2+X2m1): (new_x2-1);	\
+      new_mem_idx = ((!ycomm) && new_x2 == 2)?(idx+(arg.X[1]-1)*arg.E[0]):(idx-arg.E[0]);	\
+      new_x2 = ((!ycomm) && new_x2 == 2)? (new_x2+arg.X[1]-1): (new_x2-1);	\
       break;								\
     case 2:								\
-      new_mem_idx = ((!zcomm) && new_x3 == 2)?(idx+X3m1*E2E1):(idx-E2E1); \
-      new_x3 = ((!zcomm) && new_x3 == 2)? (new_x3+X3m1): (new_x3-1);	\
+      new_mem_idx = ((!zcomm) && new_x3 == 2)?(idx+(arg.X[2]-1)*arg.E[1]*arg.E[0]):(idx-arg.E[1]*arg.E[0]); \
+      new_x3 = ((!zcomm) && new_x3 == 2)? (new_x3+arg.X[2]-1): (new_x3-1);	\
       break;								\
     case 3:								\
-      new_mem_idx = ((!tcomm) && new_x4 == 2)?(idx+X4m1*E3E2E1):(idx-E3E2E1); \
-      new_x4 = ((!tcomm) && new_x4 == 2)? (new_x4+X4m1): (new_x4-1);	\
+      new_mem_idx = ((!tcomm) && new_x4 == 2)?(idx+(arg.X[3]-1)*arg.E[2]*arg.E[1]*arg.E[0]):(idx-arg.E[2]*arg.E[1]*arg.E[0]); \
+      new_x4 = ((!tcomm) && new_x4 == 2)? (new_x4+arg.X[3]-1): (new_x4-1);	\
       break;								\
     }									\
   }while(0)
@@ -134,20 +134,20 @@
 #define COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mydir, idx) do {		\
         switch(mydir){                                                  \
         case 0:                                                         \
-            new_mem_idx = ( (new_x1==X1m1)?idx-X1m1:idx+1);		\
-	    new_x1 = (new_x1==X1m1)?0:new_x1+1;				\
+            new_mem_idx = ( (new_x1==(arg.X[0]-1))?idx-(arg.X[0]-1):idx+1);		\
+	    new_x1 = (new_x1==(arg.X[0]-1))?0:new_x1+1;				\
             break;                                                      \
         case 1:                                                         \
-            new_mem_idx = ( (new_x2==X2m1)?idx-X2X1mX1:idx+X1);		\
-	    new_x2 = (new_x2==X2m1)?0:new_x2+1;				\
+            new_mem_idx = ( (new_x2==(arg.X[1]-1))?idx-(arg.X[1]*arg.X[0]-arg.X[0]):idx+arg.X[0]);		\
+	    new_x2 = (new_x2==(arg.X[1]-1))?0:new_x2+1;				\
             break;                                                      \
         case 2:                                                         \
-            new_mem_idx = ( (new_x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1);	\
-	    new_x3 = (new_x3==X3m1)?0:new_x3+1;				\
+            new_mem_idx = ( (new_x3==(arg.X[2]-1))?idx-(arg.X[2]-1)*arg.X[1]*arg.X[0]:idx+arg.X[1]*arg.X[0]);	\
+	    new_x3 = (new_x3==(arg.X[2]-1))?0:new_x3+1;				\
             break;                                                      \
         case 3:                                                         \
-            new_mem_idx = ( (new_x4==X4m1)?idx-X4X3X2X1mX3X2X1:idx+X3X2X1); \
-	    new_x4 = (new_x4==X4m1)?0:new_x4+1;				\
+            new_mem_idx = ( (new_x4==(arg.X[3]-1))?idx-(arg.X[3]-1)*arg.X[2]*arg.X[1]*arg.X[0]:idx+arg.X[2]*arg.X[1]*arg.X[0]); \
+	    new_x4 = (new_x4==(arg.X[3]-1))?0:new_x4+1;				\
             break;                                                      \
         }                                                               \
     }while(0)
@@ -155,20 +155,20 @@
 #define COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mydir, idx) do {		\
         switch(mydir){                                                  \
         case 0:                                                         \
-            new_mem_idx = ( (new_x1==0)?idx+X1m1:idx-1);		\
-	    new_x1 = (new_x1==0)?X1m1:new_x1 - 1;			\
+            new_mem_idx = ( (new_x1==0)?idx+(arg.X[0]-1):idx-1);		\
+	    new_x1 = (new_x1==0)?(arg.X[0]-1):new_x1 - 1;			\
             break;                                                      \
         case 1:                                                         \
-            new_mem_idx = ( (new_x2==0)?idx+X2X1mX1:idx-X1);		\
-	    new_x2 = (new_x2==0)?X2m1:new_x2 - 1;			\
+            new_mem_idx = ( (new_x2==0)?idx+(arg.X[1]*arg.X[0]-arg.X[0]):idx-arg.X[0]);		\
+	    new_x2 = (new_x2==0)?(arg.X[1]-1):new_x2 - 1;			\
             break;                                                      \
         case 2:                                                         \
-            new_mem_idx = ( (new_x3==0)?idx+X3X2X1mX2X1:idx-X2X1);	\
-	    new_x3 = (new_x3==0)?X3m1:new_x3 - 1;			\
+            new_mem_idx = ( (new_x3==0)?idx+(arg.X[2]-1)*arg.X[1]*arg.X[0]:idx-arg.X[1]*arg.X[0]);	\
+	    new_x3 = (new_x3==0)?(arg.X[2]-1):new_x3 - 1;			\
             break;                                                      \
         case 3:                                                         \
-            new_mem_idx = ( (new_x4==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1); \
-	    new_x4 = (new_x4==0)?X4m1:new_x4 - 1;			\
+            new_mem_idx = ( (new_x4==0)?idx+(arg.X[3]-1)*arg.X[2]*arg.X[1]*arg.X[0]:idx-arg.X[2]*arg.X[1]*arg.X[0]); \
+	    new_x4 = (new_x4==0)?(arg.X[3]-1):new_x4 - 1;			\
             break;                                                      \
         }                                                               \
     }while(0)
@@ -471,38 +471,27 @@
 
 //FloatN can be float2/float4/double2
 //Float2 can be float2/double2
-template<int oddBit, typename Float, typename Float2, typename FloatN>
+template<typename Float, typename Float2, typename FloatN>
   __global__ void
-  GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd,
-			const int dir, const double eb3,
-			const FloatN* linkEven, const FloatN* linkOdd,
-			const int* input_path, 
-			const int* length, const double* path_coeff, const int num_paths, const kernel_param_t kparam)
+  GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd, const FloatN* linkEven, const FloatN* linkOdd, GaugeForceArg arg)
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  if (sid >= kparam.threads) return;
+  int parity = threadIdx.y;
+  if (sid >= arg.threads) return;
 
-  int z1 = sid / X1h;
-  int x1h = sid - z1*X1h;
-  int z2 = z1 / X2;
-  int x2 = z1 - z2*X2;
-  int x4 = z2 / X3;
-  int x3 = z2 - x4*X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2*x1h + x1odd;  
+  int x[4];
+  getCoords(x, sid, arg.X, parity);
 
 #ifdef MULTI_GPU
-  x4 += 2; x3 += 2; x2 += 2; x1 += 2;
-  int X = x4*E3E2E1 + x3*E2E1 + x2*E1 + x1;
+  x[3] += 2; x[2] += 2; x[1] += 2; x[0] += 2;
+  int X = x[3]*arg.E[2]*arg.E[1]*arg.E[0] + x[2]*arg.E[1]*arg.E[0] + x[1]*arg.E[0] + x[0];
 #else
-  int X = 2*sid + x1odd;  
+  int x_odd = (x[1] + x[2] + x[3] + parity) & 1;
+  int X = 2*sid + x_odd;
 #endif
     
-  Float2* mymom=momEven;
-  if (oddBit){
-    mymom = momOdd;
-  }
+  Float2* mymom =parity ? momOdd : momEven;
 
   DECLARE_LINK_VARS(LINKA);
   DECLARE_LINK_VARS(LINKB);
@@ -514,22 +503,22 @@ template<int oddBit, typename Float, typename Float2, typename FloatN>
     
   SET_SU3_MATRIX(staple, 0);
 
-  for(i=0;i < num_paths; i++){
-    Float coeff = path_coeff[i];
+  for(i=0;i < arg.num_paths; i++){
+    Float coeff = arg.path_coeff[i];
     if(coeff == 0) continue;
 
-    int nbr_oddbit = (oddBit^1 );
+    int nbr_oddbit = (parity^1 );
 	
-    int new_x1 =x1;
-    int new_x2 =x2;
-    int new_x3 =x3;
-    int new_x4 =x4;
-    COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(dir, X);
+    int new_x1 = x[0];
+    int new_x2 = x[1];
+    int new_x3 = x[2];
+    int new_x4 = x[3];
+    COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(arg.dir, X);
 	
     //linka: current matrix
     //linkb: the loaded matrix in this round	
     SET_UNIT_SU3_MATRIX(linka);	
-    const int* path = input_path + i*gf.path_max_length;
+    const int* path = arg.input_path + i*arg.path_max_length;
 	
     int lnkdir;
     int path0 = path[0];
@@ -558,7 +547,7 @@ template<int oddBit, typename Float, typename Float2, typename FloatN>
       SU3_ADJOINT(linkb, linka);
     }	
 	
-    for(j=1; j < length[i]; j++){
+    for(j=1; j < arg.length[i]; j++){
 	    
       int lnkdir;
       int pathj = path[j];
@@ -595,19 +584,19 @@ template<int oddBit, typename Float, typename Float2, typename FloatN>
     
 
   //update mom 
-  if (oddBit){
-    LOAD_ODD_MATRIX(dir, (X>>1), LINKA);
+  if (parity){
+    LOAD_ODD_MATRIX(arg.dir, (X>>1), LINKA);
   }else{
-    LOAD_EVEN_MATRIX(dir, (X>>1), LINKA);
+    LOAD_EVEN_MATRIX(arg.dir, (X>>1), LINKA);
   }
   RECONSTRUCT_MATRIX(1, linka);
   MULT_SU3_NN_TEST(linka, staple);
-  LOAD_ANTI_HERMITIAN(mymom, dir, sid, AH);
+  LOAD_ANTI_HERMITIAN(mymom, arg.dir, sid, AH);
   UNCOMPRESS_ANTI_HERMITIAN(ah, linkb);
-  SCALAR_MULT_SUB_SU3_MATRIX(linkb, linka, eb3, linka);
+  SCALAR_MULT_SUB_SU3_MATRIX(linkb, linka, arg.coeff, linka);
   MAKE_ANTI_HERMITIAN(linka, ah);
     
-  WRITE_ANTI_HERMITIAN(mymom, dir, sid, AH, gf.mom_ga_stride);
+  WRITE_ANTI_HERMITIAN(mymom, arg.dir, sid, AH, arg.mom_stride);
 
   return;
 }

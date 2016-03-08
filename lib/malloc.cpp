@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <unistd.h> // for getpagesize()
+#include <execinfo.h> // for backtrace
 #include <quda_internal.h>
 
 #ifdef USE_QDPJIT
@@ -52,6 +53,17 @@ namespace quda {
   static long max_total_bytes[N_ALLOC_TYPE] = {0};
   static long total_host_bytes, max_total_host_bytes;
   static long total_pinned_bytes, max_total_pinned_bytes;
+
+  static void print_trace (void) {
+    void *array[10];
+    size_t size;
+    char **strings;
+    size = backtrace (array, 10);
+    strings = backtrace_symbols (array, size);
+    printfQuda("Obtained %zd stack frames.\n", size);
+    for (size_t i=0; i<size; i++) printfQuda("%s\n", strings[i]);
+    free(strings);
+  }
 
   static void print_alloc_header()
   {
@@ -185,9 +197,9 @@ namespace quda {
    * should only be called via the pinned_malloc() macro, defined in
    * malloc_quda.h
    *
-   * Note that we do rely on cudaHostAlloc(), since buffers allocated
-   * in this way have been observed to cause problems when shared with
-   * MPI via GPU Direct on some systems.
+   * Note that we do not rely on cudaHostAlloc(), since buffers
+   * allocated in this way have been observed to cause problems when
+   * shared with MPI via GPU Direct on some systems.
    */
   void *pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
@@ -277,6 +289,7 @@ namespace quda {
       track_free(MAPPED, ptr);
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);
+      print_trace();
       errorQuda("Aborting");
     }
     free(ptr);

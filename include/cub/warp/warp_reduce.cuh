@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,7 +28,7 @@
 
 /**
  * \file
- * The cub::WarpReduce class provides [<em>collective</em>](index.html#sec0) methods for computing a parallel reduction of items partitioned across CUDA warp threads.
+ * The cub::WarpReduce class provides [<em>collective</em>](index.html#sec0) methods for computing a parallel reduction of items partitioned across a CUDA thread warp.
  */
 
 #pragma once
@@ -53,11 +53,11 @@ namespace cub {
  */
 
 /**
- * \brief The WarpReduce class provides [<em>collective</em>](index.html#sec0) methods for computing a parallel reduction of items partitioned across CUDA warp threads. ![](warp_reduce_logo.png)
+ * \brief The WarpReduce class provides [<em>collective</em>](index.html#sec0) methods for computing a parallel reduction of items partitioned across a CUDA thread warp. ![](warp_reduce_logo.png)
  *
  * \tparam T                        The reduction input/output element type
- * \tparam LOGICAL_WARPS            <b>[optional]</b> The number of entrant "logical" warps performing concurrent warp reductions.  Default is 1.
  * \tparam LOGICAL_WARP_THREADS     <b>[optional]</b> The number of threads per "logical" warp (may be less than the number of hardware warp threads).  Default is the warp size of the targeted CUDA compute-capability (e.g., 32 threads for SM20).
+ * \tparam PTX_ARCH                 <b>[optional]</b> \ptxversion
  *
  * \par Overview
  * - A <a href="http://en.wikipedia.org/wiki/Reduce_(higher-order_function)"><em>reduction</em></a> (or <em>fold</em>)
@@ -66,7 +66,6 @@ namespace cub {
  * - The number of entrant threads must be an multiple of \p LOGICAL_WARP_THREADS
  *
  * \par Performance Considerations
- * - Warp reductions are concurrent if more than one logical warp is participating
  * - Uses special instructions when applicable (e.g., warp \p SHFL instructions)
  * - Uses synchronization-free communication between warp lanes when applicable
  * - Incurs zero bank conflicts for most types
@@ -85,17 +84,18 @@ namespace cub {
  *
  * __global__ void ExampleKernel(...)
  * {
- *     // Specialize WarpReduce for 4 warps on type int
- *     typedef cub::WarpReduce<int, 4> WarpReduce;
+ *     // Specialize WarpReduce for type int
+ *     typedef cub::WarpReduce<int> WarpReduce;
  *
- *     // Allocate shared memory for WarpReduce
- *     __shared__ typename WarpReduce::TempStorage temp_storage;
+ *     // Allocate WarpReduce shared memory for 4 warps
+ *     __shared__ typename WarpReduce::TempStorage temp_storage[4];
  *
  *     // Obtain one input item per thread
  *     int thread_data = ...
  *
  *     // Return the warp-wide sums to each lane0 (threads 0, 32, 64, and 96)
- *     int aggregate = WarpReduce(temp_storage).Sum(thread_data);
+ *     int warp_id = threadIdx.x / 32;
+ *     int aggregate = WarpReduce(temp_storage[warp_id]).Sum(thread_data);
  *
  * \endcode
  * \par
@@ -112,10 +112,10 @@ namespace cub {
  *
  * __global__ void ExampleKernel(...)
  * {
- *     // Specialize WarpReduce for one warp on type int
- *     typedef cub::WarpReduce<int, 1> WarpReduce;
+ *     // Specialize WarpReduce for type int
+ *     typedef cub::WarpReduce<int> WarpReduce;
  *
- *     // Allocate shared memory for WarpReduce
+ *     // Allocate WarpReduce shared memory for one warp
  *     __shared__ typename WarpReduce::TempStorage temp_storage;
  *     ...
  *
@@ -136,8 +136,8 @@ namespace cub {
  */
 template <
     typename    T,
-    int         LOGICAL_WARPS           = 1,
-    int         LOGICAL_WARP_THREADS    = CUB_PTX_WARP_THREADS>
+    int         LOGICAL_WARP_THREADS    = CUB_PTX_WARP_THREADS,
+    int         PTX_ARCH                = CUB_PTX_ARCH>
 class WarpReduce
 {
 private:
@@ -148,17 +148,21 @@ private:
 
     enum
     {
-        POW_OF_TWO = ((LOGICAL_WARP_THREADS & (LOGICAL_WARP_THREADS - 1)) == 0),
+        /// Whether the logical warp size and the PTX warp size coincide
+        IS_ARCH_WARP = (LOGICAL_WARP_THREADS == CUB_WARP_THREADS(PTX_ARCH)),
+
+        /// Whether the logical warp size is a power-of-two
+        IS_POW_OF_TWO = PowerOfTwo<LOGICAL_WARP_THREADS>::VALUE,
     };
 
 public:
 
     #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
-    /// Internal specialization.  Use SHFL-based reduction if (architecture is >= SM30) and ((only one logical warp) or (LOGICAL_WARP_THREADS is a power-of-two))
-    typedef typename If<(CUB_PTX_VERSION >= 300) && ((LOGICAL_WARPS == 1) || POW_OF_TWO),
-        WarpReduceShfl<T, LOGICAL_WARPS, LOGICAL_WARP_THREADS>,
-        WarpReduceSmem<T, LOGICAL_WARPS, LOGICAL_WARP_THREADS> >::Type InternalWarpReduce;
+    /// Internal specialization.  Use SHFL-based reduction if (architecture is >= SM30) and (LOGICAL_WARP_THREADS is a power-of-two)
+    typedef typename If<(PTX_ARCH >= 300) && (IS_POW_OF_TWO),
+        WarpReduceShfl<T, LOGICAL_WARP_THREADS, PTX_ARCH>,
+        WarpReduceSmem<T, LOGICAL_WARP_THREADS, PTX_ARCH> >::Type InternalWarpReduce;
 
     #endif // DOXYGEN_SHOULD_SKIP_THIS
 
@@ -176,24 +180,10 @@ private:
     /// Shared storage reference
     _TempStorage &temp_storage;
 
-    /// Warp ID
-    int warp_id;
-
-    /// Lane ID
-    int lane_id;
-
 
     /******************************************************************************
      * Utility methods
      ******************************************************************************/
-
-    /// Internal storage allocator
-    __device__ __forceinline__ _TempStorage& PrivateStorage()
-    {
-        __shared__ TempStorage private_storage;
-        return private_storage;
-    }
-
 
 public:
 
@@ -208,63 +198,13 @@ public:
 
 
     /**
-     * \brief Collective constructor for 1D thread blocks using a private static allocation of shared memory as temporary storage.  Logical warp and lane identifiers are constructed from <tt>threadIdx.x</tt>.
-     *
-     */
-    __device__ __forceinline__ WarpReduce()
-    :
-        temp_storage(PrivateStorage()),
-        warp_id((LOGICAL_WARPS == 1) ?
-            0 :
-            threadIdx.x / LOGICAL_WARP_THREADS),
-        lane_id(((LOGICAL_WARPS == 1) || (LOGICAL_WARP_THREADS == CUB_PTX_WARP_THREADS)) ?
-            LaneId() :
-            threadIdx.x % LOGICAL_WARP_THREADS)
-    {}
-
-
-    /**
-     * \brief Collective constructor for 1D thread blocks using the specified memory allocation as temporary storage.  Logical warp and lane identifiers are constructed from <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using the specified memory allocation as temporary storage.  Logical warp and lane identifiers are constructed from <tt>threadIdx.x</tt>.
      */
     __device__ __forceinline__ WarpReduce(
         TempStorage &temp_storage)             ///< [in] Reference to memory allocation having layout type TempStorage
     :
-        temp_storage(temp_storage.Alias()),
-        warp_id((LOGICAL_WARPS == 1) ?
-            0 :
-            threadIdx.x / LOGICAL_WARP_THREADS),
-        lane_id(((LOGICAL_WARPS == 1) || (LOGICAL_WARP_THREADS == CUB_PTX_WARP_THREADS)) ?
-            LaneId() :
-            threadIdx.x % LOGICAL_WARP_THREADS)
+        temp_storage(temp_storage.Alias())
     {}
-
-
-    /**
-     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.  Threads are identified using the given warp and lane identifiers.
-     */
-    __device__ __forceinline__ WarpReduce(
-        int warp_id,                           ///< [in] A suitable warp membership identifier
-        int lane_id)                           ///< [in] A lane identifier within the warp
-    :
-        temp_storage(PrivateStorage()),
-        warp_id(warp_id),
-        lane_id(lane_id)
-    {}
-
-
-    /**
-     * \brief Collective constructor using the specified memory allocation as temporary storage.  Threads are identified using the given warp and lane identifiers.
-     */
-    __device__ __forceinline__ WarpReduce(
-        TempStorage &temp_storage,             ///< [in] Reference to memory allocation having layout type TempStorage
-        int warp_id,                           ///< [in] A suitable warp membership identifier
-        int lane_id)                           ///< [in] A lane identifier within the warp
-    :
-        temp_storage(temp_storage.Alias()),
-        warp_id(warp_id),
-        lane_id(lane_id)
-    {}
-
 
 
     //@}  end member group
@@ -275,10 +215,11 @@ public:
 
 
     /**
-     * \brief Computes a warp-wide sum in each active warp.  The output is valid in warp <em>lane</em><sub>0</sub>.
+     * \brief Computes a warp-wide sum in the calling warp.  The output is valid in warp <em>lane</em><sub>0</sub>.
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates four concurrent warp sum reductions within a block of
      * 128 threads (one per each of the 32-thread warps).
      * \par
@@ -287,17 +228,18 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize WarpReduce for 4 warps on type int
-     *     typedef cub::WarpReduce<int, 4> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
-     *     __shared__ typename WarpReduce::TempStorage temp_storage;
+     *     // Allocate WarpReduce shared memory for 4 warps
+     *     __shared__ typename WarpReduce::TempStorage temp_storage[4];
      *
      *     // Obtain one input item per thread
      *     int thread_data = ...
      *
      *     // Return the warp-wide sums to each lane0
-     *     int aggregate = WarpReduce(temp_storage).Sum(thread_data);
+     *     int warp_id = threadIdx.x / 32;
+     *     int aggregate = WarpReduce(temp_storage[warp_id]).Sum(thread_data);
      *
      * \endcode
      * \par
@@ -309,16 +251,17 @@ public:
     __device__ __forceinline__ T Sum(
         T                   input)              ///< [in] Calling thread's input
     {
-        return InternalWarpReduce(temp_storage, warp_id, lane_id).Sum<true, 1>(input, LOGICAL_WARP_THREADS);
+        return InternalWarpReduce(temp_storage).Reduce<true, 1>(input, LOGICAL_WARP_THREADS, cub::Sum());
     }
 
     /**
-     * \brief Computes a partially-full warp-wide sum in each active warp.  The output is valid in warp <em>lane</em><sub>0</sub>.
+     * \brief Computes a partially-full warp-wide sum in the calling warp.  The output is valid in warp <em>lane</em><sub>0</sub>.
      *
-     * All threads in each logical warp must agree on the same value for \p valid_items.  Otherwise the result is undefined.
+     * All threads across the calling warp must agree on the same value for \p valid_items.  Otherwise the result is undefined.
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates a sum reduction within a single, partially-full
      * block of 32 threads (one warp).
      * \par
@@ -327,10 +270,10 @@ public:
      *
      * __global__ void ExampleKernel(int *d_data, int valid_items)
      * {
-     *     // Specialize WarpReduce for a single warp on type int
-     *     typedef cub::WarpReduce<int, 1> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
+     *     // Allocate WarpReduce shared memory for one warp
      *     __shared__ typename WarpReduce::TempStorage temp_storage;
      *
      *     // Obtain one input item per thread if in range
@@ -354,22 +297,16 @@ public:
         int                 valid_items)        ///< [in] Total number of valid items in the calling thread's logical warp (may be less than \p LOGICAL_WARP_THREADS)
     {
         // Determine if we don't need bounds checking
-        if (valid_items >= LOGICAL_WARP_THREADS)
-        {
-            return InternalWarpReduce(temp_storage, warp_id, lane_id).Sum<true, 1>(input, valid_items);
-        }
-        else
-        {
-            return InternalWarpReduce(temp_storage, warp_id, lane_id).Sum<false, 1>(input, valid_items);
-        }
+        return InternalWarpReduce(temp_storage).Reduce<false, 1>(input, valid_items, cub::Sum());
     }
 
 
     /**
-     * \brief Computes a segmented sum in each active warp where segments are defined by head-flags.  The sum of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
+     * \brief Computes a segmented sum in the calling warp where segments are defined by head-flags.  The sum of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates a head-segmented warp sum
      * reduction within a block of 32 threads (one warp).
      * \par
@@ -378,10 +315,10 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize WarpReduce for a single warp on type int
-     *     typedef cub::WarpReduce<int, 1> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
+     *     // Allocate WarpReduce shared memory for one warp
      *     __shared__ typename WarpReduce::TempStorage temp_storage;
      *
      *     // Obtain one input item and flag per thread
@@ -403,20 +340,21 @@ public:
      *
      */
     template <
-        typename            Flag>
+        typename            FlagT>
     __device__ __forceinline__ T HeadSegmentedSum(
         T                   input,              ///< [in] Calling thread's input
-        Flag                head_flag)          ///< [in] Head flag denoting whether or not \p input is the start of a new segment
+        FlagT                head_flag)          ///< [in] Head flag denoting whether or not \p input is the start of a new segment
     {
         return HeadSegmentedReduce(input, head_flag, cub::Sum());
     }
 
 
     /**
-     * \brief Computes a segmented sum in each active warp where segments are defined by tail-flags.  The sum of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
+     * \brief Computes a segmented sum in the calling warp where segments are defined by tail-flags.  The sum of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates a tail-segmented warp sum
      * reduction within a block of 32 threads (one warp).
      * \par
@@ -425,10 +363,10 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize WarpReduce for a single warp on type int
-     *     typedef cub::WarpReduce<int, 1> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
+     *     // Allocate WarpReduce shared memory for one warp
      *     __shared__ typename WarpReduce::TempStorage temp_storage;
      *
      *     // Obtain one input item and flag per thread
@@ -449,10 +387,10 @@ public:
      * \tparam ReductionOp     <b>[inferred]</b> Binary reduction operator type having member <tt>T operator()(const T &a, const T &b)</tt>
      */
     template <
-        typename            Flag>
+        typename            FlagT>
     __device__ __forceinline__ T TailSegmentedSum(
         T                   input,              ///< [in] Calling thread's input
-        Flag                tail_flag)          ///< [in] Head flag denoting whether or not \p input is the start of a new segment
+        FlagT                tail_flag)          ///< [in] Head flag denoting whether or not \p input is the start of a new segment
     {
         return TailSegmentedReduce(input, tail_flag, cub::Sum());
     }
@@ -466,12 +404,13 @@ public:
     //@{
 
     /**
-     * \brief Computes a warp-wide reduction in each active warp using the specified binary reduction functor.  The output is valid in warp <em>lane</em><sub>0</sub>.
+     * \brief Computes a warp-wide reduction in the calling warp using the specified binary reduction functor.  The output is valid in warp <em>lane</em><sub>0</sub>.
      *
      * Supports non-commutative reduction operators
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates four concurrent warp max reductions within a block of
      * 128 threads (one per each of the 32-thread warps).
      * \par
@@ -480,17 +419,18 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize WarpReduce for 4 warps on type int
-     *     typedef cub::WarpReduce<int, 4> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
-     *     __shared__ typename WarpReduce::TempStorage temp_storage;
+     *     // Allocate WarpReduce shared memory for 4 warps
+     *     __shared__ typename WarpReduce::TempStorage temp_storage[4];
      *
      *     // Obtain one input item per thread
      *     int thread_data = ...
      *
      *     // Return the warp-wide reductions to each lane0
-     *     int aggregate = WarpReduce(temp_storage).Reduce(
+     *     int warp_id = threadIdx.x / 32;
+     *     int aggregate = WarpReduce(temp_storage[warp_id]).Reduce(
      *         thread_data, cub::Max());
      *
      * \endcode
@@ -506,18 +446,19 @@ public:
         T                   input,              ///< [in] Calling thread's input
         ReductionOp         reduction_op)       ///< [in] Binary reduction operator
     {
-        return InternalWarpReduce(temp_storage, warp_id, lane_id).Reduce<true, 1>(input, LOGICAL_WARP_THREADS, reduction_op);
+        return InternalWarpReduce(temp_storage).Reduce<true, 1>(input, LOGICAL_WARP_THREADS, reduction_op);
     }
 
     /**
-     * \brief Computes a partially-full warp-wide reduction in each active warp using the specified binary reduction functor.  The output is valid in warp <em>lane</em><sub>0</sub>.
+     * \brief Computes a partially-full warp-wide reduction in the calling warp using the specified binary reduction functor.  The output is valid in warp <em>lane</em><sub>0</sub>.
      *
-     * All threads in each logical warp must agree on the same value for \p valid_items.  Otherwise the result is undefined.
+     * All threads across the calling warp must agree on the same value for \p valid_items.  Otherwise the result is undefined.
      *
      * Supports non-commutative reduction operators
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates a max reduction within a single, partially-full
      * block of 32 threads (one warp).
      * \par
@@ -526,10 +467,10 @@ public:
      *
      * __global__ void ExampleKernel(int *d_data, int valid_items)
      * {
-     *     // Specialize WarpReduce for a single warp on type int
-     *     typedef cub::WarpReduce<int, 1> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
+     *     // Allocate WarpReduce shared memory for one warp
      *     __shared__ typename WarpReduce::TempStorage temp_storage;
      *
      *     // Obtain one input item per thread if in range
@@ -555,25 +496,18 @@ public:
         ReductionOp         reduction_op,       ///< [in] Binary reduction operator
         int                 valid_items)        ///< [in] Total number of valid items in the calling thread's logical warp (may be less than \p LOGICAL_WARP_THREADS)
     {
-        // Determine if we don't need bounds checking
-        if (valid_items >= LOGICAL_WARP_THREADS)
-        {
-            return InternalWarpReduce(temp_storage, warp_id, lane_id).Reduce<true, 1>(input, valid_items, reduction_op);
-        }
-        else
-        {
-            return InternalWarpReduce(temp_storage, warp_id, lane_id).Reduce<false, 1>(input, valid_items, reduction_op);
-        }
+        return InternalWarpReduce(temp_storage).Reduce<false, 1>(input, valid_items, reduction_op);
     }
 
 
     /**
-     * \brief Computes a segmented reduction in each active warp where segments are defined by head-flags.  The reduction of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
+     * \brief Computes a segmented reduction in the calling warp where segments are defined by head-flags.  The reduction of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
      *
      * Supports non-commutative reduction operators
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates a head-segmented warp max
      * reduction within a block of 32 threads (one warp).
      * \par
@@ -582,10 +516,10 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize WarpReduce for a single warp on type int
-     *     typedef cub::WarpReduce<int, 1> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
+     *     // Allocate WarpReduce shared memory for one warp
      *     __shared__ typename WarpReduce::TempStorage temp_storage;
      *
      *     // Obtain one input item and flag per thread
@@ -607,23 +541,24 @@ public:
      */
     template <
         typename            ReductionOp,
-        typename            Flag>
+        typename            FlagT>
     __device__ __forceinline__ T HeadSegmentedReduce(
         T                   input,              ///< [in] Calling thread's input
-        Flag                head_flag,          ///< [in] Head flag denoting whether or not \p input is the start of a new segment
+        FlagT                head_flag,          ///< [in] Head flag denoting whether or not \p input is the start of a new segment
         ReductionOp         reduction_op)       ///< [in] Reduction operator
     {
-        return InternalWarpReduce(temp_storage, warp_id, lane_id).template SegmentedReduce<true>(input, head_flag, reduction_op);
+        return InternalWarpReduce(temp_storage).template SegmentedReduce<true>(input, head_flag, reduction_op);
     }
 
 
     /**
-     * \brief Computes a segmented reduction in each active warp where segments are defined by tail-flags.  The reduction of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
+     * \brief Computes a segmented reduction in the calling warp where segments are defined by tail-flags.  The reduction of each segment is returned to the first lane in that segment (which always includes <em>lane</em><sub>0</sub>).
      *
      * Supports non-commutative reduction operators
      *
      * \smemreuse
      *
+     * \par Snippet
      * The code snippet below illustrates a tail-segmented warp max
      * reduction within a block of 32 threads (one warp).
      * \par
@@ -632,10 +567,10 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize WarpReduce for a single warp on type int
-     *     typedef cub::WarpReduce<int, 1> WarpReduce;
+     *     // Specialize WarpReduce for type int
+     *     typedef cub::WarpReduce<int> WarpReduce;
      *
-     *     // Allocate shared memory for WarpReduce
+     *     // Allocate WarpReduce shared memory for one warp
      *     __shared__ typename WarpReduce::TempStorage temp_storage;
      *
      *     // Obtain one input item and flag per thread
@@ -657,13 +592,13 @@ public:
      */
     template <
         typename            ReductionOp,
-        typename            Flag>
+        typename            FlagT>
     __device__ __forceinline__ T TailSegmentedReduce(
         T                   input,              ///< [in] Calling thread's input
-        Flag                tail_flag,          ///< [in] Tail flag denoting whether or not \p input is the end of the current segment
+        FlagT                tail_flag,          ///< [in] Tail flag denoting whether or not \p input is the end of the current segment
         ReductionOp         reduction_op)       ///< [in] Reduction operator
     {
-        return InternalWarpReduce(temp_storage, warp_id, lane_id).template SegmentedReduce<false>(input, tail_flag, reduction_op);
+        return InternalWarpReduce(temp_storage).template SegmentedReduce<false>(input, tail_flag, reduction_op);
     }
 
 

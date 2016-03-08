@@ -7,134 +7,82 @@
 // ---------- blas_quda.cu ---------- 
 
 namespace quda {
-  // creates and destroys reduction buffers  
-  void initBlas(); 
-  void endBlas(void);
 
-  void setBlasParam(int kernel, int prec, int threads, int blocks);
+  namespace blas {
 
-  extern unsigned long long blas_flops;
-  extern unsigned long long blas_bytes;
+    // creates and destroys reduction buffers  
+    void init(); 
+    void end(void);
+    
+    void* getDeviceReduceBuffer();
+    void* getMappedHostReduceBuffer();
+    void* getHostReduceBuffer();
+    
+    void setParam(int kernel, int prec, int threads, int blocks);
 
-  // C++ linkage
+    extern unsigned long long flops;
+    extern unsigned long long bytes;
 
-  // Generic variants
+    double norm2(const ColorSpinorField &a);
+    double norm1(const ColorSpinorField &b);
+  
+    void zero(ColorSpinorField &a);
+    void copy(ColorSpinorField &dst, const ColorSpinorField &src);
 
-  double norm2(const ColorSpinorField&);
+    double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y);
+    double reDotProduct(ColorSpinorField &x, ColorSpinorField &y);
+    double2 reDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
 
-  // CUDA variants
+    double xmyNorm(ColorSpinorField &x, ColorSpinorField &y);
 
-  void zeroCuda(cudaColorSpinorField &a);
-  void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src);
+    void axpby(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y);
+    void axpy(const double &a, ColorSpinorField &x, ColorSpinorField &y);
+    void ax(const double &a, ColorSpinorField &x);
+    void xpy(ColorSpinorField &x, ColorSpinorField &y);
+    void xpay(ColorSpinorField &x, const double &a, ColorSpinorField &y);
+    void mxpy(ColorSpinorField &x, ColorSpinorField &y);
 
-  double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  double normCuda(const cudaColorSpinorField &b);
-  double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  void reDotProductCuda(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
+    void axpyZpbx(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, const double &b);
+    void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b, ColorSpinorField& z, const double &c); 
 
-  double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
+    void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
+    void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
+    void cxpaypbz(ColorSpinorField &, const Complex &b, ColorSpinorField &y, const Complex &c, ColorSpinorField &z);
+    void caxpbypzYmbw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, ColorSpinorField &, ColorSpinorField &);
 
-  double2 reDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
+    Complex cDotProduct(ColorSpinorField &, ColorSpinorField &);
+    Complex xpaycDotzy(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z);
 
+    double3 cDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
+    double3 cDotProductNormB(ColorSpinorField &a, ColorSpinorField &b);
+    double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, 
+					   ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &u);
 
-  void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y);
-  void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  void axCuda(const double &a, cudaColorSpinorField &x);
-  void xpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
-  void xpayCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y);
-  void mxpyCuda(cudaColorSpinorField &x, cudaColorSpinorField &y);
+    void cabxpyAx(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
+    double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
+    void caxpyXmaz(const Complex &a, ColorSpinorField &x,
+		   ColorSpinorField &y, ColorSpinorField &z);
+    double caxpyXmazNormX(const Complex &a, ColorSpinorField &x, 
+			  ColorSpinorField &y, ColorSpinorField &z);
+    double cabxpyAxNorm(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
 
-  void axpyZpbxCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z, const double &b);
-  void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, cudaColorSpinorField& z, const double &c); 
+    void caxpbypz(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, 
+		  ColorSpinorField &);
+    void caxpbypczpw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, 
+		     const Complex &, ColorSpinorField &, ColorSpinorField &);
+    Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y,
+		       ColorSpinorField &z);
+    Complex axpyCGNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y);
+    double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r);
+    double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &r);
 
-  void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y);
-  void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  void cxpaypbzCuda(cudaColorSpinorField &, const Complex &b, cudaColorSpinorField &y, const Complex &c, cudaColorSpinorField &z);
-  void caxpbypzYmbwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, cudaColorSpinorField &, cudaColorSpinorField &);
+    void tripleCGUpdate(const double &alpha, const double &beta, ColorSpinorField &q,
+			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
+    double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
-  Complex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
-  void cDotProductCuda(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
-  Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z);
-
-  double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  double3 cDotProductNormBCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
-  double3 caxpbypzYmbwcDotProductUYNormYCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y, 
-					     cudaColorSpinorField &z, cudaColorSpinorField &w, cudaColorSpinorField &u);
-
-  void cabxpyAxCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  void caxpyXmazCuda(const Complex &a, cudaColorSpinorField &x,
-		     cudaColorSpinorField &y, cudaColorSpinorField &z);
-  double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, 
-			    cudaColorSpinorField &y, cudaColorSpinorField &z);
-  double cabxpyAxNormCuda(const double &a, const Complex &b, cudaColorSpinorField &x, cudaColorSpinorField &y);
-
-  void caxpbypzCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
-		    cudaColorSpinorField &);
-  void caxpbypczpwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, 
-		       const Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
-  Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
-			       cudaColorSpinorField &z);
-  Complex axpyCGNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
-  double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r);
-  double3 xpyHeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &r);
-
-  void tripleCGUpdateCuda(const double &alpha, const double &beta, cudaColorSpinorField &q,
-			  cudaColorSpinorField &r, cudaColorSpinorField &x, cudaColorSpinorField &p);
-  double3 tripleCGReductionCuda(cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z);
-
-  // CPU variants
-
-  double axpyNormCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  double normCpu(const cpuColorSpinorField &b);
-  double reDotProductCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
-  double xmyNormCpu(const cpuColorSpinorField &a, cpuColorSpinorField &b);
-  void axpbyCpu(const double &a, const cpuColorSpinorField &x, const double &b, cpuColorSpinorField &y);
-  void axpyCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  void axCpu(const double &a, cpuColorSpinorField &x);
-  void xpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  void xpayCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y);
-  void mxpyCpu(const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  void axpyZpbxCpu(const double &a, cpuColorSpinorField &x, cpuColorSpinorField &y, 
-		   const cpuColorSpinorField &z, const double &b);
-  void axpyBzpcxCpu(const double &a, cpuColorSpinorField& x, cpuColorSpinorField& y,
-		    const double &b, const cpuColorSpinorField& z, const double &c); 
-
-  void caxpbyCpu(const Complex &a, const cpuColorSpinorField &x, const Complex &b, cpuColorSpinorField &y);
-  void caxpyCpu(const Complex &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);
-  void cxpaypbzCpu(const cpuColorSpinorField &x, const Complex &b, const cpuColorSpinorField &y, 
-		   const Complex &c, cpuColorSpinorField &z);
-  void caxpbypzYmbwCpu(const Complex &, const cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
-		       cpuColorSpinorField &, const cpuColorSpinorField &); 
-  Complex cDotProductCpu(const cpuColorSpinorField &, const cpuColorSpinorField &);
-  Complex xpaycDotzyCpu(const cpuColorSpinorField &x, const double &a, cpuColorSpinorField &y, 
-			      const cpuColorSpinorField &z);
-  double3 cDotProductNormACpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
-  double3 cDotProductNormBCpu(const cpuColorSpinorField &a, const cpuColorSpinorField &b);
-  double3 caxpbypzYmbwcDotProductUYNormYCpu(const Complex &a, const cpuColorSpinorField &x, 
-					    const Complex &b, cpuColorSpinorField &y, 
-					    cpuColorSpinorField &z, const cpuColorSpinorField &w, 
-					    const cpuColorSpinorField &u);
-
-  void cabxpyAxCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
-
-  double caxpyNormCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y);
-
-  void caxpyXmazCpu(const Complex &a, cpuColorSpinorField &x,
-		    cpuColorSpinorField &y, cpuColorSpinorField &z);
-  double caxpyXmazNormXCpu(const Complex &a, cpuColorSpinorField &x, 
-			   cpuColorSpinorField &y, cpuColorSpinorField &z);
-  double cabxpyAxNormCpu(const double &a, const Complex &b, cpuColorSpinorField &x, cpuColorSpinorField &y);
-
-  void caxpbypzCpu(const Complex &, cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
-		   cpuColorSpinorField &);
-
-  void caxpbypczpwCpu(const Complex &, cpuColorSpinorField &, const Complex &, cpuColorSpinorField &, 
-		      const Complex &, cpuColorSpinorField &, cpuColorSpinorField &);
-  Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
-			      cpuColorSpinorField &z);
-  double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &r);
-  double3 xpyHeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &y, cpuColorSpinorField &r);
+    void reDotProduct(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
+    void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b); 
+  } // namespace blas
 
 } // namespace quda
 

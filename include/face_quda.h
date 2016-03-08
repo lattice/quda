@@ -115,12 +115,7 @@ namespace quda {
   
     void scatter(quda::cudaColorSpinorField &out, int dagger, int dir, int streamIdx); 
 
- 
-    void exchangeCpuSpinor(quda::cpuColorSpinorField &in, int parity, int dagger);
-    
-    void exchangeLink(void** ghost_link, void** link_sendbuf, QudaFieldLocation location);
-    
-    static void flushPinnedCache();
+     static void flushPinnedCache();
   };
 }
   

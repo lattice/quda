@@ -1,5 +1,6 @@
 #include <quda_internal.h>
 #include <invert_quda.h>
+#include <multigrid.h>
 #include <cmath>
 
 namespace quda {
@@ -14,6 +15,12 @@ namespace quda {
   {
     Solver *solver=0;
 
+    if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
+      errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
+
+    if (param.preconditioner && param.inv_type_precondition != QUDA_MG_INVERTER)
+      errorQuda("Explicit preconditoner not supported for %d preconditioner", param.inv_type_precondition);
+
     switch (param.inv_type) {
     case QUDA_CG_INVERTER:
       report("CG");
@@ -25,7 +32,12 @@ namespace quda {
       break;
     case QUDA_GCR_INVERTER:
       report("GCR");
-      solver = new GCR(mat, matSloppy, matPrecon, param, profile);
+      if (param.preconditioner) {
+	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
+	solver = new GCR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
+      } else {
+	solver = new GCR(mat, matSloppy, matPrecon, param, profile);
+      }
       break;
     case QUDA_MR_INVERTER:
       report("MR");
@@ -56,7 +68,7 @@ namespace quda {
       solver = new MPBiCGstab(mat, param, profile);
       break;
     default:
-      errorQuda("Invalid solver type");
+      errorQuda("Invalid solver type %d", param.inv_type);
     }
     
     return solver;
@@ -137,7 +149,8 @@ namespace quda {
   void Solver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n", name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);    
+	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n",
+		   name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);
       } else {
 	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e\n", 
 		   name, k, sqrt(r2/b2), param.true_res);
@@ -147,13 +160,22 @@ namespace quda {
   }
 
   // Deflated solver factory
-  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDeflate, TimeProfile &profile)
+  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile)
   {
     DeflatedSolver* solver=0;
 
     if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
       report("Incremental EIGCG");
-      solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
+      if(profile != NULL)
+        solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
+      else
+        solver = new IncEigCG(param);//hack to clean deflation resources
+    }else if (param.inv_type == QUDA_GMRESDR_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ){
+      report("GMRESDR");
+      if(profile != NULL)
+        solver = new GMResDR(mat, matSloppy, matDeflate, param, profile);
+      else
+        solver = new GMResDR(param);
     }else{
       errorQuda("Invalid solver type");
     }

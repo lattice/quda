@@ -9,7 +9,6 @@
 #include "misc.h"
 #include "fermion_force_reference.h"
 #include "fermion_force_quda.h"
-#include "hw_quda.h"
 #include <sys/time.h>
 #include <dslash_quda.h>
 
@@ -24,9 +23,10 @@ cudaGaugeField *cudaMom = NULL;
 cpuGaugeField *cpuMom = NULL;
 cpuGaugeField *refMom = NULL;
 
-static FullHw cudaHw;
+cudaColorSpinorField *cudaHw = NULL;
+cpuColorSpinorField *cpuHw = NULL;
+
 static QudaGaugeParam gaugeParam;
-static void* hw; //the array of half_wilson_vector
 
 extern int gridsize_from_cmdline[];
 
@@ -121,15 +121,24 @@ fermion_force_init()
   gParam.precision = gaugeParam.cuda_prec;
   cudaMom = new cudaGaugeField(gParam);
     
-  hw = malloc(4*cpuGauge->Volume()*hwSiteSize*gaugeParam.cpu_prec);
-  if (hw == NULL){
-    fprintf(stderr, "ERROR: malloc failed for hw\n");
-    exit(1);	
-  }
-  createHwCPU(hw, hw_prec);
+  ColorSpinorParam hwParam;
+  hwParam.nColor = 3;
+  hwParam.nSpin = 2;
+  hwParam.nDim = 4;
+  for (int d=0; d<4; d++) hwParam.x[d] = gaugeParam.X[d];
+  hwParam.precision = cpu_hw_prec;
+  hwParam.pad = 0;
+  hwParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  hwParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  hwParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  hwParam.create = QUDA_ZERO_FIELD_CREATE;
 
-  cudaHw = createHwQuda(gaugeParam.X, hw_prec);
-    
+  cpuHw = new cpuColorSpinorField(hwParam);
+
+  hwParam.precision = hw_prec;
+  hwParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  cudaHw = new cudaColorSpinorField(hwParam);
+
   return;
 }
 
@@ -143,8 +152,8 @@ fermion_force_end()
   delete cpuMom;
   delete refMom;
 
-  freeHwQuda(cudaHw);
-  free(hw);
+  delete cudaHw;
+  delete cpuHw;
   
   endQuda();
 }
@@ -183,11 +192,10 @@ fermion_force_test(void)
   // download the gauge field to the GPU
   cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
-  loadHwToGPU(cudaHw, hw, cpu_hw_prec);
-
+  *cudaHw = *cpuHw;
     
   if (verify_results){	
-    fermion_force_reference(eps, weight1, weight2, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
+    fermion_force_reference(eps, weight1, weight2, act_path_coeff, cpuHw->V(), cpuGauge->Gauge_p(), refMom->Gauge_p());
   }
     
     
@@ -202,7 +210,7 @@ fermion_force_test(void)
   cudaDeviceSynchronize();    
 
   gettimeofday(&t0, NULL);
-  fermion_force_cuda(eps, weight1, weight2, act_path_coeff, cudaHw, *cudaGauge, *cudaMom, &gaugeParam);
+  fermion_force_cuda(eps, weight1, weight2, act_path_coeff, *cudaHw, *cudaGauge, *cudaMom, &gaugeParam);
   cudaDeviceSynchronize();
   gettimeofday(&t1, NULL);
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
