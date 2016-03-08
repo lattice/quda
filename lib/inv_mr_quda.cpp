@@ -80,6 +80,7 @@ namespace quda {
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = blas::norm2(r);
+      blas::zero(x);
     }
 
     // set initial guess to zero and thus the residual is just the source
@@ -138,7 +139,7 @@ namespace quda {
       double scale = c2 > 0.0 ? sqrt(c2) : 1.0;
       blas::axpy(scale,y,x);
     } else {
-      if (c2 > 0.0) blas::axpby(sqrt(c2), y, 0.0, x);
+      if (c2 > 0.0) blas::axpby(sqrt(c2), y, 0.0, x); // FIXME: if x contains a Nan then this will fail: hence zero of x above
     }
     // if not preserving source then overide source with residual
     if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && &r != &b) {
