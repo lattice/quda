@@ -383,23 +383,23 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
     if (out) cudaBindTexture(0, interTexSingle2, out->V(), in->Bytes()); 
     if (x) cudaBindTexture(0, accumTexSingle2, x->V(), in->Bytes()); 
   } else if (typeid(spinorFloat) == typeid(short4)) {
-    cudaBindTexture(0, spinorTexHalf, in->V(), in->Bytes()); 
-    cudaBindTexture(0, spinorTexHalfNorm, in->Norm(), in->NormBytes()); 
+    cudaBindTexture(0, spinorTexHalf, in->V(), in->Bytes());
+    cudaBindTexture(0, spinorTexHalfNorm, in->Norm(), in->NormBytes());
     cudaBindTexture(0, ghostSpinorTexHalf, in->Ghost2(), in->GhostBytes());
-    cudaBindTexture(0, ghostSpinorTexHalfNorm, in->GhostNorm(), in->GhostNormBytes()); 
-    if (out) cudaBindTexture(0, interTexHalf, out->V(), in->Bytes()); 
-    if (out) cudaBindTexture(0, interTexHalfNorm, out->Norm(), in->NormBytes()); 
-    if (x) cudaBindTexture(0, accumTexHalf, x->V(), in->Bytes()); 
-    if (x) cudaBindTexture(0, accumTexHalfNorm, x->Norm(), in->NormBytes()); 
+    cudaBindTexture(0, ghostSpinorTexHalfNorm, in->Ghost2(), in->GhostBytes());
+    if (out) cudaBindTexture(0, interTexHalf, out->V(), in->Bytes());
+    if (out) cudaBindTexture(0, interTexHalfNorm, out->Norm(), in->NormBytes());
+    if (x) cudaBindTexture(0, accumTexHalf, x->V(), in->Bytes());
+    if (x) cudaBindTexture(0, accumTexHalfNorm, x->Norm(), in->NormBytes());
   } else if (typeid(spinorFloat) == typeid(short2)) {
-    cudaBindTexture(0, spinorTexHalf2, in->V(), in->Bytes()); 
-    cudaBindTexture(0, spinorTexHalf2Norm, in->Norm(), in->NormBytes()); 
+    cudaBindTexture(0, spinorTexHalf2, in->V(), in->Bytes());
+    cudaBindTexture(0, spinorTexHalf2Norm, in->Norm(), in->NormBytes());
     cudaBindTexture(0, ghostSpinorTexHalf2, in->Ghost2(), in->GhostBytes());
-    cudaBindTexture(0, ghostSpinorTexHalf2Norm, in->GhostNorm(), in->GhostNormBytes()); 
-    if (out) cudaBindTexture(0, interTexHalf2, out->V(), in->Bytes()); 
-    if (out) cudaBindTexture(0, interTexHalf2Norm, out->Norm(), in->NormBytes()); 
-    if (x) cudaBindTexture(0, accumTexHalf2, x->V(), in->Bytes()); 
-    if (x) cudaBindTexture(0, accumTexHalf2Norm, x->Norm(), in->NormBytes()); 
+    cudaBindTexture(0, ghostSpinorTexHalf2Norm, in->Ghost2(), in->GhostBytes());
+    if (out) cudaBindTexture(0, interTexHalf2, out->V(), in->Bytes());
+    if (out) cudaBindTexture(0, interTexHalf2Norm, out->Norm(), in->NormBytes());
+    if (x) cudaBindTexture(0, accumTexHalf2, x->V(), in->Bytes());
+    if (x) cudaBindTexture(0, accumTexHalf2Norm, x->Norm(), in->NormBytes());
   } else {
     errorQuda("Unsupported precision and short vector type");
   }
