@@ -48,12 +48,7 @@
 #define mdwf_c5 mdwf_c5_d
 #else
 #define spinorFloat float
-#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
-#define POW(a, b) __powf(a, static_cast<spinorFloat>(b))
-#else
-#define POW(a, b) __powf(a, b)
-#endif
-
+#define POW(a, b) __fast_pow(a, b)
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z

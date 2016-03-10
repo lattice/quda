@@ -164,11 +164,7 @@ def def_input_spinor():
     str += "#define mdwf_c5 mdwf_c5_d\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
-    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
-    str += "#define POW(a, b) __powf(a, static_cast<spinorFloat>(b))\n"
-    str += "#else\n"
-    str += "#define POW(a, b) __powf(a, b)\n"
-    str += "#endif\n\n"
+    str += "#define POW(a, b) __fast_pow(a, b)\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c

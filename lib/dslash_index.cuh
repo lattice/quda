@@ -1,7 +1,7 @@
 // The following indexing routines work for arbitrary (including odd) lattice dimensions.
 // compute an index into the local volume from an index into the face (used by the face packing routines)
 
-  template <int dim, int nLayers, int face_num>
+template <int dim, int nLayers, int face_num>
 static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_volume, const int &parity, const int X[])
 {
   // dimensions of the face (FIXME: optimize using constant cache)
@@ -1282,6 +1282,15 @@ static inline __device__ void faceIndexFromDWCoords(int &face_idx, int x, int y,
   face_idx = (((((D[3]*s + t)*D[2] + z)*D[1] + y)*D[0] + x) >> 1);
 
   return;
+}
+
+/*
+  Fast power function that works for negative "a" argument
+*/
+__device__ inline float __fast_pow(float a, int b) {
+  float sign = signbit(a) ? -1.0f : 1.0f;
+  float power = __powf(fabsf(a), b);
+  return b&1 ? sign * power : power;
 }
 
 
