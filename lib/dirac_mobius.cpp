@@ -150,65 +150,38 @@ namespace quda {
   }
 
   // Apply the even-odd preconditioned mobius DWF operator
+  //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
   void DiracMobiusDomainWallPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if(dagger == QUDA_DAG_NO)
-    {
-      if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
-      bool reset1 = newTmp(&tmp1, in);
+    bool reset1 = newTmp(&tmp1, in);
 
-      //QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
-      //QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
-      //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
-      if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        Dslash4pre(*tmp1, in, QUDA_EVEN_PARITY);
-        Dslash4(out, *tmp1, QUDA_ODD_PARITY);
-        Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5); //kappa5 is dummy value
-        Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
-        Dslash4(*tmp1, out, QUDA_EVEN_PARITY);
-        Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        Dslash4pre(*tmp1, in, QUDA_ODD_PARITY);
-        Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
-        Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5); //kappa5 is dummy value
-        Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
-        Dslash4(*tmp1, out, QUDA_ODD_PARITY);
-        Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
-      }
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
-      deleteTmp(&tmp1, reset1);
+    //QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
+    //QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
+    if (!symmetric && !dagger) {
+      Dslash4pre(*tmp1, in, parity[1]);
+      Dslash4(out, *tmp1, parity[0]);
+      Dslash5inv(*tmp1, out, parity[0], kappa5); //kappa5 is dummy value
+      Dslash4pre(out, *tmp1, parity[0]);
+      Dslash4(*tmp1, out, parity[1]);
+      Dslash5Xpay(out, in, parity[1], *tmp1, 1.0);
+    } else if (!symmetric && dagger) {
+      Dslash4(*tmp1, in, parity[0]);
+      Dslash4pre(out, *tmp1, parity[0]);
+      Dslash5inv(*tmp1, out, parity[0], kappa5);
+      Dslash4(out, *tmp1, parity[1]);
+      Dslash4pre(*tmp1, out, parity[1]);
+      Dslash5Xpay(out, in, parity[1], *tmp1, 1.0);
+    } else {
+      errorQuda("MatPCType %d dagger %d not valid for DiracMobiusDomainWallPC", matpcType, dagger);
     }
-    else
-    {
-      if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
-      bool reset1 = newTmp(&tmp1, in);
-
-      //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
-      //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
-      //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
-      if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        Dslash4(*tmp1, in, QUDA_ODD_PARITY);
-        Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
-        Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5);
-        Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
-        Dslash4pre(*tmp1, out, QUDA_EVEN_PARITY);
-        Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        Dslash4(*tmp1, in, QUDA_EVEN_PARITY);
-        Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
-        Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5);
-        Dslash4(out, *tmp1, QUDA_ODD_PARITY);
-        Dslash4pre(*tmp1, out, QUDA_ODD_PARITY);
-        Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
-      }
-      deleteTmp(&tmp1, reset1);
-    }
+    deleteTmp(&tmp1, reset1);
   }
 
   void DiracMobiusDomainWallPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
