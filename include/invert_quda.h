@@ -368,6 +368,28 @@ namespace quda {
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
   
+  
+  // My modification: Additional GMRES solver class
+  class GMRES : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
+
+    Solver *K;
+    SolverParam Kparam; // Parameters for preconditioner solve
+
+  public:
+    GMRES(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
+	SolverParam &param, TimeProfile &profile);
+    virtual ~GMRES();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+  
+  
+  
   class MPBiCGstab : public Solver {
 
   private:
