@@ -33,7 +33,8 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	unitarize_links_quda.o milc_interface.o				\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
-	inv_mpcg_quda.o inv_mpbicgstab_quda.o
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o                           \
+	gmres_utilities.o inv_gmres_quda.o
 
 
 # header files, found in include/
@@ -45,7 +46,8 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	texture.h eig_variables.h numa_affinity.h misc_helpers.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
-	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h
+	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h       \
+	gmres_utilities.h
 
 
 # These are only inlined into blas_quda.cu
@@ -245,6 +247,8 @@ copy_gauge_single.o: copy_gauge_single.cu copy_gauge_inc.cu $(HDRS)
 copy_gauge_half.o: copy_gauge_half.cu copy_gauge_inc.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
+gmres_utilities.o: gmres_utilities.cpp $(HDRS)
+	$(CXX) $(MAGMA_INCLUDE) $(CXXFLAGS) $(MAGMA_FLAGS) $< -c -o $@	
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@
