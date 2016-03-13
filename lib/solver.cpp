@@ -15,6 +15,10 @@ namespace quda {
     Solver *solver=0;
 
     switch (param.inv_type) {
+    case QUDA_GMRES_INVERTER: // This is my modification
+      report("GMRES");
+      solver = new GMRES(mat, matSloppy, matPrecon, param, profile);
+      break;
     case QUDA_CG_INVERTER:
       report("CG");
       solver = new CG(mat, matSloppy, param, profile);
