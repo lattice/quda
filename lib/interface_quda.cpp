@@ -1702,7 +1702,6 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   setDiracParam(diracParam, inv_param, pc);
 
   DiracMobiusDomainWallPC dirac(diracParam); // create the Dirac operator
-  double kappa5 = 0.0;  // Kappa5 is dummy argument
   switch (test_type) {
     case 0:
       dirac.Dslash4(out, in, parity);
@@ -1714,7 +1713,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
       dirac.Dslash4pre(out, in, parity);
       break;
     case 3:
-      dirac.Dslash5inv(out, in, parity, kappa5);
+      dirac.Dslash5inv(out, in, parity);
       break;
   }
 

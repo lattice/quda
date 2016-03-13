@@ -527,7 +527,7 @@ double dslashCUDA(int niter) {
           if (transfer) {
             dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            dirac_mdwf->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+            dirac_mdwf->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 4:

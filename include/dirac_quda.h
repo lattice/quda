@@ -319,14 +319,17 @@ namespace quda {
     DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
     virtual ~DiracDomainWall4DPC();
     DiracDomainWall4DPC& operator=(const DiracDomainWall4DPC &dirac);
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
+
+    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &k) const;
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &kappa5) const;
+
+    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity, const double &kappa5, const ColorSpinorField &x, const double &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -354,16 +357,21 @@ namespace quda {
     DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac);
     virtual ~DiracMobiusDomainWallPC();
     DiracMobiusDomainWallPC& operator=(const DiracMobiusDomainWallPC &dirac);
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
-    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
+
+    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &k) const;
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+			const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;

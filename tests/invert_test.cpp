@@ -194,7 +194,6 @@ int main(int argc, char **argv)
     inv_param.solution_type = multishift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
   }
   inv_param.matpc_type = matpc_type;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = normalization;
@@ -315,7 +314,7 @@ int main(int argc, char **argv)
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -476,8 +475,7 @@ int main(int argc, char **argv)
 //      } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
 //        mdw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else {
-        printfQuda("Unsupported dslash_type\n");
-        exit(-1);
+        errorQuda("Unsupported dslash_type");
       }
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
         if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
@@ -518,8 +516,7 @@ int main(int argc, char **argv)
         free(kappa_b);
         free(kappa_c);
       } else {
-        printfQuda("Unsupported dslash_type\n");
-        exit(-1);
+        errorQuda("Unsupported dslash_type");
       }
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
@@ -552,8 +549,7 @@ int main(int argc, char **argv)
         wil_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
                   inv_param.cpu_prec, gauge_param);
       } else {
-        printfQuda("Unsupported dslash_type\n");
-        exit(-1);
+        errorQuda("Unsupported dslash_type");
       }
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {

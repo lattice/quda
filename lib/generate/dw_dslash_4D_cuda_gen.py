@@ -1179,7 +1179,7 @@ def twisted():
 def coeff():
   if dslash4:
     str = "coeff"
-  elif dslash5:
+  elif dslash5 or dslash5inv:
     str = "coeff"
   else :
     str = "a" 
@@ -1221,17 +1221,21 @@ def xpay():
       str += "#else\n"
       str += "coeff = a;\n"
       str += "#endif\n\n"
-    elif dslash5:
+    elif dslash5 or dslash5inv:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
       str += "coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n"
       str += "coeff *= -coeff;\n"
       str += "#else\n"
-      str += "coeff = a;\n"
+      if dslash5:
+          str += "coeff = a;\n"
+      elif dslash5inv:
+          str += "coeff = b;\n"
       str += "#endif\n\n"
-      str += "#ifdef YPAX\n"
-      str += ypax()
-      str += "#else\n"
+      if dslash5:
+          str += "#ifdef YPAX\n"
+          str += ypax()
+          str += "#else\n"
     
     str += "#ifdef SPINOR_DOUBLE\n"
 
@@ -1428,7 +1432,6 @@ def generate_dslash5D_inv():
 def generate_clover():
     return prolog() + epilog()
 
-
 # To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
 
 sharedFloats = 0
@@ -1444,6 +1447,7 @@ twist = False
 clover = False
 dslash4 = True
 dslash5 = False
+dslash5inv = False
 normalDWF = False
 
 print sys.argv[0] + ": generating dw_dslash4_core.h";
@@ -1478,6 +1482,7 @@ f.write(generate_dslash5D())
 f.close()
 
 dslash5 = False
+dslash5inv = True
 
 print sys.argv[0] + ": generating dw_dslash5inv_core.h";
 dslash = True
@@ -1492,4 +1497,3 @@ dagger = True
 f = open('dslash_core/dw_dslash5inv_dagger_core.h', 'w')
 f.write(generate_dslash5D_inv())
 f.close()
-
