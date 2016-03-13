@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include <util_quda.h>
-#include <test_util.h>
+#include <test_util.h>		// here the "extern" values are defined
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
@@ -48,7 +48,7 @@ extern QudaPrecision  prec_sloppy;
 extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
-extern double mass; // mass of Dirac operator
+extern double mass;    // mass of Dirac operator
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaMatPCType matpc_type; // preconditioning type
 
@@ -56,9 +56,9 @@ extern char latfile[];
 
 extern void usage(char** );
 
-void
-display_test_info()
-{
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void display_test_info() {
   printfQuda("running the following test:\n");
     
   printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
@@ -77,12 +77,18 @@ display_test_info()
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
   
-  return ;
-  
+  return ; 
 }
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 
-int main(int argc, char **argv)
-{
+
+//-----------------------------------------------------------------------------
+// here comes the main function
+// ./invert_test --xdim 24 --ydim 24 --zdim 24 --tdim 64 --load-gauge config64x24.ildg
+// ./invert_test --load-gauge config64x24.ildg
+//-----------------------------------------------------------------------------
+int main(int argc, char **argv) {
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
@@ -91,6 +97,7 @@ int main(int argc, char **argv)
     printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+  
 
   if (prec_sloppy == QUDA_INVALID_PRECISION){
     prec_sloppy = prec;
@@ -99,13 +106,15 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
+
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
+  printfQuda("--> initialize QMP/MPI, QUDA comms grid and RNG\n");
 
-  display_test_info();
 
   // *** QUDA parameters begin here.
-
+  printfQuda("--> QUDA parameters begin here\n");
+  
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
       dslash_type != QUDA_TWISTED_MASS_DSLASH &&
@@ -118,12 +127,56 @@ int main(int argc, char **argv)
   }
 
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = prec;
+  QudaPrecision cuda_prec = QUDA_DOUBLE_PRECISION; //prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
   QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  QudaInvertParam inv_param = newQudaInvertParam();
+  
+  // these are my own modifications
+  //---------------------------------------------------------------------------
+  //---------------------------------------------------------------------------
+  xdim = 16;		// dimension of the lattice
+  ydim = 16;
+  zdim = 16;
+  tdim = 48;
+  mass = -0.33968;		// quark mass
+  double cSW = 1.8228;		// clover constant
+  QudaDslashType dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+  
+  QudaInvertParam inv_param = newQudaInvertParam();		// set default values for solver parameters
+  
+  inv_param.dslash_type = dslash_type;
+  
+  inv_param.inv_type = QUDA_GMRES_INVERTER;
+//  inv_param.inv_type = QUDA_GCR_INVERTER;
+//  inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+//  inv_param.tune = QUDA_TUNE_NO;
+  inv_param.tune = QUDA_TUNE_YES;
+  inv_param.maxiter = 200;		// max # of outer iterations
+  inv_param.gcrNkrylov = 8;		// size of Krylov space
+  inv_param.tol = 1e-10;		// solver tolerance (rel. resNorm, i.e., |r|/|b|)
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;//QUDA_INVALID_INVERTER;
+  
+  inv_param.schwarz_type = QUDA_MULTIPLICATIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 3;
+  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.omega = 1.0;
+  
+  if (inv_param.inv_type == QUDA_GMRES_INVERTER) {
+  	inv_param.deflation_grid = 1;		// dimension of deflated subspace of F-GMRES-DR
+  }
+  //---------------------------------------------------------------------------
+  //---------------------------------------------------------------------------
+  
+  
+  // display test infos
+  printfQuda("--> display test info\n");
+  display_test_info();
+  
  
   double kappa5;
 
@@ -147,10 +200,11 @@ int main(int argc, char **argv)
   gauge_param.reconstruct_precondition = link_recon_sloppy;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  inv_param.dslash_type = dslash_type;
+  // inv_param.dslash_type = dslash_type;
 
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
+  printfQuda("--> kappa = %f\n", inv_param.kappa);
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.12;
@@ -175,12 +229,14 @@ int main(int argc, char **argv)
     }
   }
 
+
   // offsets used only by multi-shift solver
+  printfQuda("--> offsets used only by multi-shift solver\n");
   inv_param.num_offset = 4;
   double offset[4] = {0.01, 0.02, 0.03, 0.04};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
-  inv_param.inv_type = inv_type;
+  //inv_param.inv_type = inv_type;
   if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
@@ -206,8 +262,8 @@ int main(int argc, char **argv)
   inv_param.pipeline = 0;
 
   inv_param.Nsteps = 2;
-  inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-7;
+  //inv_param.gcrNkrylov = 10;
+  //inv_param.tol = 1e-7;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -222,21 +278,14 @@ int main(int argc, char **argv)
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
-  inv_param.maxiter = 10000;
+  //inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-1;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.max_res_increase = 1;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = precon_type;
-    
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 10;
-  inv_param.verbosity_precondition = QUDA_SILENT;
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
-  inv_param.omega = 1.0;
+  printfQuda("--> domain decomposition preconditioner parameters\n");
+  //inv_param.inv_type_precondition = precon_type;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -248,7 +297,7 @@ int main(int argc, char **argv)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
+  //inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 
   gauge_param.ga_pad = 0; // 24*24*24/2;
   inv_param.sp_pad = 0; // 24*24*24/2;
@@ -272,7 +321,7 @@ int main(int argc, char **argv)
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = 1.5*inv_param.kappa;
+    inv_param.clover_coeff = cSW*inv_param.kappa;
   }
 
   inv_param.verbosity = QUDA_VERBOSE;
@@ -281,6 +330,7 @@ int main(int argc, char **argv)
   // *** application-specific.
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
+  printfQuda("--> set parameters for the reference Dslash, and prepare fields to be loaded\n");
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
@@ -306,31 +356,51 @@ int main(int argc, char **argv)
   } else { // else generate a random SU(3) field
     construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
   }
-
+  
+  // Construct the Clover-matrix. If a gauge-field was supplied, generate a real Clover term,
+  // otherwise construct a random matrix.
+  // Modified on 15.10.2015.
+  //---------------------------------------------------------------------------
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
-
-    size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-    clover_inv = malloc(V*cloverSiteSize*cSize);
-    construct_clover_field(clover_inv, norm, diag, inv_param.clover_cpu_prec);
-
-    // The uninverted clover term is only needed when solving the unpreconditioned
-    // system or when using "asymmetric" even/odd preconditioning.
-    int preconditioned = (inv_param.solve_type == QUDA_DIRECT_PC_SOLVE ||
-			  inv_param.solve_type == QUDA_NORMOP_PC_SOLVE);
-    int asymmetric = preconditioned &&
-                         (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
-                          inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC);
-    if (!preconditioned) {
-      clover = clover_inv;
+     
+    // The first and better option is, we have a externally supplied gauge configuration
+    if (strcmp(latfile,"")) {
+       
+      // NOTE: In line 449 we are going to load the colver term into device memory
+      // According to "https://github.com/lattice/quda/wiki/Minutes-2015-04-23" QUDA
+      // uses a predefined clover field if one is provided. Otherwise it is calculated
+      // from the gauge field and the clover_coeff. This is what happens when NULL-pointers
+      // are handed to loadCloverQuda(...)
+      clover     = NULL;
       clover_inv = NULL;
-    } else if (asymmetric) { // fake it by using the same random matrix
-      clover = clover_inv;   // for both clover and clover_inv
-    } else {
-      clover = NULL;
+      
+    }
+    else { // We have no suitable gauge configuration, i.e., use a random clover matrix
+      double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
+      double diag = 1.0; // constant added to the diagonal
+
+      size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+      clover_inv = malloc(V*cloverSiteSize*cSize);
+      construct_clover_field(clover_inv, norm, diag, inv_param.clover_cpu_prec);
+
+      // The uninverted clover term is only needed when solving the unpreconditioned
+      // system or when using "asymmetric" even/odd preconditioning.
+      int preconditioned = (inv_param.solve_type == QUDA_DIRECT_PC_SOLVE ||
+			   inv_param.solve_type == QUDA_NORMOP_PC_SOLVE);
+      int asymmetric = preconditioned &&
+			   (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
+			   inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC);
+      if (!preconditioned) {
+	 clover = clover_inv;
+	 clover_inv = NULL;
+      } else if (asymmetric) { // fake it by using the same random matrix
+	 clover = clover_inv;   // for both clover and clover_inv
+      } else {
+	 clover = NULL;
+      }
     }
   }
+  //---------------------------------------------------------------------------
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
@@ -375,18 +445,55 @@ int main(int argc, char **argv)
   loadGaugeQuda((void*)gauge, &gauge_param);
 
   // load the clover term, if desired
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH)
+     loadCloverQuda(clover, clover_inv, &inv_param);
 
-  if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(NULL, NULL, &inv_param);
+  if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+     loadCloverQuda(NULL, NULL, &inv_param);
+  
+  // destroy all gauge fields, and recreate them again (get rid of clovers gauge copies)
+  // only necessary if the clover field was created on the fly in device memory
+  // NOTE: This is an ugly hack and due to some other ugly hacks in loadCloverQuda()
+  //---------------------------------------------------------------------------
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+     if (strcmp(latfile,"")) {
+	
+	freeGaugeQuda();
+	
+	if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
+	   read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+	   construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
+	} else { // else generate a random SU(3) field
+	   construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+	}
+	
+	loadGaugeQuda((void*)gauge, &gauge_param);
+     }
+  }
+  //---------------------------------------------------------------------------
 
   // perform the inversion
+  printfQuda("perform the inversion...");
   if (multishift) {
+    printfQuda("multishift used\n");
     invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
-  } else {
-    invertQuda(spinorOut, spinorIn, &inv_param);
+  }
+  else {
+    printfQuda("no multishift used\n");
+    if (inv_param.inv_type == QUDA_GMRES_INVERTER) {	// my modification
+    	printfQuda("       Open MAGMA...");
+  	openMagma();
+  	printfQuda("done.\n");
+    	invertQuda(spinorOut, spinorIn, &inv_param);
+    	closeMagma();
+    }
+    else {
+    	invertQuda(spinorOut, spinorIn, &inv_param);
+    }
   }
 
   // stop the timer
+  printfQuda("Stopping the timer\n");
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
     
@@ -565,7 +672,8 @@ int main(int argc, char **argv)
   }
 
   freeGaugeQuda();
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+     freeCloverQuda();
   
   // finalize the QUDA library
   endQuda();
@@ -574,3 +682,5 @@ int main(int argc, char **argv)
 
   return 0;
 }
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
