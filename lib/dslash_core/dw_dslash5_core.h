@@ -323,7 +323,8 @@ xs = X/(X1*X2*X3*X4);
 
 #ifdef MDWF_mode
  coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
- coeff *= -coeff;
+ coeff *= coeff;
+ coeff *= a;
 #else
  coeff = a;
 #endif

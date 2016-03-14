@@ -1225,7 +1225,8 @@ def xpay():
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
       str += "coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n"
-      str += "coeff *= -coeff;\n"
+      str += "coeff *= coeff;\n"
+      str += "coeff *= a;\n"
       str += "#else\n"
       if dslash5:
           str += "coeff = a;\n"

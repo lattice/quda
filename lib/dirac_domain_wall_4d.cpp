@@ -203,27 +203,27 @@ namespace quda {
       bool reset = newTmp(&tmp1, b.Even());
 
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-        // src = D5^-1 (b_e + k D4_eo*D5^-1 b_o)
+        // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
         src = &(x.Odd());
         Dslash5inv(*src, b.Odd(), QUDA_ODD_PARITY, kappa5);
         Dslash4Xpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa5);
 	Dslash5inv(*src, *tmp1, QUDA_EVEN_PARITY, kappa5);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-        // src = D5^-1 (b_o + k D4_oe*D5^-1 b_e)
+        // src = M5^-1 (b_o + k D4_oe*M5^-1 b_e)
         src = &(x.Even());
         Dslash5inv(*src, b.Even(), QUDA_EVEN_PARITY, kappa5);
         Dslash4Xpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa5);
 	Dslash5inv(*src, *tmp1, QUDA_ODD_PARITY, kappa5);
         sol = &(x.Odd());
       } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        // src = b_e + k D4_eo*D5^-1 b_o
+        // src = b_e + k D4_eo*M5^-1 b_o
         src = &(x.Odd());
         Dslash5inv(*tmp1, b.Odd(), QUDA_ODD_PARITY, kappa5);
         Dslash4Xpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa5);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // src = b_o + k D4_oe*D5^-1 b_e
+        // src = b_o + k D4_oe*M5^-1 b_e
         src = &(x.Even());
         Dslash5inv(*tmp1, b.Even(), QUDA_EVEN_PARITY, kappa5);
         Dslash4Xpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa5);
@@ -253,12 +253,12 @@ namespace quda {
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN ||
 	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      // x_o = D5^-1 (b_o + k D4_oe x_e)
+      // x_o = M5^-1 (b_o + k D4_oe x_e)
       Dslash4Xpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa5);
       Dslash5inv(x.Odd(), *tmp1, QUDA_ODD_PARITY, kappa5);
     } else if (matpcType == QUDA_MATPC_ODD_ODD ||
 	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      // x_e = D5^-1 (b_e + k D4_eo x_o)
+      // x_e = M5^-1 (b_e + k D4_eo x_o)
       Dslash4Xpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa5);
       Dslash5inv(x.Even(), *tmp1, QUDA_EVEN_PARITY, kappa5);
     } else {
