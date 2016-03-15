@@ -394,8 +394,8 @@ namespace quda
           MsgHandle *mh_send;
           MsgHandle *mh_from;
 
-          mh_send = comm_declare_send_relative	(send, dir, rel,      ghostBytes);
-          mh_from = comm_declare_receive_relative	(recv, dir, rel*(-1), ghostBytes);
+          mh_send = comm_declare_send_relative(send, dir, rel*(-1), ghostBytes);
+          mh_from = comm_declare_receive_relative(recv, dir, rel, ghostBytes);
           comm_start (mh_send);
           comm_start (mh_from);
           comm_wait (mh_send);
