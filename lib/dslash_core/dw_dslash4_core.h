@@ -12,6 +12,13 @@
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
+// workaround for C++11 bug in CUDA 6.5/7.0
+#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
+#define POW(a, b) pow(a, static_cast<spinorFloat>(b))
+#else
+#define POW(a, b) pow(a, b)
+#endif
+
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -41,6 +48,7 @@
 #define mdwf_c5 mdwf_c5_d
 #else
 #define spinorFloat float
+#define POW(a, b) __fast_pow(a, b)
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -1973,7 +1981,7 @@ if (!incomplete)
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
- coeff = (spinorFloat)(0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0));
+ coeff = static_cast<spinorFloat>(0.5)*a/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
 #else
  coeff = a;
 #endif
@@ -2040,6 +2048,7 @@ WRITE_SPINOR(param.sp_stride);
 #undef mdwf_b5
 #undef mdwf_c5
 #undef spinorFloat
+#undef POW
 #undef SHARED_STRIDE
 
 #undef g00_re

@@ -125,7 +125,6 @@ namespace quda {
 
 #include <texture.h>
 #include <reduce_core.h>
-//#include <reduce_core_cub.h>
 #include <reduce_mixed_core.h>
 
     } // namespace reduce

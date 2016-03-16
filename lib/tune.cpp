@@ -43,8 +43,8 @@ namespace quda {
 
   static bool profile_count = true;
 
-  void disableProfileCount() { printfQuda("%s\n", __func__); profile_count = false; }
-  void enableProfileCount() { printfQuda("%s\n", __func__); profile_count = true; }
+  void disableProfileCount() { profile_count = false; }
+  void enableProfileCount() { profile_count = true; }
 
   const map& getTuneCache() { return tunecache; }
 

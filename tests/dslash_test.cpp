@@ -42,7 +42,7 @@ cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
 void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac = NULL;
-DiracMobiusDomainWallPC *dirac_mdwf = NULL; // create the MDWF Dirac operator
+DiracMobiusPC *dirac_mdwf = NULL; // create the MDWF Dirac operator
 DiracDomainWall4DPC *dirac_4dpc = NULL; // create the 4d preconditioned DWF Dirac operator
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat, 3 = MatPCDagMatPC, 4 = MatDagMat)
@@ -411,7 +411,7 @@ void init(int argc, char **argv) {
       dirac = (Dirac*)dirac_4dpc;
     }
     else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
-      dirac_mdwf = new DiracMobiusDomainWallPC(diracParam);
+      dirac_mdwf = new DiracMobiusPC(diracParam);
       dirac = (Dirac*)dirac_mdwf;
     }
     else {
@@ -527,7 +527,7 @@ double dslashCUDA(int niter) {
           if (transfer) {
             dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
           } else {
-            dirac_mdwf->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+            dirac_mdwf->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity);
           }
           break;
         case 4:
@@ -779,7 +779,7 @@ void dslashRef() {
       dslash_4_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       break;
     case 1:    
-      dw_dslash_5_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      dw_dslash_5_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, true);
       break;
     case 2:    
       dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_5);
@@ -815,10 +815,10 @@ void dslashRef() {
       dslash_4_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
       break;
     case 1:
-      mdw_dslash_5(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_5);
+      mdw_dslash_5(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_5, true);
       break;
     case 2:
-      mdw_dslash_4_pre(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5 );
+      mdw_dslash_4_pre(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5, true);
       break;
     case 3:
       dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_mdwf);
