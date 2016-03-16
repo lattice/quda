@@ -2476,7 +2476,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  * and solve_type must be NORMOP or NORMOP_PC.  The solution and solve
  * preconditioning have to match.
  */
-void invertMultiRHSQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
+void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
 
   // currently that code is just a copy of invertQuda and cannot work
@@ -2539,20 +2539,49 @@ void invertMultiRHSQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_H2D);
 
-  ColorSpinorField *b = NULL;
-  ColorSpinorField *x = NULL;
+  std::vector<ColorSpinorField*> b;  // Cuda Solutions
+  b.resize(param->num_rhs);
+  std::vector<ColorSpinorField*> x;  // Cuda Solutions
+  x.resize(param->num_rhs);
   ColorSpinorField *in = NULL;
   ColorSpinorField *out = NULL;
 
   const int *X = cudaGauge->X();
 
+
+  // Host pointers for x, take a copy of the input host pointers
+  void** hp_x;
+  hp_x = new void* [ param->num_rhs ];
+
+  void** hp_b;
+  hp_b = new void* [param->num_rhs];
+
+  for(int i=0;i < param->num_offset;i++){
+    hp_x[i] = _hp_x[i];
+    hp_b[i] = _hp_b[i];
+  }
+
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
-  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+  std::vector<ColorSpinorField*> h_b;
+  h_b.resize(param->num_offset);
+  for(int i=0; i < param->num_offset; i++) {
+    h_b[i] = ColorSpinorField::Create(cpuParam);
+  }
 
   cpuParam.v = hp_x;
   cpuParam.location = param->output_location;
   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+  std::vector<ColorSpinorField*> h_x;
+  h_x.resize(param->num_offset);
+
+  for(int i=0; i < param->num_offset; i++) {
+    cpuParam.v = hp_x[i]; //MW seems wird in the loop
+    h_x[i] = ColorSpinorField::Create(cpuParam);
+  }
+
+
+  // MW currently checked until here
 
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param);

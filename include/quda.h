@@ -131,6 +131,8 @@ extern "C" {
 
     int num_offset; /**< Number of offsets in the multi-shift solver */
 
+    int num_rhs; /**< Number of rhs in the multiple right hand sides solver */
+
     int overlap; /**< Width of domain overlaps */
 
     /** Offsets for multi-shift solver */
@@ -574,13 +576,13 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invertMultiRHSQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
+  void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
 
   /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
-   * @param _hp_b    Array of source spinor fields
+   * @param _hp_b    Source spinor fields
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
