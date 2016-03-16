@@ -41,6 +41,12 @@ namespace quda {
 #undef STR
 #undef STR_
 
+  static bool profile_count = true;
+
+  void disableProfileCount() { printfQuda("%s\n", __func__); profile_count = false; }
+  void enableProfileCount() { printfQuda("%s\n", __func__); profile_count = true; }
+
+  const map& getTuneCache() { return tunecache; }
 
 
   /**
@@ -123,8 +129,13 @@ namespace quda {
 
     // now compute total time spent in kernels so we can give each kernel a significance
     for (entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+      TuneKey key = entry->first;
       TuneParam param = entry->second;
-      if (param.n_calls > 0) total_time += param.n_calls * param.time;
+
+      char tmp[7];
+      strncpy(tmp, key.aux, 6);
+      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
     }
 
 
@@ -132,7 +143,10 @@ namespace quda {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
 
-      if (param.n_calls > 0) {
+      char tmp[7];
+      strncpy(tmp, key.aux,6);
+      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      if (param.n_calls > 0 && !is_policy) {
 	double time = param.n_calls * param.time;
 
 	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
@@ -372,8 +386,12 @@ namespace quda {
 	// compute number of non-zero entries that will be output in the profile
 	int n_entry = 0;
 	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+	  // if a policy entry, then we can ignore
+	  char tmp[6];
+	  strncpy(tmp, entry->first.aux, 6);
 	  TuneParam param = entry->second;
-	  if (param.n_calls > 0) n_entry++;
+	  bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+	  if (param.n_calls > 0 && !is_policy) n_entry++;
 	}
 
 	printfQuda("Saving %d sets of cached parameters to %s\n", n_entry, profile_path.c_str());
@@ -431,6 +449,9 @@ namespace quda {
     launchTimer.TPSTART(QUDA_PROFILE_PREAMBLE);
 #endif
 
+    static bool tuning = false; // tuning in progress?
+    static const Tunable *active_tunable; // for error checking
+
     // first check if we have the tuned value and return if we have it
     //if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
 
@@ -461,7 +482,8 @@ namespace quda {
       //tally--;
       //printfQuda("pthread_mutex_unlock a complete %d\n",tally);
 #endif
-      param.n_calls++;
+      // we could be tuning outside of the current scope
+      if (!tuning && profile_count) param.n_calls++;
 
       return param;
     }
@@ -475,9 +497,6 @@ namespace quda {
     // We must switch off the global sum when tuning in case of process divergence
     bool reduceState = commGlobalReduction();
     commGlobalReductionSet(false);
-
-    static bool tuning = false; // tuning in progress?
-    static const Tunable *active_tunable; // for error checking
 
     if (enabled == QUDA_TUNE_NO) {
       tunable.defaultTuneParam(param);
@@ -581,7 +600,7 @@ namespace quda {
 //    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
 #endif
 
-    param.n_calls=1;
+    param.n_calls = profile_count ? 1 : 0;
 
     return param;
   }

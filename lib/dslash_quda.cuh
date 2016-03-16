@@ -97,6 +97,8 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
   case EXTERIOR_KERNEL_ALL:						\
     MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
+  default:								\
+    break;								\
   }
 
 #define GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
@@ -119,6 +121,8 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
   case EXTERIOR_KERNEL_ALL:						\
     MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
+  default:								\
+    break;								\
   }
 
 
@@ -294,8 +298,8 @@ protected:
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
   // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
-  unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); } 
-  char aux[7][TuneKey::aux_n];
+  unsigned int minThreads() const { return dslashParam.threads; }
+  char aux[8][TuneKey::aux_n];
 
   void fillAux(KernelType kernel_type, const char *kernel_str) {
     strcpy(aux[kernel_type],kernel_str);
@@ -352,6 +356,7 @@ public:
 #else
     fillAux(INTERIOR_KERNEL, "type=single-GPU");
 #endif // MULTI_GPU
+    fillAux(KERNEL_POLICY, "policy");
 
     dslashParam.sp_stride = in->Stride();
 
@@ -381,7 +386,7 @@ public:
 
   virtual void preTune()
   {
-    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel
+    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
       saveOut = new char[out->Bytes()];
       cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
       if (out->Precision() == QUDA_HALF_PRECISION) {
@@ -393,7 +398,7 @@ public:
     
   virtual void postTune()
   {
-    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel
+    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
       cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
       delete[] saveOut;
       if (out->Precision() == QUDA_HALF_PRECISION) {
@@ -445,6 +450,7 @@ public:
 	break;
       }
     case INTERIOR_KERNEL:
+    case KERNEL_POLICY:
       {
 	long long sites = in->VolumeCB();
 	flops_ = (num_dir*(in->Nspin()/4)*in->Ncolor()*in->Nspin() +   // spin project (=0 for staggered)
@@ -452,6 +458,7 @@ public:
 		 ((num_dir-1)*2*in->Ncolor()*in->Nspin())) * sites;   // accumulation
 	if (x) flops_ += xpay_flops * sites;
 
+	if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	// now correct for flops done by exterior kernel
 	long long ghost_sites = 0;
 	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
@@ -486,11 +493,13 @@ public:
 	break;
       }
     case INTERIOR_KERNEL:
+    case KERNEL_POLICY:
       {
 	long long sites = in->VolumeCB();
 	bytes_ = (num_dir*gauge_bytes + ((num_dir-2)*spinor_bytes + 2*proj_spinor_bytes) + spinor_bytes)*sites;
 	if (x) bytes_ += spinor_bytes;
 
+	if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	// now correct for bytes done by exterior kernel
 	long long ghost_sites = 0;
 	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
