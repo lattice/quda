@@ -44,81 +44,72 @@ namespace quda {
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
 			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			const double &k, const int *commDim, TimeProfile &profile, 
-                        const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+			const double &k, const int *commDim, TimeProfile &profile);
 
   // clover Dslash
-  void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-			const FullClover cloverInv, const cudaColorSpinorField *in, 
+  void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+			const FullClover cloverInv, const cudaColorSpinorField *in,
 			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			const double &k, const int *commDim, TimeProfile &profile, 
-                        const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+			const double &k, const int *commDim, TimeProfile &profile);
 
   // clover Dslash
-  void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-			    const FullClover cloverInv, const cudaColorSpinorField *in, 
+  void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+			    const FullClover cloverInv, const cudaColorSpinorField *in,
 			    const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			    const double &k, const int *commDim, TimeProfile &profile, 
-                            const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+			    const double &k, const int *commDim, TimeProfile &profile);
 
   // solo clover term
-  void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
+  void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover,
       const cudaColorSpinorField *in, const int oddBit);
 
   // domain wall Dslash  
-  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
-			    const int parity, const int dagger, const cudaColorSpinorField *x, 
-			    const double &m_f, const double &k, const int *commDim, TimeProfile &profile, 
-                            const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH);
+  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			    const int parity, const int dagger, const cudaColorSpinorField *x,
+			    const double &m_f, const double &k, const int *commDim, TimeProfile &profile);
 
   // Added for 4d EO preconditioning in DWF
-  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
-      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k, 
-      const int *commDim, const int DS_type, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+			    const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
+			    const int *commDim, const int DS_type, TimeProfile &profile);
 
   // Added for 4d EO preconditioning in Mobius DWF
-  void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
-      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k, 
-      const int *commDim, const int DS_type, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+  void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
+		      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
+		      const int *commDim, const int DS_type, TimeProfile &profile);
 
   // staggered Dslash    
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-      const cudaColorSpinorField *in, const int parity, const int dagger, 
-      const cudaColorSpinorField *x, const double &k, 
-      const int *commDim, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+			   const cudaColorSpinorField *in, const int parity, const int dagger,
+			   const cudaColorSpinorField *x, const double &k,
+			   const int *commDim, TimeProfile &profile);
 
   // improved staggered Dslash    
   void improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge,
-      const cudaColorSpinorField *in, const int parity, const int dagger, 
-      const cudaColorSpinorField *x, const double &k, 
-      const int *commDim, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+				   const cudaColorSpinorField *in, const int parity, const int dagger,
+				   const cudaColorSpinorField *x, const double &k,
+				   const int *commDim, TimeProfile &profile);
 
   // twisted mass Dslash  
   void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
-      const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
-      const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+			     const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
+			     const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile);
 
-  // twisted mass Dslash  
-  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
-      const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
-      const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH);
+  // twisted mass Dslash
+  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in,
+				 const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
+				 const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim,
+				 TimeProfile &profile);
 
-  // twisted clover Dslash  
-  void twistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-      const FullClover *clover, const FullClover *cloverInv, const   cudaColorSpinorField *in, 
-      const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistCloverDslashType type,
-      const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
+  // twisted clover Dslash
+  void twistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+			       const FullClover *clover, const FullClover *cloverInv, const   cudaColorSpinorField *in,
+			       const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistCloverDslashType type,
+			       const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim,
+			       TimeProfile &profile);
 
   // solo twist term
-  void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger,     
-                       const double &kappa, const double &mu, const double &epsilon, 
+  void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger,
+                       const double &kappa, const double &mu, const double &epsilon,
                        const QudaTwistGamma5Type);
 
   // solo twist clover term
@@ -126,13 +117,12 @@ namespace quda {
 			     const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity);
 
   // face packing routines
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, const int nFace, const int dagger, 
-      const int parity, const int dim, const int face_num, const cudaStream_t &stream,
-      const double a=0.0, const double b=0.0);
+  void packFace(void *ghost_buf, cudaColorSpinorField &in, const int nFace, const int dagger,
+		const int parity, const int dim, const int face_num, const cudaStream_t &stream,
+		const double a=0.0, const double b=0.0);
 
   void packFaceExtended(void *ghost_buf, cudaColorSpinorField &field, const int nFace, const int R[], const int dagger,
-      const int parity, const int dim, const int face_num, const cudaStream_t &stream, const bool unpack=false);
-
+			const int parity, const int dim, const int face_num, const cudaStream_t &stream, const bool unpack=false);
 
   // face packing routines
   void packFace(void *ghost_buf, cudaColorSpinorField &in, FullClover &clov, FullClover &clovInv,

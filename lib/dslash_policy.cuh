@@ -1029,6 +1029,7 @@ struct DslashFactory {
    const size_t regSize;
    const int parity;
    const int dagger;
+   const int *ghostFace;
    TimeProfile &profile;
 
    unsigned int sharedBytesPerThread() const { return 0; }
@@ -1036,8 +1037,9 @@ struct DslashFactory {
 
  public:
    DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity,
-		    const int dagger, TimeProfile &profile)
-     : dslash(dslash), in(in), regSize(regSize), parity(parity), dagger(dagger), profile(profile)
+		    const int dagger, const int *ghostFace, TimeProfile &profile)
+     : dslash(dslash), in(in), regSize(regSize), parity(parity), dagger(dagger),
+       ghostFace(ghostFace), profile(profile)
    {
      // before we do policy tuning we must ensure the kernel
      // constituents have been tuned since we can't do nested tuning
@@ -1046,7 +1048,7 @@ struct DslashFactory {
 
        for (unsigned int i=0; i<n_policy; i++) {
 	 DslashPolicyImp* dslashImp = DslashFactory::create(policy[i]);
-	 (*dslashImp)(dslash, in, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+	 (*dslashImp)(dslash, in, regSize, parity, dagger, in->Volume(), ghostFace, profile);
 	 delete dslashImp;
        }
 
@@ -1060,7 +1062,7 @@ struct DslashFactory {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
-     (*dslashImp)(dslash, in, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+     (*dslashImp)(dslash, in, regSize, parity, dagger, in->Volume(), ghostFace, profile);
      delete dslashImp;
    }
 
@@ -1080,9 +1082,15 @@ struct DslashFactory {
 
    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
-   void initTuneParam(TuneParam &param) const  { param.aux.x = 0; param.aux.y = 0; param.aux.z = 0; }
+   void initTuneParam(TuneParam &param) const  {
+     Tunable::initTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0;
+   }
 
-   void defaultTuneParam(TuneParam &param) const  { param.aux.x = 0; param.aux.y = 0; param.aux.z = 0; }
+   void defaultTuneParam(TuneParam &param) const  {
+     Tunable::defaultTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0;
+   }
 
    TuneKey tuneKey() const {
      KernelType kernel_type = dslashParam.kernel_type;

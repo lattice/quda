@@ -199,7 +199,7 @@ namespace quda {
       long long vol4d = in->VolumeCB() / Ls;
       long long bulk = (Ls-2)*vol4d;
       long long wall = 2*vol4d;
-      long long flops; 
+      long long flops = 0;
       switch(DS_type){
         case 0:
           flops = DslashCuda::flops();
@@ -220,7 +220,7 @@ namespace quda {
       bool isHalf = in->Precision() == sizeof(short) ? true : false;
       int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
       long long Ls = in->X(4);
-      long long bytes;
+      long long bytes = 0;
 
       switch(DS_type){
       case 0:
@@ -256,7 +256,7 @@ namespace quda {
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
           const cudaColorSpinorField *in, const int parity, const int dagger, 
           const cudaColorSpinorField *x, const double &m_f, const double &k2, 
-          const int *commOverride, const int DS_type, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+			    const int *commOverride, const int DS_type, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -302,15 +302,18 @@ namespace quda {
     DslashPolicyImp* dslashImp = NULL;
     if (DS_type != 0) {
       dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+      delete dslashImp;
     } else {
 #ifndef GPU_COMMS
-      dslashImp = DslashFactory::create(dslashPolicy);
+      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, ghostFace, profile);
+      dslash_policy.apply(0);
 #else
       dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+      delete dslashImp;
 #endif
     }
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
-    delete dslashImp;
 
     delete dslash;
     unbindGaugeTex(gauge);

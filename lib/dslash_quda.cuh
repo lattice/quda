@@ -185,6 +185,8 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
   case EXTERIOR_KERNEL_ALL:						\
     MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
+  default:								\
+    break;								\
   }
 
 #endif
@@ -269,6 +271,8 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
   case EXTERIOR_KERNEL_ALL:						\
     MORE_GENERIC_NDEG_TM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
       break;								\
+  default:								\
+    break;								\
   }
 
 #endif
