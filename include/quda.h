@@ -565,6 +565,17 @@ extern "C" {
    */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
+  /**
+   * Perform the solve like @invertQuda but for multiples right hand sides.
+   *
+   * @param _hp_x    Array of solution spinor fields
+   * @param _hp_b    Array of source spinor fields
+   * @param param  Contains all metadata regarding
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
+   */
+  void invertMultiRHSQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
+
 
   /**
    * Solve for multiple shifts (e.g., masses).
