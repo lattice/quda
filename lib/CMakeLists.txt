@@ -50,6 +50,18 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
   version.cpp )
 
+
+## split source into cu and cpp files
+FOREACH(item ${QUDA_OBJS})
+  STRING(REGEX MATCH ".+\\.cu$" item_match ${item})
+  IF(item_match)
+    MESSAGE(${item})
+    LIST(APPEND QUDA_CU_OBJS ${item})
+  ENDIF(item_match)
+ENDFOREACH(item ${QUDA_OBJS})
+
+LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
+
 #set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS dummy)
 add_custom_target( git_version
 COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy
@@ -65,7 +77,10 @@ endif()
 
 include_directories(dslash_core)
 include_directories(.)
-cuda_add_library(quda STATIC ${QUDA_OBJS})
+
+# generate a cmake object library for all cpp files first
+add_library(quda_cpp OBJECT ${QUDA_OBJS})
+cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 if(GITVERSION)
   ADD_DEPENDENCIES(quda git_version)
 endif()
