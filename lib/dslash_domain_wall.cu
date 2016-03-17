@@ -247,7 +247,7 @@ namespace quda {
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
 #ifndef GPU_COMMS
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, ghostFace, profile);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);

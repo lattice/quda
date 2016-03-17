@@ -1029,6 +1029,7 @@ struct DslashFactory {
    const size_t regSize;
    const int parity;
    const int dagger;
+   const int volume;
    const int *ghostFace;
    TimeProfile &profile;
 
@@ -1037,9 +1038,9 @@ struct DslashFactory {
 
  public:
    DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity,
-		    const int dagger, const int *ghostFace, TimeProfile &profile)
+		    const int dagger, const int volume, const int *ghostFace, TimeProfile &profile)
      : dslash(dslash), in(in), regSize(regSize), parity(parity), dagger(dagger),
-       ghostFace(ghostFace), profile(profile)
+       volume(volume), ghostFace(ghostFace), profile(profile)
    {
      // before we do policy tuning we must ensure the kernel
      // constituents have been tuned since we can't do nested tuning
@@ -1048,7 +1049,7 @@ struct DslashFactory {
 
        for (unsigned int i=0; i<n_policy; i++) {
 	 DslashPolicyImp* dslashImp = DslashFactory::create(policy[i]);
-	 (*dslashImp)(dslash, in, regSize, parity, dagger, in->Volume(), ghostFace, profile);
+	 (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
 	 delete dslashImp;
        }
 
@@ -1062,7 +1063,7 @@ struct DslashFactory {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
-     (*dslashImp)(dslash, in, regSize, parity, dagger, in->Volume(), ghostFace, profile);
+     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
      delete dslashImp;
    }
 

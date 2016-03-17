@@ -307,7 +307,7 @@ namespace quda {
       delete dslashImp;
     } else {
 #ifndef GPU_COMMS
-      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, ghostFace, profile);
+      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
       dslash_policy.apply(0);
 #else
       dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
