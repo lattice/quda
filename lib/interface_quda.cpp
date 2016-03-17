@@ -2564,18 +2564,17 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
   std::vector<ColorSpinorField*> h_b;
-  h_b.resize(param->num_offset);
-  for(int i=0; i < param->num_offset; i++) {
+  h_b.resize(param->num_rhs);
+  for(int i=0; i < param->num_rhs; i++) {
     h_b[i] = ColorSpinorField::Create(cpuParam);
   }
 
   cpuParam.v = hp_x;
   cpuParam.location = param->output_location;
-  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
   std::vector<ColorSpinorField*> h_x;
-  h_x.resize(param->num_offset);
+  h_x.resize(param->num_rhs);
 
-  for(int i=0; i < param->num_offset; i++) {
+  for(int i=0; i < param->num_rhs; i++) {
     cpuParam.v = hp_x[i]; //MW seems wird in the loop
     h_x[i] = ColorSpinorField::Create(cpuParam);
   }
@@ -2596,7 +2595,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
         (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Initial guess not supported for two-pass solver");
     }
-    for(int i=0; i < param->num_rhst; i++) {
+    for(int i=0; i < param->num_rhs; i++) {
       x[i] =  new cudaColorSpinorField(*h_x[i], cudaParam); // solution
     }
 
@@ -2642,7 +2641,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // MW: need to check what dirac.prepare does
   // for now let's just try looping of num_rhs already here???
   for(int i=0; i < param->num_rhs; i++) {
-    dirac.prepare(in, out, *x, *b, param->solution_type);
+    dirac.prepare(in, out, *x[i], *b[i], param->solution_type);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       double nin = blas::norm2(*in);
@@ -2731,7 +2730,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
     }
 
     if (getVerbosity() >= QUDA_VERBOSE){
-      double nx = blas::norm2(*x);
+      double nx = blas::norm2(*x[i]);
       printfQuda("Solution = %g\n",nx);
     }
   }
@@ -2745,7 +2744,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     for(int i=0; i< param->num_rhs; i++){
       // rescale the solution
-      blas::ax(sqrt(nb), *x[i]);
+      blas::ax(sqrt(nb[i]), *x[i]);
     }
   }
 
@@ -2768,17 +2767,18 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   if (getVerbosity() >= QUDA_VERBOSE){
     for(int i=0; i< param->num_rhs; i++){
-      double nx = blas::norm2(*x);
-      double nh_x = blas::norm2(*h_x);
+      double nx = blas::norm2(*x[i]);
+      double nh_x = blas::norm2(*h_x[i]);
       printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
     }
   }
 
-  // need to make sure all deletes are correct again
-  delete h_b;
-  delete h_x;
-  delete b;
-  if (!param->make_resident_solution) delete x;
+  //FIX need to make sure all deletes are correct again
+
+  //  delete h_b;
+//  delete h_x;
+//  delete b;
+//  if (!param->make_resident_solution) delete x;
 
   delete d;
   delete dSloppy;
