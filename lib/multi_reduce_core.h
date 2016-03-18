@@ -306,7 +306,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
         reduce.apply(*blas::getStream());
 #else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
       } else if (x[0]->Nspin() == 1) {
 #ifdef GPU_STAGGERED_DIRAC
@@ -366,7 +366,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(4*M));
 	reduce.apply(*blas::getStream());
 #else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
       } else if(x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
 #if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
@@ -395,7 +395,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
 	reduce.apply(*blas::getStream());
 #else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
     } else { // half precision
@@ -423,7 +423,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
 	reduce.apply(*blas::getStream());
 #else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
       } else if(x[0]->Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
