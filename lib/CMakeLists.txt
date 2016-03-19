@@ -55,7 +55,6 @@ set (QUDA_OBJS
 FOREACH(item ${QUDA_OBJS})
   STRING(REGEX MATCH ".+\\.cu$" item_match ${item})
   IF(item_match)
-    MESSAGE(${item})
     LIST(APPEND QUDA_CU_OBJS ${item})
   ENDIF(item_match)
 ENDFOREACH(item ${QUDA_OBJS})
