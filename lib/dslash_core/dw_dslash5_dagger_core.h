@@ -12,6 +12,13 @@
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
+// workaround for C++11 bug in CUDA 6.5/7.0
+#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
+#define POW(a, b) pow(a, static_cast<spinorFloat>(b))
+#else
+#define POW(a, b) pow(a, b)
+#endif
+
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -41,6 +48,7 @@
 #define mdwf_c5 mdwf_c5_d
 #else
 #define spinorFloat float
+#define POW(a, b) __fast_pow(a, b)
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -246,8 +254,8 @@ xs = X/(X1*X2*X3*X4);
 #if (MDWF_mode==1)
   VOLATILE spinorFloat C_5;
   VOLATILE spinorFloat B_5;
-  C_5 = (spinorFloat)mdwf_c5[xs]*0.5;
-  B_5 = (spinorFloat)mdwf_b5[xs];
+  C_5 = mdwf_c5[xs]*static_cast<spinorFloat>(0.5);
+  B_5 = mdwf_b5[xs];
 
   READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + B_5*i00_re;
@@ -276,7 +284,7 @@ xs = X/(X1*X2*X3*X4);
   o32_im = C_5*o32_im + B_5*i32_im;
 #elif (MDWF_mode==2)
   VOLATILE spinorFloat C_5;
-  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));
+  C_5 = static_cast<spinorFloat>(0.5)*(mdwf_c5[xs]*(m5+static_cast<spinorFloat>(4.0)) - static_cast<spinorFloat>(1.0))/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
 
   READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + i00_re;
@@ -314,8 +322,9 @@ xs = X/(X1*X2*X3*X4);
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
- coeff = (spinorFloat)(0.5/(mdwf_b5[xs]*(m5+4.0) + 1.0));
- coeff *= -coeff;
+ coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
+ coeff *= coeff;
+ coeff *= a;
 #else
  coeff = a;
 #endif
@@ -436,6 +445,7 @@ WRITE_SPINOR(param.sp_stride);
 #undef mdwf_b5
 #undef mdwf_c5
 #undef spinorFloat
+#undef POW
 #undef SHARED_STRIDE
 
 #undef i00_re

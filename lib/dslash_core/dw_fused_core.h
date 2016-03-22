@@ -78,69 +78,6 @@
 #define mdwf_c5 mdwf_c5_f
 #endif // SPINOR_DOUBLE
 
-// gauge link
-#ifdef GAUGE_FLOAT2
-#define g00_re G0.x
-#define g00_im G0.y
-#define g01_re G1.x
-#define g01_im G1.y
-#define g02_re G2.x
-#define g02_im G2.y
-#define g10_re G3.x
-#define g10_im G3.y
-#define g11_re G4.x
-#define g11_im G4.y
-#define g12_re G5.x
-#define g12_im G5.y
-#define g20_re G6.x
-#define g20_im G6.y
-#define g21_re G7.x
-#define g21_im G7.y
-#define g22_re G8.x
-#define g22_im G8.y
-
-#else
-#define g00_re G0.x
-#define g00_im G0.y
-#define g01_re G0.z
-#define g01_im G0.w
-#define g02_re G1.x
-#define g02_im G1.y
-#define g10_re G1.z
-#define g10_im G1.w
-#define g11_re G2.x
-#define g11_im G2.y
-#define g12_re G2.z
-#define g12_im G2.w
-#define g20_re G3.x
-#define g20_im G3.y
-#define g21_re G3.z
-#define g21_im G3.w
-#define g22_re G4.x
-#define g22_im G4.y
-
-#endif // GAUGE_DOUBLE
-
-// conjugated gauge link
-#define gT00_re (+g00_re)
-#define gT00_im (-g00_im)
-#define gT01_re (+g10_re)
-#define gT01_im (-g10_im)
-#define gT02_re (+g20_re)
-#define gT02_im (-g20_im)
-#define gT10_re (+g01_re)
-#define gT10_im (-g01_im)
-#define gT11_re (+g11_re)
-#define gT11_im (-g11_im)
-#define gT12_re (+g21_re)
-#define gT12_im (-g21_im)
-#define gT20_re (+g02_re)
-#define gT20_im (-g02_im)
-#define gT21_re (+g12_re)
-#define gT21_im (-g12_im)
-#define gT22_re (+g22_re)
-#define gT22_im (-g22_im)
-
 // output spinor
 VOLATILE spinorFloat o00_re;
 VOLATILE spinorFloat o00_im;
@@ -180,8 +117,6 @@ VOLATILE spinorFloat o32_im;
 #define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
 #endif
 #endif
-
-#include "read_gauge.h"
 #include "io_spinor.h"
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
@@ -189,12 +124,7 @@ if (sid >= param.threads*param.Ls) return;
 
 int boundaryCrossing;
 
-int X, x1, x2, x3, x4, xs;
-
-#ifdef MULTI_GPU
-int face_idx;
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
+int X, xs;
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -202,10 +132,6 @@ if (kernel_type == INTERIOR_KERNEL) {
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-x1 = X % X1;
-x2 = (X/X1) % X2;
-x3 = (X/(X1*X2)) % X3;
-x4 = (X/(X1*X2*X3)) % X4;
 xs = X/(X1*X2*X3*X4);
 
  o00_re = 0; o00_im = 0;
@@ -220,75 +146,6 @@ xs = X/(X1*X2*X3*X4);
  o30_re = 0; o30_im = 0;
  o31_re = 0; o31_im = 0;
  o32_re = 0; o32_im = 0;
-
-#ifdef MULTI_GPU
-} else { // exterior kernel
-
-const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
-const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
-face_idx = sid - face_num*face_volume; // index into the respective face
-
-// ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
-// face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-//sp_idx = face_idx + param.ghostOffset[dim];
-
-const int dims[] = {X1, X2, X3, X4};
-coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-
-READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
- o00_re = i00_re; o00_im = i00_im;
- o01_re = i01_re; o01_im = i01_im;
- o02_re = i02_re; o02_im = i02_im;
- o10_re = i10_re; o10_im = i10_im;
- o11_re = i11_re; o11_im = i11_im;
- o12_re = i12_re; o12_im = i12_im;
- o20_re = i20_re; o20_im = i20_im;
- o21_re = i21_re; o21_im = i21_im;
- o22_re = i22_re; o22_im = i22_im;
- o30_re = i30_re; o30_im = i30_im;
- o31_re = i31_re; o31_im = i31_im;
- o32_re = i32_re; o32_im = i32_im;
-}
-#endif // MULTI_GPU
-
-// declare G## here and use ASSN below instead of READ
-#ifdef GAUGE_FLOAT2
-#if (DD_PREC==0) //temporal hack
-double2 G0;
-double2 G1;
-double2 G2;
-double2 G3;
-double2 G4;
-double2 G5;
-double2 G6;
-double2 G7;
-double2 G8;
-#else
-float2 G0;
-float2 G1;
-float2 G2;
-float2 G3;
-float2 G4;
-float2 G5;
-float2 G6;
-float2 G7;
-float2 G8;
-#endif
-#else
-float4 G0;
-float4 G1;
-float4 G2;
-float4 G3;
-float4 G4;
-#endif
-
-
-
 #ifdef MULTI_GPU
 if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
  (kernel_type == EXTERIOR_KERNEL_X && x1==X1m1) )
@@ -302,10 +159,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==X1m1 ? X-X1m1 : X+1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][1];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][1];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x1==X1m1 ? X-X1m1 : X+1) >> 1;
 #endif
@@ -349,7 +203,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];
 
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
 
   a0_re = i00_re; a0_im = i00_im;
   a1_re = i01_re; a1_im = i01_im;
@@ -495,10 +349,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==0 ? X+X1m1 : X-1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][0];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x1==0 ? X+X1m1 : X-1) >> 1;
 #endif
@@ -546,7 +397,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];
 
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
 
   a0_re = i00_re; a0_im = i00_im;
   a1_re = i01_re; a1_im = i01_im;
@@ -692,10 +543,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][1];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][1];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1;
 #endif
@@ -739,7 +587,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];
 
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
 
   a0_re = i00_re; a0_im = i00_im;
   a1_re = i01_re; a1_im = i01_im;
@@ -885,10 +733,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==0 ? X+X2X1mX1 : X-X1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][0];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x2==0 ? X+X2X1mX1 : X-X1) >> 1;
 #endif
@@ -936,7 +781,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];
 
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
 
   a0_re = i00_re; a0_im = i00_im;
   a1_re = i01_re; a1_im = i01_im;
@@ -1082,10 +927,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][1];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][1];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
 #endif
@@ -1129,7 +971,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];
 
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
 
   a0_re = i00_re; a0_im = i00_im;
   a1_re = i01_re; a1_im = i01_im;
@@ -1275,10 +1117,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][0];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
 #endif
@@ -1326,7 +1165,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];
 
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+  READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
 
   a0_re = i00_re; a0_im = i00_im;
   a1_re = i01_re; a1_im = i01_im;
@@ -1472,10 +1311,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][1];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][1];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
 #endif
@@ -1519,7 +1355,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
    const int t_proj_scale = TPROJSCALE;
 
    // read half spinor from device memory
-   READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+   READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
 
    a0_re = t_proj_scale*i00_re; a0_im = t_proj_scale*i00_im;
    a1_re = t_proj_scale*i01_re; a1_im = t_proj_scale*i01_im;
@@ -1592,7 +1428,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
    const int t_proj_scale = TPROJSCALE;
 
    // read half spinor from device memory
-   READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+   READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
 
    a0_re = t_proj_scale*i00_re; a0_im = t_proj_scale*i00_im;
    a1_re = t_proj_scale*i01_re; a1_im = t_proj_scale*i01_im;
@@ -1727,10 +1563,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 
 #ifdef MULTI_GPU
  const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1 :
-  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
-#if (DD_PREC==2) // half precision
- const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][0];
-#endif
+  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
  const int sp_idx = (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
 #endif
@@ -1778,7 +1611,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
    const int t_proj_scale = TPROJSCALE;
 
    // read half spinor from device memory
-   READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+   READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
 
    a0_re = t_proj_scale*i00_re; a0_im = t_proj_scale*i00_im;
    a1_re = t_proj_scale*i01_re; a1_im = t_proj_scale*i01_im;
@@ -1851,7 +1684,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
    const int t_proj_scale = TPROJSCALE;
 
    // read half spinor from device memory
-   READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
+   READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
 
    a0_re = t_proj_scale*i00_re; a0_im = t_proj_scale*i00_im;
    a1_re = t_proj_scale*i01_re; a1_im = t_proj_scale*i01_im;
@@ -1973,85 +1806,156 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
  }
 }
 
-#if defined MULTI_GPU && defined DSLASH_XPAY
 
-int incomplete = 0; // Have all 8 contributions been computed for this site?
 
-switch(kernel_type) { // intentional fall-through
-case INTERIOR_KERNEL:
-incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-case EXTERIOR_KERNEL_T:
-incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-case EXTERIOR_KERNEL_Z:
-incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-case EXTERIOR_KERNEL_Y:
-incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-}
+// 5th dimension -- NB: not partitionable!
+{
+// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
+  {
+     int sp_idx = ( xs == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
 
-if (!incomplete)
-#endif // MULTI_GPU
+// read spinor from device memory
+     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
+
+     if ( xs != param.Ls-1 )
+     {
+   o00_re += +i00_re-i20_re;   o00_im += +i00_im-i20_im;
+   o01_re += +i01_re-i21_re;   o01_im += +i01_im-i21_im;
+   o02_re += +i02_re-i22_re;   o02_im += +i02_im-i22_im;
+
+   o10_re += +i10_re-i30_re;   o10_im += +i10_im-i30_im;
+   o11_re += +i11_re-i31_re;   o11_im += +i11_im-i31_im;
+   o12_re += +i12_re-i32_re;   o12_im += +i12_im-i32_im;
+
+   o20_re += -i00_re+i20_re;   o20_im += -i00_im+i20_im;
+   o21_re += -i01_re+i21_re;   o21_im += -i01_im+i21_im;
+   o22_re += -i02_re+i22_re;   o22_im += -i02_im+i22_im;
+
+   o30_re += -i10_re+i30_re;   o30_im += -i10_im+i30_im;
+   o31_re += -i11_re+i31_re;   o31_im += -i11_im+i31_im;
+   o32_re += -i12_re+i32_re;   o32_im += -i12_im+i32_im;
+    }
+    else
+    {
+   o00_re += -mferm*(+i00_re-i20_re);   o00_im += -mferm*(+i00_im-i20_im);
+   o01_re += -mferm*(+i01_re-i21_re);   o01_im += -mferm*(+i01_im-i21_im);
+   o02_re += -mferm*(+i02_re-i22_re);   o02_im += -mferm*(+i02_im-i22_im);
+
+   o10_re += -mferm*(+i10_re-i30_re);   o10_im += -mferm*(+i10_im-i30_im);
+   o11_re += -mferm*(+i11_re-i31_re);   o11_im += -mferm*(+i11_im-i31_im);
+   o12_re += -mferm*(+i12_re-i32_re);   o12_im += -mferm*(+i12_im-i32_im);
+
+   o20_re += -mferm*(-i00_re+i20_re);   o20_im += -mferm*(-i00_im+i20_im);
+   o21_re += -mferm*(-i01_re+i21_re);   o21_im += -mferm*(-i01_im+i21_im);
+   o22_re += -mferm*(-i02_re+i22_re);   o22_im += -mferm*(-i02_im+i22_im);
+
+   o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
+   o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
+   o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
+    } // end if ( xs != param.Ls-1 )
+  } // end P_L
+
+ // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
+  {
+    int sp_idx = ( xs == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
+
+// read spinor from device memory
+    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
+
+    if ( xs != 0 )
+    {
+   o00_re += +i00_re+i20_re;   o00_im += +i00_im+i20_im;
+   o01_re += +i01_re+i21_re;   o01_im += +i01_im+i21_im;
+   o02_re += +i02_re+i22_re;   o02_im += +i02_im+i22_im;
+
+   o10_re += +i10_re+i30_re;   o10_im += +i10_im+i30_im;
+   o11_re += +i11_re+i31_re;   o11_im += +i11_im+i31_im;
+   o12_re += +i12_re+i32_re;   o12_im += +i12_im+i32_im;
+
+   o20_re += +i00_re+i20_re;   o20_im += +i00_im+i20_im;
+   o21_re += +i01_re+i21_re;   o21_im += +i01_im+i21_im;
+   o22_re += +i02_re+i22_re;   o22_im += +i02_im+i22_im;
+
+   o30_re += +i10_re+i30_re;   o30_im += +i10_im+i30_im;
+   o31_re += +i11_re+i31_re;   o31_im += +i11_im+i31_im;
+   o32_re += +i12_re+i32_re;   o32_im += +i12_im+i32_im;
+    }
+    else
+    {
+   o00_re += -mferm*(+i00_re+i20_re);   o00_im += -mferm*(+i00_im+i20_im);
+   o01_re += -mferm*(+i01_re+i21_re);   o01_im += -mferm*(+i01_im+i21_im);
+   o02_re += -mferm*(+i02_re+i22_re);   o02_im += -mferm*(+i02_im+i22_im);
+
+   o10_re += -mferm*(+i10_re+i30_re);   o10_im += -mferm*(+i10_im+i30_im);
+   o11_re += -mferm*(+i11_re+i31_re);   o11_im += -mferm*(+i11_im+i31_im);
+   o12_re += -mferm*(+i12_re+i32_re);   o12_im += -mferm*(+i12_im+i32_im);
+
+   o20_re += -mferm*(+i00_re+i20_re);   o20_im += -mferm*(+i00_im+i20_im);
+   o21_re += -mferm*(+i01_re+i21_re);   o21_im += -mferm*(+i01_im+i21_im);
+   o22_re += -mferm*(+i02_re+i22_re);   o22_im += -mferm*(+i02_im+i22_im);
+
+   o30_re += -mferm*(+i10_re+i30_re);   o30_im += -mferm*(+i10_im+i30_im);
+   o31_re += -mferm*(+i11_re+i31_re);   o31_im += -mferm*(+i11_im+i31_im);
+   o32_re += -mferm*(+i12_re+i32_re);   o32_im += -mferm*(+i12_im+i32_im);
+    } // end if ( xs != 0 )
+  } // end P_R
+
+} // end 5th dimension
+
 {
 
 #ifdef DSLASH_XPAY
  READ_ACCUM(ACCUMTEX, param.sp_stride)
- VOLATILE spinorFloat coeff;
-
-#ifdef MDWF_mode
- coeff = static_cast<spinorFloat>(0.5)*a/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
-#else
- coeff = a;
-#endif
-
 #ifdef SPINOR_DOUBLE
- o00_re = coeff*o00_re + accum0.x;
- o00_im = coeff*o00_im + accum0.y;
- o01_re = coeff*o01_re + accum1.x;
- o01_im = coeff*o01_im + accum1.y;
- o02_re = coeff*o02_re + accum2.x;
- o02_im = coeff*o02_im + accum2.y;
- o10_re = coeff*o10_re + accum3.x;
- o10_im = coeff*o10_im + accum3.y;
- o11_re = coeff*o11_re + accum4.x;
- o11_im = coeff*o11_im + accum4.y;
- o12_re = coeff*o12_re + accum5.x;
- o12_im = coeff*o12_im + accum5.y;
- o20_re = coeff*o20_re + accum6.x;
- o20_im = coeff*o20_im + accum6.y;
- o21_re = coeff*o21_re + accum7.x;
- o21_im = coeff*o21_im + accum7.y;
- o22_re = coeff*o22_re + accum8.x;
- o22_im = coeff*o22_im + accum8.y;
- o30_re = coeff*o30_re + accum9.x;
- o30_im = coeff*o30_im + accum9.y;
- o31_re = coeff*o31_re + accum10.x;
- o31_im = coeff*o31_im + accum10.y;
- o32_re = coeff*o32_re + accum11.x;
- o32_im = coeff*o32_im + accum11.y;
+ o00_re = a*o00_re + accum0.x;
+ o00_im = a*o00_im + accum0.y;
+ o01_re = a*o01_re + accum1.x;
+ o01_im = a*o01_im + accum1.y;
+ o02_re = a*o02_re + accum2.x;
+ o02_im = a*o02_im + accum2.y;
+ o10_re = a*o10_re + accum3.x;
+ o10_im = a*o10_im + accum3.y;
+ o11_re = a*o11_re + accum4.x;
+ o11_im = a*o11_im + accum4.y;
+ o12_re = a*o12_re + accum5.x;
+ o12_im = a*o12_im + accum5.y;
+ o20_re = a*o20_re + accum6.x;
+ o20_im = a*o20_im + accum6.y;
+ o21_re = a*o21_re + accum7.x;
+ o21_im = a*o21_im + accum7.y;
+ o22_re = a*o22_re + accum8.x;
+ o22_im = a*o22_im + accum8.y;
+ o30_re = a*o30_re + accum9.x;
+ o30_im = a*o30_im + accum9.y;
+ o31_re = a*o31_re + accum10.x;
+ o31_im = a*o31_im + accum10.y;
+ o32_re = a*o32_re + accum11.x;
+ o32_im = a*o32_im + accum11.y;
 #else
- o00_re = coeff*o00_re + accum0.x;
- o00_im = coeff*o00_im + accum0.y;
- o01_re = coeff*o01_re + accum0.z;
- o01_im = coeff*o01_im + accum0.w;
- o02_re = coeff*o02_re + accum1.x;
- o02_im = coeff*o02_im + accum1.y;
- o10_re = coeff*o10_re + accum1.z;
- o10_im = coeff*o10_im + accum1.w;
- o11_re = coeff*o11_re + accum2.x;
- o11_im = coeff*o11_im + accum2.y;
- o12_re = coeff*o12_re + accum2.z;
- o12_im = coeff*o12_im + accum2.w;
- o20_re = coeff*o20_re + accum3.x;
- o20_im = coeff*o20_im + accum3.y;
- o21_re = coeff*o21_re + accum3.z;
- o21_im = coeff*o21_im + accum3.w;
- o22_re = coeff*o22_re + accum4.x;
- o22_im = coeff*o22_im + accum4.y;
- o30_re = coeff*o30_re + accum4.z;
- o30_im = coeff*o30_im + accum4.w;
- o31_re = coeff*o31_re + accum5.x;
- o31_im = coeff*o31_im + accum5.y;
- o32_re = coeff*o32_re + accum5.z;
- o32_im = coeff*o32_im + accum5.w;
+ o00_re = a*o00_re + accum0.x;
+ o00_im = a*o00_im + accum0.y;
+ o01_re = a*o01_re + accum0.z;
+ o01_im = a*o01_im + accum0.w;
+ o02_re = a*o02_re + accum1.x;
+ o02_im = a*o02_im + accum1.y;
+ o10_re = a*o10_re + accum1.z;
+ o10_im = a*o10_im + accum1.w;
+ o11_re = a*o11_re + accum2.x;
+ o11_im = a*o11_im + accum2.y;
+ o12_re = a*o12_re + accum2.z;
+ o12_im = a*o12_im + accum2.w;
+ o20_re = a*o20_re + accum3.x;
+ o20_im = a*o20_im + accum3.y;
+ o21_re = a*o21_re + accum3.z;
+ o21_im = a*o21_im + accum3.w;
+ o22_re = a*o22_re + accum4.x;
+ o22_im = a*o22_im + accum4.y;
+ o30_re = a*o30_re + accum4.z;
+ o30_im = a*o30_im + accum4.w;
+ o31_re = a*o31_re + accum5.x;
+ o31_im = a*o31_im + accum5.y;
+ o32_re = a*o32_re + accum5.z;
+ o32_im = a*o32_im + accum5.w;
 #endif // SPINOR_DOUBLE
 #endif // DSLASH_XPAY
 }
@@ -2066,25 +1970,6 @@ WRITE_SPINOR(param.sp_stride);
 #undef spinorFloat
 #undef POW
 #undef SHARED_STRIDE
-
-#undef g00_re
-#undef g00_im
-#undef g01_re
-#undef g01_im
-#undef g02_re
-#undef g02_im
-#undef g10_re
-#undef g10_im
-#undef g11_re
-#undef g11_im
-#undef g12_re
-#undef g12_im
-#undef g20_re
-#undef g20_im
-#undef g21_re
-#undef g21_im
-#undef g22_re
-#undef g22_im
 
 #undef i00_re
 #undef i00_im
