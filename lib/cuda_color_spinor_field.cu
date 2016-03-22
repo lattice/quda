@@ -1611,8 +1611,7 @@ namespace quda {
 
       if(comm_dslash_peer2peer_enabled(0,dim)) {
 	if (!comm_query_mh_send_p2p_back[dim]) comm_query_mh_send_p2p_back[dim] = comm_query(mh_send_p2p_back[dim]);
-	// FIXME: any need to query the send?
-	if (comm_query_mh_send_p2p_back[dim] && !complete_send_back[dim]) complete_send_back[dim] = ipcCopyComplete(0,dim);
+	if (comm_query_mh_send_p2p_back[dim]) complete_send_back[dim] = true; // no need to query send, fire and forget
       } else {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
       }
@@ -1635,8 +1634,7 @@ namespace quda {
 
       if(comm_dslash_peer2peer_enabled(1,dim)) {
 	if (!comm_query_mh_send_p2p_fwd[dim]) comm_query_mh_send_p2p_fwd[dim] = comm_query(mh_send_p2p_fwd[dim]);
-	// FIXME: any need to query the send?
-	if (comm_query_mh_send_p2p_fwd[dim] && !complete_send_fwd[dim]) complete_send_fwd[dim] =  ipcCopyComplete(1,dim);
+	if (comm_query_mh_send_p2p_fwd[dim]) complete_send_fwd[dim] = true; // no need to query send, fire and forget
       } else {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
       }
@@ -1671,7 +1669,7 @@ namespace quda {
 
       if (comm_dslash_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_send_p2p_back[dim]);
-	cudaEventSynchronize(ipcCopyEvent[0][dim]); // FIXME: any need to synchronize the send?
+	cudaEventSynchronize(ipcCopyEvent[0][dim]);
       } else {
 	comm_wait(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
 #ifdef GPU_COMMS
@@ -1690,7 +1688,7 @@ namespace quda {
       }
 
       if (comm_dslash_peer2peer_enabled(1,dim)) {
-	comm_wait(mh_send_p2p_fwd[dim]); // FIXME: any need to synchronize the send?
+	comm_wait(mh_send_p2p_fwd[dim]);
 	cudaEventSynchronize(ipcCopyEvent[1][dim]);
       } else {
 	comm_wait(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
