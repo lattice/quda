@@ -48,8 +48,8 @@ COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy
 )
 
 
-
-set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy)
+find_file(GITDIR NAMES .git PATHS ${CMAKE_SOURCE_DIR} NO_DEFAULT_PATH)
+set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${GITDIR}/logs/HEAD)
 
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
