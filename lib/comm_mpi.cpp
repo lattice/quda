@@ -123,47 +123,51 @@ void comm_exchange_displaced(const int displacement[], void* send_buffer, int se
 void comm_dslash_peer2peer_init()
 {
 #ifdef P2P_COMMS
-  // first check that the local GPU supports UVA
-  cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop,gpuid);
-  if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return; 
+  if (!peer2peer_init) {
 
-  comm_set_dslash_neighbor_ranks();
- 
-  char *hostname = comm_hostname();
-  char *hostname_recv_buf = (char *)safe_malloc(128*size);
-  
-  int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*size);
-  
-  MPI_CHECK( MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD) );
- 
-  // There are more efficient ways to do the following, 
-  // but it doesn't really matter since this function should be 
-  // called just once. 
-  MPI_CHECK( MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD) );
- 
-  for(int dir=0; dir<2; ++dir){ // forward/backward directions
-    for(int dim=0; dim<4; ++dim){
-      int neighbor_rank = comm_dslash_neighbor_rank(dir,dim); 
-      if(neighbor_rank == rank) continue; 
+    // first check that the local GPU supports UVA
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop,gpuid);
+    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return;
 
-      // if the neighbors are on the same 
-      if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
-        int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
-        int canAccessPeer[2];
-        cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-        cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);  
-        if(canAccessPeer[0]*canAccessPeer[1]){
-          peer2peer_enabled[dir][dim] = true;
-        } 
-      } // on the same node
-    } // different dimensions - x, y, z, t
-  } // different directions - forward/backward
+    comm_set_dslash_neighbor_ranks();
 
+    char *hostname = comm_hostname();
+    char *hostname_recv_buf = (char *)safe_malloc(128*size);
 
-  host_free(hostname_recv_buf);
-  host_free(gpuid_recv_buf);
-#endif 
+    int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*size);
+
+    MPI_CHECK( MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD) );
+
+    // There are more efficient ways to do the following,
+    // but it doesn't really matter since this function should be
+    // called just once.
+    MPI_CHECK( MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD) );
+
+    for(int dir=0; dir<2; ++dir){ // forward/backward directions
+      for(int dim=0; dim<4; ++dim){
+	int neighbor_rank = comm_dslash_neighbor_rank(dir,dim);
+	if(neighbor_rank == rank) continue;
+
+	// if the neighbors are on the same
+	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
+	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+	  int canAccessPeer[2];
+	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+	  if(canAccessPeer[0]*canAccessPeer[1]){
+	    peer2peer_enabled[dir][dim] = true;
+	  }
+	} // on the same node
+      } // different dimensions - x, y, z, t
+    } // different directions - forward/backward
+
+    host_free(hostname_recv_buf);
+    host_free(gpuid_recv_buf);
+
+    peer2peer_init = true;
+  }
+#endif
   return;
 }
 
@@ -276,8 +280,8 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 
 void comm_free(MsgHandle *mh)
 {
-  MPI_Request_free(&(mh->request));
-  if (mh->custom) MPI_Type_free(&(mh->datatype));
+  MPI_CHECK(MPI_Request_free(&(mh->request)));
+  if (mh->custom) MPI_CHECK(MPI_Type_free(&(mh->datatype)));
   host_free(mh);
 }
 
