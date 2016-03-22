@@ -63,6 +63,7 @@ namespace quda {
     const gFloat *gauge0, *gauge1;
     const double mferm;
     const double a;
+    const double b;
     const int DS_type;
 
     bool checkGrid(TuneParam &param) const {
@@ -123,9 +124,9 @@ namespace quda {
     DomainWallDslash4DPCCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
 			     const QudaReconstructType reconstruct, const cudaColorSpinorField *in, 
 			     const cudaColorSpinorField *x, const double mferm, 
-			     const double a, const int dagger, const int DS_type)
+			     const double a, const double b, const int dagger, const int DS_type)
       : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), 
-	mferm(mferm), a(a), DS_type(DS_type)
+	mferm(mferm), a(a), b(b), DS_type(DS_type)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
@@ -176,18 +177,18 @@ namespace quda {
       switch(DS_type){
         case 0:
           DSLASH(domainWallDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-          (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-          (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+		 (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(),
+		 (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, b);
           break;
         case 1:
           DSLASH(domainWallDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-          (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-          (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+		 (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(),
+		 (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, b);
           break;
         case 2:
           DSLASH(domainWallDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-          (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-          (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+		 (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(),
+		 (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, b);
           break;
         default:
           errorQuda("invalid Dslash type");
@@ -199,7 +200,7 @@ namespace quda {
       long long vol4d = in->VolumeCB() / Ls;
       long long bulk = (Ls-2)*vol4d;
       long long wall = 2*vol4d;
-      long long flops; 
+      long long flops = 0;
       switch(DS_type){
         case 0:
           flops = DslashCuda::flops();
@@ -220,7 +221,7 @@ namespace quda {
       bool isHalf = in->Precision() == sizeof(short) ? true : false;
       int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
       long long Ls = in->X(4);
-      long long bytes;
+      long long bytes = 0;
 
       switch(DS_type){
       case 0:
@@ -253,10 +254,11 @@ namespace quda {
   // 2 = dslash5inv
   //-----------------------------------------------------
 
-  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-          const cudaColorSpinorField *in, const int parity, const int dagger, 
-          const cudaColorSpinorField *x, const double &m_f, const double &k2, 
-          const int *commOverride, const int DS_type, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
+			    const cudaColorSpinorField *in, const int parity, const int dagger,
+			    const cudaColorSpinorField *x, const double &m_f, const double &a, const double &b,
+			    const int *commOverride, const int DS_type,
+			    TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -284,14 +286,14 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new DomainWallDslash4DPCCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1, 
-               gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);
+							     gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new DomainWallDslash4DPCCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1, 
-               gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);
+							   gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new DomainWallDslash4DPCCuda<short4,short4>(out, (short4*)gauge0, (short4*)gauge1, 
-               gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);
+							   gauge.Reconstruct(), in, x, m_f, a, b, dagger, DS_type);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d

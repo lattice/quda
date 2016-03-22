@@ -102,10 +102,19 @@ public:
   }
 
   long long flops() const { return arg.f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
-  long long bytes() const { 
-    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
-    if (arg.X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
-    return arg.f.streams()*bytes*arg.length; }
+  long long bytes() const
+  {
+    // bytes for low-precision vector
+    size_t base_bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    if (arg.X.Precision() == QUDA_HALF_PRECISION) base_bytes += sizeof(float);
+
+    // bytes for high precision vector
+    size_t extra_bytes = arg.Y.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    if (arg.Y.Precision() == QUDA_HALF_PRECISION) extra_bytes += sizeof(float);
+
+    // the factor two here assumes we are reading and writing to the high precision vector
+    return ((arg.f.streams()-2)*base_bytes + 2*extra_bytes)*arg.length;
+  }
   int tuningIter() const { return 3; }
 };
 

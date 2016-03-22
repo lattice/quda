@@ -1313,12 +1313,10 @@ namespace quda {
     case QUDA_MOBIUS_DWF_DSLASH:
       if (inv_param->Ls > QUDA_MAX_DWF_LS)
 	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
-      if(pc) {
-	diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC;
-	diracParam.Ls = inv_param->Ls;
-	memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
-	memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
-      } else errorQuda("At currently, only preconditioned Mobius DWF is supported, %d", inv_param->dslash_type);
+      diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
+      diracParam.Ls = inv_param->Ls;
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
       break;
     case QUDA_STAGGERED_DSLASH:
       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
@@ -1701,8 +1699,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
-  DiracMobiusDomainWallPC dirac(diracParam); // create the Dirac operator
-  double kappa5 = 0.0;  // Kappa5 is dummy argument
+  DiracMobiusPC dirac(diracParam); // create the Dirac operator
   switch (test_type) {
     case 0:
       dirac.Dslash4(out, in, parity);
@@ -1714,7 +1711,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
       dirac.Dslash4pre(out, in, parity);
       break;
     case 3:
-      dirac.Dslash5inv(out, in, parity, kappa5);
+      dirac.Dslash5inv(out, in, parity);
       break;
   }
 

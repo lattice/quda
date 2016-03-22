@@ -133,7 +133,7 @@ namespace quda {
 
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const = 0;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const = 0;
@@ -174,7 +174,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -196,7 +196,7 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
@@ -223,7 +223,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -251,15 +251,14 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
   };
 
 
-
-  // Full domain wall 
+  // Full domain wall
   class DiracDomainWall : public DiracWilson {
 
   protected:
@@ -282,7 +281,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -303,7 +302,7 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
@@ -319,55 +318,84 @@ namespace quda {
     DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
     virtual ~DiracDomainWall4DPC();
     DiracDomainWall4DPC& operator=(const DiracDomainWall4DPC &dirac);
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
+
+    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &k) const;
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &kappa5) const;
+
+    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity, const double &kappa5, const ColorSpinorField &x, const double &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
   };
 
+  // Full Mobius
+  class DiracMobius : public DiracDomainWall {
 
-// 4d Even-odd preconditioned Mobius domain wall
-  class DiracMobiusDomainWallPC : public DiracDomainWallPC {
-    
   protected:
     //Mobius coefficients
     double b_5[QUDA_MAX_DWF_LS];
     double c_5[QUDA_MAX_DWF_LS];
 
+  public:
+    DiracMobius(const DiracParam &param);
+    DiracMobius(const DiracMobius &dirac);
+    virtual ~DiracMobius();
+    DiracMobius& operator=(const DiracMobius &dirac);
+
+    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+			const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
+  // 4d Even-odd preconditioned Mobius domain wall
+  class DiracMobiusPC : public DiracMobius {
+
+  protected:
+
   private:
 
   public:
-    DiracMobiusDomainWallPC(const DiracParam &param);
-    DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac);
-    virtual ~DiracMobiusDomainWallPC();
-    DiracMobiusDomainWallPC& operator=(const DiracMobiusDomainWallPC &dirac);
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
-    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
-    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &k) const;
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    DiracMobiusPC(const DiracParam &param);
+    DiracMobiusPC(const DiracMobiusPC &dirac);
+    virtual ~DiracMobiusPC();
+    DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
+
+    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-    //void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
@@ -407,7 +435,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -433,7 +461,7 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
@@ -463,7 +491,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-       ColorSpinorField &x, ColorSpinorField &b, 
+       ColorSpinorField &x, ColorSpinorField &b,
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
@@ -489,7 +517,7 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-     ColorSpinorField &x, ColorSpinorField &b, 
+     ColorSpinorField &x, ColorSpinorField &b,
      const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
          const QudaSolutionType) const;
@@ -517,7 +545,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -538,7 +566,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -568,7 +596,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -589,7 +617,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;

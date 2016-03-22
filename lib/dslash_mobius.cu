@@ -182,22 +182,22 @@ namespace quda {
       case 0:
 	DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       case 1:
 	DSLASH(MDWFDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       case 2:
 	DSLASH(MDWFDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       case 3:
 	DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       default:
 	errorQuda("invalid Dslash type");
@@ -209,7 +209,7 @@ namespace quda {
       long long vol4d = in->VolumeCB() / Ls;
       long long bulk = (Ls-2)*vol4d;
       long long wall = 2*vol4d;
-      long long flops; 
+      long long flops = 0; 
       switch(DS_type){
       case 0:
 	flops = DslashCuda::flops();
@@ -233,7 +233,7 @@ namespace quda {
       bool isHalf = in->Precision() == sizeof(short) ? true : false;
       int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
       long long Ls = in->X(4);
-      long long bytes;
+      long long bytes = 0;
 
       switch(DS_type){
       case 0:
