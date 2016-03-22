@@ -29,10 +29,10 @@ public:
   Texture() : spinor(0) { }   
 #ifndef DIRECT_ACCESS_BLAS
   Texture(const cudaColorSpinorField *x, bool use_ghost = false)
-    : use_ghost ? spinor(x->GhostTex()) : spinor(x->Tex()) { }
+    : spinor(use_ghost ? x->GhostTex() : x->Tex()) { }
 #else
- Texture(const cudaColorSpinorField *x, bool use_ghost = false)
-   : use_ghost ? : spinor((const InputType*)(x->Ghost2())) : spinor((const InputType*)(x->V())) { }
+  Texture(const cudaColorSpinorField *x, bool use_ghost = false)
+    : spinor(use_ghost ? (const InputType*)(x->Ghost2()) : (const InputType*)(x->V())) { }
 #endif
   Texture(const Texture &tex) : spinor(tex.spinor) { }
   ~Texture() { }
@@ -125,7 +125,7 @@ template<typename OutputType, typename InputType, int tex_id>
 
  Texture(const cudaColorSpinorField *x, bool use_ghost = false)
 #ifdef DIRECT_ACCESS_BLAS 
-   : use_ghost ? : spinor((const InputType*)(x->Ghost2())) : spinor((const InputType*)(x->V())) { }
+   : spinor( use_ghost ? (const InputType*)(x->Ghost2()) : (const InputType*)(x->V())) { }
 #endif
   { 
     // only bind if bytes > 0
