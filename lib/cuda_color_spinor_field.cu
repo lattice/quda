@@ -41,7 +41,7 @@ namespace quda {
 
   void cudaColorSpinorField::createIPCDslashComms(){
 
-    if(initIPCDslashComms) return;
+    if(initIPCDslashComms || comm_size() == 1) return;
 
     if(!initComms) errorQuda("Can only be called after create comms");
     if(!ghost_field) errorQuda("ghost_field appears not to be allocated");
@@ -95,18 +95,11 @@ namespace quda {
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<num_dir; ++dir){
 	if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
-	void** ghostDest = (dir==0) ? (&backGhostSendDest[dim]) 
-			 : &(fwdGhostSendDest[dim]);
-
+	void** ghostDest = (dir==0) ? (&backGhostSendDest[dim]) : &(fwdGhostSendDest[dim]);
 	cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[dir][dim],
 			     cudaIpcMemLazyEnablePeerAccess);
-
-    checkCudaError();
-
       }
-      if(num_dir == 1){
-        fwdGhostSendDest[dim] = backGhostSendDest[dim];
-      }
+      if(num_dir == 1) fwdGhostSendDest[dim] = backGhostSendDest[dim];
     }
    
     checkCudaError();
