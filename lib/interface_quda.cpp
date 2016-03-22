@@ -2556,24 +2556,24 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   void** hp_b;
   hp_b = new void* [param->num_rhs];
 
-  for(int i=0;i < param->num_offset;i++){
+  for(int i=0;i < param->num_rhs;i++){
     hp_x[i] = _hp_x[i];
     hp_b[i] = _hp_b[i];
   }
 
   // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
+  ColorSpinorParam cpuParam(hp_b[0], *param, X, pc_solution, param->input_location);
   std::vector<ColorSpinorField*> h_b;
   h_b.resize(param->num_rhs);
   for(int i=0; i < param->num_rhs; i++) {
     h_b[i] = ColorSpinorField::Create(cpuParam);
   }
 
-  cpuParam.v = hp_x;
+ // cpuParam.v = hp_x;
   cpuParam.location = param->output_location;
   std::vector<ColorSpinorField*> h_x;
   h_x.resize(param->num_rhs);
-
+//
   for(int i=0; i < param->num_rhs; i++) {
     cpuParam.v = hp_x[i]; //MW seems wird in the loop
     h_x[i] = ColorSpinorField::Create(cpuParam);
@@ -2774,10 +2774,15 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   }
 
   //FIX need to make sure all deletes are correct again
-
-  //  delete h_b;
-//  delete h_x;
-//  delete b;
+  for(int i=0; i < param->num_rhs; i++){
+    delete h_x[i];
+    delete x[i];
+    delete h_b[i];
+    delete b[i];
+  }
+   delete [] hp_b;
+   delete [] hp_x;
+//   delete [] b;
 //  if (!param->make_resident_solution) delete x;
 
   delete d;

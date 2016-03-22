@@ -32,6 +32,9 @@ if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_DOMAIN_WALL})
 
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
+  
+  cuda_add_executable(invertmrhs_test invertmrhs_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  target_link_libraries(invertmrhs_test ${TEST_LIBS})
 endif()
 
 cuda_add_executable(deflation_test deflation_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
