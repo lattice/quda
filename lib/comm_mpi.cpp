@@ -41,11 +41,9 @@ struct MsgHandle_s {
 static int rank = -1;
 static int size = -1;
 static int gpuid = -1;
-#ifdef P2P_COMMS
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
-#endif
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -118,17 +116,16 @@ void comm_exchange_displaced(const int displacement[], void* send_buffer, int se
   return;
 }
 
-
+static bool enable_peer2peer = true;
 
 void comm_dslash_peer2peer_init()
 {
-#ifdef P2P_COMMS
   if (!peer2peer_init) {
 
     // first check that the local GPU supports UVA
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop,gpuid);
-    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return;
+    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault || !enable_peer2peer) return;
 
     comm_set_dslash_neighbor_ranks();
 
@@ -157,6 +154,8 @@ void comm_dslash_peer2peer_init()
 	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 	  if(canAccessPeer[0]*canAccessPeer[1]){
 	    peer2peer_enabled[dir][dim] = true;
+	    printf("Peer-to-peer enabled for rank %d with neighbor %d dir=%d, dim=%d\n",
+		   rank, neighbor_rank, dir, dim);
 	  }
 	} // on the same node
       } // different dimensions - x, y, z, t
@@ -167,16 +166,11 @@ void comm_dslash_peer2peer_init()
 
     peer2peer_init = true;
   }
-#endif
   return;
 }
 
 bool comm_dslash_peer2peer_enabled(int dir, int dim){
-#ifdef P2P_COMMS
   return peer2peer_enabled[dir][dim];
-#else
-  return false;
-#endif
 }
 
 

@@ -221,13 +221,6 @@ AC_ARG_ENABLE(gpu-comms,
   [ gpu_comms="no" ]
 )
 
-dnl enable direct peer-to-peer communication using CUDA's Ipc interface
-AC_ARG_ENABLE(peer-to-peer,
-  AC_HELP_STRING([--enable-peer-to-peer], [ Enable direct CUDA peer-to-peer communication (experimental, default: disabled)]),
-  [ peer_to_peer=${enableval}],
-  [ peer_to_peer="no" ]
-)
-
 dnl enable NVTX mark up for the MPI in the visual profiler
 AC_ARG_ENABLE(mpi-nvtx,
   AC_HELP_STRING([--enable-mpi-nvtx], [ Enable NVTX markup for profiling MPI API calls in the visual profiler (default: disabled)]),
@@ -613,14 +606,6 @@ yes|no);;
   ;;
 esac
 
-dnl Enables direct CUDA peer-to-peer communication
-case ${peer_to_peer} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-peer-to-peer ])
-  ;;
-esac
-
 dnl enable NVTX mark up for the MPI in the visual profiler
 case ${mpi_nvtx} in
 yes|no);;
@@ -814,9 +799,6 @@ AC_SUBST( GPU_DIRECT, [${gpu_direct}])
 
 AC_MSG_NOTICE([Setting GPU_COMMS= ${gpu_comms}])
 AC_SUBST( GPU_COMMS, [${gpu_comms}])
-
-AC_MSG_NOTICE([Setting PEER_TO_PEER= ${peer_to_peer}])
-AC_SUBST( PEER_TO_PEER, [${peer_to_peer}])
 
 AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
 AC_SUBST( MPI_NVTX, [${mpi_nvtx}])

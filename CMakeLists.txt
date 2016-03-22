@@ -74,7 +74,6 @@ set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 set(QUDA_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
 set(QUDA_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
 set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
-set(QUDA_PEER_TO_PEER OFF CACHE BOOL "set to 'yes' to enable peer-to-peer communication")
 
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
@@ -202,10 +201,6 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_POSIX_THREADS)
   add_definitions(-DPTHREADS)
-endif()
-
-if(QUDA_PEER_TO_PEER)
-  add_definitions(-DP2P_COMMS)
 endif()
 
 if(QUDA_DIRAC_WILSON)

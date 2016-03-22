@@ -608,7 +608,6 @@ BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
 INTERFACE_NVTX
 MPI_NVTX
-PEER_TO_PEER
 GPU_COMMS
 GPU_DIRECT
 POSIX_THREADS
@@ -733,7 +732,6 @@ enable_dynamic_clover
 enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
-enable_peer_to_peer
 enable_mpi_nvtx
 enable_interface_nvtx
 enable_device_pack
@@ -1410,8 +1408,8 @@ Optional Features:
                           Build asqtad fermion force (default: disabled)
   --enable-hisq-force     Build HISQ fermion force (default: disabled)
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
-                          evolver, APE, STOUT, extended gauge routines (default:
-                          disabled)
+                          evolver, APE, STOUT, extended gauge routines
+                          (default: disabled)
   --enable-gauge-alg      Build gauge fixing and pure gauge algorithms
                           (default: disabled)
   --enable-multigrid      Build multigrid linear solvers (default: disabled)
@@ -1424,8 +1422,6 @@ Optional Features:
                           enabled)
   --enable-gpu-comms      Enable direct CUDA-NIC communication (experimental,
                           default: disabled)
-  --enable-peer-to-peer   Enable direct CUDA peer-to-peer communication
-                          (experimental, default: disabled)
   --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
                           the visual profiler (default: disabled)
   --enable-interface-nvtx Enable NVTX markup for profiling interface calls in
@@ -2330,15 +2326,6 @@ if test "${enable_gpu_comms+set}" = set; then :
   enableval=$enable_gpu_comms;  gpu_comms=${enableval}
 else
    gpu_comms="no"
-
-fi
-
-
-# Check whether --enable-peer-to-peer was given.
-if test "${enable_peer_to_peer+set}" = set; then :
-  enableval=$enable_peer_to_peer;  peer_to_peer=${enableval}
-else
-   peer_to_peer="no"
 
 fi
 
@@ -4279,13 +4266,6 @@ yes|no);;
   ;;
 esac
 
-case ${peer_to_peer} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-peer-to-peer " "$LINENO" 5
-  ;;
-esac
-
 case ${mpi_nvtx} in
 yes|no);;
 *)
@@ -4532,11 +4512,6 @@ GPU_DIRECT=${gpu_direct}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_COMMS= ${gpu_comms}" >&5
 $as_echo "$as_me: Setting GPU_COMMS= ${gpu_comms}" >&6;}
 GPU_COMMS=${gpu_comms}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting PEER_TO_PEER= ${peer_to_peer}" >&5
-$as_echo "$as_me: Setting PEER_TO_PEER= ${peer_to_peer}" >&6;}
-PEER_TO_PEER=${peer_to_peer}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_NVTXS= ${mpi_nvtx}" >&5

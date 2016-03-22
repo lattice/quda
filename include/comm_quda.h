@@ -45,6 +45,13 @@ extern "C" {
      @return Coordinate of this process
    */
   int comm_coord(int dim);
+
+  /**
+     Query if peer-to-peer communication is enabled
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+     @return Whether peer-to-peer is enabled
+  */
   bool comm_dslash_peer2peer_enabled(int dir, int dim);
 
   /**
