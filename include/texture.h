@@ -11,11 +11,6 @@
 
 //namespace quda {
 
-enum UseGhost {
-  useGhost
-};
-
-
 #ifdef USE_TEXTURE_OBJECTS
 
 template<typename OutputType, typename InputType>
@@ -33,18 +28,14 @@ private:
 public:
   Texture() : spinor(0) { }   
 #ifndef DIRECT_ACCESS_BLAS
-  Texture(const cudaColorSpinorField *x) : spinor(x->Tex()) { }
-  Texture(const cudaColorSpinorField *x, UseGhost use_ghost) : spinor(x->GhostTex()) { }
+  Texture(const cudaColorSpinorField *x, bool use_ghost = false)
+    : use_ghost ? spinor(x->GhostTex()) : spinor(x->Tex()) { }
 #else
-  Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
-  Texture(const cudaColorSpinorField *x, UseGhost use_ghost) : spinor((InputType*)(x->Ghost2())) { }
+ Texture(const cudaColorSpinorField *x, bool use_ghost = false)
+   : use_ghost ? : spinor((const InputType*)(x->Ghost2())) : spinor((const InputType*)(x->V())) { }
 #endif
   Texture(const Texture &tex) : spinor(tex.spinor) { }
   ~Texture() { }
-
-  
-  
-
 
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
@@ -132,19 +123,22 @@ template<typename OutputType, typename InputType, int tex_id>
 #endif
   { count++; } 
 
-  Texture(const cudaColorSpinorField *x)
+ Texture(const cudaColorSpinorField *x, bool use_ghost = false)
 #ifdef DIRECT_ACCESS_BLAS 
-  : spinor((const InputType*)x->V()), bytes(x->Bytes())
+   : use_ghost ? : spinor((const InputType*)(x->Ghost2())) : spinor((const InputType*)(x->V())) { }
 #endif
   { 
     // only bind if bytes > 0
     if (x->Bytes()) { 
-      if (tex_id > 0 && tex_id <= MAX_TEX_ID && tex_id_table[tex_id]) {
-	errorQuda("Already bound to this texture reference");
-      } else {
-	tex_id_table[tex_id] = true;
+      if (tex_id >= 0 && tex_id < MAX_TEX_ID) {
+	if (tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0]) {
+	  errorQuda("Already bound to this texture reference");
+	} else {
+	  tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0] = true;
+	}
       }
-      bind((const InputType*)x->V(), x->Bytes()); bound = true; 
+      if (use_ghost) bind((const InputType*)(x->Ghost2()), x->GhostBytes());
+      else bind((const InputType*)x->V(), x->Bytes()); bound = true;
     } 
     count++;
   }
@@ -155,9 +149,11 @@ template<typename OutputType, typename InputType, int tex_id>
 #endif
   { count++; }
 
-  ~Texture() { if (bound && !--count) { 
-      unbind(); bound = false; tex_id_table[tex_id]=false;
-    } }
+  ~Texture() {
+    if (bound && !--count) {
+      unbind(); bound = false; tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0]=false;
+    }
+  }
 
   Texture& operator=(const Texture &tex) {
 #ifdef DIRECT_ACCESS_BLAS
@@ -173,7 +169,7 @@ template<typename OutputType, typename InputType, int tex_id>
   //default should only be called if a tex_id is out of range
   __device__ inline OutputType fetch(unsigned int idx) { OutputType x; x.x =0; return x; };  
   __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
-  };
+};
 
   template<typename OutputType, typename InputType, int tex_id>  
     bool Texture<OutputType, InputType, tex_id>::bound = false;
@@ -342,7 +338,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Texture<InterType, StoreType> ghostTex;
 #else
     Texture<InterType, StoreType, tex_id> tex;
-    Texture<InterType, StoreType, tex_id> ghostTex;
+    Texture<InterType, StoreType, -1> ghostTex;
 #endif
     float *norm; // direct reads for norm
     int stride;
@@ -355,7 +351,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor(const ColorSpinorField &x, int nFace=1) 
       : spinor((StoreType*)x.V()), ghost_spinor((StoreType*)x.Ghost2()),
         tex(&(static_cast<const cudaColorSpinorField&>(x))),
-        ghostTex(&(static_cast<const cudaColorSpinorField&>(x)),useGhost),
+        ghostTex(&(static_cast<const cudaColorSpinorField&>(x)), true),
         norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
     {
       checkTypes<RegType,InterType,StoreType>();
@@ -387,10 +383,10 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       ghost_spinor = (StoreType*)x.Ghost2();
 #ifdef USE_TEXTURE_OBJECTS 
       tex = Texture<InterType, StoreType>(&x);
-      ghostTex = Texture<InterType, StoreType>(&x,useGhost);
+      ghostTex = Texture<InterType, StoreType>(&x,true);
 #else
       tex = Texture<InterType, StoreType, tex_id>(&x);
-      ghostTex = Texture<InterType, StoreType, tex_id>(&x,useGhost);
+      ghostTex = Texture<InterType, StoreType, tex_id>(&x,true);
 #endif      
       norm = (float*)x.Norm();
       stride = x.Length()/(N*REG_LENGTH);
