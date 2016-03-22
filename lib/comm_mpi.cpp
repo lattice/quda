@@ -44,6 +44,8 @@ static int gpuid = -1;
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
+static bool enable_peer2peer = true;
+
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -93,32 +95,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   }
 }
 
-
-void comm_exchange(int dest_rank, void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes){
-  MPI_Status status;
-  int send_tag = comm_rank();
-  int recv_tag = dest_rank;
-
-  // Have to be careful how we use this in order to avoid deadlock
-  MPI_Sendrecv(send_buffer, send_bytes, MPI_BYTE, dest_rank, send_tag, 
-               recv_buffer, recv_bytes, MPI_BYTE, dest_rank, recv_tag, MPI_COMM_WORLD, &status);
-
-  return;
-}
-
-void comm_exchange_displaced(const int displacement[], void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes){
-  
-  Topology* topo = comm_default_topology();
-  int rank = comm_rank_displaced(topo,displacement);
-
-  comm_exchange(rank, send_buffer, send_bytes, recv_buffer, recv_bytes);
-  
-  return;
-}
-
-static bool enable_peer2peer = true;
-
-void comm_dslash_peer2peer_init()
+void comm_peer2peer_init()
 {
   if (!peer2peer_init) {
 
@@ -127,7 +104,7 @@ void comm_dslash_peer2peer_init()
     cudaGetDeviceProperties(&prop,gpuid);
     if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault || !enable_peer2peer) return;
 
-    comm_set_dslash_neighbor_ranks();
+    comm_set_neighbor_ranks();
 
     char *hostname = comm_hostname();
     char *hostname_recv_buf = (char *)safe_malloc(128*size);
@@ -143,7 +120,7 @@ void comm_dslash_peer2peer_init()
 
     for(int dir=0; dir<2; ++dir){ // forward/backward directions
       for(int dim=0; dim<4; ++dim){
-	int neighbor_rank = comm_dslash_neighbor_rank(dir,dim);
+	int neighbor_rank = comm_neighbor_rank(dir,dim);
 	if(neighbor_rank == rank) continue;
 
 	// if the neighbors are on the same
@@ -169,7 +146,8 @@ void comm_dslash_peer2peer_init()
   return;
 }
 
-bool comm_dslash_peer2peer_enabled(int dir, int dim){
+
+bool comm_peer2peer_enabled(int dir, int dim){
   return peer2peer_enabled[dir][dim];
 }
 

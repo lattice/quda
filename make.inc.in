@@ -45,7 +45,6 @@ BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
-PEER_TO_PEER = @PEER_TO_PEER@    # set to 'yes' to build peer-to-peer enabled dslash
 
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
@@ -199,11 +198,6 @@ ifeq ($(strip $(POSIX_THREADS)), yes)
 endif
 
 LIB += -lpthread
-
-ifeq ($(strip $(PEER_TO_PEER)), yes)
-  NVCCOPT += -DP2P_COMMS
-  COPT += -DP2P_COMMS
-endif
 
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)

@@ -27,10 +27,8 @@ extern "C" {
   Topology *comm_default_topology(void);
 
   // routines related to direct peer-2-peer access
-  void comm_set_dslash_neighbor_ranks(Topology *topo=NULL);
-  int comm_dslash_neighbor_rank(int dir, int dim);
-  void comm_dslash_peer2peer_init();
-
+  void comm_set_neighbor_ranks(Topology *topo=NULL);
+  int comm_neighbor_rank(int dir, int dim);
 
   /**
      Return the number of processes in the dimension dim
@@ -45,14 +43,6 @@ extern "C" {
      @return Coordinate of this process
    */
   int comm_coord(int dim);
-
-  /**
-     Query if peer-to-peer communication is enabled
-     @param dir Direction (0 - backwards, 1 forwards)
-     @param dim Dimension (0-3)
-     @return Whether peer-to-peer is enabled
-  */
-  bool comm_dslash_peer2peer_enabled(int dir, int dim);
 
   /**
      Create a persistent message handler for a relative send.  This
@@ -132,8 +122,19 @@ extern "C" {
   int comm_size(void);
   int comm_gpuid(void);
 
-  void comm_exchange(int dest_rank, void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes);
-  void comm_exchange_displaced(const int displacement[], void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes);
+  /**
+     Enabled peer-to-peer communication.
+   */
+  void comm_peer2peer_init();
+
+  /**
+     Query if peer-to-peer communication is enabled
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+     @return Whether peer-to-peer is enabled
+  */
+  bool comm_peer2peer_enabled(int dir, int dim);
+
   /**
      Create a persistent message handler for a relative send
      @param buffer Buffer from which message will be sent

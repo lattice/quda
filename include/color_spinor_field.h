@@ -490,7 +490,7 @@ namespace quda {
     bool initComms;
 
     /** Whether we have initialized peer-to-peer communication for this field */
-    bool initIPCDslashComms;
+    bool initIPCComms;
 
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
@@ -522,10 +522,10 @@ namespace quda {
     void destroyComms();
     
     /** Create the inter-process communication handlers */
-    void createIPCDslashComms();
+    void createIPCComms();
 
     /** Destroy the inter-process communication handlers */
-    void destroyIPCDslashComms();
+    void destroyIPCComms();
 
     /** Allocate the ghost buffers */
     void allocateGhostBuffer(int nFace);

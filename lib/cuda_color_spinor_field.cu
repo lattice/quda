@@ -35,7 +35,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false), 
-    initComms(false), initIPCDslashComms(false), bufferMessageHandler(0), nFaceComms(0)
+    initComms(false), initIPCComms(false), bufferMessageHandler(0), nFaceComms(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -58,7 +58,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-    initComms(false), initIPCDslashComms(false), bufferMessageHandler(0), nFaceComms(0)
+    initComms(false), initIPCComms(false), bufferMessageHandler(0), nFaceComms(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -68,7 +68,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-    initComms(false), initIPCDslashComms(false), bufferMessageHandler(0), nFaceComms(0)
+    initComms(false), initIPCComms(false), bufferMessageHandler(0), nFaceComms(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -122,7 +122,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-      initComms(false), initIPCDslashComms(false), bufferMessageHandler(0), nFaceComms(0)
+      initComms(false), initIPCComms(false), bufferMessageHandler(0), nFaceComms(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -1108,17 +1108,17 @@ namespace quda {
     }
     checkCudaError();
 
-    createIPCDslashComms();
+    createIPCComms();
   }
    
-  void cudaColorSpinorField::createIPCDslashComms() {
+  void cudaColorSpinorField::createIPCComms() {
 
-    if(initIPCDslashComms || comm_size() == 1) return;
+    if(initIPCComms || comm_size() == 1) return;
 
     if(!initComms) errorQuda("Can only be called after create comms");
     if(!ghost_field) errorQuda("ghost_field appears not to be allocated");
 
-    comm_dslash_peer2peer_init();
+    comm_peer2peer_init();
 
     checkCudaError();
 
@@ -1133,14 +1133,14 @@ namespace quda {
 	int disp = (dir == 1) ? +1 : -1;
 
 	// first set up receive
-	if (comm_dslash_peer2peer_enabled(1-dir,dim)) {
+	if (comm_peer2peer_enabled(1-dir,dim)) {
           receiveHandle = comm_declare_receive_relative(&ipcRemoteGhostDestHandle[1-dir][dim],
 							dim,
 							-disp,
 							sizeof(ipcRemoteGhostDestHandle[1-dir][dim]));
 	}
         // now send
-	if (comm_dslash_peer2peer_enabled(dir,dim)) {
+	if (comm_peer2peer_enabled(dir,dim)) {
 	  cudaIpcMemHandle_t ipcLocalGhostDestHandle;
 	  cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_field);
 	  sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
@@ -1166,7 +1166,7 @@ namespace quda {
       if (!commDimPartitioned(dim)) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for (int dir=0; dir<num_dir; ++dir){
-	if (!comm_dslash_peer2peer_enabled(dir,dim)) continue;
+	if (!comm_peer2peer_enabled(dir,dim)) continue;
 	void** ghostDest = (dir==0) ? (&backGhostSendDest[dim]) : &(fwdGhostSendDest[dim]);
 	cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[dir][dim],
 			     cudaIpcMemLazyEnablePeerAccess);
@@ -1191,7 +1191,7 @@ namespace quda {
 	int disp = (dir == 1) ? +1 : -1;
 
 	// first set up receive
-	if (comm_dslash_peer2peer_enabled(1-dir,dim)) {
+	if (comm_peer2peer_enabled(1-dir,dim)) {
           receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[1-dir][dim],
 							dim,
 							-disp,
@@ -1199,7 +1199,7 @@ namespace quda {
 	}
 
 	// now send
-	if (comm_dslash_peer2peer_enabled(dir,dim)) {
+	if (comm_peer2peer_enabled(dir,dim)) {
 	  cudaEventCreate(&ipcCopyEvent[dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
 	  cudaIpcEventHandle_t ipcLocalEventHandle;
 	  cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[dir][dim]);
@@ -1225,7 +1225,7 @@ namespace quda {
     for (int dim=0; dim<4; ++dim) {
       if (!commDimPartitioned(dim)) continue;
       for (int dir=0; dir<2; ++dir) {
-	if (!comm_dslash_peer2peer_enabled(dir,dim)) continue;
+	if (!comm_peer2peer_enabled(dir,dim)) continue;
 	cudaIpcOpenEventHandle(&(ipcRemoteCopyEvent[dir][dim]), ipcRemoteEventHandle[dir][dim]);
       }
     }
@@ -1233,14 +1233,14 @@ namespace quda {
     // Create message handles for IPC synchronization
     for (int dim=0; dim<4; ++dim) {
       if (!commDimPartitioned(dim)) continue;
-      if (comm_dslash_peer2peer_enabled(1,dim)) {
+      if (comm_peer2peer_enabled(1,dim)) {
 	// send to processor in forward direction
 	mh_send_p2p_fwd[dim] = comm_declare_send_relative(&buffer_send_p2p_fwd[dim], dim, +1, sizeof(int));
 	// receive from processor in forward direction
 	mh_recv_p2p_fwd[dim] = comm_declare_receive_relative(&buffer_recv_p2p_fwd[dim], dim, +1, sizeof(int));
       }
 
-      if (comm_dslash_peer2peer_enabled(0,dim)) {
+      if (comm_peer2peer_enabled(0,dim)) {
 	// send to processor in backward direction
 	mh_send_p2p_back[dim] = comm_declare_send_relative(&buffer_recv_p2p_back[dim], dim, -1, sizeof(int));
 	// receive from processor in backward direction
@@ -1249,19 +1249,19 @@ namespace quda {
     }
     checkCudaError();
 
-    initIPCDslashComms = true;
+    initIPCComms = true;
   }
 
-  void cudaColorSpinorField::destroyIPCDslashComms() {
+  void cudaColorSpinorField::destroyIPCComms() {
 
-    if (!initIPCDslashComms) return;
+    if (!initIPCComms) return;
 
     for (int dim=0; dim<4; ++dim) {
 
       if (!commDimPartitioned(dim)) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
     
-      if (comm_dslash_peer2peer_enabled(1,dim)) {
+      if (comm_peer2peer_enabled(1,dim)) {
 	comm_free(mh_send_p2p_fwd[dim]);
 	comm_free(mh_recv_p2p_fwd[dim]);
 
@@ -1271,7 +1271,7 @@ namespace quda {
 	if (num_dir == 2) cudaIpcCloseMemHandle(fwdGhostSendDest[dim]);
       }
 	
-      if (comm_dslash_peer2peer_enabled(0,dim)) {
+      if (comm_peer2peer_enabled(0,dim)) {
 	comm_free(mh_send_p2p_back[dim]);
 	comm_free(mh_recv_p2p_back[dim]);
 
@@ -1282,13 +1282,13 @@ namespace quda {
     } // iterate over dim
 
     checkCudaError();
-    initIPCDslashComms = false;
+    initIPCComms = false;
   }
 
   void cudaColorSpinorField::destroyComms()
   {
     if (initComms) {
-      destroyIPCDslashComms();
+      destroyIPCComms();
 
       for(int b=0; b<2; ++b){
       for (int j=0; j<maxNface; j++) {
@@ -1433,12 +1433,12 @@ namespace quda {
 
     if(dir%2 == 0){
       // backwards copy to host
-      if(comm_dslash_peer2peer_enabled(0,dim)) return;
+      if(comm_peer2peer_enabled(0,dim)) return;
 
       sendGhost(my_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, pack_stream);
     } else {
       // forwards copy to host
-      if(comm_dslash_peer2peer_enabled(1,dim)) return;
+      if(comm_peer2peer_enabled(1,dim)) return;
 
       sendGhost(my_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, pack_stream);
     }
@@ -1451,7 +1451,7 @@ namespace quda {
     if(!commDimPartitioned(dim)) return;
 
     if (dir%2 == 0) { // sending backwards
-      if(comm_dslash_peer2peer_enabled(1,dim)){
+      if(comm_peer2peer_enabled(1,dim)){
 	// receive from the processor in the +1 direction
 	comm_start(mh_recv_p2p_fwd[dim]);
       } else {
@@ -1460,7 +1460,7 @@ namespace quda {
       }
     } else { //sending forwards
       // Prepost receive
-      if (comm_dslash_peer2peer_enabled(0,dim)) {
+      if (comm_peer2peer_enabled(0,dim)) {
 	comm_start(mh_recv_p2p_back[dim]);
       } else {
         comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
@@ -1475,7 +1475,7 @@ namespace quda {
     if(!commDimPartitioned(dim)) return;
 
     if(dir%2 == 0){
-      if(!comm_dslash_peer2peer_enabled(0,dim)) {
+      if(!comm_peer2peer_enabled(0,dim)) {
 	comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
       } else {
 	cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
@@ -1521,7 +1521,7 @@ namespace quda {
 	comm_start(mh_send_p2p_back[dim]);
       }
     } else { // sending forwards
-      if(!comm_dslash_peer2peer_enabled(1,dim)) {
+      if(!comm_peer2peer_enabled(1,dim)) {
 	comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
       } else {
 	cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
@@ -1602,14 +1602,14 @@ namespace quda {
 
     if(dir%2==0){
 
-      if(comm_dslash_peer2peer_enabled(1,dim)) {
+      if(comm_peer2peer_enabled(1,dim)) {
 	if (!comm_query_mh_recv_p2p_fwd[dim]) comm_query_mh_recv_p2p_fwd[dim] = comm_query(mh_recv_p2p_fwd[dim]);
 	if (comm_query_mh_recv_p2p_fwd[dim] && !complete_recv_fwd[dim]) complete_recv_fwd[dim] = ipcRemoteCopyComplete(1,dim);
       } else {
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]);
       }
 
-      if(comm_dslash_peer2peer_enabled(0,dim)) {
+      if(comm_peer2peer_enabled(0,dim)) {
 	if (!comm_query_mh_send_p2p_back[dim]) comm_query_mh_send_p2p_back[dim] = comm_query(mh_send_p2p_back[dim]);
 	if (comm_query_mh_send_p2p_back[dim]) complete_send_back[dim] = true; // no need to query send, fire and forget
       } else {
@@ -1625,14 +1625,14 @@ namespace quda {
       }
 
     } else { // dir%2 == 1
-      if(comm_dslash_peer2peer_enabled(0,dim)) {
+      if(comm_peer2peer_enabled(0,dim)) {
 	if (!comm_query_mh_recv_p2p_back[dim]) comm_query_mh_recv_p2p_back[dim] = comm_query(mh_recv_p2p_back[dim]);
         if (comm_query_mh_recv_p2p_back[dim] && !complete_recv_back[dim]) complete_recv_back[dim] = ipcRemoteCopyComplete(0,dim);
       } else {
 	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][nFace-1][dim]);
       }
 
-      if(comm_dslash_peer2peer_enabled(1,dim)) {
+      if(comm_peer2peer_enabled(1,dim)) {
 	if (!comm_query_mh_send_p2p_fwd[dim]) comm_query_mh_send_p2p_fwd[dim] = comm_query(mh_send_p2p_fwd[dim]);
 	if (comm_query_mh_send_p2p_fwd[dim]) complete_send_fwd[dim] = true; // no need to query send, fire and forget
       } else {
@@ -1657,7 +1657,7 @@ namespace quda {
 
     if (dir%2==0) {
 
-      if (comm_dslash_peer2peer_enabled(1,dim)) {
+      if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_recv_p2p_fwd[dim]);
 	cudaEventSynchronize(ipcRemoteCopyEvent[1][dim]);
       } else {
@@ -1667,7 +1667,7 @@ namespace quda {
 #endif
       }
 
-      if (comm_dslash_peer2peer_enabled(0,dim)) {
+      if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_send_p2p_back[dim]);
 	cudaEventSynchronize(ipcCopyEvent[0][dim]);
       } else {
@@ -1677,7 +1677,7 @@ namespace quda {
 #endif
       }
     } else {
-      if (comm_dslash_peer2peer_enabled(0,dim)) {
+      if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_recv_p2p_back[dim]);
 	cudaEventSynchronize(ipcRemoteCopyEvent[0][dim]);
       } else {
@@ -1687,7 +1687,7 @@ namespace quda {
 #endif
       }
 
-      if (comm_dslash_peer2peer_enabled(1,dim)) {
+      if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_send_p2p_fwd[dim]);
 	cudaEventSynchronize(ipcCopyEvent[1][dim]);
       } else {
@@ -1708,11 +1708,11 @@ namespace quda {
 
     // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
-      if (comm_dslash_peer2peer_enabled(1,dim)) return;
+      if (comm_peer2peer_enabled(1,dim)) return;
 
       unpackGhost(from_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, stream_p);
     } else { // receive from backwards
-      if (comm_dslash_peer2peer_enabled(0,dim)) return;
+      if (comm_peer2peer_enabled(0,dim)) return;
 
       unpackGhost(from_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, stream_p);
     }
@@ -1727,11 +1727,11 @@ namespace quda {
 
     // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
-      if (comm_dslash_peer2peer_enabled(1,dim)) return;
+      if (comm_peer2peer_enabled(1,dim)) return;
 
       unpackGhost(from_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/]);
     } else { // receive from backwards
-      if (comm_dslash_peer2peer_enabled(0,dim)) return;
+      if (comm_peer2peer_enabled(0,dim)) return;
 
       unpackGhost(from_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
     }

@@ -209,14 +209,14 @@ Topology *comm_default_topology(void)
   return default_topo;
 }
 
-static int dslash_neighbor_rank[2][4] = { {-1,-1,-1,-1},
+static int neighbor_rank[2][4] = { {-1,-1,-1,-1},
                                           {-1,-1,-1,-1} };
 
-static bool dslash_neighbors_cached = false;
+static bool neighbors_cached = false;
 
-void comm_set_dslash_neighbor_ranks(Topology *topo){
+void comm_set_neighbor_ranks(Topology *topo){
 
-  if(dslash_neighbors_cached) return;
+  if(neighbors_cached) return;
 
   Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
   if(!topology){
@@ -229,18 +229,18 @@ void comm_set_dslash_neighbor_ranks(Topology *topo){
     int neg_displacement[4] = {0,0,0,0};
     pos_displacement[d] = +1;
     neg_displacement[d] = -1;
-    dslash_neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
-    dslash_neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
+    neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
+    neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
   }
-  dslash_neighbors_cached = true;
+  neighbors_cached = true;
   return;
 }
 
-int comm_dslash_neighbor_rank(int dir, int dim){
-  if(!dslash_neighbors_cached){
-    comm_set_dslash_neighbor_ranks();
+int comm_neighbor_rank(int dir, int dim){
+  if(!neighbors_cached){
+    comm_set_neighbor_ranks();
   }
-  return dslash_neighbor_rank[dir][dim];
+  return neighbor_rank[dir][dim];
 }
 
 
