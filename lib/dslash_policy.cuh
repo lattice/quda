@@ -161,9 +161,6 @@ struct DslashCuda2 : DslashPolicyImp {
 		
     inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
     inputSpinor->createComms(dslash.Nface()/2);	
-#ifdef P2P_COMMS
-    inputSpinor->createIPCDslashComms();
-#endif
 
     DslashCommsPattern pattern(dslashParam.commDim);
 

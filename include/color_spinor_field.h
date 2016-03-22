@@ -427,14 +427,6 @@ namespace quda {
     MsgHandle ***mh_send_norm_back[2];
 #endif
 
-#ifdef P2P_COMMS
-   static MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
-   static MsgHandle* mh_send_p2p_back[QUDA_MAX_DIM];
-   static MsgHandle* mh_recv_p2p_fwd[QUDA_MAX_DIM];
-   static MsgHandle* mh_recv_p2p_back[QUDA_MAX_DIM];
-#endif
-
-
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
@@ -446,35 +438,25 @@ namespace quda {
     static int initGhostFaceBuffer;
 
 #ifdef P2P_COMMS
-    // Static variables needed for peer-to-peer comms
-    static cudaIpcMemHandle_t ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
-    static cudaIpcMemHandle_t ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
-    static void* fwdGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
-    static void* backGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
+    MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
+    MsgHandle* mh_send_p2p_back[QUDA_MAX_DIM];
+    MsgHandle* mh_recv_p2p_fwd[QUDA_MAX_DIM];
+    MsgHandle* mh_recv_p2p_back[QUDA_MAX_DIM];
 
-    // Communication in the temporal direction is a corner case
-    // since the source buffer is not static
-    cudaIpcMemHandle_t ipcLocalFieldHandle[2];
-    cudaIpcMemHandle_t ipcRemoteFieldHandle[2];
-    cudaIpcMemHandle_t ipcLocalNormHandle[2];
-    cudaIpcMemHandle_t ipcRemoteNormHandle[2];
-    void* fwdFieldSrcBuffer;
-    void* backFieldSrcBuffer;
-    void* fwdNormSrcBuffer;
-    void* backNormSrcBuffer;
+    // Buffers used in the above
+    static int buffer_send_p2p_fwd[QUDA_MAX_DIM];
+    static int buffer_recv_p2p_fwd[QUDA_MAX_DIM];
+    static int buffer_send_p2p_back[QUDA_MAX_DIM];
+    static int buffer_recv_p2p_back[QUDA_MAX_DIM];
 
-    static cudaEvent_t ipcCopyEvent[2][QUDA_MAX_DIM];
-    static cudaEvent_t ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
-// for forward send 
-   void* fwdGhostSendDest[QUDA_MAX_DIM];
-   void* backGhostSendDest[QUDA_MAX_DIM];
-   cudaIpcMemHandle_t ipcLocalGhostDestHandle[2][QUDA_MAX_DIM];
-   cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][QUDA_MAX_DIM];
-// As soon as the send starts need to register the even on the receiving process
-// to let that process know that it is safe to proceed.
-   static cudaIpcEventHandle_t ipcLocalEventHandle[2][QUDA_MAX_DIM]; 
-   static cudaIpcEventHandle_t ipcRemoteEventHandle[2][QUDA_MAX_DIM];
-#endif  
+    // Events used to cross synchronize between peer-2-peer GPUs
+    cudaEvent_t ipcCopyEvent[2][QUDA_MAX_DIM];
+    cudaEvent_t ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
+
+    // for forward send
+    void* fwdGhostSendDest[QUDA_MAX_DIM];
+    void* backGhostSendDest[QUDA_MAX_DIM];
+#endif
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -497,8 +479,6 @@ namespace quda {
 #ifdef P2P_COMMS
     /** Whether we have initialized peer-to-peer communication for this field */
     bool initIPCDslashComms;
-    /** Whether we have initialized peer-to-peer comms in the temporal direction */
-    bool initIPCTimeComms; // should not be static
 #endif
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
@@ -629,8 +609,8 @@ namespace quda {
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
 #ifdef P2P_COMMS
-    static int ipcCopyComplete(int dir, int dim);
-    static int ipcRemoteCopyComplete(int dir, int dim);
+    int ipcCopyComplete(int dir, int dim);
+    int ipcRemoteCopyComplete(int dir, int dim);
 #endif
 
     /**
