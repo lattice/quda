@@ -18,7 +18,7 @@ static int gpuid = -1;
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
-static bool enable_peer2peer = true;
+
 
 // this is a work around (in the absence of C++11) to do a compile
 // time check that the size of float and int are the same.  Since we
@@ -115,7 +115,7 @@ void comm_peer2peer_init()
     // first check that the local GPU supports UVA
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop,gpuid);
-    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault || !enable_peer2peer) return;
+    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return;
 
     comm_set_neighbor_ranks();
 

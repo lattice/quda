@@ -44,7 +44,6 @@ static int gpuid = -1;
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
-static bool enable_peer2peer = true;
 
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
@@ -102,7 +101,7 @@ void comm_peer2peer_init()
     // first check that the local GPU supports UVA
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop,gpuid);
-    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault || !enable_peer2peer) return;
+    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return;
 
     comm_set_neighbor_ranks();
 
