@@ -31,7 +31,6 @@ namespace quda {
 
     void *v; // pointer to field
     void *norm;
-    void *ghost_field;
     
     //! for eigcg:
     int eigv_dim;    //number of eigenvectors
@@ -195,7 +194,7 @@ namespace quda {
 
     void *v; // the field elements
     void *norm; // the normalization field
-    void *ghost_field; // used
+    void *ghost_field; // unique ghost zone for this instance
 
     //! used for eigcg:
     int eigv_dim;

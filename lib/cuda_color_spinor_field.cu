@@ -41,7 +41,6 @@ namespace quda {
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = param.v;
       norm = param.norm;
-      ghost_field = param.ghost_field;
    }
 
     create(param.create);
@@ -51,7 +50,7 @@ namespace quda {
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
     } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      // dp nothing
+      // do nothing
     } else if (param.create == QUDA_COPY_FIELD_CREATE) {
       errorQuda("not implemented");
     }
@@ -88,7 +87,6 @@ namespace quda {
       if (typeid(src) == typeid(cudaColorSpinorField)) {
 	v = (void*)src.V();
 	norm = (void*)src.Norm();
-	ghost_field = (void*)src.Ghost2();
       } else {
 	errorQuda("Cannot reference a non-cuda field");
       }
@@ -101,7 +99,6 @@ namespace quda {
            //printfQuda("\nSetting pointers for vector id %d\n", eigv_id); //for debug only.
            v    = (void*)((char*)v + eigv_id*bytes);
            norm = (void*)((char*)norm + eigv_id*norm_bytes);
-           ghost_field = (void*)((char*)ghost_field + eigv_id*ghost_bytes);
          }
        //do nothing for the eigenvector subset...
       }
@@ -180,10 +177,12 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
-      if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
       if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
       alloc = true;
     }
+
+    // all fields create their own unique ghost zone
+    if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 
@@ -197,13 +196,11 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
       param.norm = norm;
-      param.ghost_field = ghost_field;
       even = new cudaColorSpinorField(*this, param);
       odd = new cudaColorSpinorField(*this, param);
 
       // need this hackery for the moment (need to locate the odd pointers half way into the full field)
       (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
-      (dynamic_cast<cudaColorSpinorField*>(odd))->ghost_field = (void*)((char*)ghost_field + ghost_bytes/2);
       if (precision == QUDA_HALF_PRECISION)
 	(dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
 
@@ -238,7 +235,6 @@ namespace quda {
          param.create = QUDA_REFERENCE_FIELD_CREATE;
          param.v = v;
          param.norm = norm;
-	 param.ghost_field = ghost_field;
          param.eigv_dim  = eigv_dim;
          //reserve eigvector set
          eigenvectors.reserve(eigv_dim);
@@ -388,9 +384,10 @@ namespace quda {
 #endif
 
   void cudaColorSpinorField::destroy() {
+    if (ghost_bytes) device_free(ghost_field);
+
     if (alloc) {
       device_free(v);
-      if (ghost_bytes) device_free(ghost_field);
       if (precision == QUDA_HALF_PRECISION) device_free(norm);
 
       if (siteSubset != QUDA_FULL_SITE_SUBSET) {
@@ -1146,8 +1143,6 @@ namespace quda {
 	}
         // now send
 	if (comm_peer2peer_enabled(dir,dim)) {
-	  printfQuda("dir=%d dim=%d creating mem handle from %p\n", dir, dim, ghost_field);
-
 	  cudaIpcMemHandle_t ipcLocalGhostDestHandle;
 	  cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_field);
 	  sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
