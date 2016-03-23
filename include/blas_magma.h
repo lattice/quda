@@ -103,6 +103,17 @@
       void Construct_harmonic_matrix(Complex * const harmH, Complex * const conjH, const double beta2, const int m, const int ldH);
 
       void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv);
+
+      /**
+	 Batch inversion the matrix field using an LU decomposition method.
+	 @param Ainv_h Matrix field containing the inverse matrices on the CPU
+	 @param A_h Matrix field containing the input matrices on the CPU
+	 @param Temporary storate on the GPU of size = A_h
+	 @param n Dimension each matrix
+	 @param batch Problem batch size
+       */
+      void BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch);
+
    };
 
 #endif // _BLAS_MAGMA_H

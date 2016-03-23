@@ -1564,8 +1564,10 @@ int device = 0;
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
+QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
+QudaPrecision  prec_precondition = QUDA_INVALID_PRECISION;
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
@@ -1578,7 +1580,7 @@ char latfile[256] = "";
 bool tune = true;
 int niter = 100;
 int test_type = 0;
-int nvec  = 1;
+int nvec[QUDA_MAX_MG_LEVEL] = { };
 char vec_infile[256] = "";
 char vec_outfile[256] = "";
 QudaInverterType inv_type;
@@ -1593,14 +1595,16 @@ QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
+QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
 
 int mg_levels = 2;
 
 int nu_pre = 2;
 int nu_post = 2;
 bool generate_nullspace = true;
+bool generate_all_levels = true;
 
-int geo_block_size[] = {4, 4, 4, 4, 4};
+int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1618,10 +1622,12 @@ void usage(char** argv )
 #ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
 #endif
-  printf("    --prec <double/single/half>               # Precision in GPU\n"); 
-  printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
-  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n"); 
-  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n"); 
+  printf("    --prec <double/single/half>               # Precision in GPU\n");
+  printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n");
+  printf("    --prec_precondition <double/single/half>  # Preconditioner precision in GPU\n");
+  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
+  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
+  printf("    --recon_precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
   printf("    --dim <n>                                 # Set space-time dimension (X Y Z T)\n"); 
   printf("    --sdim <n>                                # Set space dimension(X/Y/Z) size\n"); 
@@ -1651,18 +1657,20 @@ void usage(char** argv )
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
+  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
-  printf("    --mg-nvec                                 # Number of null-space vectors to define the multigrid transfer operator at each level\n");
+  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-block-size <x y z t>                 # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
+  printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
+  printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --help                                    # Print out this message\n"); 
@@ -1747,10 +1755,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--prec_precondition") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    prec_precondition =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--recon") == 0){
     if (i+1 >= argc){
       usage(argv);
-    }	    
+    }
     link_recon =  get_recon(argv[i+1]);
     i++;
     ret = 0;
@@ -1760,13 +1778,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
   if( strcmp(argv[i], "--recon_sloppy") == 0){
     if (i+1 >= argc){
       usage(argv);
-    }	    
+    }
     link_recon_sloppy =  get_recon(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
   
+  if( strcmp(argv[i], "--recon_precondition") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    link_recon_precondition =  get_recon(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--dim") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2170,6 +2198,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--solve-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    solve_type = get_solve_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--load-gauge") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2194,9 +2232,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    nvec= atoi(argv[i+1]);
-    if (nvec < 0 || nvec > 128){
-      printf("ERROR: invalid number of vectors (%d)\n", nvec);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    nvec[level] = atoi(argv[i+1]);
+    if (nvec[level] < 0 || nvec[level] > 128){
+      printf("ERROR: invalid number of vectors (%d)\n", nvec[level]);
       usage(argv);
     }
     i++;
@@ -2250,12 +2295,19 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){ 
       usage(argv);
     }     
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
       printf("ERROR: invalid X block size");
       usage(argv);
     }
-    geo_block_size[0] = xsize;
+    geo_block_size[level][0] = xsize;
     i++;
 
     int ysize =  atoi(argv[i+1]);
@@ -2263,7 +2315,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid Y block size");
       usage(argv);
     }
-    geo_block_size[1] = ysize;
+    geo_block_size[level][1] = ysize;
     i++;
 
     int zsize =  atoi(argv[i+1]);
@@ -2271,7 +2323,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid Z block size");
       usage(argv);
     }
-    geo_block_size[2] = zsize;
+    geo_block_size[level][2] = zsize;
     i++;
 
     int tsize =  atoi(argv[i+1]);
@@ -2279,7 +2331,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid T block size");
       usage(argv);
     }
-    geo_block_size[3] = tsize;
+    geo_block_size[level][3] = tsize;
     i++;
 
     ret = 0;
@@ -2307,6 +2359,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
       generate_nullspace = false;
     }else{
       fprintf(stderr, "ERROR: invalid generate nullspace type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-generate-all-levels") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      generate_all_levels = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      generate_all_levels = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid value for generate_all_levels type\n");
       exit(1);
     }
 

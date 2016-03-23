@@ -12,16 +12,18 @@ namespace quda {
     unsigned short C[nDim];
     int f[nDim][nDim];
     bool localParity[nDim];
-    ExtractGhostArg(const Order &order, int nFace, const int *X_, const int *A_,
+    int commDim[QUDA_MAX_DIM];
+    ExtractGhostArg(const Order &order, const GaugeField &u, const int *A_,
 		    const int *B_, const int *C_, const int f_[nDim][nDim], const int *localParity_) 
-  : order(order), nFace(nFace) { 
+      : order(order), nFace(u.Nface()) {
       for (int d=0; d<nDim; d++) {
-	X[d] = X_[d];
+	X[d] = u.X()[d];
 	A[d] = A_[d];
 	B[d] = B_[d];
 	C[d] = C_[d];
 	for (int e=0; e<nDim; e++) f[d][e] = f_[d][e];
 	localParity[d] = localParity_[d]; 
+	commDim[d] = comm_dim_partitioned(d);
       }
     }
   };
@@ -30,7 +32,7 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, typename Order>
+  template <typename Float, int length, int nDim, typename Order, bool extract>
   void extractGhost(ExtractGhostArg<Order,nDim> arg) {  
     typedef typename mapper<Float>::type RegType;
 
@@ -38,8 +40,11 @@ namespace quda {
 
       for (int dim=0; dim<nDim; dim++) {
 
-	// linear index used for writing into ghost buffer
-	int indexDst = 0;
+	// for now we never inject unless we have partitioned in that dimension
+	if (!arg.commDim[dim] && !extract) continue;
+
+	// linear index used for reading/writing into ghost buffer
+	int indexGhost = 0;
 	// the following 4-way loop means this is specialized for 4 dimensions 
 
 	// FIXME redefine a, b, c, d such that we always optimize for locality
@@ -52,17 +57,24 @@ namespace quda {
 		// we only do the extraction for parity we are currently working on
 		int oddness = (a+b+c+d) & 1;
 		if (oddness == parity) {
-		  RegType u[length];
-		  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-		  arg.order.saveGhost(u, indexDst, dim, (parity+arg.localParity[dim])&1);
-		  indexDst++;
+		  if (extract) {
+		    RegType u[length];
+		    arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
+		    arg.order.saveGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
+		    indexGhost++;
+		  } else { // injection
+		    RegType u[length];
+		    arg.order.loadGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
+		    arg.order.save(u, indexCB, dim, parity); // save the ghost element to the bulk
+		    indexGhost++;
+		  }
 		} // oddness == parity
 	      } // c
 	    } // b
 	  } // a
 	} // d
 
-	assert(indexDst == arg.order.faceVolumeCB[dim]);
+	assert(indexGhost == arg.order.faceVolumeCB[dim]);
       } // dim
 
     } // parity
@@ -74,12 +86,15 @@ namespace quda {
      NB This routines is specialized to four dimensions
      FIXME this implementation will have two-way warp divergence
   */
-  template <typename Float, int length, int nDim, typename Order>
+  template <typename Float, int length, int nDim, typename Order, bool extract>
   __global__ void extractGhostKernel(ExtractGhostArg<Order,nDim> arg) {  
     typedef typename mapper<Float>::type RegType;
 
     for (int parity=0; parity<2; parity++) {
       for (int dim=0; dim<nDim; dim++) {
+
+	// for now we never inject unless we have partitioned in that dimension
+	if (!arg.commDim[dim] && !extract) continue;
 
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
@@ -99,9 +114,15 @@ namespace quda {
 	// we only do the extraction for parity we are currently working on
 	int oddness = (a+b+c+d)&1;
 	if (oddness == parity) {
-	  RegType u[length];
-	  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-	  arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
+	  if (extract) {
+	    RegType u[length];
+	    arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
+	    arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
+	  } else {
+	    RegType u[length];
+	    arg.order.loadGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
+	    arg.order.save(u, indexCB, dim, parity); // save the ghost element to the bulk
+	  }
 	} // oddness == parity
 
       } // dim
@@ -115,6 +136,8 @@ namespace quda {
     ExtractGhostArg<Order,nDim> arg;
     int size;
     const GaugeField &meta;
+    QudaFieldLocation location;
+    bool extract;
 
   private:
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -124,7 +147,9 @@ namespace quda {
     unsigned int minThreads() const { return size; }
 
   public:
-    ExtractGhost(ExtractGhostArg<Order,nDim> &arg, const GaugeField &meta) : arg(arg), meta(meta) { 
+    ExtractGhost(ExtractGhostArg<Order,nDim> &arg, const GaugeField &meta,
+		 QudaFieldLocation location, bool extract)
+      : arg(arg), meta(meta), location(location), extract(extract) {
       int faceMax = 0;
       for (int d=0; d<nDim; d++) 
 	faceMax = (arg.order.faceVolumeCB[d] > faceMax ) 
@@ -137,13 +162,19 @@ namespace quda {
     virtual ~ExtractGhost() { ; }
   
     void apply(const cudaStream_t &stream) {
-#if (__COMPUTE_CAPABILITY__ >= 200)
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      extractGhostKernel<Float, length, nDim, Order> 
-	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#else
-      errorQuda("extractGhost not supported on pre-Fermi architecture");
-#endif
+      if (location==QUDA_CPU_FIELD_LOCATION) {
+	if (extract) extractGhost<Float,length,nDim,Order,true>(arg);
+	else extractGhost<Float,length,nDim,Order,false>(arg);
+      } else {
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	if (extract) {
+	  extractGhostKernel<Float, length, nDim, Order, true>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else {
+	  extractGhostKernel<Float, length, nDim, Order, false>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	}
+      }
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -165,11 +196,11 @@ namespace quda {
 
 
   /**
-     Generic CPU gauge ghost extraction and packing
+     Generic gauge ghost extraction and packing (or the converse)
      NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, typename Order>
-  void extractGhost(Order order, const GaugeField &u, QudaFieldLocation location) {  
+  void extractGhost(Order order, const GaugeField &u, QudaFieldLocation location, bool extract) {
     const int *X = u.X();
     const int nFace = u.Nface();
     const int nDim = 4;
@@ -199,13 +230,9 @@ namespace quda {
       //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
-    ExtractGhostArg<Order, nDim> arg(order, nFace, X, A, B, C, f, localParity);
-    if (location==QUDA_CPU_FIELD_LOCATION) {
-      extractGhost<Float,length,nDim,Order>(arg);
-    } else {
-      ExtractGhost<Float,length,nDim,Order> extract(arg, u);
-      extract.apply(0);
-    }
+    ExtractGhostArg<Order, nDim> arg(order, u, A, B, C, f, localParity);
+    ExtractGhost<Float,length,nDim,Order> extractor(arg, u, location, extract);
+    extractor.apply(0);
 
   }
 

@@ -132,8 +132,7 @@ namespace quda {
 
       int dx[4] = {0, 0, 0, 0};
       for (int dir=0; dir < 3; dir++) {				//Only spatial dimensions are smeared
-        Matrix<Cmplx,3> U, UDag, Stap, Omega, OmegaDag, OmegaDiff, ODT, Q,
-	  exp_iQ, tmp1, tmp2;
+        Matrix<Cmplx,3> U, UDag, Stap, Omega, OmegaDag, OmegaDiff, ODT, Q, exp_iQ, tmp1;
 	Cmplx OmegaDiffTr;
 	Cmplx i_2 = makeComplex<Cmplx>(0,0.5);
 

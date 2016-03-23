@@ -436,8 +436,8 @@ namespace quda {
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 
 			     bufferPinned[bufferIndex], 0, (char*)bufferPinned[bufferIndex]+bytes, 0);
 
-      cudaMemcpy(v, bufferPinned[bufferIndex], bytes, cudaMemcpyHostToDevice);
-      cudaMemcpy(norm, (char*)bufferPinned[bufferIndex]+bytes, norm_bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(v, bufferPinned[bufferIndex], bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(norm, (char*)bufferPinned[bufferIndex]+bytes, norm_bytes, cudaMemcpyHostToDevice);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else {
@@ -446,8 +446,8 @@ namespace quda {
 	resizeBufferDevice(src.Bytes()+src.NormBytes());
 	Src = bufferDevice;
 	srcNorm = (char*)bufferDevice + src.Bytes();	
-	cudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
-	cudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
+	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
+	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
 	for(int b=0; b<2; ++b){
 	 resizeBufferPinned(src.Bytes()+src.NormBytes(), b);
@@ -473,8 +473,8 @@ namespace quda {
     if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
 	typeid(dest) == typeid(cpuColorSpinorField)) {
       for(int b=0; b<2; ++b) resizeBufferPinned(bytes+norm_bytes,b);
-      cudaMemcpy(bufferPinned[bufferIndex], v, bytes, cudaMemcpyDeviceToHost);
-      cudaMemcpy((char*)bufferPinned[bufferIndex]+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(bufferPinned[bufferIndex], v, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)bufferPinned[bufferIndex]+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
 
       copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 
 			     0, bufferPinned[bufferIndex], 0, (char*)bufferPinned[bufferIndex]+bytes);
@@ -494,8 +494,8 @@ namespace quda {
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
 
       if (!zeroCopy) {
-	cudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
-	cudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
+	qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
+	qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
       } else {
 	memcpy(dest.V(), bufferPinned[bufferIndex], dest.Bytes());
 	memcpy(dest.Norm(), (char*)bufferPinned[bufferIndex]+dest.Bytes(), dest.NormBytes());
@@ -558,7 +558,7 @@ namespace quda {
     // resize face only if requested size is larger than previously allocated one
     size_t faceBytes = 0;
     for (int i=0; i<nDimComms; i++) {
-      faceBytes += 2*siteSubset*num_faces*surfaceCB[i]*spinor_size;
+      if (comm_dim_partitioned(i)) faceBytes += 2*siteSubset*num_faces*surfaceCB[i]*spinor_size;
     }
 
     if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes) {
@@ -577,14 +577,21 @@ namespace quda {
 
     size_t offset = 0;
     for (int i=0; i<nDimComms; i++) {
-      // use first buffer for recv and second for send
-      recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
-      send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
-      offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+      if (comm_dim_partitioned(i)) {
+	// use first buffer for recv and second for send
+	recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
+	send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
 
-      recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
-      send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
-      offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+	recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
+	send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+      } else {
+	recv_buf[2*i+0] = nullptr;
+	recv_buf[2*i+1] = nullptr;
+	send_buf[2*i+0] = nullptr;
+	send_buf[2*i+1] = nullptr;
+      }
     }
 
   }

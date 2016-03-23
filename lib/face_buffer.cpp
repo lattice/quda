@@ -8,8 +8,6 @@ using namespace quda;
 
 cudaStream_t *stream;
 
-bool globalReduce = true;
-
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision, const int Ls) :
@@ -403,6 +401,8 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir){
 }
 
 
+static bool globalReduce = true;
+
 void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
 
 void reduceDouble(double &sum) { if (globalReduce) comm_allreduce(&sum); }
@@ -417,3 +417,7 @@ int commCoords(int dir) { return comm_coord(dir); }
 int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
 void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+bool commGlobalReduction() { return globalReduce; }
+
+void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduction; }

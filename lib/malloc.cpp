@@ -168,6 +168,9 @@ namespace quda {
       errorQuda("Aborting");
     }
     track_malloc(DEVICE, a, ptr);
+#ifdef HOST_DEBUG
+    cudaMemset(ptr, 0xff, size);
+#endif
     return ptr;
   }
 
@@ -188,6 +191,9 @@ namespace quda {
       errorQuda("Aborting");
     }
     track_malloc(HOST, a, ptr);
+#ifdef HOST_DEBUG
+    memset(ptr, 0xff, size);
+#endif
     return ptr;
   }
 
@@ -213,6 +219,9 @@ namespace quda {
     }
     track_malloc(PINNED, a, ptr);
     return ptr;
+#ifdef HOST_DEBUG
+    memset(ptr, 0xff, a.base_size);
+#endif
   }
 
 
@@ -232,6 +241,9 @@ namespace quda {
       errorQuda("Aborting");
     }
     track_malloc(MAPPED, a, ptr);
+#ifdef HOST_DEBUG
+    memset(ptr, 0xff, a.base_size);
+#endif
     return ptr;
   }  
 

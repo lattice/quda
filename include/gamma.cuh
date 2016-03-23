@@ -29,7 +29,7 @@ namespace quda {
 
   public:
 
-    Gamma() : ndim(4) {
+    __device__ __host__ Gamma() : ndim(4) {
       complex<ValueType> I(0,1);
       if((dir==0) || (dir==1)) {
 	coupling[0] = 3;
@@ -62,7 +62,7 @@ namespace quda {
 	coupling[2] = 0;
 	coupling[3] = 1;
       } else {
-	printfQuda("Warning: Gamma matrix not defined for dir = %d and basis = %d\n", dir, basis);
+	printf("Warning: Gamma matrix not defined for dir = %d and basis = %d\n", dir, basis);
 	coupling[0] = 0;
 	coupling[1] = 0;
 	coupling[2] = 0;
@@ -125,7 +125,7 @@ namespace quda {
       }
     }
 
-    ~Gamma() {}
+    __device__ __host__ ~Gamma() {}
 
     //Returns the matrix element.
     __device__ __host__ inline complex<ValueType> getelem(int row, int col) const {
@@ -134,7 +134,7 @@ namespace quda {
 
     //Like getelem, but one only needs to specify the row.
     //The column of the non-zero component is returned via the "col" reference
-    __host__ __device__ inline complex<ValueType> getrowelem(int row, int &col) const {
+    __device__ __host__ inline complex<ValueType> getrowelem(int row, int &col) const {
       col = coupling[row];
       return elem[row];
     }

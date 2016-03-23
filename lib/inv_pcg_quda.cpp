@@ -30,7 +30,8 @@ namespace quda {
     inner.gflops = 0;
     inner.secs = 0;
 
-    inner.inv_type_precondition = QUDA_PCG_INVERTER; // used to tell the inner solver it is an inner solver 
+    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
     if(outer.inv_type == QUDA_PCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
@@ -47,7 +48,7 @@ namespace quda {
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
       K = new CG(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
-      K = new MR(matPrecon, Kparam, profile);
+      K = new MR(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
       K = new SD(matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
@@ -142,9 +143,9 @@ namespace quda {
       rPre = new cudaColorSpinorField(rSloppy,csParam);
       // Create minvrPre 
       minvrPre = new cudaColorSpinorField(*rPre);
-      globalReduce = false;
+      commGlobalReductionSet(false);
       (*K)(*minvrPre, *rPre);  
-      globalReduce = true;
+      commGlobalReductionSet(true);
       *minvrSloppy = *minvrPre;
       p = new cudaColorSpinorField(*minvrSloppy);
     }else{
@@ -227,9 +228,9 @@ namespace quda {
         if(K){
           r_new_Minvr_old = reDotProduct(rSloppy,*minvrSloppy);
           *rPre = rSloppy;
-          globalReduce = false;
+	  commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
-          globalReduce = true;
+	  commGlobalReductionSet(true);
       
 
           *minvrSloppy = *minvrPre;
@@ -260,12 +261,11 @@ namespace quda {
         // reuse r0Norm for this 
         warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
 
-        
+	if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
 
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal)break;
-        }else{
-          resIncrease = 0;
-        }
+        } else {
+	  resIncrease = 0;
+	}
 
         rNorm = sqrt(r2);
         maxrr = rNorm;
@@ -275,9 +275,9 @@ namespace quda {
 
         if(K){
           *rPre = rSloppy;
-          globalReduce = false;
+	  commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
-          globalReduce = true;
+	  commGlobalReductionSet(true);
 
           *minvrSloppy = *minvrPre;
 
@@ -310,7 +310,6 @@ namespace quda {
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-    reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
 

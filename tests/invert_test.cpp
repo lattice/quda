@@ -41,10 +41,12 @@ extern int zdim;
 extern int tdim;
 extern int Lsdim;
 extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
-extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
+extern QudaPrecision  prec_precondition;
+extern QudaReconstructType link_recon;
+extern QudaReconstructType link_recon_sloppy;
+extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
@@ -98,12 +100,10 @@ int main(int argc, char **argv)
     usage(argv);
   }
 
-  if (prec_sloppy == QUDA_INVALID_PRECISION){
-    prec_sloppy = prec;
-  }
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
-    link_recon_sloppy = link_recon;
-  }
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+  if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
   QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
   QudaPrecision cuda_prec = prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
-  QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
+  QudaPrecision cuda_prec_precondition = prec_precondition;
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -150,7 +150,7 @@ int main(int argc, char **argv)
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
-  gauge_param.reconstruct_precondition = link_recon_sloppy;
+  gauge_param.reconstruct_precondition = link_recon_precondition;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = dslash_type;

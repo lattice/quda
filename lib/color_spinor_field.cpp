@@ -435,8 +435,14 @@ namespace quda {
     size_t bytes[4];
 
     const int Ninternal = 2*nColor*nSpin;
-    for (int i=0; i<nDimComms; i++) bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*precision;
+    size_t total_bytes = 0;
+    for (int i=0; i<nDimComms; i++) {
+      bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*precision;
+      if (comm_dim_partitioned(i)) total_bytes += 2*bytes[i]; // 2 for fwd/bwd
+    }
 
+    void *total_send = nullptr;
+    void *total_recv = nullptr;
     void *send_fwd[4];
     void *send_back[4];
     void *recv_fwd[4];
@@ -445,8 +451,14 @@ namespace quda {
     // leave this option in there just in case
     bool no_comms_fill = false;
 
-    for (int i=0; i<nDimComms; i++) {
-      if (Location() == QUDA_CPU_FIELD_LOCATION) {
+    // If this is set to false, then we are assuming that the send and
+    // ghost buffers are in a single contiguous memory space.  Setting
+    // to false means we aggregate all cudaMemcpys which reduces
+    // latency.
+    bool fine_grained_memcpy = false;
+
+    if (Location() == QUDA_CPU_FIELD_LOCATION) {
+      for (int i=0; i<nDimComms; i++) {
 	if (comm_dim_partitioned(i)) {
 	  send_back[i] = sendbuf[2*i + 0];
 	  send_fwd[i]  = sendbuf[2*i + 1];
@@ -456,19 +468,40 @@ namespace quda {
 	  memcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i]);
 	  memcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i]);
 	}
-
-      } else { // FIXME add GPU_COMMS support
+      }
+    } else { // FIXME add GPU_COMMS support
+      if (total_bytes) {
+	total_send = allocatePinned(total_bytes);
+	total_recv = allocatePinned(total_bytes);
+      }
+      size_t offset = 0;
+      for (int i=0; i<nDimComms; i++) {
 	if (comm_dim_partitioned(i)) {
-	  send_back[i] = allocatePinned(bytes[i]);
-	  send_fwd[i] = allocatePinned(bytes[i]);
-	  recv_fwd[i] = allocatePinned(bytes[i]);
-	  recv_back[i] = allocatePinned(bytes[i]);
-	  cudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
-	  cudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
+	  send_back[i] = static_cast<char*>(total_send) + offset;
+	  recv_back[i] = static_cast<char*>(total_recv) + offset;
+	  offset += bytes[i];
+	  send_fwd[i] = static_cast<char*>(total_send) + offset;
+	  recv_fwd[i] = static_cast<char*>(total_recv) + offset;
+	  offset += bytes[i];
+	  if (fine_grained_memcpy) {
+	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
+	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
+	  }
 	} else if (no_comms_fill) {
-	  cudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
-	  cudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
 	}
+      }
+      if (!fine_grained_memcpy && total_bytes) {
+	// find first non-zero pointer
+	void *send_ptr = nullptr;
+	for (int i=0; i<nDimComms; i++) {
+	  if (comm_dim_partitioned(i)) {
+	    send_ptr = sendbuf[2*i];
+	    break;
+	  }
+	}
+	qudaMemcpy(total_send, send_ptr, total_bytes, cudaMemcpyDeviceToHost);
       }
     }
 
@@ -500,12 +533,27 @@ namespace quda {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
-	cudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], cudaMemcpyHostToDevice);
-	cudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], cudaMemcpyHostToDevice);
-	freePinned(send_back[i]);
-	freePinned(send_fwd[i]);
-	freePinned(recv_fwd[i]);
-	freePinned(recv_back[i]);
+	if (fine_grained_memcpy) {
+	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], cudaMemcpyHostToDevice);
+	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], cudaMemcpyHostToDevice);
+	}
+      }
+
+      if (!fine_grained_memcpy && total_bytes) {
+	// find first non-zero pointer
+	void *ghost_ptr = nullptr;
+	for (int i=0; i<nDimComms; i++) {
+	  if (comm_dim_partitioned(i)) {
+	    ghost_ptr = ghost[2*i];
+	    break;
+	  }
+	}
+	qudaMemcpy(ghost_ptr, total_recv, total_bytes, cudaMemcpyHostToDevice);
+      }
+
+      if (total_bytes) {
+	freePinned(total_send);
+	freePinned(total_recv);
       }
     }
 
@@ -516,7 +564,6 @@ namespace quda {
       comm_free(mh_from_back[i]);
       comm_free(mh_from_fwd[i]);
     }
-
   }
 
   bool ColorSpinorField::isNative() const {
