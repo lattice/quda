@@ -1606,7 +1606,8 @@ namespace quda {
 
       if (comm_peer2peer_enabled(1,dim)) {
 	if (!comm_query_mh_recv_p2p_fwd[dim]) comm_query_mh_recv_p2p_fwd[dim] = comm_query(mh_recv_p2p_fwd[dim]);
-	if (comm_query_mh_recv_p2p_fwd[dim] && !complete_recv_fwd[dim]) complete_recv_fwd[dim] = ipcRemoteCopyComplete(1,dim);
+	//if (comm_query_mh_recv_p2p_fwd[dim] && !complete_recv_fwd[dim]) complete_recv_fwd[dim] = ipcRemoteCopyComplete(1,dim);
+	if (comm_query_mh_recv_p2p_fwd[dim]) complete_recv_fwd[dim] = true;
       } else {
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]);
       }
@@ -1629,7 +1630,8 @@ namespace quda {
     } else { // dir%2 == 1
       if (comm_peer2peer_enabled(0,dim)) {
 	if (!comm_query_mh_recv_p2p_back[dim]) comm_query_mh_recv_p2p_back[dim] = comm_query(mh_recv_p2p_back[dim]);
-        if (comm_query_mh_recv_p2p_back[dim] && !complete_recv_back[dim]) complete_recv_back[dim] = ipcRemoteCopyComplete(0,dim);
+        //if (comm_query_mh_recv_p2p_back[dim] && !complete_recv_back[dim]) complete_recv_back[dim] = ipcRemoteCopyComplete(0,dim);
+        if (comm_query_mh_recv_p2p_back[dim]) complete_recv_back[dim] = true;//ipcRemoteCopyComplete(0,dim);
       } else {
 	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][nFace-1][dim]);
       }
@@ -1701,6 +1703,10 @@ namespace quda {
     }
 
     return;
+  }
+
+  const cudaEvent_t& cudaColorSpinorField::getIPCRemoteCopyEvent(int dir, int dim) const {
+    return ipcRemoteCopyEvent[dir][dim];
   }
 
   void cudaColorSpinorField::scatter(int nFace, int dagger, int dir, cudaStream_t* stream_p)

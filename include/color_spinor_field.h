@@ -526,6 +526,9 @@ namespace quda {
     /** Destroy the inter-process communication handlers */
     void destroyIPCComms();
 
+    /** Handle to remote copy event used for peer-to-peer synchronization */
+    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+
     /** Allocate the ghost buffers */
     void allocateGhostBuffer(int nFace);
 
