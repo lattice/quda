@@ -183,6 +183,7 @@ int main(int argc, char **argv)
 
   // offsets used only by multi-shift solver
   inv_param.num_offset = 12;
+  inv_param.num_rhs=2;
   double offset[12] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
@@ -341,26 +342,35 @@ int main(int argc, char **argv)
     }
   }
 
-  void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-  void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
-  void *spinorOut = NULL, **spinorOutMulti = NULL;
-  if (multishift) {
-    spinorOutMulti = (void**)malloc(inv_param.num_offset*sizeof(void *));
-    for (int i=0; i<inv_param.num_offset; i++) {
+
+  void **spinorIn = (void**)malloc(inv_param.num_rhs*sizeof(void *));
+  void **spinorCheck = (void**)malloc(inv_param.num_rhs*sizeof(void *));
+  for (int i=0; i<inv_param.num_rhs; i++) {
+    spinorIn[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+    spinorCheck[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  }
+
+  void **spinorOutMulti = NULL;
+//  if (multishift) {
+    spinorOutMulti = (void**)malloc(inv_param.num_rhs*sizeof(void *));
+    for (int i=0; i<inv_param.num_rhs; i++) {
       spinorOutMulti[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
     }
-  } else {
-    spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-  }
+//  } else {
+//    spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+//  }
 
-  memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  if (multishift) {
-    for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);    
-  } else {
-    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  }
+
+//  if (multishift) {
+    for (int i=0; i<inv_param.num_rhs; i++) {
+      memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
+      memset(spinorIn[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
+      memset(spinorCheck[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    }
+//  } else {
+//    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+//  }
 
   // create a point source at 0 (in each subvolume...  FIXME)
 
@@ -371,7 +381,7 @@ int main(int argc, char **argv)
     for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
   } else {
     //((double*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn[0])[i] = rand() / (double)RAND_MAX;
   }
 
   // start the timer
@@ -389,11 +399,11 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(NULL, NULL, &inv_param);
 
   // perform the inversion
-  if (multishift) {
-    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
-  } else {
-    invertMultiRHSQuda(&spinorOut, &spinorIn, &inv_param);
-  }
+//  if (multishift) {
+//    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
+//  } else {
+    invertMultiRHSQuda(spinorOutMulti, spinorIn, &inv_param);
+//  }
 
   // stop the timer
   time0 += clock();
@@ -415,20 +425,20 @@ int main(int argc, char **argv)
     void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
     printfQuda("Host residuum checks: \n");
-    for(int i=0; i < inv_param.num_offset; i++) {
-      ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+    for(int i=0; i < inv_param.num_rhs; i++) {
+      ax(0, spinorCheck[i], V*spinorSiteSize, inv_param.cpu_prec);
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-        tm_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
+        tm_matpc(spinorCheck[i], gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                  inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         wil_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.matpc_type, 0,
                   inv_param.cpu_prec, gauge_param);
-        wil_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
+        wil_matpc(spinorCheck[i], gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
                   inv_param.cpu_prec, gauge_param);
       } else {
         printfQuda("Domain wall not supported for multi-shift\n");
@@ -446,8 +456,9 @@ int main(int argc, char **argv)
 		 inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i]);
     }
     free(spinorTmp);
-
-  } else {
+  }
+    #if 0
+   else {
     
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 
@@ -572,7 +583,7 @@ int main(int argc, char **argv)
 	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
   }
-
+#endif
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
   
