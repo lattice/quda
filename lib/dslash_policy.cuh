@@ -271,7 +271,7 @@ struct DslashCuda2 : DslashPolicyImp {
 	  }
 
 	  // if non peer-to-peer in a given direction then we have to wait on a scatter event
-	  if (!comm_peer2peer_enabled(1,i) || !comm_peer2peer_enabled(1,i)) {
+	  if (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) {
 	    // Record the end of the scattering
 	    PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]),
 		    profile, QUDA_PROFILE_EVENT_RECORD);
