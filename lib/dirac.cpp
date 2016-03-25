@@ -200,6 +200,12 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMassPC(param, 4);
         else return new DiracTwistedMassPC(param, 5);
+    } else if (param.type == QUDA_COARSE_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
+      return new DiracCoarse(param);
+    } else if (param.type == QUDA_COARSEPC_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
+      return new DiracCoarsePC(param);
     }
 
     return 0;

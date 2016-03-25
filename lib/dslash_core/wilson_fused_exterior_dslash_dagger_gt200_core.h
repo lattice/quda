@@ -402,7 +402,7 @@ int Y[4] = {X1,X2,X3,X4};
   if (sid >= param.threads) return;
 
   dim = dimFromFaceIndex(sid, param); // sid is also modified
-  
+
 
   const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim]) >> 1);   // volume of one face
   face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
@@ -414,7 +414,7 @@ int Y[4] = {X1,X2,X3,X4};
 
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity,Y);
-  
+
   {
     bool active = false;
     for(int dir=0; dir<4; ++dir){

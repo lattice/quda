@@ -1191,7 +1191,7 @@ namespace quda {
     cudaMemset(num_failures_dev, 0, sizeof(int));
     if ( num_failures_dev == NULL ) errorQuda("cudaMalloc failed for dev_pointer\n");
     unitarizeLinksQuda(data, data, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
       cudaFree(num_failures_dev);
       errorQuda("Error in the unitarization\n");

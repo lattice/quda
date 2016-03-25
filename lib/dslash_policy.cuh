@@ -1,5 +1,13 @@
 static cudaColorSpinorField *inSpinor;
 
+// hooks into tune.cpp variables for policy tuning
+typedef std::map<TuneKey, TuneParam> map;
+const map& getTuneCache();
+
+void disableProfileCount();
+void enableProfileCount();
+
+
 /**
  * Arrays used for the dynamic scheduling.
  */
@@ -880,7 +888,6 @@ struct DslashFusedExterior : DslashPolicyImp {
     
     setThreadDimMap(dslashParam,dslash,faceVolumeCB);
 
-
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
 
@@ -1042,6 +1049,115 @@ struct DslashFactory {
     return result; // default 
   }
 };
+
+
+ // which policies are we going to tune over?
+ static constexpr unsigned int n_policy = 2;
+ static constexpr QudaDslashPolicy policy[n_policy] = { QUDA_DSLASH2, QUDA_FUSED_DSLASH };
+
+ class DslashPolicyTune : public Tunable {
+
+   DslashCuda &dslash;
+   cudaColorSpinorField *in;
+   const size_t regSize;
+   const int parity;
+   const int dagger;
+   const int volume;
+   const int *ghostFace;
+   TimeProfile &profile;
+
+   unsigned int sharedBytesPerThread() const { return 0; }
+   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+ public:
+   DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity,
+		    const int dagger, const int volume, const int *ghostFace, TimeProfile &profile)
+     : dslash(dslash), in(in), regSize(regSize), parity(parity), dagger(dagger),
+       volume(volume), ghostFace(ghostFace), profile(profile)
+   {
+     // before we do policy tuning we must ensure the kernel
+     // constituents have been tuned since we can't do nested tuning
+     if (getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+       disableProfileCount();
+
+       for (unsigned int i=0; i<n_policy; i++) {
+	 DslashPolicyImp* dslashImp = DslashFactory::create(policy[i]);
+	 (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+	 delete dslashImp;
+       }
+
+       enableProfileCount();
+     }
+   }
+
+   virtual ~DslashPolicyTune() { }
+
+   void apply(const cudaStream_t &stream) {
+     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+
+     DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
+     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+     delete dslashImp;
+   }
+
+   int tuningIter() const { return 10; }
+
+   // Find the best dslash policy
+   bool advanceAux(TuneParam &param) const
+   {
+     if (param.aux.x < n_policy-1) {
+       param.aux.x++;
+       return true;
+     } else {
+       param.aux.x = 0;
+       return false;
+     }
+   }
+
+   bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+
+   void initTuneParam(TuneParam &param) const  {
+     Tunable::initTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0;
+   }
+
+   void defaultTuneParam(TuneParam &param) const  {
+     Tunable::defaultTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0;
+   }
+
+   TuneKey tuneKey() const {
+     KernelType kernel_type = dslashParam.kernel_type;
+     dslashParam.kernel_type = KERNEL_POLICY;
+     TuneKey key = dslash.tuneKey();
+     dslashParam.kernel_type = kernel_type;
+     return key;
+   }
+
+   long long flops() const {
+     KernelType kernel_type = dslashParam.kernel_type;
+     dslashParam.kernel_type = KERNEL_POLICY;
+     long long flops_ = dslash.flops();
+     dslashParam.kernel_type = kernel_type;
+     return flops_;
+   }
+
+   long long bytes() const {
+     KernelType kernel_type = dslashParam.kernel_type;
+     dslashParam.kernel_type = KERNEL_POLICY;
+     long long bytes_ = dslash.bytes();
+     dslashParam.kernel_type = kernel_type;
+     return bytes_;
+   }
+
+   void preTune() { dslash.preTune(); }
+
+   void postTune() { dslash.postTune(); }
+
+ };
+
+
+
 
 } // anonymous namespace
 

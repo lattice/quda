@@ -48,7 +48,7 @@ POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dsla
 
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
-
+BUILD_MAGMA_VARS = @BUILD_MAGMA_VARS@ # build magma using env vars MAGMA_INC and MAGMA_LIB
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
 GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
@@ -168,10 +168,16 @@ ifeq ($(strip $(INTERFACE_NVTX)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
-  MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
+  ifeq ($(strip $(BUILD_MAGMA_VARS)),yes)
+     MAGMA_INCLUDE = ${MAGMA_INC}
+     LIB += ${MAGMA_LIB}
+  else
+     MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
+     LIB += $(shell pkg-config --libs magma)
+  endif
+ 
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
-  LIB += $(shell pkg-config --libs magma)
 else
   MAGMA_INCLUDE =
   MAGMA_FLAGS   =

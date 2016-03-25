@@ -56,8 +56,8 @@ int neighborIndex_4d(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
-// 
-// the displacements, such as dx, refer to the full lattice coordinates. 
+//
+// the displacements, such as dx, refer to the full lattice coordinates.
 //
 // neighborIndex() takes a "half index", displaces it, and returns the
 // new "half index", which can be an index into either the even or odd lattices.

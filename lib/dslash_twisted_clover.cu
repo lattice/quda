@@ -219,6 +219,7 @@ namespace quda {
       case EXTERIOR_KERNEL_ALL:
 	break;
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	// clover flops are done in the interior kernel
 	flops += clover_flops * in->VolumeCB();	  
 	break;
@@ -238,6 +239,7 @@ namespace quda {
       case EXTERIOR_KERNEL_ALL:
 	break;
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	bytes += clover_bytes*in->VolumeCB();
 	break;
       }
@@ -253,8 +255,7 @@ namespace quda {
   void twistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover *clover, const FullClover *cloverInv,
 			       const cudaColorSpinorField *in, const int parity, const int dagger, 
 			       const cudaColorSpinorField *x, const QudaTwistCloverDslashType type, const double &kappa, const double &mu, 
-			       const double &epsilon, const double &k,  const int *commOverride,
-			       TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+			       const double &epsilon, const double &k,  const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 #ifdef GPU_TWISTED_CLOVER_DIRAC
@@ -313,12 +314,13 @@ namespace quda {
     }
 
 #ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
+    dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
     delete dslashImp;
+#endif
 	
     delete dslash;
 

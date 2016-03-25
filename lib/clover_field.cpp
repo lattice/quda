@@ -237,16 +237,16 @@ namespace quda {
       
       if (src.V(false)) {
 	copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
-	cudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
 	if (precision == QUDA_HALF_PRECISION) 
-	  cudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+	  qudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
       
       if (src.V(true) && inverse) {
 	copyGenericClover(*this, src, true, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
-	cudaMemcpy(cloverInv, packClover, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(cloverInv, packClover, bytes, cudaMemcpyHostToDevice);
 	if (precision == QUDA_HALF_PRECISION) 
-	  cudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+	  qudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
     } else {
       errorQuda("Invalid clover field type");
@@ -263,14 +263,14 @@ namespace quda {
     // we know we are copying from GPU to CPU here, so for now just
     // assume that reordering is on CPU
     resizeBufferPinned(bytes + norm_bytes);
-    void *packClover = bufferPinned;
-    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned + bytes : 0;
+    void *packClover = bufferPinned[0];
+    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
 
     // first copy over the direct part (if it exists)
     if (V(false) && cpu.V(false)) {
-      cudaMemcpy(packClover, clover, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(packClover, clover, bytes, cudaMemcpyDeviceToHost);
       if (precision == QUDA_HALF_PRECISION)
-	cudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyDeviceToHost);
+	qudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     }
     else if((V(false) && !cpu.V(false)) || (!V(false) && cpu.V(false))) {
@@ -279,9 +279,9 @@ namespace quda {
 
     // now copy the inverse part (if it exists)
     if (V(true) && cpu.V(true)) {
-      cudaMemcpy(packClover, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(packClover, cloverInv, bytes, cudaMemcpyDeviceToHost);
 	if (precision == QUDA_HALF_PRECISION)
-	  cudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     }
     else if((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {

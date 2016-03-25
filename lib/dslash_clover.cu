@@ -120,8 +120,10 @@ namespace quda {
 	flops += clover_flops * 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
 	break;
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	flops += clover_flops * in->VolumeCB();	  
 
+	if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	// now correct for flops done by exterior kernel
 	long long ghost_sites = 0;
 	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
@@ -148,8 +150,10 @@ namespace quda {
 	bytes += clover_bytes * 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
 	break;
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	bytes += clover_bytes*in->VolumeCB();
 
+	if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	// now correct for bytes done by exterior kernel
 	long long ghost_sites = 0;
 	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
@@ -169,7 +173,7 @@ namespace quda {
   void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
 			const cudaColorSpinorField *in, const int parity, const int dagger, 
 			const cudaColorSpinorField *x, const double &a, const int *commOverride,
-			TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+			TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -215,12 +219,13 @@ namespace quda {
     }
 
 #ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
     delete dslashImp;
+#endif
 
     delete dslash;
     unbindGaugeTex(gauge);

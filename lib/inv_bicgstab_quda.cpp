@@ -83,7 +83,6 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      warningQuda("using init guess...");
       mat(r, x, y);
       r2 = blas::xmyNorm(b, r);
       blas::copy(y, x);
@@ -95,25 +94,18 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-//      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-
-      warningQuda("inverting on zero-field source\n");
-      if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
-      {
-        warningQuda("inverting on zero-field source\n");
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+        warningQuda("inverting on zero-field source");
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
+	profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
-      }
-      else if(param.use_init_guess == QUDA_USE_INIT_GUESS_YES)
-      {
-        warningQuda("Computing null vector\n");
+      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        printfQuda("BiCGstab: Computing null vector\n");
         b2 = r2;
-      }
-      else
-      {
-        errorQuda("Null vector computing requires non-zero guess!\n");
+      } else {
+        errorQuda("Null vector computing requires non-zero guess!");
       }
     }
 
@@ -165,8 +157,6 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
-    printfQuda("\nStopping criterio : %le\n", stop);
-
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
@@ -193,7 +183,7 @@ namespace quda {
 
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
     
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+    if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
       blas::flops = 0;    
     }
 
@@ -314,9 +304,8 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    //param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-    reduceDouble(gflops);
 
     param.gflops += gflops;
     param.iter += k;
@@ -325,11 +314,11 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+    if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
       // Calculate the true residual
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
+      param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
  
       PrintSummary("BiCGstab", k, r2, b2);      
     }

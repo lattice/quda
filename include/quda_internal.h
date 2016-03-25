@@ -90,9 +90,6 @@ extern "C" {
 }
 #endif
 
-#define REAL(a) (*((double*)&a))
-#define IMAG(a) (*((double*)&a+1))
-
 namespace quda {
 
   typedef std::complex<double> Complex;
@@ -149,6 +146,16 @@ namespace quda {
     }
 
     double Last() { return last; }
+
+    void Reset(const char *func, const char *file, int line) {
+      if (running) {
+	printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())\n", file, line, func);
+	errorQuda("Aborting");
+      }
+      time = 0.0;
+      last = 0.0;
+      count = 0;
+    }
 
   };
 
@@ -282,11 +289,14 @@ namespace quda {
       if (use_global) StopGlobal(func,file,line,idx);
     }
 
+    void Reset_(const char *func, const char *file, int line) {
+      for (int idx=0; idx<QUDA_PROFILE_COUNT; idx++)
+	profile[idx].Reset(func, file, line);
+    }
+
     double Last(QudaProfileType idx) { 
       return profile[idx].last;
     }
-
-
 
     static void PrintGlobal();
 
@@ -294,6 +304,7 @@ namespace quda {
 
 #define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
 #define TPSTOP(idx) Stop_(__func__, __FILE__, __LINE__, idx)
+#define TPRESET() Reset_(__func__, __FILE__, __LINE__)
 
 #undef PUSH_RANGE
 #undef POP_RANGE
@@ -308,8 +319,18 @@ namespace quda {
   const int Nstream = 1;
 #endif
 
+  /**
+     @brief Wrapper around cudaMemcpy used for auto-profiling
+     @param dst Destination pointer
+     @param src Source pointer
+     @param count Size of transfer
+     @param kind Type of memory copy
+  */
+  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
+		   const char *func, const char *file, int line);
+
 } // namespace quda
 
-
+#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, __FILE__, __LINE__);
 
 #endif // _QUDA_INTERNAL_H

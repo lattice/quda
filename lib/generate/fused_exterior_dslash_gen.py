@@ -9,13 +9,13 @@ def complexToStr(c):
     def fltToString(a):
         if a == int(a): return `int(a)`
         else: return `a`
-    
+
     def imToString(a):
         if a == 0: return "0i"
         elif a == -1: return "-i"
         elif a == 1: return "i"
         else: return fltToString(a)+"i"
-    
+
     re = c.real
     im = c.imag
     if re == 0 and im == 0: return "0"
@@ -135,7 +135,7 @@ def acc_im(s, c): return "acc"+`s`+`c`+"_im"
 def tmp_re(s, c): return "tmp"+`s`+`c`+"_re"
 def tmp_im(s, c): return "tmp"+`s`+`c`+"_im"
 
-def spinor(name, s, c, z): 
+def spinor(name, s, c, z):
     if z==0: return name+`s`+`c`+"_re"
     else: return name+`s`+`c`+"_im"
 
@@ -144,7 +144,7 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_DOUBLE2\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2\n"
 
@@ -161,7 +161,7 @@ def def_input_spinor():
                 str += "#define "+acc_im(s,c)+" accum"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_FLOAT4\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4\n"
     for s in range(0,4):
@@ -199,7 +199,7 @@ def def_gauge():
 
     str += "\n"
     str += "#endif // GAUGE_DOUBLE\n\n"
-            
+
     str += "// conjugated gauge link\n"
     for m in range(0,3):
         for n in range(0,3):
@@ -299,7 +299,7 @@ def prolog():
         prolog_str= ("// *** CUDA DSLASH ***\n\n" if not dagger else "// *** CUDA DSLASH DAGGER ***\n\n")
         prolog_str+= "#define DSLASH_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
     elif clover:
-        prolog_str= ("// *** CUDA CLOVER ***\n\n")    
+        prolog_str= ("// *** CUDA CLOVER ***\n\n")
         prolog_str+= "#define CLOVER_SHARED_FLOATS_PER_THREAD "+str(sharedFloats)+"\n\n"
     else:
         print "Undefined prolog"
@@ -342,7 +342,7 @@ def prolog():
 
 
     # set the pointer if using shared memory for pseudo registers
-    if sharedFloats > 0 and not sharedDslash: 
+    if sharedFloats > 0 and not sharedDslash:
         prolog_str += (
 """
 extern __shared__ char s_data[];
@@ -392,7 +392,7 @@ int Y[4] = {X1,X2,X3,X4};
   if (sid >= param.threads) return;
 
   dim = dimFromFaceIndex(sid, param); // sid is also modified
-  
+
 
   const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim]) >> 1);   // volume of one face
   face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
@@ -404,7 +404,7 @@ int Y[4] = {X1,X2,X3,X4};
 
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity,Y);
-  
+
   {
     bool active = false;
     for(int dir=0; dir<4; ++dir){
@@ -425,7 +425,7 @@ int Y[4] = {X1,X2,X3,X4};
                 out += out_re(s,c)+" = "+in_re(s,c)+";  "+out_im(s,c)+" = "+in_im(s,c)+";\n"
         prolog_str+= indent(out)
         prolog_str+=("\n\n")
-    
+
     else:
         prolog_str+=(
 """
@@ -437,7 +437,7 @@ if (sid >= param.threads) return;
 
 // read spinor from device memory
 READ_SPINOR(SPINORTEX, param.sp_stride, sid, sid);
-""")            
+""")
     return prolog_str
 # end def prolog
 
@@ -447,7 +447,7 @@ def gen(dir, pack_only=False):
     projStr = projectorToStr(projectors[projIdx])
     def proj(i,j):
         return projectors[projIdx][4*i+j]
-    
+
     # if row(i) = (j, c), then the i'th row of the projector can be represented
     # as a multiple of the j'th row: row(i) = c row(j)
     def row(i):
@@ -475,7 +475,7 @@ def gen(dir, pack_only=False):
     cond += "if ( isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " +boundary[dir]+" )\n"
 
     str = ""
-    
+
     projName = "P"+`dir/2`+["-","+"][projIdx%2]
     str += "// Projector "+projName+"\n"
     for l in projStr.splitlines():
@@ -484,14 +484,12 @@ def gen(dir, pack_only=False):
 
     str += "faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
     str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
-   
+
     str += "#if (DD_PREC==2)\n"
     str += "  sp_norm_idx = face_idx + "
-#    if dir%2 == 0:
-#      str += "faceVolume[" + `dir/2` + "] + "
     str += "param.ghostNormOffset[" + `dir/2` + "][" +  `1-dir%2` + "];\n"
-    str += "#endif\n" 
-    
+    str += "#endif\n"
+
 
     str += "\n"
     if dir % 2 == 0:
@@ -568,7 +566,7 @@ def gen(dir, pack_only=False):
                     elif re==0:
                         strRe += sign(-im)+in_im(s,c)
                         strIm += sign(im)+in_re(s,c)
-                
+
             project += h1_re(h,c)+" = "+strRe+";\n"
             project += h1_im(h,c)+" = "+strIm+";\n"
 
@@ -625,14 +623,14 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
     prep_half += load_half
     prep_half += copy_half
     prep_half += "\n"
-    
+
     ident = "// identity gauge matrix\n"
     for m in range(0,3):
         for h in range(0,2):
             ident += "spinorFloat "+h2_re(h,m)+" = " + h1_re(h,m) + "; "
             ident += "spinorFloat "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n"
     ident += "\n"
-    
+
     mult = ""
     for m in range(0,3):
         mult += "// multiply row "+`m`+"\n"
@@ -646,7 +644,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 im += h2_im(h,m) + " += " + g_im(dir,m,c) + " * "+h1_re(h,c)+";\n"
             mult += re + im
         mult += "\n"
-    
+
     reconstruct = ""
     for m in range(0,3):
 
@@ -660,7 +658,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             else:
                 reconstruct += out_re(h_out, m) + " += a*" + h2_re(h,m) + ";\n"
                 reconstruct += out_im(h_out, m) + " += a*" + h2_im(h,m) + ";\n"
-    
+
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
@@ -681,7 +679,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 elif re == 0:
                     reconstruct += out_re(s, m) + " " + sign(-im) + "= a*" + h2_im(h,m) + ";\n"
                     reconstruct += out_im(s, m) + " " + sign(+im) + "= a*" + h2_re(h,m) + ";\n"
-        
+
         reconstruct += "\n"
 
     if dir >= 6:
@@ -691,7 +689,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         str += block(decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct)
     else:
         str += decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct
-    
+
     if pack_only:
         out = load_spinor + decl_half + project
         out = out.replace("sp_idx", "idx")
@@ -707,7 +705,7 @@ def input_spinor(s,c,z):
         else: return out_im(s,c)
     else:
         if z==0: return in_re(s,c)
-        else: return in_im(s,c)        
+        else: return in_im(s,c)
 
 def to_chiral_basis(v_out,v_in,c):
     str = ""
@@ -761,11 +759,11 @@ def clover_mult(v_out, v_in, chi):
             for sn in range (0,2):
                 for cn in range (0,3):
                     str += a_re(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,0)+";\n"
-                    if (sn != sm) or (cn != cm): 
+                    if (sn != sm) or (cn != cm):
                         str += a_re(chi,sm,cm)+" -= "+c_im(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,1)+";\n"
                     #else: str += ";\n"
                     str += a_im(chi,sm,cm)+" += "+c_re(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,1)+";\n"
-                    if (sn != sm) or (cn != cm): 
+                    if (sn != sm) or (cn != cm):
                         str += a_im(chi,sm,cm)+" += "+c_im(chi,sm,cm,sn,cn)+" * "+spinor(v_in,2*chi+sn,cn,0)+";\n"
                     #else: str += ";\n"
             str += "\n"
@@ -816,7 +814,7 @@ def twisted_rotate(x):
                 elif re==0:
                     strRe += sign(-im)+out_im(s,c)
                     strIm += sign(im)+out_re(s,c)
-                
+
                 # sign(x)*i*mu*gamma_5
                 re = igamma5[4*h+s].real
                 im = igamma5[4*h+s].imag
@@ -831,7 +829,7 @@ def twisted_rotate(x):
             str += "VOLATILE spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
             str += "VOLATILE spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
         str += "\n"
-    
+
     return str+"\n"
 
 
@@ -873,7 +871,7 @@ def clover_xpay():
     str += "#endif // DSLASH_CLOVER_XPAY\n"
 
     return str
-#end def clover_xpay    
+#end def clover_xpay
 
 def xpay():
     str = ""
@@ -902,7 +900,7 @@ def epilog():
 #        if twist:
 #            str += "#ifdef MULTI_GPU\n"
 #        else:
-#            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
+#            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"
 #        str += "#endif // MULTI_GPU\n"
 
     if not asymClover:
@@ -914,14 +912,14 @@ def epilog():
         if not asymClover: block_str += xpay()
 
         str += block( block_str )
-    
+
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
     str += "WRITE_SPINOR(param.sp_stride);\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#undef WRITE_SPINOR_SHARED\n"
         str += "#undef READ_SPINOR_SHARED\n"
     if sharedFloats > 0: str += "#undef SHARED_STRIDE\n\n"
@@ -973,7 +971,7 @@ def epilog():
                     str += "#undef "+out_im(s,c)+"\n"
     str += "\n"
 
-    str += "#undef VOLATILE\n" 
+    str += "#undef VOLATILE\n"
 
     str += "\n"
     str += "#endif // MULTI_GPU"
@@ -1043,7 +1041,7 @@ def generate_dslash_kernels(arch):
     sharedFloats = 0
     if arch >= 200:
         sharedFloats = 24
-        sharedDslash = True    
+        sharedDslash = True
         name = "fermi"
     elif arch >= 120:
         sharedFloats = 0
@@ -1089,7 +1087,7 @@ def generate_dslash_kernels(arch):
     f = open(filename, 'w')
     f.write(generate_dslash())
     f.close()
-    
+
     asymClover = False
 
     twist = True
@@ -1154,7 +1152,7 @@ generate_dslash_kernels(arch)
 #cloverSharedFloats = 0
 #sharedFloats = cloverSharedFloats
 # for the clover term, only makes sense to use shared memory as pseudo registers
-#sharedDslash = False 
+#sharedDslash = False
 #print sys.argv[0] + ": generating clover_core.h";
 #f = open('dslash_core/clover_core.h', 'w')
 #f.write(generate_clover())

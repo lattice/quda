@@ -27,7 +27,6 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
   typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg){
 
-    unsigned int tid = threadIdx.x;
     unsigned int gridSize = gridDim.x*blockDim.x;
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
@@ -117,14 +116,8 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
       char *X_h[N], *Y_h[N], *Z_h[N], *W_h[N], *V_h[N];
       char *Xnorm_h[N], *Ynorm_h[N], *Znorm_h[N], *Wnorm_h[N], *Vnorm_h[N];
 
-      unsigned int sharedBytesPerThread() const { return sizeof(ReduceType); }
-
-      // When there is only one warp per block, we need to allocate two warps
-      // worth of shared memory so that we don't index shared memory out of bounds  
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-        int warpSize = 32;
-        return 2*warpSize*sizeof(ReduceType);
-      }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       virtual bool advanceSharedBytes(TuneParam &param) const
       {
@@ -139,8 +132,8 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
       MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], SpinorV V[],
 		      Reducer &r, int length) :
       arg(X, Y, Z, W, V, r, length), result(result),
-	X_h({ }), Y_h({ }), Z_h({ }), W_h({ }), V_h({ }),
-	Xnorm_h({ }), Ynorm_h({ }), Znorm_h({ }), Wnorm_h({ }), Vnorm_h({ }) { }
+	X_h(), Y_h(), Z_h(), W_h(), V_h(), Xnorm_h(),
+	Ynorm_h(), Znorm_h(), Wnorm_h(), Vnorm_h() { }
 
       virtual ~MultiReduceCuda(){}
 
@@ -287,8 +280,10 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
     int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
 
     if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
-      if (x[0]->Nspin() == 4) { // wilson
-        const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
+      if (x[0]->Nspin() == 4 || x[0]->Nspin() == 2) { // wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
+	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
+	if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 
         Spinor<double2, double2, double2, M, writeX> X[N];
         Spinor<double2, double2, double2, M, writeY> Y[N];
@@ -310,9 +305,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
           Spinor<double2, double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
         reduce.apply(*blas::getStream());
-
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
       } else if (x[0]->Nspin() == 1) {
-
+#ifdef GPU_STAGGERED_DIRAC
         const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 
         Spinor<double2, double2, double2, M, writeX> X[N];
@@ -335,13 +332,16 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
           Spinor<double2, double2, double2, M, writeZ>, Spinor<double2, double2, double2, M, writeW>,
           Spinor<double2, double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
             reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
-
         
         reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d field", x[0]->Nspin());
+#endif
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
 
     } else if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
       if (x[0]->Nspin() == 4) { // wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
         const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 
         Spinor<float4, float4, float4, M, writeX> X[N];
@@ -365,9 +365,13 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float4,float4,float4,M,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(4*M));
 	reduce.apply(*blas::getStream());
-      } else if(x[0]->Nspin() == 1) { // staggered
-
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+      } else if(x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 3 : 1; 
+	if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 
       	Spinor<float2,float2,float2,M,writeX> X[N];
         Spinor<float2,float2,float2,M,writeY> Y[N];
@@ -390,9 +394,13 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float2,float2,float2,M,writeV>, Reducer<ReduceType, float2, float2> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
 	reduce.apply(*blas::getStream());
-      }
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
     } else { // half precision
       if (x[0]->Nspin() == 4) { // wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
         Spinor<float4,float4,short4,6,writeX> X[N];
 	Spinor<float4,float4,short4,6,writeY> Y[N];
 	Spinor<float4,float4,short4,6,writeZ> Z[N];
@@ -414,7 +422,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float4,float4,short4,6,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
 	reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
       } else if(x[0]->Nspin() == 1) { // staggered
+#ifdef GPU_STAGGERED_DIRAC
         Spinor<float2,float2,short2,3,writeX> X[N];
 	Spinor<float2,float2,short2,3,writeY> Y[N];
 	Spinor<float2,float2,short2,3,writeZ> Z[N];
@@ -436,7 +448,9 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float2,float2,short2,3,writeV>, Reducer<ReduceType, float2, float2> >
 	  reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
 	reduce.apply(*blas::getStream());
-
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
     }
 

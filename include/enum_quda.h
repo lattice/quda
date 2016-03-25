@@ -143,6 +143,14 @@ extern "C" {
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
 
+  typedef enum QudaMultigridCycleType_s {
+    QUDA_MG_CYCLE_VCYCLE,
+    QUDA_MG_CYCLE_FCYCLE,
+    QUDA_MG_CYCLE_WCYCLE,
+    QUDA_MG_CYCLE_RECURSIVE,
+    QUDA_MG_CYCLE_INVALID = QUDA_INVALID_ENUM
+  } QudaMultigridCycleType;
+
   typedef enum QudaSchwarzType_s {
     QUDA_ADDITIVE_SCHWARZ,
     QUDA_MULTIPLICATIVE_SCHWARZ,
@@ -269,6 +277,8 @@ extern "C" {
     QUDA_TWISTED_MASSPC_DIRAC,
     QUDA_TWISTED_CLOVER_DIRAC,
     QUDA_TWISTED_CLOVERPC_DIRAC,
+    QUDA_COARSE_DIRAC,
+    QUDA_COARSEPC_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 
@@ -385,6 +395,12 @@ extern "C" {
     QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
   } QudaComputeNullVector;
 
+  typedef enum QudaBoolean_s {
+    QUDA_BOOLEAN_NO = 0,
+    QUDA_BOOLEAN_YES = 1,
+    QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
+  } QudaBoolean;
+
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
     QUDA_FORWARDS = +1,
@@ -407,7 +423,7 @@ extern "C" {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,
     QUDA_TENSOR_GEOMETRY = 6,
-    QUDA_COARSE_GEOMETRY = 9,
+    QUDA_COARSE_GEOMETRY = 8,
     QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
 

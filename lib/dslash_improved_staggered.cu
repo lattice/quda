@@ -138,12 +138,14 @@ namespace quda {
 	  break;
 	}
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	{
 	  long long sites = in->VolumeCB();
 	  flops = (2*num_dir*mv_flops +                   // SU(3) matrix-vector multiplies
 		   (2*num_dir-1)*2*in->Ncolor()*in->Nspin()) * sites;   // accumulation
 	  if (x) flops += xpay_flops * sites; // axpy is always on interior
 
+	  if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	  // now correct for flops done by exterior kernel
 	  long long ghost_sites = 0;
 	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
@@ -178,6 +180,7 @@ namespace quda {
 	  break;
 	}
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	{
 	  long long sites = in->VolumeCB();
 	  bytes = (num_dir*(gauge_bytes_fat + gauge_bytes_long) + // gauge reads
@@ -185,6 +188,7 @@ namespace quda {
 		   spinor_bytes)*sites;                           // spinor write
 	  if (x) bytes += spinor_bytes;
 
+	  if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	  // now correct for bytes done by exterior kernel
 	  long long ghost_sites = 0;
 	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
@@ -204,7 +208,7 @@ namespace quda {
   void improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 				   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 				   const int parity, const int dagger, const cudaColorSpinorField *x,
-				   const double &k, const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+				   const double &k, const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -272,13 +276,13 @@ namespace quda {
     }
 
 #ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(),  in->GhostFace(), profile);
+    dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
-
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
     delete dslashImp;
+#endif
 
     delete dslash;
     unbindFatGaugeTex(fatGauge);

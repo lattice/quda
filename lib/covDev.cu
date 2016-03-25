@@ -387,7 +387,7 @@ namespace quda
           comm_free (mh_from);
 
           // Send buffers to GPU:
-          cudaMemcpy(ghostBuffer, recv, ghostBytes, cudaMemcpyHostToDevice);
+          qudaMemcpy(ghostBuffer, recv, ghostBytes, cudaMemcpyHostToDevice);
           cudaDeviceSynchronize();
 
           host_free(send);
@@ -531,8 +531,10 @@ namespace quda
 
         for(int i=0; i<4; i++) {
           dslashParam.ghostDim[i] = 0;
-          dslashParam.ghostOffset[i] = 0;
-          dslashParam.ghostNormOffset[i] = 0;
+          dslashParam.ghostOffset[i][0] = 0;
+          dslashParam.ghostOffset[i][1] = 0;
+          dslashParam.ghostNormOffset[i][0] = 0;
+          dslashParam.ghostNormOffset[i][1] = 0;
           dslashParam.commDim[i] = 0;
         }
 

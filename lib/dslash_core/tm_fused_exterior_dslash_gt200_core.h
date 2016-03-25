@@ -216,7 +216,6 @@ int sid;
 
 int dim;
 int face_idx;
-int face_num;
 int Y[4] = {X1,X2,X3,X4};
 
   sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -225,8 +224,8 @@ int Y[4] = {X1,X2,X3,X4};
 
   dim = dimFromFaceIndex(sid, param); // sid is also modified
 
-  const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim]) >> 1);  
-  face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
+  const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim]) >> 1);
+  const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
   face_idx = sid - face_num*face_volume;        // index into the respective face
 
 
