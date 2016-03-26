@@ -27,13 +27,14 @@ namespace quda {
     int comm_dim[QUDA_MAX_DIM]; /** Node parition array */
 
     Float kappa;                /** kappa value */
+    Float mu;                   /** mu value */
 
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
     CalculateYArg(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinor &V,
 		  const fineClover &C, const fineClover &Cinv, double kappa, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
-      : Y(Y), X(X), Xinv(Xinv), UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), kappa(static_cast<Float>(kappa)),
+      : Y(Y), X(X), Xinv(Xinv), UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)),
 	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
     {
       if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
@@ -556,6 +557,39 @@ namespace quda {
     } //Spin
    }
 
+  //Adds the twisted-mass term to the coarse local term.
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  void AddCoarseTmDiagonalCPU(Arg &arg) {
+
+    const complex<Float> In(0.,1.);
+
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+        for(int s = 0; s < nSpin; s++) { //Spin
+         for(int c = 0; c < nColor; c++) { //Color
+          arg.X(0,parity,x_cb,s,((s+2)%4),c,c) += arg.mu*In;
+         } //Color
+        } //Spin
+      } // x_cb
+    } //parity
+   }
+
+  //Adds the twisted-mass term to the coarse local term.
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  __global__ void AddCoarseTmDiagonalGPU(Arg &arg) {
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    if (x_cb >= arg.coarseVolumeCB) return;
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+
+    const complex<Float> In(0.,1.);
+
+    for(int s = 0; s < nSpin; s++) { //Spin
+      for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
+       arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) += arg.mu*In;
+      } //Color
+    } //Spin
+   }
+
 
   enum ComputeType {
     COMPUTE_UV,
@@ -565,6 +599,7 @@ namespace quda {
     COMPUTE_REVERSE_Y,
     COMPUTE_COARSE_LOCAL,
     COMPUTE_DIAGONAL,
+    COMPUTE_TMDIAGONAL,
     COMPUTE_INVALID
   };
 
@@ -610,6 +645,7 @@ namespace quda {
 	flops_ = 2*arg.coarseVolumeCB*coarseSpin*coarseSpin*coarseColor*coarseColor*2;
 	break;
       case COMPUTE_DIAGONAL:
+      case COMPUTE_TMDIAGONAL:
 	// read addition on the diagonal
 	flops_ = 2*arg.coarseVolumeCB*coarseSpin*coarseColor;
 	break;
@@ -639,6 +675,7 @@ namespace quda {
 	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
       case COMPUTE_COARSE_LOCAL:
       case COMPUTE_DIAGONAL:
+      case COMPUTE_TMDIAGONAL:
 	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
 	break;
       default:
@@ -659,6 +696,7 @@ namespace quda {
       case COMPUTE_REVERSE_Y:
       case COMPUTE_COARSE_LOCAL:
       case COMPUTE_DIAGONAL:
+      case COMPUTE_TMDIAGONAL:
 	threads = arg.coarseVolumeCB;
 	break;
       default:
@@ -744,6 +782,10 @@ namespace quda {
 
 	  AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
 
+	} else if (type == COMPUTE_TMDIAGONAL) {
+
+          AddCoarseTmDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
+
 	} else {
 	  errorQuda("Undefined compute type %d", type);
 	}
@@ -778,6 +820,7 @@ namespace quda {
       else if (type == COMPUTE_REVERSE_Y)     strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_COARSE_LOCAL)  strcat(Aux,",computeCoarseLocal");
       else if (type == COMPUTE_DIAGONAL)      strcat(Aux,",computeCoarseDiagonal");
+      else if (type == COMPUTE_TMDIAGONAL)    strcat(Aux,",computeCoarseTmDiagonal");
       else errorQuda("Unknown type=%d\n", type);
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
@@ -885,13 +928,14 @@ namespace quda {
      @param Yhat_[out] Preconditioned coarse link field
      @param v[in] Packed null-space vectors
      @param kappa[in] Kappa parameter
+     @param mu[in] Twisted-mass parameter
      @param matpc[in] The type of preconditioning of the source fine-grid operator
    */
   template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
 	   QudaGaugeFieldOrder gOrder, typename F, typename Ftmp, typename coarseGauge, typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, Ftmp &UV, F &AV, F &V, fineGauge &G, fineClover &C, fineClover &Cinv,
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, ColorSpinorField &av, const ColorSpinorField &v,
-		  double kappa, QudaDiracType dirac, QudaMatPCType matpc) {
+		  double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
 
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
       errorQuda("Unsupported coarsening of matpc = %d", matpc);
@@ -914,7 +958,7 @@ namespace quda {
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     typedef CalculateYArg<Float,coarseGauge,fineGauge,F,Ftmp,fineClover> Arg;
-    Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, x_size, xc_size, geo_bs, spin_bs);
+    Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, x_size, xc_size, geo_bs, spin_bs);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v);
 
     // If doing a preconditioned operator with a clover term then we
@@ -1001,6 +1045,10 @@ namespace quda {
       printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(0);
+      if (dirac == QUDA_TWISTED_MASS_DIRAC) {
+        y.setComputeType(COMPUTE_TMDIAGONAL);
+        y.apply(0);
+      }
       printfQuda("X2 = %e\n", X.norm2(0));
     }
 
