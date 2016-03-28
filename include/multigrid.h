@@ -317,11 +317,11 @@ namespace quda {
   };
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
-		   bool dslash=true, bool clover=true);
+		   const GaugeField &Y, const GaugeField &X, double kappa, double mu,
+		   int parity = QUDA_INVALID_PARITY, bool dslash=true, bool clover=true);
 
   /**
-     @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
+     @brief Coarse operator construction from a fine-grid operator (Wilson / Clover / Twisted-mass)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
      @param Xinv[out] Coarse clover inverse field
@@ -330,13 +330,14 @@ namespace quda {
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
      @param kappa[in] Kappa parameter
+     @param mu[in] Twisted-mass parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa,
+		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa, double mu,
 		QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
@@ -350,6 +351,7 @@ namespace quda {
      @param clover[in] Clover field on fine grid
      @param cloverInv[in] Clover inverse field on fine grid
      @param kappa[in] Kappa parameter
+     @param mu[in] Twisted-mass parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
@@ -357,7 +359,7 @@ namespace quda {
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		      const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
-		      double kappa, QudaDiracType dirac, QudaMatPCType matpc);
+		      double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      This is an object that captures an entire MG preconditioner
