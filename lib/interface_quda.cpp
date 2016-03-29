@@ -2566,6 +2566,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   std::vector<ColorSpinorField*> h_b;
   h_b.resize(param->num_rhs);
   for(int i=0; i < param->num_rhs; i++) {
+    cpuParam.v = hp_b[i]; //MW seems wird in the loop
     h_b[i] = ColorSpinorField::Create(cpuParam);
   }
 
@@ -2619,8 +2620,8 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       double nh_b = blas::norm2(*h_b[i]);
       double nh_x = blas::norm2(*h_x[i]);
       double nx = blas::norm2(*x[i]);
-      printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb[i]);
-      printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+      printfQuda("Source %i: CPU = %g, CUDA copy = %g\n", i, nh_b, nb[i]);
+      printfQuda("Solution %i: CPU = %g, CUDA copy = %g\n", i, nh_x, nx);
     }
   }
 
@@ -2700,7 +2701,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
       blas::copy(*in, *out);
-      solverParam.updateInvertParam(*param);
+      solverParam.updateInvertParam(*param,i,i);
       delete solve;
     }
 
@@ -2709,14 +2710,14 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
-      solverParam.updateInvertParam(*param);
+      solverParam.updateInvertParam(*param,i,i);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
-      solverParam.updateInvertParam(*param);
+      solverParam.updateInvertParam(*param,i,i);
       delete solve;
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -2725,7 +2726,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(tmp, *in); // y = (M M^\dag) b
       dirac.Mdag(*out, tmp);  // x = M^dag y
-      solverParam.updateInvertParam(*param);
+      solverParam.updateInvertParam(*param,i,i);
       delete solve;
     }
 
