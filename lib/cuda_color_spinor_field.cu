@@ -1118,11 +1118,9 @@ namespace quda {
     createIPCComms();
   }
    
-  static bool enable_peer2peer = true;
-
   void cudaColorSpinorField::createIPCComms() {
 
-    if (initIPCComms || comm_size() == 1 || !enable_peer2peer) return;
+    if (initIPCComms || comm_size() == 1) return;
 
     if (!initComms) errorQuda("Can only be called after create comms");
     if (!ghost_field) errorQuda("ghost_field appears not to be allocated");
