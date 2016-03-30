@@ -110,7 +110,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
 void comm_peer2peer_init()
 {
-  char *disable_peer_to_peer = getenv("QUDA_ENABLE_P2P");
+  char *disable_peer_to_peer = getenv("QUDA_DISABLE_P2P");
 
   if (!peer2peer_init && !disable_peer_to_peer) {
 
