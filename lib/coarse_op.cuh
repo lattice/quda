@@ -33,7 +33,7 @@ namespace quda {
     const int coarseVolumeCB;   /** Coarse grid volume */
 
     CalculateYArg(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinor &V,
-		  const fineClover &C, const fineClover &Cinv, double kappa, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
+		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
       : Y(Y), X(X), Xinv(Xinv), UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)),
 	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
     {
@@ -561,15 +561,19 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void AddCoarseTmDiagonalCPU(Arg &arg) {
 
-    const complex<Float> In(0.,1.);
+    const complex<Float> In(0., 1.);
 
     for (int parity=0; parity<2; parity++) {
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-        for(int s = 0; s < nSpin; s++) { //Spin
+        //for(int s = 0; s < nSpin; s++) { //Spin
          for(int c = 0; c < nColor; c++) { //Color
-          arg.X(0,parity,x_cb,s,((s+2)%4),c,c) += arg.mu*In;
+          //arg.X(0,parity,x_cb,s,((s+2)%nSpin),c,c) += arg.mu*In;
+          arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
+          arg.X(0,parity,x_cb,1,1,c,c) -= arg.mu*In;
+          //arg.X(0,parity,x_cb,2,2,c,c) -= arg.mu*In;
+          //arg.X(0,parity,x_cb,3,3,c,c) -= arg.mu*In;
          } //Color
-        } //Spin
+        //} //Spin
       } // x_cb
     } //parity
    }
@@ -1035,17 +1039,21 @@ namespace quda {
     y.apply(0);
     printfQuda("X2 = %e\n", X.norm2(0));
 
-    // Check if we have a clover term that needs to tbe coarsened
-    if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC) {
+    // Check if we have a clover term that needs to be coarsened
+    if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       printfQuda("Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(0);
+      if (dirac == QUDA_TWISTED_CLOVER_DIRAC || mu != 0.) {
+        y.setComputeType(COMPUTE_TMDIAGONAL);
+        y.apply(0);
+      }
       printfQuda("X2 = %e\n", X.norm2(0));
     } else {  //Otherwise, we just have to add the identity matrix
       printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(0);
-      if (dirac == QUDA_TWISTED_MASS_DIRAC) {
+      if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC || mu != 0.) {
         y.setComputeType(COMPUTE_TMDIAGONAL);
         y.apply(0);
       }

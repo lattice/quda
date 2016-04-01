@@ -1,6 +1,7 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -169,6 +170,10 @@ namespace quda {
     // do nothing
   }
 
+  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+    double a = -2.0 * kappa * mu; //FIXME This is going to be flavor-dependent now. As it is, it would work for one flavor only
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+  }
 
   DiracTwistedCloverPC::DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac) : DiracTwistedClover(dirac) { }
 
@@ -443,5 +448,9 @@ namespace quda {
       errorQuda("Non-degenrate DiracTwistedCloverPC is not implemented \n");
     }//end of twist doublet...
     deleteTmp(&tmp1, reset);
+  }
+
+  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, 0.0, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 } // namespace quda

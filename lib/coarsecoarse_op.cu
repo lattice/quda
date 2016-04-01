@@ -82,7 +82,7 @@ namespace quda {
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
-			const GaugeField &cloverInv, double kappa, QudaDiracType dirac, QudaMatPCType matpc) {
+			const GaugeField &cloverInv, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
     if (g.Ncolor()/T.Vectors().Nspin() == 2) {
       calculateYcoarse<Float,csOrder,gOrder,2>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, kappa, mu, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 8) {

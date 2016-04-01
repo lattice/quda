@@ -336,7 +336,7 @@ namespace quda {
      even-odd preconditioned and we coarsen the full operator.
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa,
+		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa, double mu,
 		QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
@@ -357,7 +357,7 @@ namespace quda {
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		      const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
-		      double kappa, QudaDiracType dirac, QudaMatPCType matpc);
+		      double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      This is an object that captures an entire MG preconditioner
