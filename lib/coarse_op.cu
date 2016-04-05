@@ -178,9 +178,9 @@ namespace quda {
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
-    // if we are coarsening a preconditioned clover operator we need
+    // if we are coarsening a preconditioned clover or twisted-mass operator we need
     // an additional vector to store the cloverInv * V field, else just alias v
-    ColorSpinorField *av = (matpc != QUDA_MATPC_INVALID && clover) ? ColorSpinorField::Create(UVparam) :
+    ColorSpinorField *av = ((matpc != QUDA_MATPC_INVALID && clover) || (matpc != QUDA_MATPC_INVALID && (mu != 0.0))) ? ColorSpinorField::Create(UVparam) :
       &const_cast<ColorSpinorField&>(T.Vectors());
 
     //If the fine lattice operator is the clover operator, copy the cudaCloverField to cpuCloverField

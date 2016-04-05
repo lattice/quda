@@ -193,6 +193,53 @@ namespace quda {
   }
 
   /**
+     Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x) for twisted-mass fermions
+     Where: s = fine spin, c' = coarse color, c = fine color
+  */
+  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __device__ __host__ inline void computeTMAV(Arg &arg, int parity, int x_cb) {
+
+    complex<Float> factorp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
+    complex<Float> factorm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
+    //complex<Float> factorm(1.,0.);
+
+    for(int s = 0; s < fineSpin/2; s++) {
+      for(int c = 0; c < fineColor; c++) {
+	for(int v = 0; v < coarseColor; v++) {
+	  arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*factorp;
+	}
+      }
+    }
+
+    for(int s = fineSpin/2; s < fineSpin; s++) {
+      for(int c = 0; c < fineColor; c++) {
+	for(int v = 0; v < coarseColor; v++) {
+	  arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*factorm;
+	}
+      }
+    }
+
+  } // computeTMAV
+
+  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  void ComputeTMAVCPU(Arg &arg) {
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
+	computeTMAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+      } // c/b volume
+    }   // parity
+  }
+
+  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __global__ void ComputeTMAVGPU(Arg arg) {
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    if (x_cb >= arg.fineVolumeCB) return;
+
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    computeTMAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+  }
+
+  /**
      @brief Do a single (AV)^\dagger * UV product, where for preconditioned
      clover, AV correspond to the clover inverse multiplied by the
      packed null space vectors, else AV is simply the packed null
@@ -563,20 +610,28 @@ namespace quda {
 
     const complex<Float> In(0., 1.);
 
-    for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-        //for(int s = 0; s < nSpin; s++) { //Spin
-         for(int c = 0; c < nColor; c++) { //Color
-          //arg.X(0,parity,x_cb,s,((s+2)%nSpin),c,c) += arg.mu*In;
-          arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
-          arg.X(0,parity,x_cb,1,1,c,c) -= arg.mu*In;
-          //arg.X(0,parity,x_cb,2,2,c,c) -= arg.mu*In;
-          //arg.X(0,parity,x_cb,3,3,c,c) -= arg.mu*In;
-         } //Color
-        //} //Spin
-      } // x_cb
-    } //parity
-   }
+    if (nSpin == 2) {
+      for (int parity=0; parity<2; parity++) {
+        for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+          for(int c = 0; c < nColor; c++) { //Color
+            arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
+            arg.X(0,parity,x_cb,1,1,c,c) -= arg.mu*In;
+          } //Color
+        } // x_cb
+      } //parity
+    } else {
+      for (int parity=0; parity<2; parity++) {
+        for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+          for(int c = 0; c < nColor; c++) { //Color
+            arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
+            arg.X(0,parity,x_cb,1,1,c,c) += arg.mu*In;
+            arg.X(0,parity,x_cb,2,2,c,c) -= arg.mu*In;
+            arg.X(0,parity,x_cb,3,3,c,c) -= arg.mu*In;
+          } //Color
+        } // x_cb
+      } //parity
+    }
+  }
 
   //Adds the twisted-mass term to the coarse local term.
   template<typename Float, int nSpin, int nColor, typename Arg>
@@ -594,10 +649,10 @@ namespace quda {
     } //Spin
    }
 
-
   enum ComputeType {
     COMPUTE_UV,
     COMPUTE_AV,
+    COMPUTE_TMAV,
     COMPUTE_VUV,
     COMPUTE_COARSE_CLOVER,
     COMPUTE_REVERSE_Y,
@@ -629,6 +684,7 @@ namespace quda {
 	flops_ = 2*arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * !from_coarse ? 1 : fineSpin;
 	break;
       case COMPUTE_AV:
+      case COMPUTE_TMAV:
 	// # chiral blocks * size of chiral block * number of null space vectors
 	flops_ = 2*arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
@@ -669,6 +725,9 @@ namespace quda {
       case COMPUTE_AV:
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes();
 	break;
+      case COMPUTE_TMAV:
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
+	break;
       case COMPUTE_VUV:
 	bytes_ = arg.UV.Bytes() + arg.V.Bytes();
 	break;
@@ -693,6 +752,7 @@ namespace quda {
       switch (type) {
       case COMPUTE_UV:
       case COMPUTE_AV:
+      case COMPUTE_TMAV:
       case COMPUTE_VUV:
       case COMPUTE_COARSE_CLOVER:
 	threads = arg.fineVolumeCB;
@@ -712,7 +772,7 @@ namespace quda {
   public:
     CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta)
       : TunableVectorY(2), arg(arg), type(type),
-	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || bidirectional_debug),
+	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || (dirac == QUDA_WILSONPC_DIRAC && arg.mu != 0.0) ||  bidirectional_debug),
 	meta(meta), dim(0), dir(QUDA_BACKWARDS)
     {
       strcpy(aux, meta.AuxString());
@@ -752,6 +812,11 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
 	  ComputeAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+
+	} else if (type == COMPUTE_TMAV) {
+
+	  if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
+	  ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 
 	} else if (type == COMPUTE_VUV) {
 
@@ -819,6 +884,7 @@ namespace quda {
 
       if      (type == COMPUTE_UV)            strcat(Aux,",computeUV");
       else if (type == COMPUTE_AV)            strcat(Aux,",computeAV");
+      else if (type == COMPUTE_TMAV)          strcat(Aux,",computeAV");
       else if (type == COMPUTE_VUV)           strcat(Aux,",computeVUV");
       else if (type == COMPUTE_COARSE_CLOVER) strcat(Aux,",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)     strcat(Aux,",computeYreverse");
@@ -967,7 +1033,7 @@ namespace quda {
 
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
-    bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug);
+    bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug || (dirac == QUDA_WILSONPC_DIRAC && mu != 0.0));
     if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
     else printfQuda("Doing uni-directional link coarsening\n");
 
@@ -979,6 +1045,18 @@ namespace quda {
       printfQuda("Computing AV\n");
 
       y.setComputeType(COMPUTE_AV);
+      y.apply(0);
+
+      printfQuda("AV2 = %e\n", AV.norm2());
+    }
+
+    // If doing preconditioned twisted-mass then we first multiply the
+    // null-space vectors by the inverse twist, since this is
+    // needed for the coarse link computation
+    if ( dirac == QUDA_WILSONPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) && (mu != 0.0)) {
+      printfQuda("Computing TMAV\n");
+
+      y.setComputeType(COMPUTE_TMAV);
       y.apply(0);
 
       printfQuda("AV2 = %e\n", AV.norm2());
@@ -1005,6 +1083,12 @@ namespace quda {
     // forward links, since doing the AV exchange will overwrite the V
     // ghost which we need for the forward links
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
+      int dummy = 0;
+      av.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+      arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
+    }
+
+    if ( dirac == QUDA_WILSONPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) && (mu != 0.0)) {
       int dummy = 0;
       av.exchangeGhost(QUDA_INVALID_PARITY, dummy);
       arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
@@ -1040,11 +1124,12 @@ namespace quda {
     printfQuda("X2 = %e\n", X.norm2(0));
 
     // Check if we have a clover term that needs to be coarsened
-    if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
+    if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC) {
       printfQuda("Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(0);
-      if (dirac == QUDA_TWISTED_CLOVER_DIRAC || mu != 0.) {
+
+      if (mu != 0.) {
         y.setComputeType(COMPUTE_TMDIAGONAL);
         y.apply(0);
       }
@@ -1053,13 +1138,13 @@ namespace quda {
       printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(0);
-      if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC || mu != 0.) {
+
+      if (mu != 0. && dirac == QUDA_WILSON_DIRAC) {
         y.setComputeType(COMPUTE_TMDIAGONAL);
         y.apply(0);
       }
       printfQuda("X2 = %e\n", X.norm2(0));
     }
-
 
     {
       cpuGaugeField *X_h = static_cast<cpuGaugeField*>(&X_);
