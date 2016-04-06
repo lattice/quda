@@ -206,14 +206,19 @@ namespace quda {
     cf_param.create = QUDA_NULL_FIELD_CREATE;
     cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
 
-    cpuCloverField c(cf_param);
-    if (clover) clover->saveCPUField(c);
-
     if (cloverInv) {
+      printfQuda("Inverse field\n");
+      cf_param.direct = false;
       cpuCloverField cI(cf_param);
       cloverInv->saveCPUField(cI);
+      printfQuda("Direct field\n");
+      cf_param.direct = true;
+      cpuCloverField c(cf_param);
+      clover->saveCPUField(c);
       calculateY(Y, X, Xinv, Yhat, *uv, *av, T, g, c, cI, kappa, mu, dirac, matpc);
     } else {
+      cpuCloverField c(cf_param);
+      if (clover) clover->saveCPUField(c);
       calculateY(Y, X, Xinv, Yhat, *uv, *av, T, g, c, c, kappa, mu, dirac, matpc);
     }
 

@@ -245,7 +245,7 @@ namespace quda {
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb) {
 
-    complex<Float> mu(0.,0.5*arg.mu);
+    complex<Float> mu(0.,arg.mu);
 
     for(int s = 0; s < fineSpin; s++) {
       for(int c = 0; c < fineColor; c++) {
@@ -257,7 +257,7 @@ namespace quda {
     }
 
     //First we store in UV the product [(Clover -/+ i mu)·Vector]
-    for(int s = 0; s < fineSpin/2; s++) {  //Fine Spin
+    for(int s = 0; s < fineSpin; s++) {  //Fine Spin
       const int s_c = s/arg.spin_bs;
 
       //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
@@ -268,29 +268,27 @@ namespace quda {
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	      arg.UV(parity, x_cb, s, ic, ic_c) +=
-		(arg.C(0, parity, x_cb, s, s_col, ic, jc) - mu)* arg.V(parity, x_cb, s_col, jc, ic_c);
+		arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
 	    }  //Fine color columns
 	  }  //Fine color rows
 	} //Coarse color
       }
     } //Fine Spin
 
+    for(int s = 0; s < fineSpin/2; s++) {  //Fine Spin
+      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
+	  arg.UV(parity, x_cb, s, ic, ic_c) -= mu * arg.V(parity, x_cb, s, ic, ic_c);
+	}  //Fine color
+      } //Coarse color
+    } //Fine Spin
+
     for(int s = fineSpin/2; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = s/arg.spin_bs;
-
-      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-      //in the same chiral block.
-      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-
-	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      arg.UV(parity, x_cb, s, ic, ic_c) +=
-		(arg.C(0, parity, x_cb, s, s_col, ic, jc) + mu)* arg.V(parity, x_cb, s_col, jc, ic_c);
-	    }  //Fine color columns
-	  }  //Fine color rows
-	} //Coarse color
-      }
+      for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
+	  arg.UV(parity, x_cb, s, ic, ic_c) += mu * arg.V(parity, x_cb, s, ic, ic_c);
+	}  //Fine color
+      } //Coarse color
     } //Fine Spin
 
     //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
