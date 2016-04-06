@@ -199,14 +199,13 @@ namespace quda {
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ inline void computeTMAV(Arg &arg, int parity, int x_cb) {
 
-    complex<Float> factorp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
-    complex<Float> factorm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
-    //complex<Float> factorm(1.,0.);
+    complex<Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
+    complex<Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
 
     for(int s = 0; s < fineSpin/2; s++) {
       for(int c = 0; c < fineColor; c++) {
 	for(int v = 0; v < coarseColor; v++) {
-	  arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*factorp;
+	  arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*fp;
 	}
       }
     }
@@ -214,7 +213,7 @@ namespace quda {
     for(int s = fineSpin/2; s < fineSpin; s++) {
       for(int c = 0; c < fineColor; c++) {
 	for(int v = 0; v < coarseColor; v++) {
-	  arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*factorm;
+	  arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v)*fm;
 	}
       }
     }
@@ -239,6 +238,102 @@ namespace quda {
     computeTMAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
   }
 
+  /**
+     Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x) for twisted-clover fermions
+     Where: s = fine spin, c' = coarse color, c = fine color
+  */
+  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb) {
+
+    complex<Float> mu(0.,0.5*arg.mu);
+
+    for(int s = 0; s < fineSpin; s++) {
+      for(int c = 0; c < fineColor; c++) {
+	for(int v = 0; v < coarseColor; v++) {
+	  arg.UV(parity,x_cb,s,c,v) = static_cast<Float>(0.0);
+	  arg.AV(parity,x_cb,s,c,v) = static_cast<Float>(0.0);
+	}
+      }
+    }
+
+    //First we store in UV the product [(Clover -/+ i mu)·Vector]
+    for(int s = 0; s < fineSpin/2; s++) {  //Fine Spin
+      const int s_c = s/arg.spin_bs;
+
+      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
+      //in the same chiral block.
+      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+
+	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+	      arg.UV(parity, x_cb, s, ic, ic_c) +=
+		(arg.C(0, parity, x_cb, s, s_col, ic, jc) - mu)* arg.V(parity, x_cb, s_col, jc, ic_c);
+	    }  //Fine color columns
+	  }  //Fine color rows
+	} //Coarse color
+      }
+    } //Fine Spin
+
+    for(int s = fineSpin/2; s < fineSpin; s++) {  //Fine Spin
+      const int s_c = s/arg.spin_bs;
+
+      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
+      //in the same chiral block.
+      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+
+	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+	      arg.UV(parity, x_cb, s, ic, ic_c) +=
+		(arg.C(0, parity, x_cb, s, s_col, ic, jc) + mu)* arg.V(parity, x_cb, s_col, jc, ic_c);
+	    }  //Fine color columns
+	  }  //Fine color rows
+	} //Coarse color
+      }
+    } //Fine Spin
+
+    //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
+    //for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
+    for(int s = 0; s < fineSpin; s++) {  //Fine Spin
+      const int s_c = s/arg.spin_bs;
+
+      //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
+      //in the same chiral block.
+      for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
+
+	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
+	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+	      arg.AV(parity, x_cb, s, ic, ic_c) +=
+		arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * arg.UV(parity, x_cb, s_col, jc, ic_c);
+	    }  //Fine color columns
+	  }  //Fine color rows
+	} //Coarse color
+      }
+    } //Fine Spin
+
+  } // computeTMCAV
+
+  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  void ComputeTMCAVCPU(Arg &arg) {
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
+	computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+      } // c/b volume
+    }   // parity
+  }
+
+  template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
+  __global__ void ComputeTMCAVGPU(Arg arg) {
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    if (x_cb >= arg.fineVolumeCB) return;
+
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+  }
+
+  /**
   /**
      @brief Do a single (AV)^\dagger * UV product, where for preconditioned
      clover, AV correspond to the clover inverse multiplied by the
@@ -653,6 +748,7 @@ namespace quda {
     COMPUTE_UV,
     COMPUTE_AV,
     COMPUTE_TMAV,
+    COMPUTE_TMCAV,
     COMPUTE_VUV,
     COMPUTE_COARSE_CLOVER,
     COMPUTE_REVERSE_Y,
@@ -687,6 +783,10 @@ namespace quda {
       case COMPUTE_TMAV:
 	// # chiral blocks * size of chiral block * number of null space vectors
 	flops_ = 2*arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
+	break;
+      case COMPUTE_TMCAV:
+	// # Twice chiral blocks * size of chiral block * number of null space vectors
+	flops_ = 4*arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
       case COMPUTE_VUV:
 	// when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
@@ -728,6 +828,9 @@ namespace quda {
       case COMPUTE_TMAV:
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
 	break;
+      case COMPUTE_TMCAV:
+	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.UV.Bytes() + 4*arg.C.Bytes(); // Two clover terms and more temporary storage
+	break;
       case COMPUTE_VUV:
 	bytes_ = arg.UV.Bytes() + arg.V.Bytes();
 	break;
@@ -753,6 +856,7 @@ namespace quda {
       case COMPUTE_UV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
+      case COMPUTE_TMCAV:
       case COMPUTE_VUV:
       case COMPUTE_COARSE_CLOVER:
 	threads = arg.fineVolumeCB;
@@ -817,6 +921,11 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
 	  ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+
+	} else if (type == COMPUTE_TMCAV) {
+
+	  if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
+	  ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
 
 	} else if (type == COMPUTE_VUV) {
 
@@ -884,7 +993,8 @@ namespace quda {
 
       if      (type == COMPUTE_UV)            strcat(Aux,",computeUV");
       else if (type == COMPUTE_AV)            strcat(Aux,",computeAV");
-      else if (type == COMPUTE_TMAV)          strcat(Aux,",computeAV");
+      else if (type == COMPUTE_TMAV)          strcat(Aux,",computeTmAV");
+      else if (type == COMPUTE_TMCAV)         strcat(Aux,",computeTmcAV");
       else if (type == COMPUTE_VUV)           strcat(Aux,",computeVUV");
       else if (type == COMPUTE_COARSE_CLOVER) strcat(Aux,",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)     strcat(Aux,",computeYreverse");
@@ -1042,11 +1152,17 @@ namespace quda {
     // null-space vectors by the clover inverse matrix, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      printfQuda("Computing AV\n");
+      if (mu != 0.0) {
+        printfQuda("Computing TMCAV\n");
 
-      y.setComputeType(COMPUTE_AV);
-      y.apply(0);
+        y.setComputeType(COMPUTE_TMCAV);
+        y.apply(0);
+      } else {
+        printfQuda("Computing AV\n");
 
+        y.setComputeType(COMPUTE_AV);
+        y.apply(0);
+      }
       printfQuda("AV2 = %e\n", AV.norm2());
     }
 
