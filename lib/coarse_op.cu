@@ -154,9 +154,6 @@ namespace quda {
 		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
-#ifdef	DYNAMIC_CLOVER
-    errorQuda("Unsupported feature DYNAMIC_CLOVER in multigrid solver for twisted-clover fermions\n");
-#endif
     int pad = 0;
     GaugeFieldParam gf_param(gauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
     gf_param.order = QUDA_QDP_GAUGE_ORDER;
@@ -207,11 +204,9 @@ namespace quda {
     cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
 
     if (cloverInv) {
-      printfQuda("Inverse field\n");
       cf_param.direct = false;
       cpuCloverField cI(cf_param);
       cloverInv->saveCPUField(cI);
-      printfQuda("Direct field\n");
       cf_param.direct = true;
       cpuCloverField c(cf_param);
       clover->saveCPUField(c);
