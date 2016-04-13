@@ -14,8 +14,8 @@ namespace quda {
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder,
             int fineColor, int fineSpin, int coarseColor, int coarseSpin>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		  const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		  const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
 
     typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder> F;
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
@@ -37,35 +37,35 @@ namespace quda {
     cFine cInvAccessor(const_cast<CloverField&>(cI), true);
 
     calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
-      (yAccessor, xAccessor, xInvAccessor, uvAccessor, avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, Yhat, av, v, kappa, mu, dirac, matpc);
+      (yAccessor, xAccessor, xInvAccessor, uvAccessor, avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, Yhat, av, v, kappa, mu, dirac, matpc, twisted);
   }
 
   // template on the number of coarse degrees of freedom
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder,
 	    int fineColor, int fineSpin>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		  const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		  const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     if (T.Vectors().Nspin()/T.Spin_bs() != 2)
       errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
     if (coarseColor == 2) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else if (coarseColor == 4) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,4,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,4,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else if (coarseColor == 8) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,8,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,8,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else if (coarseColor == 12) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,12,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,12,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else if (coarseColor == 16) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,16,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,16,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else if (coarseColor == 20) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,20,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,20,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else if (coarseColor == 24) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else if (coarseColor == 32) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,32,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,32,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -73,10 +73,10 @@ namespace quda {
 
   // template on fine spin
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder, int fineColor>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		  const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		  const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     if (uv.Nspin() == 4) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,4>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,4>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       errorQuda("Unsupported number of spins %d\n", uv.Nspin());
     }
@@ -84,49 +84,49 @@ namespace quda {
 
   // template on fine colors
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		  const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		  const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     if (g.Ncolor() == 3) {
-      calculateY<Float,csOrder,gOrder,clOrder,3>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,clOrder,3>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }
   }
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		  const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		  const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     //If c == NULL, then this is standard Wilson.  csOrder is dummy and will not matter      
     if (c.Order() == QUDA_PACKED_CLOVER_ORDER) {
-      calculateY<Float,csOrder,gOrder,QUDA_PACKED_CLOVER_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,gOrder,QUDA_PACKED_CLOVER_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       errorQuda("Unsupported field order %d\n", c.Order());
     }
   }
 
   template <typename Float, QudaFieldOrder csOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		  const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		  const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     if (g.FieldOrder() == QUDA_QDP_GAUGE_ORDER) {
-      calculateY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       errorQuda("Unsupported field order %d\n", g.FieldOrder());
     }
   }
 
  template <typename Float>
- void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		 const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+ void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		 const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     if (T.Vectors().FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      calculateY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
     }
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av,
-		  const Transfer &T, const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+		  const GaugeField &g, const CloverField &c, const CloverField &cI, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     if (X.Precision() != Y.Precision() || Y.Precision() != uv.Precision() ||
         Y.Precision() != T.Vectors().Precision() || Y.Precision() != g.Precision())
       errorQuda("Unsupported precision mix");
@@ -135,12 +135,12 @@ namespace quda {
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
-      calculateY<double>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<double>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-      calculateY<float>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY<float>(Y, X, Xinv, Yhat, uv, av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
@@ -151,7 +151,7 @@ namespace quda {
   //N.B. Assumes Y, X have been allocated.
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover, const cudaCloverField *cloverInv,
-		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
     int pad = 0;
@@ -179,7 +179,7 @@ namespace quda {
 
     // if we are coarsening a preconditioned clover or twisted-mass operator we need
     // an additional vector to store the cloverInv * V field, else just alias v
-    ColorSpinorField *av = ((matpc != QUDA_MATPC_INVALID && clover) || (matpc != QUDA_MATPC_INVALID && (mu != 0.0))) ? ColorSpinorField::Create(UVparam) :
+    ColorSpinorField *av = ((matpc != QUDA_MATPC_INVALID && clover) || (matpc != QUDA_MATPC_INVALID && twisted)) ? ColorSpinorField::Create(UVparam) :
       &const_cast<ColorSpinorField&>(T.Vectors());
 
     //If the fine lattice operator is the clover operator, copy the cudaCloverField to cpuCloverField
@@ -203,18 +203,18 @@ namespace quda {
     cf_param.create = QUDA_NULL_FIELD_CREATE;
     cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
 
-    if (cloverInv) {
+    if (cloverInv && twisted) {
       cf_param.direct = false;
       cpuCloverField cI(cf_param);
       cloverInv->saveCPUField(cI);
       cf_param.direct = true;
       cpuCloverField c(cf_param);
       clover->saveCPUField(c);
-      calculateY(Y, X, Xinv, Yhat, *uv, *av, T, g, c, cI, kappa, mu, dirac, matpc);
+      calculateY(Y, X, Xinv, Yhat, *uv, *av, T, g, c, cI, kappa, mu, dirac, matpc, twisted);
     } else {
       cpuCloverField c(cf_param);
       if (clover) clover->saveCPUField(c);
-      calculateY(Y, X, Xinv, Yhat, *uv, *av, T, g, c, c, kappa, mu, dirac, matpc);
+      calculateY(Y, X, Xinv, Yhat, *uv, *av, T, g, c, c, kappa, mu, dirac, matpc, twisted);
     }
 
     if (&T.Vectors() != av) delete av;

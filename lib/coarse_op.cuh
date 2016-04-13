@@ -29,13 +29,15 @@ namespace quda {
     Float kappa;                /** kappa value */
     Float mu;                   /** mu value */
 
+    bool  twisted;		/** Are we using twisted-mas/clover fermions? */
+
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
     CalculateYArg(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinor &V,
-		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
+		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_, bool twisted)
       : Y(Y), X(X), Xinv(Xinv), UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)),
-	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
+	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()), twisted(twisted)
     {
       if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
 	errorQuda("Gamma basis %d not supported", V.GammaBasis());
@@ -1355,7 +1357,7 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
   public:
     CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta)
       : TunableVectorY(2), arg(arg), type(type),
-	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || (dirac == QUDA_WILSONPC_DIRAC && arg.mu != 0.0) ||  bidirectional_debug),
+	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || (dirac == QUDA_WILSONPC_DIRAC && arg.twisted) ||  bidirectional_debug),
 	meta(meta), dim(0), dir(QUDA_BACKWARDS)
     {
       strcpy(aux, meta.AuxString());
@@ -1589,12 +1591,13 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
      @param kappa[in] Kappa parameter
      @param mu[in] Twisted-mass parameter
      @param matpc[in] The type of preconditioning of the source fine-grid operator
+     @param twisted[in] Are we using twisted-mass/clover fermions?
    */
   template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
 	   QudaGaugeFieldOrder gOrder, typename F, typename Ftmp, typename coarseGauge, typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, Ftmp &UV, F &AV, F &V, fineGauge &G, fineClover &C, fineClover &Cinv,
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, ColorSpinorField &av, const ColorSpinorField &v,
-		  double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+		  double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted) {
 
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
       errorQuda("Unsupported coarsening of matpc = %d", matpc);
@@ -1617,12 +1620,12 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     typedef CalculateYArg<Float,coarseGauge,fineGauge,F,Ftmp,fineClover> Arg;
-    Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, x_size, xc_size, geo_bs, spin_bs);
+    Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, x_size, xc_size, geo_bs, spin_bs, twisted);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v);
 
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
-    bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug || (dirac == QUDA_WILSONPC_DIRAC && mu != 0.0));
+    bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug || (dirac == QUDA_WILSONPC_DIRAC && twisted));
     if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
     else printfQuda("Doing uni-directional link coarsening\n");
 
@@ -1631,7 +1634,7 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
     // null-space vectors by the clover inverse matrix, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      if (mu != 0.0) {
+      if (twisted) {
         printfQuda("Computing TMCAV\n");
 
         y.setComputeType(COMPUTE_TMCAV);
@@ -1648,7 +1651,7 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
     // If doing preconditioned twisted-mass then we first multiply the
     // null-space vectors by the inverse twist, since this is
     // needed for the coarse link computation
-    if ( dirac == QUDA_WILSONPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) && (mu != 0.0)) {
+    if ( dirac == QUDA_WILSONPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) && twisted) {
       printfQuda("Computing TMAV\n");
 
       y.setComputeType(COMPUTE_TMAV);
@@ -1683,7 +1686,7 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
       arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
     }
 
-    if ( dirac == QUDA_WILSONPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) && (mu != 0.0)) {
+    if ( dirac == QUDA_WILSONPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) && twisted) {
       int dummy = 0;
       av.exchangeGhost(QUDA_INVALID_PARITY, dummy);
       arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
@@ -1724,7 +1727,7 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(0);
 
-      if (mu != 0.) {
+      if (twisted) {
         y.setComputeType(COMPUTE_TMDIAGONAL);
         y.apply(0);
       }
@@ -1734,7 +1737,7 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(0);
 
-      if (mu != 0. && dirac == QUDA_WILSON_DIRAC) {
+      if (twisted && dirac == QUDA_WILSON_DIRAC) {
         y.setComputeType(COMPUTE_TMDIAGONAL);
         y.apply(0);
       }
