@@ -1,9 +1,10 @@
-#include <multigrid.h>
 #include <transfer.h>
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
+#if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
+#endif
 
 namespace quda {
 
@@ -362,7 +363,7 @@ namespace quda {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
-#ifdef __CUDA_ARCH__
+#if __CUDA_ARCH__ >= 300
 	// reduce down to the first group of column-split threads
 	const int warp_size = 32;
 #pragma unroll
@@ -513,7 +514,8 @@ namespace quda {
     // Experimental autotuning of the color column stride
     bool advanceAux(TuneParam &param) const
     {
-
+#if __COMPUTE_CAPABILITY__ >= 300
+      // we can only split the dot product on Kepler and later since we need the __shfl instruction
       if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0) {
 	param.aux.x *= 2; // safe to advance
 	color_col_stride = param.aux.x;
@@ -524,6 +526,7 @@ namespace quda {
 	// check this grid size is valid before returning
 	if (param.grid.x < deviceProp.maxGridSize[0]) return true;
       }
+#endif
 
       // reset color column stride if too large or not divisible
       param.aux.x = 1;

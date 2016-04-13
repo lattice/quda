@@ -1564,8 +1564,10 @@ int device = 0;
 
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
+QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
+QudaPrecision  prec_precondition = QUDA_INVALID_PRECISION;
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
@@ -1620,10 +1622,12 @@ void usage(char** argv )
 #ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
 #endif
-  printf("    --prec <double/single/half>               # Precision in GPU\n"); 
-  printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
-  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n"); 
-  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n"); 
+  printf("    --prec <double/single/half>               # Precision in GPU\n");
+  printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n");
+  printf("    --prec_precondition <double/single/half>  # Preconditioner precision in GPU\n");
+  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
+  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
+  printf("    --recon_precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
   printf("    --dim <n>                                 # Set space-time dimension (X Y Z T)\n"); 
   printf("    --sdim <n>                                # Set space dimension(X/Y/Z) size\n"); 
@@ -1751,10 +1755,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--prec_precondition") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    prec_precondition =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--recon") == 0){
     if (i+1 >= argc){
       usage(argv);
-    }	    
+    }
     link_recon =  get_recon(argv[i+1]);
     i++;
     ret = 0;
@@ -1764,13 +1778,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
   if( strcmp(argv[i], "--recon_sloppy") == 0){
     if (i+1 >= argc){
       usage(argv);
-    }	    
+    }
     link_recon_sloppy =  get_recon(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
   
+  if( strcmp(argv[i], "--recon_precondition") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    link_recon_precondition =  get_recon(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--dim") == 0){
     if (i+1 >= argc){
       usage(argv);

@@ -48,7 +48,7 @@ namespace quda {
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
       K = new CG(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
-      K = new MR(matPrecon, Kparam, profile);
+      K = new MR(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
       K = new SD(matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner

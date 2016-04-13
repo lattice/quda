@@ -39,8 +39,10 @@ extern int Lsdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
-extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
+extern QudaPrecision  prec_precondition;
+extern QudaReconstructType link_recon_sloppy;
+extern QudaReconstructType link_recon_precondition;
 extern double mass;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
@@ -103,7 +105,7 @@ display_test_info()
 QudaPrecision &cpu_prec = prec;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-QudaPrecision &cuda_prec_precondition = prec_sloppy;
+QudaPrecision &cuda_prec_precondition = prec_precondition;
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.X[0] = xdim;
@@ -125,7 +127,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
 
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
-  gauge_param.reconstruct_precondition = link_recon_sloppy;
+  gauge_param.reconstruct_precondition = link_recon_precondition;
 
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
@@ -263,6 +265,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
@@ -326,7 +329,6 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
 }
 
@@ -341,12 +343,10 @@ int main(int argc, char **argv)
     usage(argv);
   }
 
-  if (prec_sloppy == QUDA_INVALID_PRECISION){
-    prec_sloppy = prec;
-  }
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
-    link_recon_sloppy = link_recon;
-  }
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+  if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);

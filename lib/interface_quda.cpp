@@ -1313,12 +1313,10 @@ namespace quda {
     case QUDA_MOBIUS_DWF_DSLASH:
       if (inv_param->Ls > QUDA_MAX_DWF_LS)
 	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
-      if(pc) {
-	diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC;
-	diracParam.Ls = inv_param->Ls;
-	memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
-	memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
-      } else errorQuda("At currently, only preconditioned Mobius DWF is supported, %d", inv_param->dslash_type);
+      diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
+      diracParam.Ls = inv_param->Ls;
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
       break;
     case QUDA_STAGGERED_DSLASH:
       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
@@ -1383,7 +1381,7 @@ namespace quda {
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
-  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc, bool comms)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1400,10 +1398,10 @@ namespace quda {
     diracParam.cloverInv = cloverInvPrecondition;
 
     for (int i=0; i<4; i++) {
-      diracParam.commDim[i] = 0; // comms are always off
+      diracParam.commDim[i] = comms ? 1 : 0;
     }
 
-    // In the preconditioned staggered CG allow a different dlsash type in the preconditioning
+    // In the preconditioned staggered CG allow a different dslash type in the preconditioning
     if(inv_param->inv_type == QUDA_PCG_INVERTER && inv_param->dslash_type == QUDA_ASQTAD_DSLASH
        && inv_param->dslash_type_precondition == QUDA_STAGGERED_DSLASH) {
        diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
@@ -1420,7 +1418,7 @@ namespace quda {
 
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    setDiracPreParam(diracPreParam, &param, pc_solve);
+    setDiracPreParam(diracPreParam, &param, pc_solve, false);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -1701,8 +1699,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
-  DiracMobiusDomainWallPC dirac(diracParam); // create the Dirac operator
-  double kappa5 = 0.0;  // Kappa5 is dummy argument
+  DiracMobiusPC dirac(diracParam); // create the Dirac operator
   switch (test_type) {
     case 0:
       dirac.Dslash4(out, in, parity);
@@ -1714,7 +1711,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
       dirac.Dslash4pre(out, in, parity);
       break;
     case 3:
-      dirac.Dslash5inv(out, in, parity, kappa5);
+      dirac.Dslash5inv(out, in, parity);
       break;
   }
 
@@ -2202,7 +2199,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
 
   // this is the Dirac operator we use for smoothing
-  DiracParam diracSloppyParam;
+  DiracParam diracSmoothParam;
   bool fine_grid_pc_solve = (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
     (mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
   setDiracSloppyParam(diracSloppyParam, param, fine_grid_pc_solve);
@@ -2212,6 +2209,12 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   }else{
     mSmooth   = new DiracM(*dSmooth);
   }
+
+  // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
+  DiracParam diracSmoothSloppyParam;
+  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
+  dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
+  mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
   printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
@@ -2223,9 +2226,9 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   // fill out the MG parameters for the fine level
   if( ksmSmooth == nullptr )//
-    mgParam = new MGParam(mg_param, B, *m, *mSmooth);
+    mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
   else
-    mgParam = new MGParam(mg_param, B, *m, *ksmSmooth);
+    mgParam = new MGParam(mg_param, B, *m, *ksmSmooth, *mSmoothSloppy);//BUG!
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
