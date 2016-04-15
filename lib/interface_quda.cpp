@@ -2700,9 +2700,8 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
 
     if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-      errorQuda("norm_error_solve not supported in multiRhs solve");
-      // cudaColorSpinorField tmp(*in);
-      // dirac.Mdag(*in, tmp);
+      cudaColorSpinorField tmp(*(in[i]));
+      dirac.Mdag(*(in[i]), tmp);
     } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);

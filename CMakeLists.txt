@@ -1,8 +1,9 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 11)
 
 # disable in source builds
 # this is only a temporary fix, but for now we need it as cmake will
@@ -380,7 +381,7 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
 # NVCC FLAGS independet off build type
-set(QUDA_NVCC_FLAGS -std=c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+set(QUDA_NVCC_FLAGS --std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
@@ -413,19 +414,19 @@ mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
 # we might use:
 # set_property(TARGET tgt PROPERTY CXX_STANDARD 11) in the future but need to check support in older cmake version
 
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS}-O3 -Wall" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -w" CACHE STRING
+set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
