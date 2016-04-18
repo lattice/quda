@@ -419,10 +419,10 @@ set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -Wall" CACHE STRI
 set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -Wno-unknown-pragmas" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
 set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
@@ -437,7 +437,7 @@ set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
 set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CMAKE_C_FLAGS_HOSTDEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_C_FLAGS_HOSTDEBUG "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
 set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
