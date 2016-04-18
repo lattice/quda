@@ -2543,8 +2543,15 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   b.resize(param->num_rhs);
   std::vector<ColorSpinorField*> x;  // Cuda Solutions
   x.resize(param->num_rhs);
-  ColorSpinorField *in = NULL;
-  ColorSpinorField *out = NULL;
+  std::vector<ColorSpinorField*> in;// = NULL;
+  in.resize(param->num_rhs);
+  std::vector<ColorSpinorField*> out;// = NULL;
+  out.resize(param->num_rhs);
+
+  for(int i=0;i < param->num_rhs;i++){
+    in[i] = NULL;
+    out[i] = NULL;
+  }
 
   const int *X = cudaGauge->X();
 
@@ -2642,17 +2649,17 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // MW: need to check what dirac.prepare does
   // for now let's just try looping of num_rhs already here???
   for(int i=0; i < param->num_rhs; i++) {
-    dirac.prepare(in, out, *x[i], *b[i], param->solution_type);
+    dirac.prepare(in[i], out[i], *x[i], *b[i], param->solution_type);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
-      double nin = blas::norm2(*in);
-      double nout = blas::norm2(*out);
+      double nin = blas::norm2(*(in[i]));
+      double nout = blas::norm2(*(out[i]));
       printfQuda("Prepared source = %g\n", nin);
       printfQuda("Prepared solution = %g\n", nout);
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) {
-      double nin = blas::norm2(*in);
+      double nin = blas::norm2(*(in[i]));
       printfQuda("Prepared source post mass rescale = %g\n", nin);
     }
 
@@ -2693,14 +2700,15 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
 
     if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-      cudaColorSpinorField tmp(*in);
-      dirac.Mdag(*in, tmp);
+      errorQuda("norm_error_solve not supported in multiRhs solve");
+      // cudaColorSpinorField tmp(*in);
+      // dirac.Mdag(*in, tmp);
     } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(*out, *in);
-      blas::copy(*in, *out);
+      (*solve)(*(out[i]), *(in[i]));
+      blas::copy(*(in[i]), *(out[i]));
       solverParam.updateInvertParam(*param,i,i);
       delete solve;
     }
@@ -2709,25 +2717,26 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(*out, *in);
+      (*solve)(*(out[i]), *(in[i]));
       solverParam.updateInvertParam(*param,i,i);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(*out, *in);
+      (*solve)(*(out[i]), *(in[i]));
       solverParam.updateInvertParam(*param,i,i);
       delete solve;
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      cudaColorSpinorField tmp(*out);
-      SolverParam solverParam(*param);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(tmp, *in); // y = (M M^\dag) b
-      dirac.Mdag(*out, tmp);  // x = M^dag y
-      solverParam.updateInvertParam(*param,i,i);
-      delete solve;
+      //cudaColorSpinorField tmp(*out);
+      errorQuda("norm_error_solve not supported in multiRhs solve");
+      // SolverParam solverParam(*param);
+      //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      //(*solve)(tmp, *in); // y = (M M^\dag) b
+      //dirac.Mdag(*out, tmp);  // x = M^dag y
+      //solverParam.updateInvertParam(*param,i,i);
+      // delete solve;
     }
 
     if (getVerbosity() >= QUDA_VERBOSE){

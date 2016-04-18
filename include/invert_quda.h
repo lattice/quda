@@ -568,6 +568,34 @@ namespace quda {
     void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in);
   };
 
+
+  class MultiRhsSolver {
+
+  protected:
+    SolverParam &param;
+    TimeProfile &profile;
+
+  public:
+    MultiRhsSolver(SolverParam &param, TimeProfile &profile) :
+    param(param), profile(profile) { ; }
+    virtual ~MultiRhsSolver() { ; }
+
+    virtual void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
+  };
+
+  class MultiRhsCG : public MultiRhsSolver {
+
+  protected:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+
+  public:
+    MultiRhsCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~MultiRhsCG();
+
+    void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
+  };
+
   /**
      This computes the optimum guess for the system Ax=b in the L2
      residual norm.  For use in the HMD force calculations using a
