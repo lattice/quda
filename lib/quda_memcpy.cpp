@@ -48,7 +48,7 @@ namespace quda {
 
     TuneKey tuneKey() const {
       char vol[128];
-      sprintf(vol, "bytes=%u", (unsigned int)count);
+      sprintf(vol, "bytes=%llu", (long long unsigned int)count);
       return TuneKey(vol, name, aux);
     }
 
@@ -59,9 +59,13 @@ namespace quda {
 
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
 		  const char *func, const char *file, int line) {
+    if (getVerbosity() == QUDA_DEBUG_VERBOSE)
+      printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
+
     if (count == 0) return;
     QudaMemCopy copy(dst, src, count, kind, func, file, line);
     copy.apply(0);
+    checkCudaError();
   }
 
 } // namespace quda
