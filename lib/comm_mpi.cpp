@@ -96,6 +96,8 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
 void comm_peer2peer_init()
 {
+  if (peer2peer_init) return;
+
   bool disable_peer_to_peer = false;
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
   if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
@@ -146,9 +148,9 @@ void comm_peer2peer_init()
 
     host_free(hostname_recv_buf);
     host_free(gpuid_recv_buf);
-
-    peer2peer_init = true;
   }
+
+  peer2peer_init = true;
   return;
 }
 
