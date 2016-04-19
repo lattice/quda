@@ -80,23 +80,24 @@ namespace quda {
       cudaGaugeField& outFieldA;
       cudaGaugeField& outFieldB;
       typename RealTypeId<Complex>::Type coeff[2];
-      
+
       StaggeredOprodArg(const unsigned int length,
-          const int X[4],
-          const unsigned int parity,
-          const unsigned int dir,
-          const unsigned int ghostOffset,
-          const unsigned int displacement,   
-          const KernelType& kernelType, 
-          const double coeff[2],
-          InputA& inA,
-          InputB& inB,
-          Output& outA,
-          Output& outB,
-          cudaGaugeField& outFieldA,
-          cudaGaugeField& outFieldB) : length(length), parity(parity), ghostOffset(ghostOffset), 
-      displacement(displacement), kernelType(kernelType), inA(inA), inB(inB), outA(outA), outB(outB),
-      outFieldA(outFieldA), outFieldB(outFieldB)
+			const int X[4],
+			const unsigned int parity,
+			const unsigned int dir,
+			const unsigned int ghostOffset,
+			const unsigned int displacement,
+			const KernelType& kernelType,
+			const double coeff[2],
+			InputA& inA,
+			InputB& inB,
+			Output& outA,
+			Output& outB,
+			cudaGaugeField& outFieldA,
+			cudaGaugeField& outFieldB) :
+	length(length), parity(parity), dir(dir), ghostOffset(ghostOffset),
+	displacement(displacement), kernelType(kernelType), inA(inA), inB(inB),
+	outA(outA), outB(outB), outFieldA(outFieldA), outFieldB(outFieldB)
       {
         this->coeff[0] = coeff[0];
         this->coeff[1] = coeff[1];
@@ -177,7 +178,7 @@ namespace quda {
     {
 
       if(Nspin == 1){
-        unsigned int Xh[2] = {X[0]/2, X[1]/2};
+       int Xh[2] = {X[0]/2, X[1]/2};
         switch(dir){
           case 0:
             x[2] = cb_idx/Xh[1] % X[2];
@@ -605,7 +606,6 @@ namespace quda {
 
               arg.dir = i;
               arg.ghostOffset = ghostOffset[i];
-              const unsigned int volume = arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3];
               // First, do the one hop term
               {
 
@@ -648,6 +648,8 @@ namespace quda {
   {
 
 #ifdef GPU_STAGGERED_OPROD 
+    inEven.allocateGhostBuffer(3);
+    inOdd.allocateGhostBuffer(3);
 
     if(outA.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", outA.Order());    

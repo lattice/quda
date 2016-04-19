@@ -1483,7 +1483,10 @@ namespace quda {
 
 
         for(int i=0;i < 4; i++){
-          kparam_1g.ghostDim[i] = kparam_2g.ghostDim[i]=kparam_1g.ghostDim[i]=kparam_2g.ghostDim[i] = ghostDim[i];
+          kparam_1g.ghostDim[i] = ghostDim[i];
+	  kparam_2g.ghostDim[i] = ghostDim[i];
+	  kparam_1g.ghostDim[i] = ghostDim[i];
+	  kparam_2g.ghostDim[i] = ghostDim[i];
         }
 #else
         hisq_kernel_param_t kparam;
