@@ -22,7 +22,7 @@ int zeroCopy = 0;
 namespace quda {
 
   int cudaColorSpinorField::bufferIndex = 0;
-  int cudaColorSpinorField::initGhostFaceBuffer = 0;
+  bool cudaColorSpinorField::initGhostFaceBuffer = false;
   void* cudaColorSpinorField::ghostFaceBuffer[2]; //gpu memory
   void* cudaColorSpinorField::fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
@@ -34,8 +34,8 @@ namespace quda {
   int cudaColorSpinorField::buffer_recv_p2p_back[QUDA_MAX_DIM];
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-    ColorSpinorField(param), alloc(false), init(true), texInit(false), 
-    initComms(false), initIPCComms(false), bufferMessageHandler(0)
+    ColorSpinorField(param), alloc(false), init(true), ghostInit(false), texInit(false),
+    ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -57,8 +57,8 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-    ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-    initComms(false), initIPCComms(false), bufferMessageHandler(0)
+    ColorSpinorField(src), alloc(false), init(true), ghostInit(false), texInit(false),
+    ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -67,8 +67,8 @@ namespace quda {
   // creates a copy of src, any differences defined in param
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
-    ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-    initComms(false), initIPCComms(false), bufferMessageHandler(0)
+    ColorSpinorField(src), alloc(false), init(true), ghostInit(false), texInit(false),
+    ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -121,8 +121,8 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
-    : ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-      initComms(false), initIPCComms(false), bufferMessageHandler(0)
+    : ColorSpinorField(src), alloc(false), init(true), ghostInit(false), texInit(false),
+      ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -334,6 +334,7 @@ namespace quda {
   void cudaColorSpinorField::createGhostTexObject() {
     // create the ghost texture object
     if (isNative() && ghost_bytes) {
+      if (ghostTexInit) errorQuda("Already bound ghost texture");
 
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
@@ -386,6 +387,10 @@ namespace quda {
 
 	cudaCreateTextureObject(&ghostTexNorm, &resDesc, &texDesc, NULL);
       }
+
+      ghostTexInit = true;
+
+      checkCudaError();
     }
   }
 
@@ -400,10 +405,20 @@ namespace quda {
       texInit = false;
     }
   }
+
+  void cudaColorSpinorField::destroyGhostTexObject() {
+    if (isNative() && ghostTexInit) {
+      cudaDestroyTextureObject(ghostTex);
+      if (precision == QUDA_HALF_PRECISION) {
+	cudaDestroyTextureObject(ghostTexNorm);
+      }
+      ghostTexInit = false;
+    }
+  }
 #endif
 
   void cudaColorSpinorField::destroy() {
-    if (ghost_bytes) device_free(ghost_field);
+    if (ghost_field) device_free(ghost_field);
 
     if (alloc) {
       device_free(v);
@@ -560,25 +575,35 @@ namespace quda {
   }
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace) {
-    createGhostZone(nFace);
+    if (!ghostInit || nFace != nFaceComms) {
 
-    static bool init_ghost = false;
-
-    if (init_ghost) return;
-
-    // all fields create their own unique ghost zone
-    if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
-    createGhostTexObject();
-
-    // initialize the ghost pointers
-    if (siteSubset == QUDA_PARITY_SITE_SUBSET) {
-      for (int i=0; i<nDim; ++i) {
-        if (commDimPartitioned(i)) {
-          ghost[i] = (char*)ghost_field + ghostOffset[i][0]*precision;
-          if (precision == QUDA_HALF_PRECISION)
-            ghostNorm[i] = (char*)ghost_field + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
-        }
+      if (nFace != nFaceComms) {
+#ifdef USE_TEXTURE_OBJECTS
+	destroyGhostTexObject();
+#endif
+	if (ghostInit && ghost_bytes) device_free(ghost_field);
       }
+
+      createGhostZone(nFace);
+
+      // all fields create their own unique ghost zone
+      if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
+#ifdef USE_TEXTURE_OBJECTS
+      createGhostTexObject();
+#endif
+
+      // initialize the ghost pointers
+      if (siteSubset == QUDA_PARITY_SITE_SUBSET) {
+	for (int i=0; i<nDim; ++i) {
+	  if (commDimPartitioned(i)) {
+	    ghost[i] = (char*)ghost_field + ghostOffset[i][0]*precision;
+	    if (precision == QUDA_HALF_PRECISION)
+	      ghostNorm[i] = (char*)ghost_field + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
+	  }
+	}
+      }
+
+      ghostInit = true;
     }
 
     int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
@@ -598,7 +623,7 @@ namespace quda {
     }
 
     // only allocate if not already allocated or buffer required is bigger than previously
-    if (initGhostFaceBuffer == 0 || faceBytes > ghostFaceBytes) {
+    if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes) {
 
       if (initGhostFaceBuffer) {
         for (int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]);
@@ -606,7 +631,7 @@ namespace quda {
 
       if (faceBytes > 0) {
 	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(faceBytes);
-	initGhostFaceBuffer = 1;
+	initGhostFaceBuffer = true;
 	ghostFaceBytes = faceBytes;
       }
 
@@ -628,8 +653,6 @@ namespace quda {
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
     }
-
-    init_ghost = true;
   }
 
   void cudaColorSpinorField::allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const
@@ -653,7 +676,7 @@ namespace quda {
 
       if (faceBytes > 0) {
 	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(faceBytes);
-	initGhostFaceBuffer = 1;
+	initGhostFaceBuffer = true;
 	ghostFaceBytes = faceBytes;
       }
 
@@ -693,7 +716,7 @@ namespace quda {
         fwdGhostFaceBuffer[b][i] = NULL;
       }
     }
-    initGhostFaceBuffer = 0;
+    initGhostFaceBuffer = false;
   }
 
   // pack the ghost zone into a contiguous buffer for communications
@@ -906,6 +929,8 @@ namespace quda {
   cudaStream_t *stream;
 
   void cudaColorSpinorField::createComms(int nFace) {
+
+    allocateGhostBuffer(nFace); // allocate the ghost buffer if not yet allocated
 
     if (bufferMessageHandler != bufferPinnedResizeCount) destroyComms();
 
@@ -1418,7 +1443,6 @@ namespace quda {
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
 				  bool zeroCopyPack, double a, double b) {
 
-    allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
     createComms(nFace); // must call this first
 
     stream = stream_p;
@@ -1437,7 +1461,6 @@ namespace quda {
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx, 
 				  bool zeroCopyPack, double a, double b) {
 
-    allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
     createComms(nFace); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
@@ -1455,7 +1478,6 @@ namespace quda {
                                           const int dagger, const int dim,
                                           cudaStream_t *stream_p, const bool zeroCopyPack) {
 
-    allocateGhostBuffer(nFace); // allocate the ghost buffer if not yet allocated
     createComms(nFace); // must call this first
 
     stream = stream_p;

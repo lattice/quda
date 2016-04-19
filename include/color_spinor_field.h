@@ -397,8 +397,10 @@ namespace quda {
   private:
     bool alloc; // whether we allocated memory
     bool init;
+    bool ghostInit;
 
     bool texInit; // whether a texture object has been created or not
+    bool ghostTexInit; // whether the ghost texture object has been created
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
@@ -407,6 +409,7 @@ namespace quda {
     void createTexObject();
     void createGhostTexObject();
     void destroyTexObject();
+    void destroyGhostTexObject();
 #endif
 
 #ifdef GPU_COMMS  // This is a hack for half precision.
@@ -429,7 +432,7 @@ namespace quda {
     static void* ghostFaceBuffer[2]; // gpu memory
     static void* fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    static int initGhostFaceBuffer;
+    static bool initGhostFaceBuffer;
 
     /** Peer-to-peer message handler for signaling event posting */
     MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
