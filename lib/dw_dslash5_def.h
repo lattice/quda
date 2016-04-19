@@ -189,7 +189,7 @@
 #define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
-#define SPINORTEX ghostSpinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
@@ -410,6 +410,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
+#undef GHOSTSPINORTEX
 #undef READ_INTERMEDIATE_SPINOR
 #undef INTERTEX
 #undef READ_ACCUM
