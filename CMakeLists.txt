@@ -394,7 +394,7 @@ set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas -O3
 set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG CACHE STRING
+set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -G CACHE STRING
@@ -425,7 +425,7 @@ set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -Wno-unknown
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -Wno-unknown-pragmas" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -std=c++11 -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
