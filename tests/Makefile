@@ -48,7 +48,7 @@ ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
 endif
 
 TESTS = su3_test pack_test blas_test dslash_test invert_test		\
-	deflation_test multigrid_invert_test multigrid_benchmark $(DIRAC_TEST)	\
+	deflation_test multigrid_invert_test multigrid_benchmark_test $(DIRAC_TEST)	\
 	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)	\
 	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
 	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)		\
@@ -65,7 +65,7 @@ invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dsl
 multigrid_invert_test: multigrid_invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-multigrid_benchmark: multigrid_benchmark.o test_util.o misc.o $(QUDA)
+multigrid_benchmark_test: multigrid_benchmark_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 deflation_test: deflation_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
