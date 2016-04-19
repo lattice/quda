@@ -110,6 +110,7 @@ namespace quda {
 			   const double &k, const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
+    inSpinor->allocateGhostBuffer(1);
 
 #ifdef GPU_STAGGERED_DIRAC
 

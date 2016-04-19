@@ -205,6 +205,9 @@ namespace quda {
     size_t eigv_length;       // length including pads (but not ghost zones)
 
     // multi-GPU parameters
+
+    int nFaceComms; // number of faces allocated
+
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
     
@@ -214,8 +217,6 @@ namespace quda {
 
     size_t ghost_length; // length of ghost zone
     size_t ghost_norm_length; // length of ghost zone for norm
-    size_t total_length; // total length of spinor (physical + pad + ghost)
-    size_t total_norm_length; // total length of norm
 
     mutable void *ghost_fixme[2*QUDA_MAX_DIM];
 
@@ -228,8 +229,6 @@ namespace quda {
     //multi_GPU parameters:
     
     //ghost pointers are always for single eigenvector..
-    size_t eigv_total_length;
-    size_t eigv_total_norm_length;
     size_t eigv_ghost_length;
     size_t eigv_ghost_norm_length;
 
@@ -248,13 +247,12 @@ namespace quda {
     //! for eigcg:
     std::vector<ColorSpinorField*> eigenvectors;
       
-    void createGhostZone();
+    void createGhostZone(int nFace);
 
     // resets the above attributes based on contents of param
     void reset(const ColorSpinorParam &);
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
-    void clearGhostPointers();
 
     char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
     void setTuningString(); // set the vol_string and aux_string for use in tuning
@@ -277,7 +275,6 @@ namespace quda {
     int X(int d) const { return x[d]; }
     size_t RealLength() const { return real_length; }
     size_t Length() const { return length; }
-    size_t TotalLength() const { return total_length; }
     int Stride() const { return stride; }
     int Volume() const { return volume; }
     int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
@@ -331,7 +328,6 @@ namespace quda {
     int EigvStride() const { return eigv_stride; }
     size_t EigvLength() const { return eigv_length; }
     size_t EigvRealLength() const { return eigv_real_length; }
-    size_t EigvTotalLength() const { return eigv_total_length; }
     
     size_t EigvBytes() const { return eigv_bytes; }
     size_t EigvNormBytes() const { return eigv_norm_bytes; }
@@ -409,6 +405,7 @@ namespace quda {
     cudaTextureObject_t ghostTex;
     cudaTextureObject_t ghostTexNorm;
     void createTexObject();
+    void createGhostTexObject();
     void destroyTexObject();
 #endif
 
@@ -493,9 +490,6 @@ namespace quda {
 
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
-
-    /** How many faces we are communicating in this communicator */
-    int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
   public:
 

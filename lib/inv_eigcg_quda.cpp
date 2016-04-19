@@ -601,8 +601,8 @@ namespace quda {
          eigvRestart++;
 
          //Restart search space :
-         int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
-         int clen = Vm->EigvLength()      >> 1; //complex vector length
+         int cldn = Vm->EigvLength() >> 1; //complex leading dimension
+         int clen = Vm->EigvLength() >> 1; //complex vector length
          //
          int _2nev = eigcg_args->RestartVm(Vm->V(), cldn, clen, Vm->Precision());
 
