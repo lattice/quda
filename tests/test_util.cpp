@@ -1745,7 +1745,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--prec_sloppy") == 0){
+  if( strcmp(argv[i], "--prec-sloppy") == 0){
     if (i+1 >= argc){
       usage(argv);
     }	    
@@ -1755,7 +1755,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--prec_precondition") == 0){
+  if( strcmp(argv[i], "--prec-precondition") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
