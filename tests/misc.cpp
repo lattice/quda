@@ -788,17 +788,17 @@ get_dslash_type(char* s)
     ret = QUDA_WILSON_DSLASH;
   }else if (strcmp(s, "clover") == 0){
     ret = QUDA_CLOVER_WILSON_DSLASH;
-  }else if (strcmp(s, "twisted_mass") == 0){
+  }else if (strcmp(s, "twisted-mass") == 0){
     ret = QUDA_TWISTED_MASS_DSLASH;
-  }else if (strcmp(s, "twisted_clover") == 0){
+  }else if (strcmp(s, "twisted-clover") == 0){
     ret = QUDA_TWISTED_CLOVER_DSLASH;
   }else if (strcmp(s, "staggered") == 0){
     ret =  QUDA_STAGGERED_DSLASH;
   }else if (strcmp(s, "asqtad") == 0){
     ret =  QUDA_ASQTAD_DSLASH;
-  }else if (strcmp(s, "domain_wall") == 0){
+  }else if (strcmp(s, "domain-wall") == 0){
     ret =  QUDA_DOMAIN_WALL_DSLASH;
-  }else if (strcmp(s, "domain_wall_4d") == 0){
+  }else if (strcmp(s, "domain-wall-4d") == 0){
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
   }else if (strcmp(s, "mobius") == 0){
     ret =  QUDA_MOBIUS_DWF_DSLASH;
@@ -823,10 +823,10 @@ get_dslash_str(QudaDslashType type)
     ret= "clover";
     break;
   case QUDA_TWISTED_MASS_DSLASH:
-    ret= "twisted_mass";
+    ret= "twisted-mass";
     break;
   case QUDA_TWISTED_CLOVER_DSLASH:
-    ret= "twisted_clover";
+    ret= "twisted-clover";
     break;
   case QUDA_STAGGERED_DSLASH:
     ret = "staggered";
@@ -835,7 +835,7 @@ get_dslash_str(QudaDslashType type)
     ret = "asqtad";
     break;
   case QUDA_DOMAIN_WALL_DSLASH:
-    ret = "domain_wall";
+    ret = "domain-wall";
       break;
   case QUDA_DOMAIN_WALL_4D_DSLASH:
     ret = "domain_wall_4d";
@@ -862,7 +862,7 @@ get_mass_normalization_type(char* s)
     ret = QUDA_KAPPA_NORMALIZATION;
   }else if (strcmp(s, "mass") == 0){
     ret = QUDA_MASS_NORMALIZATION;
-  }else if (strcmp(s, "asym_mass") == 0){
+  }else if (strcmp(s, "asym-mass") == 0){
     ret = QUDA_ASYMMETRIC_MASS_NORMALIZATION;
   }else{
     fprintf(stderr, "Error: invalid mass normalization\n");
@@ -885,7 +885,7 @@ get_mass_normalization_str(QudaMassNormalization type)
     s = "mass";
     break;
   case QUDA_ASYMMETRIC_MASS_NORMALIZATION:
-    s = "asym_mass";
+    s = "asym-mass";
     break;
   default:
     fprintf(stderr, "Error: invalid mass normalization\n");
@@ -900,13 +900,13 @@ get_matpc_type(char* s)
 {
   QudaMatPCType ret =  QUDA_MATPC_INVALID;
 
-  if (strcmp(s, "even_even") == 0){
+  if (strcmp(s, "even-even") == 0){
     ret = QUDA_MATPC_EVEN_EVEN;
-  }else if (strcmp(s, "odd_odd") == 0){
+  }else if (strcmp(s, "odd-odd") == 0){
     ret = QUDA_MATPC_ODD_ODD;
-  }else if (strcmp(s, "even_even_asym") == 0){
+  }else if (strcmp(s, "even-even-asym") == 0){
     ret = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-  }else if (strcmp(s, "odd_odd_asym") == 0){
+  }else if (strcmp(s, "odd-odd-asym") == 0){
     ret = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
   }else{
     fprintf(stderr, "Error: invalid matpc type %s\n", s);
@@ -923,16 +923,16 @@ get_matpc_str(QudaMatPCType type)
 
   switch(type) {
   case QUDA_MATPC_EVEN_EVEN:
-    ret = "even_even";
+    ret = "even-even";
     break;
   case QUDA_MATPC_ODD_ODD:
-    ret = "odd_odd";
+    ret = "odd-odd";
     break;
   case QUDA_MATPC_EVEN_EVEN_ASYMMETRIC:
-    ret = "even_even_asym";
+    ret = "even-even-asym";
     break;
   case QUDA_MATPC_ODD_ODD_ASYMMETRIC:
-    ret = "odd_odd_asym";
+    ret = "odd-odd-asym";
     break;
   default:
     fprintf(stderr, "Error: invalid matpc type %d\n", type);
@@ -1008,9 +1008,9 @@ get_flavor_type(char* s)
     ret = QUDA_TWIST_MINUS;
   }else if (strcmp(s, "plus") == 0){
     ret = QUDA_TWIST_PLUS;
-  }else if (strcmp(s, "deg_doublet") == 0){
+  }else if (strcmp(s, "deg-doublet") == 0){
     ret = QUDA_TWIST_DEG_DOUBLET;
-  }else if (strcmp(s, "nondeg_doublet") == 0){
+  }else if (strcmp(s, "nondeg-doublet") == 0){
     ret = QUDA_TWIST_NONDEG_DOUBLET;
   }else if (strcmp(s, "no") == 0){
     ret =  QUDA_TWIST_NO;
@@ -1035,10 +1035,10 @@ get_flavor_str(QudaTwistFlavorType type)
     ret = "plus";
     break;
   case QUDA_TWIST_DEG_DOUBLET:
-    ret = "deg_doublet";
+    ret = "deg-doublet";
     break;
   case QUDA_TWIST_NONDEG_DOUBLET:
-    ret = "nondeg_doublet";
+    ret = "nondeg-doublet";
     break;
   case QUDA_TWIST_NO:
     ret = "no";
