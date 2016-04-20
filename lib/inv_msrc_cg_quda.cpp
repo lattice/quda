@@ -16,17 +16,17 @@
 
 namespace quda {
 
-  MultiRhsCG::MultiRhsCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    MultiRhsSolver(param, profile), mat(mat), matSloppy(matSloppy)
+  MultiSrcCG::MultiSrcCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    MultiSrcSolver(param, profile), mat(mat), matSloppy(matSloppy)
   {
 
   }
 
-  MultiRhsCG::~MultiRhsCG() {
+  MultiSrcCG::~MultiSrcCG() {
 
   }
 
-  void MultiRhsCG::operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in) 
+  void MultiSrcCG::operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in) 
   {
     
 

@@ -2476,7 +2476,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  * and solve_type must be NORMOP or NORMOP_PC.  The solution and solve
  * preconditioning have to match.
  */
-void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
+void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
 
   // currently that code is just a copy of invertQuda and cannot work
@@ -2540,15 +2540,15 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   profileInvert.TPSTART(QUDA_PROFILE_H2D);
 
   std::vector<ColorSpinorField*> b;  // Cuda Solutions
-  b.resize(param->num_rhs);
+  b.resize(param->num_src);
   std::vector<ColorSpinorField*> x;  // Cuda Solutions
-  x.resize(param->num_rhs);
+  x.resize(param->num_src);
   std::vector<ColorSpinorField*> in;// = NULL;
-  in.resize(param->num_rhs);
+  in.resize(param->num_src);
   std::vector<ColorSpinorField*> out;// = NULL;
-  out.resize(param->num_rhs);
+  out.resize(param->num_src);
 
-  for(int i=0;i < param->num_rhs;i++){
+  for(int i=0;i < param->num_src;i++){
     in[i] = NULL;
     out[i] = NULL;
   }
@@ -2558,12 +2558,12 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   // Host pointers for x, take a copy of the input host pointers
   void** hp_x;
-  hp_x = new void* [ param->num_rhs ];
+  hp_x = new void* [ param->num_src ];
 
   void** hp_b;
-  hp_b = new void* [param->num_rhs];
+  hp_b = new void* [param->num_src];
 
-  for(int i=0;i < param->num_rhs;i++){
+  for(int i=0;i < param->num_src;i++){
     hp_x[i] = _hp_x[i];
     hp_b[i] = _hp_b[i];
   }
@@ -2571,8 +2571,8 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b[0], *param, X, pc_solution, param->input_location);
   std::vector<ColorSpinorField*> h_b;
-  h_b.resize(param->num_rhs);
-  for(int i=0; i < param->num_rhs; i++) {
+  h_b.resize(param->num_src);
+  for(int i=0; i < param->num_src; i++) {
     cpuParam.v = hp_b[i]; //MW seems wird in the loop
     h_b[i] = ColorSpinorField::Create(cpuParam);
   }
@@ -2580,9 +2580,9 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
  // cpuParam.v = hp_x;
   cpuParam.location = param->output_location;
   std::vector<ColorSpinorField*> h_x;
-  h_x.resize(param->num_rhs);
+  h_x.resize(param->num_src);
 //
-  for(int i=0; i < param->num_rhs; i++) {
+  for(int i=0; i < param->num_src; i++) {
     cpuParam.v = hp_x[i]; //MW seems wird in the loop
     h_x[i] = ColorSpinorField::Create(cpuParam);
   }
@@ -2593,7 +2593,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param);
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  for(int i=0; i < param->num_rhs; i++) {
+  for(int i=0; i < param->num_src; i++) {
     b[i] = new cudaColorSpinorField(*h_b[i], cudaParam);
   }
 
@@ -2603,14 +2603,14 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
         (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Initial guess not supported for two-pass solver");
     }
-    for(int i=0; i < param->num_rhs; i++) {
+    for(int i=0; i < param->num_src; i++) {
       x[i] =  new cudaColorSpinorField(*h_x[i], cudaParam); // solution
     }
 
   } else { // zero initial guess
     // Create the solution fields filled with zero
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-    for(int i=0; i < param->num_rhs; i++) {
+    for(int i=0; i < param->num_src; i++) {
       x[i] = new cudaColorSpinorField(cudaParam);
     }
  // solution
@@ -2618,8 +2618,8 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
 
-  double * nb = new double[param->num_rhs];
-  for(int i=0; i < param->num_rhs; i++) {
+  double * nb = new double[param->num_src];
+  for(int i=0; i < param->num_src; i++) {
     nb[i] = blas::norm2(*b[i]);
     if (nb[i]==0.0) errorQuda("Source has zero norm");
 
@@ -2636,32 +2636,33 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    for(int i=0; i < param->num_rhs; i++) {
+    for(int i=0; i < param->num_src; i++) {
       blas::ax(1.0/sqrt(nb[i]), *b[i]);
       blas::ax(1.0/sqrt(nb[i]), *x[i]);
     }
   }
 
-  for(int i=0; i < param->num_rhs; i++) {
+  for(int i=0; i < param->num_src; i++) {
     massRescale(*static_cast<cudaColorSpinorField*>(b[i]), *param);
   }
 
   // MW: need to check what dirac.prepare does
   // for now let's just try looping of num_rhs already here???
-  for(int i=0; i < param->num_rhs; i++) {
+  for(int i=0; i < param->num_src; i++) {
     dirac.prepare(in[i], out[i], *x[i], *b[i], param->solution_type);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       double nin = blas::norm2(*(in[i]));
       double nout = blas::norm2(*(out[i]));
-      printfQuda("Prepared source = %g\n", nin);
-      printfQuda("Prepared solution = %g\n", nout);
+      printfQuda("Prepared source %i = %g\n", i, nin);
+      printfQuda("Prepared solution %i = %g\n", i, nout);
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       double nin = blas::norm2(*(in[i]));
-      printfQuda("Prepared source post mass rescale = %g\n", nin);
+      printfQuda("Prepared source %i post mass rescale = %g\n", i, nin);
     }
+  }
 
     // solution_type specifies *what* system is to be solved.
     // solve_type specifies *how* the system is to be solved.
@@ -2700,15 +2701,19 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
 
     if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-      cudaColorSpinorField tmp(*(in[i]));
-      dirac.Mdag(*(in[i]), tmp);
+      for(int i=0; i < param->num_src; i++) {
+        cudaColorSpinorField tmp(*(in[i]));
+        dirac.Mdag(*(in[i]), tmp);
+      }
     } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(*(out[i]), *(in[i]));
-      blas::copy(*(in[i]), *(out[i]));
-      solverParam.updateInvertParam(*param,i,i);
+      for(int i=0; i < param->num_src; i++) {
+        (*solve)(*(out[i]), *(in[i]));
+        blas::copy(*(in[i]), *(out[i]));
+        solverParam.updateInvertParam(*param,i,i);
+      }
       delete solve;
     }
 
@@ -2716,20 +2721,24 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(*(out[i]), *(in[i]));
-      solverParam.updateInvertParam(*param,i,i);
+      for(int i=0; i < param->num_src; i++) {
+        (*solve)(*(out[i]), *(in[i]));
+        solverParam.updateInvertParam(*param,i,i);
+      }
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(*(out[i]), *(in[i]));
-      solverParam.updateInvertParam(*param,i,i);
+      for(int i=0; i < param->num_src; i++) {
+        (*solve)(*(out[i]), *(in[i]));
+        solverParam.updateInvertParam(*param,i,i);
+      }
       delete solve;
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      //cudaColorSpinorField tmp(*out);
       errorQuda("norm_error_solve not supported in multiRhs solve");
+      //cudaColorSpinorField tmp(*out);
       // SolverParam solverParam(*param);
       //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       //(*solve)(tmp, *in); // y = (M M^\dag) b
@@ -2739,19 +2748,21 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
     }
 
     if (getVerbosity() >= QUDA_VERBOSE){
-      double nx = blas::norm2(*x[i]);
-      printfQuda("Solution = %g\n",nx);
+      for(int i=0; i < param->num_src; i++) {
+        double nx = blas::norm2(*x[i]);
+        printfQuda("Solution %i = %g\n",i, nx);
+      }
     }
-  }
+  
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
-  for(int i=0; i< param->num_rhs; i++){
+  for(int i=0; i< param->num_src; i++){
     dirac.reconstruct(*x[i], *b[i], param->solution_type);
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    for(int i=0; i< param->num_rhs; i++){
+    for(int i=0; i< param->num_src; i++){
       // rescale the solution
       blas::ax(sqrt(nb[i]), *x[i]);
     }
@@ -2760,7 +2771,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // MW -- not sure how to handle that here
   if (!param->make_resident_solution) {
     profileInvert.TPSTART(QUDA_PROFILE_D2H);
-    for(int i=0; i< param->num_rhs; i++){
+    for(int i=0; i< param->num_src; i++){
       *h_x[i] = *x[i];
     }
     profileInvert.TPSTOP(QUDA_PROFILE_D2H);
@@ -2775,7 +2786,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 //  }
 
   if (getVerbosity() >= QUDA_VERBOSE){
-    for(int i=0; i< param->num_rhs; i++){
+    for(int i=0; i< param->num_src; i++){
       double nx = blas::norm2(*x[i]);
       double nh_x = blas::norm2(*h_x[i]);
       printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
@@ -2783,7 +2794,7 @@ void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   }
 
   //FIX need to make sure all deletes are correct again
-  for(int i=0; i < param->num_rhs; i++){
+  for(int i=0; i < param->num_src; i++){
     delete h_x[i];
     delete x[i];
     delete h_b[i];

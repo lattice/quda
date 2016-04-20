@@ -569,29 +569,29 @@ namespace quda {
   };
 
 
-  class MultiRhsSolver {
+  class MultiSrcSolver {
 
   protected:
     SolverParam &param;
     TimeProfile &profile;
 
   public:
-    MultiRhsSolver(SolverParam &param, TimeProfile &profile) :
+    MultiSrcSolver(SolverParam &param, TimeProfile &profile) :
     param(param), profile(profile) { ; }
-    virtual ~MultiRhsSolver() { ; }
+    virtual ~MultiSrcSolver() { ; }
 
     virtual void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
   };
 
-  class MultiRhsCG : public MultiRhsSolver {
+  class MultiSrcCG : public MultiSrcSolver {
 
   protected:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
 
   public:
-    MultiRhsCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~MultiRhsCG();
+    MultiSrcCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~MultiSrcCG();
 
     void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
   };

@@ -402,7 +402,7 @@ int main(int argc, char **argv)
 //  if (multishift) {
 //    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
 //  } else {
-    invertMultiRHSQuda(spinorOutMulti, spinorIn, &inv_param);
+    invertMultiSrcQuda(spinorOutMulti, spinorIn, &inv_param);
 //  }
 
   // stop the timer

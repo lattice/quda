@@ -131,7 +131,7 @@ extern "C" {
 
     int num_offset; /**< Number of offsets in the multi-shift solver */
 
-    int num_rhs; /**< Number of rhs in the multiple right hand sides solver */
+    int num_src; /**< Number of sources in the multiple source solver */
 
     int overlap; /**< Width of domain overlaps */
 
@@ -576,7 +576,7 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invertMultiRHSQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
+  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
 
 
   /**
