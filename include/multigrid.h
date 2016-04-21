@@ -336,11 +336,10 @@ namespace quda {
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
-     @param twisted[in] For twisted-mass/clover fermions is set to true, false otherwise
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover, const cudaCloverField *cloverInv,
-		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc, bool twisted);
+		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)

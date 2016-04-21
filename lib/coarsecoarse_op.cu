@@ -37,7 +37,7 @@ namespace quda {
 
     calculateY<true,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
       (yAccessor, xAccessor, xInvAccessor, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor,
-       Y, X, Xinv, Yhat, const_cast<ColorSpinorField&>(v), v, kappa, mu, dirac, matpc, false);
+       Y, X, Xinv, Yhat, const_cast<ColorSpinorField&>(v), v, kappa, mu, dirac, matpc);
   }
 
 

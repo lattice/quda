@@ -172,7 +172,7 @@ namespace quda {
 
   void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, &cloverInv, kappa, a, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID, true);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, &cloverInv, kappa, a, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracTwistedCloverPC::DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac) : DiracTwistedClover(dirac) { }
@@ -452,6 +452,6 @@ namespace quda {
 
   void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, &cloverInv, kappa, a, QUDA_CLOVERPC_DIRAC, matpcType, true);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, &cloverInv, kappa, a, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
   }
 } // namespace quda
