@@ -74,6 +74,11 @@ namespace quda {
     return solver;
   }
 
+
+  void Solver::operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in){
+    for(int i=0; i < param.num_src; i++) (*this)(*(out[i]),*(in[i]));
+  };
+
   double Solver::stopping(const double &tol, const double &b2, QudaResidualType residual_type) {
 
     double stop=0.0;

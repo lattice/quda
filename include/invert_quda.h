@@ -105,6 +105,10 @@ namespace quda {
     /**< Domain overlap to use in the preconditioning */
     int overlap_precondition;
 
+
+    /**< Number of sources in the multi-src solver */
+    int num_src;
+
     // Multi-shift solver parameters
 
     /**< Number of offsets in the multi-shift solver */
@@ -200,7 +204,7 @@ namespace quda {
       maxiter(param.maxiter), iter(param.iter),
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
       precision_precondition(param.cuda_prec_precondition),
-      preserve_source(param.preserve_source), num_offset(param.num_offset),
+      preserve_source(param.preserve_source), num_src(param.num_src), num_offset(param.num_offset),
       Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
@@ -277,6 +281,8 @@ namespace quda {
     virtual ~Solver() { ; }
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
+
+    virtual void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
 
     /**
        Solver factory
@@ -569,32 +575,6 @@ namespace quda {
   };
 
 
-  class MultiSrcSolver {
-
-  protected:
-    SolverParam &param;
-    TimeProfile &profile;
-
-  public:
-    MultiSrcSolver(SolverParam &param, TimeProfile &profile) :
-    param(param), profile(profile) { ; }
-    virtual ~MultiSrcSolver() { ; }
-
-    virtual void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
-  };
-
-  class MultiSrcCG : public MultiSrcSolver {
-
-  protected:
-    const DiracMatrix &mat;
-    const DiracMatrix &matSloppy;
-
-  public:
-    MultiSrcCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~MultiSrcCG();
-
-    void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
-  };
 
   /**
      This computes the optimum guess for the system Ax=b in the L2

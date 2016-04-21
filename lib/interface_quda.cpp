@@ -2730,10 +2730,10 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      for(int i=0; i < param->num_src; i++) {
-        (*solve)(*(out[i]), *(in[i]));
-        solverParam.updateInvertParam(*param,i,i);
-      }
+      //for(int i=0; i < param->num_src; i++) {
+        (*solve)(out,in);
+       // solverParam.updateInvertParam(*param,i,i);
+      //}
       delete solve;
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);

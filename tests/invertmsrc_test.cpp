@@ -183,7 +183,7 @@ int main(int argc, char **argv)
 
   // offsets used only by multi-shift solver
   inv_param.num_offset = 12;
-  inv_param.num_rhs=2;
+  inv_param.num_src=2;
   double offset[12] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
@@ -344,17 +344,17 @@ int main(int argc, char **argv)
 
 
 
-  void **spinorIn = (void**)malloc(inv_param.num_rhs*sizeof(void *));
-  void **spinorCheck = (void**)malloc(inv_param.num_rhs*sizeof(void *));
-  for (int i=0; i<inv_param.num_rhs; i++) {
+  void **spinorIn = (void**)malloc(inv_param.num_src*sizeof(void *));
+  void **spinorCheck = (void**)malloc(inv_param.num_src*sizeof(void *));
+  for (int i=0; i<inv_param.num_src; i++) {
     spinorIn[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
     spinorCheck[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   }
 
   void **spinorOutMulti = NULL;
 //  if (multishift) {
-    spinorOutMulti = (void**)malloc(inv_param.num_rhs*sizeof(void *));
-    for (int i=0; i<inv_param.num_rhs; i++) {
+    spinorOutMulti = (void**)malloc(inv_param.num_src*sizeof(void *));
+    for (int i=0; i<inv_param.num_src; i++) {
       spinorOutMulti[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
     }
 //  } else {
@@ -363,7 +363,7 @@ int main(int argc, char **argv)
 
 
 //  if (multishift) {
-    for (int i=0; i<inv_param.num_rhs; i++) {
+    for (int i=0; i<inv_param.num_src; i++) {
       memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
       memset(spinorIn[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
       memset(spinorCheck[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
@@ -375,7 +375,7 @@ int main(int argc, char **argv)
   // create a point source at 0 (in each subvolume...  FIXME)
 
   // create a point source at 0 (in each subvolume...  FIXME)
-    for (int j=0; j<inv_param.num_rhs; j++) {
+    for (int j=0; j<inv_param.num_src; j++) {
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
     //((float*)spinorIn)[0] = 1.0;
     for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn[j])[i] = rand() / (float)RAND_MAX;
@@ -425,7 +425,7 @@ int main(int argc, char **argv)
 //    void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 //
 //    printfQuda("Host residuum checks: \n");
-//    for(int i=0; i < inv_param.num_rhs; i++) {
+//    for(int i=0; i < inv_param.num_src; i++) {
 //      ax(0, spinorCheck[i], V*spinorSiteSize, inv_param.cpu_prec);
 //
 //      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -459,7 +459,7 @@ int main(int argc, char **argv)
 //  }
 //    #if 0
 //   else
-  for (int i=0; i <inv_param.num_rhs; i++){
+  for (int i=0; i <inv_param.num_src; i++){
     
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 
