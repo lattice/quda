@@ -389,7 +389,8 @@ endif(QUDA_VERBOSE_BUILD)
 
 
 set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas -O3 -lineinfo CACHE STRING
-    "Flags used by the CUDA compiler during regular development builds." )
+    "Flags used by the CUDA compiler during regular development builds."
+    FORCE )
 set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )

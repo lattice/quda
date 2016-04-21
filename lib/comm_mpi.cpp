@@ -101,7 +101,7 @@ void comm_peer2peer_init()
   bool disable_peer_to_peer = false;
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
   if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
-    printfQuda("Disabling peer-to-peer access\n");
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling peer-to-peer access\n");
     disable_peer_to_peer = true;
   }
 
@@ -139,8 +139,9 @@ void comm_peer2peer_init()
 	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 	  if(canAccessPeer[0]*canAccessPeer[1]){
 	    peer2peer_enabled[dir][dim] = true;
-	    printf("Peer-to-peer enabled for rank %d with neighbor %d dir=%d, dim=%d\n",
-		   rank, neighbor_rank, dir, dim);
+	    if (getVerbosity() > QUDA_SILENT)
+	      printf("Peer-to-peer enabled for rank %d with neighbor %d dir=%d, dim=%d\n",
+		     rank, neighbor_rank, dir, dim);
 	  }
 	} // on the same node
       } // different dimensions - x, y, z, t
