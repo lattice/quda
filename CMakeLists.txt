@@ -412,7 +412,7 @@ mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
 # we might use:
 # set_property(TARGET tgt PROPERTY CXX_STANDARD 11) in the future but need to check support in older cmake version
 
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -std=c++11 -Ofast -Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -Wall" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -std=c++11 -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds.")
