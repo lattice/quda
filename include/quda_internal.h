@@ -319,18 +319,17 @@ namespace quda {
   const int Nstream = 1;
 #endif
 
-  /**
-     @brief Wrapper around cudaMemcpy used for auto-profiling
-     @param dst Destination pointer
-     @param src Source pointer
-     @param count Size of transfer
-     @param kind Type of memory copy
-  */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-		   const char *func, const char *file, int line);
+
 
 } // namespace quda
 
 #define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, __FILE__, __LINE__);
+namespace quda{
+  /**
+     * Check that the resident gauge field is compatible with the requested inv_param
+     * @param inv_param   Contains all metadata regarding host and device storage
+     */
+bool canReuseResidentGauge(QudaInvertParam *inv_param);
+}
 
 #endif // _QUDA_INTERNAL_H
