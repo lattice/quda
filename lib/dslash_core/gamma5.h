@@ -566,5 +566,7 @@ __global__ void gamma5Kernel(short4* spinor, float *spinorNorm, DslashParam para
 #undef tmp3_re
 #undef tmp3_im
 
+#undef SPINORTEX
+
 #endif	//_TWIST_QUDA_G5
 

@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2011-2013 NVIDIA Corporation. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- *   Redistributions of source code must retain the above copyright notice, 
+ *   Redistributions of source code must retain the above copyright notice,
  *   this list of conditions and the following disclaimer.
  *
  *   Redistributions in binary form must reproduce the above copyright notice,
@@ -12,31 +12,31 @@
  *   and/or other materials provided with the distribution.
  *
  *   Neither the name of NVIDIA Corporation nor the names of its contributors
- *   may be used to endorse or promote products derived from this software 
+ *   may be used to endorse or promote products derived from this software
  *   without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
 /*
  * Release 1.2
- * 
+ *
  * (1) Deployed new implementation of div_dbldbl() and sqrt_dbldbl() based on
  *     Newton-Raphson iteration, providing significant speedup.
  * (2) Added new function rsqrt_dbldbl() which provides reciprocal square root.
  *
  * Release 1.1
- * 
+ *
  * (1) Fixed a bug affecting add_dbldbl() and sub_dbldbl() that in very rare
  *     cases returned results with reduced accuracy.
  * (2) Replaced the somewhat inaccurate error bounds with the experimentally
@@ -52,16 +52,16 @@ extern "C" {
 
 #include <math.h>       /* import sqrt() */
 
-/* The head of a double-double number is stored in the most significant part 
+/* The head of a double-double number is stored in the most significant part
    of a double2 (the y-component). The tail is stored in the least significant
-   part of the double2 (the x-component). All double-double operands must be 
+   part of the double2 (the x-component). All double-double operands must be
    normalized on both input to and return from all basic operations, i.e. the
    magnitude of the tail shall be <= 0.5 ulp of the head.
 */
 typedef double2 dbldbl;
 
-/* Create a double-double from two doubles. No normalization is performed, 
-   so the head and tail components passed in must satisfy the normalization 
+/* Create a double-double from two doubles. No normalization is performed,
+   so the head and tail components passed in must satisfy the normalization
    requirement. To create a double-double from two arbitrary double-precision
    numbers, use add_double_to_dbldbl().
 */
@@ -118,10 +118,10 @@ __device__ __forceinline__ dbldbl neg_dbldbl (dbldbl a)
 }
 
 /* Compute high-accuracy sum of two double-double operands. In the absence of
-   underflow and overflow, the maximum relative error observed with 10 billion 
-   test cases was 3.0716194922303448e-32 (~= 2**-104.6826). 
-   This implementation is based on: Andrew Thall, Extended-Precision 
-   Floating-Point Numbers for GPU Computation. Retrieved on 7/12/2011 
+   underflow and overflow, the maximum relative error observed with 10 billion
+   test cases was 3.0716194922303448e-32 (~= 2**-104.6826).
+   This implementation is based on: Andrew Thall, Extended-Precision
+   Floating-Point Numbers for GPU Computation. Retrieved on 7/12/2011
    from http://andrewthall.org/papers/df64_qf128.pdf.
 */
 __device__ __forceinline__ dbldbl add_dbldbl (dbldbl a, dbldbl b)
@@ -143,11 +143,11 @@ __device__ __forceinline__ dbldbl add_dbldbl (dbldbl a, dbldbl b)
     return z;
 }
 
-/* Compute high-accuracy difference of two double-double operands. In the 
-   absence of underflow and overflow, the maximum relative error observed 
-   with 10 billion test cases was 3.0716194922303448e-32 (~= 2**-104.6826). 
-   This implementation is based on: Andrew Thall, Extended-Precision 
-   Floating-Point Numbers for GPU Computation. Retrieved on 7/12/2011 
+/* Compute high-accuracy difference of two double-double operands. In the
+   absence of underflow and overflow, the maximum relative error observed
+   with 10 billion test cases was 3.0716194922303448e-32 (~= 2**-104.6826).
+   This implementation is based on: Andrew Thall, Extended-Precision
+   Floating-Point Numbers for GPU Computation. Retrieved on 7/12/2011
    from http://andrewthall.org/papers/df64_qf128.pdf.
 */
 __device__ __forceinline__ dbldbl sub_dbldbl (dbldbl a, dbldbl b)
@@ -170,7 +170,7 @@ __device__ __forceinline__ dbldbl sub_dbldbl (dbldbl a, dbldbl b)
 }
 
 /* Compute high-accuracy product of two double-double operands, taking full
-   advantage of FMA. In the absence of underflow and overflow, the maximum 
+   advantage of FMA. In the absence of underflow and overflow, the maximum
    relative error observed with 10 billion test cases was 5.238480533564479e-32
    (~= 2**-103.9125).
 */
@@ -189,7 +189,7 @@ __device__ __forceinline__ dbldbl mul_dbldbl (dbldbl a, dbldbl b)
 }
 
 /* Compute high-accuracy quotient of two double-double operands, using Newton-
-   Raphson iteration. Based on: T. Nagai, H. Yoshida, H. Kuroda, Y. Kanada. 
+   Raphson iteration. Based on: T. Nagai, H. Yoshida, H. Kuroda, Y. Kanada.
    Fast Quadruple Precision Arithmetic Library on Parallel Computer SR11000/J2.
    In Proceedings of the 8th International Conference on Computational Science,
    ICCS '08, Part I, pp. 446-455. In the absence of underflow and overflow, the
@@ -215,11 +215,11 @@ __device__ __forceinline__ dbldbl div_dbldbl (dbldbl a, dbldbl b)
     return z;
 }
 
-/* Compute high-accuracy square root of a double-double number. Newton-Raphson 
+/* Compute high-accuracy square root of a double-double number. Newton-Raphson
    iteration based on equation 4 from a paper by Alan Karp and Peter Markstein,
-   High Precision Division and Square Root, ACM TOMS, vol. 23, no. 4, December 
-   1997, pp. 561-589. In the absence of underflow and overflow, the maximum 
-   relative error observed with 10 billion test cases was 
+   High Precision Division and Square Root, ACM TOMS, vol. 23, no. 4, December
+   1997, pp. 561-589. In the absence of underflow and overflow, the maximum
+   relative error observed with 10 billion test cases was
    3.7564109505601846e-32 (~= 2**-104.3923).
 */
 __device__ __forceinline__ dbldbl sqrt_dbldbl (dbldbl a)
@@ -246,7 +246,7 @@ __device__ __forceinline__ dbldbl sqrt_dbldbl (dbldbl a)
 
 /* Compute high-accuracy reciprocal square root of a double-double number.
    Based on Newton-Raphson iteration. In the absence of underflow and overflow,
-   the maximum relative error observed with 10 billion test cases was 
+   the maximum relative error observed with 10 billion test cases was
    6.4937771666026349e-32 (~= 2**-103.6026)
 */
 __device__ __forceinline__ dbldbl rsqrt_dbldbl (dbldbl a)
@@ -288,7 +288,7 @@ struct doubledouble {
   __device__ __host__ doubledouble(const doubledouble &a) : a(a.a) { }
   __device__ __host__ doubledouble(const dbldbl &a) : a(a) { }
   __device__ __host__ doubledouble(const double &head, const double &tail) { a.y = head; a.x = tail; }
-  __device__ __host__ doubledouble(const double &head) { a.y = head; a.x = 0.0; } 
+  __device__ __host__ doubledouble(const double &head) { a.y = head; a.x = 0.0; }
 
   __device__ __host__ doubledouble& operator=(const double &head) {
     this->a.y = head;
@@ -334,7 +334,7 @@ __device__ inline doubledouble add_double_to_doubledouble(const double &a, const
 __device__ inline doubledouble mul_double_to_doubledouble(const double &a, const double &b) {
   return doubledouble(mul_double_to_dbldbl(a,b));
 }
- 
+
 struct doubledouble2 {
   doubledouble x;
   doubledouble y;

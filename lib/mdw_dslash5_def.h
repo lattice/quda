@@ -53,11 +53,11 @@
 #endif
 
 #if (DD_PREC == 0)
-#define DD_PARAM4 const double mferm, const double2 *x, const float *xNorm, const double a, const DslashParam param
+#define DD_PARAM4 const double mferm, const double2 *x, const float *xNorm, const double a, const double b, const DslashParam param
 #elif (DD_PREC == 1) 
-#define DD_PARAM4 const float mferm, const float4 *x, const float *xNorm, const float a, const DslashParam param
+#define DD_PARAM4 const float mferm, const float4 *x, const float *xNorm, const float a, const float b, const DslashParam param
 #else
-#define DD_PARAM4 const float mferm, const short4 *x, const float *xNorm, const float a, const DslashParam param
+#define DD_PARAM4 const float mferm, const short4 *x, const float *xNorm, const float a, const float b, const DslashParam param
 #endif
 
 #if (DD_RECON==0) // reconstruct from 8 reals
@@ -186,8 +186,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
@@ -258,8 +260,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle
+#define GHOSTSPINORTEX ghostSpinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -326,8 +330,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
+#define GHOSTSPINORTEX ghostSpinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -408,6 +414,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
+#undef GHOSTSPINORTEX
 #undef READ_INTERMEDIATE_SPINOR
 #undef INTERTEX
 #undef READ_ACCUM

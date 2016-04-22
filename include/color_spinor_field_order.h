@@ -101,13 +101,12 @@ namespace quda {
       complex<Float> *v;
       complex<Float> *ghost[8];
       mutable int x[QUDA_MAX_DIM];
-      const int volume;
       const int volumeCB;
       const int nDim;
       const QudaGammaBasis gammaBasis;
-      const QudaSiteSubset siteSubset;
       const AccessorCB<Float,nSpin,nColor,nVec,order> accessor;
       const GhostAccessorCB<Float,nSpin,nColor,nVec,order> ghostAccessor;
+      const int siteSubset;
       const int nParity;
 
     public:
@@ -118,9 +117,9 @@ namespace quda {
     FieldOrderCB(const ColorSpinorField &field, void *v_=0, void **ghost_=0)
       : v(v_? static_cast<complex<Float>*>(const_cast<void*>(v_))
 	  : static_cast<complex<Float>*>(const_cast<void*>(field.V()))),
-	volume(field.Volume()), volumeCB(field.VolumeCB()),
+	volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
-	siteSubset(field.SiteSubset()),	nParity(field.SiteSubset()),
+	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
 	accessor(field), ghostAccessor(field)
       { 
 	for (int d=0; d<4; d++) {
@@ -135,6 +134,14 @@ namespace quda {
        * Destructor for the FieldOrderCB class
        */
       virtual ~FieldOrderCB() { ; }
+
+      void resetGhost(void * const *ghost_)
+      {
+	for (int d=0; d<4; d++) {
+	  ghost[2*d+0] = static_cast<complex<Float>*>(ghost_[2*d+0]);
+	  ghost[2*d+1] = static_cast<complex<Float>*>(ghost_[2*d+1]);
+	}
+      }
 
       /**
        * Read-only complex-member accessor function.  The last
@@ -250,9 +257,6 @@ namespace quda {
       __device__ __host__ inline int Nparity() const { return nParity; }
 
       /** Returns the field volume */
-      __device__ __host__ inline int Volume() const { return volume; }
-
-      /** Returns the field volume */
       __device__ __host__ inline int VolumeCB() const { return volumeCB; }
 
       /** Returns the field geometric dimension */
@@ -260,9 +264,6 @@ namespace quda {
 
       /** Returns the field geometric dimension */
       __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ inline int SiteSubset() const { return siteSubset; }
 
       /** Returns the number of packed vectors (for mg prolongator) */
       __device__ __host__ inline int Nvec() const { return nVec; }
@@ -278,7 +279,7 @@ namespace quda {
 	return nrm2;
       }
 
-      size_t Bytes() const { return nParity * volumeCB * nColor * nSpin * nVec * 2 * sizeof(Float); }
+      size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(Float); }
     };
 
     template <typename Float, int Ns, int Nc, int N>

@@ -125,7 +125,6 @@ namespace quda {
 
 #include <texture.h>
 #include <reduce_core.h>
-//#include <reduce_core_cub.h>
 #include <reduce_mixed_core.h>
 
     } // namespace reduce
@@ -135,34 +134,34 @@ namespace quda {
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct ReduceFunctor {
-      
+
       //! pre-computation routine called before the "M-loop"
       virtual __device__ __host__ void pre() { ; }
-      
+
       //! where the reduction is usually computed and any auxiliary operations
       virtual __device__ __host__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y,
 							   FloatN &z, FloatN &w, FloatN &v) = 0;
-      
+
       //! post-computation routine called after the "M-loop"
       virtual __device__ __host__ void post(ReduceType &sum) { ; }
-      
+
     };
-    
+
     /**
        Return the L1 norm of x
     */
     template<typename ReduceType> __device__ __host__ ReduceType norm1_(const double2 &a) {
       return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y);
     }
-    
+
     template<typename ReduceType> __device__ __host__ ReduceType norm1_(const float2 &a) {
       return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y);
     }
-    
+
     template<typename ReduceType> __device__ __host__ ReduceType norm1_(const float4 &a) {
       return (ReduceType)fabs(a.x) + (ReduceType)fabs(a.y) + (ReduceType)fabs(a.z) + (ReduceType)fabs(a.w);
     }
-  
+
     template <typename ReduceType, typename Float2, typename FloatN>
     struct Norm1 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Norm1(const Float2 &a, const Float2 &b) { ; }
@@ -171,12 +170,12 @@ namespace quda {
       static int streams() { return 1; } //! total number of input and output streams
       static int flops() { return 2; } //! flops per element
     };
-    
+
     double norm1(const ColorSpinorField &x) {
 #ifdef HOST_DEBUG
       ColorSpinorField &y = const_cast<ColorSpinorField&>(x); // FIXME
       return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm1,0,0,0,0,0,false>
-	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);	
+	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
 #else
 	errorQuda("L1 norm kernel only built when HOST_DEBUG is enabled");
       return 0.0;
@@ -189,7 +188,7 @@ namespace quda {
     template<typename ReduceType> __device__ __host__ ReduceType norm2_(const double2 &a) {
       return (ReduceType)a.x*(ReduceType)a.x + (ReduceType)a.y*(ReduceType)a.y;
     }
-      
+
     template<typename ReduceType> __device__ __host__ ReduceType norm2_(const float2 &a) {
       return (ReduceType)a.x*(ReduceType)a.x + (ReduceType)a.y*(ReduceType)a.y;
     }
@@ -214,7 +213,7 @@ namespace quda {
       return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
     }
-    
+
 
     /**
        Return the real dot product of x and y
@@ -323,7 +322,7 @@ namespace quda {
   }
 
 
-    /** 
+    /**
      * Returns the real component of the dot product of a and b and
      * the norm of a
     */
@@ -335,7 +334,7 @@ namespace quda {
       c.y = norm2_<scalar>(a);
       return c;
     }
-      
+
     template <typename ReduceType, typename Float2, typename FloatN>
     struct DotNormA : public ReduceFunctor<ReduceType, Float2, FloatN> {
       DotNormA(const Float2 &a, const Float2 &b){}
@@ -359,12 +358,12 @@ namespace quda {
     struct axpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a;
       axpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
 	y += a.x*x; sum += norm2_<ReduceType>(y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
     };
-    
+
     double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
       return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
@@ -416,7 +415,7 @@ namespace quda {
     struct caxpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a;
       caxpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
 	Caxpy_(a, x, y); sum += norm2_<ReduceType>(y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 6; } //! flops per element
@@ -430,7 +429,7 @@ namespace quda {
 
     /**
        double caxpyXmayNormCuda(float a, float *x, float *y, n){}
-       
+
        First performs the operation y[i] = a*x[i] + y[i]
        Second performs the operator x[i] -= a*z[i]
        Third returns the norm of x
@@ -454,7 +453,7 @@ namespace quda {
 
     /**
        double cabxpyAxNorm(float a, complex b, float *x, float *y, n){}
-       
+
        First performs the operation y[i] += a*b*x[i]
        Second performs x[i] *= a
        Third returns the norm of x
@@ -550,7 +549,7 @@ namespace quda {
         errorQuda("Unsupported vector size\n");
         break;
       }
-      
+
       for (unsigned int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
       delete[] cdot;
     }
@@ -580,7 +579,7 @@ namespace quda {
 
     /**
        double caxpyDotzyCuda(float a, float *x, float *y, float *z, n){}
-       
+
        First performs the operation y[i] = a*x[i] + y[i]
        Second returns the dot product (z,y)
     */
@@ -653,7 +652,7 @@ namespace quda {
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 6; } //! flops per element
     };
-  
+
     double3 cDotProductNormB(ColorSpinorField &x, ColorSpinorField &y) {
       return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormB,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
@@ -661,7 +660,7 @@ namespace quda {
 
 
     /**
-       This convoluted kernel does the following: 
+       This convoluted kernel does the following:
        z += a*x + b*y, y -= b*w, norm = (y,y), dot = (u, y)
     */
     template <typename ReduceType, typename Float2, typename FloatN>
@@ -698,10 +697,10 @@ namespace quda {
     struct axpyCGNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a;
       axpyCGNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
 	typedef typename ScalarType<ReduceType>::type scalar;
 	FloatN y_new = y + a.x*x;
-	sum.x += norm2_<scalar>(y_new); 
+	sum.x += norm2_<scalar>(y_new);
 	sum.y += dot_<scalar>(y_new, y_new-y);
 	y = y_new;
       }
@@ -720,7 +719,7 @@ namespace quda {
        This kernel returns (x, x) and (r,r) and also returns the so-called
        heavy quark norm as used by MILC: 1 / N * \sum_i (r, r)_i / (x, x)_i, where
        i is site index and N is the number of sites.
-       
+
        When this kernel is launched, we must enforce that the parameter M
        in the launcher corresponds to the number of FloatN fields used to
        represent the spinor, e.g., M=6 for Wilson and M=3 for staggered.
@@ -734,24 +733,24 @@ namespace quda {
       Float2 b;
       ReduceType aux;
       HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      
+
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
-      
+
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
 	typedef typename ScalarType<ReduceType>::type scalar;
 	aux.x += norm2_<scalar>(x); aux.y += norm2_<scalar>(y);
       }
-      
+
       //! sum the solution and residual norms, and compute the heavy-quark norm
-      __device__ __host__ void post(ReduceType &sum) 
-      { 
-	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0; 
+      __device__ __host__ void post(ReduceType &sum)
+      {
+	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0;
       }
-      
+
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 4; } //! undercounts since it excludes the per-site division
     };
-  
+
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r) {
       double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
@@ -773,24 +772,24 @@ namespace quda {
       Float2 b;
       ReduceType aux;
       xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      
+
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
-      
+
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
 	typedef typename ScalarType<ReduceType>::type scalar;
 	aux.x += norm2_<scalar>(x + y); aux.y += norm2_<scalar>(z);
       }
-      
+
       //! sum the solution and residual norms, and compute the heavy-quark norm
-      __device__ __host__ void post(ReduceType &sum) 
-      { 
-	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0; 
+      __device__ __host__ void post(ReduceType &sum)
+      {
+	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0;
       }
-      
+
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 5; }
     };
-  
+
     double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y,
 				      ColorSpinorField &r) {
       double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
@@ -801,7 +800,7 @@ namespace quda {
 
     /**
        double3 tripleCGUpdate(V x, V y, V z){}
-       
+
        First performs the operation norm2(x)
        Second performs the operatio norm2(y)
        Third performs the operation dotPropduct(y,z)

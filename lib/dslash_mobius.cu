@@ -182,22 +182,22 @@ namespace quda {
       case 0:
 	DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       case 1:
 	DSLASH(MDWFDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       case 2:
 	DSLASH(MDWFDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       case 3:
 	DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
+	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
 	break;
       default:
 	errorQuda("invalid Dslash type");
@@ -209,7 +209,7 @@ namespace quda {
       long long vol4d = in->VolumeCB() / Ls;
       long long bulk = (Ls-2)*vol4d;
       long long wall = 2*vol4d;
-      long long flops; 
+      long long flops = 0;
       switch(DS_type){
       case 0:
 	flops = DslashCuda::flops();
@@ -233,7 +233,7 @@ namespace quda {
       bool isHalf = in->Precision() == sizeof(short) ? true : false;
       int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
       long long Ls = in->X(4);
-      long long bytes;
+      long long bytes = 0;
 
       switch(DS_type){
       case 0:
@@ -270,20 +270,22 @@ namespace quda {
   void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 		      const cudaColorSpinorField *in, const int parity, const int dagger, 
 		      const cudaColorSpinorField *x, const double &m_f, const double &k2, 
-		      const int *commOverride, const int DS_type, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+		      const int *commOverride, const int DS_type, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
+    inSpinor->allocateGhostBuffer(1);
 
     dslashParam.parity = parity;
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
     //currently splitting in space-time is impelemented:
     int dirs = 4;
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
     for(int i = 0;i < dirs; i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }  
 
@@ -316,15 +318,18 @@ namespace quda {
     DslashPolicyImp* dslashImp = NULL;
     if (DS_type != 0) {
       dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+      delete dslashImp;
     } else {
 #ifndef GPU_COMMS
-      dslashImp = DslashFactory::create(dslashPolicy);
+      DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger,  in->Volume()/in->X(4), ghostFace, profile);
+      dslash_policy.apply(0);
 #else
       dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+      delete dslashImp;
 #endif
     }
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
-    delete dslashImp;
 
     delete dslash;
     unbindGaugeTex(gauge);

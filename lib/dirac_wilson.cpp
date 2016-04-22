@@ -1,6 +1,7 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -155,9 +156,9 @@ namespace quda {
   grid
   */
 
-  void DiracWilson::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
+  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
     cudaCloverField *c = NULL;
-    CoarseOp(T, Y, X, *gauge, c,  kappa);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)

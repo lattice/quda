@@ -347,7 +347,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifndef INIT_PARAM
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
+      param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 #endif
     P(clover_cpu_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec, QUDA_INVALID_PRECISION);
@@ -361,6 +362,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
+
+    P(clover_coeff, INVALID_DOUBLE);
 #ifndef INIT_PARAM
   }
 #endif
@@ -431,6 +434,89 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifdef INIT_PARAM
   return ret;
 #endif
+}
+
+
+#if defined INIT_PARAM
+ QudaMultigridParam newQudaMultigridParam(void) {
+   QudaMultigridParam ret;
+#elif defined CHECK_PARAM
+   static void checkMultigridParam(QudaMultigridParam *param) {
+#else
+void printQudaMultigridParam(QudaMultigridParam *param) {
+  printfQuda("QUDA Multigrid Parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  // do nothing
+#elif defined CHECK_PARAM
+  checkInvertParam(param->invert_param);
+#else
+  printQudaInvertParam(param->invert_param);
+#endif
+
+  P(n_level, INVALID_INT);
+
+#ifdef INIT_PARAM
+  int n_level = QUDA_MAX_MG_LEVEL;
+#else
+  int n_level = param->n_level;
+#endif
+
+  for (int i=0; i<n_level; i++) {
+    P(smoother[i], QUDA_INVALID_INVERTER);
+    P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+
+    // these parameters are not set for the bottom grid
+    if (i<n_level-1) {
+      for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
+      P(spin_block_size[i], INVALID_INT);
+      P(n_vec[i], INVALID_INT);
+      P(cycle_type[i], QUDA_MG_CYCLE_INVALID);
+      P(nu_pre[i], INVALID_INT);
+      P(nu_post[i], INVALID_INT);
+      P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
+    }
+
+    P(smoother_tol[i], INVALID_DOUBLE);
+#ifdef INIT_PARAM
+    P(global_reduction[i], QUDA_BOOLEAN_YES);
+#else
+    P(global_reduction[i], QUDA_BOOLEAN_INVALID);
+#endif
+
+    P(omega[i], INVALID_DOUBLE);
+    P(location[i], QUDA_INVALID_FIELD_LOCATION);
+  }
+
+  P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
+  P(generate_all_levels, QUDA_BOOLEAN_INVALID);
+
+#ifdef CHECK_PARAM
+  // if only doing top-level null-space generation, check that n_vec
+  // is equal on all levels
+  if (param->generate_all_levels == QUDA_BOOLEAN_NO && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+    for (int i=1; i<n_level-1; i++)
+      if (param->n_vec[0] != param->n_vec[i])
+	errorQuda("n_vec %d != %d must be equal on all levels if generate_all_levels == false",
+		  param->n_vec[0], param->n_vec[i]);
+  }
+#endif
+
+  P(run_verify, QUDA_BOOLEAN_INVALID);
+
+#ifdef INIT_PARAM
+  P(gflops, 0.0);
+  P(secs, 0.0);
+#elif defined(PRINT_PARAM)
+  P(gflops, INVALID_DOUBLE);
+  P(secs, INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+
 }
 
 

@@ -115,6 +115,7 @@ namespace quda {
       case EXTERIOR_KERNEL_ALL:
 	break;
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	// clover flops are done in the interior kernel
 	flops += clover_flops * in->VolumeCB();	  
 	break;
@@ -134,6 +135,7 @@ namespace quda {
       case EXTERIOR_KERNEL_ALL:
 	break;
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	bytes += clover_bytes*in->VolumeCB();
 	break;
       }
@@ -149,16 +151,19 @@ namespace quda {
   void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
 			    const cudaColorSpinorField *in, const int parity, const int dagger, 
 			    const cudaColorSpinorField *x, const double &a, const int *commOverride,
-			    TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+			    TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
+    inSpinor->allocateGhostBuffer(1);
 
 #ifdef GPU_CLOVER_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
 
@@ -193,12 +198,13 @@ namespace quda {
     }
 
 #ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
     delete dslashImp;
+#endif
 
     delete dslash;
     unbindGaugeTex(gauge);

@@ -148,6 +148,12 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
+    str += "// workaround for C++11 bug in CUDA 6.5/7.0\n"
+    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
+    str += "#define POW(a, b) pow(a, static_cast<spinorFloat>(b))\n"
+    str += "#else\n"
+    str += "#define POW(a, b) pow(a, b)\n"
+    str += "#endif\n\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -158,6 +164,7 @@ def def_input_spinor():
     str += "#define mdwf_c5 mdwf_c5_d\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
+    str += "#define POW(a, b) __fast_pow(a, b)\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -352,13 +359,6 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
         if not domain_wall:
             prolog_str += "#include \"read_clover.h\"\n"
         prolog_str += "#include \"io_spinor.h\"\n"
-        if dslash4 == True:
-            prolog_str += (
-"""
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
-int sp_norm_idx;
-#endif // MULTI_GPU half precision
-""")
         prolog_str += (
 """
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
@@ -455,10 +455,6 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
-
-#if (DD_PREC==2) // half precision
-sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-#endif
 
 const int dims[] = {X1, X2, X3, X4};
 coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
@@ -577,7 +573,10 @@ def gen(dir, pack_only=False):
 
     str += "#ifdef MULTI_GPU\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
-    str += " face_idx + param.ghostOffset[static_cast<int>(kernel_type)];\n"
+    str += " face_idx + param.ghostOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#if (DD_PREC==2) // half precision\n"
+    str += "const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#endif\n"
     str += "#else\n"
     str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
@@ -637,8 +636,9 @@ def gen(dir, pack_only=False):
 
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+    load_half += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+#    if (dir+1) % 2 == 0: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+#    else: load_half += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     load_gauge = "// read gauge matrix from device memory\n"
     load_gauge += "ASSN_GAUGE_MATRIX(G, GAUGE"+`( dir%2)`+"TEX, "+`dir`+", ga_idx, ga_stride);\n\n"
 
@@ -850,8 +850,8 @@ def gen_dw():
       str += "#if (MDWF_mode==1)\n"
       str += "  VOLATILE spinorFloat C_5;\n"
       str += "  VOLATILE spinorFloat B_5;\n"
-      str += "  C_5 = (spinorFloat)mdwf_c5[xs]*0.5;\n"
-      str += "  B_5 = (spinorFloat)mdwf_b5[xs];\n\n"
+      str += "  C_5 = mdwf_c5[xs]*static_cast<spinorFloat>(0.5);\n"
+      str += "  B_5 = mdwf_b5[xs];\n\n"
       str += "  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );\n"
       str += "  o00_re = C_5*o00_re + B_5*i00_re;\n" 
       str += "  o00_im = C_5*o00_im + B_5*i00_im;\n"
@@ -879,7 +879,7 @@ def gen_dw():
       str += "  o32_im = C_5*o32_im + B_5*i32_im;\n"
       str += "#elif (MDWF_mode==2)\n"
       str += "  VOLATILE spinorFloat C_5;\n"
-      str += "  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n\n"
+      str += "  C_5 = static_cast<spinorFloat>(0.5)*(mdwf_c5[xs]*(m5+static_cast<spinorFloat>(4.0)) - static_cast<spinorFloat>(1.0))/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n\n"
       str += "  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );\n"
       str += "  o00_re = C_5*o00_re + i00_re;\n"
       str += "  o00_im = C_5*o00_im + i00_im;\n"
@@ -915,17 +915,11 @@ def gen_dw():
 def gen_dw_inv():
 
     str = "\n"
-    str += "// workaround for C++11 bug in CUDA 6.5/7.0\n"
-    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
-    str += "#define POW(a, b) pow(a, (spinorFloat)b)\n"
-    str += "#else\n"
-    str += "#define POW(a, b) pow(a, b)\n"
-    str += "#endif\n\n"
     str += "VOLATILE spinorFloat kappa;\n\n"
     str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
-    str += "  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));\n"
+    str += "  kappa = -(mdwf_c5[xs]*(static_cast<spinorFloat>(4.0) + m5) - static_cast<spinorFloat>(1.0))/(mdwf_b5[xs]*(static_cast<spinorFloat>(4.0) + m5) + static_cast<spinorFloat>(1.0));\n"
     str += "#else\n" 
-    str += "  kappa = 2.0*a;\n"
+    str += "  kappa = static_cast<spinorFloat>(2.0)*a;\n"
     str += "#endif  // select MDWF mode\n\n"
     str += "// M5_inv operation -- NB: not partitionable!\n\n"
     str += "// In this part, we will do the following operation in parallel way.\n\n"
@@ -940,15 +934,17 @@ def gen_dw_inv():
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + POW(kappa,param.Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.Ls)*mferm );\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
     str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;\n\n"
+        str += "    int exponent = xs > s ? param.Ls-xs+s : s-xs;\n"
+        str += "    factorR = inv_d_n * POW(kappa,exponent) * ( xs > s ? -mferm : static_cast<spinorFloat>(1.0) );\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;\n\n"
+        str += "    int exponent = xs < s ? param.Ls-s+xs : xs-s;\n"
+        str += "    factorR = inv_d_n * POW(kappa,exponent) * ( xs < s ? -mferm : static_cast<spinorFloat>(1.0) );\n\n"
     str += "    sp_idx = base_idx + s*Vh;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
@@ -978,9 +974,11 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;\n\n"
+        str += "    int exponent2 = xs < s ? param.Ls-s+xs : xs-s;\n"
+        str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( xs < s ? -mferm : static_cast<spinorFloat>(1.0));\n\n"
     else : 
-        str += "    factorL = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;\n\n"
+        str += "    int exponent2 = xs > s ? param.Ls-xs+s : s-xs;\n"
+        str += "    factorL = inv_d_n * POW(kappa,exponent2) * ( xs > s ? -mferm : static_cast<spinorFloat>(1.0));\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"
@@ -1174,7 +1172,7 @@ def twisted():
 def coeff():
   if dslash4:
     str = "coeff"
-  elif dslash5:
+  elif dslash5 or dslash5inv:
     str = "coeff"
   else :
     str = "a" 
@@ -1212,21 +1210,26 @@ def xpay():
     if dslash4:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "coeff = static_cast<spinorFloat>(0.5)*a/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n"
       str += "#else\n"
       str += "coeff = a;\n"
       str += "#endif\n\n"
-    elif dslash5:
+    elif dslash5 or dslash5inv:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
-      str += "coeff *= -coeff;\n"
+      str += "coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));\n"
+      str += "coeff *= coeff;\n"
+      str += "coeff *= a;\n"
       str += "#else\n"
-      str += "coeff = a;\n"
+      if dslash5:
+          str += "coeff = a;\n"
+      elif dslash5inv:
+          str += "coeff = b;\n"
       str += "#endif\n\n"
-      str += "#ifdef YPAX\n"
-      str += ypax()
-      str += "#else\n"
+      if dslash5:
+          str += "#ifdef YPAX\n"
+          str += ypax()
+          str += "#else\n"
     
     str += "#ifdef SPINOR_DOUBLE\n"
 
@@ -1303,6 +1306,7 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
     str += "#undef mdwf_b5\n"
     str += "#undef mdwf_c5\n"
     str += "#undef spinorFloat\n"
+    str += "#undef POW\n"
     str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:
@@ -1422,7 +1426,6 @@ def generate_dslash5D_inv():
 def generate_clover():
     return prolog() + epilog()
 
-
 # To fit 192 threads/SM (single precision) with 16K shared memory, set sharedFloats to 19 or smaller
 
 sharedFloats = 0
@@ -1438,6 +1441,7 @@ twist = False
 clover = False
 dslash4 = True
 dslash5 = False
+dslash5inv = False
 normalDWF = False
 
 print sys.argv[0] + ": generating dw_dslash4_core.h";
@@ -1472,6 +1476,7 @@ f.write(generate_dslash5D())
 f.close()
 
 dslash5 = False
+dslash5inv = True
 
 print sys.argv[0] + ": generating dw_dslash5inv_core.h";
 dslash = True
@@ -1486,4 +1491,3 @@ dagger = True
 f = open('dslash_core/dw_dslash5inv_dagger_core.h', 'w')
 f.write(generate_dslash5D_inv())
 f.close()
-

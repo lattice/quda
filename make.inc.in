@@ -46,10 +46,9 @@ BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU c
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
 
-
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
-
+BUILD_MAGMA_VARS = @BUILD_MAGMA_VARS@ # build magma using env vars MAGMA_INC and MAGMA_LIB
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
 GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
@@ -169,10 +168,16 @@ ifeq ($(strip $(INTERFACE_NVTX)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
-  MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
+  ifeq ($(strip $(BUILD_MAGMA_VARS)),yes)
+     MAGMA_INCLUDE = ${MAGMA_INC}
+     LIB += ${MAGMA_LIB}
+  else
+     MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
+     LIB += $(shell pkg-config --libs magma)
+  endif
+ 
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
-  LIB += $(shell pkg-config --libs magma)
 else
   MAGMA_INCLUDE =
   MAGMA_FLAGS   =
@@ -199,6 +204,7 @@ ifeq ($(strip $(POSIX_THREADS)), yes)
 endif
 
 LIB += -lpthread
+
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC

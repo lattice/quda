@@ -41,6 +41,12 @@ namespace quda {
 #undef STR
 #undef STR_
 
+  static bool profile_count = true;
+
+  void disableProfileCount() { profile_count = false; }
+  void enableProfileCount() { profile_count = true; }
+
+  const map& getTuneCache() { return tunecache; }
 
 
   /**
@@ -72,7 +78,7 @@ namespace quda {
       if (check < 0 || check >= key.name_n) errorQuda("Error writing name string");
       check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
       if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string");
-      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.time;
+      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y >> param.aux.z >> param.time;
       ls.ignore(1); // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
       param.comment += "\n"; // our convention is to include the newline, since ctime() likes to do this
@@ -92,10 +98,11 @@ namespace quda {
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      out << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
+      out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
       out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
       out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
-      out << param.shared_bytes << "\t" << param.time << "\t" << param.comment; // param.comment ends with a newline
+      out << param.shared_bytes << "\t" << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t";
+      out << param.time << "\t" << param.comment; // param.comment ends with a newline
     }
   }
 
@@ -122,8 +129,13 @@ namespace quda {
 
     // now compute total time spent in kernels so we can give each kernel a significance
     for (entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+      TuneKey key = entry->first;
       TuneParam param = entry->second;
-      if (param.n_calls > 0) total_time += param.n_calls * param.time;
+
+      char tmp[7];
+      strncpy(tmp, key.aux, 6);
+      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
     }
 
 
@@ -131,11 +143,14 @@ namespace quda {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
 
-      if (param.n_calls > 0) {
+      char tmp[7];
+      strncpy(tmp, key.aux,6);
+      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      if (param.n_calls > 0 && !is_policy) {
 	double time = param.n_calls * param.time;
 
 	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
-	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(15) << key.volume << "\t";
+	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16) << key.volume << "\t";
 	out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
       }
 
@@ -310,7 +325,7 @@ namespace quda {
        cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
-      cache_file << "volume\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\ttime\tcomment" << std::endl;
+      cache_file << std::setw(16) << "volume" << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\taux.x\taux.y\taux.z\ttime\tcomment" << std::endl;
       serializeTuneCache(cache_file);
       cache_file.close();
 
@@ -371,8 +386,12 @@ namespace quda {
 	// compute number of non-zero entries that will be output in the profile
 	int n_entry = 0;
 	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+	  // if a policy entry, then we can ignore
+	  char tmp[6];
+	  strncpy(tmp, entry->first.aux, 6);
 	  TuneParam param = entry->second;
-	  if (param.n_calls > 0) n_entry++;
+	  bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+	  if (param.n_calls > 0 && !is_policy) n_entry++;
 	}
 
 	printfQuda("Saving %d sets of cached parameters to %s\n", n_entry, profile_path.c_str());
@@ -387,7 +406,7 @@ namespace quda {
        profile_file << "\t" << quda_version;
 #endif
       profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
-      profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(15) << "volume" << "\tname\taux\tcomment" << std::endl;
+      profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(16) << "volume" << "\tname\taux\tcomment" << std::endl;
       serializeProfile(profile_file);
       profile_file.close();
 
@@ -430,6 +449,9 @@ namespace quda {
     launchTimer.TPSTART(QUDA_PROFILE_PREAMBLE);
 #endif
 
+    static bool tuning = false; // tuning in progress?
+    static const Tunable *active_tunable; // for error checking
+
     // first check if we have the tuned value and return if we have it
     //if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
 
@@ -460,7 +482,8 @@ namespace quda {
       //tally--;
       //printfQuda("pthread_mutex_unlock a complete %d\n",tally);
 #endif
-      param.n_calls++;
+      // we could be tuning outside of the current scope
+      if (!tuning && profile_count) param.n_calls++;
 
       return param;
     }
@@ -472,11 +495,8 @@ namespace quda {
 
 
     // We must switch off the global sum when tuning in case of process divergence
-    bool reduceState = globalReduce;
-    globalReduce = false;
-
-    static bool tuning = false; // tuning in progress?
-    static const Tunable *active_tunable; // for error checking
+    bool reduceState = commGlobalReduction();
+    commGlobalReductionSet(false);
 
     if (enabled == QUDA_TUNE_NO) {
       tunable.defaultTuneParam(param);
@@ -510,7 +530,13 @@ namespace quda {
 	tunable.checkLaunchParam(param);
 	cudaEventRecord(start, 0);
 	for (int i=0; i<tunable.tuningIter(); i++) {
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("About to call tunable.apply\n");
+	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+		       param.block.x, param.block.y, param.block.z,
+		       param.grid.x, param.grid.y, param.grid.z,
+		       param.shared_bytes,
+		       param.aux.x, param.aux.y, param.aux.z);
+	  }
 	  tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	}
 	cudaEventRecord(end, 0);
@@ -566,7 +592,7 @@ namespace quda {
     }
 
     // restore the original reduction state
-    globalReduce = reduceState;
+    commGlobalReductionSet(reduceState);
 
 #ifdef PTHREADS
 //    pthread_mutex_unlock(&pthread_mutex);
@@ -574,7 +600,7 @@ namespace quda {
 //    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
 #endif
 
-    param.n_calls=1;
+    param.n_calls = profile_count ? 1 : 0;
 
     return param;
   }

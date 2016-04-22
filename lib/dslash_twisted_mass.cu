@@ -105,6 +105,8 @@ namespace quda {
       case QUDA_DEG_DSLASH_TWIST_XPAY:
 	strcat(key.aux,",DslashTwist");
 	break;
+      default:
+	errorQuda("Unsupported twisted-dslash type %d", dslashType);
       }
       return key;
     }
@@ -148,6 +150,7 @@ namespace quda {
       case EXTERIOR_KERNEL_ALL:
 	break;
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	// twisted mass flops are done in the interior kernel
 	flops += twisted_flops * in->VolumeCB();	  
 	break;
@@ -163,10 +166,11 @@ namespace quda {
 			     const cudaColorSpinorField *in, const int parity, const int dagger, 
 			     const cudaColorSpinorField *x, const QudaTwistDslashType type, 
 			     const double &kappa, const double &mu, const double &epsilon, 
-			     const double &k,  const int *commOverride, TimeProfile &profile, 
-			     const QudaDslashPolicy &dslashPolicy)
+			     const double &k,  const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
+    inSpinor->allocateGhostBuffer(1);
+
 #ifdef GPU_TWISTED_MASS_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
@@ -175,8 +179,10 @@ namespace quda {
 
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
       ghost_threads[i] = in->GhostFace()[i];
     }
@@ -207,15 +213,14 @@ namespace quda {
       dslash = new TwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
     }
 
-
 #ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
+    dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
-
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
     delete dslashImp;
+#endif
 
     delete dslash;
 #ifdef MULTI_GPU

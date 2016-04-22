@@ -169,7 +169,7 @@ namespace quda {
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
 		QudaDWFPCType PCtype, int nev = 0, int evid = -1);
     void destroy();  
-
+    
   protected:
     bool init;
     QudaPrecision precision;
@@ -194,6 +194,7 @@ namespace quda {
 
     void *v; // the field elements
     void *norm; // the normalization field
+    void *ghost_field; // unique ghost zone for this instance
 
     //! used for eigcg:
     int eigv_dim;
@@ -204,29 +205,30 @@ namespace quda {
     size_t eigv_length;       // length including pads (but not ghost zones)
 
     // multi-GPU parameters
+
+    int nFaceComms; // number of faces allocated
+
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
     
     int ghostFace[QUDA_MAX_DIM];// the size of each face
-    int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
-    int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
+    int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
+    int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
     size_t ghost_length; // length of ghost zone
     size_t ghost_norm_length; // length of ghost zone for norm
-    size_t total_length; // total length of spinor (physical + pad + ghost)
-    size_t total_norm_length; // total length of norm
 
     mutable void *ghost_fixme[2*QUDA_MAX_DIM];
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
+    size_t ghost_bytes; // size in bytes of the ghost field
+    size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     /*Warning: we need copies of the above params for eigenvectors*/
     //multi_GPU parameters:
     
     //ghost pointers are always for single eigenvector..
-    size_t eigv_total_length;
-    size_t eigv_total_norm_length;
     size_t eigv_ghost_length;
     size_t eigv_ghost_norm_length;
 
@@ -245,13 +247,12 @@ namespace quda {
     //! for eigcg:
     std::vector<ColorSpinorField*> eigenvectors;
       
-    void createGhostZone();
+    void createGhostZone(int nFace);
 
     // resets the above attributes based on contents of param
     void reset(const ColorSpinorParam &);
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
-    void clearGhostPointers();
 
     char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
     void setTuningString(); // set the vol_string and aux_string for use in tuning
@@ -274,13 +275,14 @@ namespace quda {
     int X(int d) const { return x[d]; }
     size_t RealLength() const { return real_length; }
     size_t Length() const { return length; }
-    size_t TotalLength() const { return total_length; }
     int Stride() const { return stride; }
     int Volume() const { return volume; }
     int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
+    size_t GhostBytes() const { return ghost_bytes; } 
+    size_t GhostNormBytes() const { return ghost_bytes; } 
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
     const char *AuxString() const { return aux_string; }
@@ -289,6 +291,8 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+    void* Ghost2() { return ghost_field; }
+    const void* Ghost2() const { return ghost_field; } // v will eventually be replaced by ghost_field
 
     int Nface() const { return (nSpin == 1) ? 3 : 1; } // FIXME for naive staggered or other operators
 
@@ -324,7 +328,6 @@ namespace quda {
     int EigvStride() const { return eigv_stride; }
     size_t EigvLength() const { return eigv_length; }
     size_t EigvRealLength() const { return eigv_real_length; }
-    size_t EigvTotalLength() const { return eigv_total_length; }
     
     size_t EigvBytes() const { return eigv_bytes; }
     size_t EigvNormBytes() const { return eigv_norm_bytes; }
@@ -339,13 +342,16 @@ namespace quda {
 
     size_t GhostLength() const { return ghost_length; }
     const int *GhostFace() const { return ghostFace; }  
-    int GhostOffset(const int i) const { return ghostOffset[i]; }  
-    int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
+    int GhostOffset(const int i) const { return ghostOffset[i][0]; }  
+    int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
+    int GhostNormOffset(const int i ) const { return ghostNormOffset[i][0]; }  
+    int GhostNormOffset(const int i, const int j) const { return ghostNormOffset[i][j]; }
+    
     void* Ghost(const int i);
     const void* Ghost(const int i) const;
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
-    
+
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */
@@ -391,13 +397,19 @@ namespace quda {
   private:
     bool alloc; // whether we allocated memory
     bool init;
+    bool ghostInit;
 
     bool texInit; // whether a texture object has been created or not
+    bool ghostTexInit; // whether the ghost texture object has been created
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
+    cudaTextureObject_t ghostTex;
+    cudaTextureObject_t ghostTexNorm;
     void createTexObject();
+    void createGhostTexObject();
     void destroyTexObject();
+    void destroyGhostTexObject();
 #endif
 
 #ifdef GPU_COMMS  // This is a hack for half precision.
@@ -420,7 +432,43 @@ namespace quda {
     static void* ghostFaceBuffer[2]; // gpu memory
     static void* fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    static int initGhostFaceBuffer;
+    static bool initGhostFaceBuffer;
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_send_p2p_back[QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_recv_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_recv_p2p_back[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_back[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_back[QUDA_MAX_DIM];
+
+    /** Local copy of event used for peer-to-peer synchronization */
+    cudaEvent_t ipcCopyEvent[2][QUDA_MAX_DIM];
+
+    /** Remote copy of event used for peer-to-peer synchronization */
+    cudaEvent_t ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
+
+    /** Remote ghost pointer for sending ghost to */
+    void* fwdGhostSendDest[QUDA_MAX_DIM];
+
+    /** Remote ghost pointer for sending ghost to */
+    void* backGhostSendDest[QUDA_MAX_DIM];
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -440,16 +488,16 @@ namespace quda {
     /** Whether we have initialized communication for this field */
     bool initComms;
 
+    /** Whether we have initialized peer-to-peer communication for this field */
+    bool initIPCComms;
+
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
-
-    /** How many faces we are communicating in this communicator */
-    int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
   public:
 
     static int bufferIndex;
-	
+
     //cudaColorSpinorField();
     cudaColorSpinorField(const cudaColorSpinorField&);
     cudaColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);
@@ -465,11 +513,26 @@ namespace quda {
 
     /** Create the communication handlers and buffers */
     void createComms(int nFace);
+
     /** Destroy the communication handlers and buffers */
     void destroyComms();
+    
+    /** Create the inter-process communication handlers */
+    void createIPCComms();
+
+    /** Destroy the inter-process communication handlers */
+    void destroyIPCComms();
+
+    /** Handle to remote copy event used for peer-to-peer synchronization */
+    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+
+    /** Allocate the ghost buffers */
     void allocateGhostBuffer(int nFace);
+
     /** Ghost buffer allocation for the generic packer*/
     void allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const;
+
+    /** Free statically allocated ghost buffers */
     static void freeGhostBuffer(void);
 
     /**
@@ -553,16 +616,22 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
-    void recvStart(int nFace, int dir, int dagger=0);
-    void sendStart(int nFace, int dir, int dagger=0);
-    void commsStart(int nFace, int dir, int dagger=0);
-    int commsQuery(int nFace, int dir, int dagger=0); 
-    void commsWait(int nFace, int dir, int dagger=0); 
+    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
+    /** Helper function to determine if local-to-remote (send) peer-to-peer copy is complete */
+    inline bool ipcCopyComplete(int dir, int dim);
+
+    /** Helper function to determine if local-to-remote (receive) peer-to-peer copy is complete */
+    inline bool ipcRemoteCopyComplete(int dir, int dim);
 
     /**
        Do a ghost exchange between neighbouring nodes.  All dimensions
@@ -571,10 +640,11 @@ namespace quda {
      */
     void exchangeGhost(QudaParity parity, int dagger) const;
 
-
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
+    const cudaTextureObject_t& GhostTex() const { return ghostTex; }
+    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm; }
 #endif
 
     cudaColorSpinorField& Eigenvec(const int idx) const;

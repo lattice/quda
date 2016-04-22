@@ -728,7 +728,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE || 
+      inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()
   bool pc_solution = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
@@ -754,7 +755,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   CloverField *in=NULL, *inInv=NULL;
 
   if(!device_calc){
-    printfQuda("Device_calc = %d\n", device_calc);
     // create a param for the cpu clover field
     profileClover.TPSTART(QUDA_PROFILE_INIT);
     CloverFieldParam cpuParam;
@@ -971,7 +971,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
     // copy the odd components into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
-    cudaMemcpy((char*)(in->V(false))+in->Bytes()/2, (char*)(hack.V(true))+hack.Bytes()/2,
+    qudaMemcpy((char*)(in->V(false))+in->Bytes()/2, (char*)(hack.V(true))+hack.Bytes()/2,
         in->Bytes()/2, cudaMemcpyDeviceToHost);
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
 
@@ -1229,11 +1229,6 @@ void endQuda(void)
   saveTuneCache(getVerbosity());
   saveProfile(getVerbosity());
 
-#if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
-  // end this CUDA context
-  cudaDeviceReset();
-#endif
-
   initialized = false;
 
   comm_finalize();
@@ -1281,6 +1276,12 @@ void endQuda(void)
   }
 
   assertAllMemFree();
+
+#if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
+  // end this CUDA context
+  cudaDeviceReset();
+#endif
+
 }
 
 
@@ -1313,12 +1314,10 @@ namespace quda {
     case QUDA_MOBIUS_DWF_DSLASH:
       if (inv_param->Ls > QUDA_MAX_DWF_LS)
 	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
-      if(pc) {
-	diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC;
-	diracParam.Ls = inv_param->Ls;
-	memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
-	memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
-      } else errorQuda("At currently, only preconditioned Mobius DWF is supported, %d", inv_param->dslash_type);
+      diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
+      diracParam.Ls = inv_param->Ls;
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
       break;
     case QUDA_STAGGERED_DSLASH:
       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
@@ -1383,7 +1382,7 @@ namespace quda {
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
-  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  void setDiracPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc, bool comms)
   {
     setDiracParam(diracParam, inv_param, pc);
 
@@ -1400,10 +1399,10 @@ namespace quda {
     diracParam.cloverInv = cloverInvPrecondition;
 
     for (int i=0; i<4; i++) {
-      diracParam.commDim[i] = 0; // comms are always off
+      diracParam.commDim[i] = comms ? 1 : 0;
     }
 
-    // In the preconditioned staggered CG allow a different dlsash type in the preconditioning
+    // In the preconditioned staggered CG allow a different dslash type in the preconditioning
     if(inv_param->inv_type == QUDA_PCG_INVERTER && inv_param->dslash_type == QUDA_ASQTAD_DSLASH
        && inv_param->dslash_type_precondition == QUDA_STAGGERED_DSLASH) {
        diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
@@ -1420,7 +1419,7 @@ namespace quda {
 
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    setDiracPreParam(diracPreParam, &param, pc_solve);
+    setDiracPreParam(diracPreParam, &param, pc_solve, false);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -1701,8 +1700,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
-  DiracMobiusDomainWallPC dirac(diracParam); // create the Dirac operator
-  double kappa5 = 0.0;  // Kappa5 is dummy argument
+  DiracMobiusPC dirac(diracParam); // create the Dirac operator
   switch (test_type) {
     case 0:
       dirac.Dslash4(out, in, parity);
@@ -1714,7 +1712,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
       dirac.Dslash4pre(out, in, parity);
       break;
     case 3:
-      dirac.Dslash5inv(out, in, parity, kappa5);
+      dirac.Dslash5inv(out, in, parity);
       break;
   }
 
@@ -1881,6 +1879,12 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   delete in_h;
 
   popVerbosity();
+}
+
+namespace quda{
+bool canReuseResidentGauge(QudaInvertParam *param){
+  return (gaugePrecise != NULL) and param->cuda_prec == gaugePrecise->Precision();
+}
 }
 
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
@@ -2162,26 +2166,52 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   QudaInvertParam *param = mg_param.invert_param;
 
   cudaGaugeField *cudaGauge = checkGauge(param);
-  checkInvertParam(param);
+  checkMultigridParam(&mg_param);
+
+  // check MG params (needs to go somewhere else)
+  if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
+    errorQuda("Requested MG levels %d greater than allowed maximum %d", mg_param.n_level, QUDA_MAX_MG_LEVEL);
+  for (int i=0; i<mg_param.n_level; i++) {
+    if (mg_param.smoother_solve_type[i] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[i] != QUDA_DIRECT_PC_SOLVE)
+      errorQuda("Unsupported smoother solve type %d on level %d", mg_param.smoother_solve_type[i], i);
+  }
+  if (param->solve_type != QUDA_DIRECT_SOLVE)
+    errorQuda("Outer MG solver can only use QUDA_DIRECT_SOLVE at present");
 
   setTuning(param->tune);
   pushVerbosity(param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
-  param->secs = 0;
-  param->gflops = 0;
-  param->iter = 0;
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaMultigridParam(&mg_param);
+  mg_param.secs = 0;
+  mg_param.gflops = 0;
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+
+  bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
-  // create the dirac operators
-  createDirac(d, dSloppy, dPre, *param, pc_solve);
+  // create the dirac operators for the fine grid
 
+  // this is the Dirac operator we use for inter-grid residual computation
+  // at prsent this doesn't support preconditioning
+  DiracParam diracParam;
+  setDiracSloppyParam(diracParam, param, outer_pc_solve);
+  d = Dirac::create(diracParam);
   m = new DiracM(*d);
-  mSloppy = new DiracM(*dSloppy);
-  mPre = new DiracM(*dPre);
+
+  // this is the Dirac operator we use for smoothing
+  DiracParam diracSmoothParam;
+  bool fine_grid_pc_solve = (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
+    (mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
+  setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
+  dSmooth = Dirac::create(diracSmoothParam);
+  mSmooth = new DiracM(*dSmooth);
+
+  // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
+  DiracParam diracSmoothSloppyParam;
+  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
+  dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
+  mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
   printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
@@ -2192,7 +2222,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
 
   // fill out the MG parameters for the fine level
-  mgParam = new MGParam(mg_param, B, *mSloppy, *mSloppy);
+  mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
@@ -2201,9 +2231,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  if(!InitMagma) openMagma();
 
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
 
+  closeMagma();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
   return static_cast<void*>(mg);
 }
@@ -2375,8 +2407,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Normal-error solve requires Mat solution");
   }
 
-  if (param->inv_type_precondition == QUDA_MG_INVERTER && (pc_solve || pc_solution || !direct_solve || !mat_solution))
-      errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
+  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution))
+      errorQuda("Multigrid preconditioning only supported for direct solves");
 
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
@@ -2722,7 +2754,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(out,in);
-      solverParam.updateInvertParam(*param,i,i);
+      solverParam.updateInvertParam(*param);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);

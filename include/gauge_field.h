@@ -44,8 +44,6 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
-    int siteDim;  //Used for Coarse gauge fields when nDim != siteDim;
-
     /** Imaginary chemical potential */
     double i_mu;
 
@@ -70,7 +68,6 @@ namespace quda {
 
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
       staggeredPhaseApplied(false),
-      siteDim(4),
       i_mu(0.0)
 	{
 	  // variables declared in LatticeFieldParam
@@ -93,7 +90,7 @@ namespace quda {
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
       pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), siteDim(4), i_mu(0.0)
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), i_mu(0.0)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -114,9 +111,6 @@ namespace quda {
       staggeredPhaseType(param.staggered_phase_type), 
       staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu)
 	{
-	  //Following is irrelevant for non-coarse gauge fields.
-	  this->siteDim = this->nDim;
-
 	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
 	  else errorQuda("Error: invalid link type(%d)\n", link_type);
@@ -177,7 +171,13 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
-    void exchange(void **ghost_link, void **link_sendbuf) const;
+    /**
+       @brief Exchange the buffers across all dimensions in a given direction
+       @param recv[out] Reicve buffer
+       @param send[in] Send buffer
+       @param dir[in] Direction in which we are sending (forwards OR backwards only)
+    */
+    void exchange(void **recv, void **send, QudaDirection dir) const;
 
     /** Imaginary chemical potential */
     double i_mu;
@@ -187,6 +187,7 @@ namespace quda {
     virtual ~GaugeField();
 
     virtual void exchangeGhost() = 0;
+    virtual void injectGhost() = 0;
 
     int Length() const { return length; }
     int Ncolor() const { return nColor; }
@@ -252,6 +253,12 @@ namespace quda {
        Set all field elements to zero (virtual)
     */
     virtual void zero() = 0;
+
+    /**
+     * Generic gauge field copy
+     * @param[in] src Source from which we are copying
+     */
+    virtual void copy(const GaugeField &src) = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -274,10 +281,19 @@ namespace quda {
     cudaGaugeField(const GaugeFieldParam &);
     virtual ~cudaGaugeField();
 
-    void exchangeGhost(); // exchange the ghost and store store in the padded region
+    /**
+       @brief Exchange the ghost and store store in the padded region
+     */
+    void exchangeGhost();
 
     /**
-       This does routine will populate the border / halo region of a
+       @brief The opposite of exchangeGhost: take the ghost zone on x,
+       send to node x-1, and inject back into the field
+     */
+    void injectGhost();
+
+    /**
+       @brief This does routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.  
 
        @param R The thickness of the extended region in each dimension
@@ -286,7 +302,12 @@ namespace quda {
     */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
-    void copy(const GaugeField &);     // generic gauge field copy
+    /**
+     * Generic gauge field copy
+     * @param[in] src Source from which we are copying
+     */
+    void copy(const GaugeField &src);
+
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
     void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
 
@@ -335,10 +356,19 @@ namespace quda {
     cpuGaugeField(const GaugeFieldParam &);
     virtual ~cpuGaugeField();
 
+    /**
+       @brief Exchange the ghost and store store in the padded region
+     */
     void exchangeGhost();
 
     /**
-       This does routine will populate the border / halo region of a
+       @brief The opposite of exchangeGhost: take the ghost zone on x,
+       send to node x-1, and inject back into the field
+     */
+    void injectGhost();
+
+    /**
+       @brief This does routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.  
 
        @param R The thickness of the extended region in each dimension
@@ -346,6 +376,12 @@ namespace quda {
        region in non-partitioned dimenions
     */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
+
+    /**
+     * Generic gauge field copy
+     * @param[in] src Source from which we are copying
+     */
+    void copy(const GaugeField &src);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
@@ -404,8 +440,9 @@ namespace quda {
      gauge field array.  Defined in extract_gauge_ghost.cu.
      @param u The gauge field from which we want to extract the ghost zone
      @param ghost The array where we want to pack the ghost zone into
+     @param extract Where we are extracting into ghost or injecting from ghost
   */
-  void extractGaugeGhost(const GaugeField &u, void **ghost);
+  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

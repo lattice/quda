@@ -6,8 +6,8 @@ set (QUDA_OBJS
   multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp
-  inv_multi_cg_quda.cpp  inv_eigcg_quda.cpp 
-  gauge_ape.cu gauge_stout.cu gauge_plaq.cu
+  inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
+  gauge_stout.cu gauge_plaq.cu
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
@@ -48,7 +48,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  version.cpp )
+  quda_memcpy.cpp version.cpp )
 
 
 ## split source into cu and cpp files

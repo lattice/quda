@@ -332,26 +332,57 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Smoother to use on each level */
+    QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+    /** The type of residual to send to the next coarse grid, and thus the
+	type of solution to receive back from this coarse grid */
+    QudaSolutionType coarse_grid_solution_type[QUDA_MAX_MG_LEVEL];
+
+    /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
+    QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL];
+
+    /** The type of multigrid cycle to perform at each level */
+    QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
+
     /** Number of pre-smoother applications on each level */
     int nu_pre[QUDA_MAX_MG_LEVEL];
 
-    /** Number of post-smoother applicaitons on each level */
+    /** Number of post-smoother applications on each level */
     int nu_post[QUDA_MAX_MG_LEVEL];
 
-    /** Smoother / solver to use on each level */
-    QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+    /** Tolerance to use for the smoother / solver on each level */
+    double smoother_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Over/under relaxation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use global reductions or not for the smoother / solver at each level */
+    QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
 
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
+ 
+    /** Whether to generate on all levels or just on level 0 */
+    QudaBoolean generate_all_levels; 
+
+    /** Whether to run the verification checks once set up is complete */
+    QudaBoolean run_verify;
 
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
+
+    /** The Gflops rate of the multigrid solver setup */
+    double gflops;
+
+    /**< The time taken by the multigrid solver setup */
+    double secs;
 
   } QudaMultigridParam;
 
@@ -484,6 +515,15 @@ extern "C" {
   QudaInvertParam newQudaInvertParam(void);
 
   /**
+   * A new QudaMultigridParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaMultigridParam mg_param = newQudaMultigridParam();
+   */
+  QudaMultigridParam newQudaMultigridParam(void);
+
+  /**
    * A new QudaEigParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
    * using this function.  Typical usage is as follows:
@@ -499,10 +539,16 @@ extern "C" {
   void printQudaGaugeParam(QudaGaugeParam *param);
 
   /**
-   * Print the members of QudaGaugeParam.
-   * @param param The QudaGaugeParam whose elements we are to print.
+   * Print the members of QudaInvertParam.
+   * @param param The QudaInvertParam whose elements we are to print.
    */
   void printQudaInvertParam(QudaInvertParam *param);
+
+  /**
+   * Print the members of QudaMultigridParam.
+   * @param param The QudaMultigridParam whose elements we are to print.
+   */
+  void printQudaMultigridParam(QudaMultigridParam *param);
 
   /**
    * Print the members of QudaEigParam.

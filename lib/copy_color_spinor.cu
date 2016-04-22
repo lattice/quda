@@ -24,6 +24,9 @@ namespace quda {
 			      QudaFieldLocation location, void *Dst, void *Src, 
 			      void *dstNorm, void *srcNorm) {
 
+    if (dst.SiteSubset() != src.SiteSubset())
+      errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
+
     if (dst.Ncolor() != src.Ncolor()) 
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 

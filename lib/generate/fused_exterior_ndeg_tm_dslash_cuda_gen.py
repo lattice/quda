@@ -10,13 +10,13 @@ def complexToStr(c):
     def fltToString(a):
         if a == int(a): return `int(a)`
         else: return `a`
-    
+
     def imToString(a):
         if a == 0: return "0i"
         elif a == -1: return "-i"
         elif a == 1: return "i"
         else: return fltToString(a)+"i"
-    
+
     re = c.real
     im = c.imag
     if re == 0 and im == 0: return "0"
@@ -146,7 +146,7 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_DOUBLE2\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2\n"
 
@@ -157,7 +157,7 @@ def def_input_spinor():
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_FLOAT4\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4\n"
     for s in range(0,4):
@@ -189,7 +189,7 @@ def def_gauge():
 
     str += "\n"
     str += "#endif // GAUGE_DOUBLE\n\n"
-            
+
     str += "// conjugated gauge link\n"
     for m in range(0,3):
         for n in range(0,3):
@@ -254,7 +254,6 @@ def prolog():
 #else // Open64 compiler
 #define VOLATILE volatile
 #endif
-KernelType kernel_type = EXTERIOR_KERNEL_ALL;
 """)
 
     prolog_str+= def_input_spinor()
@@ -283,7 +282,7 @@ KernelType kernel_type = EXTERIOR_KERNEL_ALL;
 
 
     # set the pointer if using shared memory for pseudo registers
-#    if sharedFloatsPerFlavor > 0 and not sharedDslash: 
+#    if sharedFloatsPerFlavor > 0 and not sharedDslash:
     if sharedFloatsPerFlavor > 0:
         prolog_str += (
 """
@@ -319,25 +318,6 @@ int sid;
 int dim;
 int face_idx;
 int Y[4] = {X1,X2,X3,X4};
-#if DD_PREC==2
-int faceVolume[4];
-faceVolume[0] = (X2*X3*X4)>>1;
-faceVolume[1] = (X1*X3*X4)>>1;
-faceVolume[2] = (X1*X2*X4)>>1;
-faceVolume[3] = (X1*X2*X3)>>1;
-#endif
-
-#ifdef MULTI_GPU
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // Inline by hand for the moment and assume even dimensions
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
-
-  // only need to check Y and Z dims currently since X and T set to match exactly
-  if (x2 >= X2) return;
-  if (x3 >= X3) return; 
 
 """)
         else:
@@ -346,59 +326,23 @@ if (kernel_type == INTERIOR_KERNEL) {
 int dim;
 int face_idx;
 int Y[4] = {X1,X2,X3,X4};
-#if DD_PREC==2
-int faceVolume[4];
-faceVolume[0] = (X2*X3*X4)>>1;
-faceVolume[1] = (X1*X3*X4)>>1;
-faceVolume[2] = (X1*X2*X4)>>1;
-faceVolume[3] = (X1*X2*X3)>>1;
-#endif
-
-
-#ifdef MULTI_GPU
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  sid = blockIdx.x*blockDim.x + threadIdx.x;
-  if (sid >= param.threads) return;
-
-  // Inline by hand for the moment and assume even dimensions
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
 
 """)
 
-        out = ""
-        for s in range(0,4):
-            for c in range(0,3):
-                out += out1_re(s,c)+" = 0;  "+out1_im(s,c)+" = 0;\n"
-
-        out += "\n"
-
-        for s in range(0,4):
-            for c in range(0,3):
-                out += out2_re(s,c)+" = 0;  "+out2_im(s,c)+" = 0;\n"
-
-        prolog_str+= indent(out)
-
         prolog_str+= (
 """
-#ifdef MULTI_GPU
-} else { // exterior kernel
-
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
 
-  dim = dimFromFaceIndex(sid, param); // sid is also modified 
+  dim = dimFromFaceIndex(sid, param); // sid is also modified
 
-  const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim]) >> 1);       
+  const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim]) >> 1);
   // volume of one face (per flavor)
   const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
   face_idx = sid - face_num*face_volume;        // index into the respective face
 
   // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-  //sp_idx = face_idx + param.ghostOffset[dim];
 
 
   const int dims[] = {X1, X2, X3, X4};
@@ -444,8 +388,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 """)
 
 
-        prolog_str+= "}\n"
-        prolog_str+= "#endif // MULTI_GPU\n\n\n"
+        prolog_str+= "\n"
 
     else:
         prolog_str+=(
@@ -457,7 +400,7 @@ if (sid >= param.threads) return;
 
 // read spinor from device memory
 READ_SPINOR(SPINORTEX, param.sp_stride, sid, sid);
-""")            
+""")
     return prolog_str
 # end def prolog
 
@@ -467,7 +410,7 @@ def gen(dir, pack_only=False):
     projStr = projectorToStr(projectors[projIdx])
     def proj(i,j):
         return projectors[projIdx][4*i+j]
-    
+
     # if row(i) = (j, c), then the i'th row of the projector can be represented
     # as a multiple of the j'th row: row(i) = c row(j)
     def row(i):
@@ -497,23 +440,21 @@ def gen(dir, pack_only=False):
 #    cond += "     (kernel_type == EXTERIOR_KERNEL_"+dim[dir/2]+" && "+boundary[dir]+") )\n"
 #    cond += "#endif\n"
     cond += "if (isActive(dim,"  + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " + boundary[dir] +")\n"
-  
+
     str = ""
-    
+
     projName = "P"+`dir/2`+["-","+"][projIdx%2]
     str += "// Projector "+projName+"\n"
     for l in projStr.splitlines():
         str += "// "+l+"\n"
     str += "\n"
-  
-    str += "faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
-    str += "const int sp_idx =  face_idx + param.ghostOffset[" + `dir/2` + "];\n"
 
-    str += "#if (DD_PREC==2)\n" 
+    str += "faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
+    str += "const int sp_idx =  face_idx + param.ghostOffset[" + `dir/2` + "]["  + `1-dir%2` + "];\n"
+
+    str += "#if (DD_PREC==2)\n"
     str += "  sp_norm_idx = face_idx + "
-    if dir%2 == 0:
-      str += "faceVolume[" + `dir/2` + "] + " 
-    str += "param.ghostNormOffset[" + `dir/2` + "];\n"
+    str += "param.ghostNormOffset[" + `dir/2` + "][" +  `1-dir%2` + "];\n"
     str += "#endif"
     str += "\n"
 
@@ -579,22 +520,26 @@ def gen(dir, pack_only=False):
     load_half_flv1 = "// read half spinor for the first flavor from device memory\n"
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0: 
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-    else: 
+#    if (dir+1) % 2 == 0:
+#          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+#    else:
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
-    
+#          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+    load_half_flv1 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
     load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[" + `dir/2` + "];\n"
+    load_half_flv2 += "#if (DD_PREC==2)\n"
+    load_half_flv2 += "const int fl_norm_idx = sp_norm_idx + ghostFace[" + `dir/2` + "];\n"
+    load_half_flv2 += "#endif\n"
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0: 
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
-    else: 
+#    if (dir+1) % 2 == 0:
+#          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
+#  else:
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
-
+#          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
+    load_half_flv2 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx);\n\n"
 
 
     project = "// project spinor into half spinors\n"
@@ -623,7 +568,7 @@ def gen(dir, pack_only=False):
                     elif re==0:
                         strRe += sign(-im)+in_im(s,c)
                         strIm += sign(im)+in_re(s,c)
-                
+
             project += h1_re(h,c)+" = "+strRe+";\n"
             project += h1_im(h,c)+" = "+strIm+";\n"
 
@@ -680,41 +625,18 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 
     copy_half += "\n"
 
-    prep_half_cond1 =  ""
-    prep_half_cond1 += "#ifdef MULTI_GPU\n"
-    prep_half_cond1 += "if (kernel_type == INTERIOR_KERNEL) {\n"
-    prep_half_cond1 += "#endif\n"
-    prep_half_cond1 += "\n"
-
-    prep_half_flv1 = ""
-    prep_half_flv1 += indent(load_flv1)
-    prep_half_flv1 += indent(project)
-
-    prep_half_flv2 = ""
-    prep_half_flv2 += indent(load_flv2)
-    prep_half_flv2 += indent(project)
-
-    prep_half_cond2 = "\n"
-    prep_half_cond2 += "#ifdef MULTI_GPU\n"
-    prep_half_cond2 += "} else {\n"
-    prep_half_cond2 += "\n"
-
     prep_face_flv1 = indent(load_half_flv1)
     prep_face_flv2 = indent(load_half_flv2)
 
     prep_half = indent(copy_half)
 
-    prep_half_cond3 = "}\n"
-    prep_half_cond3 += "#endif // MULTI_GPU\n"
-    prep_half_cond3 += "\n"
-    
     ident = "// identity gauge matrix\n"
     for m in range(0,3):
         for h in range(0,2):
             ident += "spinorFloat "+h2_re(h,m)+" = " + h1_re(h,m) + "; "
             ident += "spinorFloat "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n"
     ident += "\n"
-    
+
     mult = ""
     for m in range(0,3):
         mult += "// multiply row "+`m`+"\n"
@@ -728,7 +650,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 im += h2_im(h,m) + " += " + g_im(dir,m,c) + " * "+h1_re(h,c)+";\n"
             mult += re + im
         mult += "\n"
-    
+
     reconstruct_flv1 = ""
     for m in range(0,3):
 
@@ -738,7 +660,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 h_out = h+2
             reconstruct_flv1 += out1_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
             reconstruct_flv1 += out1_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
-    
+
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
@@ -751,7 +673,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             elif re == 0:
                 reconstruct_flv1 += out1_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
                 reconstruct_flv1 += out1_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
-        
+
         reconstruct_flv1 += "\n"
 
     reconstruct_flv2 = ""
@@ -763,7 +685,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 h_out = h+2
             reconstruct_flv2 += out2_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
             reconstruct_flv2 += out2_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
-    
+
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
@@ -776,20 +698,20 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             elif re == 0:
                 reconstruct_flv2 += out2_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
                 reconstruct_flv2 += out2_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
-        
+
         reconstruct_flv2 += "\n"
 
 
     if dir >= 6:
         str += decl_half
         str += "if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)\n"
-        str += block("{\n" + prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + ident + reconstruct_flv1 + "}\n" + "{\n" + prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + ident + reconstruct_flv2 + "}\n")
+        str += block("{\n" + load_half_cond + prep_face_flv1 + prep_half + ident + reconstruct_flv1 + "}\n" + "{\n" + load_half_cond + prep_face_flv2 + prep_half + ident + reconstruct_flv2 + "}\n")
         str += " else "
-        str += block(load_gauge + reconstruct_gauge + "{\n"+ prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + mult + reconstruct_flv1 + "}\n" + "{\n"+ prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + mult + reconstruct_flv2 +"}\n")
+        str += block(load_gauge + reconstruct_gauge + "{\n"+ load_half_cond + prep_face_flv1 + prep_half + mult + reconstruct_flv1 + "}\n" + "{\n" + load_half_cond + prep_face_flv2 + prep_half + mult + reconstruct_flv2 +"}\n")
     else:
-        str += decl_half + load_gauge + reconstruct_gauge 
-        str +="{\n" + prep_half_cond1 + prep_half_flv1 + prep_half_cond2 + load_half_cond + prep_face_flv1 + prep_half + prep_half_cond3 + mult + reconstruct_flv1 + "}\n" 
-        str +="{\n" + prep_half_cond1 + prep_half_flv2 + prep_half_cond2 + load_half_cond + prep_face_flv2 + prep_half + prep_half_cond3 + mult + reconstruct_flv2 + "}\n"     
+        str += decl_half + load_gauge + reconstruct_gauge
+        str +="{\n" + load_half_cond + prep_face_flv1 + prep_half + mult + reconstruct_flv1 + "}\n"
+        str +="{\n" + load_half_cond + prep_face_flv2 + prep_half + mult + reconstruct_flv2 + "}\n"
 
     if pack_only:
         out = load_spinor + decl_half + project
@@ -823,7 +745,7 @@ def twisted():
     if dagger :
        a1 += " - a *"
        a2 += " + a *"
-    else:     
+    else:
        a1 += " + a *"
        a2 += " - a *"
 
@@ -978,7 +900,7 @@ def xpay():
     if dagger :
        a1 += " - a *"
        a2 += " + a *"
-    else:     
+    else:
        a1 += " + a *"
        a2 += " - a *"
 
@@ -1049,37 +971,16 @@ def xpay():
 
 def epilog():
     str = ""
-    if dslash:
-       str += "#ifdef MULTI_GPU\n"
-       str += (
-"""
-int incomplete = 0; // Have all 8 contributions been computed for this site?
-
-switch(kernel_type) { // intentional fall-through
-case INTERIOR_KERNEL:
-  incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-case EXTERIOR_KERNEL_T:
-  incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-case EXTERIOR_KERNEL_Z:
-  incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-case EXTERIOR_KERNEL_Y:
-  incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-}
-
-""")    
-    str += "\n"
-    str += "if (!incomplete)\n"
-    str += "#endif // MULTI_GPU\n"
     str += "// apply twisted mass rotation\n"
     str += block( "\n" + twisted() + xpay() )
-    
+
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
     str += "WRITE_FLAVOR_SPINOR();\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#undef WRITE_SPINOR_SHARED\n"
         str += "#undef READ_SPINOR_SHARED\n"
     if sharedFloatsPerFlavor > 0: str += "#undef SHARED_STRIDE\n\n"
@@ -1108,7 +1009,7 @@ case EXTERIOR_KERNEL_Y:
                     str += "#undef "+out1_im(s,c)+"\n"
     str += "\n"
 
-    str += "#undef VOLATILE\n" 
+    str += "#undef VOLATILE\n"
 
     return str
 # end def epilog
@@ -1134,7 +1035,7 @@ def generate_dslash_kernels(arch):
     if arch >= 200:
         sharedFloatsPerFlavor = 0
         #sharedDslash = True
-        sharedDslash = False    
+        sharedDslash = False
         name = "fermi"
     elif arch >= 120:
         sharedFloatsPerFlavor = 0
