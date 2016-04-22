@@ -1,3 +1,7 @@
+#ifdef READ_SPINOR
+#undef READ_SPINOR
+#endif
+
 #ifndef _TWIST_QUDA_CONTRACT
 #define _TWIST_QUDA_CONTRACT
 
@@ -51,6 +55,9 @@
 		#define INTERTEX interTexDouble
 	#endif	// USE_TEXTURE_OBJECTS
 
+#ifdef SPINOR_HOP
+#undef SPINOR_HOP
+#endif
 #define	SPINOR_HOP	12
 
 #endif

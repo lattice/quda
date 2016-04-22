@@ -218,10 +218,10 @@ namespace quda {
       errorQuda("Aborting");
     }
     track_malloc(PINNED, a, ptr);
-    return ptr;
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
 #endif
+    return ptr;
   }
 
 

@@ -1623,11 +1623,11 @@ void usage(char** argv )
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
 #endif
   printf("    --prec <double/single/half>               # Precision in GPU\n");
-  printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n");
-  printf("    --prec_precondition <double/single/half>  # Preconditioner precision in GPU\n");
+  printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
+  printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
-  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
-  printf("    --recon_precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
+  printf("    --recon-sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
+  printf("    --recon-precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
   printf("    --dim <n>                                 # Set space-time dimension (X Y Z T)\n"); 
   printf("    --sdim <n>                                # Set space dimension(X/Y/Z) size\n"); 
@@ -1643,20 +1643,20 @@ void usage(char** argv )
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
-  printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
-         "                                                  /asqtad/domain_wall/domain_wall_4d/mobius\n");
-  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, deg_doublet, nondeg_doublet)\n");
+  printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
+	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
+         "                                                  /asqtad/domain-wall/domain-wall-4d/mobius\n");
+  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
-  printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
-  printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
+  printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
+  printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
 	 "                                                  For multigrid this sets the smoother type.\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
-  printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
-  printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
+  printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
+  printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
   printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
@@ -1745,7 +1745,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--prec_sloppy") == 0){
+  if( strcmp(argv[i], "--prec-sloppy") == 0){
     if (i+1 >= argc){
       usage(argv);
     }	    
@@ -1755,7 +1755,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--prec_precondition") == 0){
+  if( strcmp(argv[i], "--prec-precondition") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -1775,7 +1775,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--recon_sloppy") == 0){
+  if( strcmp(argv[i], "--recon-sloppy") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -1785,7 +1785,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--recon_precondition") == 0){
+  if( strcmp(argv[i], "--recon-precondition") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -2098,7 +2098,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--dslash_type") == 0){
+  if( strcmp(argv[i], "--dslash-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
@@ -2118,7 +2118,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--inv_type") == 0){
+  if( strcmp(argv[i], "--inv-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
@@ -2128,7 +2128,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--precon_type") == 0){
+  if( strcmp(argv[i], "--precon-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }

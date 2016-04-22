@@ -305,10 +305,6 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + SHARED_TMNDEG_FLOATS_PER_THREAD
 int x1, x2, x3, x4;
 int X;
 
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
-int sp_norm_idx;
-#endif // MULTI_GPU half precision
-
 int sid;
 """)
 
@@ -375,10 +371,6 @@ if (kernel_type == INTERIOR_KERNEL) {
   // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
   //sp_idx = face_idx + param.ghostOffset[dim];
-
-#if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)] + face_num*ghostFace[static_cast<int>(kernel_type)];
-#endif
 
   const int dims[] = {X1, X2, X3, X4};
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
@@ -479,7 +471,10 @@ def gen(dir, pack_only=False):
 
     str += "#ifdef MULTI_GPU\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
-    str += "  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];\n"
+    str += "  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#if (DD_PREC==2) // half precision\n"
+    str += "const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#endif\n"
     str += "#else\n"
     str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
@@ -549,24 +544,30 @@ def gen(dir, pack_only=False):
     load_half_cond += "\n"
 
     load_half_flv1 = "// read half spinor for the first flavor from device memory\n"
+
+
+
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0: 
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-    else: 
+#if (dir+1) % 2 == 0: 
+ #         load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+  #  else: 
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+   #       load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+
+    load_half_flv1 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
     
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
     load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[static_cast<int>(kernel_type)];\n"
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0: 
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
-    else: 
+    #if (dir+1) % 2 == 0: 
+     #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+    #else: 
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+     #     load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
 
+    load_half_flv2 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
 
     project = "// project spinor into half spinors\n"
     for h in range(0, 2):

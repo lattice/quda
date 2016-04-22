@@ -49,8 +49,8 @@ if(${QUDA_MULTIGRID})
   cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(multigrid_invert_test ${TEST_LIBS})
 
-  cuda_add_executable(multigrid_benchmark multigrid_benchmark.cu)
-  target_link_libraries(multigrid_benchmark ${TEST_LIBS})
+  cuda_add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
+  target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
 endif()
 
 cuda_add_executable(su3_test su3_test.cpp)

@@ -514,6 +514,10 @@ namespace quda {
   {
 
 #ifdef GPU_CLOVER_DIRAC
+    static_cast<cudaColorSpinorField&>(x.Even()).allocateGhostBuffer(1);
+    static_cast<cudaColorSpinorField&>(x.Odd()).allocateGhostBuffer(1);
+    static_cast<cudaColorSpinorField&>(p.Even()).allocateGhostBuffer(1);
+    static_cast<cudaColorSpinorField&>(p.Odd()).allocateGhostBuffer(1);
 
     if(force.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", force.Order());    
@@ -522,7 +526,7 @@ namespace quda {
 #ifdef MULTI_GPU
     const unsigned int Npad = x.Ncolor()*x.Nspin()*2/x.FieldOrder();
     for(int dir=0; dir<4; ++dir){
-      ghostOffset[dir] = Npad*(x.GhostOffset(dir) + x.Stride()); 
+      ghostOffset[dir] = Npad*(x.Even().GhostOffset(dir) + x.Even().Stride());
     }
 #endif
 

@@ -173,7 +173,7 @@ namespace quda {
 #endif // MULTI_GPU
         break;
       default:
-	errorQuda("Unsupported dslash type %d", dslashType);
+	errorQuda("Unsupported twisted-dslash type %d", dslashType);
       }
     }
 
@@ -203,7 +203,8 @@ namespace quda {
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cNorm, cloverInv, cNrm2,
 	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)x->V(), (float*)x->Norm());
 	break;
-      default: errorQuda("Invalid twisted clover dslash type");
+      default:
+	errorQuda("Invalid twisted clover dslash type");
       }
     }
 
@@ -257,6 +258,8 @@ namespace quda {
 			       const double &epsilon, const double &k,  const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
+    inSpinor->allocateGhostBuffer(1);
+
 #ifdef GPU_TWISTED_CLOVER_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
@@ -265,8 +268,11 @@ namespace quda {
 
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
       ghost_threads[i] = ((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
     }

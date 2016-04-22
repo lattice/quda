@@ -407,8 +407,8 @@ namespace quda {
  {
    if(!init_flag) errorQuda("\nGMResDR resources were not allocated.\n");
 
-   int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
-   int clen = Vm->EigvLength()      >> 1; //complex vector length
+   int cldn = Vm->EigvLength() >> 1; //complex leading dimension
+   int clen = Vm->EigvLength() >> 1; //complex vector length
 
    for(int j = 0; j <= m; j++) //row index
    {

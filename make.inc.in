@@ -46,7 +46,6 @@ BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU c
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
 
-
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
 BUILD_MAGMA_VARS = @BUILD_MAGMA_VARS@ # build magma using env vars MAGMA_INC and MAGMA_LIB
@@ -205,6 +204,7 @@ ifeq ($(strip $(POSIX_THREADS)), yes)
 endif
 
 LIB += -lpthread
+
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
