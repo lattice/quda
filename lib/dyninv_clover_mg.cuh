@@ -47,9 +47,6 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
     /* Compute (T^2 + mu2) first, then invert */
     /* We proceed by chiral blocks */
 
-    /* FIXME: This happens because of the last final loop */
-    if (fineSpin != 4 || fineColor != 3) errorQuda("Fine spin, fine color combination not supported for Dynamic Clover inversion\n");
-
 
     for (int ch = 0; ch < 4; ch += 2) {	/* Loop over chiral blocks */
 	complex<Float> tri0, tri1, tri2, tri3, tri4, tri6, tri7, tri8, tri10, tri11, tri12;
@@ -247,9 +244,6 @@ __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
 	InvClv(1,2,1,2) = sqrt(InvClv(1,2,1,2));
 	tmp5 = 1. / InvClv(1,2,1,2);
 
-	/* NO INFO YET ON TR(LOG A) FOR TM-CLOVER */
-	/* Accumulate trlogA */	
-	/* for (int j=0;j<6;j++) trlogA += (double)2.0*log((double)(diag[j])); */
 
 	/* Forwards substitute */
 

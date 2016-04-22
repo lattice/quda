@@ -240,7 +240,7 @@ namespace quda {
 
 #ifdef DYNAMIC_CLOVER
   #ifdef UGLY_DYNCLOV
-    #include<dyninv_clover_mg.h>
+    #include<dyninv_clover_mg.cuh>
   #else
 
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
@@ -248,10 +248,6 @@ namespace quda {
     /* Applies the inverse of the clover term squared plus mu2 to the spinor */
     /* Compute (T^2 + mu2) first, then invert */
     /* We proceed by chiral blocks */
-
-    /* FIXME: This happens because of the last final loop */
-    if (fineSpin != 4 || fineColor != 3) errorQuda("Fine spin, fine color combination not supported for Dynamic Clover inversion\n");
-
 
     for (int ch = 0; ch < 2; ch++) {	/* Loop over chiral blocks */
       Float d, diag[6], tmp[6];
@@ -310,10 +306,6 @@ namespace quda {
           }
         }
       }
-
-      /* NO INFO YET ON TR(LOG A) FOR TM-CLOVER */
-      /* Accumulate trlogA */	
-      /* for (int j=0;j<6;j++) trlogA += (double)2.0*log((double)(diag[j])); */
 
       /* Now use forward and backward substitution to construct inverse */
       complex<Float> v1[6];
@@ -478,7 +470,6 @@ namespace quda {
     computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
   }
 
-  /**
   /**
      @brief Do a single (AV)^\dagger * UV product, where for preconditioned
      clover, AV correspond to the clover inverse multiplied by the
@@ -1262,8 +1253,17 @@ namespace quda {
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, ColorSpinorField &av, const ColorSpinorField &v,
 		  double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
 
+    // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
       errorQuda("Unsupported coarsening of matpc = %d", matpc);
+
+    bool is_dirac_coarse = (dirac == QUDA_COARSE_DIRAC || dirac == QUDA_COARSEPC_DIRAC) ? true : false;
+    if (is_dirac_coarse && fineSpin != 2)
+      errorQuda("Input Dirac operator %d should have nSpin=2, not nSpin=%d\n", dirac, fineSpin);
+    if (!is_dirac_coarse && fineSpin != 4)
+      errorQuda("Input Dirac operator %d should have nSpin=4, not nSpin=%d\n", dirac, fineSpin);
+    if (!is_dirac_coarse && fineColor != 3)
+      errorQuda("Input Dirac operator %d should have nColor=3, not nColor=%d\n", dirac, fineColor);
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
