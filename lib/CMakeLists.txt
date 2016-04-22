@@ -62,13 +62,15 @@ ENDFOREACH(item ${QUDA_OBJS})
 LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 
 #set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS dummy)
-add_custom_target( git_version
-COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy
-)
+#add_custom_target( git_version
+#COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy
+#)
 
 
-
-set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy)
+if(GITVERSION)
+  find_file(GITDIR NAMES .git PATHS ${CMAKE_SOURCE_DIR} NO_DEFAULT_PATH)
+  set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${GITDIR}/logs/HEAD)
+endif()
 
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
@@ -76,13 +78,8 @@ endif()
 
 include_directories(dslash_core)
 include_directories(.)
+cuda_add_library(quda STATIC ${QUDA_OBJS})
 
-# generate a cmake object library for all cpp files first
-add_library(quda_cpp OBJECT ${QUDA_OBJS})
-cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
-if(GITVERSION)
-  ADD_DEPENDENCIES(quda git_version)
-endif()
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 
 

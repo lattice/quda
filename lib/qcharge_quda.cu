@@ -20,14 +20,10 @@ namespace quda {
   template<typename Float, typename Gauge>
   struct QChargeArg : public ReduceArg<double> {
     int threads; // number of active threads required
-
-    typename ComplexTypeId<Float>::Type* Fmunu;
-
     Gauge data;
-    
-      QChargeArg(const Gauge &data, GaugeField& Fmunu) : ReduceArg<double>(), data(data), 
-        threads(Fmunu.Volume()) {}
-    };
+    QChargeArg(const Gauge &data, GaugeField& Fmunu)
+      : ReduceArg<double>(), data(data), threads(Fmunu.Volume()) {}
+  };
 
   // Core routine for computing the topological charge from the field strength
   template<int blockSize, typename Float, typename Gauge>

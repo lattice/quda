@@ -44,14 +44,15 @@ namespace quda {
   };
  
   std::ostream& operator<<(std::ostream& output, const GaugeForceArg& arg) {
-    std::cout << "threads         = " << arg.threads << std::endl;
-    std::cout << "gauge_stride    = " << arg.gauge_stride << std::endl;
-    std::cout << "mom_stride      = " << arg.mom_stride << std::endl;
-    std::cout << "num_paths       = " << arg.num_paths << std::endl;
-    std::cout << "path_max_length = " << arg.path_max_length << std::endl;
-    std::cout << "coeff           = " << arg.coeff << std::endl;
-    std::cout << "dir             = " << arg.dir << std::endl;
-    std::cout << "count           = " << arg.count << std::endl;
+    output << "threads         = " << arg.threads << std::endl;
+    output << "gauge_stride    = " << arg.gauge_stride << std::endl;
+    output << "mom_stride      = " << arg.mom_stride << std::endl;
+    output << "num_paths       = " << arg.num_paths << std::endl;
+    output << "path_max_length = " << arg.path_max_length << std::endl;
+    output << "coeff           = " << arg.coeff << std::endl;
+    output << "dir             = " << arg.dir << std::endl;
+    output << "count           = " << arg.count << std::endl;
+    return output;
   }
 
 #define GF_SITE_MATRIX_LOAD_TEX 1

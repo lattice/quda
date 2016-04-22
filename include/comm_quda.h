@@ -26,6 +26,10 @@ extern "C" {
   void comm_set_default_topology(Topology *topo);
   Topology *comm_default_topology(void);
 
+  // routines related to direct peer-2-peer access
+  void comm_set_neighbor_ranks(Topology *topo=NULL);
+  int comm_neighbor_rank(int dir, int dim);
+
   /**
      Return the number of processes in the dimension dim
      @param dim Dimension which we are querying
@@ -117,6 +121,19 @@ extern "C" {
   int comm_rank(void);
   int comm_size(void);
   int comm_gpuid(void);
+
+  /**
+     Enabled peer-to-peer communication.
+   */
+  void comm_peer2peer_init();
+
+  /**
+     Query if peer-to-peer communication is enabled
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+     @return Whether peer-to-peer is enabled
+  */
+  bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
      Create a persistent message handler for a relative send

@@ -526,8 +526,6 @@ namespace quda {
     cudaMemset(gauge, 0, bytes);
   }
 
-  void setGhostSpinor(bool value);
-
   ColorSpinorParam colorSpinorParam(const cudaGaugeField &a) {
    if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
         a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
@@ -573,21 +571,13 @@ namespace quda {
 
   // Return the L2 norm squared of the gauge field
   double norm2(const cudaGaugeField &a) {
-    // quick hack to disable ghost zone creation which otherwise breaks this mapping on multi-gpu
-    setGhostSpinor(false);
     cudaColorSpinorField b(colorSpinorParam(a));
-    setGhostSpinor(true);
-
     return blas::norm2(b);
   }
 
   // Return the L1 norm of the gauge field
   double norm1(const cudaGaugeField &a) {
-    // quick hack to disable ghost zone creation which otherwise breaks this mapping on multi-gpu
-    setGhostSpinor(false);
     cudaColorSpinorField b(colorSpinorParam(a));
-    setGhostSpinor(true);
-
     return blas::norm1(b);
   }
 

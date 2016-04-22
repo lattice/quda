@@ -728,7 +728,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE || 
+      inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()
   bool pc_solution = (inv_param->solution_type == QUDA_MATPC_SOLUTION ||
@@ -1878,6 +1879,12 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   delete in_h;
 
   popVerbosity();
+}
+
+namespace quda{
+bool canReuseResidentGauge(QudaInvertParam *param){
+  return (gaugePrecise != NULL) and param->cuda_prec == gaugePrecise->Precision();
+}
 }
 
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {

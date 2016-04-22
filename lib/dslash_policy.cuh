@@ -169,7 +169,9 @@ struct DslashCuda2 : DslashPolicyImp {
 		
     inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
     inputSpinor->createComms(dslash.Nface()/2);	
+
     DslashCommsPattern pattern(dslashParam.commDim);
+
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
     for(int i=3; i>=0; i--){
@@ -178,6 +180,7 @@ struct DslashCuda2 : DslashPolicyImp {
         PROFILE(inputSpinor->recvStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
       }
     }
+
     bool pack = false;
     for (int i=3; i>=0; i--) 
       if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
@@ -255,14 +258,27 @@ struct DslashCuda2 : DslashPolicyImp {
 
         } // dir=0,1
 
-        // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
+	// if peer-2-peer in a given direction then we need only wait on that copy event to finish
+	// else we post an event in the scatter stream and wait on that
         if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
-	  // Record the end of the scattering
-	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
-		  profile, QUDA_PROFILE_EVENT_RECORD);
-	  // wait for scattering to finish and then launch dslash
-	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
-		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  if (comm_peer2peer_enabled(0,i)) {
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
+		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  }
+	  if (comm_peer2peer_enabled(1,i)) {
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(1,i), 0),
+		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  }
+
+	  // if non peer-to-peer in a given direction then we have to wait on a scatter event
+	  if (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) {
+	    // Record the end of the scattering
+	    PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]),
+		    profile, QUDA_PROFILE_EVENT_RECORD);
+	    // wait for scattering to finish and then launch dslash
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0),
+		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  }
 
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
@@ -946,11 +962,28 @@ struct DslashFusedExterior : DslashPolicyImp {
       dslashParam.threads = dslashParam.threadDimMapUpper[i];
     }
 
-    PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]), 
-      profile, QUDA_PROFILE_EVENT_RECORD);
+    // if peer-2-peer in a given direction then we need to to wait on that copy event
+    // if any comms is not peer-2-peer then we need to post a scatter event and wait on that
+    bool post_scatter_event = false;
+    for (int i=3; i>=0; i--) {
+      if (comm_peer2peer_enabled(0,i)) {
+	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
+		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+      }
+      if (comm_peer2peer_enabled(1,i)) {
+	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(1,i), 0),
+		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+      }
+      if (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) post_scatter_event = true;
+    }
 
-    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0),
-      profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    if (post_scatter_event) {
+      PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]),
+	      profile, QUDA_PROFILE_EVENT_RECORD);
+
+      PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0),
+	      profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    }
 
     if (pattern.commDimTotal) {
       PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
