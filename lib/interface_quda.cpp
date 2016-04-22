@@ -2709,11 +2709,11 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      (*solve)(out,in);
       for(int i=0; i < param->num_src; i++) {
-        (*solve)(*(out[i]), *(in[i]));
         blas::copy(*(in[i]), *(out[i]));
-        solverParam.updateInvertParam(*param,i,i);
       }
+      solverParam.updateInvertParam(*param);
       delete solve;
     }
 
@@ -2721,23 +2721,19 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      for(int i=0; i < param->num_src; i++) {
-        (*solve)(*(out[i]), *(in[i]));
-        solverParam.updateInvertParam(*param,i,i);
-      }
+      (*solve)(out,in);
+      solverParam.updateInvertParam(*param,i,i);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      //for(int i=0; i < param->num_src; i++) {
-        (*solve)(out,in);
-       // solverParam.updateInvertParam(*param,i,i);
-      //}
+      (*solve)(out,in);
+      solverParam.updateInvertParam(*param);
       delete solve;
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      errorQuda("norm_error_solve not supported in multiRhs solve");
+      errorQuda("norm_error_solve not supported in multi source solve");
       //cudaColorSpinorField tmp(*out);
       // SolverParam solverParam(*param);
       //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
