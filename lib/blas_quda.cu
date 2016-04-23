@@ -91,8 +91,14 @@ namespace quda {
     };
 
     void axpby(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y) {
-      blasCuda<axpby_,0,1,0,0>(make_double2(a, 0.0), make_double2(b, 0.0), 
-			       make_double2(0.0, 0.0), x, y, x, x);
+      if (x.Precision() != y.Precision()) {
+	// call hacked mixed precision kernel
+	mixed::blasCuda<axpby_,0,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+				       x, y, x, x);
+      } else {
+	blasCuda<axpby_,0,1,0,0>(make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0),
+				 x, y, x, x);
+      }
     }
 
     /**

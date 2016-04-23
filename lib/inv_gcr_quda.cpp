@@ -37,7 +37,10 @@ namespace quda {
     inner.gflops = 0;
     inner.secs = 0;
 
-    inner.inv_type_precondition = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
+    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inner.is_preconditioner = true; // tell inner solver it is a preconditionis_re
+
+    inner.global_reduction = false;
 
     if (outer.inv_type == QUDA_GCR_INVERTER && outer.precision_sloppy != outer.precision_precondition) 
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
@@ -189,7 +192,7 @@ namespace quda {
     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
       K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
-      K = new MR(matPrecon, Kparam, profile);
+      K = new MR(matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner MR preconditioner
       K = new SD(matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unknown preconditioner
@@ -371,8 +374,7 @@ namespace quda {
 
     int pipeline = param.pipeline;
     // Vectorized dot product only has limited support so work around
-    if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION ||
-	Ap[0]->Nspin() == 2 || pipeline == 0) pipeline = 1;
+    if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION || pipeline == 0) pipeline = 1;
 
     if (pipeline > 1)
       warningQuda("GCR with pipeline length %d is experimental", pipeline);
@@ -499,7 +501,7 @@ namespace quda {
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-    reduceDouble(gflops);
+    if (K) gflops += K->flops()*1e-9;
 
     if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -508,7 +510,7 @@ namespace quda {
 
     if (param.compute_true_res) {
       // Calculate the true residual
-      mat(r, x);
+      mat(r, x, y);
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL)

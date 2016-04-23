@@ -18,7 +18,7 @@
 #else // Fermi
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
-#define DIRECT_ACCESS_SPINOR
+//#define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
@@ -123,7 +123,7 @@ namespace quda {
       int xpay_flops = 2 * 2 * in->Ncolor() * in->Nspin(); // multiply and add per real component
       int num_dir = 2 * 4; // dir * dim
 
-      long long flops;
+      long long flops = 0;
       switch(dslashParam.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -138,12 +138,14 @@ namespace quda {
 	  break;
 	}
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	{
 	  long long sites = in->VolumeCB();
 	  flops = (2*num_dir*mv_flops +                   // SU(3) matrix-vector multiplies
 		   (2*num_dir-1)*2*in->Ncolor()*in->Nspin()) * sites;   // accumulation
 	  if (x) flops += xpay_flops * sites; // axpy is always on interior
 
+	  if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	  // now correct for flops done by exterior kernel
 	  long long ghost_sites = 0;
 	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
@@ -163,7 +165,7 @@ namespace quda {
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat) + spinor_bytes;
       int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
 
-      long long bytes;
+      long long bytes = 0;
       switch(dslashParam.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -178,6 +180,7 @@ namespace quda {
 	  break;
 	}
       case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 	{
 	  long long sites = in->VolumeCB();
 	  bytes = (num_dir*(gauge_bytes_fat + gauge_bytes_long) + // gauge reads
@@ -185,6 +188,7 @@ namespace quda {
 		   spinor_bytes)*sites;                           // spinor write
 	  if (x) bytes += spinor_bytes;
 
+	  if (dslashParam.kernel_type == KERNEL_POLICY) break;
 	  // now correct for bytes done by exterior kernel
 	  long long ghost_sites = 0;
 	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
@@ -204,9 +208,10 @@ namespace quda {
   void improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 				   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 				   const int parity, const int dagger, const cudaColorSpinorField *x,
-				   const double &k, const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
+				   const double &k, const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
+    inSpinor->allocateGhostBuffer(3);    
 
 #ifdef GPU_STAGGERED_DIRAC
 
@@ -227,8 +232,10 @@ namespace quda {
 
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
+      dslashParam.ghostOffset[i][1] = in->GhostOffset(i,1)/in->FieldOrder();
+      dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
+      dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
 
@@ -270,12 +277,13 @@ namespace quda {
     }
 
 #ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(),  in->GhostFace(), profile);
+    dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
     delete dslashImp;
+#endif
 
     delete dslash;
     unbindFatGaugeTex(fatGauge);

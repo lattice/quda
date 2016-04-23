@@ -32,8 +32,13 @@ namespace quda {
       break;
     case QUDA_GCR_INVERTER:
       report("GCR");
-      if (param.preconditioner) {
+      if (param.preconditioner && param.maxiter == 11) { // FIXME - dirty hack
+	MG *mg = static_cast<MG*>(param.preconditioner);
+	solver = new GCR(mat, *(mg), matSloppy, matPrecon, param, profile);
+      } else if (param.preconditioner) {
 	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
+	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
+	param.precision_precondition = param.precision_sloppy;
 	solver = new GCR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
       } else {
 	solver = new GCR(mat, matSloppy, matPrecon, param, profile);
@@ -41,7 +46,7 @@ namespace quda {
       break;
     case QUDA_MR_INVERTER:
       report("MR");
-      solver = new MR(mat, param, profile);
+      solver = new MR(mat, matSloppy, param, profile);
       break;
     case QUDA_SD_INVERTER:
       report("SD");

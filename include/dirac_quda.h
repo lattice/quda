@@ -133,7 +133,7 @@ namespace quda {
 
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const = 0;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const = 0;
@@ -148,7 +148,18 @@ namespace quda {
 
     QudaMatPCType getMatPCType() const { return matpcType; }
     void Dagger(QudaDagType dag) { dagger = dag; }
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {errorQuda("Not implemented");}
+
+    /**
+     * @brief Create the coarse operator (virtual parent)
+     *
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat[out] Coarse preconditioned link field
+     * @param T[in] Transfer operator defining the coarse grid
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
+    {errorQuda("Not implemented");}
   };
 
   // Full Wilson
@@ -174,11 +185,21 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+
+    /**
+     * @brief Create the coarse Wilson operator
+     *
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat[out] Coarse preconditioned link field
+     * @param T[in] Transfer operator defining the coarse grid
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -196,7 +217,7 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
@@ -223,14 +244,22 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
-  };
 
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
+    /**
+     * @brief Create the coarse clover operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+  };
 
   // Even-odd preconditioned clover
   class DiracCloverPC : public DiracClover {
@@ -251,15 +280,28 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse even-odd preconditioned clover
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned clover operator differs from that of the
+     * unpreconditioned clover operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
 
-
-  // Full domain wall 
+  // Full domain wall
   class DiracDomainWall : public DiracWilson {
 
   protected:
@@ -282,7 +324,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -303,7 +345,7 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
@@ -319,55 +361,84 @@ namespace quda {
     DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
     virtual ~DiracDomainWall4DPC();
     DiracDomainWall4DPC& operator=(const DiracDomainWall4DPC &dirac);
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
+
+    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &k) const;
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &kappa5) const;
+
+    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity, const double &kappa5, const ColorSpinorField &x, const double &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
   };
 
+  // Full Mobius
+  class DiracMobius : public DiracDomainWall {
 
-// 4d Even-odd preconditioned Mobius domain wall
-  class DiracMobiusDomainWallPC : public DiracDomainWallPC {
-    
   protected:
     //Mobius coefficients
     double b_5[QUDA_MAX_DWF_LS];
     double c_5[QUDA_MAX_DWF_LS];
 
+  public:
+    DiracMobius(const DiracParam &param);
+    DiracMobius(const DiracMobius &dirac);
+    virtual ~DiracMobius();
+    DiracMobius& operator=(const DiracMobius &dirac);
+
+    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+			const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
+		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
+  // 4d Even-odd preconditioned Mobius domain wall
+  class DiracMobiusPC : public DiracMobius {
+
+  protected:
+
   private:
 
   public:
-    DiracMobiusDomainWallPC(const DiracParam &param);
-    DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac);
-    virtual ~DiracMobiusDomainWallPC();
-    DiracMobiusDomainWallPC& operator=(const DiracMobiusDomainWallPC &dirac);
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
-    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, 
-		const QudaParity parity) const;
-    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &k) const;
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, 
-		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    DiracMobiusPC(const DiracParam &param);
+    DiracMobiusPC(const DiracMobiusPC &dirac);
+    virtual ~DiracMobiusPC();
+    DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
+
+    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-    //void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
@@ -407,10 +478,20 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+   /**
+     * @brief Create the coarse twisted-mass operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -433,10 +514,20 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b, 
+		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+   /**
+     * @brief Create the coarse even-odd preconditioned twisted-mass
+     *        operator
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Full twisted mass with a clover term
@@ -463,10 +554,20 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-       ColorSpinorField &x, ColorSpinorField &b, 
+       ColorSpinorField &x, ColorSpinorField &b,
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
+   /**
+     * @brief Create the coarse twisted-clover operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -489,10 +590,24 @@ namespace quda {
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-     ColorSpinorField &x, ColorSpinorField &b, 
+     ColorSpinorField &x, ColorSpinorField &b,
      const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
          const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse even-odd preconditioned twisted-clover
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned clover operator differs from that of the
+     * unpreconditioned clover operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Full staggered
@@ -517,7 +632,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -538,7 +653,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -568,7 +683,7 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
@@ -589,10 +704,158 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b, 
+			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+  };
+
+  /**
+     This class serves as a front-end to the coarse Dslash operator,
+     similar to the other dslash operators.
+   */
+  class DiracCoarse : public Dirac {
+
+  protected:
+    const Transfer *transfer; /** restrictor / prolongator defined here */
+    const Dirac *dirac; /** Parent Dirac operator */
+
+    cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
+    cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
+    cpuGaugeField *Xinv_h; /** CPU copy of the inverse coarse clover term */
+    cpuGaugeField *Yhat_h; /** CPU copy of the preconditioned coarse link field */
+
+    cudaGaugeField *Y_d; /** GPU copy of the coarse link field */
+    cudaGaugeField *X_d; /** GPU copy of the coarse clover term */
+    cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
+    cudaGaugeField *Yhat_d; /** GPU copy of the preconditioned coarse link field */
+
+    void initializeCoarse();  /** Initialize the coarse gauge field */
+
+    bool enable_gpu; /** Whether to enable this operator for the GPU */
+    bool init; /** Whether this instance did the allocation or not */
+
+  public:
+    /**
+       @param[in] param Parameters defining this operator
+       @param[in] enable_gpu Whether to enable this operator for the GPU
+     */
+    DiracCoarse(const DiracParam &param, bool enable_gpu=true);
+
+    /**
+       @param[in] param Parameters defining this operator
+       @param[in] Y_h CPU coarse link field
+       @param[in] X_h CPU coarse clover field
+       @param[in] Xinv_h CPU coarse inverse clover field
+       @param[in] Yhat_h CPU coarse preconditioned link field
+       @param[in] Y_d GPU coarse link field
+       @param[in] X_d GPU coarse clover field
+       @param[in] Xinv_d GPU coarse inverse clover field
+       @param[in] Yhat_d GPU coarse preconditioned link field
+     */
+    DiracCoarse(const DiracParam &param,
+		cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h, cpuGaugeField *Yhat_h,
+		cudaGaugeField *Y_d=0, cudaGaugeField *X_d=0, cudaGaugeField *Xinv_d=0, cudaGaugeField *Yhat_d=0);
+
+    /**
+       @param[in] dirac Another operator instance to clone from (shallow copy)
+       @param[in] param Parameters defining this operator
+     */
+    DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
+    virtual ~DiracCoarse();
+
+    /**
+       @brief Apply the coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    /**
+       @brief Apply the inverse coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    /**
+       @brief Apply DslashXpay out = (D * in)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity) const;
+
+    /**
+       @brief Apply DslashXpay out = (D * in + A * x)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+			    const ColorSpinorField &x, const double &k) const;
+
+    /**
+       @brief Apply the full operator
+       @param[out] out output vector, out = M * in
+       @param[in] in input vector
+     */
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse operator from this coarse operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat[out] Coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+  };
+
+  /**
+     Even-odd preconditioned variant of coarse Dslash operator
+  */
+  class DiracCoarsePC : public DiracCoarse {
+
+  public:
+    DiracCoarsePC(const DiracParam &param, bool enable_gpu=true);
+    DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param);
+    virtual ~DiracCoarsePC();
+
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+		    const ColorSpinorField &x, const double &k) const;
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
+		 const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse even-odd preconditioned coarse
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned coarse operator differs from that of the
+     * unpreconditioned coarse operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
@@ -602,8 +865,8 @@ namespace quda {
     const Dirac *dirac;
 
   public:
-  DiracMatrix(const Dirac &d) : dirac(&d) { }
-  DiracMatrix(const Dirac *d) : dirac(d) { }
+    DiracMatrix(const Dirac &d) : dirac(&d) { }
+    DiracMatrix(const Dirac *d) : dirac(d) { }
     virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
@@ -642,19 +905,22 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
-      dirac->tmp1 = &tmp;
+      bool reset1 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
       dirac->M(out, in);
-      dirac->tmp1 = NULL;
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
-      dirac->tmp1 = &Tmp1;
-      dirac->tmp2 = &Tmp2;
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
+      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
       dirac->M(out, in);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
+      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
   };
 

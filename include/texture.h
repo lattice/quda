@@ -28,13 +28,15 @@ private:
 public:
   Texture() : spinor(0) { }   
 #ifndef DIRECT_ACCESS_BLAS
-  Texture(const cudaColorSpinorField *x) : spinor(x->Tex()) { }
+  Texture(const cudaColorSpinorField *x, bool use_ghost = false)
+    : spinor(use_ghost ? x->GhostTex() : x->Tex()) { }
 #else
-  Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
+  Texture(const cudaColorSpinorField *x, bool use_ghost = false)
+    : spinor(use_ghost ? (const InputType*)(x->Ghost2()) : (const InputType*)(x->V())) { }
 #endif
   Texture(const Texture &tex) : spinor(tex.spinor) { }
   ~Texture() { }
-  
+
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
     return *this;
@@ -121,19 +123,22 @@ template<typename OutputType, typename InputType, int tex_id>
 #endif
   { count++; } 
 
-  Texture(const cudaColorSpinorField *x)
+ Texture(const cudaColorSpinorField *x, bool use_ghost = false)
 #ifdef DIRECT_ACCESS_BLAS 
-  : spinor((const InputType*)x->V()), bytes(x->Bytes())
+   : spinor( use_ghost ? (const InputType*)(x->Ghost2()) : (const InputType*)(x->V())) { }
 #endif
   { 
     // only bind if bytes > 0
     if (x->Bytes()) { 
-      if (tex_id > 0 && tex_id <= MAX_TEX_ID && tex_id_table[tex_id]) {
-	errorQuda("Already bound to this texture reference");
-      } else {
-	tex_id_table[tex_id] = true;
+      if (tex_id >= 0 && tex_id < MAX_TEX_ID) {
+	if (tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0]) {
+	  errorQuda("Already bound to this texture reference");
+	} else {
+	  tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0] = true;
+	}
       }
-      bind((const InputType*)x->V(), x->Bytes()); bound = true; 
+      if (use_ghost) bind((const InputType*)(x->Ghost2()), x->GhostBytes());
+      else bind((const InputType*)x->V(), x->Bytes()); bound = true;
     } 
     count++;
   }
@@ -144,9 +149,11 @@ template<typename OutputType, typename InputType, int tex_id>
 #endif
   { count++; }
 
-  ~Texture() { if (bound && !--count) { 
-      unbind(); bound = false; tex_id_table[tex_id]=false;
-    } }
+  ~Texture() {
+    if (bound && !--count) {
+      unbind(); bound = false; tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0]=false;
+    }
+  }
 
   Texture& operator=(const Texture &tex) {
 #ifdef DIRECT_ACCESS_BLAS
@@ -162,7 +169,7 @@ template<typename OutputType, typename InputType, int tex_id>
   //default should only be called if a tex_id is out of range
   __device__ inline OutputType fetch(unsigned int idx) { OutputType x; x.x =0; return x; };  
   __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
-  };
+};
 
   template<typename OutputType, typename InputType, int tex_id>  
     bool Texture<OutputType, InputType, tex_id>::bound = false;
@@ -325,33 +332,35 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 
   private:
     StoreType *spinor;
+    StoreType *ghost_spinor;
 #ifdef USE_TEXTURE_OBJECTS // texture objects
     Texture<InterType, StoreType> tex;
+    Texture<InterType, StoreType> ghostTex;
 #else
     Texture<InterType, StoreType, tex_id> tex;
+    Texture<InterType, StoreType, -1> ghostTex;
 #endif
     float *norm; // direct reads for norm
     int stride;
     int ghost_stride[4];
 
   public:
-    Spinor() 
-  : spinor(0), tex(), norm(0), stride(0) { } // default constructor
+    Spinor() : spinor(0), ghost_spinor(0), tex(), ghostTex(), norm(0), stride(0) { } // default constructor
 
-  // Spinor must only eveb called with cudaColorSpinorField references!!!!
- Spinor(const ColorSpinorField &x, int nFace=1) 
-     : spinor((StoreType*)x.V()), tex(&(static_cast<const cudaColorSpinorField&>(x))), norm((float*)x.Norm()),
-       stride(x.Length()/(N*REG_LENGTH)) { 
-      checkTypes<RegType,InterType,StoreType>(); 
-      for (int d=0; d<4; d++) {
-	ghost_stride[d] = nFace*x.SurfaceCB(d);
-      }
+    // Spinor must only ever called with cudaColorSpinorField references!!!!
+    Spinor(const ColorSpinorField &x, int nFace=1) 
+      : spinor((StoreType*)x.V()), ghost_spinor((StoreType*)x.Ghost2()),
+        tex(&(static_cast<const cudaColorSpinorField&>(x))),
+        ghostTex(&(static_cast<const cudaColorSpinorField&>(x)), true),
+        norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+    {
+      checkTypes<RegType,InterType,StoreType>();
+      for (int d=0; d<4; d++) ghost_stride[d] = nFace*x.SurfaceCB(d);
     }
 
     Spinor(const Spinor &st) 
-  : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { 
-      for (int d=0; d<4; d++) ghost_stride[d] = st.ghost_stride[d];
-    }
+      : spinor(st.spinor), ghost_spinor(st.ghost_spinor), tex(st.tex), ghostTex(st.ghostTex), norm(st.norm), stride(st.stride)
+      { for (int d=0; d<4; d++) ghost_stride[d] = st.ghost_stride[d]; }
 
   /*Spinor(StoreType* spinor, float* norm, int stride) 
     : spinor(spinor), norm(norm), stride(stride), ghost_stride({}) { checkTypes<RegType, InterType, StoreType>(); }*/
@@ -359,7 +368,9 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor& operator=(const Spinor &src) {
       if (&src != this) {
 	spinor = src.spinor;
+        ghost_spinor = src.ghost_spinor;
 	tex = src.tex;
+        ghostTex = src.ghostTex;
 	norm = src.norm;
 	stride = src.stride;
 	for (int d=0; d<4; d++) ghost_stride[d] = src.ghost_stride[d];
@@ -369,10 +380,13 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 
     void set(const cudaColorSpinorField &x){
       spinor = (StoreType*)x.V();
+      ghost_spinor = (StoreType*)x.Ghost2();
 #ifdef USE_TEXTURE_OBJECTS 
       tex = Texture<InterType, StoreType>(&x);
+      ghostTex = Texture<InterType, StoreType>(&x,true);
 #else
       tex = Texture<InterType, StoreType, tex_id>(&x);
+      ghostTex = Texture<InterType, StoreType, tex_id>(&x,true);
 #endif      
       norm = (float*)x.Norm();
       stride = x.Length()/(N*REG_LENGTH);
@@ -423,27 +437,27 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
   /**
      Load the ghost spinor.  For Wilson fermions, we assume that the
      ghost is spin projected
-   */
+  */
   __device__ inline void loadGhost(RegType x[], const int i, const int dim) {
     // load data into registers first using the storage order
     const int Nspin = (REG_LENGTH * N) / (3 * 2);
     // if Wilson, then load only half the number of components
     const int M = ((N * sizeof(RegType)) / sizeof(InterType)) / ((Nspin == 4) ? 2 : 1);
-
+    
     InterType y[M];
     
     // If we are using tex references, then we can only use the predeclared texture ids
 #ifndef USE_TEXTURE_OBJECTS
     if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
 #endif
-      // half precision types
+      // half precision types (FIXME - these don't look correct?)
       if ( IS_SHORT(StoreType) ) { 
 	float xN = norm[i];
 #pragma unroll
-	for (int j=0; j<M; j++) y[j] = xN*tex[i + j*ghost_stride[dim]];
+	for (int j=0; j<M; j++) y[j] = xN*ghostTex[i + j*ghost_stride[dim]];
       } else { // other types
 #pragma unroll 
-	for (int j=0; j<M; j++) copyFloatN(y[j], tex[i + j*ghost_stride[dim]]);
+	for (int j=0; j<M; j++) copyFloatN(y[j], ghostTex[i + j*ghost_stride[dim]]);
       }
 #ifndef USE_TEXTURE_OBJECTS
     } else { // default load when out of tex_id range
@@ -452,12 +466,12 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 	float xN = norm[i];
 #pragma unroll
 	for (int j=0; j<M; j++) {
-	  copyFloatN(y[j], spinor[i + j*ghost_stride[dim]]);
+	  copyFloatN(y[j], ghost_spinor[i + j*ghost_stride[dim]]);
 	  y[j] *= xN;
 	}
       } else { // other types
 #pragma unroll
-	for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*ghost_stride[dim]]);
+	for (int j=0; j<M; j++) copyFloatN(y[j],ghost_spinor[i + j*ghost_stride[dim]]);
       }
     }
 #endif
@@ -465,7 +479,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     // now convert into desired register order
     convert<RegType, InterType>(x, y, N);
   }
-
+  
     // default store used for simple fields
     __device__ inline void save(RegType x[], int i) {
       if (write) {

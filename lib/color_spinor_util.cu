@@ -100,6 +100,8 @@ namespace quda {
       genericSource<Float,nSpin,20,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 24) {
       genericSource<Float,nSpin,24,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 32) {
+      genericSource<Float,nSpin,32,order>(a,sourceType, x, s, c);
     } else {
       errorQuda("Unsupported nColor=%d\n", a.Ncolor());
     }
@@ -184,7 +186,7 @@ namespace quda {
 
     for (int f=0; f<fail_check; f++) {
       printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)tol), 
-		 fail[f], u.Volume()*N, fail[f] / (double)(u.Volume()*N));
+		 fail[f], u.Nparity()*u.VolumeCB()*N, fail[f] / (double)(u.Nparity()*u.VolumeCB()*N));
     }
 
     delete []iter;

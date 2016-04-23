@@ -254,21 +254,21 @@ namespace quda {
   int EigCGArgs<Float, CudaComplex>::RestartVm(void* v, const int cld, const int clen, const int vprec)
   {
     //Create device version of the Lanczos matrix:
-    cudaMemcpy(dTm, hTm, ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);//!
+    qudaMemcpy(dTm, hTm, ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);//!
 
     //Solve m-dimensional eigenproblem:
-    cudaMemcpy(dTvecm, dTm,   ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);
+    qudaMemcpy(dTvecm, dTm,   ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);
     eigcg_magma_args->MagmaHEEVD((void*)dTvecm, (void*)hTvalm, m);
 
     //Solve (m-1)-dimensional eigenproblem:
-    cudaMemcpy(dTvecm1, dTm,   ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);
+    qudaMemcpy(dTvecm1, dTm,   ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);
     eigcg_magma_args->MagmaHEEVD((void*)dTvecm1, (void*)hTvalm, m-1);
 
     //Zero the last row (coloumn-major format of the matrix re-interpreted as 2D row-major formated):
     cudaMemset2D(&dTvecm1[(m-1)], ldm*sizeof(CudaComplex), 0, sizeof(CudaComplex),  (m-1));
 
     //Attach nev old vectors to nev new vectors (note 2*nev << m):
-    cudaMemcpy(&dTvecm[ldm*nev], dTvecm1, ldm*nev*sizeof(CudaComplex), cudaMemcpyDefault);
+    qudaMemcpy(&dTvecm[ldm*nev], dTvecm1, ldm*nev*sizeof(CudaComplex), cudaMemcpyDefault);
 
     //Perform QR-factorization and compute QH*Tm*Q:
     int i = eigcg_magma_args->MagmaORTH_2nev((void*)dTvecm, (void*)dTm);
@@ -598,9 +598,9 @@ namespace quda {
          eigvRestart++;
 
          //Restart search space :
-         int cldn = Vm->ComponentTotalLength() >> 1; //complex leading dimension
-         int clen = Vm->ComponentLength()      >> 1; //complex vector length
-         if(Vm->SiteSubset() != QUDA_PARITY_SITE_SUBSET) clen += Vm->ComponentGhostLength() >> 1;
+         int cldn = Vm->ComponentLength() >> 1; //complex leading dimension
+         int clen = Vm->ComponentLength() >> 1; //complex vector length
+
          //
          int _2nev = eigcg_args->RestartVm(Vm->V(), cldn, clen, Vm->Precision());
 
@@ -662,7 +662,6 @@ namespace quda {
     param.secs = profile->Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat->flops())*1e-9;
 
-    reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
 

@@ -242,7 +242,6 @@ namespace quda {
       PackSpinor<FloatOut, FloatIn, 4, 3, OutOrder, InOrder, ChiralToNonRelBasis<FloatOut, FloatIn, 4, 3> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
-      errorQuda("Not enabled");
     } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && dstBasis == QUDA_CHIRAL_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
       if (Nc != 3) errorQuda("Can only change basis with Ncolor = 4, not Ncolor = %d", Nc);
@@ -251,7 +250,7 @@ namespace quda {
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
     } else {
-      errorQuda("Basis change not supported");
+      errorQuda("Basis change from %d to %d not supported", srcBasis, dstBasis);
     }
   }
 
@@ -285,7 +284,7 @@ namespace quda {
 #ifdef BUILD_QDPJIT_INTERFACE
       QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif

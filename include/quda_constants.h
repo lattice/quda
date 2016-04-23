@@ -17,6 +17,13 @@
 #define QUDA_MAX_DIM 6
 
 /**
+ * @def   QUDA_MAX_GEOMETRY
+ * @brief Maximum geometry supported by a field.  This essentially is
+ * the maximum number of dimensions supported per lattice site.
+ */
+#define QUDA_MAX_GEOMETRY 8
+
+/**
  * @def QUDA_MAX_MULTI_SHIFT
  * @brief Maximum number of shifts supported by the multi-shift solver.
  *        This number may be changed if need be.

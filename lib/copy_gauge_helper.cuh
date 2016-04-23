@@ -265,7 +265,7 @@ namespace quda {
       }
 #ifdef MULTI_GPU // only copy the ghost zone if doing multi-gpu
       if (type == 0 || type == 1) {
-	if (geometry == QUDA_VECTOR_GEOMETRY) copyGhost<FloatOut, FloatIn, length>(arg);
+	if (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY) copyGhost<FloatOut, FloatIn, length>(arg);
 	//else warningQuda("Cannot copy for %d geometry gauge field", geometry);
       }
 #endif
@@ -277,7 +277,7 @@ namespace quda {
       }
 #ifdef MULTI_GPU
       if (type == 0 || type == 1) {
-	if (geometry == QUDA_VECTOR_GEOMETRY) {
+	if (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY) {
 	  // now copy ghost
 	  CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg, out);
 	  ghostCopier.apply(0);

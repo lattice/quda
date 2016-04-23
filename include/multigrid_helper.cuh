@@ -16,7 +16,7 @@ namespace quda {
        @return Coarse spin coordinate
      */
     __device__ __host__ inline int operator()( int s ) const
-    { return s / spin_block_size; }
+    { return s / (spin_block_size > 0 ? spin_block_size : 1); }
   };
 
 

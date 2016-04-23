@@ -28,6 +28,9 @@ extern "C" {
   QudaMatPCType get_matpc_type(char* s);
   const char* get_matpc_str(QudaMatPCType);
 
+  QudaSolveType get_solve_type(char* s);
+  const char* get_solve_str(QudaSolveType);
+
   QudaTwistFlavorType get_flavor_type(char* s);
 
   QudaDslashType get_dslash_type(char* s);

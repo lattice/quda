@@ -45,7 +45,7 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 static bool initialized = false;
 static int gridDim[4];
 static int localDim[4];
-static int clover_alloc = 0;
+
 static bool invalidate_quda_gauge = true;
 static bool create_quda_gauge = false;
 
@@ -56,7 +56,6 @@ static bool invalidate_quda_mom = true;
 
 using namespace quda;
 using namespace quda::fermion_force;
-
 
 
 #define QUDAMILC_VERBOSE 1
@@ -158,12 +157,12 @@ void qudaHisqParamsInit(QudaHisqParams_t params)
   if(initialized) return;
   qudamilc_called<true>(__func__);
 
+#if defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)
   const bool reunit_allow_svd = (params.reunit_allow_svd) ? true : false;
   const bool reunit_svd_only  = (params.reunit_svd_only) ? true : false;
-
-
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
+#endif
 
 #ifdef GPU_HISQ_FORCE
   quda::fermion_force::setUnitarizeForceConstants(unitarize_eps,
@@ -427,13 +426,6 @@ double qudaMomAction(int prec, void *momentum)
 
   return action;
 }
-
-// gauge force code
-static int getVolume(const int dim[4])
-{
-  return dim[0]*dim[1]*dim[2]*dim[3];
-}
-
 
 static inline int opp(int dir){
   return 7-dir;
@@ -833,13 +825,9 @@ void qudaMultishiftInvert(int external_precision,
 
   invertParam.use_sloppy_partial_accumulator = 0;
 
-
-  const double ignore_mass = 1.0;
-
   QudaParity local_parity = inv_args.evenodd;
   {
-    // need to set this to zero until issue #146 is fixed
-    const double reliable_delta = (use_mixed_precision ? 1e-1 :0.0);
+    const double reliable_delta = (use_mixed_precision ? 1e-1 : 0.0);
     setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
         num_offsets, offset, target_residual, target_fermilab_residual,
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
@@ -847,8 +835,6 @@ void qudaMultishiftInvert(int external_precision,
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
-
-  const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (*num_iters == -1) {
@@ -964,13 +950,11 @@ void qudaInvert(int external_precision,
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
 
-
-  const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   const int fat_pad  = getFatLinkPadding(localDim);
   const int long_pad = 3*fat_pad;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1) {
+  if (*num_iters == -1  || !canReuseResidentGauge(&invertParam) ) {
     invalidateGaugeQuda();
   }
 
@@ -1045,11 +1029,10 @@ void qudaEigCGInvert(int external_precision,
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision_sloppy;
+  QudaPrecision device_precision_sloppy = QUDA_INVALID_PRECISION;
   QudaPrecision ritz_precision = (ritz_prec == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;;
 
   if(inv_args.mixed_precision == 2){
-    //device_precision_sloppy = QUDA_HALF_PRECISION;
     errorQuda("Sloppy half is not supported for eigCG solver\n");
   }else if(inv_args.mixed_precision == 1){
     device_precision_sloppy = QUDA_SINGLE_PRECISION;
@@ -1106,7 +1089,7 @@ void qudaEigCGInvert(int external_precision,
   invertParam.nev = nev;
   invertParam.max_search_dim = max_search_dim;
   invertParam.deflation_grid = deflation_grid;//to test the stuff
-  invertParam.cuda_prec_ritz = ritz_prec == 2 ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  invertParam.cuda_prec_ritz = ritz_precision;
   invertParam.tol_restart = (tol_restart > target_residual) ? tol_restart : target_residual;//think about this...
   //invertParam.use_sloppy_partial_accumulator = 0;
 
@@ -1138,6 +1121,8 @@ void qudaEigCGInvert(int external_precision,
 #endif
 
 #ifdef GPU_CLOVER_DIRAC
+
+static int clover_alloc = 0;
 
 static inline void* createExtendedGaugeField(void* gauge, int geometry, int precision, int resident)
 {

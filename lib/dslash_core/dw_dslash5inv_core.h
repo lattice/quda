@@ -12,6 +12,13 @@
 // input spinor
 #ifdef SPINOR_DOUBLE
 #define spinorFloat double
+// workaround for C++11 bug in CUDA 6.5/7.0
+#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
+#define POW(a, b) pow(a, static_cast<spinorFloat>(b))
+#else
+#define POW(a, b) pow(a, b)
+#endif
+
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -41,6 +48,7 @@
 #define mdwf_c5 mdwf_c5_d
 #else
 #define spinorFloat float
+#define POW(a, b) __fast_pow(a, b)
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I0.z
@@ -139,19 +147,12 @@ xs = X/(X1*X2*X3*X4);
  o31_re = 0; o31_im = 0;
  o32_re = 0; o32_im = 0;
 
-// workaround for C++11 bug in CUDA 6.5/7.0
-#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
-#define POW(a, b) pow(a, (spinorFloat)b)
-#else
-#define POW(a, b) pow(a, b)
-#endif
-
 VOLATILE spinorFloat kappa;
 
 #ifdef MDWF_mode   // Check whether MDWF option is enabled
-  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));
+  kappa = -(mdwf_c5[xs]*(static_cast<spinorFloat>(4.0) + m5) - static_cast<spinorFloat>(1.0))/(mdwf_b5[xs]*(static_cast<spinorFloat>(4.0) + m5) + static_cast<spinorFloat>(1.0));
 #else
-  kappa = 2.0*a;
+  kappa = static_cast<spinorFloat>(2.0)*a;
 #endif  // select MDWF mode
 
 // M5_inv operation -- NB: not partitionable!
@@ -170,13 +171,14 @@ VOLATILE spinorFloat kappa;
 // s' = input vector index and
 // 'a'= kappa5
 
-  spinorFloat inv_d_n = 1.0 / ( 1.0 + POW(kappa,param.Ls)*mferm);
+  spinorFloat inv_d_n = static_cast<spinorFloat>(0.5) / ( static_cast<spinorFloat>(1.0) + POW(kappa,param.Ls)*mferm );
   spinorFloat factorR;
   spinorFloat factorL;
 
   for(int s = 0; s < param.Ls; s++)
   {
-    factorR = ( xs < s ? -inv_d_n*POW(kappa,param.Ls-s+xs)*mferm : inv_d_n*POW(kappa,xs-s))/2.0;
+    int exponent = xs < s ? param.Ls-s+xs : xs-s;
+    factorR = inv_d_n * POW(kappa,exponent) * ( xs < s ? -mferm : static_cast<spinorFloat>(1.0) );
 
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
@@ -207,7 +209,8 @@ VOLATILE spinorFloat kappa;
     o32_re += factorR*(i12_re + i32_re);
     o32_im += factorR*(i12_im + i32_im);
 
-    factorL = ( xs > s ? -inv_d_n*POW(kappa,param.Ls-xs+s)*mferm : inv_d_n*POW(kappa,s-xs))/2.0;
+    int exponent2 = xs > s ? param.Ls-xs+s : s-xs;
+    factorL = inv_d_n * POW(kappa,exponent2) * ( xs > s ? -mferm : static_cast<spinorFloat>(1.0));
 
     o00_re += factorL*(i00_re - i20_re);
     o00_im += factorL*(i00_im - i20_im);
@@ -241,56 +244,66 @@ VOLATILE spinorFloat kappa;
 
 #ifdef DSLASH_XPAY
  READ_ACCUM(ACCUMTEX, param.sp_stride)
-#ifdef SPINOR_DOUBLE
- o00_re = a*o00_re + accum0.x;
- o00_im = a*o00_im + accum0.y;
- o01_re = a*o01_re + accum1.x;
- o01_im = a*o01_im + accum1.y;
- o02_re = a*o02_re + accum2.x;
- o02_im = a*o02_im + accum2.y;
- o10_re = a*o10_re + accum3.x;
- o10_im = a*o10_im + accum3.y;
- o11_re = a*o11_re + accum4.x;
- o11_im = a*o11_im + accum4.y;
- o12_re = a*o12_re + accum5.x;
- o12_im = a*o12_im + accum5.y;
- o20_re = a*o20_re + accum6.x;
- o20_im = a*o20_im + accum6.y;
- o21_re = a*o21_re + accum7.x;
- o21_im = a*o21_im + accum7.y;
- o22_re = a*o22_re + accum8.x;
- o22_im = a*o22_im + accum8.y;
- o30_re = a*o30_re + accum9.x;
- o30_im = a*o30_im + accum9.y;
- o31_re = a*o31_re + accum10.x;
- o31_im = a*o31_im + accum10.y;
- o32_re = a*o32_re + accum11.x;
- o32_im = a*o32_im + accum11.y;
+ VOLATILE spinorFloat coeff;
+
+#ifdef MDWF_mode
+ coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
+ coeff *= coeff;
+ coeff *= a;
 #else
- o00_re = a*o00_re + accum0.x;
- o00_im = a*o00_im + accum0.y;
- o01_re = a*o01_re + accum0.z;
- o01_im = a*o01_im + accum0.w;
- o02_re = a*o02_re + accum1.x;
- o02_im = a*o02_im + accum1.y;
- o10_re = a*o10_re + accum1.z;
- o10_im = a*o10_im + accum1.w;
- o11_re = a*o11_re + accum2.x;
- o11_im = a*o11_im + accum2.y;
- o12_re = a*o12_re + accum2.z;
- o12_im = a*o12_im + accum2.w;
- o20_re = a*o20_re + accum3.x;
- o20_im = a*o20_im + accum3.y;
- o21_re = a*o21_re + accum3.z;
- o21_im = a*o21_im + accum3.w;
- o22_re = a*o22_re + accum4.x;
- o22_im = a*o22_im + accum4.y;
- o30_re = a*o30_re + accum4.z;
- o30_im = a*o30_im + accum4.w;
- o31_re = a*o31_re + accum5.x;
- o31_im = a*o31_im + accum5.y;
- o32_re = a*o32_re + accum5.z;
- o32_im = a*o32_im + accum5.w;
+ coeff = b;
+#endif
+
+#ifdef SPINOR_DOUBLE
+ o00_re = coeff*o00_re + accum0.x;
+ o00_im = coeff*o00_im + accum0.y;
+ o01_re = coeff*o01_re + accum1.x;
+ o01_im = coeff*o01_im + accum1.y;
+ o02_re = coeff*o02_re + accum2.x;
+ o02_im = coeff*o02_im + accum2.y;
+ o10_re = coeff*o10_re + accum3.x;
+ o10_im = coeff*o10_im + accum3.y;
+ o11_re = coeff*o11_re + accum4.x;
+ o11_im = coeff*o11_im + accum4.y;
+ o12_re = coeff*o12_re + accum5.x;
+ o12_im = coeff*o12_im + accum5.y;
+ o20_re = coeff*o20_re + accum6.x;
+ o20_im = coeff*o20_im + accum6.y;
+ o21_re = coeff*o21_re + accum7.x;
+ o21_im = coeff*o21_im + accum7.y;
+ o22_re = coeff*o22_re + accum8.x;
+ o22_im = coeff*o22_im + accum8.y;
+ o30_re = coeff*o30_re + accum9.x;
+ o30_im = coeff*o30_im + accum9.y;
+ o31_re = coeff*o31_re + accum10.x;
+ o31_im = coeff*o31_im + accum10.y;
+ o32_re = coeff*o32_re + accum11.x;
+ o32_im = coeff*o32_im + accum11.y;
+#else
+ o00_re = coeff*o00_re + accum0.x;
+ o00_im = coeff*o00_im + accum0.y;
+ o01_re = coeff*o01_re + accum0.z;
+ o01_im = coeff*o01_im + accum0.w;
+ o02_re = coeff*o02_re + accum1.x;
+ o02_im = coeff*o02_im + accum1.y;
+ o10_re = coeff*o10_re + accum1.z;
+ o10_im = coeff*o10_im + accum1.w;
+ o11_re = coeff*o11_re + accum2.x;
+ o11_im = coeff*o11_im + accum2.y;
+ o12_re = coeff*o12_re + accum2.z;
+ o12_im = coeff*o12_im + accum2.w;
+ o20_re = coeff*o20_re + accum3.x;
+ o20_im = coeff*o20_im + accum3.y;
+ o21_re = coeff*o21_re + accum3.z;
+ o21_im = coeff*o21_im + accum3.w;
+ o22_re = coeff*o22_re + accum4.x;
+ o22_im = coeff*o22_im + accum4.y;
+ o30_re = coeff*o30_re + accum4.z;
+ o30_im = coeff*o30_im + accum4.w;
+ o31_re = coeff*o31_re + accum5.x;
+ o31_im = coeff*o31_im + accum5.y;
+ o32_re = coeff*o32_re + accum5.z;
+ o32_im = coeff*o32_im + accum5.w;
 #endif // SPINOR_DOUBLE
 #endif // DSLASH_XPAY
 }
@@ -303,6 +316,7 @@ WRITE_SPINOR(param.sp_stride);
 #undef mdwf_b5
 #undef mdwf_c5
 #undef spinorFloat
+#undef POW
 #undef SHARED_STRIDE
 
 #undef i00_re

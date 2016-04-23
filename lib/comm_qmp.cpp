@@ -15,6 +15,10 @@ struct MsgHandle_s {
 };
 
 static int gpuid = -1;
+static bool peer2peer_enabled[2][4] = { {false,false,false,false},
+                                        {false,false,false,false} };
+static bool peer2peer_init = false;
+
 
 // this is a work around (in the absence of C++11) to do a compile
 // time check that the size of float and int are the same.  Since we
@@ -25,6 +29,44 @@ inline void static_assert_equal_size()
   typedef char sizeof_float_must_equal_sizeof_int[sizeof(A) == sizeof(B) ? 1 : -1];
   (void) sizeof(sizeof_float_must_equal_sizeof_int);
 }
+
+
+void get_hostnames(char *hostname_recv_buf) {
+  // determine which GPU this rank will use
+  char *hostname = comm_hostname();
+
+  // Abuse reductions to emulate all-gather.  We need to copy the
+  // local hostname to all other nodes
+  for (int i=0; i<comm_size(); i++) {
+    int data[128];
+    for (int j=0; j<128; j++) {
+      data[j] = (i == comm_rank()) ? hostname[j] : 0;
+    }
+
+    static_assert_equal_size<float,int>();
+    QMP_sum_float_array(reinterpret_cast<float*>(&data), 128);
+
+    for (int j=0; j<128; j++) {
+      hostname_recv_buf[i*128 + j] = data[j];
+    }
+  }
+}
+
+
+void get_gpuid(int *gpuid_recv_buf) {
+
+  // Abuse reductions to emulate all-gather.  We need to copy the
+  // local hostname to all other nodes
+  for (int i=0; i<comm_size(); i++) {
+    int data = (i == comm_rank()) ? gpuid : 0;
+
+    static_assert_equal_size<float,int>();
+    QMP_sum_float_array(reinterpret_cast<float*>(&data), 1);
+
+    gpuid_recv_buf[i] = data;
+  }
+}
+
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -45,28 +87,12 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   comm_set_default_topology(topo);
 
   // determine which GPU this rank will use
-  char *hostname = comm_hostname();
   char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
-
-  // Abuse reductions to emulate all-gather.  We need to copy the
-  // local hostname to all other nodes
-  for (int i=0; i<comm_size(); i++) {
-    int data[128];
-    for (int j=0; j<128; j++) {
-      data[j] = (i == comm_rank()) ? hostname[j] : 0;
-    }
-    // check nasty int to float hack is valid
-    static_assert_equal_size<float,int>();
-    QMP_sum_float_array(reinterpret_cast<float*>(&data), 128);
-
-    for (int j=0; j<128; j++) {
-      hostname_recv_buf[i*128 + j] = data[j];
-    }
-  }
+  get_hostnames(hostname_recv_buf);
 
   gpuid = 0;
   for (int i = 0; i < comm_rank(); i++) {
-    if (!strncmp(hostname, &hostname_recv_buf[128*i], 128)) {
+    if (!strncmp(comm_hostname(), &hostname_recv_buf[128*i], 128)) {
       gpuid++;
     }
   }
@@ -79,6 +105,69 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   }
 
   gpuid = (comm_rank() % device_count);
+}
+
+
+void comm_peer2peer_init()
+{
+  if (peer2peer_init) return;
+
+  bool disable_peer_to_peer = false;
+  char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
+    if (getVerbosity() > QUDA_SILENT)
+      printfQuda("Disabling peer-to-peer access\n");
+    disable_peer_to_peer = true;
+  }
+
+  if (!peer2peer_init && !disable_peer_to_peer) {
+
+    // first check that the local GPU supports UVA
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop,gpuid);
+    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return;
+
+    comm_set_neighbor_ranks();
+
+    char *hostname = comm_hostname();
+    char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
+    int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
+
+    get_hostnames(hostname_recv_buf);
+    get_gpuid(gpuid_recv_buf);
+
+    for(int dir=0; dir<2; ++dir){ // forward/backward directions
+      for(int dim=0; dim<4; ++dim){
+	int neighbor_rank = comm_neighbor_rank(dir,dim);
+	if(neighbor_rank == comm_rank()) continue;
+
+	// if the neighbors are on the same
+	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
+	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+	  int canAccessPeer[2];
+	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+	  if(canAccessPeer[0]*canAccessPeer[1]){
+	    peer2peer_enabled[dir][dim] = true;
+	    if (getVerbosity() > QUDA_SILENT)
+	      printf("Peer-to-peer enabled for rank %d with neighbor %d dir=%d, dim=%d\n",
+		     comm_rank(), neighbor_rank, dir, dim);
+	  }
+	} // on the same node
+      } // different dimensions - x, y, z, t
+    } // different directions - forward/backward
+
+    host_free(hostname_recv_buf);
+    host_free(gpuid_recv_buf);
+  }
+
+  peer2peer_init = true;
+  return;
+}
+
+
+bool comm_peer2peer_enabled(int dir, int dim){
+  return peer2peer_enabled[dir][dim];
 }
 
 

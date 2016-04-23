@@ -170,7 +170,7 @@ namespace quda {
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-      FieldOrder(CloverField &A) : A(A), volumeCB(A.VolumeCB()), accessor(A)
+      FieldOrder(CloverField &A, bool inverse=false) : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse)
 	{ }
 	
 	CloverField& Field() { return A; }
@@ -178,7 +178,8 @@ namespace quda {
 	virtual ~FieldOrder() { ; } 
     
     	/**
-	 * Read-only complex-member accessor function
+	 * @brief Read-only complex-member accessor function
+	 *
 	 * @param parity Parity index
 	 * @param x 1-d site index
 	 * @param s_row row spin index
@@ -191,8 +192,28 @@ namespace quda {
 	  return accessor(parity, x, s_row, s_col, c_row, c_col);
 	}
 	
+    	/**
+	 * @brief Read-only complex-member accessor function.  This is a
+	 * special variant that is compatible with the equivalent
+	 * gauge::FieldOrder accessor so these can be used
+	 * interchangebly in templated code
+	 *
+	 * @param dummy Dummy parameter that is ignored
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ inline complex<Float> operator()(int dummy, int parity, int x, int s_row,
+							     int s_col, int c_row, int c_col) const {
+	  return accessor(parity,x,s_row,s_col,c_row,c_col);
+	}
+
 	/**
-	 * Complex-member accessor function
+	 * @brief Complex-member accessor function
+	 *
 	 * @param parity Parity index
 	 * @param x 1-d site index
 	 * @param s_row row spin index
@@ -216,6 +237,13 @@ namespace quda {
 
 	/** Returns the field volume */
 	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
+
+	/** Return the size of the allocation (parity left out and added as needed in Tunable::bytes) */
+	size_t Bytes() const {
+	  constexpr int n = (nSpin * nColor) / 2;
+	  constexpr int chiral_block = n * n / 2;
+	  return static_cast<size_t>(volumeCB) * chiral_block * 2ll * 2ll * sizeof(Float); // 2 from complex, 2 from chirality
+	}
       };
 
     /**
@@ -285,7 +313,7 @@ namespace quda {
 	  }
 	}
 
-	size_t Bytes() const { 
+	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
 	  if (sizeof(Float)==sizeof(short)) bytes += 2*sizeof(float);
 	  return bytes;

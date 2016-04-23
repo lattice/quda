@@ -179,6 +179,10 @@ namespace quda {
 
     bool compute_true_res; //! whether to compute the true residual or not at the end
 
+    bool is_preconditioner; //! whether the solver acting as a preconditioner for another solver
+
+    bool global_reduction; //! whether to use a global or local (node) reduction for this solver
+
     /**
        Default constructor
      */
@@ -209,7 +213,8 @@ namespace quda {
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
-      verbosity_precondition(param.verbosity_precondition), compute_true_res(true)
+      verbosity_precondition(param.verbosity_precondition), compute_true_res(true),
+      is_preconditioner(false), global_reduction(true)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -225,6 +230,45 @@ namespace quda {
         rhs_idx = param.rhs_idx;
       }
     }
+
+    SolverParam(const SolverParam &param) : inv_type(param.inv_type),
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      delta(param.delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
+      heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
+      tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
+      true_res(param.true_res), true_res_hq(param.true_res_hq),
+      maxiter(param.maxiter), iter(param.iter),
+      precision(param.precision), precision_sloppy(param.precision_sloppy),
+      precision_precondition(param.precision_precondition),
+      preserve_source(param.preserve_source), num_offset(param.num_offset),
+      Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
+      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
+      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
+      deflation_grid(param.deflation_grid), rhs_idx(0), use_reduced_vector_set(param.use_reduced_vector_set),
+      use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
+      eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
+      inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
+      verbosity_precondition(param.verbosity_precondition), compute_true_res(param.compute_true_res),
+      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction)
+    {
+      for (int i=0; i<num_offset; i++) {
+	offset[i] = param.offset[i];
+	tol_offset[i] = param.tol_offset[i];
+	tol_hq_offset[i] = param.tol_hq_offset[i];
+      }
+
+      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
+        m = (m / 16) * 16 + 16;
+        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
+      }
+      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
+        rhs_idx = param.rhs_idx;
+      }
+    }
+
     ~SolverParam() { }
 
     /**
@@ -235,7 +279,8 @@ namespace quda {
       param.true_res = true_res;
       param.true_res_hq = true_res_hq;
       param.iter += iter;
-      param.gflops = (param.gflops*param.secs + gflops*secs) / (param.secs + secs);
+      reduceDouble(gflops);
+      param.gflops += gflops;
       param.secs += secs;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];
@@ -326,6 +371,11 @@ namespace quda {
     */
     void PrintSummary(const char *name, int k, const double &r2, const double &b2);
 
+    /**
+     * Return flops
+     * @return flops expended by this operator
+     */
+    virtual double flops() const { return 0; }
   };
 
   class CG : public Solver {
@@ -485,6 +535,7 @@ namespace quda {
 
   private:
     const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
     ColorSpinorField *rp;
     ColorSpinorField *Arp;
     ColorSpinorField *tmpp;
@@ -494,7 +545,7 @@ namespace quda {
     bool allocate_y;
 
   public:
-    MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    MR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -533,6 +584,36 @@ namespace quda {
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
+
+
+  class PreconditionedSolver : public Solver {
+
+  private:
+    Solver *solver;
+    const Dirac &dirac;
+    const char *prefix;
+
+  public:
+  PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile, const char *prefix)
+    : Solver(param, profile), solver(&solver), dirac(dirac), prefix(prefix) { }
+    virtual ~PreconditionedSolver() { delete solver; }
+
+    void operator()(ColorSpinorField &x, ColorSpinorField &b) {
+      setOutputPrefix(prefix);
+
+      QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
+
+      ColorSpinorField *out=nullptr;
+      ColorSpinorField *in=nullptr;
+
+      dirac.prepare(in, out, x, b, solution_type);
+      (*solver)(*out, *in);
+      dirac.reconstruct(x, b, solution_type);
+
+      setOutputPrefix("");
+    }
+  };
+
 
   class MultiShiftSolver {
 

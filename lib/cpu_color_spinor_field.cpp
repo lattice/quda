@@ -118,15 +118,12 @@ namespace quda {
     // whether the field is a cpu or cuda field
     ghost_length = 0;
     ghost_norm_length = 0;
-    total_length = length;
-    total_norm_length = (precision == QUDA_HALF_PRECISION) ?
-      (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride : 0;
 
     // set this again here.  this is a hack since we can determine we
     // have a cpu or cuda field in ColorSpinorField::create(), which
     // means a ghost zone is set.  So we unset it here.  This will be
     // fixed when clean up the ghost code with the peer-2-peer branch
-    bytes = total_length * precision;
+    bytes = length * precision;
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
 

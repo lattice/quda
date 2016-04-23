@@ -15,16 +15,16 @@ extern "C" {
 		 QudaPrecision precision, QudaGaugeParam &param, double mferm);
 
   void dw_dslash_5_4d(void *res, void **gaugeFull, void *spinorField, int oddBit, int daggerBit, 
-		 QudaPrecision precision, QudaGaugeParam &param, double mferm);
+		      QudaPrecision precision, QudaGaugeParam &param, double mferm, bool zero_initialize);
 
   void dslash_5_inv(void *res, void **gaugeFull, void *spinorField, int oddBit, int daggerBit, 
 		 QudaPrecision precision, QudaGaugeParam &param, double mferm, double *kappa);
 
   void mdw_dslash_5(void *res, void **gaugeFull, void *spinorField, int oddBit, int daggerBit, 
-		 QudaPrecision precision, QudaGaugeParam &param, double mferm, double *kappa);
+		    QudaPrecision precision, QudaGaugeParam &param, double mferm, double *kappa, bool zero_initialize);
 
   void mdw_dslash_4_pre(void *res, void **gaugeFull, void *spinorField, int oddBit, int daggerBit, 
-		 QudaPrecision precision, QudaGaugeParam &param, double mferm, double *b5, double *c5);
+			QudaPrecision precision, QudaGaugeParam &param, double mferm, double *b5, double *c5, bool zero_initialize);
 
   void dw_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &param, double mferm);
 

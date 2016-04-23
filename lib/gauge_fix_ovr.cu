@@ -1523,7 +1523,7 @@ namespace quda {
 
 
     unitarizeLinksQuda(data, data, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
       cudaFree(num_failures_dev);
       errorQuda("Error in the unitarization\n");
@@ -1680,7 +1680,7 @@ namespace quda {
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         unitarizeLinksQuda(data, data, num_failures_dev);
-        cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+        qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) {
           cudaFree(num_failures_dev);
           errorQuda("Error in the unitarization\n");
@@ -1707,7 +1707,7 @@ namespace quda {
     }
     if ((iter % reunit_interval) != 0 )  {
       unitarizeLinksQuda(data, data, num_failures_dev);
-      cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+      qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) {
         cudaFree(num_failures_dev);
         errorQuda("Error in the unitarization\n");

@@ -1,5 +1,13 @@
 static cudaColorSpinorField *inSpinor;
 
+// hooks into tune.cpp variables for policy tuning
+typedef std::map<TuneKey, TuneParam> map;
+const map& getTuneCache();
+
+void disableProfileCount();
+void enableProfileCount();
+
+
 /**
  * Arrays used for the dynamic scheduling.
  */
@@ -161,7 +169,9 @@ struct DslashCuda2 : DslashPolicyImp {
 		
     inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
     inputSpinor->createComms(dslash.Nface()/2);	
+
     DslashCommsPattern pattern(dslashParam.commDim);
+
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
     for(int i=3; i>=0; i--){
@@ -170,6 +180,7 @@ struct DslashCuda2 : DslashPolicyImp {
         PROFILE(inputSpinor->recvStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
       }
     }
+
     bool pack = false;
     for (int i=3; i>=0; i--) 
       if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
@@ -247,14 +258,27 @@ struct DslashCuda2 : DslashPolicyImp {
 
         } // dir=0,1
 
-        // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
+	// if peer-2-peer in a given direction then we need only wait on that copy event to finish
+	// else we post an event in the scatter stream and wait on that
         if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
-	  // Record the end of the scattering
-	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
-		  profile, QUDA_PROFILE_EVENT_RECORD);
-	  // wait for scattering to finish and then launch dslash
-	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
-		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  if (comm_peer2peer_enabled(0,i)) {
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
+		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  }
+	  if (comm_peer2peer_enabled(1,i)) {
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(1,i), 0),
+		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  }
+
+	  // if non peer-to-peer in a given direction then we have to wait on a scatter event
+	  if (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) {
+	    // Record the end of the scattering
+	    PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]),
+		    profile, QUDA_PROFILE_EVENT_RECORD);
+	    // wait for scattering to finish and then launch dslash
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0),
+		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  }
 
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
@@ -864,7 +888,6 @@ struct DslashFusedExterior : DslashPolicyImp {
     
     setThreadDimMap(dslashParam,dslash,faceVolumeCB);
 
-
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
 
@@ -939,11 +962,28 @@ struct DslashFusedExterior : DslashPolicyImp {
       dslashParam.threads = dslashParam.threadDimMapUpper[i];
     }
 
-    PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]), 
-      profile, QUDA_PROFILE_EVENT_RECORD);
+    // if peer-2-peer in a given direction then we need to to wait on that copy event
+    // if any comms is not peer-2-peer then we need to post a scatter event and wait on that
+    bool post_scatter_event = false;
+    for (int i=3; i>=0; i--) {
+      if (comm_peer2peer_enabled(0,i)) {
+	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
+		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+      }
+      if (comm_peer2peer_enabled(1,i)) {
+	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(1,i), 0),
+		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+      }
+      if (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) post_scatter_event = true;
+    }
 
-    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0),
-      profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    if (post_scatter_event) {
+      PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]),
+	      profile, QUDA_PROFILE_EVENT_RECORD);
+
+      PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0),
+	      profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+    }
 
     if (pattern.commDimTotal) {
       PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
@@ -1009,6 +1049,115 @@ struct DslashFactory {
     return result; // default 
   }
 };
+
+
+ // which policies are we going to tune over?
+ static constexpr unsigned int n_policy = 2;
+ static constexpr QudaDslashPolicy policy[n_policy] = { QUDA_DSLASH2, QUDA_FUSED_DSLASH };
+
+ class DslashPolicyTune : public Tunable {
+
+   DslashCuda &dslash;
+   cudaColorSpinorField *in;
+   const size_t regSize;
+   const int parity;
+   const int dagger;
+   const int volume;
+   const int *ghostFace;
+   TimeProfile &profile;
+
+   unsigned int sharedBytesPerThread() const { return 0; }
+   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+ public:
+   DslashPolicyTune(DslashCuda &dslash, cudaColorSpinorField *in, const size_t regSize, const int parity,
+		    const int dagger, const int volume, const int *ghostFace, TimeProfile &profile)
+     : dslash(dslash), in(in), regSize(regSize), parity(parity), dagger(dagger),
+       volume(volume), ghostFace(ghostFace), profile(profile)
+   {
+     // before we do policy tuning we must ensure the kernel
+     // constituents have been tuned since we can't do nested tuning
+     if (getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+       disableProfileCount();
+
+       for (unsigned int i=0; i<n_policy; i++) {
+	 DslashPolicyImp* dslashImp = DslashFactory::create(policy[i]);
+	 (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+	 delete dslashImp;
+       }
+
+       enableProfileCount();
+     }
+   }
+
+   virtual ~DslashPolicyTune() { }
+
+   void apply(const cudaStream_t &stream) {
+     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+
+     DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
+     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+     delete dslashImp;
+   }
+
+   int tuningIter() const { return 10; }
+
+   // Find the best dslash policy
+   bool advanceAux(TuneParam &param) const
+   {
+     if (param.aux.x < n_policy-1) {
+       param.aux.x++;
+       return true;
+     } else {
+       param.aux.x = 0;
+       return false;
+     }
+   }
+
+   bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+
+   void initTuneParam(TuneParam &param) const  {
+     Tunable::initTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0;
+   }
+
+   void defaultTuneParam(TuneParam &param) const  {
+     Tunable::defaultTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0;
+   }
+
+   TuneKey tuneKey() const {
+     KernelType kernel_type = dslashParam.kernel_type;
+     dslashParam.kernel_type = KERNEL_POLICY;
+     TuneKey key = dslash.tuneKey();
+     dslashParam.kernel_type = kernel_type;
+     return key;
+   }
+
+   long long flops() const {
+     KernelType kernel_type = dslashParam.kernel_type;
+     dslashParam.kernel_type = KERNEL_POLICY;
+     long long flops_ = dslash.flops();
+     dslashParam.kernel_type = kernel_type;
+     return flops_;
+   }
+
+   long long bytes() const {
+     KernelType kernel_type = dslashParam.kernel_type;
+     dslashParam.kernel_type = KERNEL_POLICY;
+     long long bytes_ = dslash.bytes();
+     dslashParam.kernel_type = kernel_type;
+     return bytes_;
+   }
+
+   void preTune() { dslash.preTune(); }
+
+   void postTune() { dslash.postTune(); }
+
+ };
+
+
+
 
 } // anonymous namespace
 

@@ -31,9 +31,20 @@ namespace quda {
      complete.  This results in improved strong scaling of the
      multi-shift solver.
 
-     Since the natrix-vector consists of multiple dslash applications,
+     Since the matrix-vector consists of multiple dslash applications,
      we partition the shifts between these successive dslash
-     applicaitons for optimal communications hiding.
+     applications for optimal communications hiding.
+
+     In general, when using a Worker class to hide communication in
+     the dslash, one must be aware whether auto-tuning on the dslash
+     policy that envelops the dslash will occur.  If so, then the
+     Worker class instance will be called multiple times during this
+     tuning, potentially rendering the results wrong.  This isn't a
+     problem in the multi-shift solve, since we are guaranteed to not
+     run the worker class on the first iteration (when the dslash
+     policy tuning will take place), but this is something that will
+     need to be addressed in the future as the Worker idea to applied
+     elsewhere.
    */
   class ShiftUpdate : public Worker {
 
@@ -67,7 +78,7 @@ namespace quda {
     virtual ~ShiftUpdate() { }
     
     void updateNshift(int new_n_shift) { n_shift = new_n_shift; }
-    void updateNupdate(int new_n_update) { n_update = 1; }
+    void updateNupdate(int new_n_update) { n_update = new_n_update; }
     
     // note that we can't set the stream parameter here so it is
     // ignored.  This is more of a future design direction to consider
@@ -337,13 +348,13 @@ namespace quda {
 
 	// this should trigger the shift update in the subsequent sloppy dslash
 	aux_update = true;
-	//shift_update.apply(0);
-	//shift_update.apply(0);
-	/*for (int j=1; j<num_offset_now; j++) {
+	/*
+	  for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
 	  // update p[i] and x[i]
 	  blas::axpyBzpcx(alpha[j], *p[j], *x_sloppy[j], zeta[j], *r_sloppy, beta[j]);
-	  }*/
+	  }
+	*/
       } else {
 	for (int j=0; j<num_offset_now; j++) {
 	  blas::axpy(alpha[j], *p[j], *x_sloppy[j]);
@@ -396,7 +407,7 @@ namespace quda {
 	maxrx[m] = rNorm[m];
 	r0Norm[m] = rNorm[m];      
 	rUpdate++;
-      }    
+      }
 
       // now we can check if any of the shifts have converged and remove them
       int converged = 0;
@@ -449,7 +460,6 @@ namespace quda {
     
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-    reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
 

@@ -18,29 +18,39 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
 
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
-		     bool enable_gpu, TimeProfile &profile)
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu, TimeProfile &profile)
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0),
+      spin_bs(spin_bs), spin_map(0), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
-      profile(profile)
+      flops_(0), profile(profile)
   {
     int ndim = B[0]->Ndim();
-    this->geo_bs = new int[ndim];
-    for (int d = 0; d < ndim; d++) this->geo_bs[d] = geo_bs[d];
-
-    if (B[0]->X(0) == geo_bs[0]) 
-      errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);
 
     for (int d = 0; d < ndim; d++) {
-      if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
-	errorQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d\n", d, B[0]->X(d)/geo_bs[d]);
-
-      if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
-	errorQuda("cannot parition dim[%d]=%d with block length %d\n", d, B[0]->X(d), geo_bs[d]);
+      while (geo_bs[d] > 0) {
+	if (d==0 && B[0]->X(0) == geo_bs[0])
+	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
+	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
+	  warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0]->X(d)/geo_bs[d]);
+	else if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
+	  warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0]->X(d), geo_bs[d]);
+	else
+	  break; // this is a valid block size so let's use it
+	geo_bs[d] /= 2;
+      }
+      if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
     }
+
+    this->geo_bs = new int[ndim];
+    int total_block_size = 1;
+    for (int d = 0; d < ndim; d++) {
+      this->geo_bs[d] = geo_bs[d];
+      total_block_size *= geo_bs[d];
+    }
+
+    if (total_block_size == 1) errorQuda("Total geometric block size is 1");
 
     char block_str[128];
     sprintf(block_str, "%d", geo_bs[0]);
@@ -146,6 +156,50 @@ namespace quda {
 
     if (coarse_tmp_h) delete coarse_tmp_h;
     if (coarse_tmp_d) delete coarse_tmp_d;
+
+    if (geo_bs) delete []geo_bs;
+  }
+
+  void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_) {
+    if (parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
+    parity = parity_;
+
+    if (site_subset == site_subset_) return;
+    site_subset = site_subset_;
+
+    // this function only does something non-trivial if the operator is on the GPU
+    if (!enable_gpu) return;
+
+    if (site_subset == QUDA_PARITY_SITE_SUBSET) {
+      // if doing single-parity then delete full field V and replace with single parity
+
+      delete V_d;
+
+      ColorSpinorParam param(*V_h);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      param.x[0] /= 2;
+      param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+
+      V_d = ColorSpinorField::Create(param);
+      *V_d = parity == QUDA_EVEN_PARITY ? V_h->Even() : V_h->Odd();
+
+    } else if (site_subset == QUDA_FULL_SITE_SUBSET) {
+      // if doing full field then delete single parity V and replace with single parity
+
+      delete V_d;
+
+      ColorSpinorParam param(*V_h);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+
+      V_d = ColorSpinorField::Create(param);
+      *V_d = *V_h;
+
+    } else {
+      errorQuda("Undefined site_subset %d", site_subset_);
+    }
+
   }
 
   void Transfer::fillV(ColorSpinorField &V) { 
@@ -196,8 +250,8 @@ namespace quda {
     for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine_h[i] = geo_sort[i].y;
 
     if (enable_gpu) {
-      cudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
-      cudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
       checkCudaError();
     }
 
@@ -223,29 +277,36 @@ namespace quda {
 
     if (use_gpu) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
-      if (out.Location() == QUDA_CPU_FIELD_LOCATION ||
-	  out.GammaBasis() != V->GammaBasis()) output = fine_tmp_d;
+      if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
+	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
-      output = (out.Location() == QUDA_CUDA_FIELD_LOCATION) ? fine_tmp_h : &out;
+      if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
+	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
     *input = in; // copy result to input field (aliasing handled automatically)
     
+    if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
+
     if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))){
       errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
     }
 
-    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map);
+    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
     out = *output; // copy result to out field (aliasing handled automatically)
+
+    flops_ += 8*in.Ncolor()*out.Ncolor()*out.VolumeCB()*out.SiteSubset();
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
@@ -256,20 +317,24 @@ namespace quda {
 
     if (use_gpu) {
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION ||
-	  in.GammaBasis() != V->GammaBasis()) input = fine_tmp_d;
+      if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
+	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
-      if (in.Location() == QUDA_CUDA_FIELD_LOCATION) input = fine_tmp_h;
+      if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
+	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
-    *input = in; // copy result to input field (aliasing handled automatically)  
-    
+    *input = in;
+
+    if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot restrict a full field since only have single parity null-space components");
+
     if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
@@ -277,7 +342,15 @@ namespace quda {
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
       cudaDeviceSynchronize();
 
+    flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
+
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+  }
+
+  double Transfer::flops() const {
+    double rtn = flops_;
+    flops_ = 0;
+    return rtn;
   }
 
 } // namespace quda
