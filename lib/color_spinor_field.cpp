@@ -17,21 +17,26 @@ namespace quda {
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
     : LatticeField(param), init(false), v(0), norm(0), ghost_field(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
-      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0), eigenvectors(0)
+      ghost_length(0), ghost_norm_length(0),
+      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
+      composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
+      components(0)
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor,
 	   param.precision, param.pad, param.siteSubset, param.siteOrder,
-	   param.fieldOrder, param.gammaBasis, param.PCtype, param.eigv_dim);
+	   param.fieldOrder, param.gammaBasis, param.PCtype);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
     : LatticeField(field), init(false), v(0), norm(0), ghost_field(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
-      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0), eigenvectors(0)
+      ghost_length(0), ghost_norm_length(0),
+      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
+     composite_descr(field.composite_descr), components(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor,
 	   field.precision, field.pad, field.siteSubset, field.siteOrder,
-	   field.fieldOrder, field.gammaBasis, field.PCtype, field.eigv_dim, field.eigv_id);
+	   field.fieldOrder, field.gammaBasis, field.PCtype);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -119,22 +124,12 @@ namespace quda {
     if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
 
-    if (eigv_dim && eigv_id == -1) {
-      eigv_ghost_length      = ghost_length;
-      eigv_ghost_norm_length = ghost_norm_length;
-      ghost_length *= eigv_dim;
-      ghost_norm_length *= eigv_dim;
-    } else {
-      eigv_ghost_length      = 0;
-      eigv_ghost_norm_length = 0;
-    }
-
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
-				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC, int evdim /*= 0*/, int evid /* = -1*/) {
+				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -149,10 +144,6 @@ namespace quda {
     twistFlavor = Twistflavor;
 
     PCtype = DWFPC;
-
-//! for eigCG:
-    eigv_dim    = evdim;
-    eigv_id     = (evdim == 0) ? -1: evid;
 
     precision = Prec;
     volume = 1;
@@ -190,30 +181,35 @@ namespace quda {
     init = true;
 
 //! stuff for deflated solvers (eigenvector sets):
-    if (evdim != 0) {
-      eigv_volume = volume;
-      eigv_stride = stride;
-      eigv_length = length;
-      eigv_real_length = real_length;
+    if (composite_descr.is_composite) {
 
-      eigv_bytes       = bytes;
-      eigv_norm_bytes  = norm_bytes; 
-      
-      volume *= evdim;
-      stride *= evdim;
-      length *= evdim;
-      real_length *= evdim;
-      
-      bytes *= evdim;
-      norm_bytes *= evdim;
-    } else {
-      eigv_volume = 0;
-      eigv_stride = 0;
-      eigv_length = 0;
-      eigv_real_length = 0;
+      if (composite_descr.is_component) errorQuda("\nComposite type is not implemented.\n");
 
-      eigv_bytes       = 0;
-      eigv_norm_bytes  = 0;
+      composite_descr.volume   = volume;
+      composite_descr.volumeCB = volumeCB;
+      composite_descr.stride = stride;
+      composite_descr.length = length;
+      composite_descr.real_length = real_length;
+      composite_descr.bytes       = bytes;
+      composite_descr.norm_bytes  = norm_bytes; 
+      
+      volume *= composite_descr.dim;
+      stride *= composite_descr.dim;
+      length *= composite_descr.dim;
+      real_length *= composite_descr.dim;
+      
+      bytes *= composite_descr.dim;
+      norm_bytes *= composite_descr.dim;
+    }  else if (composite_descr.is_component) {
+      composite_descr.dim = 0;
+
+      composite_descr.volume      = 0;
+      composite_descr.volumeCB    = 0;
+      composite_descr.stride      = 0;
+      composite_descr.length      = 0;
+      composite_descr.real_length = 0;
+      composite_descr.bytes       = 0;
+      composite_descr.norm_bytes  = 0;
     }
 
     setTuningString();
@@ -248,9 +244,22 @@ namespace quda {
 
   ColorSpinorField& ColorSpinorField::operator=(const ColorSpinorField &src) {
     if (&src != this) {
+      if(src.composite_descr.is_composite){
+        this->composite_descr.is_composite = true;
+        this->composite_descr.dim          = src.composite_descr.dim;
+        this->composite_descr.is_component = false;
+        this->composite_descr.id           = 0; 
+      }
+      else if(src.composite_descr.is_component){
+        this->composite_descr.is_composite = false;
+        this->composite_descr.dim          = 0;
+        //this->composite_descr.is_component = false;
+        //this->composite_descr.id           = 0;
+      }
+
       create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor,
 	     src.precision, src.pad, src.siteSubset, 
-	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype, src.eigv_dim, src.eigv_id);    
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);    
     }
     return *this;
   }
@@ -267,13 +276,10 @@ namespace quda {
     if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
     if (param.nDim != 0) nDim = param.nDim;
 
-    if (param.eigv_dim  != 0 ) {
-      eigv_dim     = param.eigv_dim;
-      eigv_id      = param.eigv_id;
-    } else {
-      eigv_dim     = 0;
-      eigv_id      = -1;
-    }
+    composite_descr.is_composite     = param.is_composite;
+    composite_descr.is_component     = param.is_component;
+    composite_descr.dim              = param.is_composite ? param.composite_dim : 0;
+    composite_descr.id               = param.component_id;
 
     volume = 1;
     for (int d=0; d<nDim; d++) {
@@ -316,30 +322,28 @@ namespace quda {
     }
 
     //! for deflated solvers:
-    if (eigv_dim > 0) {
-       if (eigv_id == -1) {
-          eigv_volume            = volume;
-          eigv_stride            = stride;
-          eigv_length            = length;
-          eigv_real_length       = real_length;
-          eigv_bytes             = bytes;
-          eigv_norm_bytes        = norm_bytes;
-
-          volume            *= eigv_dim;
-          stride            *= eigv_dim;
-          length            *= eigv_dim;
-          real_length       *= eigv_dim;
-       } else if (eigv_id > -1) {
- // just to be safe...
-          eigv_volume            = 0;
-          eigv_stride            = 0;
-          eigv_length            = 0;
-          eigv_real_length       = 0;
-          eigv_bytes             = 0;
-          eigv_norm_bytes        = 0; 
-       } else {
-          errorQuda("\nIncorrect eigenvector index.\n");
-       }
+    if (composite_descr.is_composite) {
+      composite_descr.volume            = volume;
+      composite_descr.stride            = stride;
+      composite_descr.length            = length;
+      composite_descr.real_length       = real_length;
+      composite_descr.bytes             = bytes;
+      composite_descr.norm_bytes        = norm_bytes;
+      
+      volume            *= composite_descr.dim;
+      stride            *= composite_descr.dim;
+      length            *= composite_descr.dim;
+      real_length       *= composite_descr.dim;
+      
+      bytes      *= composite_descr.dim;
+      norm_bytes *= composite_descr.dim;
+    } else {
+      composite_descr.volume            = 0;
+      composite_descr.stride            = 0;
+      composite_descr.length            = 0;
+      composite_descr.real_length       = 0;
+      composite_descr.bytes             = 0;
+      composite_descr.norm_bytes        = 0;
     }
 
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
@@ -361,8 +365,12 @@ namespace quda {
     param.twistFlavor = twistFlavor;
     param.precision = precision;
     param.nDim = nDim;
-    param.eigv_dim = eigv_dim;
-    param.eigv_id = eigv_id;
+
+    param.is_composite  = composite_descr.is_composite;
+    param.composite_dim = composite_descr.dim;
+    param.is_component  = false;//always either a regular spinor or a composite object
+    param.component_id  = 0;
+
     memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
     param.pad = pad;
     param.siteSubset = siteSubset;
@@ -758,11 +766,16 @@ namespace quda {
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
-    out << "eigDim = " << a.eigv_dim << std::endl;
-    out << "eigID = " << a.eigv_id << std::endl;
-    out << "eigVolume = " << a.eigv_volume << std::endl;
-    out << "eigStride = " << a.eigv_stride << std::endl;
-    out << "eigLength = " << a.eigv_length << std::endl;
+    out << "Is composite = " << a.composite_descr.is_composite << std::endl;
+    if(a.composite_descr.is_composite)
+    {
+      out << "Composite Dim = " << a.composite_descr.dim << std::endl;
+      out << "Composite Volume = " << a.composite_descr.volume << std::endl;
+      out << "Composite Stride = " << a.composite_descr.stride << std::endl;
+      out << "Composite Length = " << a.composite_descr.length << std::endl;
+    }
+    out << "Is component = " << a.composite_descr.is_component << std::endl;
+    if(a.composite_descr.is_composite) out << "Component ID = " << a.composite_descr.id << std::endl;
     out << "PC type = " << a.PCtype << std::endl;
     return out;
   }

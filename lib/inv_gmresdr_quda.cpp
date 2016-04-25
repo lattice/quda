@@ -49,7 +49,7 @@ namespace quda {
 
       //Objects required for the Galerkin projections
       Complex *projMat;  //host   projection matrix:
-      cudaColorSpinorField    *projVecs;      //device buffer for HRitz vectors
+      cudaColorSpinorFieldSet    *projVecs;      //device buffer for HRitz vectors
 
       //needed for MinRes Projection:
       Complex *projQRMat;
@@ -94,7 +94,7 @@ namespace quda {
 
          if(ldn != ld)                 errorQuda("Error: leading dimension of the source matrix must match that of the projection matrix.");
 
-         if(Vm->EigvDim() < (nevs+1))  errorQuda("Error: it seems that the provided eigenvector content is inconsistent with the projection matrix dimensions: %d vs %d", Vm->EigvDim(), (nevs+1));
+         if(Vm->CompositeDim() < (nevs+1))  errorQuda("Error: it seems that the provided eigenvector content is inconsistent with the projection matrix dimensions: %d vs %d", Vm->CompositeDim(), (nevs+1));
 
          if(nevs != nv) nv = nevs;
 
@@ -116,15 +116,14 @@ namespace quda {
 
          memcpy(projMat, srcMat, nv*ld*sizeof(Complex));
 
-         ColorSpinorParam csParam(Vm->Eigenvec(0));
+         ColorSpinorParam csParam(Vm->Component(0));
          csParam.create = QUDA_ZERO_FIELD_CREATE;
+         csParam.is_composite   = true;
+         csParam.composite_dim  = (nv+1);
 
-         csParam.eigv_dim  = (nv+1);
-         csParam.eigv_id   = -1;
+         projVecs  = new cudaColorSpinorFieldSet(csParam);//temporary field
 
-         projVecs  = new cudaColorSpinorField(csParam);//temporary field
-
-         for(int i = 0; i < (nv+1); i++) copy(projVecs->Eigenvec(i), Vm->Eigenvec(i));
+         for(int i = 0; i < (nv+1); i++) copy(projVecs->Component(i), Vm->Component(i));
 
          //perform QR decomposition of the projection matrix:
          if(projType == QUDA_MINRES_PROJECTION)
@@ -235,13 +234,13 @@ namespace quda {
       //
       void ComputeHarmonicRitzPairs();
 
-      void RestartVH(cudaColorSpinorField *Vm);
+      void RestartVH(cudaColorSpinorFieldSet *Vm);
 
       void PrepareDeflatedRestart(Complex *givensH, Complex *g, const bool use_deflated_cycles = true);
 
       void PrepareGivens(Complex *givensH, const int col, const bool use_deflated_cycles = true);
 
-      void UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorField *Vm, Complex *givensH, Complex *g, const int j);
+      void UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorFieldSet *Vm, Complex *givensH, Complex *g, const int j);
    };
 
   GMResDRArgs::GMResDRArgs(int m, int ldm, int nev): GMResDR_magma_args(0), harVecs(0), harVals(0), sortedHarVecs(0), sortedHarVals(0), harMat(0), qrH(0), tauH(0), srtRes(0),
@@ -343,7 +342,7 @@ namespace quda {
 
 
 //Note: in fact, x is an accumulation field initialized to zero (if a sloppy field is used!) and has the same precision as Vm
- void GMResDRArgs::UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorField *Vm, Complex *givensH, Complex *g, const int j)
+ void GMResDRArgs::UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorFieldSet *Vm, Complex *givensH, Complex *g, const int j)
  {
    //if (mixed_precision_GMResDR) zero(*x);//it's done in the main loop, no need for this
    memset(lsqSol, 0, (m+1)*sizeof(Complex));
@@ -363,7 +362,7 @@ namespace quda {
    }
    //
    //compute x = x0+Vm*lsqSol
-   for(int l = 0; l < j; l++)  caxpy(lsqSol[l], Vm->Eigenvec(l), *x);
+   for(int l = 0; l < j; l++)  caxpy(lsqSol[l], Vm->Component(l), *x);
 
    return;
  }
@@ -398,17 +397,15 @@ namespace quda {
 
    for(int e = 0; e < nev; e++) memcpy(&sortedHarVecs[ldm*e], &harVecs[ldm*( sorted_evals_cntr[e].eval_idx)], (ldm)*sizeof(Complex));
 
-//   for(int e = 0; e < 16; e++) printfQuda("\nEigenval #%d: real %le imag %le abs %le\n", sorted_evals_cntr[e].eval_idx, harVals[(sorted_evals_cntr[e].eval_idx)].real(), harVals[(sorted_evals_cntr[e].eval_idx)].imag(),  abs(harVals[(sorted_evals_cntr[e].eval_idx)]));
-
    return;
  }
 
- void GMResDRArgs::RestartVH(cudaColorSpinorField *Vm)
+ void GMResDRArgs::RestartVH(cudaColorSpinorFieldSet *Vm)
  {
    if(!init_flag) errorQuda("\nGMResDR resources were not allocated.\n");
 
-   int cldn = Vm->EigvLength() >> 1; //complex leading dimension
-   int clen = Vm->EigvLength() >> 1; //complex vector length
+   int cldn = Vm->ComponentLength() >> 1; //complex leading dimension
+   int clen = Vm->ComponentLength() >> 1; //complex vector length
 
    for(int j = 0; j <= m; j++) //row index
    {
@@ -431,15 +428,15 @@ namespace quda {
 
    for(int j = 0; j < nev; j++)
    {
-     Complex calpha = cDotProduct(Vm->Eigenvec(j), Vm->Eigenvec(nev));//
-     caxpy(-calpha, Vm->Eigenvec(j), Vm->Eigenvec(nev));
+     Complex calpha = cDotProduct(Vm->Component(j), Vm->Component(nev));//
+     caxpy(-calpha, Vm->Component(j), Vm->Component(nev));
    }
 
-   double dalpha = norm2(Vm->Eigenvec(nev));
+   double dalpha = norm2(Vm->Component(nev));
 
    double tmpd=1.0e+00/sqrt(dalpha);
 
-   ax(tmpd, Vm->Eigenvec(nev));
+   ax(tmpd, Vm->Component(nev));
 
    //done.
 
@@ -537,11 +534,13 @@ namespace quda {
 
    printfQuda("\nAllocating resources for the GMResDR solver...\n");
 
-   csParam.eigv_dim = param.m+1; // basis dimension (abusive notations!)
+   csParam.is_composite  = true;
+   csParam.composite_dim = param.m+1;
 
-   Vm = new cudaColorSpinorField(csParam); //search space for Ritz vectors
-//BUG ALLERT! if one sets csParam.eigv_dim = 1 then any other allocation of regular spinors with csParam hangs the program!
-   csParam.eigv_dim = 0;
+   Vm = new cudaColorSpinorFieldSet(csParam); //search space for Ritz vectors
+
+   csParam.is_composite  = false;
+   csParam.composite_dim = 0;
 
    checkCudaError();
 
@@ -573,14 +572,14 @@ namespace quda {
     if(dpar->projType == QUDA_GALERKIN_PROJECTION)
     {
       //Compute c = VT^{pr}_k r0
-      for(int i = 0; i < dpar->nv; i++ ) d[i] = cDotProduct(dpar->projVecs->Eigenvec(i), r_sloppy);//
+      for(int i = 0; i < dpar->nv; i++ ) d[i] = cDotProduct(dpar->projVecs->Component(i), r_sloppy);//
       //Solve H^{pr}_k d = c: this nvxnv problem..
       magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)dpar->projMat, dpar->ld);
     }
     else if(dpar->projType == QUDA_MINRES_PROJECTION)
     {
       //Compute c = VT^{pr}_k+1 r0
-      for(int i = 0; i < (dpar->nv + 1); i++ ) d[i] = cDotProduct(dpar->projVecs->Eigenvec(i), r_sloppy);//
+      for(int i = 0; i < (dpar->nv + 1); i++ ) d[i] = cDotProduct(dpar->projVecs->Component(i), r_sloppy);//
       //
       magma_args.LeftConjZUNMQR(dpar->nv /*number of reflectors*/, 1 /*number of columns of mat*/, d, (dpar->nv+1) /*number of rows*/, dpar->ld, dpar->projQRMat, dpar->ld, dpar->projTau);
        //Solve H^{pr}_k d = c: this nvxnv problem..
@@ -592,7 +591,7 @@ namespace quda {
     }
 
     //Compute the new approximate solution:
-    for(int l = 0; l < dpar->nv; l++)  caxpy(d[l], dpar->projVecs->Eigenvec(l), x_sloppy);
+    for(int l = 0; l < dpar->nv; l++)  caxpy(d[l], dpar->projVecs->Component(l), x_sloppy);
 
     //Compute the new residual vector:
     //memset(c, 0, (dpar->nv+1)*sizeof(Complex));//now use as a temp array
@@ -603,7 +602,7 @@ namespace quda {
          c[j] +=  (dpar->projMat[i*dpar->ld + j] * d[i]);//column major format
       }
 
-    for(int l = 0; l < (dpar->nv+1); l++)  caxpy(-c[l], dpar->projVecs->Eigenvec(l), r_sloppy);
+    for(int l = 0; l < (dpar->nv+1); l++)  caxpy(-c[l], dpar->projVecs->Component(l), r_sloppy);
 
     delete[] d;
     delete[] c;
@@ -710,7 +709,7 @@ namespace quda {
 
     ax(r2_inv, r);
     //
-    copy(Vm->Eigenvec(0), r);
+    copy(Vm->Component(0), r);
 
     int j = 0;//here also a column index of H
 
@@ -731,23 +730,23 @@ namespace quda {
 
     while(j < m)//we allow full cycle
     {
-      cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
+      cudaColorSpinorField *Av = &Vm->Component(j+1);
 
-      (*sloppy_mat)(*Av, Vm->Eigenvec(j), tmp, tmp2);
+      (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);
 
       ///////////
-      Complex h0 = cDotProduct(Vm->Eigenvec(0), *Av);//
+      Complex h0 = cDotProduct(Vm->Component(0), *Av);//
       args->SetHessenbergElement(0, j, h0);
       //scale w:
-      caxpy(-h0, Vm->Eigenvec(0), *Av);
+      caxpy(-h0, Vm->Component(0), *Av);
       //
       for (int i = 1; i <= j; i++)//i is a row index
       {
-        Complex h1 = cDotProduct(Vm->Eigenvec(i), *Av);//
+        Complex h1 = cDotProduct(Vm->Component(i), *Av);//
         //load columns:
         args->SetHessenbergElement(i, j, h1);
         //scale:
-        caxpy(-h1, Vm->Eigenvec(i), *Av);
+        caxpy(-h1, Vm->Component(i), *Av);
 
         //lets do Givens rotations:
         givensH[ldH*j+(i-1)]   =  conj(Cn[i-1])*h0 + Sn[i-1]*h1;
@@ -841,7 +840,7 @@ namespace quda {
 
        args->RestartVH( Vm );
 
-       for(int i = 0; i <= nev ; i++ ) g[i] = cDotProduct(Vm->Eigenvec(i), *r_sloppy);//
+       for(int i = 0; i <= nev ; i++ ) g[i] = cDotProduct(Vm->Component(i), *r_sloppy);//
      }
      else //use Galerkin projection instead:
      {
@@ -865,7 +864,7 @@ namespace quda {
        //
        ax(1.0 / beta, r);
        //
-       copy(Vm->Eigenvec(0), r);
+       copy(Vm->Component(0), r);
 
        g[0] = beta;
 
@@ -879,20 +878,20 @@ namespace quda {
      while(j < m) //we allow full cycle
      {
        //pointer aliasing:
-       cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
+       cudaColorSpinorField *Av = &Vm->Component(j+1);
 
-       (*sloppy_mat)(*Av, Vm->Eigenvec(j), *ctmp1_p, *ctmp2_p);
+       (*sloppy_mat)(*Av, Vm->Component(j), *ctmp1_p, *ctmp2_p);
        //
        Complex h0(0.0, 0.0);
        //
        for (int i = 0; i <= jlim; i++)//i is a row index
        {
-          h0 = cDotProduct(Vm->Eigenvec(i), *Av);//
+          h0 = cDotProduct(Vm->Component(i), *Av);//
           //Warning: column major format!!! (m+1) size of a column.
           //load columns:
           args->SetHessenbergElement(i, j, h0);
           //
-          caxpy(-h0, Vm->Eigenvec(i), *Av);
+          caxpy(-h0, Vm->Component(i), *Av);
        }
 
        //Let's do Givens rotation:
@@ -902,12 +901,12 @@ namespace quda {
 
        for(int i = (jlim+1); i <= j; i++)
        {
-          Complex h1 = cDotProduct(Vm->Eigenvec(i), *Av);//
+          Complex h1 = cDotProduct(Vm->Component(i), *Av);//
           //Warning: column major format!!! (m+1) size of a column.
           //load columns:
           args->SetHessenbergElement(i, j, h1);
           //
-          caxpy(-h1, Vm->Eigenvec(i), *Av);
+          caxpy(-h1, Vm->Component(i), *Av);
 
           //Lets do Givens rotations:
           givensH[ldH*j+(i-1)]   =  conj(Cn[i-1])*h0 + Sn[i-1]*h1;
@@ -1199,7 +1198,7 @@ namespace quda {
        //
        ax(1.0 / beta, r);
        //
-       copy(Vm->Eigenvec(0), r);
+       copy(Vm->Component(0), r);
 
        g[0] = beta;
 
@@ -1209,23 +1208,23 @@ namespace quda {
 
       while(j < m)//we allow full cycle
       {
-        cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
+        cudaColorSpinorField *Av = &Vm->Component(j+1);
 
-        (*sloppy_mat)(*Av, Vm->Eigenvec(j), tmp, tmp2);//must be matDefl
+        (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);//must be matDefl
 
         ///////////
-        Complex h0 = cDotProduct(Vm->Eigenvec(0), *Av);//
+        Complex h0 = cDotProduct(Vm->Component(0), *Av);//
         args->SetHessenbergElement(0, j, h0);
         //scale w:
-        caxpy(-h0, Vm->Eigenvec(0), *Av);
+        caxpy(-h0, Vm->Component(0), *Av);
         //
         for (int i = 1; i <= j; i++)//i is a row index
         {
-          Complex h1 = cDotProduct(Vm->Eigenvec(i), *Av);//
+          Complex h1 = cDotProduct(Vm->Component(i), *Av);//
           //load columns:
           args->SetHessenbergElement(i, j, h1);
           //scale:
-          caxpy(-h1, Vm->Eigenvec(i), *Av);
+          caxpy(-h1, Vm->Component(i), *Av);
 
           //lets do Givens rotations:
           givensH[ldH*j+(i-1)]   =  conj(Cn[i-1])*h0 + Sn[i-1]*h1;

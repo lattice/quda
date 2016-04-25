@@ -31,6 +31,9 @@ namespace quda {
       case cudaMemcpyDeviceToDevice:
 	name = "cudaMemcpyDeviceToDevice";
 	break;
+      case cudaMemcpyDefault:
+        name = "cudaMemcpyDefault";
+        break;
       default:
 	errorQuda("Unsupported cudaMemcpyType %d", kind);
       }
