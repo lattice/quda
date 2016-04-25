@@ -38,7 +38,7 @@ namespace quda {
      Complex *proj_matrix; //VH A V
 
      QudaPrecision           ritz_prec;             //keep it right now.
-     cudaColorSpinorField    *cudaRitzVectors;      //device buffer for Ritz vectors
+     cudaColorSpinorFieldSet    *cudaRitzVectors;      //device buffer for Ritz vectors
      double *ritz_values;
 
      int ld;                 //projection matrix leading dimension
@@ -67,11 +67,11 @@ namespace quda {
 
         eigv_param.setPrecision(ritz_prec);//the same as for full precision iterations (see diracDeflateParam)
         eigv_param.create   = QUDA_ZERO_FIELD_CREATE;
-        eigv_param.eigv_dim = tot_dim;
-        eigv_param.eigv_id  = -1;
+        eigv_param.is_composite  = true;
+        eigv_param.composite_dim = tot_dim;
+  
+        cudaRitzVectors = new cudaColorSpinorFieldSet(eigv_param);
 
-        //if(eigv_param.siteSubset == QUDA_FULL_SITE_SUBSET) eigv_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-        cudaRitzVectors = new cudaColorSpinorField(eigv_param);
 
         return;
      }
@@ -128,11 +128,11 @@ namespace quda {
 
         if(!cuda_ritz_alloc) errorQuda("\nCannot reshape Ritz vectors set.\n");
         //
-        ColorSpinorParam cudaEigvParam(cudaRitzVectors->Eigenvec(0));
+        ColorSpinorParam cudaEigvParam(cudaRitzVectors->Component(0));
 
         cudaEigvParam.create   = QUDA_ZERO_FIELD_CREATE;
-        cudaEigvParam.eigv_dim = nev;
-        cudaEigvParam.eigv_id  = -1;
+        cudaEigvParam.is_composite  = true;
+        cudaEigvParam.composite_dim = nev;
 
         if(new_ritz_prec != QUDA_INVALID_PRECISION)
         {
@@ -143,10 +143,9 @@ namespace quda {
 
         CleanDeviceRitzVectors();
 
-        cudaRitzVectors = new cudaColorSpinorField(cudaEigvParam);
+        cudaRitzVectors = new cudaColorSpinorFieldSet(cudaEigvParam);
 
         cur_dim = nev;
-
         cuda_ritz_alloc = true;
 
         return;
@@ -188,9 +187,9 @@ namespace quda {
 
       //methods
       void FillLanczosDiag(const int _2nev);
-      void FillLanczosOffDiag(const int _2nev, cudaColorSpinorField *v, cudaColorSpinorField *u, double inv_sqrt_r2);
+      void FillLanczosOffDiag(const int _2nev, cudaColorSpinorField *v, cudaColorSpinorFieldSet *u, double inv_sqrt_r2);
       //
-      void CheckEigenvalues(const cudaColorSpinorField *Vm, const DiracMatrix &matDefl, const int restart_num);//this method is designed to monitor eigcg effeciency, not for production runs
+      void CheckEigenvalues(const cudaColorSpinorFieldSet *Vm, const DiracMatrix &matDefl, const int restart_num);//this method is designed to monitor eigcg effeciency, not for production runs
    };
 
    template<typename Float, typename CudaComplex>
@@ -297,11 +296,11 @@ namespace quda {
  }
 
   template<typename Float, typename CudaComplex>
-  void EigCGArgs<Float, CudaComplex>::FillLanczosOffDiag(const int _2nev, cudaColorSpinorField *v, cudaColorSpinorField *u, double inv_sqrt_r2)
+  void EigCGArgs<Float, CudaComplex>::FillLanczosOffDiag(const int _2nev, cudaColorSpinorField *v, cudaColorSpinorFieldSet *u, double inv_sqrt_r2)
   {
     if(v->Precision() != u->Precision()) errorQuda("\nIncorrect precision...\n");
     for (int i = 0; i < _2nev; i++){
-       std::complex<double> s = cDotProduct(*v, u->Eigenvec(i));
+       std::complex<double> s = cDotProduct(*v, u->Component(i));
        s *= inv_sqrt_r2;
        hTm[_2nev*ldm+i] = std::complex<Float>((Float)s.real(), (Float)s.imag());
        hTm[i*ldm+_2nev] = conj(hTm[_2nev*ldm+i]);
@@ -310,18 +309,15 @@ namespace quda {
 
   //not implemented
   template<typename Float, typename CudaComplex>
-  void EigCGArgs<Float, CudaComplex>::CheckEigenvalues(const cudaColorSpinorField *Vm, const DiracMatrix &matDefl, const int restart_num)
+  void EigCGArgs<Float, CudaComplex>::CheckEigenvalues(const cudaColorSpinorFieldSet *Vm, const DiracMatrix &matDefl, const int restart_num)
   {
     printfQuda("\nPrint eigenvalue accuracy after %d restart.\n", restart_num);
 
     Complex *hproj = (Complex*)mapped_malloc(nev*nev*sizeof(Complex));
     memset(hproj, 0, nev*nev*sizeof(Complex));
 
-    ColorSpinorParam csParam(Vm->Eigenvec(0));
+    ColorSpinorParam csParam(Vm->Component(0));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-    csParam.eigv_dim  = 0;
-    csParam.eigv_id   = -1;
 
     cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
     cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
@@ -335,19 +331,19 @@ namespace quda {
 
     for (int j = 0; j < nev; j++)//
     {
-       matDefl(*W, Vm->Eigenvec(j), tmp, tmp2);
+       matDefl(*W, Vm->Component(j), tmp, tmp2);
 
        //off-diagonal:
        for (int i = 0; i < j; i++)//row id
        {
-          alpha  =  cDotProduct(Vm->Eigenvec(i), *W);
+          alpha  =  cDotProduct(Vm->Component(i), *W);
           //
           hproj[j*nev+i] = alpha;
           hproj[i*nev+j] = conj(alpha);//conj
        }
 
        //diagonal:
-       alpha  =  cDotProduct(Vm->Eigenvec(j), *W);
+       alpha  =  cDotProduct(Vm->Component(j), *W);
        //
        hproj[j*nev+j] = alpha;
     }
@@ -360,7 +356,7 @@ namespace quda {
 
     for(int i = 0; i < nev; i++)//newnev
     {
-      for(int j = 0; j < nev; j++) caxpy(hproj[i*nev+j], Vm->Eigenvec(j), *W);
+      for(int j = 0; j < nev; j++) caxpy(hproj[i*nev+j], Vm->Component(j), *W);
 
       matDefl(*W2, *W, tmp, tmp2);
 
@@ -531,9 +527,10 @@ namespace quda {
        //Create an eigenvector set:
        csParam.create   = QUDA_ZERO_FIELD_CREATE;
        csParam.setPrecision(search_space_prec);//eigCG internal search space precision: must be adjustable (this coinsides with the accumulation array precision).
-       csParam.eigv_dim = param.m;
+       csParam.is_composite = true;
+       csParam.composite_dim = param.m;
 
-       Vm = new cudaColorSpinorField(csParam); //search space for Ritz vectors
+       Vm = new cudaColorSpinorFieldSet(csParam); //search space for Ritz vectors
 
        checkCudaError();
        printfQuda("\n..done.\n");
@@ -541,7 +538,7 @@ namespace quda {
        eigcg_alloc = true;
     }
 
-    ColorSpinorParam eigParam(Vm->Eigenvec(0));
+    ColorSpinorParam eigParam(Vm->Component(0));
     eigParam.create = QUDA_ZERO_FIELD_CREATE;
 
     cudaColorSpinorField  *v0   = NULL; //temporary field.
@@ -550,7 +547,7 @@ namespace quda {
 
     if(search_space_prec != param.precision_sloppy)
     {
-       v0 = new cudaColorSpinorField(Vm->Eigenvec(0), eigParam); //temporary field.
+       v0 = new cudaColorSpinorField(Vm->Component(0), eigParam); //temporary field.
     }
     else
     {
@@ -601,8 +598,9 @@ namespace quda {
          eigvRestart++;
 
          //Restart search space :
-         int cldn = Vm->EigvLength() >> 1; //complex leading dimension
-         int clen = Vm->EigvLength() >> 1; //complex vector length
+         int cldn = Vm->ComponentLength() >> 1; //complex leading dimension
+         int clen = Vm->ComponentLength() >> 1; //complex vector length
+
          //
          int _2nev = eigcg_args->RestartVm(Vm->V(), cldn, clen, Vm->Precision());
 
@@ -628,10 +626,10 @@ namespace quda {
       }
 
       //construct Lanczos basis:
-      copy(Vm->Eigenvec(l), r);//convert arrays
+      copy(Vm->Component(l), r);//convert arrays
 
       //rescale the vector
-      ax(1.0 / sqrt(r2), Vm->Eigenvec(l));
+      ax(1.0 / sqrt(r2), Vm->Component(l));
 
       //update search space index
       l += 1;
@@ -706,7 +704,7 @@ namespace quda {
   {
     printfQuda("\nCreate deflation space...\n");
 
-    if(eigcgSpinor.SiteSubset() != QUDA_PARITY_SITE_SUBSET) errorQuda("\nRitz spinors must be parity spinors\n");//or adjust it
+    //if(eigcgSpinor.SiteSubset() != QUDA_PARITY_SITE_SUBSET) errorQuda("\nRitz spinors must be parity spinors\n");//or adjust it
 
     ColorSpinorParam cudaEigvParam(eigcgSpinor);
 
@@ -766,15 +764,15 @@ namespace quda {
      {
        for(int j = 0; j < i; j++)
        {
-         alpha = cDotProduct(dpar->cudaRitzVectors->Eigenvec(j), dpar->cudaRitzVectors->Eigenvec(i));//<j,i>
+         alpha = cDotProduct(dpar->cudaRitzVectors->Component(j), dpar->cudaRitzVectors->Component(i));//<j,i>
          Complex scale = Complex(-alpha.real(), -alpha.imag());
-         caxpy(scale, dpar->cudaRitzVectors->Eigenvec(j), dpar->cudaRitzVectors->Eigenvec(i)); //i-<j,i>j
+         caxpy(scale, dpar->cudaRitzVectors->Component(j), dpar->cudaRitzVectors->Component(i)); //i-<j,i>j
        }
 
-       alpha = norm2(dpar->cudaRitzVectors->Eigenvec(i));
+       alpha = norm2(dpar->cudaRitzVectors->Component(i));
        if(alpha.real() > 1e-16)
        {
-          ax(1.0 /sqrt(alpha.real()), dpar->cudaRitzVectors->Eigenvec(i));
+          ax(1.0 /sqrt(alpha.real()), dpar->cudaRitzVectors->Component(i));
           addednev += 1;
        }
        else
@@ -783,11 +781,8 @@ namespace quda {
        }
      }
 
-     ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
+     ColorSpinorParam csParam(dpar->cudaRitzVectors->Component(0));
      csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-     csParam.eigv_dim  = 0;
-     csParam.eigv_id   = -1;
 
      cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
      cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
@@ -799,19 +794,19 @@ namespace quda {
 
      for (int j = dpar->cur_dim; j < (dpar->cur_dim+addednev); j++)//
      {
-       (*matDefl)(*W, dpar->cudaRitzVectors->Eigenvec(j), tmp, tmp2);//precision must match!
+       (*matDefl)(*W, dpar->cudaRitzVectors->Component(j), tmp, tmp2);//precision must match!
 
        //off-diagonal:
        for (int i = 0; i < j; i++)//row id
        {
-          alpha  =  cDotProduct(dpar->cudaRitzVectors->Eigenvec(i), *W);
+          alpha  =  cDotProduct(dpar->cudaRitzVectors->Component(i), *W);
           //
           dpar->proj_matrix[j*dpar->ld+i] = alpha;
           dpar->proj_matrix[i*dpar->ld+j] = conj(alpha);//conj
        }
 
        //diagonal:
-       alpha  =  cDotProduct(dpar->cudaRitzVectors->Eigenvec(j), *W);
+       alpha  =  cDotProduct(dpar->cudaRitzVectors->Component(j), *W);
        //
        dpar->proj_matrix[j*dpar->ld+j] = alpha;
      }
@@ -844,12 +839,9 @@ namespace quda {
 
      magma_args.MagmaHEEVD(projm, evals, curr_evals, true);
 
-     ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
+     ColorSpinorParam csParam(dpar->cudaRitzVectors->Component(0));
 
      csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-     csParam.eigv_dim  = 0;
-     csParam.eigv_id   = -1;
 
      cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
      cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
@@ -861,7 +853,7 @@ namespace quda {
 
      for(int i = 0; i < nevs_to_print; i++)//newnev
      {
-         for(int j = 0; j < curr_evals; j++) caxpy(projm[i*dpar->ld+j], dpar->cudaRitzVectors->Eigenvec(j), *W);
+         for(int j = 0; j < curr_evals; j++) caxpy(projm[i*dpar->ld+j], dpar->cudaRitzVectors->Component(j), *W);
 
          (*matDefl)(*W2, *W, tmp, tmp2);
 
@@ -929,11 +921,8 @@ namespace quda {
        }
      }
 
-     ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
+     ColorSpinorParam csParam(dpar->cudaRitzVectors->Component(0));
      csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-     csParam.eigv_dim  = 0;
-     csParam.eigv_id   = -1;
 
      cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
      cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
@@ -950,9 +939,10 @@ namespace quda {
        //Create an eigenvector set:
        csParam.create   = QUDA_ZERO_FIELD_CREATE;
        //csParam.setPrecision(search_space_prec);//eigCG internal search space precision: must be adjustable.
-       csParam.eigv_dim = max_nevs;
+       csParam.is_composite = true;
+       csParam.composite_dim = max_nevs;
 
-       Vm = new cudaColorSpinorField(csParam); //search space for Ritz vectors
+       Vm = new cudaColorSpinorFieldSet(csParam); //search space for Ritz vectors
 
        checkCudaError();
        printfQuda("\n..done.\n");
@@ -966,9 +956,9 @@ namespace quda {
 
      while ((relerr < tol) && (idx < max_nevs))//newnev
      {
-         for(int j = 0; j < dpar->cur_dim; j++) caxpy(projm[idx*dpar->ld+j], dpar->cudaRitzVectors->Eigenvec(j), *W);
+         for(int j = 0; j < dpar->cur_dim; j++) caxpy(projm[idx*dpar->ld+j], dpar->cudaRitzVectors->Component(j), *W);
          //load aigenvector into temporary buffer:
-         copy(Vm->Eigenvec(idx), *W);
+         copy(Vm->Component(idx), *W);
 
          if(getVerbosity() >= QUDA_VERBOSE)
          {
@@ -997,7 +987,7 @@ namespace quda {
      dpar->ReshapeDeviceRitzVectorsSet(idx);//
 
      //copy all the stuff to cudaRitzVectors set:
-     for(int i = 0; i < idx; i++) copy(dpar->cudaRitzVectors->Eigenvec(i), Vm->Eigenvec(i));
+     for(int i = 0; i < idx; i++) copy(dpar->cudaRitzVectors->Component(i), Vm->Component(i));
 
      //reset current dimension:
      printfQuda("\nUsed eigenvectors: %d\n", idx);
@@ -1035,11 +1025,7 @@ namespace quda {
     if(dpar->cudaRitzVectors->Precision() != x.Precision())
     {
 
-      ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      //
-      csParam.eigv_dim  = 0;
-      csParam.eigv_id   = -1;
+      ColorSpinorParam csParam(dpar->cudaRitzVectors->Component(0));
       //Create an eigenvector set:
       csParam.create   = QUDA_ZERO_FIELD_CREATE;
       //
@@ -1058,14 +1044,14 @@ namespace quda {
 
     for(int i = 0; i < dpar->cur_dim; i++)
     {
-      vec[i] = cDotProduct(dpar->cudaRitzVectors->Eigenvec(i), *in);//<i, b>
+      vec[i] = cDotProduct(dpar->cudaRitzVectors->Component(i), *in);//<i, b>
     }
 
     magma_args.SolveProjMatrix((void*)vec, dpar->ld,  dpar->cur_dim, (void*)dpar->proj_matrix, dpar->ld);
 
     for(int i = 0; i < dpar->cur_dim; i++)
     {
-      caxpy(vec[i], dpar->cudaRitzVectors->Eigenvec(i), *out); //a*i+x
+      caxpy(vec[i], dpar->cudaRitzVectors->Component(i), *out); //a*i+x
     }
 
     if(dpar->cudaRitzVectors->Precision() != x.Precision())
@@ -1100,11 +1086,7 @@ namespace quda {
     if(dpar->cudaRitzVectors->Precision() != x.Precision())
     {
 
-      ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      //
-      csParam.eigv_dim  = 0;
-      csParam.eigv_id   = -1;
+      ColorSpinorParam csParam(dpar->cudaRitzVectors->Component(0));
       //Create an eigenvector set:
       csParam.create   = QUDA_ZERO_FIELD_CREATE;
       //
@@ -1123,15 +1105,15 @@ namespace quda {
 
     for(int i = 0; i < dpar->rtz_dim; i+=2)
     {
-      Complex tmp = cDotProduct(dpar->cudaRitzVectors->Eigenvec(i), *in);//<i, b>
+      Complex tmp = cDotProduct(dpar->cudaRitzVectors->Component(i), *in);//<i, b>
       tmp = tmp * dpar->ritz_values[i];
 
       if (i+1 < dpar->rtz_dim) {
-	Complex tmp2 = cDotProduct(dpar->cudaRitzVectors->Eigenvec(i+1), *in);//<i, b>
+	Complex tmp2 = cDotProduct(dpar->cudaRitzVectors->Component(i+1), *in);//<i, b>
 	tmp2 = tmp2 * dpar->ritz_values[i+1];
-	caxpbypz(tmp, dpar->cudaRitzVectors->Eigenvec(i), tmp2,  dpar->cudaRitzVectors->Eigenvec(i+1), *out);
+	caxpbypz(tmp, dpar->cudaRitzVectors->Component(i), tmp2,  dpar->cudaRitzVectors->Component(i+1), *out);
       } else {
-	caxpy(tmp, dpar->cudaRitzVectors->Eigenvec(i), *out); //a*i+x
+	caxpy(tmp, dpar->cudaRitzVectors->Component(i), *out); //a*i+x
       }
     }
 
@@ -1154,11 +1136,11 @@ namespace quda {
   {
      const int first_idx = dpar->cur_dim;
 
-     if(dpar->cudaRitzVectors->EigvDim() < (first_idx+param.nev)) errorQuda("\nNot enough space to copy %d vectors..\n", param.nev);
+     if(dpar->cudaRitzVectors->CompositeDim() < (first_idx+param.nev)) errorQuda("\nNot enough space to copy %d vectors..\n", param.nev);
 
      else if(!eigcg_alloc || !dpar->cuda_ritz_alloc) errorQuda("\nEigCG resources were cleaned.\n");
 
-     for(int i = 0; i < param.nev; i++) copy(dpar->cudaRitzVectors->Eigenvec(first_idx+i), Vm->Eigenvec(i));
+     for(int i = 0; i < param.nev; i++) copy(dpar->cudaRitzVectors->Component(first_idx+i), Vm->Component(i));
 
      if(cleanEigCGResources)
      {
@@ -1176,7 +1158,7 @@ namespace quda {
   void IncEigCG::StoreRitzVecs(void *hu, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources)
   {
       const int spinorSize = 24;
-      size_t h_size   = spinorSize*defl_param->ritz_prec*defl_param->cudaRitzVectors->EigvVolume();//WARNING: might be brocken when padding is set!
+      size_t h_size   = spinorSize*defl_param->ritz_prec*defl_param->cudaRitzVectors->ComponentVolume();//WARNING: might be brocken when padding is set!
 
       int nev_to_copy = nev > defl_param->cur_dim ? defl_param->cur_dim : nev;
       if(nev > defl_param->cur_dim) warningQuda("\nWill copy %d eigenvectors (requested %d)\n", nev_to_copy, nev);
@@ -1191,7 +1173,7 @@ namespace quda {
 
           cpuColorSpinorField *tmp = new cpuColorSpinorField(cpuParam);
 
-          *tmp = defl_param->cudaRitzVectors->Eigenvec(i);//copy gpu field
+          *tmp = defl_param->cudaRitzVectors->Component(i);//copy gpu field
 
           delete tmp;
       }
@@ -1415,10 +1397,6 @@ namespace quda {
         ColorSpinorParam cudaParam(*out);
 
         cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-
-        cudaParam.eigv_dim  = 0;
-
-        cudaParam.eigv_id   = -1;
 
         cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam);
 

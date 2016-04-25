@@ -82,9 +82,7 @@ include_directories(.)
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
 cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
-#if(GITVERSION)
-#  ADD_DEPENDENCIES(quda git_version)
-#endif()
+
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 
 

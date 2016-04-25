@@ -1,6 +1,7 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -185,6 +186,11 @@ namespace quda {
     // do nothing
   }
 
+  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    cudaCloverField *c = NULL;
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, c, kappa, a, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
+  }
 
   DiracTwistedMassPC::DiracTwistedMassPC(const DiracTwistedMassPC &dirac) : DiracTwistedMass(dirac) { }
 
@@ -537,5 +543,11 @@ namespace quda {
       }    
     }//end of twist doublet...
     deleteTmp(&tmp1, reset);
+  }
+
+  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+    double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    cudaCloverField *c = NULL;
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, c, kappa, a, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
   }
 } // namespace quda

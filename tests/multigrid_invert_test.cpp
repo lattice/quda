@@ -44,6 +44,7 @@ extern QudaPrecision  prec_precondition;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
+extern double mu;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
@@ -65,6 +66,9 @@ extern QudaSolveType solve_type;
 
 extern char vec_infile[];
 extern char vec_outfile[];
+
+//Twisted mass flavor type
+extern QudaTwistFlavorType twist_flavor;
 
 extern void usage(char** );
 
@@ -161,7 +165,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
@@ -179,6 +183,17 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   //Free field!
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    inv_param.mu = mu;
+    inv_param.twist_flavor = twist_flavor;
+    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
+
+    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      printfQuda("Twisted-mass doublet non supported (yet)\n");
+      exit(0);
+    }
+  }
 
   inv_param.clover_coeff = clover_coeff;
 
@@ -271,7 +286,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
@@ -290,6 +305,17 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
 
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    inv_param.mu = mu;
+    inv_param.twist_flavor = twist_flavor;
+    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
+
+    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      printfQuda("Twisted-mass doublet non supported (yet)\n");
+      exit(0);
+    }
+  }
+
   inv_param.clover_coeff = clover_coeff;
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -300,6 +326,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   // do we want to use an even-odd preconditioned solve or not
   inv_param.solve_type = solve_type;
+  //inv_param.solve_type = QUDA_DIRECT_SOLVE;
   inv_param.matpc_type = matpc_type;
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
@@ -359,7 +386,9 @@ int main(int argc, char **argv)
   // *** QUDA parameters begin here.
 
   if (dslash_type != QUDA_WILSON_DSLASH &&
-      dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
+      dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
+      dslash_type != QUDA_TWISTED_MASS_DSLASH &&
+      dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
@@ -404,7 +433,7 @@ int main(int argc, char **argv)
     
   }
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
@@ -445,7 +474,8 @@ int main(int argc, char **argv)
   loadGaugeQuda((void*)gauge, &gauge_param);
 
   // load the clover term, if desired
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
+  //if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(NULL, NULL, &inv_param);
 
   // setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);
@@ -480,7 +510,7 @@ int main(int argc, char **argv)
     
   printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
   //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
   //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
@@ -491,8 +521,14 @@ int main(int argc, char **argv)
     if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
     } else {
-      printfQuda("Unsupported dslash_type\n");
-      exit(-1);
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {
+          tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
+        } else {
+          printfQuda("Unsupported dslash_type\n");
+          exit(-1);
+        }
+      }
     }
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
@@ -504,8 +540,15 @@ int main(int argc, char **argv)
       wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
 		inv_param.cpu_prec, gauge_param);
     } else {
-      printfQuda("Unsupported dslash_type\n");
-      exit(-1);
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        if (inv_param.twist_flavor == QUDA_TWIST_MINUS || inv_param.twist_flavor == QUDA_TWIST_PLUS) {
+          tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+                   inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+        } else {
+          printfQuda("Unsupported dslash_type\n");
+          exit(-1);
+        }
+      }
     }
     
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
@@ -525,7 +568,7 @@ int main(int argc, char **argv)
 
 
   freeGaugeQuda();
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) freeCloverQuda();
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
 
   // finalize the QUDA library
   endQuda();

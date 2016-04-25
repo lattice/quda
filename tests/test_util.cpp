@@ -1588,6 +1588,7 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
+double mu = 0.1;
 double anisotropy = 1.0;
 double tol = 1e-7;
 double tol_hq = 0.;
@@ -1654,6 +1655,7 @@ void usage(char** argv )
 	 "                                                  For multigrid this sets the smoother type.\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
+  printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
@@ -2142,7 +2144,17 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    mass= atof(argv[i+1]);
+    mass = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mu") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mu = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

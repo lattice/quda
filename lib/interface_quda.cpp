@@ -2193,7 +2193,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   // create the dirac operators for the fine grid
 
   // this is the Dirac operator we use for inter-grid residual computation
-  // at prsent this doesn't support preconditioning
+  // at present this doesn't support preconditioning
   DiracParam diracParam;
   setDiracSloppyParam(diracParam, param, outer_pc_solve);
   d = Dirac::create(diracParam);
