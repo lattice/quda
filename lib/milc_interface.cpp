@@ -905,8 +905,8 @@ void qudaInvert(int external_precision,
     exit(1);
   }
 
-  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-                                     ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
+  //  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
+  //                                 ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
 
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1023,8 +1023,8 @@ void qudaEigCGInvert(int external_precision,
     exit(1);
   }
 
-  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-                                     ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
+  // const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
+  // ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
 
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1076,7 +1076,6 @@ void qudaEigCGInvert(int external_precision,
 
 
   QudaParity local_parity = inv_args.evenodd;
-  //double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
   double& target_res = target_residual;
   double& target_res_hq = target_fermilab_residual;
   const double reliable_delta = 1e-1;
@@ -1511,6 +1510,7 @@ void qudaEigCGCloverInvert(int external_precision,
 
   invertParam.residual_type = (target_residual != 0) ? QUDA_L2_RELATIVE_RESIDUAL : QUDA_HEAVY_QUARK_RESIDUAL;
   invertParam.tol = (target_residual != 0) ? target_residual : target_fermilab_residual;
+  invertParam.reliable_delta = reliable_delta;
 
   //eigcg specific stuff:
   invertParam.rhs_idx = rhs_idx;
