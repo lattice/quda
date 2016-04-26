@@ -4366,7 +4366,7 @@ computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   *num_failures_h = 0;
-  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, num_failures_d, &partialFlops);
+  unitarizeForce(*inForcePtr, *outForcePtr, *gaugePtr, num_failures_d, &partialFlops);
   *flops += partialFlops;
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
