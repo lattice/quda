@@ -573,6 +573,7 @@ void qudaGaugeForce( int precision,
 
 #endif // GPU_GAUGE_FORCE
 
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_CLOVER_DIRAC)
 static int getFatLinkPadding(const int dim[4])
 {
   int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
@@ -580,7 +581,7 @@ static int getFatLinkPadding(const int dim[4])
   padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
   return padding;
 }
-
+#endif
 
 #ifdef GPU_STAGGERED_DIRAC
 // set the params for the single mass solver
