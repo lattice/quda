@@ -752,7 +752,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   CloverFieldParam clover_param;
-  CloverField *in=NULL, *inInv=NULL;
+  CloverField *in=NULL;
+#ifndef DYNAMIC_CLOVER
+  CloverField *inInv=NULL;
+#endif
 
   if(!device_calc){
     // create a param for the cpu clover field

@@ -250,7 +250,7 @@ namespace quda {
     /* We proceed by chiral blocks */
 
     for (int ch = 0; ch < 2; ch++) {	/* Loop over chiral blocks */
-      Float d, diag[6], tmp[6];
+      Float diag[6], tmp[6];
       complex<Float> tri[15];	/* Off-diagonal components of the inverse clover term */
 
       /*	This macro avoid the infinitely long expansion of the tri products	*/
