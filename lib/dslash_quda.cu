@@ -597,7 +597,7 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
 #ifdef GPU_TWISTED_CLOVER_DIRAC
   Tunable *tmClovGamma5 = 0;
 
-  void *clover, *cNorm, *cloverInv, *cNorm2;
+  void *clover=0, *cNorm=0, *cloverInv=0, *cNorm2=0;
   QudaPrecision clover_prec = bindTwistedCloverTex(*clov, *clovInv, parity, &clover, &cNorm, &cloverInv, &cNorm2);
 
   if (in->Precision() != clover_prec)

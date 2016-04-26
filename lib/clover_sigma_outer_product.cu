@@ -16,14 +16,14 @@ namespace quda {
 #include <texture.h>
   }
   
-  template<typename Complex, typename Output, typename InputA, typename InputB>
+  template<typename Float, typename Output, typename InputA, typename InputB>
   struct CloverSigmaOprodArg {
     unsigned int length;
     unsigned int parity;
     InputA inA;
     InputB inB;
     Output oprod;
-    typename RealTypeId<Complex>::Type coeff;
+    Float coeff;
     int mu;
     int nu;
     int count;
@@ -44,9 +44,9 @@ namespace quda {
     }
   };
 
-  template<typename Complex, typename Output, typename InputA, typename InputB>
-  __global__ void sigmaOprodKernel(CloverSigmaOprodArg<Complex, Output, InputA, InputB> arg) {
-    typedef typename RealTypeId<Complex>::Type real;
+  template<typename real, typename Output, typename InputA, typename InputB>
+  __global__ void sigmaOprodKernel(CloverSigmaOprodArg<real, Output, InputA, InputB> arg) {
+    typedef complex<real> Complex;
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
     ColorSpinor<real,3,4> A, B;
@@ -66,12 +66,12 @@ namespace quda {
       result = outerProdSpinTrace(C,B);
 
       if (arg.count > 0) {
-	arg.oprod.load(reinterpret_cast<real*>(temp.data), idx, 0, arg.parity); 
+	arg.oprod.load(reinterpret_cast<real*>(temp.data), idx, 0, arg.parity);
 	temp = arg.coeff*result + temp;
       } else {
 	temp = arg.coeff*result;
       }
-      arg.oprod.save(reinterpret_cast<real*>(temp.data), idx, 0, arg.parity); 
+      arg.oprod.save(reinterpret_cast<real*>(temp.data), idx, 0, arg.parity);
 #if (CUDA_VERSION >= 6000)
       idx += gridDim.x*blockDim.x;
     }
@@ -80,11 +80,11 @@ namespace quda {
   } // sigmaOprodKernel
 
   
-  template<typename Complex, typename Output, typename InputA, typename InputB> 
+  template<typename Float, typename Output, typename InputA, typename InputB>
   class CloverSigmaOprod : public Tunable {
     
   private:
-    CloverSigmaOprodArg<Complex,Output,InputA,InputB> &arg;
+    CloverSigmaOprodArg<Float,Output,InputA,InputB> &arg;
     const GaugeField &meta;
     QudaFieldLocation location; // location of the lattice fields
     
@@ -95,11 +95,11 @@ namespace quda {
     bool tuneGridDim() const { return false; }
     
   public:
-    CloverSigmaOprod(CloverSigmaOprodArg<Complex,Output,InputA,InputB> &arg,
+    CloverSigmaOprod(CloverSigmaOprodArg<Float,Output,InputA,InputB> &arg,
 		     const GaugeField &meta, QudaFieldLocation location)
       : arg(arg), meta(meta), location(location) {
       writeAuxString("prec=%lu,stride=%d,mu=%d,nu=%d", 
-		     sizeof(Complex)/2, arg.inA.Stride(), arg.mu, arg.nu);
+		     sizeof(Float), arg.inA.Stride(), arg.mu, arg.nu);
       // this sets the communications pattern for the packing kernel
     } 
     
@@ -134,12 +134,12 @@ namespace quda {
     }
   }; // CloverSigmaOprod
   
-  template<typename Complex, typename Output, typename InputA, typename InputB>
+  template<typename Float, typename Output, typename InputA, typename InputB>
   void computeCloverSigmaOprodCuda(Output oprod, cudaGaugeField& out, InputA& inA, InputB& inB,
 				   const unsigned int parity, const double coeff, int mu, int nu, int shift) {
     // Create the arguments 
-    CloverSigmaOprodArg<Complex,Output,InputA,InputB> arg(parity, coeff, mu, nu, shift, inA, inB, oprod, out);
-    CloverSigmaOprod<Complex,Output,InputA,InputB> sigma_oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
+    CloverSigmaOprodArg<Float,Output,InputA,InputB> arg(parity, coeff, mu, nu, shift, inA, inB, oprod, out);
+    CloverSigmaOprod<Float,Output,InputA,InputB> sigma_oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
     sigma_oprod.apply(0);
   } // computeCloverSigmaOprodCuda
   
@@ -164,8 +164,8 @@ namespace quda {
       if(x.Precision() == QUDA_DOUBLE_PRECISION){
 	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
 	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
-	computeCloverSigmaOprodCuda<double2>(gauge::FloatNOrder<double, 18, 2, 18>(oprod), 
-					     oprod, spinorA, spinorB, parity, coeff, mu, nu, shift);
+	computeCloverSigmaOprodCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(oprod),
+					    oprod, spinorA, spinorB, parity, coeff, mu, nu, shift);
       } else {
 	errorQuda("Unsupported precision: %d\n", x.Precision());
       }

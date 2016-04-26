@@ -41,10 +41,10 @@ namespace quda {
   };
 
 
-  template <typename Float, typename GaugeOr, typename GaugeDs, typename Float2>
-  __host__ __device__ void computeStaple(GaugeAPEArg<Float,GaugeOr,GaugeDs>& arg, int idx, int parity, int dir, Matrix<Float2,3> &staple) {
+  template <typename Float, typename GaugeOr, typename GaugeDs>
+  __host__ __device__ void computeStaple(GaugeAPEArg<Float,GaugeOr,GaugeDs>& arg, int idx, int parity, int dir, Matrix<complex<Float>,3> &staple) {
 
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Complex;
       // compute spacetime dimensions and parity
 
     int X[4]; 
@@ -70,20 +70,17 @@ namespace quda {
 
       {
         int dx[4] = {0, 0, 0, 0};
-        Matrix<Cmplx,3> U1;
+        Matrix<Complex,3> U1, U2, U3, tmpS;
+
         arg.origin.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity); 
 
-        Matrix<Cmplx,3> U2;
         dx[mu]++;
         arg.origin.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity); 
 
-        Matrix<Cmplx,3> U3;
         dx[mu]--;
         dx[nu]++;
         arg.origin.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity); 
    
-        Matrix<Cmplx,3> tmpS;
-
         tmpS	= U1 * U2;
 	tmpS	= tmpS * conj(U3);
 
@@ -110,7 +107,6 @@ namespace quda {
     __global__ void computeAPEStep(GaugeAPEArg<Float,GaugeOr,GaugeDs> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
       if(idx >= arg.threads) return;
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
 
       int parity = 0;
       if(idx >= arg.threads/2) {
@@ -132,9 +128,9 @@ namespace quda {
 
       int dx[4] = {0, 0, 0, 0};
       for (int dir=0; dir < 3; dir++) {				//Only spatial dimensions are smeared
-        Matrix<Cmplx,3> U, S, TestU, I;
+        Matrix<complex<Float>,3> U, S, TestU, I;
 
-        computeStaple<Float,GaugeOr,GaugeDs,Cmplx>(arg,idx,parity,dir,S);
+        computeStaple<Float,GaugeOr,GaugeDs>(arg,idx,parity,dir,S);
 
         arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity);
 
@@ -142,7 +138,7 @@ namespace quda {
         setIdentity(&I);
 
         TestU  = I*(1.-arg.alpha) + S*conj(U);
-        polarSu3<Cmplx,Float>(TestU, arg.tolerance);
+        polarSu3<Float>(TestU, arg.tolerance);
         U = TestU*U;
 
         arg.dest.save((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity); 

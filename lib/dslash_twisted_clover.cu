@@ -285,7 +285,7 @@ namespace quda {
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
-    void *cloverP, *cloverNormP, *cloverInvP, *cloverInvNormP;
+    void *cloverP=0, *cloverNormP=0, *cloverInvP=0, *cloverInvNormP=0;
     QudaPrecision clover_prec = bindTwistedCloverTex(*clover, *cloverInv, parity, &cloverP, &cloverNormP, &cloverInvP, &cloverInvNormP);
 
     if (in->Precision() != clover_prec)

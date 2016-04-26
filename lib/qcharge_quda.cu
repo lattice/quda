@@ -39,10 +39,9 @@ namespace quda {
           parity = 1;
           idx -= arg.threads/2;
         }
-        typedef typename ComplexTypeId<Float>::Type Cmplx;
 
         // Load the field-strength tensor from global memory
-        Matrix<Cmplx,3> F[6], temp1, temp2, temp3;
+        Matrix<complex<Float>,3> F[6], temp1, temp2, temp3;
         double tmpQ2, tmpQ3;
         for(int i=0; i<6; ++i){
           arg.data.load((Float*)(F[i].data), idx, i, parity);

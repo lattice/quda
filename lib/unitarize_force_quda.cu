@@ -47,9 +47,8 @@ static bool   HOST_REUNIT_SVD_ONLY;
 static double HOST_REUNIT_SVD_REL_ERROR;
 static double HOST_REUNIT_SVD_ABS_ERROR;
 
-
  
-  namespace fermion_force{
+  namespace fermion_force {
 
 
     void setUnitarizeForceConstants(double unitarize_eps_h, double hisq_force_filter_h, 
@@ -225,15 +224,17 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     }
 
 
-    template<class Cmplx>
+    template<class Float>
     __device__ __host__
-    void accumBothDerivatives(Matrix<Cmplx,3>* result, const Matrix<Cmplx,3> & left, const Matrix<Cmplx,3> & right, const Matrix<Cmplx,3> & outer_prod)
+    void accumBothDerivatives(Matrix<complex<Float>,3>* result, const Matrix<complex<Float>,3> &left,
+			      const Matrix<complex<Float>,3> &right, const Matrix<complex<Float>,3> &outer_prod)
     {
-      const typename RealTypeId<Cmplx>::Type temp = 2.0*getTrace(left*outer_prod).x;
+      const Float temp = (2.0*getTrace(left*outer_prod)).real();;
       for(int k=0; k<3; ++k){
 	for(int l=0; l<3; ++l){
 	  // Need to write it this way to get it to work 
 	  // on the CPU. Not sure why.
+	  // FIXME check this is true
 	  result->operator()(k,l).x += temp*right(k,l).x;
 	  result->operator()(k,l).y += temp*right(k,l).y;
 	}
@@ -290,15 +291,15 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
     // Compute the reciprocal square root of the matrix q
     // Also modify q if the eigenvalues are dangerously small.
-    template<class Cmplx> 
+    template<class Float>
     __device__  __host__ 
-    void reciprocalRoot(Matrix<Cmplx,3>* res, DerivativeCoefficients<typename RealTypeId<Cmplx>::Type>* deriv_coeffs, 
-			typename RealTypeId<Cmplx>::Type f[3], Matrix<Cmplx,3> & q, int *unitarization_failed){
+    void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
+			Float f[3], Matrix<complex<Float>,3> & q, int *unitarization_failed){
 
-      Matrix<Cmplx,3> qsq, tempq;
+      Matrix<complex<Float>,3> qsq, tempq;
 
-      typename RealTypeId<Cmplx>::Type c[3];
-      typename RealTypeId<Cmplx>::Type g[3];
+      Float c[3];
+      Float g[3];
 
 #ifdef __CUDA_ARCH__
 #define REUNIT_SVD_ONLY DEV_REUNIT_SVD_ONLY
@@ -314,7 +315,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	c[2] = getTrace(tempq).x/3.0;
 
 	g[0] = g[1] = g[2] = c[0]/3.;
-	typename RealTypeId<Cmplx>::Type r,s,theta;
+	Float r,s,theta;
 	s = c[1]/3. - c[0]*c[0]/18;
 	r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
 
@@ -324,7 +325,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 #define HISQ_UNITARIZE_EPS HOST_HISQ_UNITARIZE_EPS
 #endif
 
-	typename RealTypeId<Cmplx>::Type cosTheta = r/sqrt(s*s*s);
+	Float cosTheta = r/sqrt(s*s*s);
 	if(fabs(s) < HISQ_UNITARIZE_EPS){
 	  cosTheta = 1.;
 	  s = 0.0; 
@@ -364,21 +365,21 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       if(REUNIT_ALLOW_SVD){
 	bool perform_svd = true;
 	if(!REUNIT_SVD_ONLY){
-	  const typename RealTypeId<Cmplx>::Type det = getDeterminant(q).x;
+	  const Float det = getDeterminant(q).x;
 	  if( fabs(det) >= REUNIT_SVD_ABS_ERROR){  
 	    if( checkRelativeError(g[0]*g[1]*g[2],det,REUNIT_SVD_REL_ERROR) ) perform_svd = false;
 	  }
 	}	
 
 	if(perform_svd){	
-	  Matrix<Cmplx,3> tmp2;
+	  Matrix<complex<Float>,3> tmp2;
 	  // compute the eigenvalues using the singular value decomposition
-	  computeSVD<Cmplx>(q,tempq,tmp2,g);
+	  computeSVD<Float>(q,tempq,tmp2,g);
 	  // The array g contains the eigenvalues of the matrix q
 	  // The determinant is the product of the eigenvalues, and I can use this
 	  // to check the SVD
-	  const typename RealTypeId<Cmplx>::Type determinant = getDeterminant(q).x;
-	  const typename RealTypeId<Cmplx>::Type gprod = g[0]*g[1]*g[2];
+	  const Float determinant = getDeterminant(q).x;
+	  const Float gprod = g[0]*g[1]*g[2];
 	  // Check the svd result for errors
 #ifdef __CUDA_ARCH__
 #define MAX_DET_ERROR DEV_MAX_DET_ERROR
@@ -404,7 +405,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 #else
 #define HISQ_FORCE_FILTER HOST_HISQ_FORCE_FILTER
 #endif	
-      typename RealTypeId<Cmplx>::Type delta = getAbsMin(g,3);
+      Float delta = getAbsMin(g,3);
       if(delta < HISQ_FORCE_FILTER){
 	for(int i=0; i<3; ++i){ 
 	  g[i]     += HISQ_FORCE_FILTER; 
@@ -426,7 +427,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       // set the derivative coefficients!
       deriv_coeffs->set(g[0], g[1], g[2]);
 
-      const typename RealTypeId<Cmplx>::Type & denominator  = g[2]*(g[0]*g[1]-g[2]); 
+      const Float& denominator  = g[2]*(g[0]*g[1]-g[2]);
       c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1]))/denominator;
       c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1])/denominator;
       c[2] =  g[0]/denominator;
@@ -448,21 +449,22 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
 
     // "v" denotes a "fattened" link variable
-    template<class Cmplx>
+    template<class Float>
     __device__ __host__
-    void getUnitarizeForceSite(const Matrix<Cmplx,3> & v, const Matrix<Cmplx,3> & outer_prod, Matrix<Cmplx,3>* result, int *unitarization_failed)
+    void getUnitarizeForceSite(const Matrix<complex<Float>,3> & v, const Matrix<complex<Float>,3> & outer_prod,
+			       Matrix<complex<Float>,3>* result, int *unitarization_failed)
     {
-      typename RealTypeId<Cmplx>::Type f[3]; 
-      typename RealTypeId<Cmplx>::Type b[6];
+      typedef Matrix<complex<Float>,3> M;
+      Float f[3];
+      Float b[6];
 
-      Matrix<Cmplx,3> v_dagger = conj(v);  // okay!
-      Matrix<Cmplx,3> q   = v_dagger*v;    // okay!
+      M v_dagger = conj(v);  // okay!
+      M q   = v_dagger*v;    // okay!
+      M rsqrt_q;
 
-      Matrix<Cmplx,3> rsqrt_q;
+      DerivativeCoefficients<Float> deriv_coeffs;
 
-      DerivativeCoefficients<typename RealTypeId<Cmplx>::Type> deriv_coeffs;
-
-      reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed); // approx 529 flops (assumes no SVD)
+      reciprocalRoot<Float>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed); // approx 529 flops (assumes no SVD)
 
       // Pure hack here
       b[0] = deriv_coeffs.getB00();
@@ -472,20 +474,19 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       b[4] = deriv_coeffs.getB12();
       b[5] = deriv_coeffs.getB22();
 
-
-      Matrix<Cmplx,3> & local_result = *result;
+      M & local_result = *result;
 
       local_result = rsqrt_q*outer_prod;
 
       // We are now finished with rsqrt_q
-      Matrix<Cmplx,3> qv_dagger  = q*v_dagger;
-      Matrix<Cmplx,3> vv_dagger  = v*v_dagger; 
-      Matrix<Cmplx,3> vqv_dagger = v*qv_dagger;
-      Matrix<Cmplx,3> temp = f[1]*vv_dagger + f[2]*vqv_dagger;
+      M qv_dagger  = q*v_dagger;
+      M vv_dagger  = v*v_dagger;
+      M vqv_dagger = v*qv_dagger;
+      M temp = f[1]*vv_dagger + f[2]*vqv_dagger;
 
 
       temp = f[1]*v_dagger + f[2]*qv_dagger;
-      Matrix<Cmplx,3> conj_outer_prod = conj(outer_prod);
+      M conj_outer_prod = conj(outer_prod);
 
 
       temp = f[1]*v + f[2]*v*q;
@@ -495,16 +496,16 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
 
       // now done with vv_dagger, I think
-      Matrix<Cmplx,3> qsqv_dagger = q*qv_dagger;
-      Matrix<Cmplx,3> pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
+      M qsqv_dagger = q*qv_dagger;
+      M pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
       accumBothDerivatives(&local_result, v, pv_dagger, outer_prod); // 41 flops
 
-      Matrix<Cmplx,3> rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
-      Matrix<Cmplx,3> vq = v*q;
+      M rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
+      M vq = v*q;
       accumBothDerivatives(&local_result, vq, rv_dagger, outer_prod); // 41 flops
 
-      Matrix<Cmplx,3> sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
-      Matrix<Cmplx,3> vqsq = vq*q;
+      M sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
+      M vqsq = vq*q;
       accumBothDerivatives(&local_result, vqsq, sv_dagger, outer_prod); // 41 flops
       return;
       // 4528 flops - 17 matrix multiplies (198 flops each) + reciprocal root (approx 529 flops) + accumBothDerivatives (41 each) + miscellaneous
@@ -540,13 +541,13 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
 
       // This part of the calculation is always done in double precision
-      Matrix<double2,3> v, result, oprod;
+      Matrix<complex<double>,3> v, result, oprod;
            
       for(int dir=0; dir<4; ++dir){
 	loadLinkVariableFromArray(old_force, dir, mem_idx, HALF_VOLUME, &oprod);
 	loadLinkVariableFromArray(link, dir, mem_idx, HALF_VOLUME, &v);
 
-	getUnitarizeForceSite<double2>(v, oprod, &result, unitarization_failed); 
+	getUnitarizeForceSite<double>(v, oprod, &result, unitarization_failed);
 
 	writeLinkVariableToArray(result, dir, mem_idx, HALF_VOLUME, force); 
       } // 4*4528 flops per site
@@ -558,7 +559,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     {
       
       int num_failures = 0;	
-      Matrix<double2,3> old_force, new_force, v;
+      Matrix<complex<double>,3> old_force, new_force, v;
 
       // I can change this code to make it much more compact
 
@@ -570,12 +571,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	    if(cpuGauge.Precision() == QUDA_SINGLE_PRECISION){
 	      copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
 	      copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+	      getUnitarizeForceSite<double>(v, old_force, &new_force, &num_failures);
 	      copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
 	    }else if(cpuGauge.Precision() == QUDA_DOUBLE_PRECISION){
 	      copyArrayToLink(&old_force, ((double*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
 	      copyArrayToLink(&v, ((double*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+	      getUnitarizeForceSite<double>(v, old_force, &new_force, &num_failures);
 	      copyLinkToArray(((double*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
 	    } // precision?
 	  } // dir
@@ -586,12 +587,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	    if(cpuGauge.Precision() == QUDA_SINGLE_PRECISION){
 	      copyArrayToLink(&old_force, ((float**)(cpuOldForce.Gauge_p()))[dir] + i*18);
 	      copyArrayToLink(&v, ((float**)(cpuGauge.Gauge_p()))[dir] + i*18);
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+	      getUnitarizeForceSite<double>(v, old_force, &new_force, &num_failures);
 	      copyLinkToArray(((float**)(cpuNewForce->Gauge_p()))[dir] + i*18, new_force);
 	    }else if(cpuGauge.Precision() == QUDA_DOUBLE_PRECISION){
 	      copyArrayToLink(&old_force, ((double**)(cpuOldForce.Gauge_p()))[dir] + i*18);
 	      copyArrayToLink(&v, ((double**)(cpuGauge.Gauge_p()))[dir] + i*18);
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
+	      getUnitarizeForceSite<double>(v, old_force, &new_force, &num_failures);
 	      copyLinkToArray(((double**)(cpuNewForce->Gauge_p()))[dir] + i*18, new_force);
 	    }
           }
