@@ -1517,7 +1517,7 @@ namespace quda {
     printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
 
-    unitarizeLinksQuda(data, data, num_failures_dev);
+    unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
       cudaFree(num_failures_dev);
@@ -1674,7 +1674,7 @@ namespace quda {
          #endif*/
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
-        unitarizeLinksQuda(data, data, num_failures_dev);
+        unitarizeLinks(data, data, num_failures_dev);
         qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) {
           cudaFree(num_failures_dev);
@@ -1701,7 +1701,7 @@ namespace quda {
       action0 = action;
     }
     if ((iter % reunit_interval) != 0 )  {
-      unitarizeLinksQuda(data, data, num_failures_dev);
+      unitarizeLinks(data, data, num_failures_dev);
       qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) {
         cudaFree(num_failures_dev);

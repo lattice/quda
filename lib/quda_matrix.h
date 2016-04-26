@@ -147,6 +147,11 @@ namespace quda {
           return data[index<N>(j,k)];
         }
 
+	template<class U>
+	  __device__ __host__ inline void operator=(const Matrix<U,N> & b) {
+	  for(int i=0; i<N*N; i++) data[i] = b.data[i];
+	}
+
     };
 
   template<class T>
