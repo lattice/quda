@@ -34,6 +34,8 @@ namespace quda {
   template <typename Float, typename Fmunu, typename GaugeOrder>
     __host__ __device__ void computeFmunuCore(FmunuArg<Float,Fmunu,GaugeOrder>& arg, int idx) {
 
+      typedef Matrix<complex<Float>,3> M;
+
       // compute spacetime dimensions and parity
       int parity = 0;
       if(idx >= arg.threads/2){
@@ -41,49 +43,43 @@ namespace quda {
         idx -= arg.threads/2;
       }
 
-      int X[4]; 
+      int X[4];
       for(int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
 
       int x[4];
       getCoords(x, idx, X, parity);
 #ifdef MULTI_GPU
       for(int dir=0; dir<4; ++dir){
-           x[dir] += arg.border[dir];
-           X[dir] += 2*arg.border[dir];
+	x[dir] += arg.border[dir];
+	X[dir] += 2*arg.border[dir];
       }
 #endif
 
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
-
       for (int mu=0; mu<4; mu++) {
         for (int nu=0; nu<mu; nu++) {
-          Matrix<Cmplx,3> F;
+          M F;
           setZero(&F);
           { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
+            M U1, U2, U3, U4;
 
             // load U(x)_(+mu)
-            Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
-            arg.gauge.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity); 
+            arg.gauge.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
             // load U(x+mu)_(+nu)
-            Matrix<Cmplx,3> U2;
             dx[mu]++;
-            arg.gauge.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity); 
+            arg.gauge.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
             dx[mu]--;
-   
 
-            Matrix<Cmplx,3> Ftmp = U1 * U2;
+            M Ftmp = U1 * U2;
 
             // load U(x+nu)_(+mu)
-            Matrix<Cmplx,3> U3;
             dx[nu]++;
-            arg.gauge.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity); 
+            arg.gauge.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
             dx[nu]--;
 
             Ftmp = Ftmp * conj(U3) ;
 
             // load U(x)_(+nu)
-            Matrix<Cmplx,3> U4;
             arg.gauge.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity); 
 
             // complete the plaquette
@@ -92,24 +88,22 @@ namespace quda {
 
 
           { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
+            M U1, U2, U3, U4;
 
             // load U(x)_(+nu)
-            Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
             arg.gauge.load((Float*)(U1.data), linkIndexShift(x,dx,X), nu, parity);
 
             // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
-            Matrix<Cmplx,3> U2;
             dx[nu]++;
             dx[mu]--;
             arg.gauge.load((Float*)(U2.data), linkIndexShift(x,dx,X), mu, parity);
             dx[mu]++;
             dx[nu]--;
 
-            Matrix<Cmplx,3> Ftmp =  U1 * conj(U2);
+            M Ftmp =  U1 * conj(U2);
 
             // load U(x-mu)_nu
-            Matrix<Cmplx,3> U3;
             dx[mu]--;
             arg.gauge.load((Float*)(U3.data), linkIndexShift(x,dx,X), nu, 1-parity);
             dx[mu]++;
@@ -117,7 +111,6 @@ namespace quda {
             Ftmp =  Ftmp * conj(U3);
 
             // load U(x)_(-mu) = U(x-mu)_(+mu)
-            Matrix<Cmplx,3> U4;
             dx[mu]--;
             arg.gauge.load((Float*)(U4.data), linkIndexShift(x,dx,X), mu, 1-parity);
             dx[mu]++;
@@ -130,25 +123,22 @@ namespace quda {
           }
 
           { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
-
+            M U1, U2, U3, U4;
 
             // load U(x)_(-nu)
-            Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
             dx[nu]--;
             arg.gauge.load((Float*)(U1.data), linkIndexShift(x,dx,X), nu, 1-parity);
             dx[nu]++;
 
             // load U(x-nu)_(+mu)
-            Matrix<Cmplx,3> U2;
             dx[nu]--;
             arg.gauge.load((Float*)(U2.data), linkIndexShift(x,dx,X), mu, 1-parity);
             dx[nu]++;
 
-            Matrix<Cmplx,3> Ftmp = conj(U1) * U2;
+            M Ftmp = conj(U1) * U2;
 
             // load U(x+mu-nu)_(+nu)
-            Matrix<Cmplx,3> U3;
             dx[mu]++;
             dx[nu]--;
             arg.gauge.load((Float*)(U3.data), linkIndexShift(x,dx,X), nu, parity);
@@ -158,7 +148,6 @@ namespace quda {
             Ftmp = Ftmp * U3;
 
             // load U(x)_(+mu)
-            Matrix<Cmplx,3> U4;
             arg.gauge.load((Float*)(U4.data), linkIndexShift(x,dx,X), mu, parity);
 
             Ftmp = Ftmp * conj(U4);
@@ -168,29 +157,24 @@ namespace quda {
           }
 
           { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
-
+            M U1, U2, U3, U4;
 
             // load U(x)_(-mu)
-            Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
             dx[mu]--;
             arg.gauge.load((Float*)(U1.data), linkIndexShift(x,dx,X), mu, 1-parity);
             dx[mu]++;
 
-
-
             // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
-            Matrix<Cmplx,3> U2;
             dx[mu]--;
             dx[nu]--;
             arg.gauge.load((Float*)(U2.data), linkIndexShift(x,dx,X), nu, parity);
             dx[nu]++;
             dx[mu]++;
 
-            Matrix<Cmplx,3> Ftmp = conj(U1) * conj(U2);
+            M Ftmp = conj(U1) * conj(U2);
 
             // load U(x-nu)_mu
-            Matrix<Cmplx,3> U3;
             dx[mu]--;
             dx[nu]--;
             arg.gauge.load((Float*)(U3.data), linkIndexShift(x,dx,X), mu, parity);
@@ -200,7 +184,6 @@ namespace quda {
             Ftmp = Ftmp * U3;
 
             // load U(x)_(-nu) = U(x-nu)_(+nu)
-            Matrix<Cmplx,3> U4;
             dx[nu]--;
             arg.gauge.load((Float*)(U4.data), linkIndexShift(x,dx,X), nu, 1-parity);
             dx[nu]++;
@@ -319,7 +302,7 @@ namespace quda {
 
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);  
+	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);

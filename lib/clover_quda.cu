@@ -74,19 +74,18 @@ namespace quda {
         parity = 1;
         idx -= arg.threads/2;
       }
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
-
+      typedef complex<Float> Complex;
 
       // Load the field-strength tensor from global memory
-      Matrix<Cmplx,3> F[6];
+      Matrix<Complex,3> F[6];
       for(int i=0; i<6; ++i){
 	arg.f.load((Float*)(F[i].data), idx, i, parity);
       }
 
-      Cmplx I; I.x = 0; I.y = 1.0;
-      Cmplx coeff; coeff.x = 0; coeff.y = arg.cloverCoeff;
-      Matrix<Cmplx,3> block1[2];
-      Matrix<Cmplx,3> block2[2];
+      Complex I; I.x = 0; I.y = 1.0;
+      Complex coeff; coeff.x = 0; coeff.y = arg.cloverCoeff;
+      Matrix<Complex,3> block1[2];
+      Matrix<Complex,3> block2[2];
       block1[0] =  coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops 
       block1[1] =  coeff*(F[0]+F[5]); // 72 floating-point ops 
       block2[0] =  arg.cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
@@ -95,7 +94,7 @@ namespace quda {
 
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
       Float diag[6];
-      Cmplx triangle[15]; 
+      Complex triangle[15];
       Float A[72];
 
       // This uses lots of unnecessary memory

@@ -102,18 +102,18 @@ namespace{
 
   // Compute the reciprocal square root of the matrix q
   // Also modify q if the eigenvalues are dangerously small.
-  template<class Cmplx> 
+  template<class Float>
   __device__  __host__ 
-  bool reciprocalRoot(const Matrix<Cmplx,3>& q, Matrix<Cmplx,3>* res){
+  bool reciprocalRoot(const Matrix<complex<Float>,3>& q, Matrix<complex<Float>,3>* res){
 
-    Matrix<Cmplx,3> qsq, tempq;
+    Matrix<complex<Float>,3> qsq, tempq;
 
-    typename RealTypeId<Cmplx>::Type c[3];
-    typename RealTypeId<Cmplx>::Type g[3];
+    Float c[3];
+    Float g[3];
 
-    const typename RealTypeId<Cmplx>::Type one_third = 0.333333333333333333333;
-    const typename RealTypeId<Cmplx>::Type one_ninth = 0.111111111111111111111;
-    const typename RealTypeId<Cmplx>::Type one_eighteenth = 0.055555555555555555555;
+    const Float one_third = 0.333333333333333333333;
+    const Float one_ninth = 0.111111111111111111111;
+    const Float one_eighteenth = 0.055555555555555555555;
 
     qsq = q*q;
     tempq = qsq*q;
@@ -123,7 +123,7 @@ namespace{
     c[2] = getTrace(tempq).x * one_third;;
 
     g[0] = g[1] = g[2] = c[0] * one_third;
-    typename RealTypeId<Cmplx>::Type r,s,theta;
+    Float r,s,theta;
     s = c[1]*one_third - c[0]*c[0]*one_eighteenth;
 
 #ifdef __CUDA_ARCH__
@@ -142,9 +142,9 @@ namespace{
 #endif
 
 
-    typename RealTypeId<Cmplx>::Type cosTheta; 
+    Float cosTheta;
     if(fabs(s) >= FL_UNITARIZE_EPS){ // faster when this conditional is removed?
-      const typename RealTypeId<Cmplx>::Type rsqrt_s = rsqrt(s);
+      const Float rsqrt_s = rsqrt(s);
       r = c[2]*0.5 - (c[0]*one_third)*(c[1] - c[0]*c[0]*one_ninth);
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
 
@@ -154,10 +154,10 @@ namespace{
 	theta = acos(cosTheta); // this is the primary performance limiter
       }
 
-      const typename RealTypeId<Cmplx>::Type sqrt_s = s*rsqrt_s;
+      const Float sqrt_s = s*rsqrt_s;
 
 #if 0 // experimental version
-      typename RealTypeId<Cmplx>::Type as, ac;
+      Float as, ac;
       sincos( theta*one_third, &as, &ac );
       g[0] = c[0]*one_third + 2*sqrt_s*ac;
       //g[1] = c[0]*one_third + 2*sqrt_s*(ac*cos(1*FL_UNITARIZE_PI23) - as*sin(1*FL_UNITARIZE_PI23));
@@ -173,7 +173,7 @@ namespace{
                 
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
     // return false. Then call SVD instead.
-    typename RealTypeId<Cmplx>::Type det = getDeterminant(q).x;
+    Float det = getDeterminant(q).x;
     if( fabs(det) < FL_REUNIT_SVD_ABS_ERROR ) return false;
     if( checkRelativeError(g[0]*g[1]*g[2],det,FL_REUNIT_SVD_REL_ERROR) == false ) return false;
 
@@ -187,7 +187,7 @@ namespace{
     g[1] = c[0]*c[1] + c[0]*c[2] + c[1]*c[2];
     g[2] = c[0]*c[1]*c[2];
         
-    const typename RealTypeId<Cmplx>::Type & denominator  = 1.0 / ( g[2]*(g[0]*g[1]-g[2]) ); 
+    const Float denominator  = 1.0 / ( g[2]*(g[0]*g[1]-g[2]) );
     c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1])) * denominator;
     c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1]) * denominator;
     c[2] =  g[0] * denominator;
@@ -206,11 +206,11 @@ namespace{
 
 
 
-  template<class Cmplx>
+  template<class Float>
   __host__ __device__
-  bool unitarizeLinkMILC(const Matrix<Cmplx,3>& in, Matrix<Cmplx,3>* const result)
+  bool unitarizeLinkMILC(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result)
   {
-    Matrix<Cmplx,3> u;
+    Matrix<complex<Float>,3> u;
 #ifdef __CUDA_ARCH__
 #define FL_REUNIT_SVD_ONLY  DEV_FL_REUNIT_SVD_ONLY
 #define FL_REUNIT_ALLOW_SVD DEV_FL_REUNIT_ALLOW_SVD
@@ -219,7 +219,7 @@ namespace{
 #define FL_REUNIT_ALLOW_SVD HOST_FL_REUNIT_ALLOW_SVD
 #endif
     if( !FL_REUNIT_SVD_ONLY ){
-      if( reciprocalRoot<Cmplx>(conj(in)*in,&u) ){
+      if( reciprocalRoot<Float>(conj(in)*in,&u) ){
 	*result = in*u;
 	return true;
       }
@@ -229,21 +229,21 @@ namespace{
     // has failed. If SVD is not allowed, the unitarization has failed.
     if( !FL_REUNIT_ALLOW_SVD ) return false;
 
-    Matrix<Cmplx,3> v;
-    typename RealTypeId<Cmplx>::Type singular_values[3];
-    computeSVD<Cmplx>(in, u, v, singular_values);
+    Matrix<complex<Float>,3> v;
+    Float singular_values[3];
+    computeSVD<Float>(in, u, v, singular_values);
     *result = u*conj(v);
     return true;
   } // unitarizeMILC
     
 
-  template<class Cmplx>
+  template<class Float>
   __host__ __device__
-  bool unitarizeLinkSVD(const Matrix<Cmplx,3>& in, Matrix<Cmplx,3>* const result)
+  bool unitarizeLinkSVD(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result)
   {
-    Matrix<Cmplx,3> u, v;
-    typename RealTypeId<Cmplx>::Type singular_values[3];
-    computeSVD<Cmplx>(in, u, v, singular_values); // should pass pointers to u,v I guess	
+    Matrix<complex<Float>,3> u, v;
+    Float singular_values[3];
+    computeSVD<Float>(in, u, v, singular_values); // should pass pointers to u,v I guess
 
     *result = u*conj(v);
 
@@ -263,11 +263,11 @@ namespace{
 #undef FL_MAX_ERROR
 
 
-  template<class Cmplx>
+  template<class Float>
   __host__ __device__
-  bool unitarizeLinkNewton(const Matrix<Cmplx,3>& in, Matrix<Cmplx,3>* const result)
+  bool unitarizeLinkNewton(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result)
   {
-    Matrix<Cmplx,3> u, uinv;
+    Matrix<complex<Float>,3> u, uinv;
     u = in;
 
 #ifdef __CUDA_ARCH__
@@ -297,17 +297,17 @@ namespace{
       errorQuda("Precisions must match (out=%d != in=%d)", outfield.Precision(), infield.Precision());
     
     int num_failures = 0;
-    Matrix<double2,3> inlink, outlink;
+    Matrix<complex<double>,3> inlink, outlink;
       
     for (int i=0; i<infield.Volume(); ++i){
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION){
 	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if( unitarizeLinkNewton<double2>(inlink, &outlink) == false ) num_failures++; 
+	  if( unitarizeLinkNewton<double>(inlink, &outlink) == false ) num_failures++;
 	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink); 
 	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION){
 	  copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if( unitarizeLinkNewton<double2>(inlink, &outlink) == false ) num_failures++; 
+	  if( unitarizeLinkNewton<double>(inlink, &outlink) == false ) num_failures++;
 	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink); 
 	} // precision?
       } // dir
@@ -318,7 +318,7 @@ namespace{
   // CPU function which checks that the gauge field is unitary
   bool isUnitary(const cpuGaugeField& field, double max_error)
   {
-    Matrix<double2,3> link, identity;
+    Matrix<complex<double>,3> link, identity;
       
     for(int i=0; i<field.Volume(); ++i){
       for(int dir=0; dir<4; ++dir){
@@ -361,7 +361,6 @@ namespace{
   __global__ void DoUnitarizedLink(UnitarizeLinksQudaArg<Out,In> arg){
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
     if(idx >= arg.threads) return;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     int parity = 0;
     if(idx >= arg.threads/2) {
       parity = 1;
@@ -373,8 +372,9 @@ namespace{
     getCoords(x, idx, X, parity);
     
     idx = linkIndex(x,X);
-    Matrix<double2,3> v, result;
-    Matrix<Cmplx,3> tmp;
+    // result is always in double precision
+    Matrix<complex<double>,3> v, result;
+    Matrix<complex<Float>,3> tmp;
     for (int mu = 0; mu < 4; mu++) { 
       arg.input.load((Float*)(tmp.data),idx, mu, parity);
       for(int i = 0; i < 9;i++) {
@@ -604,12 +604,11 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
     int parity = blockIdx.y;
     if(idx >= arg.threads) return;
     
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
-    Matrix<Cmplx,3> u;
+    Matrix<complex<Float>,3> u;
 
     for (int mu = 0; mu < 4; mu++) { 
       arg.u.load((Float*)(u.data),idx, mu, parity);
-      polarSu3<Cmplx,Float>(u, arg.tol);
+      polarSu3<Float>(u, arg.tol);
 
       // count number of failures
       if(isUnitary(u, arg.tol) == false) atomicAdd(arg.fails, 1);

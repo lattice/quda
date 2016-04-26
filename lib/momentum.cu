@@ -155,10 +155,9 @@ using namespace gauge;
 
   template<typename Float, typename Mom, typename Force>
   __global__ void UpdateMom(UpdateMomArg<Float, Mom, Force> arg) {
-    typedef typename ComplexTypeId<Float>::Type Complex;
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y;
-    Matrix<Complex,3> m, f;
+    Matrix<complex<Float>,3> m, f;
     while(x<arg.volumeCB){
       for (int d=0; d<4; d++) {
 	arg.mom.load(reinterpret_cast<Float*>(m.data), x, d, parity); 

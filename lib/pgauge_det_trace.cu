@@ -38,12 +38,6 @@ struct KernelArg : public ReduceArg<double2> {
   double2 getValue(){return result_h[0];}
 };
 
-template<class Cmplx>
- __device__ __host__ inline double2 CmplxToDouble2(const Cmplx b){
-  return make_double2(b.x , b.y);
-}
-
-
 
 
 template<int blockSize, typename Float, typename Gauge, int NCOLORS, int functiontype>
@@ -51,12 +45,8 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   int idx = threadIdx.x + blockIdx.x*blockDim.x;
   int parity = threadIdx.y;
 
-  typedef cub::BlockReduce<double2, blockSize> BlockReduce;
-  __shared__ typename BlockReduce::TempStorage temp_storage;
-  
-  double2 val = make_double2(0.0, 0.0);
+  complex<double> val(0.0, 0.0);
   if(idx < arg.threads) {
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     int X[4]; 
     #pragma unroll
     for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
@@ -73,14 +63,15 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   #endif
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
-      Matrix<Cmplx,NCOLORS> U;
+      Matrix<complex<Float>,NCOLORS> U;
       arg.dataOr.load((Float*)(U.data), idx, mu, parity);
-      if(functiontype == 0) val += CmplxToDouble2(getDeterminant(U));
-      if(functiontype == 1) val += CmplxToDouble2(getTrace(U));
+      if(functiontype == 0) val += getDeterminant(U);
+      if(functiontype == 1) val += getTrace(U);
     }
   }
 
-  reduce2d<blockSize,2>(arg, val);
+  double2 sum = make_double2(val.real(), val.imag());
+  reduce2d<blockSize,2>(arg, sum);
 }
 
 
@@ -111,7 +102,7 @@ class CalcFunc : TunableLocalParity {
   TuneKey tuneKey() const {
     std::stringstream vol;
     vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
-    sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+    sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
     return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     
   }
@@ -123,8 +114,8 @@ class CalcFunc : TunableLocalParity {
   }
 
   long long flops() const { 
-    if(NCOLORS==3 && functiontype == 0) return 264LL*2*arg.threads+2LL*tp.block.x ; 
-    if(NCOLORS==3 && functiontype == 1) return 24LL*2*arg.threads+2LL*tp.block.x ; 
+    if(NCOLORS==3 && functiontype == 0) return 264LL*2*arg.threads+2LL*tp.block.x;
+    else if(NCOLORS==3 && functiontype == 1) return 24LL*2*arg.threads+2LL*tp.block.x;
     else return 0; 
   }// Only correct if there is no link reconstruction
   long long bytes() const { return 4LL*NCOLORS * NCOLORS * sizeof(Float)*2*2*arg.threads + tp.block.x * sizeof(double2); }
@@ -174,27 +165,29 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
 template<typename Float, int functiontype>
 double2 computeValue(cudaGaugeField& data) {
 
+  double2 rtn = make_double2(0.0,0.0);
+
   // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-  // Need to fix this!!
   if(data.isNative()) {
     if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
     //printfQuda("QUDA_RECONSTRUCT_NO\n");
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-      return  computeValue<Float, 3, functiontype>(Gauge(data), data);
+      rtn = computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
     //printfQuda("QUDA_RECONSTRUCT_12\n");
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-      return computeValue<Float, 3, functiontype>(Gauge(data), data);
+      rtn = computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
     //printfQuda("QUDA_RECONSTRUCT_8\n");
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-      return computeValue<Float, 3, functiontype>(Gauge(data), data);    
+      rtn = computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else {
       errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
     }
   } else {
     errorQuda("Invalid Gauge Order\n");
   }
+  return rtn;
 }
 #endif // GPU_GAUGE_ALG
 
