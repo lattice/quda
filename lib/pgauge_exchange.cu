@@ -136,6 +136,7 @@ namespace quda {
     }
   }
 
+#ifdef MULTI_GPU
   static void *send[4];
   static void *recv[4];
   static void *sendg[4];
@@ -159,8 +160,7 @@ namespace quda {
   static dim3 block[4];
   static dim3 grid[4];
   static bool notinitialized = true;
-
-
+#endif // MULTI_GPU
 
   /**
    * @brief Release all allocated memory used to exchange data between nodes

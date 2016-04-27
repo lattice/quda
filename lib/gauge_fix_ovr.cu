@@ -203,12 +203,6 @@ namespace quda {
   }
 
 
-
-  static bool checkDimsPartitioned(){
-    if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
-    return false;
-  }
-
   /**
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
@@ -956,7 +950,7 @@ namespace quda {
         faceVolume[dir] = faceVolume_[dir];
         faceVolumeCB[dir] = faceVolumeCB_[dir];
       }
-      if ( checkDimsPartitioned() ) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
+      if ( comm_partitioned() ) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
     }
   };
 
@@ -1142,7 +1136,7 @@ namespace quda {
     }
     GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
     ~GaugeFixBorderPoints () {
-      if ( checkDimsPartitioned() ) for ( int i = 0; i < 2; i++ ) cudaFree(arg.borderpoints[i]);
+      if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) cudaFree(arg.borderpoints[i]);
     }
     void setParity(const int par){
       parity = par;
@@ -1452,7 +1446,7 @@ namespace quda {
     dim3 block[4];
     dim3 grid[4];
 
-    if ( checkDimsPartitioned() ) {
+    if ( comm_partitioned() ) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -1535,7 +1529,7 @@ namespace quda {
         flop += (double)gaugeFix.flops();
         byte += (double)gaugeFix.bytes();
       #else
-        if ( !checkDimsPartitioned() ) {
+        if ( !comm_partitioned() ) {
           gaugeFix.setParity(p);
           gaugeFix.apply(0);
           flop += (double)gaugeFix.flops();
@@ -1632,7 +1626,7 @@ namespace quda {
            flop += (double)gaugeFix.flops();
            byte += (double)gaugeFix.bytes();
            #ifdef MULTI_GPU
-           if(checkDimsPartitioned()){//exchange updated top face links in current parity
+           if(comm_partitioned()){//exchange updated top face links in current parity
            for (int d=0; d<4; d++) {
             if (!commDimPartitioned(d)) continue;
             comm_start(mh_recv_back[d]);
@@ -1722,7 +1716,7 @@ namespace quda {
     }
     cudaFree(num_failures_dev);
   #ifdef MULTI_GPU
-    if ( checkDimsPartitioned() ) {
+    if ( comm_partitioned() ) {
       data.exchangeExtendedGhost(data.R(),false);
       for ( int d = 0; d < 4; d++ ) {
         if ( commDimPartitioned(d)) {

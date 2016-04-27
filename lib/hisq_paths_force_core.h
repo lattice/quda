@@ -891,11 +891,11 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
   int oddBit = threadIdx.y;
 
   int x[4];
-  int dx[4] = {0,0,0,0};
   getCoords(x, sid, kparam.X, oddBit);
 
   int new_sid=sid;
 #ifdef MULTI_GPU
+  int dx[4] = {0,0,0,0};
   x[0] = x[0]+2;
   x[1] = x[1]+2;
   x[2] = x[2]+2;

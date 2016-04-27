@@ -31,9 +31,11 @@ namespace quda {
     }
 
 
+#ifdef MULTI_GPU
   static cudaEvent_t packEnd;
   static cudaEvent_t gatherEnd[4];
   static cudaEvent_t scatterEnd[4];
+#endif
   static cudaEvent_t oprodStart;
   static cudaEvent_t oprodEnd;
 
