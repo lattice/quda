@@ -732,7 +732,7 @@ namespace quda {
       Float2 a;
       Float2 b;
       ReduceType aux;
-      HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux{ } { ; }
 
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 
@@ -771,7 +771,7 @@ namespace quda {
       Float2 a;
       Float2 b;
       ReduceType aux;
-      xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux{ } { ; }
 
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 

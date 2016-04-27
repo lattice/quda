@@ -518,6 +518,12 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const do
   profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
+void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {
+  initLatticeConstants(gauge, profile);
+  initGaugeConstants(gauge, profile);
+  initDslashConstants(profile);
+}
+
 void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
 		   const int dagger, const QudaTwistGamma5Type twist) {
   if (twist == QUDA_TWIST_GAMMA5_DIRECT) {

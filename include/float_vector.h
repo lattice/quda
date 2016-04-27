@@ -191,13 +191,13 @@ namespace quda {
   };
 
   __forceinline__ __host__ __device__ double max_fabs(const double4 &c) {
-    double a = fmaxf(fabsf(c.x), fabsf(c.y));
-    double b = fmaxf(fabsf(c.z), fabsf(c.w));
-    return fmaxf(a, b);
+    double a = fmax(fabs(c.x), fabs(c.y));
+    double b = fmax(fabs(c.z), fabs(c.w));
+    return fmax(a, b);
   };
 
   __forceinline__ __host__ __device__ double max_fabs(const double2 &b) {
-    return fmaxf(fabsf(b.x), fabsf(b.y));
+    return fmax(fabs(b.x), fabs(b.y));
   };
 
   /*

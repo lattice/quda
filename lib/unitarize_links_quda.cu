@@ -28,25 +28,57 @@ namespace{
 #define FL_UNITARIZE_PI23 FL_UNITARIZE_PI*0.66666666666666666666
 #endif 
  
-  __constant__ int DEV_MAX_ITER = 20;
+  static const int max_iter_newton = 20;
+  static const int max_iter = 20;
 
-  static int HOST_MAX_ITER = 20;
+  static double unitarize_eps = 1e-14;
+  static double max_error = 1e-10;
+  static int reunit_allow_svd = 1;
+  static int reunit_svd_only  = 0;
+  static double svd_rel_error = 1e-6;
+  static double svd_abs_error = 1e-6;
 
-  __constant__ double DEV_FL_MAX_ERROR;
-  __constant__ double DEV_FL_UNITARIZE_EPS;
-  __constant__ bool   DEV_FL_REUNIT_ALLOW_SVD;
-  __constant__ bool   DEV_FL_REUNIT_SVD_ONLY;
-  __constant__ double DEV_FL_REUNIT_SVD_REL_ERROR;
-  __constant__ double DEV_FL_REUNIT_SVD_ABS_ERROR;
-  __constant__ bool   DEV_FL_CHECK_UNITARIZATION;
+  template <typename Out, typename In>
+  struct UnitarizeLinksArg {
+    int threads; // number of active threads required
+    int X[4]; // grid dimensions
+    Out output;
+    const In input;
+    int *fails;
+    const int max_iter;
+    const double unitarize_eps;
+    const double max_error;
+    const int reunit_allow_svd;
+    const int reunit_svd_only;
+    const double svd_rel_error;
+    const double svd_abs_error;
+    const static bool check_unitarization = true;
 
-  static double HOST_FL_MAX_ERROR;
-  static double HOST_FL_UNITARIZE_EPS;
-  static bool   HOST_FL_REUNIT_ALLOW_SVD;
-  static bool   HOST_FL_REUNIT_SVD_ONLY;
-  static double HOST_FL_REUNIT_SVD_REL_ERROR;
-  static double HOST_FL_REUNIT_SVD_ABS_ERROR;
-  static bool   HOST_FL_CHECK_UNITARIZATION;
+    UnitarizeLinksArg(Out &output, const In &input, const GaugeField &data, int* fails,
+		      int max_iter, double unitarize_eps, double max_error,
+		      int reunit_allow_svd, int reunit_svd_only, double svd_rel_error,
+		      double svd_abs_error)
+      : output(output), input(input), fails(fails), unitarize_eps(unitarize_eps),
+	max_iter(max_iter), max_error(max_error), reunit_allow_svd(reunit_allow_svd),
+	reunit_svd_only(reunit_svd_only), svd_rel_error(svd_rel_error),
+	svd_abs_error(svd_abs_error)
+    {
+      for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
+      threads = X[0]*X[1]*X[2]*X[3];
+    }
+  };
+
+  void setUnitarizeLinksConstants(double unitarize_eps_, double max_error_,
+				  bool reunit_allow_svd_, bool reunit_svd_only_,
+				  double svd_rel_error_, double svd_abs_error_) {
+    unitarize_eps = unitarize_eps_;
+    max_error = max_error_;
+    reunit_allow_svd = reunit_allow_svd_;
+    reunit_svd_only = reunit_svd_only_;
+    svd_rel_error = svd_rel_error_;
+    svd_abs_error = svd_abs_error_;
+  }
+
 
   template<class Cmplx>
   __device__ __host__
@@ -102,9 +134,9 @@ namespace{
 
   // Compute the reciprocal square root of the matrix q
   // Also modify q if the eigenvalues are dangerously small.
-  template<class Float>
+  template<class Float, typename Arg>
   __device__  __host__ 
-  bool reciprocalRoot(const Matrix<complex<Float>,3>& q, Matrix<complex<Float>,3>* res){
+  bool reciprocalRoot(const Matrix<complex<Float>,3>& q, Matrix<complex<Float>,3>* res, Arg &arg){
 
     Matrix<complex<Float>,3> qsq, tempq;
 
@@ -126,24 +158,8 @@ namespace{
     Float r,s,theta;
     s = c[1]*one_third - c[0]*c[0]*one_eighteenth;
 
-#ifdef __CUDA_ARCH__
-#define FL_UNITARIZE_EPS DEV_FL_UNITARIZE_EPS
-#else
-#define FL_UNITARIZE_EPS HOST_FL_UNITARIZE_EPS
-#endif
-
-
-#ifdef __CUDA_ARCH__
-#define FL_REUNIT_SVD_REL_ERROR DEV_FL_REUNIT_SVD_REL_ERROR
-#define FL_REUNIT_SVD_ABS_ERROR DEV_FL_REUNIT_SVD_ABS_ERROR
-#else // cpu
-#define FL_REUNIT_SVD_REL_ERROR HOST_FL_REUNIT_SVD_REL_ERROR
-#define FL_REUNIT_SVD_ABS_ERROR HOST_FL_REUNIT_SVD_ABS_ERROR
-#endif
-
-
     Float cosTheta;
-    if(fabs(s) >= FL_UNITARIZE_EPS){ // faster when this conditional is removed?
+    if(fabs(s) >= arg.unitarize_eps){ // faster when this conditional is removed?
       const Float rsqrt_s = rsqrt(s);
       r = c[2]*0.5 - (c[0]*one_third)*(c[1] - c[0]*c[0]*one_ninth);
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
@@ -174,8 +190,8 @@ namespace{
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
     // return false. Then call SVD instead.
     Float det = getDeterminant(q).x;
-    if( fabs(det) < FL_REUNIT_SVD_ABS_ERROR ) return false;
-    if( checkRelativeError(g[0]*g[1]*g[2],det,FL_REUNIT_SVD_REL_ERROR) == false ) return false;
+    if( fabs(det) < arg.svd_abs_error) return false;
+    if( checkRelativeError(g[0]*g[1]*g[2],det,arg.svd_rel_error) == false ) return false;
 
 
     // At this point we have finished with the c's 
@@ -206,20 +222,13 @@ namespace{
 
 
 
-  template<class Float>
+  template<class Float, typename Arg>
   __host__ __device__
-  bool unitarizeLinkMILC(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result)
+  bool unitarizeLinkMILC(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result, Arg &arg)
   {
     Matrix<complex<Float>,3> u;
-#ifdef __CUDA_ARCH__
-#define FL_REUNIT_SVD_ONLY  DEV_FL_REUNIT_SVD_ONLY
-#define FL_REUNIT_ALLOW_SVD DEV_FL_REUNIT_ALLOW_SVD
-#else
-#define FL_REUNIT_SVD_ONLY  HOST_FL_REUNIT_SVD_ONLY
-#define FL_REUNIT_ALLOW_SVD HOST_FL_REUNIT_ALLOW_SVD
-#endif
-    if( !FL_REUNIT_SVD_ONLY ){
-      if( reciprocalRoot<Float>(conj(in)*in,&u) ){
+    if( !arg.reunit_svd_only ){
+      if( reciprocalRoot<Float>(conj(in)*in,&u,arg) ){
 	*result = in*u;
 	return true;
       }
@@ -227,7 +236,7 @@ namespace{
 
     // If we've got this far, then the Caley-Hamilton unitarization 
     // has failed. If SVD is not allowed, the unitarization has failed.
-    if( !FL_REUNIT_ALLOW_SVD ) return false;
+    if( !arg.reunit_allow_svd ) return false;
 
     Matrix<complex<Float>,3> v;
     Float singular_values[3];
@@ -239,7 +248,8 @@ namespace{
 
   template<class Float>
   __host__ __device__
-  bool unitarizeLinkSVD(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result)
+  bool unitarizeLinkSVD(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result,
+			const double max_error)
   {
     Matrix<complex<Float>,3> u, v;
     Float singular_values[3];
@@ -247,40 +257,28 @@ namespace{
 
     *result = u*conj(v);
 
-#ifdef __CUDA_ARCH__ 
-#define FL_MAX_ERROR  DEV_FL_MAX_ERROR
-#else 
-#define FL_MAX_ERROR  HOST_FL_MAX_ERROR
-#endif
-    if(isUnitary(*result,FL_MAX_ERROR)==false)
+    if (isUnitary(*result,max_error)==false)
       {
 	printf("ERROR: Link unitarity test failed\n");
-	printf("TOLERANCE: %g\n", FL_MAX_ERROR);
+	printf("TOLERANCE: %g\n", max_error);
 	return false;
       }
     return true;
   }
-#undef FL_MAX_ERROR
 
 
   template<class Float>
   __host__ __device__
-  bool unitarizeLinkNewton(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result)
+  bool unitarizeLinkNewton(const Matrix<complex<Float>,3>& in, Matrix<complex<Float>,3>* const result, int max_iter)
   {
     Matrix<complex<Float>,3> u, uinv;
     u = in;
 
-#ifdef __CUDA_ARCH__
-#define MAX_ITER DEV_MAX_ITER
-#else
-#define MAX_ITER HOST_MAX_ITER
-#endif
-    for(int i=0; i<MAX_ITER; ++i){
+    for(int i=0; i<max_iter; ++i){
       computeMatrixInverse(u, &uinv);
       u = 0.5*(u + conj(uinv));
     }
 
-#undef MAX_ITER	
     if(isUnitarizedLinkConsistent(in,u,0.0000001)==false)
       {
         printf("ERROR: Unitarized link is not consistent with incoming link\n");
@@ -303,11 +301,11 @@ namespace{
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION){
 	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if( unitarizeLinkNewton<double>(inlink, &outlink) == false ) num_failures++;
+	  if( unitarizeLinkNewton<double>(inlink, &outlink, max_iter_newton) == false ) num_failures++;
 	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink); 
 	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION){
 	  copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if( unitarizeLinkNewton<double>(inlink, &outlink) == false ) num_failures++;
+	  if( unitarizeLinkNewton<double>(inlink, &outlink, max_iter_newton) == false ) num_failures++;
 	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink); 
 	} // precision?
       } // dir
@@ -342,23 +340,9 @@ namespace{
     return true;
   } // is unitary
 
-  template <typename Out, typename In>
-  struct UnitarizeLinksQudaArg {
-    int threads; // number of active threads required
-    int X[4]; // grid dimensions
-    Out output;
-    const In input;
-    int *fails;
-    UnitarizeLinksQudaArg(Out &output, const In &input, const GaugeField &data,  int* fails) 
-      : output(output), input(input), fails(fails) {
-      for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
-      threads = X[0]*X[1]*X[2]*X[3];
-    }
-  };
-
 
   template<typename Float, typename Out, typename In>
-  __global__ void DoUnitarizedLink(UnitarizeLinksQudaArg<Out,In> arg){
+  __global__ void DoUnitarizedLink(UnitarizeLinksArg<Out,In> arg){
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
     if(idx >= arg.threads) return;
     int parity = 0;
@@ -377,34 +361,15 @@ namespace{
     Matrix<complex<Float>,3> tmp;
     for (int mu = 0; mu < 4; mu++) { 
       arg.input.load((Float*)(tmp.data),idx, mu, parity);
-      for(int i = 0; i < 9;i++) {
-        v.data[i].x = (double)tmp.data[i].x;
-        v.data[i].y = (double)tmp.data[i].y;
-      }
-      unitarizeLinkMILC(v, &result);
-#ifdef __CUDA_ARCH__
-#define FL_MAX_ERROR DEV_FL_MAX_ERROR
-#define FL_CHECK_UNITARIZATION DEV_FL_CHECK_UNITARIZATION
-#else
-#define FL_MAX_ERROR HOST_FL_MAX_ERROR
-#define FL_CHECK_UNITARIZATION HOST_FL_CHECK_UNITARIZATION
-#endif
-      if(FL_CHECK_UNITARIZATION){
-        if(isUnitary(result,FL_MAX_ERROR) == false)
-	  {
 
-#ifdef __CUDA_ARCH__
-	    atomicAdd(arg.fails, 1);
-#else 
-	    (*arg.fails)++;
-#endif
-	  }
+      v = tmp;
+      unitarizeLinkMILC(v, &result, arg);
+      if (arg.check_unitarization) {
+        if (isUnitary(result,arg.max_error) == false) atomicAdd(arg.fails, 1);
       }
       //WRITE BACK IF FAIL??????????
-      for(int i = 0; i < 9;i++) {
-	tmp.data[i].x = (Float)result.data[i].x;
-	tmp.data[i].y = (Float)result.data[i].y;
-      }
+      tmp = result;
+
       arg.output.save((Float*)(tmp.data),idx, mu, parity); 
     }
   }
@@ -412,8 +377,8 @@ namespace{
 
 
   template<typename Float, typename Out, typename In>
-  class UnitarizeLinksQuda : Tunable {    
-    UnitarizeLinksQudaArg<Out,In> arg;
+  class UnitarizeLinks : Tunable {
+    UnitarizeLinksArg<Out,In> arg;
     
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
@@ -423,7 +388,7 @@ namespace{
     unsigned int minThreads() const { return arg.threads; }
     
   public:
-    UnitarizeLinksQuda(UnitarizeLinksQudaArg<Out,In> &arg) : arg(arg) { }
+    UnitarizeLinks(UnitarizeLinksArg<Out,In> &arg) : arg(arg) { }
     
     
     void apply(const cudaStream_t &stream){
@@ -437,7 +402,7 @@ namespace{
     }
     
     long long flops() const { 
-	  // Accounted only the minimum flops for the case FL_REUNIT_SVD_ONLY=0
+      // Accounted only the minimum flops for the case reunitarize_svd_only=0
       return 4588LL*arg.threads; 
     }
     long long bytes() const { return 4ll * arg.threads * (arg.input.Bytes() + arg.output.Bytes()); }
@@ -455,15 +420,16 @@ namespace{
   
   
   template<typename Float, typename Out, typename In>
-  void unitarizeLinksQuda(Out output,  const In input, const cudaGaugeField& meta, int* fails) {
-    UnitarizeLinksQudaArg<Out,In> arg(output, input, meta, fails);
-    UnitarizeLinksQuda<Float, Out, In> unitlinks(arg) ;
+  void unitarizeLinks(Out output,  const In input, const cudaGaugeField& meta, int* fails) {
+    UnitarizeLinksArg<Out,In> arg(output, input, meta, fails, max_iter, unitarize_eps, max_error,
+				      reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
+    UnitarizeLinks<Float, Out, In> unitlinks(arg) ;
     unitlinks.apply(0);
     cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
   }
   
 template<typename Float>
-void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int* fails) {
+void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fails) {
 
   if( output.isNative() && input.isNative() ) {
     if(output.Reconstruct() == QUDA_RECONSTRUCT_NO) {
@@ -471,13 +437,13 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
 
       if(input.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else if(input.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else if(input.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else {
 	errorQuda("Reconstruction type %d of gauge field not supported", input.Reconstruct());
       }
@@ -487,13 +453,13 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
 
       if(input.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else if(input.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else if(input.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else {
 	errorQuda("Reconstruction type %d of gauge field not supported", input.Reconstruct());
       }
@@ -504,13 +470,13 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
 
       if(input.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else if(input.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else if(input.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type In;
-	unitarizeLinksQuda<Float>(Out(output), In(input), input, fails) ;
+	unitarizeLinks<Float>(Out(output), In(input), input, fails) ;
       } else {
 	errorQuda("Reconstruction type %d of gauge field not supported", input.Reconstruct());
       }
@@ -526,15 +492,15 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
   
 #endif
   
-  void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int* fails) {
+  void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fails) {
 #ifdef GPU_UNITARIZE
     if (input.Precision() != output.Precision()) 
       errorQuda("input (%d) and output (%d) precisions must match", output.Precision(), input.Precision());
 
     if (input.Precision() == QUDA_SINGLE_PRECISION) {
-      unitarizeLinksQuda<float>(output, input, fails);
+      unitarizeLinks<float>(output, input, fails);
     } else if(input.Precision() == QUDA_DOUBLE_PRECISION) {
-      unitarizeLinksQuda<double>(output, input, fails);
+      unitarizeLinks<double>(output, input, fails);
     } else {
       errorQuda("Precision %d not supported", input.Precision());
     }
@@ -543,44 +509,8 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
 #endif
   }
 
-  void unitarizeLinksQuda(cudaGaugeField &links, int* fails) {
-    unitarizeLinksQuda(links, links, fails);
-  }
-
-  void setUnitarizeLinksConstants(double unitarize_eps_h, double max_error_h, 
-				  bool allow_svd_h, bool svd_only_h,
-				  double svd_rel_error_h, double svd_abs_error_h, 
-				  bool check_unitarization_h)
-  {
-#ifdef GPU_UNITARIZE
-    // not_set is only initialised once
-    static bool not_set=true;
-		
-    if(not_set){
-      cudaMemcpyToSymbol(DEV_FL_UNITARIZE_EPS, &unitarize_eps_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_ALLOW_SVD, &allow_svd_h, sizeof(bool));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_ONLY, &svd_only_h, sizeof(bool));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_REL_ERROR, &svd_rel_error_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_ABS_ERROR, &svd_abs_error_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_MAX_ERROR, &max_error_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_CHECK_UNITARIZATION, &check_unitarization_h, sizeof(bool));
-	  
-
-      HOST_FL_UNITARIZE_EPS = unitarize_eps_h;
-      HOST_FL_REUNIT_ALLOW_SVD = allow_svd_h;
-      HOST_FL_REUNIT_SVD_ONLY = svd_only_h;
-      HOST_FL_REUNIT_SVD_REL_ERROR = svd_rel_error_h;
-      HOST_FL_REUNIT_SVD_ABS_ERROR = svd_abs_error_h;
-      HOST_FL_MAX_ERROR = max_error_h;     
-      HOST_FL_CHECK_UNITARIZATION = check_unitarization_h;
-
-      not_set = false;
-    }
-    checkCudaError();
-#else
-    errorQuda("Unitarization has not been built");
-#endif
-    return;
+  void unitarizeLinks(cudaGaugeField &links, int* fails) {
+    unitarizeLinks(links, links, fails);
   }
 
 

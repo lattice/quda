@@ -44,7 +44,7 @@ namespace quda {
   template <typename Float, typename GaugeOr, typename GaugeDs, typename Float2>
   __host__ __device__ void computeStaple(GaugeSTOUTArg<Float,GaugeOr,GaugeDs>& arg, int idx, int parity, int dir, Matrix<Float2,3> &staple) {
 
-    typedef Matrix<complex<Float>,3> M;
+    typedef Matrix<complex<Float>,3> Link;
       // compute spacetime dimensions and parity
 
     int X[4]; 
@@ -70,7 +70,7 @@ namespace quda {
 
       {
         int dx[4] = {0, 0, 0, 0};
-        M U1, U2, U3, U4, tmpS;
+        Link U1, U2, U3, U4, tmpS;
         arg.origin.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity); 
 
         dx[mu]++;
@@ -107,7 +107,7 @@ namespace quda {
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
       if(idx >= arg.threads) return;
       typedef complex<Float> Complex;
-      typedef Matrix<complex<Float>,3> M;
+      typedef Matrix<complex<Float>,3> Link;
 
       int parity = 0;
       if(idx >= arg.threads/2) {
@@ -129,7 +129,7 @@ namespace quda {
 
       int dx[4] = {0, 0, 0, 0};
       for (int dir=0; dir < 3; dir++) {				//Only spatial dimensions are smeared
-        M U, UDag, Stap, Omega, OmegaDag, OmegaDiff, ODT, Q, exp_iQ, tmp1;
+        Link U, UDag, Stap, Omega, OmegaDag, OmegaDiff, ODT, Q, exp_iQ, tmp1;
 	Complex OmegaDiffTr;
 	Complex i_2(0,0.5);
 

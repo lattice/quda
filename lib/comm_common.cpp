@@ -429,3 +429,12 @@ int comm_dim_partitioned(int dim)
 {
   return (manual_set_partition[dim] || (comm_dim(dim) > 1));
 }
+
+int comm_partitioned()
+{
+  int partitioned = 0;
+  for (int i=0; i<4; i++) {
+    partitioned = partitioned || comm_dim_partitioned(i);
+  }
+  return partitioned;
+}

@@ -34,7 +34,7 @@ namespace quda {
   template <typename Float, typename Fmunu, typename GaugeOrder>
     __host__ __device__ void computeFmunuCore(FmunuArg<Float,Fmunu,GaugeOrder>& arg, int idx) {
 
-      typedef Matrix<complex<Float>,3> M;
+      typedef Matrix<complex<Float>,3> Link;
 
       // compute spacetime dimensions and parity
       int parity = 0;
@@ -57,10 +57,10 @@ namespace quda {
 
       for (int mu=0; mu<4; mu++) {
         for (int nu=0; nu<mu; nu++) {
-          M F;
+          Link F;
           setZero(&F);
           { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
-            M U1, U2, U3, U4;
+            Link U1, U2, U3, U4;
 
             // load U(x)_(+mu)
             int dx[4] = {0, 0, 0, 0};
@@ -70,7 +70,7 @@ namespace quda {
             arg.gauge.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
             dx[mu]--;
 
-            M Ftmp = U1 * U2;
+            Link Ftmp = U1 * U2;
 
             // load U(x+nu)_(+mu)
             dx[nu]++;
@@ -88,7 +88,7 @@ namespace quda {
 
 
           { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
-            M U1, U2, U3, U4;
+            Link U1, U2, U3, U4;
 
             // load U(x)_(+nu)
             int dx[4] = {0, 0, 0, 0};
@@ -101,7 +101,7 @@ namespace quda {
             dx[mu]++;
             dx[nu]--;
 
-            M Ftmp =  U1 * conj(U2);
+            Link Ftmp =  U1 * conj(U2);
 
             // load U(x-mu)_nu
             dx[mu]--;
@@ -123,7 +123,7 @@ namespace quda {
           }
 
           { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
-            M U1, U2, U3, U4;
+            Link U1, U2, U3, U4;
 
             // load U(x)_(-nu)
             int dx[4] = {0, 0, 0, 0};
@@ -136,7 +136,7 @@ namespace quda {
             arg.gauge.load((Float*)(U2.data), linkIndexShift(x,dx,X), mu, 1-parity);
             dx[nu]++;
 
-            M Ftmp = conj(U1) * U2;
+            Link Ftmp = conj(U1) * U2;
 
             // load U(x+mu-nu)_(+nu)
             dx[mu]++;
@@ -157,7 +157,7 @@ namespace quda {
           }
 
           { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
-            M U1, U2, U3, U4;
+            Link U1, U2, U3, U4;
 
             // load U(x)_(-mu)
             int dx[4] = {0, 0, 0, 0};
@@ -172,7 +172,7 @@ namespace quda {
             dx[nu]++;
             dx[mu]++;
 
-            M Ftmp = conj(U1) * conj(U2);
+            Link Ftmp = conj(U1) * conj(U2);
 
             // load U(x-nu)_mu
             dx[mu]--;

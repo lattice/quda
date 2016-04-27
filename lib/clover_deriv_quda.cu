@@ -47,7 +47,7 @@ namespace quda {
   cloverDerivativeKernel(Arg arg)
   {
     typedef complex<real> Complex;
-    typedef Matrix<Complex,3> M;
+    typedef Matrix<Complex,3> Link;
 
     int index = threadIdx.x + blockIdx.x*blockDim.x;
 
@@ -70,12 +70,12 @@ namespace quda {
     const int& mu = arg.mu;
     const int& nu = arg.nu;
 
-    M thisForce, otherForce;
+    Link thisForce, otherForce;
 
     // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
     {
       int d[4] = {0, 0, 0, 0};
-      M U1, U2, U3, U4, Oprod1, Oprod2;
+      Link U1, U2, U3, U4, Oprod1, Oprod2;
 
       // load U(x)_(+mu)
       arg.gauge.load((real*)(U1.data), linkIndexShift(x, d, X), mu, arg.parity);
@@ -110,7 +110,7 @@ namespace quda {
  
     {
       int d[4] = {0, 0, 0, 0};
-      M U1, U2, U3, U4, Oprod3, Oprod4;
+      Link U1, U2, U3, U4, Oprod3, Oprod4;
 
       // load U(x)_(+mu)
       arg.gauge.load((real*)(U1.data), linkIndexShift(y, d, X), mu, otherparity);
@@ -151,7 +151,7 @@ namespace quda {
     // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
     {
       int d[4] = {0, 0, 0, 0};
-      M U1, U2, U3, U4, Oprod1, Oprod2;
+      Link U1, U2, U3, U4, Oprod1, Oprod2;
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -190,7 +190,7 @@ namespace quda {
 
     {
       int d[4] = {0, 0, 0, 0};
-      M U1, U2, U3, U4, Oprod1, Oprod4;
+      Link U1, U2, U3, U4, Oprod1, Oprod4;
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -228,14 +228,14 @@ namespace quda {
 
     // Write to array
     {
-      M F;
+      Link F;
       arg.force.load((real*)(F.data), index, mu, arg.parity);
       F += thisForce;
       arg.force.save((real*)(F.data), index, mu, arg.parity);
     }
       
     {
-      M F;
+      Link F;
       arg.force.load((real*)(F.data), index, mu, otherparity);
       F += otherForce;
       arg.force.save((real*)(F.data), index, mu, otherparity);

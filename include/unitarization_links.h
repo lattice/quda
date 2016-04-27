@@ -31,13 +31,12 @@ namespace quda {
 
   void setUnitarizeLinksConstants(double unitarize_eps, double max_error, 
 				  bool allow_svd, bool svd_only,
-				  double svd_rel_error, double svd_abs_error,
-				  bool check_unitarization=true);
+				  double svd_rel_error, double svd_abs_error);
 
   void unitarizeLinksCPU(cpuGaugeField& outfield, const cpuGaugeField &infield);
 
-  void unitarizeLinksQuda(cudaGaugeField& outfield, const cudaGaugeField &infield, int *fails);
-  void unitarizeLinksQuda(cudaGaugeField& outfield, int *fails);
+  void unitarizeLinks(cudaGaugeField& outfield, const cudaGaugeField &infield, int *fails);
+  void unitarizeLinks(cudaGaugeField& outfield, int *fails);
   
   bool isUnitary(const cpuGaugeField& field, double max_error);
 

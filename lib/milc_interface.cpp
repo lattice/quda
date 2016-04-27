@@ -99,7 +99,7 @@ void qudaFinalize()
   endQuda();
   qudamilc_called<false>(__func__);
 }
-
+#ifdef MULTI_GPU
 /**
  *  Implements a lexicographical mapping of node coordinates to ranks,
  *  with t varying fastest.
@@ -114,7 +114,7 @@ static int rankFromCoords(const int *coords, void *fdata)
   }
   return rank;
 }
-
+#endif
 
 void qudaSetLayout(QudaLayout_t input)
 {
@@ -212,13 +212,10 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
   return gParam;
 }
 
-
 static  void invalidateGaugeQuda() {
   freeGaugeQuda();
   invalidate_quda_gauge = true;
 }
-
-#ifdef GPU_FATLINK
 
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
     const double act_path_coeff[6], void* inlink, void* fatlink, void* longlink)
@@ -273,10 +270,6 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
   qudamilc_called<false>(__func__);
 }
 
-#endif
-
-
-#ifdef GPU_HISQ_FORCE
 
 void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coeff[6],
     const void* const staple_src[4], const void* const one_link_src[4], const void* const naik_src[4],
@@ -341,9 +334,7 @@ void qudaComputeOprod(int prec, int num_terms, double** coeff,
   return;
 }
 
-#endif // GPU_HISQ_FORCE
 
-#ifdef GPU_GAUGE_FORCE
 void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
 {
   qudamilc_called<true>(__func__);
@@ -571,7 +562,6 @@ void qudaGaugeForce( int precision,
   return;
 }
 
-#endif // GPU_GAUGE_FORCE
 
 static int getFatLinkPadding(const int dim[4])
 {
@@ -582,7 +572,6 @@ static int getFatLinkPadding(const int dim[4])
 }
 
 
-#ifdef GPU_STAGGERED_DIRAC
 // set the params for the single mass solver
 static void setInvertParams(const int dim[4],
     QudaPrecision cpu_prec,
@@ -905,8 +894,8 @@ void qudaInvert(int external_precision,
     exit(1);
   }
 
-  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-                                     ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
+  //  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
+  //                                 ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
 
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1023,8 +1012,8 @@ void qudaEigCGInvert(int external_precision,
     exit(1);
   }
 
-  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-                                     ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
+  // const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
+  // ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
 
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1076,7 +1065,6 @@ void qudaEigCGInvert(int external_precision,
 
 
   QudaParity local_parity = inv_args.evenodd;
-  //double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
   double& target_res = target_residual;
   double& target_res_hq = target_fermilab_residual;
   const double reliable_delta = 1e-1;
@@ -1118,9 +1106,6 @@ void qudaEigCGInvert(int external_precision,
   return;
 } // qudaEigCGInvert
 
-#endif
-
-#ifdef GPU_CLOVER_DIRAC
 
 static int clover_alloc = 0;
 
@@ -1511,6 +1496,7 @@ void qudaEigCGCloverInvert(int external_precision,
 
   invertParam.residual_type = (target_residual != 0) ? QUDA_L2_RELATIVE_RESIDUAL : QUDA_HEAVY_QUARK_RESIDUAL;
   invertParam.tol = (target_residual != 0) ? target_residual : target_fermilab_residual;
+  invertParam.reliable_delta = reliable_delta;
 
   //eigcg specific stuff:
   invertParam.rhs_idx = rhs_idx;
@@ -1639,9 +1625,6 @@ void qudaCloverMultishiftInvert(int external_precision,
   return;
 } // qudaCloverMultishiftInvert
 
-#endif
-
-#ifdef GPU_GAUGE_ALG
 
 void qudaGaugeFixingOVR( int precision,
     unsigned int gauge_dir,
@@ -1706,7 +1689,5 @@ void qudaGaugeFixingFFT( int precision,
 
   return;
 }
-#endif // BUILD_GAUGE_ALG
-
 
 #endif // BUILD_MILC_INTERFACE

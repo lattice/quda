@@ -37,6 +37,8 @@ extern int device;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
+extern bool tune;
+
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
@@ -81,6 +83,7 @@ static void
 hisq_force_init()
 {
   initQuda(device);
+  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
 
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;
@@ -168,12 +171,12 @@ hisq_force_test()
   cudaMemset(num_failures_dev, 0, sizeof(int));
 
   printfQuda("Calling unitarizeForceCuda\n");
-  fermion_force::unitarizeForceCuda(*cudaOprod, *cudaFatLink, cudaResult, num_failures_dev);
+  fermion_force::unitarizeForce(*cudaResult, *cudaOprod, *cudaFatLink, num_failures_dev);
 
 
   if(verify_results){
     printfQuda("Calling unitarizeForceCPU\n");
-    fermion_force::unitarizeForceCPU(*cpuOprod, *cpuFatLink, cpuResult);
+    fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
   }
 
   cudaResult->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION);

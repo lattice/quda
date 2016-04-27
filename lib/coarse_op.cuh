@@ -1011,7 +1011,7 @@ namespace quda {
 
   public:
     CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta)
-      : TunableVectorY(2), arg(arg), type(type),
+      : TunableVectorY(2), arg(arg), type(COMPUTE_INVALID),
 	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || dirac==QUDA_TWISTED_MASSPC_DIRAC || dirac==QUDA_TWISTED_CLOVERPC_DIRAC ||  bidirectional_debug),
 	meta(meta), dim(0), dir(QUDA_BACKWARDS)
     {
