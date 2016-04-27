@@ -212,13 +212,10 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
   return gParam;
 }
 
-
 static  void invalidateGaugeQuda() {
   freeGaugeQuda();
   invalidate_quda_gauge = true;
 }
-
-#ifdef GPU_FATLINK
 
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
     const double act_path_coeff[6], void* inlink, void* fatlink, void* longlink)
@@ -273,10 +270,6 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
   qudamilc_called<false>(__func__);
 }
 
-#endif
-
-
-#ifdef GPU_HISQ_FORCE
 
 void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coeff[6],
     const void* const staple_src[4], const void* const one_link_src[4], const void* const naik_src[4],
@@ -341,9 +334,7 @@ void qudaComputeOprod(int prec, int num_terms, double** coeff,
   return;
 }
 
-#endif // GPU_HISQ_FORCE
 
-#ifdef GPU_GAUGE_FORCE
 void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
 {
   qudamilc_called<true>(__func__);
@@ -571,9 +562,7 @@ void qudaGaugeForce( int precision,
   return;
 }
 
-#endif // GPU_GAUGE_FORCE
 
-#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_CLOVER_DIRAC)
 static int getFatLinkPadding(const int dim[4])
 {
   int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
@@ -581,9 +570,8 @@ static int getFatLinkPadding(const int dim[4])
   padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
   return padding;
 }
-#endif
 
-#ifdef GPU_STAGGERED_DIRAC
+
 // set the params for the single mass solver
 static void setInvertParams(const int dim[4],
     QudaPrecision cpu_prec,
@@ -1118,9 +1106,6 @@ void qudaEigCGInvert(int external_precision,
   return;
 } // qudaEigCGInvert
 
-#endif
-
-#ifdef GPU_CLOVER_DIRAC
 
 static int clover_alloc = 0;
 
@@ -1640,9 +1625,6 @@ void qudaCloverMultishiftInvert(int external_precision,
   return;
 } // qudaCloverMultishiftInvert
 
-#endif
-
-#ifdef GPU_GAUGE_ALG
 
 void qudaGaugeFixingOVR( int precision,
     unsigned int gauge_dir,
@@ -1707,7 +1689,5 @@ void qudaGaugeFixingFFT( int precision,
 
   return;
 }
-#endif // BUILD_GAUGE_ALG
-
 
 #endif // BUILD_MILC_INTERFACE
