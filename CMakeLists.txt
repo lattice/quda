@@ -163,7 +163,7 @@ endif()
 if(${QUDA_MPI})
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
-  include_directories(${MPI_CXX_INCLUDE_PATH})
+  include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 endif()
 
 if (${QUDA_QMP})
@@ -172,7 +172,7 @@ if (${QUDA_QMP})
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
   FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
-  include_directories(${QUDA_QMPHOME}/include)
+  include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
@@ -181,14 +181,14 @@ if (${QUDA_QIO})
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
   FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
-  include_directories(${QUDA_QIOHOME}/include)
+  include_directories(SYSTEM ${QUDA_QIOHOME}/include)
 endif()
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(MAGMA  magma)
-  include_directories(${MAGMA_INCLUDEDIR})
+  include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
   message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
 endif(QUDA_MAGMA)
@@ -351,6 +351,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 include_directories(include)
 include_directories(lib)
+get_directory_property(CUDA_NVCC_INCLUDE_DIRECTORIES INCLUDE_DIRECTORIES)
+MESSAGE(${CUDA_NVCC_INCLUDE_DIRECTORIES})
 
 # QUDA_HASH for tunecache
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
@@ -390,7 +392,7 @@ endif(QUDA_VERBOSE_BUILD)
 
 
 
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas -O3 -lineinfo CACHE STRING
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING

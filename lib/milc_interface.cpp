@@ -99,7 +99,7 @@ void qudaFinalize()
   endQuda();
   qudamilc_called<false>(__func__);
 }
-
+#ifdef MULTI_GPU
 /**
  *  Implements a lexicographical mapping of node coordinates to ranks,
  *  with t varying fastest.
@@ -114,7 +114,7 @@ static int rankFromCoords(const int *coords, void *fdata)
   }
   return rank;
 }
-
+#endif
 
 void qudaSetLayout(QudaLayout_t input)
 {
