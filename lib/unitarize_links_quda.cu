@@ -68,6 +68,17 @@ namespace{
     }
   };
 
+  void setUnitarizeLinksConstants(double unitarize_eps_, double max_error_,
+				  bool reunit_allow_svd_, bool reunit_svd_only_,
+				  double svd_rel_error_, double svd_abs_error_) {
+    unitarize_eps = unitarize_eps_;
+    max_error = max_error_;
+    reunit_allow_svd = reunit_allow_svd_;
+    reunit_svd_only = reunit_svd_only_;
+    svd_rel_error = svd_rel_error_;
+    svd_abs_error = svd_abs_error_;
+  }
+
 
   template<class Cmplx>
   __device__ __host__
@@ -500,17 +511,6 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
 
   void unitarizeLinks(cudaGaugeField &links, int* fails) {
     unitarizeLinks(links, links, fails);
-  }
-
-  void setUnitarizeLinksConstants(double unitarize_eps_, double max_error_,
-				  bool reunit_allow_svd_, bool reunit_svd_only_,
-				  double svd_rel_error_, double svd_abs_error_) {
-    unitarize_eps = unitarize_eps_;
-    max_error = max_error_;
-    reunit_allow_svd = reunit_allow_svd_;
-    reunit_svd_only = reunit_svd_only_;
-    svd_rel_error = svd_rel_error_;
-    svd_abs_error = svd_abs_error_;
   }
 
 

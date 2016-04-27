@@ -272,7 +272,9 @@ template <template <typename Float, typename FloatN> class Functor,
     errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       const int M = 1;
+#endif
       if (x.Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	Spinor<float4,float4,float4,M,writeX,0> X(x);
