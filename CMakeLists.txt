@@ -392,7 +392,7 @@ endif(QUDA_VERBOSE_BUILD)
 
 
 
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef -O3 -lineinfo CACHE STRING
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING

@@ -385,10 +385,8 @@ int X, x1, x2, x3, x4, xs;
         if dslash4 == True:
             prolog_str += (
 """
-#ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
-#endif
 """)
         prolog_str += (
 """
@@ -444,7 +442,6 @@ X += aux1;
         if dslash4 == True:
           prolog_str+= (
 """
-#ifdef MULTI_GPU
 } else { // exterior kernel
 
 const int dim = static_cast<int>(kernel_type);
@@ -471,7 +468,6 @@ READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
               out += out_re(s,c)+" = "+in_re(s,c)+"; "+out_im(s,c)+" = "+in_im(s,c)+";\n"
           prolog_str+= indent(out)
           prolog_str+= "}\n"
-          prolog_str+= "#endif // MULTI_GPU\n"
 
           if domain_wall:
             if dslash4 == True:

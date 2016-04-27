@@ -191,10 +191,8 @@ int boundaryCrossing;
 
 int X, x1, x2, x3, x4, xs;
 
-#ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
-#endif
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -221,7 +219,6 @@ xs = X/(X1*X2*X3*X4);
  o31_re = 0; o31_im = 0;
  o32_re = 0; o32_im = 0;
 
-#ifdef MULTI_GPU
 } else { // exterior kernel
 
 const int dim = static_cast<int>(kernel_type);
@@ -254,7 +251,6 @@ READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
  o31_re = i31_re; o31_im = i31_im;
  o32_re = i32_re; o32_im = i32_im;
 }
-#endif // MULTI_GPU
 
 // declare G## here and use ASSN below instead of READ
 #ifdef GAUGE_FLOAT2
