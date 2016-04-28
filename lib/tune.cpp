@@ -117,10 +117,11 @@ namespace quda {
   /**
    * Serialize tunecache to an ostream, useful for writing to a file or sending to other nodes.
    */
-  static void serializeProfile(std::ostream &out)
+  static void serializeProfile(std::ostream &out, std::ostream &async_out)
   {
     map::iterator entry;
     double total_time = 0.0;
+    double async_total_time = 0.0;
 
     // first let's sort the entries in decreasing order of significance
     typedef std::pair<TuneKey, TuneParam> profile_t;
@@ -136,6 +137,7 @@ namespace quda {
       strncpy(tmp, key.aux, 6);
       bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
       if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
+      if (param.n_calls > 0 && is_policy) async_total_time += param.n_calls * param.time;
     }
 
 
@@ -146,6 +148,8 @@ namespace quda {
       char tmp[7];
       strncpy(tmp, key.aux,6);
       bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+
+      // synchronous profile
       if (param.n_calls > 0 && !is_policy) {
 	double time = param.n_calls * param.time;
 
@@ -154,10 +158,20 @@ namespace quda {
 	out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
       }
 
+      // async policy profile
+      if (param.n_calls > 0 && is_policy) {
+	double time = param.n_calls * param.time;
+
+	async_out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / async_total_time) * 100 << "\t";
+	async_out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16) << key.volume << "\t";
+	async_out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
+      }
+
       q.pop();
     }
 
     out << std::endl << "# Total time spent in kernels = " << total_time << " seconds" << std::endl;
+    async_out << std::endl << "# Total time spent in asynchronous execution = " << async_total_time << " seconds" << std::endl;
   }
 
 
@@ -348,8 +362,8 @@ namespace quda {
   {
     time_t now;
     int lock_handle;
-    std::string lock_path, profile_path;
-    std::ofstream profile_file;
+    std::string lock_path, profile_path, async_profile_path;
+    std::ofstream profile_file, async_profile_file;
 
     if (resource_path.empty()) return;
 
@@ -373,6 +387,7 @@ namespace quda {
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
       char *profile_fname = getenv("QUDA_PROFILE_OUTPUT");
+      char *async_profile_fname = getenv("QUDA_ASYNC_PROFILE_OUTPUT");
 
       if (!profile_fname) {
 	warningQuda("Environment variable QUDA_PROFILE_OUTPUT is not set; writing to profile.tsv");
@@ -382,9 +397,18 @@ namespace quda {
       }
       profile_file.open(profile_path.c_str());
 
+      if (!async_profile_fname) {
+	warningQuda("Environment variable QUDA_ASYNC_PROFILE_OUTPUT is not set; writing to async_profile.tsv");
+	async_profile_path = resource_path + "/async_profile.tsv";
+      } else {
+	async_profile_path = resource_path + "/" + async_profile_fname;
+      }
+      async_profile_file.open(async_profile_path.c_str());
+
       if (verbosity >= QUDA_SUMMARIZE) {
 	// compute number of non-zero entries that will be output in the profile
 	int n_entry = 0;
+	int n_policy = 0;
 	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
 	  // if a policy entry, then we can ignore
 	  char tmp[6];
@@ -392,23 +416,37 @@ namespace quda {
 	  TuneParam param = entry->second;
 	  bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
 	  if (param.n_calls > 0 && !is_policy) n_entry++;
+	  if (param.n_calls > 0 && is_policy) n_policy++;
 	}
 
 	printfQuda("Saving %d sets of cached parameters to %s\n", n_entry, profile_path.c_str());
+	printfQuda("Saving %d sets of cached profiles to %s\n", n_policy, async_profile_path.c_str());
       }
 
       time(&now);
 
       profile_file << "profile\t" << quda_version;
 #ifdef GITVERSION
-       profile_file << "\t" << gitversion;
+      profile_file << "\t" << gitversion;
 #else
-       profile_file << "\t" << quda_version;
+      profile_file << "\t" << quda_version;
 #endif
       profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(16) << "volume" << "\tname\taux\tcomment" << std::endl;
-      serializeProfile(profile_file);
+
+      async_profile_file << "profile\t" << quda_version;
+#ifdef GITVERSION
+      async_profile_file << "\t" << gitversion;
+#else
+      async_profile_file << "\t" << quda_version;
+#endif
+      async_profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
+      async_profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(16) << "volume" << "\tname\taux\tcomment" << std::endl;
+
+      serializeProfile(profile_file, async_profile_file);
+
       profile_file.close();
+      async_profile_file.close();
 
       // Release lock.
       close(lock_handle);
