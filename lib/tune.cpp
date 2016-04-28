@@ -386,23 +386,17 @@ namespace quda {
       int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
-      char *profile_fname = getenv("QUDA_PROFILE_OUTPUT");
-      char *async_profile_fname = getenv("QUDA_ASYNC_PROFILE_OUTPUT");
+      char *profile_fname = getenv("QUDA_PROFILE_OUTPUT_BASE");
 
       if (!profile_fname) {
-	warningQuda("Environment variable QUDA_PROFILE_OUTPUT is not set; writing to profile.tsv");
+	warningQuda("Environment variable QUDA_PROFILE_OUTPUT_BASE is not set; writing to profile.tsv and profile_async.tsv");
 	profile_path = resource_path + "/profile.tsv";
+	async_profile_path = resource_path + "/profile_async.tsv";
       } else {
-	profile_path = resource_path + "/" + profile_fname;
+	profile_path = resource_path + "/" + profile_fname + ".tsv";
+	async_profile_path = resource_path + "/" + profile_fname + "_async.tsv";
       }
       profile_file.open(profile_path.c_str());
-
-      if (!async_profile_fname) {
-	warningQuda("Environment variable QUDA_ASYNC_PROFILE_OUTPUT is not set; writing to async_profile.tsv");
-	async_profile_path = resource_path + "/async_profile.tsv";
-      } else {
-	async_profile_path = resource_path + "/" + async_profile_fname;
-      }
       async_profile_file.open(async_profile_path.c_str());
 
       if (verbosity >= QUDA_SUMMARIZE) {
