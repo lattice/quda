@@ -11,48 +11,31 @@
 
 //namespace quda{
 
+// FIXME replace this with hypot
 template<class Cmplx> 
 inline DEVICEHOST
-typename RealTypeId<Cmplx>::Type cabs(const Cmplx & z)
+typename std::remove_reference<decltype(Cmplx::x)>::type cabs(const Cmplx & z)
 {
-  typename RealTypeId<Cmplx>::Type max, ratio, square;
+  typedef typename std::remove_reference<decltype(Cmplx::x)>::type real;
+  real max, ratio, square;
   if(fabs(z.x) > fabs(z.y)){ max = z.x; ratio = z.y/max; }else{ max=z.y; ratio = z.x/max; }
   square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
 
-/*
-   template<class Cmplx>
-   inline DEVICEHOST
-   typename RealTypeId<Cmplx>::Type cabs(const Cmplx & z)
-   {
-   return sqrt(z.x*z.x + z.y*z.y);
-   }
-   */
-
 template<class T, class U> 
 inline DEVICEHOST typename PromoteTypeId<T,U>::Type quadSum(const T & a, const U & b){
   typename PromoteTypeId<T,U>::Type ratio, square, max;
-  if(fabs(a) > fabs(b)){ max = a; ratio = b/a; }else{ max=b; ratio = a/b; }
+  if (fabs(a) > fabs(b)) { max = a; ratio = b/a; } else { max=b; ratio = a/b; }
   square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
-/*
-   template<class T, class U>
-   inline DEVICEHOST
-   T quadSum(const T & a, const U & b)
-   {
-   return sqrt(a*a + b*b);
-   }
-   */
-
-
 
 // In future iterations of the code, I would like to use templates to compute the norm
 DEVICEHOST
-inline float getNorm(const Array<float2,3>& a){
+inline float getNorm(const Array<complex<float>,3>& a){
   float temp1, temp2, temp3;
   temp1 = cabs(a[0]);
   temp2 = cabs(a[1]);
@@ -63,7 +46,7 @@ inline float getNorm(const Array<float2,3>& a){
 
 
 DEVICEHOST
-inline double getNorm(const Array<double2,3>& a){
+inline double getNorm(const Array<complex<double>,3>& a){
   double temp1, temp2, temp3;
   temp1 = cabs(a[0]);
   temp2 = cabs(a[1]);
@@ -80,7 +63,7 @@ void constructHHMat(const T & tau, const Array<T,3> & v, Matrix<T,3> & hh)
   Matrix<T,3> temp1, temp2;
   outerProd(v,v,&temp1);
 
-  temp2 = Conj(tau)*temp1;    
+  temp2 = conj(tau)*temp1;
 
   setIdentity(&temp1);
 
@@ -272,27 +255,27 @@ void smallSVD(Matrix<Real,2> & u, Matrix<Real,2> & v, Matrix<Real,2> & m){
 
 // Change this so that the bidiagonal terms are not returned 
 // as a complex matrix
-template<class Cmplx>
+template<class Float>
   DEVICEHOST
-void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat, 
-    Matrix<Cmplx,3> & u,
-    Matrix<Cmplx,3> & v)
+void getRealBidiagMatrix(const Matrix<complex<Float>,3> &mat, Matrix<complex<Float>,3> &u, Matrix<complex<Float>,3> &v)
 {
-  Matrix<Cmplx,3> p;
-  Array<Cmplx,3> vec;
-  Matrix<Cmplx,3> temp;
+  typedef complex<Float> Complex;
+
+  Matrix<Complex,3> p;
+  Array<Complex,3> vec;
+  Matrix<Complex,3> temp;
 
 
-  const Cmplx COMPLEX_UNITY = makeComplex<Cmplx>(1,0);
-  const Cmplx COMPLEX_ZERO  = makeComplex<Cmplx>(0,0);
+  const Complex COMPLEX_UNITY(1.0,0.0);
+  const Complex COMPLEX_ZERO = 0.0;
   // Step 1: build the first left reflector v,
   //	      calculate the first left rotation
   //	      apply to the original matrix
-  typename RealTypeId<Cmplx>::Type x = cabs(mat(1,0));
-  typename RealTypeId<Cmplx>::Type y = cabs(mat(2,0));
-  typename RealTypeId<Cmplx>::Type norm1 = quadSum(x,y);
-  typename RealTypeId<Cmplx>::Type beta;
-  Cmplx w, tau, z;
+  Float x = cabs(mat(1,0));
+  Float y = cabs(mat(2,0));
+  Float norm1 = quadSum(x,y);
+  Float beta;
+  Complex w, tau, z;
 
   // Set them to values that would never be set.  If at the end of the
   // below algorithmic flow, these values have been preserved then we
@@ -303,15 +286,15 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   if(norm1 == 0 && mat(0,0).y == 0){
     p = mat;
   }else{
-    Array<Cmplx,3> temp_vec;
+    Array<Complex,3> temp_vec;
     copyColumn(mat, 0, &temp_vec);
 
     beta = (mat(0,0).x > 0.0) ? -getNorm(temp_vec) : getNorm(temp_vec);
 
     w.x = mat(0,0).x - beta; // work around for LLVM
     w.y = mat(0,0).y;
-    typename RealTypeId<Cmplx>::Type norm1_inv = 1.0/cabs(w);
-    w = Conj(w)*norm1_inv; 
+    Float norm1_inv = 1.0/cabs(w);
+    w = conj(w)*norm1_inv;
 
     // Assign the vector elements
     vec[0] = COMPLEX_UNITY; 
@@ -328,7 +311,7 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   }
 
   // Step 2: build the first right reflector
-  typename RealTypeId<Cmplx>::Type norm2 = cabs(p(0,2));
+  Float norm2 = cabs(p(0,2));
   if(norm2 != 0.0 || p(0,1).y != 0.0){
     norm1 = cabs(p(0,1));
     beta  = (p(0,1).x > 0.0) ? -quadSum(norm1,norm2) : quadSum(norm1,norm2);
@@ -337,10 +320,10 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
 
     w.x = p(0,1).x-beta; // work around for LLVM
     w.y = p(0,1).y;
-    typename RealTypeId<Cmplx>::Type norm1_inv = 1.0/cabs(w);
-    w = Conj(w)*norm1_inv; 
-    z = Conj(p(0,2))*norm1_inv;
-    vec[2] = z*Conj(w);
+    Float norm1_inv = 1.0/cabs(w);
+    w = conj(w)*norm1_inv;
+    z = conj(p(0,2))*norm1_inv;
+    vec[2] = z*conj(w);
 
     tau.x = (beta - p(0,1).x)/beta; // work around for LLVM
     tau.y = (- p(0,1).y)/beta;
@@ -362,8 +345,8 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
 
     w.x = p(1,1).x - beta; // work around for LLVM
     w.y = p(1,1).y;
-    typename RealTypeId<Cmplx>::Type norm1_inv = 1.0/cabs(w);
-    w = Conj(w)*norm1_inv;
+    Float norm1_inv = 1.0/cabs(w);
+    w = conj(w)*norm1_inv;
     z = p(2,1)*norm1_inv;
     vec[2] = z*w;
 
@@ -382,7 +365,7 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   setIdentity(&temp);
   if( p(1,2).y != 0.0 ){
     beta = p(1,2).x > 0.0 ? -cabs(p(1,2)) : cabs(p(1,2));
-    temp(2,2) = Conj(p(1,2))/beta;
+    temp(2,2) = conj(p(1,2))/beta;
     p(2,2) = p(2,2)*temp(2,2); // This is the only element of p needed below
     v = v*temp;
   }
@@ -632,21 +615,18 @@ void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
 
 
 
-template<class Cmplx>
+template<class Float>
   DEVICEHOST
-void computeSVD(const Matrix<Cmplx,3> & m, 
-    Matrix<Cmplx,3>&  u,
-    Matrix<Cmplx,3>&  v,
-    typename RealTypeId<Cmplx>::Type singular_values[3])
+void computeSVD(const Matrix<complex<Float>,3> & m, Matrix<complex<Float>,3>&  u,
+		Matrix<complex<Float>,3>& v,  Float singular_values[3])
 {
+  getRealBidiagMatrix<Float>(m, u, v);
 
-  getRealBidiagMatrix<Cmplx>(m, u, v);
-
-  Matrix<typename RealTypeId<Cmplx>::Type,3> bd, u_real, v_real;
+  Matrix<Float,3> bd, u_real, v_real;
   // Make real
   for(int i=0; i<3; ++i){
     for(int j=0; j<3; ++j){
-      bd(i,j) = (conj(u)*m*(v))(i,j).x;
+      bd(i,j) = (conj(u)*m*(v))(i,j).real();
     }
   }
 

@@ -752,7 +752,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   CloverFieldParam clover_param;
-  CloverField *in=NULL, *inInv=NULL;
+  CloverField *in=NULL;
+#ifndef DYNAMIC_CLOVER
+  CloverField *inInv=NULL;
+#endif
 
   if(!device_calc){
     // create a param for the cpu clover field
@@ -3575,7 +3578,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 {
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-  // Initialize unitarization parameters
+
   if(ulink){
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
@@ -3681,7 +3684,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
     profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
-    quda::unitarizeLinksQuda(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
+    quda::unitarizeLinks(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
     profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     if(*num_failures_h>0){
@@ -4710,7 +4713,7 @@ computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   *num_failures_h = 0;
-  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, num_failures_d, &partialFlops);
+  unitarizeForce(*inForcePtr, *outForcePtr, *gaugePtr, num_failures_d, &partialFlops);
   *flops += partialFlops;
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 

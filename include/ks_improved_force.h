@@ -37,16 +37,15 @@ namespace quda {
 				     double svd_rel_error,
 				     double svd_abs_error);
 
-  void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
-                          cudaGaugeField &cudaGauge,
-                          cudaGaugeField *cudaNewForce,
-			  int* unitarization_failed, 
-			  long long* flops = NULL);
+  void unitarizeForce(cudaGaugeField &newForce,
+		      const cudaGaugeField &oldForce,
+		      const cudaGaugeField &gauge,
+		      int* unitarization_failed,
+		      long long* flops = NULL);
 
-  void unitarizeForceCPU( cpuGaugeField &cpuOldForce,
-                          cpuGaugeField &cpuGauge,
-                          cpuGaugeField *cpuNewForce);
-
+  void unitarizeForceCPU( cpuGaugeField &newForce,
+			  const cpuGaugeField &oldForce,
+                          const cpuGaugeField &gauge);
 
  } // namespace fermion_force
 }  // namespace quda

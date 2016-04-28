@@ -211,7 +211,7 @@ unitarize_link_test()
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
-  unitarizeLinksQuda(*cudaULink, *cudaFatLink, num_failures_dev);
+  unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_dev);
   cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 

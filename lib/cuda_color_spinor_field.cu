@@ -12,9 +12,9 @@
 #include <dslash_quda.h>
 
 #ifdef DEVICE_PACK
-#define REORDER_LOCATION QUDA_CUDA_FIELD_LOCATION
+static const QudaFieldLocation reorder_location = QUDA_CUDA_FIELD_LOCATION;
 #else
-#define REORDER_LOCATION QUDA_CPU_FIELD_LOCATION
+static const QudaFieldLocation reorder_location = QUDA_CPU_FIELD_LOCATION;
 #endif
 
 int zeroCopy = 0;
@@ -509,7 +509,7 @@ namespace quda {
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
-    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
+    if (reorder_location == QUDA_CPU_FIELD_LOCATION &&
 	typeid(src) == typeid(cpuColorSpinorField)) {
       for (int b=0; b<2; ++b) {
         resizeBufferPinned(bytes + norm_bytes, b);
@@ -551,7 +551,7 @@ namespace quda {
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
-    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
+    if (reorder_location == QUDA_CPU_FIELD_LOCATION &&
 	typeid(dest) == typeid(cpuColorSpinorField)) {
       for (int b=0; b<2; ++b) resizeBufferPinned(bytes+norm_bytes,b);
       qudaMemcpy(bufferPinned[bufferIndex], v, bytes, cudaMemcpyDeviceToHost);

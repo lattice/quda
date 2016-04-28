@@ -416,7 +416,7 @@ int main(int argc, char **argv)
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-  void *gauge[4], *clover_inv=0, *clover=0;
+  void *gauge[4], *clover_inv=0;//, *clover=0;
 
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
@@ -449,12 +449,12 @@ int main(int argc, char **argv)
                          (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
                           inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC);
     if (!preconditioned) {
-      clover = clover_inv;
+      //clover = clover_inv;
       clover_inv = NULL;
     } else if (asymmetric) { // fake it by using the same random matrix
-      clover = clover_inv;   // for both clover and clover_inv
+      //clover = clover_inv;   // for both clover and clover_inv
     } else {
-      clover = NULL;
+      //clover = NULL;
     }
   }
 

@@ -250,7 +250,7 @@ namespace quda {
     /* We proceed by chiral blocks */
 
     for (int ch = 0; ch < 2; ch++) {	/* Loop over chiral blocks */
-      Float d, diag[6], tmp[6];
+      Float diag[6], tmp[6];
       complex<Float> tri[15];	/* Off-diagonal components of the inverse clover term */
 
       /*	This macro avoid the infinitely long expansion of the tri products	*/
@@ -1011,7 +1011,7 @@ namespace quda {
 
   public:
     CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta)
-      : TunableVectorY(2), arg(arg), type(type),
+      : TunableVectorY(2), arg(arg), type(COMPUTE_INVALID),
 	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || dirac==QUDA_TWISTED_MASSPC_DIRAC || dirac==QUDA_TWISTED_CLOVERPC_DIRAC ||  bidirectional_debug),
 	meta(meta), dim(0), dir(QUDA_BACKWARDS)
     {

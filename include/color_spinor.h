@@ -27,7 +27,7 @@ namespace quda {
     struct ColorSpinor<Float, Nc, 4> {
     static const int Ns = 4;
     complex<Float> data[Nc*4];
-    
+
     __device__ __host__ ColorSpinor<Float, Nc, 4>() {
       for (int i=0; i<Nc*Ns; i++) {
 	data[i] = 0;
@@ -473,10 +473,9 @@ namespace quda {
      @return The spin traced matrix
   */
   template<typename Float, int Nc, int Ns> __device__ __host__
-    Matrix< typename ComplexTypeId<Float>::Type ,Nc> outerProdSpinTrace(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b) {
+    Matrix<complex<Float>,Nc> outerProdSpinTrace(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b) {
 
-    typedef typename ComplexTypeId<Float>::Type complex_type;
-    Matrix<complex_type,Nc> out;
+    Matrix<complex<Float>,Nc> out;
     for (int i=0; i<Nc; i++) {
       for(int j=0; j<Nc; j++) {
 	out(i,j) = make_double2(0.0, 0.0);
@@ -487,14 +486,13 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       // outer product over color
       for (int i=0; i<Nc; i++) {
-        for(int j=0; j<Nc; j++) {
+	for(int j=0; j<Nc; j++) {
 	  out(j,i) += a(s,j) * conj(b(s,i));
 	}
       }
     }
     return out;
   }
-
 
   
 } // namespace quda

@@ -93,16 +93,17 @@ namespace quda {
     return;
   }
   
+#if 0
   ImpRstLanczos::ImpRstLanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile) :
     Eig_Solver(eigParam, profile), ritz_mat(ritz_mat)
-  {
-  }
+  { }
 
-  ImpRstLanczos::~ImpRstLanczos() 
-  {
-  }
+  ImpRstLanczos::~ImpRstLanczos()
+  { }
 
-  void ImpRstLanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m) 
-  {
-  }
+  void ImpRstLanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec,
+				 cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m)
+  { }
+#endif
+
 } // namespace quda

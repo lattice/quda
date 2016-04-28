@@ -1,3 +1,5 @@
+#include<type_traits>
+
 
 //macro KERNEL_ENABLED is used to control compile time, debug purpose only
 #if (PRECISION == 0 && RECON == 18)
@@ -90,7 +92,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive>
                      RealA* const newOprodEven, RealA* const newOprodOdd,
                      hisq_kernel_param_t kparam) 
 {
-
+  typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+  typedef complex<real> Complex;
 
   int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -100,9 +103,8 @@ template<class RealA, class RealB, int sig_positive, int mu_positive>
 
   getCoords(x, sid, kparam.D, oddBit);
 
-
-  Matrix<RealA,3> Uab, Ubc, Uad;
-  Matrix<RealA,3> Ow, Ox, Oy;
+  Matrix<Complex,3> Uab, Ubc, Uad;
+  Matrix<Complex,3> Ow, Ox, Oy;
 
 
   /*        A________B
@@ -255,16 +257,16 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam) 
 {
+  typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+  typedef complex<real> Complex;
 
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
   int oddBit = threadIdx.y;
 
 
-  Matrix<RealA,3> Uab, Ubc, Uad;
-  Matrix<RealA,3> Ow, Ox, Oy;
-
-
+  Matrix<Complex,3> Uab, Ubc, Uad;
+  Matrix<Complex,3> Ow, Ox, Oy;
 
 
   /*        A________B
@@ -440,18 +442,16 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
+  typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+  typedef complex<real> Complex;
+
   int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
-
   int x[4];
   int dx[4] = {0,0,0,0};
   getCoords(x, sid, kparam.D, oddBit);
-
-
-
-
 
 #ifdef MULTI_GPU
   int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
@@ -466,14 +466,8 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   int new_sid = sid;
 #endif
 
-
-
-  Matrix<RealA,3> Uad;
-  Matrix<RealA,3> Ow, Ox, Oy;
-
-
-
-
+  Matrix<Complex,3> Uad;
+  Matrix<Complex,3> Ow, Ox, Oy;
 
   loadMatrixFromField(P3Even, P3Odd, new_sid, Oy.data, oddBit, kparam.color_matrix_stride);
 
@@ -491,14 +485,11 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
 
   int y[4] = {x[0], x[1], x[2], x[3]}; 
 
-  typename RealTypeId<RealA>::Type mycoeff;
   int point_d;
   int ad_link_nbr_idx;
   int mymu = posDir(mu);
   updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim);
   point_d = linkIndexShift(y,dx,E);
-
-
 
   if (mu_positive){
     ad_link_nbr_idx = point_d;
@@ -515,10 +506,8 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     Ow = conj(Uad)*Oy;
   }
 
-
-
   addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit, kparam.color_matrix_stride);
-  mycoeff = CoeffSign(sig_positive, oddBit)*coeff;
+  real mycoeff = CoeffSign(sig_positive, oddBit)*coeff;
 
   loadMatrixFromField(QprodEven, QprodOdd, point_d, Ox.data, 1-oddBit, kparam.color_matrix_stride);
 
@@ -548,6 +537,9 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
+  typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+  typedef complex<real> Complex;
+
   int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
@@ -581,12 +573,12 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
    *
    */
 
-  Matrix<RealA,3> Ow, Oy;
+  Matrix<Complex,3> Ow, Oy;
 
 
   loadMatrixFromField(P3Even, P3Odd, new_sid, Oy.data, oddBit, kparam.color_matrix_stride);
 
-  typename RealTypeId<RealA>::Type mycoeff;
+  real mycoeff;
   int point_d;
   int mymu = posDir(mu);
   int y[4] = {x[0], x[1], x[2], x[3]};  
@@ -656,6 +648,9 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
+  typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+  typedef complex<real> Complex;
+
   int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
@@ -667,8 +662,8 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
 
 
-  Matrix<RealA,3> Uab, Ubc, Uad;
-  Matrix<RealA,3> Ow, Ox, Oy, Oz;
+  Matrix<Complex,3> Uab, Ubc, Uad;
+  Matrix<Complex,3> Ow, Ox, Oy, Oz;
 
 
   /*            sig
@@ -804,6 +799,9 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
     RealA* const outputEven, RealA* const outputOdd,
     hisq_kernel_param_t kparam)
 {
+  typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+  typedef complex<real> Complex;
+
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if (sid >= kparam.threads) return;
   int oddBit = threadIdx.y;
@@ -839,8 +837,8 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
    */
 
 
-  Matrix<RealA,3> Uab, Ubc, Ude, Uef;
-  Matrix<RealA,3> Ox, Oy, Oz;
+  Matrix<Complex,3> Uab, Ubc, Ude, Uef;
+  Matrix<Complex,3> Ox, Oy, Oz;
 
   // compute the force for forward long links
   for(int sig=0; sig<4; ++sig){
@@ -868,7 +866,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
     loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, Oy.data, 1-oddBit, kparam.color_matrix_stride);
     loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, Ox.data, oddBit, kparam.color_matrix_stride);
 
-    Matrix<RealA,3> temp = Ude*Uef*Oz - Ude*Oy*Ubc + Ox*Uab*Ubc;
+    Matrix<Complex,3> temp = Ude*Uef*Oz - Ude*Oy*Ubc + Ox*Uab*Ubc;
 
     addMatrixToField(temp.data, sig, new_sid,  coeff, outputEven, outputOdd, oddBit, kparam.color_matrix_stride);
   } // loop over sig
@@ -885,16 +883,19 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
     RealA* const forceEven, RealA* const forceOdd,
     hisq_kernel_param_t kparam)
 {
+  typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+  typedef complex<real> Complex;
+
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if (sid >= kparam.threads) return;
   int oddBit = threadIdx.y;
 
   int x[4];
-  int dx[4] = {0,0,0,0};
   getCoords(x, sid, kparam.X, oddBit);
 
   int new_sid=sid;
 #ifdef MULTI_GPU
+  int dx[4] = {0,0,0,0};
   x[0] = x[0]+2;
   x[1] = x[1]+2;
   x[2] = x[2]+2;
@@ -905,12 +906,12 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
 
   for(int sig=0; sig<4; ++sig){
   
-    Matrix<RealA,3> Uw, Ow, Ox;
+    Matrix<Complex,3> Uw, Ow, Ox;
 
     loadLink<18>(linkEven, linkOdd, sig, new_sid, Uw.data, oddBit, kparam.thin_link_stride);  
 
     loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, Ox.data, oddBit, kparam.color_matrix_stride);
-    typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
+    real coeff = (oddBit==1) ? -1 : 1;
     Ow = Uw*Ox;
 
     storeMatrixToMomentumField(Ow.data, sig, sid, coeff, forceEven, forceOdd, oddBit, kparam.momentum_stride); 

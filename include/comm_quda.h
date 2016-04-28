@@ -114,6 +114,11 @@ extern "C" {
   void comm_dim_partitioned_set(int dim);
   int comm_dim_partitioned(int dim);
 
+  /**
+     @brief Loop over comm_dim_partitioned(dim) for all comms dimensions
+     @return Whether any communications dimensions are partitioned
+   */
+  int comm_partitioned();
 
   /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
 

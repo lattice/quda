@@ -303,9 +303,9 @@ namespace quda {
 	
 	// Normalize the block
 	// nrm2 is pure real, but need to use Complex because of template.
-	complex<sumFloat> nrm2 = 0.0;
+        sumFloat nrm2 = 0.0;
 	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*N+jc)*blockSize+i]);
-	sumFloat scale = nrm2.real() > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
+	sumFloat scale = nrm2 > 0.0 ? 1.0/sqrt(nrm2) : 0.0;
 	for (int i=0; i<blockSize; i++) v[(b*N+jc)*blockSize+i] *= scale;
       }
 

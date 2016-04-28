@@ -16,7 +16,6 @@
 
 namespace quda {
 
-#ifdef MULTI_GPU
   XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
     Solver(param,profile), mat(mat)
   {
@@ -33,7 +32,6 @@ namespace quda {
     delete sd;
     if(!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
-
 
   void XSD::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
@@ -56,5 +54,4 @@ namespace quda {
     return;
   }
 
-#endif // MULTI_GPU
 } // namespace quda

@@ -39,67 +39,67 @@ namespace quda {
 
   template<int blockSize, typename Float, typename Gauge>
   __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
-      int idx = threadIdx.x + blockIdx.x*blockDim.x;
-      int parity = threadIdx.y;
+    typedef complex<Float> Complex;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int parity = threadIdx.y;
 
-      double2 plaq = make_double2(0.0,0.0);
+    double2 plaq = make_double2(0.0,0.0);
 
-      if(idx < arg.threads) {
-        typedef typename ComplexTypeId<Float>::Type Cmplx;
-        int X[4]; 
-        for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
+    if(idx < arg.threads) {
+      int X[4];
+      for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
-        int x[4];
-        getCoords(x, idx, X, parity);
+      int x[4];
+      getCoords(x, idx, X, parity);
 #ifdef MULTI_GPU
-        for(int dr=0; dr<4; ++dr) {
-          x[dr] += arg.border[dr];
-          X[dr] += 2*arg.border[dr];
-        }
+      for(int dr=0; dr<4; ++dr) {
+	x[dr] += arg.border[dr];
+	X[dr] += 2*arg.border[dr];
+      }
 #endif
 
-        int dx[4] = {0, 0, 0, 0};
-        for (int mu = 0; mu < 3; mu++) {
-          for (int nu = (mu+1); nu < 3; nu++) {
-            Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
+      int dx[4] = {0, 0, 0, 0};
+      for (int mu = 0; mu < 3; mu++) {
+	for (int nu = (mu+1); nu < 3; nu++) {
+	  Matrix<Complex,3> U1, U2, U3, U4, tmpM;
 
-            arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
-	    dx[mu]++;
-            arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
-            dx[mu]--;
-            dx[nu]++;
-            arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
-	    dx[nu]--;
-            arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity);
+	  arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
+	  dx[mu]++;
+	  arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
+	  dx[mu]--;
+	  dx[nu]++;
+	  arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
+	  dx[nu]--;
+	  arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity);
 
-	    tmpM = U1 * U2;
-	    tmpM = tmpM * conj(U3);
-	    tmpM = tmpM * conj(U4);
+	  tmpM = U1 * U2;
+	  tmpM = tmpM * conj(U3);
+	  tmpM = tmpM * conj(U4);
 
-	    plaq.x += getTrace(tmpM).x;
-          }
+	  plaq.x += getTrace(tmpM).x;
+	}
 
-          Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
+	Matrix<Complex,3> U1, U2, U3, U4, tmpM;
 
-          arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
-          dx[mu]++;
-          arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), 3, 1-parity);
-          dx[mu]--;
-          dx[3]++;
-          arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
-          dx[3]--;
-          arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), 3, parity);
+	arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
+	dx[mu]++;
+	arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), 3, 1-parity);
+	dx[mu]--;
+	dx[3]++;
+	arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
+	dx[3]--;
+	arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), 3, parity);
 
-          tmpM = U1 * U2;
-          tmpM = tmpM * conj(U3);
-          tmpM = tmpM * conj(U4);
+	tmpM = U1 * U2;
+	tmpM = tmpM * conj(U3);
+	tmpM = tmpM * conj(U4);
 
-          plaq.y += getTrace(tmpM).x;
-        }
+	plaq.y += getTrace(tmpM).x;
       }
+    }
 
-      // perform final inter-block reduction and write out result
-      reduce2d<blockSize,2>(arg, plaq);
+    // perform final inter-block reduction and write out result
+    reduce2d<blockSize,2>(arg, plaq);
   }
 
   template<typename Float, typename Gauge>

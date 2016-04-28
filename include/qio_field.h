@@ -9,17 +9,17 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
 void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
 			int nColor, int nSpin, int Nvec, int argc, char *argv[]);
 #else
-static void read_gauge_field(const char *filename, void *gauge[], QudaPrecision prec,
+inline void read_gauge_field(const char *filename, void *gauge[], QudaPrecision prec,
 		      const int *X, int argc, char *argv[]) {
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-static void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
+inline void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
 			int nColor, int nSpin, int Nvec, int argc, char *argv[]) {
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-static void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
+inline void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
 			       int nColor, int nSpin, int Nvec, int argc, char *argv[]) {
   printf("QIO support has not been enabled\n");
   exit(-1);

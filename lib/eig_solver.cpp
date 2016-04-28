@@ -18,10 +18,12 @@ namespace quda {
       report("Lanczos solver");
       eig_solver = new Lanczos(ritz_mat, param, profile);
       break;
+#if 0
     case QUDA_IMP_RST_LANCZOS:
-      report("BiCGstab");
+      report("Implicitly restarted Lanczos");
       eig_solver = new ImpRstLanczos(ritz_mat, param, profile);
       break;
+#endif
     default:
       errorQuda("Invalid eig solver type");
     }
