@@ -388,12 +388,12 @@ if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
 endif(QUDA_VERBOSE_BUILD)
 
-
+# some clang warnings shouds be warning even when turning warnings into errors
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CLANG_NOERROR "-Wno-error=unused-private-field")
 endif()
 
-
+## define NVCC flags
 set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
@@ -413,17 +413,7 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
-
-
-# to remain consistent with other build types
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
-mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
-mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
-
-# we might use:
-# set_property(TARGET tgt PROPERTY CXX_STANDARD 11) in the future but need to check support in older cmake version
-
+#define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
@@ -437,15 +427,7 @@ set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas"
 set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds.")
 
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
-mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
-
-set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
-mark_as_advanced(CMAKE_F_FLAGS)
-
-
+#define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
     "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT "-Wall -O3 -Werror -Wno-error=unused-private-field"  CACHE STRING
@@ -459,12 +441,27 @@ set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
 set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C compiler during full (host+device) debug builds.")
 
+#define FORTRAN FLAGS
+set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
+
+# make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by default )
+mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
+mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
+mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
+mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
+
+mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
+mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
+mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
+mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
+
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_C_FLAGS_STRICT)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 
+mark_as_advanced(CMAKE_F_FLAGS)
+
 ### add tests and quda library
 add_subdirectory(lib)
-
 add_subdirectory(tests)
