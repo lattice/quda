@@ -78,6 +78,8 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 int numa_affinity_enabled = 1;
 
+
+
 using namespace quda;
 
 static cudaGaugeField* cudaStapleField = NULL;
@@ -699,6 +701,12 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+
+  int x=5;
+  if(x=2){
+    return;
+  }
+
   profileClover.TPSTART(QUDA_PROFILE_TOTAL);
   bool device_calc = false; // calculate clover and inverse on the device?
 
@@ -728,7 +736,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE || 
+      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
       inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()
@@ -5198,8 +5206,8 @@ void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatDagMatQuda(h_out, h_in, inv_param); }
-void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
-{ invertQuda(hp_x, hp_b, param); }    
+void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param)
+{ invertQuda(hp_x, hp_b, param); }
 void invert_multishift_quda_(void *hp_x[QUDA_MAX_MULTI_SHIFT], void *hp_b, QudaInvertParam *param)
 { invertMultiShiftQuda(hp_x, hp_b, param); }
 void new_quda_gauge_param_(QudaGaugeParam *param) {
