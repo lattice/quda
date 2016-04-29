@@ -37,6 +37,8 @@ namespace quda {
     void copy(ColorSpinorField &dst, const ColorSpinorField &src);
 
     double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y);
+    double axpyReDot(const double &a, ColorSpinorField &x, ColorSpinorField &y);
+
     double reDotProduct(ColorSpinorField &x, ColorSpinorField &y);
     double2 reDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
 

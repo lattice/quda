@@ -311,10 +311,9 @@ namespace quda {
       // iteration so that all shifts are updated during the dslash
       shift_update.updateNshift(num_offset_now);
 
-      // FIXME - this should be curried into the Dirac operator
-      if (r->Nspin()==4) blas::axpy(offset[0], *p[0], *Ap); 
-
-      pAp = blas::reDotProduct(*p[0], *Ap);
+      // at some point we should curry these into the Dirac operator
+      if (r->Nspin()==4) pAp = blas::axpyReDot(offset[0], *p[0], *Ap);
+      else pAp = blas::reDotProduct(*p[0], *Ap);
 
       // compute zeta and alpha
       updateAlphaZeta(alpha, zeta, zeta_old, r2, beta, pAp, offset, num_offset_now, j_low);
