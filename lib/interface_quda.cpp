@@ -701,11 +701,12 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
-
+  // DO NOT MERGE THIS
   int x=5;
   if(x=2){
     return;
   }
+// DO NOT MERGE THIS
 
   profileClover.TPSTART(QUDA_PROFILE_TOTAL);
   bool device_calc = false; // calculate clover and inverse on the device?
