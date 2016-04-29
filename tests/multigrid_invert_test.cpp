@@ -326,7 +326,6 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   // do we want to use an even-odd preconditioned solve or not
   inv_param.solve_type = solve_type;
-  //inv_param.solve_type = QUDA_DIRECT_SOLVE;
   inv_param.matpc_type = matpc_type;
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
@@ -475,7 +474,11 @@ int main(int argc, char **argv)
 
   // load the clover term, if desired
   //if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
+
+  // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
+  if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(NULL, NULL, &inv_param);
+  inv_param.solve_type = solve_type; // restore actual solve_type we want to do
 
   // setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);
