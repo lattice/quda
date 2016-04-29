@@ -589,20 +589,23 @@ namespace quda {
   void cudaColorSpinorField::allocateGhostBuffer(int nFace) {
     if (!ghostInit || nFace != nFaceComms) {
 
-      if (nFace != nFaceComms) {
+      size_t ghost_bytes_old = ghost_bytes;
+
+      createGhostZone(nFace);
+
+      if (ghost_bytes_old != ghost_bytes) {
 #ifdef USE_TEXTURE_OBJECTS
 	destroyGhostTexObject();
 #endif
 	if (ghostInit && ghost_bytes) device_free(ghost_field);
-      }
 
-      createGhostZone(nFace);
+	// all fields create their own unique ghost zone
+	if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
 
-      // all fields create their own unique ghost zone
-      if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
 #ifdef USE_TEXTURE_OBJECTS
-      createGhostTexObject();
+	createGhostTexObject();
 #endif
+      }
 
       // initialize the ghost pointers
       if (siteSubset == QUDA_PARITY_SITE_SUBSET) {
