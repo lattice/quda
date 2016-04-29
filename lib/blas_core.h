@@ -22,6 +22,9 @@ template <typename FloatN, int M, typename SpinorX, typename SpinorY,
   __global__ void blasKernel(BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
+
+  arg.f.init();
+
   while (i < arg.length) {
     FloatN x[M], y[M], z[M], w[M];
     arg.X.load(x, i);
