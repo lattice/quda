@@ -501,8 +501,6 @@ namespace quda {
 	double3 result = __ldg(Ar3);
 	a.y = a.x * (real)(result.y) * ((real)1.0 / (real)result.z);
 	a.x = a.x * (real)(result.x) * ((real)1.0 / (real)result.z);
-#else
-	errorQuda("This kernel cannot be run on CPU fields");
 #endif
       }
 
@@ -517,6 +515,8 @@ namespace quda {
 		     ColorSpinorField &y, ColorSpinorField &z) {
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
+      if (x.Location() == QUDA_CPU_FIELD_LOCATION)
+	errorQuda("This kernel cannot be run on CPU fields");
 
       blasCuda<caxpyxmazMR_,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0),
 				     make_double2(0.0, 0.0), x, y, z, x);
