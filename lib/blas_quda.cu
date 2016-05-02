@@ -76,15 +76,25 @@ namespace quda {
 #include <blas_mixed_core.h>
 
 
+    template <typename Float2, typename FloatN>
+    struct BlasFunctor {
+
+      //! pre-computation routine before the main loop
+      virtual __device__ __host__ void init() { ; }
+
+      //! where the reduction is usually computed and any auxiliary operations
+      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) = 0;
+    };
+
     /**
        Functor to perform the operation y = a*x + b*y
     */
     template <typename Float2, typename FloatN>
-    struct axpby_ {
+    struct axpby_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       axpby_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { y = a.x*x + b.x*y; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 3; } //! flops per element
@@ -105,9 +115,9 @@ namespace quda {
        Functor to perform the operation y += x
     */
     template <typename Float2, typename FloatN>
-    struct xpy_ {
+    struct xpy_ : public BlasFunctor<Float2,FloatN> {
       xpy_(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y += x ; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y += x ; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 1; } //! flops per element
     };
@@ -121,10 +131,10 @@ namespace quda {
        Functor to perform the operation y += a*x
     */
     template <typename Float2, typename FloatN>
-    struct axpy_ {
+    struct axpy_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       axpy_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y = a.x*x + y; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y = a.x*x + y; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 2; } //! flops per element
     };
@@ -144,10 +154,10 @@ namespace quda {
        Functor to perform the operation y = x + a*y
     */
     template <typename Float2, typename FloatN>
-    struct xpay_ {
+    struct xpay_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       xpay_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y = x + a.x*y; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y = x + a.x*y; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 2; } //! flops per element
     };
@@ -161,9 +171,9 @@ namespace quda {
        Functor to perform the operation y -= x;
     */
     template <typename Float2, typename FloatN>
-    struct mxpy_ {
+    struct mxpy_ : public BlasFunctor<Float2,FloatN> {
       mxpy_(const Float2 &a, const Float2 &b, const Float2 &c) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { y -= x; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y -= x; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 1; } //! flops per element
     };
@@ -177,10 +187,10 @@ namespace quda {
        Functor to perform the operation x *= a
     */
     template <typename Float2, typename FloatN>
-    struct ax_ {
+    struct ax_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       ax_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, const FloatN &y, const FloatN &z, const FloatN &w) { x *= a.x; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { x *= a.x; }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 1; } //! flops per element
     };
@@ -212,10 +222,10 @@ namespace quda {
     }
 
     template <typename Float2, typename FloatN>
-    struct caxpy_ {
+    struct caxpy_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       caxpy_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { _caxpy(a, x, y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
@@ -251,11 +261,11 @@ namespace quda {
       y = yy; }
 
     template <typename Float2, typename FloatN>
-    struct caxpby_ {
+    struct caxpby_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       caxpby_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { _caxpby(a, x, b, y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 7; } //! flops per element
@@ -294,11 +304,11 @@ namespace quda {
     }
 
     template <typename Float2, typename FloatN>
-    struct cxpaypbz_ {
+    struct cxpaypbz_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       cxpaypbz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(const FloatN &x, const FloatN &y, FloatN &z, FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { _cxpaypbz(x, a, y, b, z); }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
@@ -314,12 +324,12 @@ namespace quda {
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
     */
     template <typename Float2, typename FloatN>
-    struct axpyBzpcx_ {
+    struct axpyBzpcx_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       const Float2 c;
       axpyBzpcx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { y += a.x*x; x = b.x*z + c.x*x; }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 10; } //! flops per element
@@ -342,11 +352,11 @@ namespace quda {
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]
     */
     template <typename Float2, typename FloatN>
-    struct axpyZpbx_ {
+    struct axpyZpbx_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       axpyZpbx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { y += a.x*x; x = z + b.x*x; }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
@@ -369,11 +379,11 @@ namespace quda {
        Functor performing the operations z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
     */
     template <typename Float2, typename FloatN>
-    struct caxpbypzYmbw_ {
+    struct caxpbypzYmbw_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       caxpbypzYmbw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, FloatN &z, const FloatN &w)
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { _caxpy(a, x, z); _caxpy(b, y, z); _caxpy(-b, w, y); }
 
       static int streams() { return 6; } //! total number of input and output streams
@@ -390,11 +400,11 @@ namespace quda {
        Functor performing the operation y[i] += a*b*x[i], x[i] *= a
     */
     template <typename Float2, typename FloatN>
-    struct cabxpyAx_ {
+    struct cabxpyAx_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       cabxpyAx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { x *= a.x; _caxpy(b, x, y); }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 5; } //! flops per element
@@ -411,11 +421,11 @@ namespace quda {
        Functor performing the operation z[i] = a*x[i] + b*y[i] + z[i]
     */
     template <typename Float2, typename FloatN>
-    struct caxpbypz_ {
+    struct caxpbypz_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       caxpbypz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(const FloatN &x, const FloatN &y, FloatN &z, const FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { _caxpy(a, x, z); _caxpy(b, y, z); }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 5; } //! flops per element
@@ -431,12 +441,12 @@ namespace quda {
        Functor Performing the operation w[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
     */
     template <typename Float2, typename FloatN>
-    struct caxpbypczpw_ {
+    struct caxpbypczpw_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
       const Float2 b;
       const Float2 c;
       caxpbypczpw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-      __device__ __host__ void operator()(const FloatN &x, const FloatN &y, const FloatN &z, FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { _caxpy(a, x, w); _caxpy(b, y, w); _caxpy(c, z, w); }
 
       static int streams() { return 4; } //! total number of input and output streams
@@ -457,10 +467,10 @@ namespace quda {
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename Float2, typename FloatN>
-    struct caxpyxmaz_ {
+    struct caxpyxmaz_ : public BlasFunctor<Float2,FloatN> {
       Float2 a;
       caxpyxmaz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       { _caxpy(a, x, y); _caxpy(-a, z, x); }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
@@ -473,6 +483,46 @@ namespace quda {
     }
 
     /**
+       double caxpyXmazMR(c a, V x, V y, V z){}
+
+       First performs the operation y[i] += a*x[i]
+       Second performs the operator x[i] -= a*z[i]
+    */
+    template <typename Float2, typename FloatN>
+    struct caxpyxmazMR_ : public BlasFunctor<Float2,FloatN> {
+      Float2 a;
+      double3 *Ar3;
+      caxpyxmazMR_(const Float2 &a, const Float2 &b, const Float2 &c)
+	: a(a), Ar3(static_cast<double3*>(blas::getDeviceReduceBuffer())) { ; }
+
+      inline __device__ __host__ void init() {
+#ifdef __CUDA_ARCH__
+	typedef decltype(a.x) real;
+	double3 result = __ldg(Ar3);
+	a.y = a.x * (real)(result.y) * ((real)1.0 / (real)result.z);
+	a.x = a.x * (real)(result.x) * ((real)1.0 / (real)result.z);
+#endif
+      }
+
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      { _caxpy(a, x, y); _caxpy(-a, z, x); }
+
+      static int streams() { return 5; } //! total number of input and output streams
+      static int flops() { return 8; } //! flops per element
+    };
+
+    void caxpyXmazMR(const Complex &a, ColorSpinorField &x,
+		     ColorSpinorField &y, ColorSpinorField &z) {
+      if (!commAsyncReduction())
+	errorQuda("This kernel requires asynchronous reductions to be set");
+      if (x.Location() == QUDA_CPU_FIELD_LOCATION)
+	errorQuda("This kernel cannot be run on CPU fields");
+
+      blasCuda<caxpyxmazMR_,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0),
+				     make_double2(0.0, 0.0), x, y, z, x);
+    }
+
+    /**
        double tripleCGUpdate(d a, d b, V x, V y, V z, V w){}
    
        First performs the operation y[i] = y[i] + a*w[i]
@@ -480,10 +530,10 @@ namespace quda {
        Third performs the operation w[i] = z[i] + b*w[i]
     */
     template <typename Float2, typename FloatN>
-    struct tripleCGUpdate_ {
+    struct tripleCGUpdate_ : public BlasFunctor<Float2,FloatN> {
       Float2 a, b;
       tripleCGUpdate_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w) 
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
       //{ y -= a.x*x; z += a.x*w; w = y + b.x*w; }
       { y += a.x*w; z -= a.x*x; w = z + b.x*w; }
       static int streams() { return 7; } //! total number of input and output streams

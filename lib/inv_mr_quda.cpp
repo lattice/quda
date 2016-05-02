@@ -111,17 +111,27 @@ namespace quda {
       printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
     }
 
+    double3 Ar3;
     while (k < param.maxiter && r2 > 0.0) {
     
       matSloppy(Ar, r, tmp);
 
-      double3 Ar3 = blas::cDotProductNormA(Ar, r);
-      Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
+      if (param.global_reduction) {
+        Ar3 = blas::cDotProductNormA(Ar, r);
+	Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
 
-      // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = blas::norm2(r)
-      //r2 = blas::caxpyXmazNormX(omega*alpha, r, x, Ar);
-      blas::caxpyXmaz(omega*alpha, r, y, Ar);
+	// x += omega*alpha*r, r -= omega*alpha*Ar, r2 = blas::norm2(r)
+	//r2 = blas::caxpyXmazNormX(omega*alpha, r, x, Ar);
+	blas::caxpyXmaz(omega*alpha, r, y, Ar);
+      } else {
+	// doing local reductions so can make it asynchronous
+	commAsyncReductionSet(true);
+	Ar3 = blas::cDotProductNormA(Ar, r);
 
+	// omega*alpha is done in the kernel
+	blas::caxpyXmazMR(omega, r, y, Ar);
+	commAsyncReductionSet(false);
+      }
       k++;
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
