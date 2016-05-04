@@ -19,52 +19,51 @@ static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
 
+// While we can emulate an all-gather using QMP reductions, this
+// scales horribly as the number of nodes increases, so for
+// performance we just call MPI directly
+#define USE_MPI_GATHER
 
-// this is a work around (in the absence of C++11) to do a compile
-// time check that the size of float and int are the same.  Since we
-// are reinterpretting a float as an int, this property is required.
-template <typename A, typename B>
-inline void static_assert_equal_size()
-{
-  typedef char sizeof_float_must_equal_sizeof_int[sizeof(A) == sizeof(B) ? 1 : -1];
-  (void) sizeof(sizeof_float_must_equal_sizeof_int);
-}
-
+#ifdef USE_MPI_GATHER
+#include <mpi.h>
+#endif
 
 void get_hostnames(char *hostname_recv_buf) {
   // determine which GPU this rank will use
   char *hostname = comm_hostname();
 
+#ifdef USE_MPI_GATHER
+  MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD);
+#else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
+  // this isn't very scalable though
   for (int i=0; i<comm_size(); i++) {
     int data[128];
     for (int j=0; j<128; j++) {
       data[j] = (i == comm_rank()) ? hostname[j] : 0;
-    }
-
-    static_assert_equal_size<float,int>();
-    QMP_sum_float_array(reinterpret_cast<float*>(&data), 128);
-
-    for (int j=0; j<128; j++) {
+      QMP_sum_int(data+j);
       hostname_recv_buf[i*128 + j] = data[j];
     }
   }
+#endif
+
 }
 
 
 void get_gpuid(int *gpuid_recv_buf) {
 
+#ifdef USE_MPI_GATHER
+  MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD);
+#else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
   for (int i=0; i<comm_size(); i++) {
     int data = (i == comm_rank()) ? gpuid : 0;
-
-    static_assert_equal_size<float,int>();
-    QMP_sum_float_array(reinterpret_cast<float*>(&data), 1);
-
+    QMP_sum_int(&data);
     gpuid_recv_buf[i] = data;
   }
+#endif
 }
 
 
@@ -96,19 +95,23 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
       gpuid++;
     }
   }
-  host_free(hostname_recv_buf);
 
   int device_count;
   cudaGetDeviceCount(&device_count);
   if (device_count == 0) {
     errorQuda("No CUDA devices found");
   }
+  if (gpuid >= device_count) {
+    errorQuda("Too few GPUs available on %s", comm_hostname());
+  }
 
-  gpuid = (comm_rank() % device_count);
+  comm_peer2peer_init(hostname_recv_buf);
+
+  host_free(hostname_recv_buf);
 }
 
 
-void comm_peer2peer_init()
+void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
@@ -130,10 +133,8 @@ void comm_peer2peer_init()
     comm_set_neighbor_ranks();
 
     char *hostname = comm_hostname();
-    char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
     int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
 
-    get_hostnames(hostname_recv_buf);
     get_gpuid(gpuid_recv_buf);
 
     for(int dir=0; dir<2; ++dir){ // forward/backward directions
@@ -150,18 +151,19 @@ void comm_peer2peer_init()
 	  if(canAccessPeer[0]*canAccessPeer[1]){
 	    peer2peer_enabled[dir][dim] = true;
 	    if (getVerbosity() > QUDA_SILENT)
-	      printf("Peer-to-peer enabled for rank %d with neighbor %d dir=%d, dim=%d\n",
-		     comm_rank(), neighbor_rank, dir, dim);
+	      printf("Peer-to-peer enabled for rank %d gpu=%d with neighbor %d gpu=%d dir=%d, dim=%d\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
 	  }
 	} // on the same node
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
 
-    host_free(hostname_recv_buf);
     host_free(gpuid_recv_buf);
   }
 
   peer2peer_init = true;
+
+  checkCudaError();
   return;
 }
 
