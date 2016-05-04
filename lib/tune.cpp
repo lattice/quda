@@ -133,7 +133,7 @@ namespace quda {
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      char tmp[7];
+      char tmp[7] = { };
       strncpy(tmp, key.aux, 6);
       bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
       if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
@@ -145,8 +145,8 @@ namespace quda {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
 
-      char tmp[7];
-      strncpy(tmp, key.aux,6);
+      char tmp[7] = { };
+      strncpy(tmp, key.aux, 6);
       bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
 
       // synchronous profile
@@ -405,7 +405,7 @@ namespace quda {
 	int n_policy = 0;
 	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
 	  // if a policy entry, then we can ignore
-	  char tmp[6];
+	  char tmp[7] = { };
 	  strncpy(tmp, entry->first.aux, 6);
 	  TuneParam param = entry->second;
 	  bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
