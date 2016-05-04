@@ -11,7 +11,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   comm_set_default_topology(topo);
 }
 
-void comm_peer2peer_init(const *hostname_buf) {}
+void comm_peer2peer_init(const char *hostname_buf) {}
 
 bool comm_peer2peer_enabled(int die, int dim) { return false; }
 
