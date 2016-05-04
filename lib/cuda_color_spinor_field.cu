@@ -1205,10 +1205,6 @@ namespace quda {
     if (!initComms) errorQuda("Can only be called after create comms");
     if (!ghost_field) errorQuda("ghost_field appears not to be allocated");
 
-    comm_peer2peer_init();
-
-    checkCudaError();
-
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][QUDA_MAX_DIM];
 

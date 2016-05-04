@@ -82,7 +82,6 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
       gpuid++;
     }
   }
-  host_free(hostname_recv_buf);
 
   int device_count;
   cudaGetDeviceCount(&device_count);
@@ -92,9 +91,13 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   if (gpuid >= device_count) {
     errorQuda("Too few GPUs available on %s", hostname);
   }
+
+  comm_peer2peer_init(hostname_recv_buf);
+
+  host_free(hostname_recv_buf);
 }
 
-void comm_peer2peer_init()
+void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
@@ -115,11 +118,8 @@ void comm_peer2peer_init()
     comm_set_neighbor_ranks();
 
     char *hostname = comm_hostname();
-    char *hostname_recv_buf = (char *)safe_malloc(128*size);
 
     int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*size);
-
-    MPI_CHECK( MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD) );
 
     // There are more efficient ways to do the following,
     // but it doesn't really matter since this function should be
@@ -147,7 +147,6 @@ void comm_peer2peer_init()
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
 
-    host_free(hostname_recv_buf);
     host_free(gpuid_recv_buf);
   }
 

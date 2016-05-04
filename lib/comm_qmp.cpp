@@ -95,19 +95,23 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
       gpuid++;
     }
   }
-  host_free(hostname_recv_buf);
 
   int device_count;
   cudaGetDeviceCount(&device_count);
   if (device_count == 0) {
     errorQuda("No CUDA devices found");
   }
+  if (gpuid >= device_count) {
+    errorQuda("Too few GPUs available on %s", comm_hostname());
+  }
 
-  gpuid = (comm_rank() % device_count);
+  comm_peer2peer_init(hostname_recv_buf);
+
+  host_free(hostname_recv_buf);
 }
 
 
-void comm_peer2peer_init()
+void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
@@ -129,10 +133,8 @@ void comm_peer2peer_init()
     comm_set_neighbor_ranks();
 
     char *hostname = comm_hostname();
-    char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
     int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
 
-    get_hostnames(hostname_recv_buf);
     get_gpuid(gpuid_recv_buf);
 
     for(int dir=0; dir<2; ++dir){ // forward/backward directions
@@ -156,11 +158,12 @@ void comm_peer2peer_init()
       } // different dimensions - x, y, z, t
     } // different directions - forward/backward
 
-    host_free(hostname_recv_buf);
     host_free(gpuid_recv_buf);
   }
 
   peer2peer_init = true;
+
+  checkCudaError();
   return;
 }
 
