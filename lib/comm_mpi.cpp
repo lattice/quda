@@ -140,8 +140,8 @@ void comm_peer2peer_init()
 	  if(canAccessPeer[0]*canAccessPeer[1]){
 	    peer2peer_enabled[dir][dim] = true;
 	    if (getVerbosity() > QUDA_SILENT)
-	      printf("Peer-to-peer enabled for rank %d with neighbor %d dir=%d, dim=%d\n",
-		     rank, neighbor_rank, dir, dim);
+	      printf("Peer-to-peer enabled for rank %d gpu=%d with neighbor %d gpu=%d dir=%d, dim=%d\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
 	  }
 	} // on the same node
       } // different dimensions - x, y, z, t
