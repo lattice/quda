@@ -54,13 +54,12 @@ namespace quda {
       partial(static_cast<T*>(blas::getDeviceReduceBuffer())),
       result_d(static_cast<T*>(blas::getMappedHostReduceBuffer())),
       result_h(static_cast<T*>(blas::getHostReduceBuffer())) 
-    { }
+    {
+      //  write reduction to GPU memory if asynchronous
+      if (commAsyncReduction()) result_d = partial;
+    }
 
   };
-
-  __device__ __host__ inline void zero(double &a) { a = 0.0; }
-  __device__ __host__ inline void zero(double2 &a) { a.x = 0.0; a.y = 0.0; }
-  __device__ __host__ inline void zero(double3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
 
 #ifdef QUAD_SUM
   __device__ __host__ inline void zero(doubledouble &x) { x.a.x = 0.0; x.a.y = 0.0; }

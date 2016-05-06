@@ -131,8 +131,8 @@ namespace quda {
 
 	const int chirality = s_col / 2;
 
-	int row = s_row%2 * nColor + c_row;
-	int col = s_col%2 * nColor + c_col;
+	unsigned int row = s_row%2 * nColor + c_row;
+	unsigned int col = s_col%2 * nColor + c_col;
 
 	if (row == col) {
 	  complex<Float> tmp = a[parity][(x*2 + chirality)*N*N + row];

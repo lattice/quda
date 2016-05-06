@@ -203,12 +203,6 @@ namespace quda {
   }
 
 
-
-  static bool checkDimsPartitioned(){
-    if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
-    return false;
-  }
-
   /**
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
@@ -241,12 +235,13 @@ namespace quda {
    */
   template<int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix_quality(GaugeFixQualityArg<Gauge> argQ){
+    typedef complex<Float> Cmplx;
+
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
     if ( idx < argQ.threads ) {
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
       int X[4];
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
@@ -322,7 +317,7 @@ namespace quda {
       vol << argQ.X[1] << "x";
       vol << argQ.X[2] << "x";
       vol << argQ.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d,gaugedir=%d",argQ.threads, sizeof(Float),gauge_dir);
+      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",argQ.threads, sizeof(Float),gauge_dir);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
@@ -378,12 +373,12 @@ namespace quda {
    */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity){
+    typedef complex<Float> Cmplx;
+
     int tid = (threadIdx.x + blockSize) % blockSize;
     int idx = blockIdx.x * blockSize + tid;
 
     if ( idx >= arg.threads ) return;
-
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
 
     // 8 threads per lattice site
     if ( ImplementationType < 3 ) {
@@ -412,12 +407,12 @@ namespace quda {
       arg.dataOr.load((Float*)(link.data),idx, mu, oddbit);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 8x more shared memory than the implementation using atomicadd 
-      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
-      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       arg.dataOr.save((Float*)(link.data),idx, mu, oddbit);
     }
     // 4 threads per lattice site
@@ -450,12 +445,12 @@ namespace quda {
 
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 4x more shared memory than the implementation using atomicadd 
-      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
-      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
       arg.dataOr.save((Float*)(link.data),idx, mu, parity);
       arg.dataOr.save((Float*)(link1.data),idx1, mu, 1 - parity);
@@ -578,11 +573,9 @@ namespace quda {
       param.shared_bytes = param.block.x * 4 * sizeof(Float);
     }
 
-    GaugeFix(GaugeFixArg<Float, Gauge> &arg) : arg(arg) {
-      int parity = 0;
-    }
-    ~GaugeFix () {
-    }
+    GaugeFix(GaugeFixArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
+    ~GaugeFix () { }
+
     void setParity(const int par){
       parity = par;
     }
@@ -603,7 +596,7 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
+      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     }
 
@@ -672,9 +665,9 @@ namespace quda {
     int tid = (threadIdx.x + blockSize) % blockSize;
     int idx = blockIdx.x * blockSize + tid;
     if ( idx >= arg.threads ) return;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Complex;
     int X[4];
-  #pragma unroll
+#pragma unroll
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     int x[4];
 #ifdef MULTI_GPU
@@ -705,38 +698,38 @@ namespace quda {
         parity = 1 - parity;
       }
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link;
+      Matrix<Complex,3> link;
       arg.dataOr.load((Float*)(link.data),idx, mu, parity);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 8x more shared memory than the implementation using atomicadd 
-      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
-      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       arg.dataOr.save((Float*)(link.data),idx, mu, parity);
     }
     // 4 threads per lattice site
     else{
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link;
+      Matrix<Complex,3> link;
       arg.dataOr.load((Float*)(link.data),idx, mu, parity);
 
 
       x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
       int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link1;
+      Matrix<Complex,3> link1;
       arg.dataOr.load((Float*)(link1.data),idx1, mu, 1 - parity);
 
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 4x more shared memory than the implementation using atomicadd 
-      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
-      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
       arg.dataOr.save((Float*)(link.data),idx, mu, parity);
       arg.dataOr.save((Float*)(link1.data),idx1, mu, 1 - parity);
@@ -860,11 +853,8 @@ namespace quda {
       param.grid = createGrid(param.block);
       param.shared_bytes = param.block.x * 4 * sizeof(Float);
     }
-    GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg) : arg(arg) {
-      int parity = 0;
-    }
-    ~GaugeFixInteriorPoints () {
-    }
+    GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
+    ~GaugeFixInteriorPoints () { }
     void setParity(const int par){
       parity = par;
     }
@@ -886,7 +876,7 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
+      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     }
 
@@ -960,7 +950,7 @@ namespace quda {
         faceVolume[dir] = faceVolume_[dir];
         faceVolumeCB[dir] = faceVolumeCB_[dir];
       }
-      if ( checkDimsPartitioned() ) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
+      if ( comm_partitioned() ) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
     }
   };
 
@@ -969,10 +959,11 @@ namespace quda {
   */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> arg, int parity){
+    typedef complex<Float> Cmplx;
+
     int tid = (threadIdx.x + blockSize) % blockSize;
     int idx = blockIdx.x * blockSize + tid;
     if ( idx >= arg.threads ) return;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
     int mu = (threadIdx.x / blockSize);
     idx = arg.borderpoints[parity][idx];
     int X[4], x[4];
@@ -997,12 +988,12 @@ namespace quda {
       arg.dataOr.load((Float*)(link.data),idx, mu, parity);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 8x more shared memory than the implementation using atomicadd 
-      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
-      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+      if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       arg.dataOr.save((Float*)(link.data),idx, mu, parity);
     }
     // 4 threads per lattice site
@@ -1019,12 +1010,12 @@ namespace quda {
 
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
       // this implementation needs 4x more shared memory than the implementation using atomicadd 
-      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
-      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
       // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
-      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+      if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
       arg.dataOr.save((Float*)(link.data),idx, mu, parity);
       arg.dataOr.save((Float*)(link1.data),idx1, mu, 1 - parity);
@@ -1143,11 +1134,9 @@ namespace quda {
       param.grid = createGrid(param.block);
       param.shared_bytes = param.block.x * 4 * sizeof(Float);
     }
-    GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg) : arg(arg) {
-      int parity = 0;
-    }
+    GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
     ~GaugeFixBorderPoints () {
-      if ( checkDimsPartitioned() ) for ( int i = 0; i < 2; i++ ) cudaFree(arg.borderpoints[i]);
+      if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) cudaFree(arg.borderpoints[i]);
     }
     void setParity(const int par){
       parity = par;
@@ -1169,7 +1158,7 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
+      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     }
 
@@ -1231,7 +1220,7 @@ namespace quda {
 
 
   template<int NElems, typename Float, typename Gauge, bool pack>
-  __global__ void Kernel_UnPackGhost(int size, GaugeFixUnPackArg<Gauge> arg, typename ComplexTypeId<Float>::Type *array, int parity, int face, int dir){
+  __global__ void Kernel_UnPackGhost(int size, GaugeFixUnPackArg<Gauge> arg, complex<Float> *array, int parity, int face, int dir){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -1281,7 +1270,7 @@ namespace quda {
     x[face] -= 1;
     parity = 1 - parity;
     int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[NElems];
     RegType data[18];
@@ -1301,7 +1290,7 @@ namespace quda {
 
 
   template<int NElems, typename Float, typename Gauge, bool pack>
-  __global__ void Kernel_UnPackTop(int size, GaugeFixUnPackArg<Gauge> arg, typename ComplexTypeId<Float>::Type *array, int parity, int face, int dir){
+  __global__ void Kernel_UnPackTop(int size, GaugeFixUnPackArg<Gauge> arg, complex<Float> *array, int parity, int face, int dir){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -1348,7 +1337,7 @@ namespace quda {
       X[dr] += 2 * arg.border[dr];
     }
     int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[NElems];
     RegType data[18];
@@ -1457,7 +1446,7 @@ namespace quda {
     dim3 block[4];
     dim3 grid[4];
 
-    if ( checkDimsPartitioned() ) {
+    if ( comm_partitioned() ) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -1522,7 +1511,7 @@ namespace quda {
     printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
 
-    unitarizeLinksQuda(data, data, num_failures_dev);
+    unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
       cudaFree(num_failures_dev);
@@ -1540,7 +1529,7 @@ namespace quda {
         flop += (double)gaugeFix.flops();
         byte += (double)gaugeFix.bytes();
       #else
-        if ( !checkDimsPartitioned() ) {
+        if ( !comm_partitioned() ) {
           gaugeFix.setParity(p);
           gaugeFix.apply(0);
           flop += (double)gaugeFix.flops();
@@ -1564,9 +1553,9 @@ namespace quda {
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
-            Kernel_UnPackTop<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(send_d[d]), p, d, d);
+            Kernel_UnPackTop<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
             //extract bottom ghost
-            Kernel_UnPackGhost<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(sendg_d[d]), 1 - p, d, d);
+            Kernel_UnPackGhost<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
@@ -1613,14 +1602,14 @@ namespace quda {
           #ifdef GPU_COMMS
             comm_wait(mh_recv_back[d]);
           #endif
-            Kernel_UnPackGhost<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recv_d[d]), p, d, d);
+            Kernel_UnPackGhost<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
           #ifdef GPU_COMMS
             comm_wait(mh_recv_fwd[d]);
           #endif
-            Kernel_UnPackTop<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recvg_d[d]), 1 - p, d, d);
+            Kernel_UnPackTop<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
@@ -1637,7 +1626,7 @@ namespace quda {
            flop += (double)gaugeFix.flops();
            byte += (double)gaugeFix.bytes();
            #ifdef MULTI_GPU
-           if(checkDimsPartitioned()){//exchange updated top face links in current parity
+           if(comm_partitioned()){//exchange updated top face links in current parity
            for (int d=0; d<4; d++) {
             if (!commDimPartitioned(d)) continue;
             comm_start(mh_recv_back[d]);
@@ -1679,7 +1668,7 @@ namespace quda {
          #endif*/
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
-        unitarizeLinksQuda(data, data, num_failures_dev);
+        unitarizeLinks(data, data, num_failures_dev);
         qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) {
           cudaFree(num_failures_dev);
@@ -1706,7 +1695,7 @@ namespace quda {
       action0 = action;
     }
     if ((iter % reunit_interval) != 0 )  {
-      unitarizeLinksQuda(data, data, num_failures_dev);
+      unitarizeLinks(data, data, num_failures_dev);
       qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) {
         cudaFree(num_failures_dev);
@@ -1727,7 +1716,7 @@ namespace quda {
     }
     cudaFree(num_failures_dev);
   #ifdef MULTI_GPU
-    if ( checkDimsPartitioned() ) {
+    if ( comm_partitioned() ) {
       data.exchangeExtendedGhost(data.R(),false);
       for ( int d = 0; d < 4; d++ ) {
         if ( commDimPartitioned(d)) {

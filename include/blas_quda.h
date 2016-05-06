@@ -37,6 +37,8 @@ namespace quda {
     void copy(ColorSpinorField &dst, const ColorSpinorField &src);
 
     double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y);
+    double axpyReDot(const double &a, ColorSpinorField &x, ColorSpinorField &y);
+
     double reDotProduct(ColorSpinorField &x, ColorSpinorField &y);
     double2 reDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
 
@@ -69,7 +71,9 @@ namespace quda {
     double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
     void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z);
-    double caxpyXmazNormX(const Complex &a, ColorSpinorField &x, 
+    void caxpyXmazMR(const Complex &a, ColorSpinorField &x,
+		     ColorSpinorField &y, ColorSpinorField &z);
+    double caxpyXmazNormX(const Complex &a, ColorSpinorField &x,
 			  ColorSpinorField &y, ColorSpinorField &z);
     double cabxpyAxNorm(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
 

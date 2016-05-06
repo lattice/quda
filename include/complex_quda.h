@@ -418,6 +418,14 @@ public:
       return *this;
     }
 
+  __host__ __device__
+    inline complex<ValueType>& operator*=(const ValueType z)
+    {
+      this->x *= z;
+      this->y *= z;
+      return *this;
+    }
+
   __host__ __device__ inline ValueType real() const volatile;
   __host__ __device__ inline ValueType imag() const volatile;
   __host__ __device__ inline ValueType real() const;
@@ -511,6 +519,14 @@ public:
       return *this;
     }
 
+  __host__ __device__
+    inline complex<float>& operator*=(const float z)
+    {
+      this->x *= z;
+      this->y *= z;
+      return *this;
+    }
+
   // Let the compiler synthesize the copy and assignment operators.
   __host__ __device__ inline complex<float>(const volatile complex<float> & z)
   {
@@ -591,6 +607,14 @@ public:
     }
 
   __host__ __device__
+    inline complex<double>& operator+=(const complex<float> z)
+    {
+      real(real()+z.real());
+      imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__
     inline complex<double>& operator-=(const complex<double> z)
     {
       real(real()-z.real());
@@ -609,6 +633,14 @@ public:
     inline complex<double>& operator/=(const complex<double> z)
     {
       *this = *this / z;
+      return *this;
+    }
+
+  __host__ __device__
+    inline complex<double>& operator*=(const double z)
+    {
+      this->x *= z;
+      this->y *= z;
       return *this;
     }
 

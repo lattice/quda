@@ -65,7 +65,7 @@ invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dsl
 multigrid_invert_test: multigrid_invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-multigrid_benchmark: multigrid_benchmark.o test_util.o misc.o $(QUDA)
+multigrid_benchmark_test: multigrid_benchmark_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 deflation_test: deflation_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)

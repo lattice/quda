@@ -22,6 +22,9 @@ template <typename FloatN, int M, typename SpinorX, typename SpinorY,
   __global__ void blasKernel(BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
+
+  arg.f.init();
+
   while (i < arg.length) {
     FloatN x[M], y[M], z[M], w[M];
     arg.X.load(x, i);
@@ -272,7 +275,9 @@ template <template <typename Float, typename FloatN> class Functor,
     errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       const int M = 1;
+#endif
       if (x.Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	Spinor<float4,float4,float4,M,writeX,0> X(x);

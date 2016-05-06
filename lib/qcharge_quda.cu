@@ -20,14 +20,10 @@ namespace quda {
   template<typename Float, typename Gauge>
   struct QChargeArg : public ReduceArg<double> {
     int threads; // number of active threads required
-
-    typename ComplexTypeId<Float>::Type* Fmunu;
-
     Gauge data;
-    
-      QChargeArg(const Gauge &data, GaugeField& Fmunu) : ReduceArg<double>(), data(data), 
-        threads(Fmunu.Volume()) {}
-    };
+    QChargeArg(const Gauge &data, GaugeField& Fmunu)
+      : ReduceArg<double>(), data(data), threads(Fmunu.Volume()) {}
+  };
 
   // Core routine for computing the topological charge from the field strength
   template<int blockSize, typename Float, typename Gauge>
@@ -43,10 +39,9 @@ namespace quda {
           parity = 1;
           idx -= arg.threads/2;
         }
-        typedef typename ComplexTypeId<Float>::Type Cmplx;
 
         // Load the field-strength tensor from global memory
-        Matrix<Cmplx,3> F[6], temp1, temp2, temp3;
+        Matrix<complex<Float>,3> F[6], temp1, temp2, temp3;
         double tmpQ2, tmpQ3;
         for(int i=0; i<6; ++i){
           arg.data.load((Float*)(F[i].data), idx, i, parity);

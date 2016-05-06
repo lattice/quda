@@ -109,7 +109,9 @@ namespace quda
         break;									\
       case EXTERIOR_KERNEL_T:						\
         MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
-        break;									\
+	break;							        \
+      default:								\
+        errorQuda("Unsupported kernel_type %d", param.kernel_type);	\
     }
 
   #define COVDEV(FUNC, mu, gridDim, blockDim, shared, stream, param, ...)	\
@@ -531,8 +533,10 @@ namespace quda
 
         for(int i=0; i<4; i++) {
           dslashParam.ghostDim[i] = 0;
-          dslashParam.ghostOffset[i] = 0;
-          dslashParam.ghostNormOffset[i] = 0;
+          dslashParam.ghostOffset[i][0] = 0;
+          dslashParam.ghostOffset[i][1] = 0;
+          dslashParam.ghostNormOffset[i][0] = 0;
+          dslashParam.ghostNormOffset[i][1] = 0;
           dslashParam.commDim[i] = 0;
         }
 

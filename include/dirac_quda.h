@@ -484,6 +484,16 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+   /**
+     * @brief Create the coarse twisted-mass operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -510,6 +520,16 @@ namespace quda {
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
+   /**
+     * @brief Create the coarse even-odd preconditioned twisted-mass
+     *        operator
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Full twisted mass with a clover term
@@ -540,6 +560,16 @@ namespace quda {
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
+   /**
+     * @brief Create the coarse twisted-clover operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -566,6 +596,20 @@ namespace quda {
      const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
          const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse even-odd preconditioned twisted-clover
+     * operator.  Unlike the Wilson operator, the coarsening of the
+     * preconditioned clover operator differs from that of the
+     * unpreconditioned clover operator, so we need to specialize it.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param Xinv[out] Coarse clover inverse field
+     * @param Yhat coarse preconditioned link field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
   };
 
   //void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);

@@ -209,6 +209,40 @@ Topology *comm_default_topology(void)
   return default_topo;
 }
 
+static int neighbor_rank[2][4] = { {-1,-1,-1,-1},
+                                          {-1,-1,-1,-1} };
+
+static bool neighbors_cached = false;
+
+void comm_set_neighbor_ranks(Topology *topo){
+
+  if(neighbors_cached) return;
+
+  Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
+  if(!topology){
+    errorQuda("Topology not specified");
+    return;
+  }
+     
+  for(int d=0; d<4; ++d){
+    int pos_displacement[4] = {0,0,0,0};
+    int neg_displacement[4] = {0,0,0,0};
+    pos_displacement[d] = +1;
+    neg_displacement[d] = -1;
+    neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
+    neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
+  }
+  neighbors_cached = true;
+  return;
+}
+
+int comm_neighbor_rank(int dir, int dim){
+  if(!neighbors_cached){
+    comm_set_neighbor_ranks();
+  }
+  return neighbor_rank[dir][dim];
+}
+
 
 int comm_dim(int dim)
 {
@@ -394,4 +428,13 @@ void comm_dim_partitioned_set(int dim)
 int comm_dim_partitioned(int dim)
 {
   return (manual_set_partition[dim] || (comm_dim(dim) > 1));
+}
+
+int comm_partitioned()
+{
+  int partitioned = 0;
+  for (int i=0; i<4; i++) {
+    partitioned = partitioned || comm_dim_partitioned(i);
+  }
+  return partitioned;
 }

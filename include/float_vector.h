@@ -9,6 +9,15 @@
 
 namespace quda {
 
+  __device__ __host__ inline void zero(double &a) { a = 0.0; }
+  __device__ __host__ inline void zero(double2 &a) { a.x = 0.0; a.y = 0.0; }
+  __device__ __host__ inline void zero(double3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
+
+  __device__ __host__ inline void zero(float &a) { a = 0.0; }
+  __device__ __host__ inline void zero(float2 &a) { a.x = 0.0; a.y = 0.0; }
+  __device__ __host__ inline void zero(float3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
+  __device__ __host__ inline void zero(float4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
+
   __host__ __device__ inline double2 operator+(const double2& x, const double2 &y) {
     return make_double2(x.x + y.x, x.y + y.y);
   }
@@ -182,13 +191,13 @@ namespace quda {
   };
 
   __forceinline__ __host__ __device__ double max_fabs(const double4 &c) {
-    double a = fmaxf(fabsf(c.x), fabsf(c.y));
-    double b = fmaxf(fabsf(c.z), fabsf(c.w));
-    return fmaxf(a, b);
+    double a = fmax(fabs(c.x), fabs(c.y));
+    double b = fmax(fabs(c.z), fabs(c.w));
+    return fmax(a, b);
   };
 
   __forceinline__ __host__ __device__ double max_fabs(const double2 &b) {
-    return fmaxf(fabsf(b.x), fabsf(b.y));
+    return fmax(fabs(b.x), fabs(b.y));
   };
 
   /*

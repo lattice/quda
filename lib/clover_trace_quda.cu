@@ -28,9 +28,8 @@ namespace quda {
     {
 
       Float A[72];
-      typedef typename ComplexTypeId<Float>::Type Complex;
 
-      Matrix<Complex,3> mat;  
+      Matrix<complex<Float>,3> mat;
       setZero(&mat);
 
       // load the clover term into memory

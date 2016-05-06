@@ -381,8 +381,8 @@ gauge_force_test(void)
 
   size_t gSize = qudaGaugeParam.cpu_prec;
     
-  void* sitelink;  
-  void* sitelink_1d;
+  void* sitelink = nullptr;
+  void* sitelink_1d = nullptr;
   
 #ifdef GPU_DIRECT
   sitelink_1d = pinned_malloc(4*V*gaugeSiteSize*gSize);

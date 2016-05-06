@@ -164,29 +164,6 @@ namespace quda {
       return make_double2(a*b.x,a*b.y);
     }
 
-    inline __device__ const float2 & operator+=(float2 & a, const float2 & b)
-    {
-      a.x += b.x;
-      a.y += b.y;
-      return a;
-    }
-
-    inline __device__ const double2 & operator+=(double2 & a, const double2 & b)
-    {
-      a.x += b.x;
-      a.y += b.y;
-      return a;
-    }
-
-    inline __device__ const float4 & operator+=(float4 & a, const float4 & b)
-    {
-      a.x += b.x;
-      a.y += b.y;
-      a.z += b.z;
-      a.w += b.w;
-      return a;
-    }
-
     // Replication of code 
     // This structure is already defined in 
     // unitarize_utilities.h
@@ -232,10 +209,10 @@ namespace quda {
       }
 
 
-    template<int N, class T>
+    template<int N, class T, class U>
       inline __device__
       void loadMatrixFromField(const T* const field_even, const T* const field_odd,
-          int dir, int idx, T* const mat, int oddness, int stride)
+          int dir, int idx, U* const mat, int oddness, int stride)
       {
         const T* const field = (oddness)?field_odd:field_even;
         for(int i = 0;i < N ;i++){
@@ -244,20 +221,18 @@ namespace quda {
         return;
       }
 
-    template<class T>
+    template<class T, class U>
       inline __device__
       void loadMatrixFromField(const T* const field_even, const T* const field_odd,
-          int dir, int idx, T* const mat, int oddness, int stride)
+			       int dir, int idx, complex<U>* const mat, int oddness, int stride)
       {
         loadMatrixFromField<9> (field_even, field_odd, dir, idx, mat, oddness, stride);
         return;
       }
 
-
-
     inline __device__
       void loadMatrixFromField(const float4* const field_even, const float4* const field_odd, 
-          int dir, int idx, float2* const mat, int oddness, int stride)
+			       int dir, int idx, complex<float>* const mat, int oddness, int stride)
       {
         const float4* const field = oddness?field_odd: field_even;
         float4 tmp;
@@ -273,9 +248,9 @@ namespace quda {
         return;
       }
 
-    template<class T>
+    template<class T, class U>
       inline __device__
-      void loadMatrixFromField(const T* const field_even, const T* const field_odd, int idx, T* const mat, int oddness, int stride)
+      void loadMatrixFromField(const T* const field_even, const T* const field_odd, int idx, U* const mat, int oddness, int stride)
       {
         const T* const field = (oddness)?field_odd:field_even;
         mat[0] = field[idx];
@@ -292,11 +267,11 @@ namespace quda {
       }
 
     template<class U>
-      inline __device__
-      void  addMatrixToNewOprod(const double2* const mat,  int dir, int idx, U coeff, 
-          double2* const field_even, double2* const field_odd, int oddness, int stride){
-        double2* const field = (oddness)?field_odd: field_even;		
-        double2 value[9];			
+    inline __device__
+    void  addMatrixToNewOprod(const complex<double>* const mat,  int dir, int idx, U coeff,
+			      double2* const field_even, double2* const field_odd, int oddness, int stride){
+      double2* const field = (oddness)?field_odd: field_even;
+      double2 value[9];
 
 #if (HISQ_NEW_OPROD_LOAD_TEX == 1)
         value[0] = READ_DOUBLE2_TEXTURE( ((oddness)?newOprod1TexDouble:newOprod0TexDouble), field, idx+dir*stride*9); 
@@ -327,14 +302,14 @@ namespace quda {
 
 
     template<class U>
-      inline __device__
-      void  addMatrixToNewOprod(const float2* const mat,  int dir, int idx, U coeff, 
-          float2* const field_even, float2* const field_odd, int oddness, int stride){
-        float2* const field = (oddness)?field_odd: field_even;		
-        float2 value[9];			
+    inline __device__
+    void  addMatrixToNewOprod(const complex<float>* const mat,  int dir, int idx, U coeff,
+			      float2* const field_even, float2* const field_odd, int oddness, int stride){
+      float2* const field = (oddness)?field_odd: field_even;
+      float2 value[9];
 
 #if (HISQ_NEW_OPROD_LOAD_TEX == 1)
-        value[0] = tex1Dfetch( ((oddness)?newOprod1TexSingle:newOprod0TexSingle),  idx+dir*stride*9); 
+        value[0] = tex1Dfetch( ((oddness)?newOprod1TexSingle:newOprod0TexSingle),  idx+dir*stride*9);
         value[1] = tex1Dfetch( ((oddness)?newOprod1TexSingle:newOprod0TexSingle),  idx+dir*stride*9 + stride); 
         value[2] = tex1Dfetch( ((oddness)?newOprod1TexSingle:newOprod0TexSingle),  idx+dir*stride*9 + 2*stride); 
         value[3] = tex1Dfetch( ((oddness)?newOprod1TexSingle:newOprod0TexSingle),  idx+dir*stride*9 + 3*stride); 
@@ -362,12 +337,12 @@ namespace quda {
 
     // only works if Promote<T,U>::Type = T
 
-    template<class T, class U>   
+    template<class T, class U, class V>
       inline __device__
       void addMatrixToField(const T* const mat, int dir, int idx, U coeff, 
-          T* const field_even, T* const field_odd, int oddness, int stride)
+          V* const field_even, V* const field_odd, int oddness, int stride)
       {
-        T* const field = (oddness)?field_odd: field_even;
+        V* const field = (oddness)?field_odd: field_even;
         field[idx + dir*stride*9]          += coeff*mat[0];
         field[idx + dir*stride*9 + stride]     += coeff*mat[1];
         field[idx + dir*stride*9 + stride*2]   += coeff*mat[2];
@@ -382,14 +357,14 @@ namespace quda {
       }
 
 
-    template<class T, class U>
+    template<class T, class U, class V>
       inline __device__
-      void addMatrixToField(const T* const mat, int idx, U coeff, T* const field_even,
-          T* const field_odd, int oddness, int stride)
+      void addMatrixToField(const T* const mat, int idx, U coeff, V* const field_even,
+          V* const field_odd, int oddness, int stride)
       {
-        T* const field = (oddness)?field_odd: field_even;
-        field[idx ]         += coeff*mat[0];
-        field[idx + stride]     += coeff*mat[1];
+        V* const field = (oddness)?field_odd: field_even;
+        field[idx + stride*0]   += coeff*mat[0];
+        field[idx + stride*1]   += coeff*mat[1];
         field[idx + stride*2]   += coeff*mat[2];
         field[idx + stride*3]   += coeff*mat[3];
         field[idx + stride*4]   += coeff*mat[4];
@@ -422,9 +397,9 @@ namespace quda {
         return;
       }
 
-    template<class T>
+    template<class T, class U>
       inline __device__
-      void storeMatrixToField(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness, int stride)
+      void storeMatrixToField(const T* const mat, int dir, int idx, U* const field_even, U* const field_odd, int oddness, int stride)
       {
         T* const field = (oddness)?field_odd: field_even;
         field[idx + dir*stride*9]          = mat[0];
@@ -441,11 +416,11 @@ namespace quda {
       }
 
 
-    template<class T>
+    template<class T, class U>
       inline __device__
-      void storeMatrixToField(const T* const mat, int idx, T* const field_even, T* const field_odd, int oddness, int stride)
+      void storeMatrixToField(const T* const mat, int idx, U* const field_even, U* const field_odd, int oddness, int stride)
       {
-        T* const field = (oddness)?field_odd: field_even;
+        U* const field = (oddness)?field_odd: field_even;
         field[idx]          = mat[0];
         field[idx + stride]     = mat[1];
         field[idx + stride*2]   = mat[2];
@@ -460,12 +435,12 @@ namespace quda {
       }
 
 
-    template<class T, class U> 
+    template<class T, class U, class V>
       inline __device__
       void storeMatrixToMomentumField(const T* const mat, int dir, int idx, U coeff, 
-          T* const mom_even, T* const mom_odd, int oddness, int stride)
+          V* const mom_even, V* const mom_odd, int oddness, int stride)
       {
-        T* const mom_field = (oddness)?mom_odd:mom_even;
+        V* const mom_field = (oddness)?mom_odd:mom_even;
         T temp2;
         temp2.x = (mat[1].x - mat[3].x)*0.5*coeff;
         temp2.y = (mat[1].y + mat[3].y)*0.5*coeff;
@@ -479,7 +454,7 @@ namespace quda {
         temp2.y = (mat[5].y + mat[7].y)*0.5*coeff;
         mom_field[idx + dir*stride*5 + stride*2] = temp2;
 
-        const typename RealTypeId<T>::Type temp = (mat[0].y + mat[4].y + mat[8].y)*0.3333333333333333333333333;
+        const typename T::value_type temp = (mat[0].y + mat[4].y + mat[8].y)*0.3333333333333333333333333;
         temp2.x =  (mat[0].y-temp)*coeff; 
         temp2.y =  (mat[4].y-temp)*coeff;
         mom_field[idx + dir*stride*5 + stride*3] = temp2;
@@ -521,6 +496,9 @@ namespace quda {
           typename RealTypeId<RealA>::Type coeff,
           RealA* const outputEven, RealA* const outputOdd, hisq_kernel_param_t kparam)
       {
+	typedef typename std::remove_reference<decltype(RealA::x)>::type real;
+	typedef complex<real> Complex;
+
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
         if (sid >= kparam.threads) return;
 	int oddBit = threadIdx.y;
@@ -535,7 +513,7 @@ namespace quda {
         int new_sid = sid;
 #endif
 	for(int sig=0; sig<4; ++sig){
-          RealA COLOR_MAT_W[ArrayLength<RealA>::result];
+          Complex COLOR_MAT_W[ArrayLength<RealA>::result];
           loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, kparam.color_matrix_stride);
           addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit, kparam.color_matrix_stride);
 	}
@@ -1323,7 +1301,7 @@ namespace quda {
             return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
-#define CALL_ARGUMENTS(typeA, typeB)  <<<tp.grid, tp.block>>>		\
+#define CALL_ARGUMENTS(typeA, typeB)  <<<tp.grid, tp.block>>>	\
           ((typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
            (typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
            (typeA*)mom.Even_p(), (typeA*)mom.Odd_p(),			\
@@ -1483,7 +1461,10 @@ namespace quda {
 
 
         for(int i=0;i < 4; i++){
-          kparam_1g.ghostDim[i] = kparam_2g.ghostDim[i]=kparam_1g.ghostDim[i]=kparam_2g.ghostDim[i] = ghostDim[i];
+          kparam_1g.ghostDim[i] = ghostDim[i];
+	  kparam_2g.ghostDim[i] = ghostDim[i];
+	  kparam_1g.ghostDim[i] = ghostDim[i];
+	  kparam_2g.ghostDim[i] = ghostDim[i];
         }
 #else
         hisq_kernel_param_t kparam;

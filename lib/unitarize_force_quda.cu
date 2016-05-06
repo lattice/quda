@@ -8,6 +8,7 @@
 
 #include <tune_quda.h>
 #include <quda_matrix.h>
+#include <gauge_field_order.h>
 
 #ifdef GPU_HISQ_FORCE
 
@@ -30,57 +31,55 @@ namespace { // anonymous
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
 
-// constants - File scope only
-__constant__ double DEV_HISQ_UNITARIZE_EPS;
-__constant__ double DEV_HISQ_FORCE_FILTER;
-__constant__ double DEV_MAX_DET_ERROR;
-__constant__ bool DEV_REUNIT_ALLOW_SVD;
-__constant__ bool DEV_REUNIT_SVD_ONLY;
-__constant__ double DEV_REUNIT_SVD_REL_ERROR;
-__constant__ double DEV_REUNIT_SVD_ABS_ERROR;
-
-static double HOST_HISQ_UNITARIZE_EPS;
-static double HOST_HISQ_FORCE_FILTER;
-static double HOST_MAX_DET_ERROR;
-static bool   HOST_REUNIT_ALLOW_SVD;
-static bool   HOST_REUNIT_SVD_ONLY;
-static double HOST_REUNIT_SVD_REL_ERROR;
-static double HOST_REUNIT_SVD_ABS_ERROR;
+  static double unitarize_eps;
+  static double force_filter;
+  static double max_det_error;
+  static bool   allow_svd;
+  static bool   svd_only;
+  static double svd_rel_error;
+  static double svd_abs_error;
 
 
- 
-  namespace fermion_force{
+  namespace fermion_force {
 
+    template <typename F, typename G>
+    struct UnitarizeForceArg {
+      int threads;
+      F force;
+      F force_old;
+      G gauge;
+      int *fails;
+      const double unitarize_eps;
+      const double force_filter;
+      const double max_det_error;
+      const int allow_svd;
+      const int svd_only;
+      const double svd_rel_error;
+      const double svd_abs_error;
 
-    void setUnitarizeForceConstants(double unitarize_eps_h, double hisq_force_filter_h, 
-				    double max_det_error_h, bool allow_svd_h, bool svd_only_h,
-				    double svd_rel_error_h, double svd_abs_error_h)
-    {
-
-      // not_set is only initialised once
-      static bool not_set=true;
-		
-      if(not_set){
-
-	cudaMemcpyToSymbol(DEV_HISQ_UNITARIZE_EPS, &unitarize_eps_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_HISQ_FORCE_FILTER, &hisq_force_filter_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_MAX_DET_ERROR, &max_det_error_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_REUNIT_ALLOW_SVD, &allow_svd_h, sizeof(bool));
-	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ONLY, &svd_only_h, sizeof(bool));
-	cudaMemcpyToSymbol(DEV_REUNIT_SVD_REL_ERROR, &svd_rel_error_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ABS_ERROR, &svd_abs_error_h, sizeof(double));
-
-	HOST_HISQ_UNITARIZE_EPS = unitarize_eps_h;
-	HOST_HISQ_FORCE_FILTER = hisq_force_filter_h;
-	HOST_MAX_DET_ERROR = max_det_error_h;     
-	HOST_REUNIT_ALLOW_SVD = allow_svd_h;
-	HOST_REUNIT_SVD_ONLY = svd_only_h;
-	HOST_REUNIT_SVD_REL_ERROR = svd_rel_error_h;
-	HOST_REUNIT_SVD_ABS_ERROR = svd_abs_error_h;
-	not_set = false;
+      UnitarizeForceArg(const F &force, const F &force_old, const G &gauge, const GaugeField &meta, int *fails,
+			double unitarize_eps, double force_filter, double max_det_error, int allow_svd,
+			int svd_only, double svd_rel_error, double svd_abs_error)
+	: threads(1), force(force), force_old(force_old), gauge(gauge), fails(fails), unitarize_eps(unitarize_eps),
+	  force_filter(force_filter), max_det_error(max_det_error), allow_svd(allow_svd),
+	  svd_only(svd_only), svd_rel_error(svd_rel_error), svd_abs_error(svd_abs_error)
+      {
+	for(int dir=0; dir<4; ++dir) threads *= meta.X()[dir];
       }
-      checkCudaError();
-      return;
+    };
+
+
+    void setUnitarizeForceConstants(double unitarize_eps_, double force_filter_,
+				    double max_det_error_, bool allow_svd_, bool svd_only_,
+				    double svd_rel_error_, double svd_abs_error_)
+    {
+      unitarize_eps = unitarize_eps_;
+      force_filter = force_filter_;
+      max_det_error = max_det_error_;
+      allow_svd = allow_svd_;
+      svd_only = svd_only_;
+      svd_rel_error = svd_rel_error_;
+      svd_abs_error = svd_abs_error_;
     }
 
 
@@ -225,15 +224,17 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     }
 
 
-    template<class Cmplx>
+    template<class Float>
     __device__ __host__
-    void accumBothDerivatives(Matrix<Cmplx,3>* result, const Matrix<Cmplx,3> & left, const Matrix<Cmplx,3> & right, const Matrix<Cmplx,3> & outer_prod)
+    void accumBothDerivatives(Matrix<complex<Float>,3>* result, const Matrix<complex<Float>,3> &left,
+			      const Matrix<complex<Float>,3> &right, const Matrix<complex<Float>,3> &outer_prod)
     {
-      const typename RealTypeId<Cmplx>::Type temp = 2.0*getTrace(left*outer_prod).x;
+      const Float temp = (2.0*getTrace(left*outer_prod)).real();;
       for(int k=0; k<3; ++k){
 	for(int l=0; l<3; ++l){
 	  // Need to write it this way to get it to work 
 	  // on the CPU. Not sure why.
+	  // FIXME check this is true
 	  result->operator()(k,l).x += temp*right(k,l).x;
 	  result->operator()(k,l).y += temp*right(k,l).y;
 	}
@@ -260,9 +261,9 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     __device__ __host__
     T getAbsMin(const T* const array, int size){
       T min = fabs(array[0]);
-      for(int i=1; i<size; ++i){
+      for (int i=1; i<size; ++i) {
         T abs_val = fabs(array[i]);
-        if((abs_val) < min){ min = abs_val; }   
+        if ((abs_val) < min){ min = abs_val; }
       }
       return min;
     }
@@ -290,22 +291,17 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
     // Compute the reciprocal square root of the matrix q
     // Also modify q if the eigenvalues are dangerously small.
-    template<class Cmplx> 
+    template<class Float, typename Arg>
     __device__  __host__ 
-    void reciprocalRoot(Matrix<Cmplx,3>* res, DerivativeCoefficients<typename RealTypeId<Cmplx>::Type>* deriv_coeffs, 
-			typename RealTypeId<Cmplx>::Type f[3], Matrix<Cmplx,3> & q, int *unitarization_failed){
+    void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
+			Float f[3], Matrix<complex<Float>,3> & q, Arg &arg) {
 
-      Matrix<Cmplx,3> qsq, tempq;
+      Matrix<complex<Float>,3> qsq, tempq;
 
-      typename RealTypeId<Cmplx>::Type c[3];
-      typename RealTypeId<Cmplx>::Type g[3];
+      Float c[3];
+      Float g[3];
 
-#ifdef __CUDA_ARCH__
-#define REUNIT_SVD_ONLY DEV_REUNIT_SVD_ONLY
-#else
-#define REUNIT_SVD_ONLY HOST_REUNIT_SVD_ONLY
-#endif
-      if(!REUNIT_SVD_ONLY){
+      if(!arg.svd_only){
 	qsq = q*q;
 	tempq = qsq*q;
 
@@ -314,18 +310,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	c[2] = getTrace(tempq).x/3.0;
 
 	g[0] = g[1] = g[2] = c[0]/3.;
-	typename RealTypeId<Cmplx>::Type r,s,theta;
+	Float r,s,theta;
 	s = c[1]/3. - c[0]*c[0]/18;
 	r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
 
-#ifdef __CUDA_ARCH__
-#define HISQ_UNITARIZE_EPS DEV_HISQ_UNITARIZE_EPS
-#else
-#define HISQ_UNITARIZE_EPS HOST_HISQ_UNITARIZE_EPS
-#endif
-
-	typename RealTypeId<Cmplx>::Type cosTheta = r/sqrt(s*s*s);
-	if(fabs(s) < HISQ_UNITARIZE_EPS){
+	Float cosTheta = r/sqrt(s*s*s);
+	if (fabs(s) < arg.unitarize_eps) {
 	  cosTheta = 1.;
 	  s = 0.0; 
 	}
@@ -351,64 +341,44 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	// too often, we expect pretty good performance.
 	//
 
-#ifdef __CUDA_ARCH__
-#define REUNIT_ALLOW_SVD DEV_REUNIT_ALLOW_SVD
-#define REUNIT_SVD_REL_ERROR DEV_REUNIT_SVD_REL_ERROR
-#define REUNIT_SVD_ABS_ERROR DEV_REUNIT_SVD_ABS_ERROR
-#else // cpu
-#define REUNIT_ALLOW_SVD HOST_REUNIT_ALLOW_SVD
-#define REUNIT_SVD_REL_ERROR HOST_REUNIT_SVD_REL_ERROR
-#define REUNIT_SVD_ABS_ERROR HOST_REUNIT_SVD_ABS_ERROR
-#endif
-
-      if(REUNIT_ALLOW_SVD){
+      if (arg.allow_svd) {
 	bool perform_svd = true;
-	if(!REUNIT_SVD_ONLY){
-	  const typename RealTypeId<Cmplx>::Type det = getDeterminant(q).x;
-	  if( fabs(det) >= REUNIT_SVD_ABS_ERROR){  
-	    if( checkRelativeError(g[0]*g[1]*g[2],det,REUNIT_SVD_REL_ERROR) ) perform_svd = false;
+	if (!arg.svd_only) {
+	  const Float det = getDeterminant(q).x;
+	  if( fabs(det) >= arg.svd_abs_error) {
+	    if( checkRelativeError(g[0]*g[1]*g[2],det,arg.svd_rel_error) ) perform_svd = false;
 	  }
 	}	
 
 	if(perform_svd){	
-	  Matrix<Cmplx,3> tmp2;
+	  Matrix<complex<Float>,3> tmp2;
 	  // compute the eigenvalues using the singular value decomposition
-	  computeSVD<Cmplx>(q,tempq,tmp2,g);
+	  computeSVD<Float>(q,tempq,tmp2,g);
 	  // The array g contains the eigenvalues of the matrix q
 	  // The determinant is the product of the eigenvalues, and I can use this
 	  // to check the SVD
-	  const typename RealTypeId<Cmplx>::Type determinant = getDeterminant(q).x;
-	  const typename RealTypeId<Cmplx>::Type gprod = g[0]*g[1]*g[2];
+	  const Float determinant = getDeterminant(q).x;
+	  const Float gprod = g[0]*g[1]*g[2];
 	  // Check the svd result for errors
-#ifdef __CUDA_ARCH__
-#define MAX_DET_ERROR DEV_MAX_DET_ERROR
-#else
-#define MAX_DET_ERROR HOST_MAX_DET_ERROR
-#endif
-	  if(fabs(gprod - determinant) > MAX_DET_ERROR){
-	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), MAX_DET_ERROR);
+	  if (fabs(gprod - determinant) > arg.max_det_error) {
+	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
 	    printLink(q);
 
 #ifdef __CUDA_ARCH__
-	    atomicAdd(unitarization_failed,1);
+	    atomicAdd(arg.fails, 1);
 #else
-	    (*unitarization_failed)++;
+	    (*arg.fails)++;
 #endif
 	  } 
 	} // perform_svd?
 
       } // REUNIT_ALLOW_SVD?
 
-#ifdef __CUDA_ARCH__
-#define HISQ_FORCE_FILTER DEV_HISQ_FORCE_FILTER
-#else
-#define HISQ_FORCE_FILTER HOST_HISQ_FORCE_FILTER
-#endif	
-      typename RealTypeId<Cmplx>::Type delta = getAbsMin(g,3);
-      if(delta < HISQ_FORCE_FILTER){
-	for(int i=0; i<3; ++i){ 
-	  g[i]     += HISQ_FORCE_FILTER; 
-	  q(i,i).x += HISQ_FORCE_FILTER;
+      Float delta = getAbsMin(g,3);
+      if (delta < arg.force_filter) {
+	for (int i=0; i<3; ++i) {
+	  g[i]     += arg.force_filter;
+	  q(i,i).x += arg.force_filter;
 	}
 	qsq = q*q; // recalculate Q^2
       }
@@ -416,7 +386,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       // At this point we have finished with the c's 
       // use these to store sqrt(g)
-      for(int i=0; i<3; ++i) c[i] = sqrt(g[i]);
+      for (int i=0; i<3; ++i) c[i] = sqrt(g[i]);
 
       // done with the g's, use these to store u, v, w
       g[0] = c[0]+c[1]+c[2];
@@ -426,7 +396,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       // set the derivative coefficients!
       deriv_coeffs->set(g[0], g[1], g[2]);
 
-      const typename RealTypeId<Cmplx>::Type & denominator  = g[2]*(g[0]*g[1]-g[2]); 
+      const Float& denominator  = g[2]*(g[0]*g[1]-g[2]);
       c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1]))/denominator;
       c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1])/denominator;
       c[2] =  g[0]/denominator;
@@ -448,21 +418,22 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
 
     // "v" denotes a "fattened" link variable
-    template<class Cmplx>
+    template<class Float, typename Arg>
     __device__ __host__
-    void getUnitarizeForceSite(const Matrix<Cmplx,3> & v, const Matrix<Cmplx,3> & outer_prod, Matrix<Cmplx,3>* result, int *unitarization_failed)
+    void getUnitarizeForceSite(Matrix<complex<Float>,3>& result, const Matrix<complex<Float>,3> & v,
+			       const Matrix<complex<Float>,3> & outer_prod, Arg &arg)
     {
-      typename RealTypeId<Cmplx>::Type f[3]; 
-      typename RealTypeId<Cmplx>::Type b[6];
+      typedef Matrix<complex<Float>,3> Link;
+      Float f[3];
+      Float b[6];
 
-      Matrix<Cmplx,3> v_dagger = conj(v);  // okay!
-      Matrix<Cmplx,3> q   = v_dagger*v;    // okay!
+      Link v_dagger = conj(v);  // okay!
+      Link q   = v_dagger*v;    // okay!
+      Link rsqrt_q;
 
-      Matrix<Cmplx,3> rsqrt_q;
+      DerivativeCoefficients<Float> deriv_coeffs;
 
-      DerivativeCoefficients<typename RealTypeId<Cmplx>::Type> deriv_coeffs;
-
-      reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed); // approx 529 flops (assumes no SVD)
+      reciprocalRoot<Float>(&rsqrt_q, &deriv_coeffs, f, q, arg); // approx 529 flops (assumes no SVD)
 
       // Pure hack here
       b[0] = deriv_coeffs.getB00();
@@ -472,197 +443,202 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       b[4] = deriv_coeffs.getB12();
       b[5] = deriv_coeffs.getB22();
 
-
-      Matrix<Cmplx,3> & local_result = *result;
-
-      local_result = rsqrt_q*outer_prod;
+      result = rsqrt_q*outer_prod;
 
       // We are now finished with rsqrt_q
-      Matrix<Cmplx,3> qv_dagger  = q*v_dagger;
-      Matrix<Cmplx,3> vv_dagger  = v*v_dagger; 
-      Matrix<Cmplx,3> vqv_dagger = v*qv_dagger;
-      Matrix<Cmplx,3> temp = f[1]*vv_dagger + f[2]*vqv_dagger;
+      Link qv_dagger  = q*v_dagger;
+      Link vv_dagger  = v*v_dagger;
+      Link vqv_dagger = v*qv_dagger;
+      Link temp = f[1]*vv_dagger + f[2]*vqv_dagger;
 
 
       temp = f[1]*v_dagger + f[2]*qv_dagger;
-      Matrix<Cmplx,3> conj_outer_prod = conj(outer_prod);
+      Link conj_outer_prod = conj(outer_prod);
 
 
       temp = f[1]*v + f[2]*v*q;
-      local_result = local_result + outer_prod*temp*v_dagger + f[2]*q*outer_prod*vv_dagger;
+      result = result + outer_prod*temp*v_dagger + f[2]*q*outer_prod*vv_dagger;
 
-      local_result = local_result + v_dagger*conj_outer_prod*conj(temp) + f[2]*qv_dagger*conj_outer_prod*v_dagger;
+      result = result + v_dagger*conj_outer_prod*conj(temp) + f[2]*qv_dagger*conj_outer_prod*v_dagger;
 
 
       // now done with vv_dagger, I think
-      Matrix<Cmplx,3> qsqv_dagger = q*qv_dagger;
-      Matrix<Cmplx,3> pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
-      accumBothDerivatives(&local_result, v, pv_dagger, outer_prod); // 41 flops
+      Link qsqv_dagger = q*qv_dagger;
+      Link pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
+      accumBothDerivatives(&result, v, pv_dagger, outer_prod); // 41 flops
 
-      Matrix<Cmplx,3> rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
-      Matrix<Cmplx,3> vq = v*q;
-      accumBothDerivatives(&local_result, vq, rv_dagger, outer_prod); // 41 flops
+      Link rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
+      Link vq = v*q;
+      accumBothDerivatives(&result, vq, rv_dagger, outer_prod); // 41 flops
 
-      Matrix<Cmplx,3> sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
-      Matrix<Cmplx,3> vqsq = vq*q;
-      accumBothDerivatives(&local_result, vqsq, sv_dagger, outer_prod); // 41 flops
+      Link sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
+      Link vqsq = vq*q;
+      accumBothDerivatives(&result, vqsq, sv_dagger, outer_prod); // 41 flops
       return;
       // 4528 flops - 17 matrix multiplies (198 flops each) + reciprocal root (approx 529 flops) + accumBothDerivatives (41 each) + miscellaneous
     } // get unit force term
 
 
-
-    template<class Cmplx>
-    __global__ void getUnitarizeForceField(const int threads, const Cmplx* link_even, const Cmplx* link_odd,
-					   const Cmplx* old_force_even, const Cmplx* old_force_odd,
-					   Cmplx* force_even, Cmplx* force_odd,
-					   int* unitarization_failed)
+    template<typename Float, typename Arg>
+    __global__ void getUnitarizeForceField(Arg arg)
     {
-       
-      int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
-      // The number of GPU threads is equal to the local volume
-      const int HALF_VOLUME = threads/2;
-      if(mem_idx >= threads) return;
-	
-      Cmplx* force;
-      const Cmplx* link;
-      const Cmplx* old_force;
-
-      force = force_even;
-      link = link_even;
-      old_force = old_force_even;
-      if(mem_idx >= HALF_VOLUME){
-	      mem_idx = mem_idx - HALF_VOLUME;
-	      force = force_odd;
-	      link = link_odd;
-	      old_force = old_force_odd;
+      int idx = blockIdx.x*blockDim.x + threadIdx.x;
+      if(idx >= arg.threads) return;
+      int parity = 0;
+      if(idx >= arg.threads/2) {
+	parity = 1;
+	idx -= arg.threads/2;
       }
 
-
       // This part of the calculation is always done in double precision
-      Matrix<double2,3> v, result, oprod;
+      Matrix<complex<double>,3> v, result, oprod;
            
       for(int dir=0; dir<4; ++dir){
-	loadLinkVariableFromArray(old_force, dir, mem_idx, HALF_VOLUME, &oprod);
-	loadLinkVariableFromArray(link, dir, mem_idx, HALF_VOLUME, &v);
+	arg.force_old.load((Float*)(oprod.data), idx, dir, parity);
+	arg.gauge.load((Float*)(v.data), idx, dir, parity);
 
-	getUnitarizeForceSite<double2>(v, oprod, &result, unitarization_failed); 
+	getUnitarizeForceSite<double>(result, v, oprod, arg);
 
-	writeLinkVariableToArray(result, dir, mem_idx, HALF_VOLUME, force); 
+	arg.force.save((Float*)(oprod.data), idx, dir, parity);
       } // 4*4528 flops per site
       return;
     } // getUnitarizeForceField
 
 
-    void unitarizeForceCPU(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
+    template <typename Float, typename Arg>
+    void unitarizeForceCPU(Arg &arg) {
+      Matrix<complex<double>,3> v, result, oprod;
+
+      for (int parity=0; parity<2; parity++) {
+	for (int i=0; i<arg.threads/2; i++) {
+	  for (int dir=0; dir<4; dir++) {
+	    arg.force_old.load((Float*)(oprod.data), i, dir, parity);
+	    arg.gauge.load((Float*)(v.data), i, dir, parity);
+
+	    getUnitarizeForceSite<double>(result, v, oprod, arg);
+
+	    arg.force.save((Float*)(oprod.data), i, dir, parity);
+	  }
+	}
+      }
+    }
+
+    void unitarizeForceCPU(cpuGaugeField& newForce, const cpuGaugeField& oldForce, const cpuGaugeField& gauge)
     {
-      
       int num_failures = 0;	
-      Matrix<double2,3> old_force, new_force, v;
+      Matrix<complex<double>,3> old_force, new_force, v;
 
-      // I can change this code to make it much more compact
-
-      const QudaGaugeFieldOrder order = cpuGauge.Order();
-
-      if(order == QUDA_MILC_GAUGE_ORDER){
-        for(int i=0; i<cpuGauge.Volume(); ++i){
-	  for(int dir=0; dir<4; ++dir){
-	    if(cpuGauge.Precision() == QUDA_SINGLE_PRECISION){
-	      copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
-	      copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
-	    }else if(cpuGauge.Precision() == QUDA_DOUBLE_PRECISION){
-	      copyArrayToLink(&old_force, ((double*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
-	      copyArrayToLink(&v, ((double*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((double*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
-	    } // precision?
-	  } // dir
-        } // i
-      }else if(order == QUDA_QDP_GAUGE_ORDER){
-        for(int dir=0; dir<4; ++dir){
-          for(int i=0; i<cpuGauge.Volume(); ++i){
-	    if(cpuGauge.Precision() == QUDA_SINGLE_PRECISION){
-	      copyArrayToLink(&old_force, ((float**)(cpuOldForce.Gauge_p()))[dir] + i*18);
-	      copyArrayToLink(&v, ((float**)(cpuGauge.Gauge_p()))[dir] + i*18);
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((float**)(cpuNewForce->Gauge_p()))[dir] + i*18, new_force);
-	    }else if(cpuGauge.Precision() == QUDA_DOUBLE_PRECISION){
-	      copyArrayToLink(&old_force, ((double**)(cpuOldForce.Gauge_p()))[dir] + i*18);
-	      copyArrayToLink(&v, ((double**)(cpuGauge.Gauge_p()))[dir] + i*18);
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((double**)(cpuNewForce->Gauge_p()))[dir] + i*18, new_force);
-	    }
-          }
-        }
-      }else{
+      if (gauge.Order() == QUDA_MILC_GAUGE_ORDER) {
+	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
+	  typedef gauge::MILCOrder<double,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<double>(arg);
+	} else {
+	  typedef gauge::MILCOrder<float,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<float>(arg);
+	}
+      } else if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
+	  typedef gauge::QDPOrder<double,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<double>(arg);
+	} else {
+	  typedef gauge::QDPOrder<float,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<float>(arg);
+	}
+      } else {
         errorQuda("Only MILC and QDP gauge orders supported\n");
       }
+
+      if (num_failures) errorQuda("Unitarization failed, failures = %d", num_failures);
       return;
     } // unitarize_force_cpu
 
-    class UnitarizeForceCuda : public Tunable {
+    template <typename Float, typename Arg>
+    class UnitarizeForce : public Tunable {
     private:
-      const cudaGaugeField &oldForce;
-      const cudaGaugeField &gauge;
-      cudaGaugeField &newForce;
-      int *fails;
+      Arg &arg;
+      const GaugeField &meta;
 
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
       bool tuneGridDim() const { return false; }
-      unsigned int minThreads() const { return gauge.Volume(); }
+      unsigned int minThreads() const { return arg.threads; }
 
     public:
-      UnitarizeForceCuda(const cudaGaugeField& oldForce, const cudaGaugeField& gauge,  
-			 cudaGaugeField& newForce, int* fails) : 
-	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { 
-	writeAuxString("threads=%d,prec=%lu,stride=%d", 
-		       gauge.Volume(), gauge.Precision(), gauge.Stride());
+      UnitarizeForce(Arg &arg, const GaugeField& meta) : arg(arg), meta(meta) {
+	writeAuxString("threads=%d,prec=%lu,stride=%d", meta.Volume(), meta.Precision(), meta.Stride());
       }
-      virtual ~UnitarizeForceCuda() { ; }
+      virtual ~UnitarizeForce() { ; }
 
       void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-	if(gauge.Precision() == QUDA_SINGLE_PRECISION){
-	  getUnitarizeForceField<<<tp.grid,tp.block>>>(gauge.Volume(), (const float2*)gauge.Even_p(), (const float2*)gauge.Odd_p(),
-						       (const float2*)oldForce.Even_p(), (const float2*)oldForce.Odd_p(),
-						       (float2*)newForce.Even_p(), (float2*)newForce.Odd_p(), 
-						       fails);
-	}else if(gauge.Precision() == QUDA_DOUBLE_PRECISION){
-	  getUnitarizeForceField<<<tp.grid,tp.block>>>(gauge.Volume(), (const double2*)gauge.Even_p(), (const double2*)gauge.Odd_p(),
-						       (const double2*)oldForce.Even_p(), (const double2*)oldForce.Odd_p(),
-						       (double2*)newForce.Even_p(), (double2*)newForce.Odd_p(), 
-						       fails);      
-	}
+	getUnitarizeForceField<Float><<<tp.grid,tp.block>>>(arg);
       }
       
       void preTune() { ; }
-      void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
+      void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
       
-      long long flops() const { return 4ll*4528*gauge.Volume(); }
+      long long flops() const { return 4ll*4528*meta.Volume(); }
       
-      TuneKey tuneKey() const { return TuneKey(gauge.VolString(), typeid(*this).name(), aux); }
-    }; // UnitarizeForceCuda
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    }; // UnitarizeForce
 
-    void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
-                            cudaGaugeField &cudaGauge, cudaGaugeField *cudaNewForce, int* unitarization_failed, long long *flops) {
+    template<typename Float, typename Gauge>
+    void unitarizeForce(Gauge newForce, const Gauge oldForce, const Gauge gauge,
+			const GaugeField &meta, int* fails, long long *flops) {
 
-      UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
+      UnitarizeForceArg<Gauge,Gauge> arg(newForce, oldForce, gauge, meta, fails, unitarize_eps, force_filter,
+					 max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+      UnitarizeForce<Float,UnitarizeForceArg<Gauge,Gauge> > unitarizeForce(arg, meta);
       unitarizeForce.apply(0);
       cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       if(flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }
-    
-    
+
+    void unitarizeForce(cudaGaugeField &newForce, const cudaGaugeField &oldForce, const cudaGaugeField &gauge,
+			int* fails, long long *flops) {
+
+      if (oldForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
+	errorQuda("Force field should not use reconstruct %d", oldForce.Reconstruct());
+
+      if (newForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
+	errorQuda("Force field should not use reconstruct %d", newForce.Reconstruct());
+
+      if (oldForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
+	errorQuda("Gauge field should not use reconstruct %d", gauge.Reconstruct());
+
+      if (gauge.Precision() != oldForce.Precision() || gauge.Precision() != newForce.Precision())
+	errorQuda("Mixed precision not supported");
+
+      if (gauge.Order() != oldForce.Order() || gauge.Order() != newForce.Order())
+	errorQuda("Mixed data ordering not supported not supported");
+
+      if (gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
+	  typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type G;
+	  unitarizeForce<double>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	} else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
+	  typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type G;
+	  unitarizeForce<float>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	}
+      } else {
+	errorQuda("Data order %d not supported", gauge.Order());
+      }
+
+    }
+
   } // namespace fermion_force
 
-//#endif
 } // namespace quda
 
 

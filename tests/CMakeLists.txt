@@ -1,11 +1,9 @@
 
 include_directories(.)
 
-
+#build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
-
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-
 set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
@@ -25,6 +23,8 @@ if(QUDA_MAGMA)
   LIST(APPEND TEST_LIBS ${MAGMA})
 endif()
 
+
+#define tests
 
 if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_DOMAIN_WALL})
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp)
@@ -49,8 +49,8 @@ if(${QUDA_MULTIGRID})
   cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(multigrid_invert_test ${TEST_LIBS})
 
-  cuda_add_executable(multigrid_benchmark multigrid_benchmark.cu)
-  target_link_libraries(multigrid_benchmark ${TEST_LIBS})
+  cuda_add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
+  target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
 endif()
 
 cuda_add_executable(su3_test su3_test.cpp)

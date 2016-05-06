@@ -351,7 +351,7 @@ namespace quda {
 
 
     /**
-       First performs the operation y[i] = a*x[i]
+       First performs the operation y[i] += a*x[i]
        Return the norm of y
     */
     template <typename ReduceType, typename Float2, typename FloatN>
@@ -366,6 +366,26 @@ namespace quda {
 
     double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
       return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0,0,0,false>
+	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+    }
+
+
+    /**
+       First performs the operation y[i] += a*x[i]
+       Return real dot product (x,y)
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct AxpyReDot : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      AxpyReDot(const Float2 &a, const Float2 &b) : a(a) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+	y += a.x*x; sum += dot_<ReduceType>(x,y); }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 4; } //! flops per element
+    };
+
+    double axpyReDot(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
+      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,AxpyReDot,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -732,7 +752,7 @@ namespace quda {
       Float2 a;
       Float2 b;
       ReduceType aux;
-      HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux{ } { ; }
 
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 
@@ -771,7 +791,7 @@ namespace quda {
       Float2 a;
       Float2 b;
       ReduceType aux;
-      xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux{ } { ; }
 
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 

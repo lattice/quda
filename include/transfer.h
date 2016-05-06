@@ -94,12 +94,6 @@ namespace quda {
     /** The parity of any single-parity fine-grid fields that are passed into the transfer operator */
     QudaParity parity;
 
-    /** The length of the fine lattice */
-    int fine_length;
-
-    /** The length of the coarse lattice */
-    int coarse_length;
-
     /** Whether to enable transfer operator on the GPU */
     bool enable_gpu;
 

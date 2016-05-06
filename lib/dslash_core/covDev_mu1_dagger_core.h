@@ -248,7 +248,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==0 ? X+X2X1mX1 : X-X1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x2==0 ? X+X2X1mX1 : X-X1) >> 1;
 #endif

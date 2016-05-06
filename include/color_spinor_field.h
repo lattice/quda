@@ -11,6 +11,67 @@
 namespace quda {
   struct FullClover;
 
+  /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
+  typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
+
+  /**
+     Any spinor object can be qualified in the following categories:
+     1. A regular spinor field (is_composite = false , is_component = false)
+     2. A composite spinor field, i.e., a collection of spinor fields (is_composite = true , is_component = false)
+     3. An individual component of a composite spinor field (is_composite = false , is_component = true)
+     4. A subset of a composite spinor field (e.g., based on index range or field precision) : currently not implemented
+  */
+  struct CompositeColorSpinorFieldDescriptor {
+
+     bool is_composite; //set to 'false' for a regular spinor field
+     bool is_component; //set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
+
+     int  dim;//individual component has dim = 0
+     int  id;
+
+     int volume;       // volume of a single eigenvector
+     int volumeCB;     // CB volume of a single eigenvector 
+     int stride;       // stride of a single eigenvector
+     size_t real_length;  // physical length of a single eigenvector
+     size_t length;       // length including pads (but not ghost zones)
+
+     size_t bytes;      // size in bytes of spinor field
+     size_t norm_bytes; // makes no sense but let's keep it...
+
+     CompositeColorSpinorFieldDescriptor()
+     : is_composite(false), is_component(false), dim(0), id(0), volume(0), volumeCB(0),
+       stride(0), real_length(0), length(0), bytes(0), norm_bytes(0)  {};
+
+     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0)
+     : is_composite(is_composite), is_component(is_component), dim(dim), id(id), volume(0), volumeCB(0),
+       stride(0), real_length(0), length(0), bytes(0), norm_bytes(0)
+     {        
+        if(is_composite && is_component) errorQuda("\nComposite type is not implemented.\n");
+        else if(is_composite && dim == 0) is_composite = false; 
+     }
+
+     CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr)
+     {
+       is_composite = descr.is_composite;
+       is_component = descr.is_component;
+
+       if(is_composite && is_component) errorQuda("\nComposite type is not implemented.\n");
+
+       dim = descr.dim;
+       id  = descr.id;
+
+       volume   = descr.volume; 
+       volumeCB = descr.volumeCB;     
+       stride   = descr.stride;       // stride of a single eigenvector
+       real_length = descr.real_length;  // physical length of a single eigenvector
+       length      = descr.length;       // length including pads (but not ghost zones)
+
+       bytes = descr.bytes;      // size in bytes of spinor field
+       norm_bytes = descr.norm_bytes; // makes no sense but let's keep it...
+     }
+
+  };
+
   class ColorSpinorParam : public LatticeFieldParam {
 
   public:
@@ -32,9 +93,11 @@ namespace quda {
     void *v; // pointer to field
     void *norm;
     
-    //! for eigcg:
-    int eigv_dim;    //number of eigenvectors
-    int eigv_id;     //eigenvector index
+    //! for deflation solvers:
+    bool is_composite;
+    int composite_dim;    //e.g., number of eigenvectors in the set
+    bool is_component;
+    int component_id;          //eigenvector index
 
     ColorSpinorParam(const ColorSpinorField &a);
       
@@ -43,7 +106,7 @@ namespace quda {
       nSpin(0), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
       create(QUDA_INVALID_FIELD_CREATE), PCtype(QUDA_PC_INVALID),
-      eigv_dim(0), eigv_id(-1) { ; }
+      is_composite(false), composite_dim(0), is_component(false), component_id(0) { ; }
 
       // used to create cpu params
   ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
@@ -56,7 +119,7 @@ namespace quda {
       create(QUDA_REFERENCE_FIELD_CREATE),
       PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||
 	      (inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ), 
-      v(V), eigv_dim(0), eigv_id(-1) {
+      v(V), is_composite(false), composite_dim(0), is_component(false), component_id(0) {
     
         if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
 	for (int d=0; d<nDim; d++) x[d] = X[d];
@@ -107,7 +170,7 @@ namespace quda {
       location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor), 
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-      create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), eigv_dim(cpuParam.eigv_dim), eigv_id(-1)
+      create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
       {
 	siteSubset = cpuParam.siteSubset;
 	fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
@@ -150,7 +213,8 @@ namespace quda {
       printfQuda("create = %d\n", create);
       printfQuda("v = %lx\n", (unsigned long)v);
       printfQuda("norm = %lx\n", (unsigned long)norm);
-      if(eigv_dim != 0) printfQuda("nEv = %d\n", eigv_dim);
+      //! for deflation etc.
+      if(is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
 
     virtual ~ColorSpinorParam() {
@@ -167,9 +231,9 @@ namespace quda {
     void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 		QudaPrecision precision, int pad, QudaSiteSubset subset, 
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-		QudaDWFPCType PCtype, int nev = 0, int evid = -1);
+		QudaDWFPCType PCtype);
     void destroy();  
-
+    
   protected:
     bool init;
     QudaPrecision precision;
@@ -194,44 +258,28 @@ namespace quda {
 
     void *v; // the field elements
     void *norm; // the normalization field
-
-    //! used for eigcg:
-    int eigv_dim;
-    int eigv_id;
-    int eigv_volume;       // volume of a single eigenvector 
-    int eigv_stride;       // stride of a single eigenvector
-    size_t eigv_real_length;  // physical length of a single eigenvector
-    size_t eigv_length;       // length including pads (but not ghost zones)
+    void *ghost_field; // unique ghost zone for this instance
 
     // multi-GPU parameters
+
+    int nFaceComms; // number of faces allocated
+
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
     
     int ghostFace[QUDA_MAX_DIM];// the size of each face
-    int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
-    int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
+    int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
+    int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
     size_t ghost_length; // length of ghost zone
     size_t ghost_norm_length; // length of ghost zone for norm
-    size_t total_length; // total length of spinor (physical + pad + ghost)
-    size_t total_norm_length; // total length of norm
 
     mutable void *ghost_fixme[2*QUDA_MAX_DIM];
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-
-    /*Warning: we need copies of the above params for eigenvectors*/
-    //multi_GPU parameters:
-    
-    //ghost pointers are always for single eigenvector..
-    size_t eigv_total_length;
-    size_t eigv_total_norm_length;
-    size_t eigv_ghost_length;
-    size_t eigv_ghost_norm_length;
-
-    size_t eigv_bytes;      // size in bytes of spinor field
-    size_t eigv_norm_bytes; // makes no sense but let's keep it...
+    size_t ghost_bytes; // size in bytes of the ghost field
+    size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -242,16 +290,17 @@ namespace quda {
     ColorSpinorField *even;
     ColorSpinorField *odd;
 
-    //! for eigcg:
-    std::vector<ColorSpinorField*> eigenvectors;
+    //! used for deflation eigenvector sets etc.:
+    CompositeColorSpinorFieldDescriptor composite_descr;//containes info about the set
+    //
+    CompositeColorSpinorField components;
       
-    void createGhostZone();
+    void createGhostZone(int nFace);
 
     // resets the above attributes based on contents of param
     void reset(const ColorSpinorParam &);
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
-    void clearGhostPointers();
 
     char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
     void setTuningString(); // set the vol_string and aux_string for use in tuning
@@ -274,13 +323,14 @@ namespace quda {
     int X(int d) const { return x[d]; }
     size_t RealLength() const { return real_length; }
     size_t Length() const { return length; }
-    size_t TotalLength() const { return total_length; }
     int Stride() const { return stride; }
     int Volume() const { return volume; }
     int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
+    size_t GhostBytes() const { return ghost_bytes; } 
+    size_t GhostNormBytes() const { return ghost_bytes; } 
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
     const char *AuxString() const { return aux_string; }
@@ -289,6 +339,8 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+    void* Ghost2() { return ghost_field; }
+    const void* Ghost2() const { return ghost_field; } // v will eventually be replaced by ghost_field
 
     int Nface() const { return (nSpin == 1) ? 3 : 1; } // FIXME for naive staggered or other operators
 
@@ -317,18 +369,19 @@ namespace quda {
       */ 
     bool isNative() const;
 
-    //! for eigcg only:
-    int EigvDim() const { return eigv_dim; }
-    int EigvId() const { return eigv_id; }
-    int EigvVolume() const { return eigv_volume; }
-    int EigvStride() const { return eigv_stride; }
-    size_t EigvLength() const { return eigv_length; }
-    size_t EigvRealLength() const { return eigv_real_length; }
-    size_t EigvTotalLength() const { return eigv_total_length; }
-    
-    size_t EigvBytes() const { return eigv_bytes; }
-    size_t EigvNormBytes() const { return eigv_norm_bytes; }
-    size_t EigvGhostLength() const { return eigv_ghost_length; }
+    bool IsComposite() const { return composite_descr.is_composite; }
+    bool IsComponent() const { return composite_descr.is_component; }
+
+    int CompositeDim() const { return composite_descr.dim; }
+    int ComponentId() const { return composite_descr.id; }
+    int ComponentVolume() const { return composite_descr.volume; }
+    int ComponentVolumeCB() const { return composite_descr.volumeCB; }
+    int ComponentStride() const { return composite_descr.stride; }
+    size_t ComponentLength() const { return composite_descr.length; }
+    size_t ComponentRealLength() const { return composite_descr.real_length; } 
+ 
+    size_t ComponentBytes() const { return composite_descr.bytes; }
+    size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
 
     QudaDWFPCType DWFPCtype() const { return PCtype; }
 
@@ -339,13 +392,16 @@ namespace quda {
 
     size_t GhostLength() const { return ghost_length; }
     const int *GhostFace() const { return ghostFace; }  
-    int GhostOffset(const int i) const { return ghostOffset[i]; }  
-    int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
+    int GhostOffset(const int i) const { return ghostOffset[i][0]; }  
+    int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
+    int GhostNormOffset(const int i ) const { return ghostNormOffset[i][0]; }  
+    int GhostNormOffset(const int i, const int j) const { return ghostNormOffset[i][j]; }
+    
     void* Ghost(const int i);
     const void* Ghost(const int i) const;
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
-    
+
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */
@@ -391,13 +447,19 @@ namespace quda {
   private:
     bool alloc; // whether we allocated memory
     bool init;
+    bool ghostInit;
 
     bool texInit; // whether a texture object has been created or not
+    bool ghostTexInit; // whether the ghost texture object has been created
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
+    cudaTextureObject_t ghostTex;
+    cudaTextureObject_t ghostTexNorm;
     void createTexObject();
+    void createGhostTexObject();
     void destroyTexObject();
+    void destroyGhostTexObject();
 #endif
 
 #ifdef GPU_COMMS  // This is a hack for half precision.
@@ -420,7 +482,43 @@ namespace quda {
     static void* ghostFaceBuffer[2]; // gpu memory
     static void* fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    static int initGhostFaceBuffer;
+    static bool initGhostFaceBuffer;
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_send_p2p_back[QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_recv_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    MsgHandle* mh_recv_p2p_back[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_fwd[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_back[QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_back[QUDA_MAX_DIM];
+
+    /** Local copy of event used for peer-to-peer synchronization */
+    cudaEvent_t ipcCopyEvent[2][QUDA_MAX_DIM];
+
+    /** Remote copy of event used for peer-to-peer synchronization */
+    cudaEvent_t ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
+
+    /** Remote ghost pointer for sending ghost to */
+    void* fwdGhostSendDest[QUDA_MAX_DIM];
+
+    /** Remote ghost pointer for sending ghost to */
+    void* backGhostSendDest[QUDA_MAX_DIM];
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -440,16 +538,16 @@ namespace quda {
     /** Whether we have initialized communication for this field */
     bool initComms;
 
+    /** Whether we have initialized peer-to-peer communication for this field */
+    bool initIPCComms;
+
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
-
-    /** How many faces we are communicating in this communicator */
-    int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
   public:
 
     static int bufferIndex;
-	
+
     //cudaColorSpinorField();
     cudaColorSpinorField(const cudaColorSpinorField&);
     cudaColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);
@@ -465,11 +563,26 @@ namespace quda {
 
     /** Create the communication handlers and buffers */
     void createComms(int nFace);
+
     /** Destroy the communication handlers and buffers */
     void destroyComms();
+    
+    /** Create the inter-process communication handlers */
+    void createIPCComms();
+
+    /** Destroy the inter-process communication handlers */
+    void destroyIPCComms();
+
+    /** Handle to remote copy event used for peer-to-peer synchronization */
+    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+
+    /** Allocate the ghost buffers */
     void allocateGhostBuffer(int nFace);
+
     /** Ghost buffer allocation for the generic packer*/
     void allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const;
+
+    /** Free statically allocated ghost buffers */
     static void freeGhostBuffer(void);
 
     /**
@@ -553,16 +666,22 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
-    void recvStart(int nFace, int dir, int dagger=0);
-    void sendStart(int nFace, int dir, int dagger=0);
-    void commsStart(int nFace, int dir, int dagger=0);
-    int commsQuery(int nFace, int dir, int dagger=0); 
-    void commsWait(int nFace, int dir, int dagger=0); 
+    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
+    /** Helper function to determine if local-to-remote (send) peer-to-peer copy is complete */
+    inline bool ipcCopyComplete(int dir, int dim);
+
+    /** Helper function to determine if local-to-remote (receive) peer-to-peer copy is complete */
+    inline bool ipcRemoteCopyComplete(int dir, int dim);
 
     /**
        Do a ghost exchange between neighbouring nodes.  All dimensions
@@ -571,14 +690,15 @@ namespace quda {
      */
     void exchangeGhost(QudaParity parity, int dagger) const;
 
-
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
+    const cudaTextureObject_t& GhostTex() const { return ghostTex; }
+    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm; }
 #endif
 
-    cudaColorSpinorField& Eigenvec(const int idx) const;
-    void CopyEigenvecSubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
+    cudaColorSpinorField& Component(const int idx) const;
+    void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
 
     void zero();
 

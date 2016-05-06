@@ -450,13 +450,11 @@ def gen(dir, pack_only=False):
     str += "\n"
 
     str += "faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
-    str += "const int sp_idx =  face_idx + param.ghostOffset[" + `dir/2` + "];\n"
+    str += "const int sp_idx =  face_idx + param.ghostOffset[" + `dir/2` + "]["  + `1-dir%2` + "];\n"
 
     str += "#if (DD_PREC==2)\n"
     str += "  sp_norm_idx = face_idx + "
-    if dir%2 == 0:
-      str += "FLAVORS*ghostFace[" + `dir/2` + "] + "
-    str += "param.ghostNormOffset[" + `dir/2` + "];\n"
+    str += "param.ghostNormOffset[" + `dir/2` + "][" +  `1-dir%2` + "];\n"
     str += "#endif"
     str += "\n"
 
@@ -522,22 +520,26 @@ def gen(dir, pack_only=False):
     load_half_flv1 = "// read half spinor for the first flavor from device memory\n"
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0:
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
-    else:
+#    if (dir+1) % 2 == 0:
+#          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
+#    else:
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+#          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
+    load_half_flv1 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
 
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
     load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[" + `dir/2` + "];\n"
+    load_half_flv2 += "#if (DD_PREC==2)\n"
+    load_half_flv2 += "const int fl_norm_idx = sp_norm_idx + ghostFace[" + `dir/2` + "];\n"
+    load_half_flv2 += "#endif\n"
 # we have to use the same volume index for backwards and forwards gathers
 # instead of using READ_UP_SPINOR and READ_DOWN_SPINOR, just use READ_HALF_SPINOR with the appropriate shift
-    if (dir+1) % 2 == 0:
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
-    else:
+#    if (dir+1) % 2 == 0:
+#          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
+#  else:
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
-
+#          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[" + `dir/2` + "]);\n\n"
+    load_half_flv2 += "READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, fl_idx, fl_norm_idx);\n\n"
 
 
     project = "// project spinor into half spinors\n"

@@ -219,7 +219,7 @@ namespace quda {
     }
     else
     {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, 0.0, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     }
   }
 
@@ -399,7 +399,7 @@ namespace quda {
     }
     else
     {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, 0.0, QUDA_COARSEPC_DIRAC, matpcType);
     }
   }
 

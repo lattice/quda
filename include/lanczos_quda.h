@@ -70,8 +70,9 @@ namespace quda {
                     cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m);
   };
     
+#if 0
   /**
-  Not implemented yet!!!, Implicitely restarted Lanczos algoritm can rapidly approach the solution than normal Lanczos, Chebychev acceleration and implicite restart processes are needed. At this moment external program call can do this.
+     Not implemented yet!!!, Implicitely restarted Lanczos algoritm can rapidly approach the solution than normal Lanczos, Chebychev acceleration and implicite restart processes are needed. At this moment external program call can do this.
   */
 
   class ImpRstLanczos : public Eig_Solver {
@@ -86,7 +87,7 @@ namespace quda {
     void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
                     cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m);
   };
-
+#endif
 
 } // namespace quda
 

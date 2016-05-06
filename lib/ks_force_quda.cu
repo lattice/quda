@@ -63,11 +63,9 @@ namespace quda {
 #endif
 #endif
 
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
-
-      Matrix<Cmplx,3> O;
-      Matrix<Cmplx,3> G;
-      Matrix<Cmplx,3> M;
+      Matrix<complex<Float>,3> O;
+      Matrix<complex<Float>,3> G;
+      Matrix<complex<Float>,3> M;
 
 
       int dx[4] = {0,0,0,0};
@@ -277,7 +275,7 @@ X[dir] += 2*arg.border[dir];
 #endif
 #endif
 
-typedef typename ComplexTypeId<Float>::Type Cmplx;
+typedef complex<Float> Cmplx;
 
 Matrix<Cmplx,3> O;
 Matrix<Cmplx,3> G;

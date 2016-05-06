@@ -329,15 +329,17 @@ namespace quda {
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
+     @param cloverInv[in] Inverse Clover field on fine grid (optional, only for twisted-clover)
      @param kappa[in] Kappa parameter
+     @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa,
-		QudaDiracType dirac, QudaMatPCType matpc);
+		const cudaGaugeField &gauge, const cudaCloverField *clover, const cudaCloverField *cloverInv,
+		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
 
 
   /**
@@ -365,6 +367,7 @@ namespace quda {
      @param clover[in] Clover field on fine grid
      @param cloverInv[in] Clover inverse field on fine grid
      @param kappa[in] Kappa parameter
+     @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
@@ -372,7 +375,7 @@ namespace quda {
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		      const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
-		      double kappa, QudaDiracType dirac, QudaMatPCType matpc);
+		      double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      KS version of the above, in fact, just identical function

@@ -1,6 +1,6 @@
 
 
-
+# all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
@@ -50,25 +50,40 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
   quda_memcpy.cpp version.cpp )
 
-#set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS dummy)
-add_custom_target( git_version
-COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy
-)
 
+## split source into cu and cpp files
+FOREACH(item ${QUDA_OBJS})
+  STRING(REGEX MATCH ".+\\.cu$" item_match ${item})
+  IF(item_match)
+    LIST(APPEND QUDA_CU_OBJS ${item})
+  ENDIF(item_match)
+ENDFOREACH(item ${QUDA_OBJS})
 
-
-set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy)
-
+LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
 endif()
 
+# QUDA_CU_OBJS shoudl contain all cuda files now
+# QUDA_OBJS all c, cpp, fortran sources
+
+# if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
+if(GITVERSION)
+  find_file(QUDA_GITDIR NAMES .git PATHS ${CMAKE_SOURCE_DIR} NO_DEFAULT_PATH)
+  set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/logs/HEAD)
+endif()
+mark_as_advanced(QUDA_GITDIR)
+
+
+
 include_directories(dslash_core)
 include_directories(.)
-cuda_add_library(quda STATIC ${QUDA_OBJS})
-if(GITVERSION)
-  ADD_DEPENDENCIES(quda git_version)
-endif()
+
+# generate a cmake object library for all cpp files first
+add_library(quda_cpp OBJECT ${QUDA_OBJS})
+cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+
+# until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 
 
