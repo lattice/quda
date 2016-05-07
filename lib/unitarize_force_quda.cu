@@ -499,7 +499,7 @@ namespace { // anonymous
 
 	getUnitarizeForceSite<double>(result, v, oprod, arg);
 
-	arg.force.save((Float*)(oprod.data), idx, dir, parity);
+	arg.force.save((Float*)(result.data), idx, dir, parity);
       } // 4*4528 flops per site
       return;
     } // getUnitarizeForceField
@@ -517,7 +517,7 @@ namespace { // anonymous
 
 	    getUnitarizeForceSite<double>(result, v, oprod, arg);
 
-	    arg.force.save((Float*)(oprod.data), i, dir, parity);
+	    arg.force.save((Float*)(result.data), i, dir, parity);
 	  }
 	}
       }
