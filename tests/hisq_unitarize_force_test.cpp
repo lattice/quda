@@ -92,7 +92,7 @@ hisq_force_init()
 
   setDims(gaugeParam.X);
 
-  gaugeParam.cpu_prec = link_prec;
+  gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
