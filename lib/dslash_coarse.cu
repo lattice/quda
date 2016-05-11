@@ -310,7 +310,7 @@ namespace quda {
 	}
       }
     }
-
+#endif
     return; 
   }
 
