@@ -22,6 +22,9 @@ template <typename FloatN, int M, typename SpinorX, typename SpinorY,
   __global__ void blasKernel(BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
+
+  arg.f.init();
+
   while (i < arg.length) {
     FloatN x[M], y[M], z[M], w[M];
     arg.X.load(x, i);
@@ -272,40 +275,39 @@ template <template <typename Float, typename FloatN> class Functor,
     errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    if (x.Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       const int M = 1;
-#endif
-      if (x.Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-	Spinor<float4,float4,float4,M,writeX,0> X(x);
-	Spinor<float4,float4,float4,M,writeY,1> Y(y);
-	Spinor<float4,float4,float4,M,writeZ,2> Z(z);
-	Spinor<float4,float4,float4,M,writeW,3> W(w);
-	Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-	BlasCuda<float4,M,
-	  Spinor<float4,float4,float4,M,writeX,0>, Spinor<float4,float4,float4,M,writeY,1>, 
-	  Spinor<float4,float4,float4,M,writeZ,2>, Spinor<float4,float4,float4,M,writeW,3>, 
-	  Functor<float2, float4> > blas(X, Y, Z, W, f, x.Length()/(4*M), bytes, norm_bytes);
-	blas.apply(*blasStream);
+      Spinor<float4,float4,float4,M,writeX,0> X(x);
+      Spinor<float4,float4,float4,M,writeY,1> Y(y);
+      Spinor<float4,float4,float4,M,writeZ,2> Z(z);
+      Spinor<float4,float4,float4,M,writeW,3> W(w);
+      Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+      BlasCuda<float4,M,
+	Spinor<float4,float4,float4,M,writeX,0>, Spinor<float4,float4,float4,M,writeY,1>,
+	Spinor<float4,float4,float4,M,writeZ,2>, Spinor<float4,float4,float4,M,writeW,3>,
+	Functor<float2, float4> > blas(X, Y, Z, W, f, x.Length()/(4*M), bytes, norm_bytes);
+      blas.apply(*blasStream);
 #else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else if (x.Nspin()==2 || x.Nspin()==1) {
+    } else if (x.Nspin()==2 || x.Nspin()==1) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
-	Spinor<float2,float2,float2,M,writeX,0> X(x);
-	Spinor<float2,float2,float2,M,writeY,1> Y(y);
-	Spinor<float2,float2,float2,M,writeZ,2> Z(z);
-	Spinor<float2,float2,float2,M,writeW,3> W(w);
-	Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-	BlasCuda<float2,M,
-	  Spinor<float2,float2,float2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>, 
-	  Spinor<float2,float2,float2,M,writeZ,2>, Spinor<float2,float2,float2,M,writeW,3>, 
-	  Functor<float2, float2> > blas(X, Y, Z, W, f, x.Length()/(2*M), bytes, norm_bytes);
-	blas.apply(*blasStream);
+      const int M = 1;
+      Spinor<float2,float2,float2,M,writeX,0> X(x);
+      Spinor<float2,float2,float2,M,writeY,1> Y(y);
+      Spinor<float2,float2,float2,M,writeZ,2> Z(z);
+      Spinor<float2,float2,float2,M,writeW,3> W(w);
+      Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+      BlasCuda<float2,M,
+	Spinor<float2,float2,float2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>,
+	Spinor<float2,float2,float2,M,writeZ,2>, Spinor<float2,float2,float2,M,writeW,3>,
+	Functor<float2, float2> > blas(X, Y, Z, W, f, x.Length()/(2*M), bytes, norm_bytes);
+      blas.apply(*blasStream);
 #else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+    } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
   } else {
     if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
     if (x.Nspin() == 4){ //wilson

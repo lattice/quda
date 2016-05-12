@@ -82,16 +82,16 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 
   LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,ReduceSimpleType,FloatN,M);
 
+  if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
-  if(deviceProp.canMapHostMemory) {
-    cudaEventRecord(reduceEnd, stream);
-    while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
-  } else
+    if(deviceProp.canMapHostMemory) {
+      cudaEventRecord(reduceEnd, stream);
+      while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
+    } else
 #endif
-    { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
-
+      { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
+  }
   doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
-
   return cpu_sum;
 }
 

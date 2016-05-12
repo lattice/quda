@@ -177,6 +177,10 @@ namespace quda {
       }
     }
 
+    // reduce over all processes
+    for (int i=0; i<N; i++) comm_allreduce_int(&iter[i]);
+    for (int f=0; f<fail_check; f++) comm_allreduce_int(&fail[f]);
+
     for (int i=0; i<N; i++) printfQuda("%d fails = %d\n", i, iter[i]);
 
     int accuracy_level =0;
@@ -184,9 +188,10 @@ namespace quda {
       if (fail[f] == 0) accuracy_level = f+1;
     }
 
+    size_t total = u.Nparity()*u.VolumeCB()*N*comm_size();
     for (int f=0; f<fail_check; f++) {
-      printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)tol), 
-		 fail[f], u.Nparity()*u.VolumeCB()*N, fail[f] / (double)(u.Nparity()*u.VolumeCB()*N));
+      printfQuda("%e Failures: %d / %lu  = %e\n", pow(10.0,-(f+1)/(double)tol),
+		 fail[f], total, fail[f] / (double)total);
     }
 
     delete []iter;

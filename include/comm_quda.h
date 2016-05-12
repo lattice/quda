@@ -129,8 +129,9 @@ extern "C" {
 
   /**
      Enabled peer-to-peer communication.
+     @param hostname_buf Array that holds all process hostnames
    */
-  void comm_peer2peer_init();
+  void comm_peer2peer_init(const char *hostname_recv_buf);
 
   /**
      Query if peer-to-peer communication is enabled

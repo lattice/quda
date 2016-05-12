@@ -1,3 +1,4 @@
+#pragma GCC diagnostic ignored "-Wall"
 // Copyright 2008, Google Inc.
 // All rights reserved.
 //

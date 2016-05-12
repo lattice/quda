@@ -129,6 +129,9 @@ void commDimPartitionedSet(int dir);
 bool commGlobalReduction();
 void commGlobalReductionSet(bool global_reduce);
 
+bool commAsyncReduction();
+void commAsyncReductionSet(bool global_reduce);
+
 #ifdef __cplusplus
   extern "C" {
 #endif
