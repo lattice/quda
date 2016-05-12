@@ -402,6 +402,7 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir){
 
 
 static bool globalReduce = true;
+static bool asyncReduce = false;
 
 void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
 
@@ -421,3 +422,7 @@ void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
 bool commGlobalReduction() { return globalReduce; }
 
 void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduction; }
+
+bool commAsyncReduction() { return asyncReduce; }
+
+void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }

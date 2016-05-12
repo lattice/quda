@@ -589,20 +589,23 @@ namespace quda {
   void cudaColorSpinorField::allocateGhostBuffer(int nFace) {
     if (!ghostInit || nFace != nFaceComms) {
 
-      if (nFace != nFaceComms) {
+      size_t ghost_bytes_old = ghost_bytes;
+
+      createGhostZone(nFace);
+
+      if (ghost_bytes_old != ghost_bytes) {
 #ifdef USE_TEXTURE_OBJECTS
 	destroyGhostTexObject();
 #endif
 	if (ghostInit && ghost_bytes) device_free(ghost_field);
-      }
 
-      createGhostZone(nFace);
+	// all fields create their own unique ghost zone
+	if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
 
-      // all fields create their own unique ghost zone
-      if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
 #ifdef USE_TEXTURE_OBJECTS
-      createGhostTexObject();
+	createGhostTexObject();
 #endif
+      }
 
       // initialize the ghost pointers
       if (siteSubset == QUDA_PARITY_SITE_SUBSET) {
@@ -1201,10 +1204,6 @@ namespace quda {
 
     if (!initComms) errorQuda("Can only be called after create comms");
     if (!ghost_field) errorQuda("ghost_field appears not to be allocated");
-
-    comm_peer2peer_init();
-
-    checkCudaError();
 
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][QUDA_MAX_DIM];

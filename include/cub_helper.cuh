@@ -54,7 +54,10 @@ namespace quda {
       partial(static_cast<T*>(blas::getDeviceReduceBuffer())),
       result_d(static_cast<T*>(blas::getMappedHostReduceBuffer())),
       result_h(static_cast<T*>(blas::getHostReduceBuffer())) 
-    { }
+    {
+      //  write reduction to GPU memory if asynchronous
+      if (commAsyncReduction()) result_d = partial;
+    }
 
   };
 
