@@ -77,6 +77,12 @@ namespace quda {
     /** The sloppy Dirac operator to use for smoothing */
     DiracMatrix &matSmoothSloppy;
 
+    /** The Dirac operator used for eigensolver*/
+    DiracMatrix *matEigen;
+
+    /** The Dirac operator used for eigensolver*/
+    DiracMatrix *matEigenSloppy;
+
     /** What type of smoother to use */
     QudaInverterType smoother;
 
@@ -117,6 +123,8 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       matSmoothSloppy(matSmoothSloppy),
+      matEigen(nullptr),
+      matEigenSloppy(nullptr),
       smoother(param.smoother[level]),
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
@@ -152,6 +160,8 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       matSmoothSloppy(matSmoothSloppy),
+      matEigen(nullptr),
+      matEigenSloppy(nullptr),
       smoother(param.mg_global.smoother[level]),
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
@@ -163,6 +173,13 @@ namespace quda {
 	// set the smoother relaxation factor
 	omega = param.mg_global.omega[level];
       }
+
+    /**Helper method to set Dirac operator for the eigensolver*/ 
+    void setMatEigen(DiracMatrix &_matEigen, DiracMatrix &_matEigenSloppy)
+    { 
+       if( matEigen       == nullptr ) matEigen       = &_matEigen;
+       if( matEigenSloppy == nullptr ) matEigenSloppy = &_matEigenSloppy;
+    }
 
   };
 
@@ -400,7 +417,11 @@ namespace quda {
     DiracM *mSmoothSloppy;
 
     //For the fine-grid level even-odd staggered:
+    Dirac *dEigen;
+    Dirac *dEigenSloppy;
+
     DiracMdagM *ksmSmooth;
+    DiracMdagM *ksmSmoothSloppy;
 
     std::vector<ColorSpinorField*> B;
 
@@ -422,12 +443,15 @@ namespace quda {
 
       if (m) delete m;
       if (mSmooth) delete mSmooth;
-      if (ksmSmooth) delete ksmSmooth;
       if (mSmoothSloppy) delete mSmoothSloppy;
+      if (ksmSmooth) delete ksmSmooth;
+      if (ksmSmoothSloppy) delete ksmSmoothSloppy;
 
       if (d) delete d;
       if (dSmooth) delete dSmooth;
       if (dSmoothSloppy && dSmoothSloppy != dSmooth) delete dSmoothSloppy;
+      if (dEigen) delete dEigen;
+      if (dEigenSloppy && dEigenSloppy != dEigen) delete dEigenSloppy;
       profile.TPSTOP(QUDA_PROFILE_FREE);
     }
   };
