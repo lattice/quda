@@ -28,6 +28,9 @@ namespace quda {
        if (param.level < param.Nlevel-1 ) { // null space generation only on level 1 currently
            if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
 	      generateNullVectors(param.B);
+           } else if(param.mg_global.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR){
+              computeLowModeVectors(param.B);
+              warningQuda("\nUse eigensolver to generate nullspace..\n");
       	   } else {
 		loadVectors(param.B);
       	   }
@@ -38,6 +41,9 @@ namespace quda {
        if (param.level == 0 ) { // null space generation only on level 1 currently
            if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
               generateNullVectors(param.B);
+           } else if(param.mg_global.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR){
+              computeLowModeVectors(param.B);
+              warningQuda("\nUse eigensolver to generate nullspace..\n");
            } else {
                 loadVectors(param.B);
            }
@@ -767,6 +773,280 @@ namespace quda {
 	delete b;
 	delete x;
       }//stop for-loop:
+
+    saveVectors(B);
+
+    return;
+  }
+
+  const bool use_mixed_precision = false;
+
+  void MG::computeLowModeVectors(std::vector<ColorSpinorField*> B) {
+    printfQuda("\nCompute low mode vectors\n");
+    //Create spinor field parameters:
+    const Dirac &dirac  = *(param.matEigen->Expose());
+    //const Dirac &dirac  = *(param.matSmooth.Expose());//if use_mixed_precision 
+
+    SolverParam solverParam(param);
+
+    // set low-mode-space generation options - need to expose these
+    if(!(param.matSmooth.isStaggered() && param.level == 0 /*&& param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE*/)) errorQuda("\nEigensolver is cuurently not implemented for this operator\n");
+    //set incremetal (solo-precision) eigcg with 12 RHS:
+    const int rhs_num = 24;//48, 24 for real fld, 80 could be fine (128)
+    const int Nvec = B.size();
+
+    solverParam.inv_type = QUDA_INC_EIGCG_INVERTER;
+    //general setup:
+    solverParam.maxiter = 30000;
+    solverParam.tol = 1e-16;//1e-14
+    solverParam.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+    solverParam.delta = 1e-7;
+
+    solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+    solverParam.compute_null_vector = QUDA_COMPUTE_LOW_MODE_VECTOR;
+    solverParam.precision = param.mg_global.eigensolver_precision;
+    //solverParam.precision = solverParam.precision_sloppy;
+    solverParam.precision_sloppy = (param.mg_global.eigensolver_precision != solverParam.precision_sloppy && use_mixed_precision) ? solverParam.precision_sloppy : param.mg_global.eigensolver_precision;
+
+    //eigcg specific setup:
+    solverParam.nev = 8; 
+    solverParam.m   = 128;//144
+    solverParam.deflation_grid = rhs_num;//to generate 48 eigenvectors but we will compute 96 vectors
+    solverParam.precision_ritz = (param.mg_global.eigensolver_precision != solverParam.precision_sloppy && use_mixed_precision) ? solverParam.precision_sloppy : param.mg_global.eigensolver_precision;// B[0]->Precision(); 
+    solverParam.tol_restart = 5e+3*solverParam.tol;//think about this...
+    solverParam.use_reduced_vector_set = true;
+    solverParam.use_cg_updates = false;
+    solverParam.cg_iterref_tol = 5e-2;
+    solverParam.eigcg_max_restarts = 1;//3
+    solverParam.max_restart_num = 3;
+    solverParam.inc_tol = 1e-2;
+    solverParam.eigenval_tol = 1e+1;//eigenvalue selection (default 1e-2) 
+    solverParam.rhs_idx = 0;
+
+    if( (solverParam.deflation_grid*solverParam.nev) < Nvec) errorQuda("\nIncorrect eigCG parameters.\n");
+
+    ColorSpinorParam csParam(*B[0]);
+    // to force setting the field to be native first set to double-precision native order
+    // then use the setPrecision method to set to native order
+    csParam.gammaBasis = param.B[0]->GammaBasis();//hack for staggered
+    csParam.precision = QUDA_DOUBLE_PRECISION;
+    if(solverParam.precision != QUDA_DOUBLE_PRECISION)
+    {
+      csParam.setPrecision(B[0]->Precision());//ok
+    }
+    else
+    {
+      printfQuda("\nRunning full precision eigensolver.\n");
+    }
+
+    printfQuda("\nPrecisions: (%d, %d, %d)\n", solverParam.precision, solverParam.precision_sloppy, solverParam.precision_ritz);
+      
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    cpuColorSpinorField *v1 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
+
+    csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    csParam.location   = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
+
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+//    std::vector<ColorSpinorField*>::iterator ref = B.begin();//reference field
+//    cpuColorSpinorField *cpu_ref     = static_cast<cpuColorSpinorField*> (*ref);
+    cpuColorSpinorField &cpu_even_ref = static_cast<cpuColorSpinorField&>(v1->Even());
+    cpuColorSpinorField &cpu_odd_ref = static_cast<cpuColorSpinorField&>(v1->Odd());
+
+    csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+    csParam.x[0] /= 2;
+
+    //Create eigensolver:
+    //
+    Dirac &dirac_tmp = const_cast<Dirac&>(dirac);
+    double init_mass = dirac_tmp.Mass();
+    dirac_tmp.setMass((1.0*init_mass));//invert on zero mass, 0.001, 1.0 for l32t48
+
+    //DeflatedSolver *solve = DeflatedSolver::create(solverParam, &param.matSmooth, &param.matSmooth, &param.matSmooth, &param.matSmooth, &profile);
+    DeflatedSolver *solve = (param.mg_global.eigensolver_precision != solverParam.precision_sloppy && use_mixed_precision) ? DeflatedSolver::create(solverParam, param.matEigen, &param.matSmooth, &param.matSmooth, &param.matSmooth, &profile) : DeflatedSolver::create(solverParam, param.matEigen, param.matEigen, param.matEigen, param.matEigen, &profile);
+
+    for(int rhs = 0; rhs < solverParam.deflation_grid; rhs++ )
+    {
+       //cpu_par_ref.Source(QUDA_RANDOM_SOURCE);
+       v1->Source(QUDA_RANDOM_SOURCE);
+       csParam.create      = QUDA_COPY_FIELD_CREATE;
+       ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpu_even_ref, csParam));
+       //
+       csParam.create = QUDA_ZERO_FIELD_CREATE;
+       ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+       //
+       (*solve)(static_cast<cudaColorSpinorField*>(x), static_cast<cudaColorSpinorField*>(b));//launch eigCG on parity fields
+       //
+       printfQuda("\nWorked with RHS %d\n", rhs);
+       delete x;
+       delete b;
+    }
+    //save ritz vectors:
+    solve->ExtractRitzVecs(B, Nvec, true);
+    printfQuda("\nDelete incremental EigCG solver resources...\n");
+    //clean resources:
+    solve->CleanResources();
+    //
+    delete solve;
+
+    bool solve_other_parity = false;//true
+
+    if(solve_other_parity)
+    {
+       solverParam.rhs_idx = 0;
+
+       QudaMatPCType curr_matpctype  = dirac_tmp.getMatPCType();
+       QudaMatPCType other_matpctype = curr_matpctype == QUDA_MATPC_EVEN_EVEN ? QUDA_MATPC_ODD_ODD : QUDA_MATPC_EVEN_EVEN ;
+
+       dirac_tmp.setMatPCType(other_matpctype);
+
+       DeflatedSolver *solve = DeflatedSolver::create(solverParam, param.matEigen, param.matEigen, param.matEigen, param.matEigen, &profile);
+
+       for(int rhs = 0; rhs < solverParam.deflation_grid; rhs++ )
+       {
+         v1->Source(QUDA_RANDOM_SOURCE);
+         csParam.create      = QUDA_COPY_FIELD_CREATE;
+         ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpu_odd_ref, csParam));
+
+         csParam.create = QUDA_ZERO_FIELD_CREATE;
+         ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+
+         (*solve)(static_cast<cudaColorSpinorField*>(x), static_cast<cudaColorSpinorField*>(b));
+
+         delete x;
+         delete b;
+       }
+
+       csParam.create = QUDA_ZERO_FIELD_CREATE;
+       csParam.setPrecision(B[0]->Precision());//just to be safe   
+
+       csParam.x[0] *= 2;
+       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+       //full field
+       ColorSpinorField *t = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+
+       int id = 0;//current Ritz vector index
+
+       for(std::vector<ColorSpinorField*>::iterator vec = B.begin() ; vec != B.end() ; ++vec){       
+
+          cpuColorSpinorField *curr_vec = static_cast<cpuColorSpinorField*> (*vec);
+          copy(*t, *curr_vec);
+
+          if( other_matpctype == QUDA_MATPC_ODD_ODD )
+          {
+             solve->ExtractSingleRitzVec(&t->Odd(), id, QUDA_ODD_PARITY);
+          }
+          else
+          {
+             solve->ExtractSingleRitzVec(&t->Even(), id, QUDA_EVEN_PARITY);
+          }
+          copy(*curr_vec, *t);
+          id += 1;
+       }
+
+       solve->CleanResources();
+
+       delete t;
+       delete solve;
+
+       dirac_tmp.setMatPCType(curr_matpctype);
+       dirac_tmp.setMass(init_mass);
+    }
+    else
+    {
+       dirac_tmp.setMass(init_mass);
+
+       //create auxiliary gpu fields:
+       csParam.create = QUDA_ZERO_FIELD_CREATE;
+       //csParam.setPrecision(B[0]->Precision());//just to be safe   
+
+       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+
+       csParam.x[0] *= 2;
+       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+       //full field
+       ColorSpinorField *t = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+
+       QudaMatPCType curr_matpctype  = dirac.getMatPCType();
+
+       double _mass = dirac.Mass();
+
+       printfQuda("\nReconstruct parity components with mass %le\n", _mass);
+
+       for(std::vector<ColorSpinorField*>::iterator vec = B.begin() ; vec != B.end() ; ++vec){
+         //restore the other parity
+         cpuColorSpinorField *curr_vec = static_cast<cpuColorSpinorField*> (*vec);
+
+         copy(*t, *curr_vec);
+
+         if(curr_matpctype == QUDA_MATPC_EVEN_EVEN)
+         {
+            dirac.Dslash(t->Odd(), t->Even(), QUDA_ODD_PARITY);
+            ax(+ 1.0 / (2*_mass), t->Odd());//hopping term has opposite sign
+         }
+         else
+         {
+            dirac.Dslash(t->Even(), t->Odd(), QUDA_EVEN_PARITY);
+            ax(+ 1.0 / (2*_mass), t->Even());//hopping term has opposite sign
+         }
+
+         copy(*curr_vec, *t);
+
+         for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != vec; ++prevvec)
+         {
+            cpuColorSpinorField *prev_vec = static_cast<cpuColorSpinorField*> (*prevvec);
+
+            Complex alpha = cDotProduct(*prev_vec, *curr_vec);
+            caxpy(-alpha, *prev_vec, *curr_vec); 
+         }
+
+         double nrm2 = norm2(*curr_vec);
+         if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *curr_vec);
+         else errorQuda("\nCannot orthogonalize %ld vector\n", vec-B.begin());
+
+
+         if (getVerbosity() >= QUDA_VERBOSE)
+         {
+            copy(*t, *curr_vec);
+            double nrm_1   = blas::norm2(*t);
+            double nrm_1_e = blas::norm2(t->Even());
+            double nrm_1_o = blas::norm2(t->Odd());
+            printfQuda("Solution = %g (%g, %g) \n", nrm_1, nrm_1_e, nrm_1_o);
+
+            csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+            csParam.setPrecision(B[0]->Precision());
+            ColorSpinorField *t2 = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+            ColorSpinorField *t3 = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+
+            copy(*t3, *t);
+
+            param.matResidual(*t2, *t3);
+            if(param.matResidual.isStaggered())
+            {
+              double nrm_2 = blas::norm2(*t2);
+              blas::ax(2.0*dirac.Mass(), *t3);
+              double nrm_3 = xmyNorm(*t2, *t3);
+              printfQuda("NULL CHECK = %g (nrm_3 = %g)\n", nrm_2 / nrm_1, sqrt(nrm_3));
+            }
+
+            delete t3;
+            delete t2;
+         }//end QUDA_VERBOSE
+       }//stop for-loop:
+
+       delete t;
+    }
+
+    printfQuda("\n...done.\n");
+
+    delete v1;
+    //set original mass:
+    //dirac_tmp.setMass(init_mass);
 
     saveVectors(B);
 

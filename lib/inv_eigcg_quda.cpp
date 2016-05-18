@@ -1185,6 +1185,98 @@ namespace quda {
       return;
   }
 
+  void IncEigCG::ExtractRitzVecs(std::vector<ColorSpinorField*> &B, const int nev, bool exact, bool cleanResources)//cpu fields
+  {
+      if(B[0]->Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("\nWrong field location.\n");
+
+      if(B.size() < static_cast<const unsigned int>(nev)) errorQuda("\nContainer size is too small\n");
+
+      int nev_to_copy = nev > defl_param->cur_dim ? defl_param->cur_dim : nev;
+
+      if(nev > nev_to_copy)
+      {
+        if(!exact) 
+          warningQuda("\nWill copy %d eigenvectors (requested %d)\n", nev_to_copy, nev);
+        else
+          errorQuda("\nCannot copy %d eigenvectors (available %d)\n", nev, nev_to_copy);
+      }
+
+      QudaSiteSubset quda_field_site_subset = defl_param->cudaRitzVectors->SiteSubset();//parity or full field
+      QudaSiteSubset cpu_field_site_subset  = B[0]->SiteSubset();//parity or full field
+
+      if(cpu_field_site_subset == QUDA_PARITY_SITE_SUBSET && quda_field_site_subset == QUDA_FULL_SITE_SUBSET)
+         errorQuda("\nCannot copy full field to parity field, please check settings.\n");
+
+      QudaParity cpu_parity = QUDA_INVALID_PARITY;
+
+      if(cpu_field_site_subset == QUDA_FULL_SITE_SUBSET && quda_field_site_subset == QUDA_PARITY_SITE_SUBSET)
+      {//we need to know which parity to copy:
+        const Dirac &dirac = *(const_cast<DiracMatrix*>(matDefl)->Expose());
+        QudaMatPCType matpctype = dirac.getMatPCType();
+        cpu_parity = (matpctype == QUDA_MATPC_EVEN_EVEN || matpctype == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+      }
+
+      ColorSpinorParam csParam(defl_param->cudaRitzVectors->Component(0));
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+      if(quda_field_site_subset == QUDA_PARITY_SITE_SUBSET)
+      {
+        csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+        csParam.x[0] *= 2;
+      }
+
+      cudaColorSpinorField *tmp = new cudaColorSpinorField(csParam);
+
+      int i = 0;
+      for(std::vector<ColorSpinorField*>::iterator vec = B.begin() ; vec != B.end(); ++vec)
+      {
+         cpuColorSpinorField  *tmp2  = static_cast<cpuColorSpinorField*> (*vec);
+
+         if( cpu_field_site_subset == quda_field_site_subset)
+         {
+            copy(*tmp2, defl_param->cudaRitzVectors->Component(i++));
+         }
+         else if( cpu_parity == QUDA_EVEN_PARITY ) 
+         {
+            copy(tmp->Even(), defl_param->cudaRitzVectors->Component(i++));
+            copy(*tmp2, *tmp);
+         }
+         else
+         {
+            copy(tmp->Odd(), defl_param->cudaRitzVectors->Component(i++));
+            copy(*tmp2, *tmp);
+         }
+      }
+
+      delete tmp;
+
+      if(cleanResources) CleanResources();
+
+      return;
+  }
+
+  void IncEigCG::ExtractSingleRitzVec(ColorSpinorField* out, const int id, QudaParity parity)
+  {
+    if( (defl_param->cudaRitzVectors->SiteSubset() == QUDA_PARITY_SITE_SUBSET && (out->SiteSubset() == QUDA_FULL_SITE_SUBSET && parity == QUDA_INVALID_PARITY)) || (defl_param->cudaRitzVectors->SiteSubset() == QUDA_FULL_SITE_SUBSET && out->SiteSubset() == QUDA_PARITY_SITE_SUBSET) || ( id > defl_param->cur_dim ) )
+       errorQuda("\nCannot extract Ritz vector.\n");
+
+    if(out->SiteSubset() == defl_param->cudaRitzVectors->SiteSubset())
+    {
+      copy(*out, defl_param->cudaRitzVectors->Component(id));
+    }
+    else if(parity == QUDA_EVEN_PARITY)
+    {
+      copy(out->Even(), defl_param->cudaRitzVectors->Component(id));
+    }
+    else
+    {
+      copy(out->Odd(), defl_param->cudaRitzVectors->Component(id));
+    }
+
+    return;
+  } 
+
+
   void IncEigCG::CleanResources()
   {
     DeleteEigCGSearchSpace();
@@ -1215,6 +1307,10 @@ namespace quda {
 
        DeleteEigCGSearchSpace();
        //
+       //
+       if(param.compute_null_vector != QUDA_COMPUTE_LOW_MODE_VECTOR) printfQuda("\nWarning: IncEigCG will deploy initCG solver.\n");
+       else {printfQuda("\nWarning: nothing to do for the eigCG solver.\n"); return;}
+
        fillInitCGSolveParam(initCGparam, param.use_sloppy_partial_accumulator);
 
      }
@@ -1301,6 +1397,8 @@ namespace quda {
            //too messy..
            bool cg_updates    = (param.use_cg_updates || (eigcg_restarts < param.eigcg_max_restarts) || (defl_param->cur_dim == defl_param->tot_dim) || (stop_div_r2 > param.cg_iterref_tol));
 
+           if(param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR) cg_updates = false;//for MG low mode vectors enforce eigcg cycles
+
            bool eigcg_updates = !cg_updates;
 
            if(cg_updates) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, *profile);
@@ -1339,20 +1437,27 @@ namespace quda {
 
               if(eigcg_updates)
               {
-                 if(((eigcg_restarts >= param.eigcg_max_restarts) || (stop_div_r2 < param.cg_iterref_tol)) && (defl_param->cur_dim < defl_param->tot_dim))
+                 bool continue_eigcg_updates = ((eigcg_restarts >= param.eigcg_max_restarts) || (stop_div_r2 < param.cg_iterref_tol)) && (defl_param->cur_dim < defl_param->tot_dim);
+                 if(continue_eigcg_updates )
                  {
                    SaveEigCGRitzVecs(defl_param);//accumulate
                    //
                    ExpandDeflationSpace(defl_param, param.nev);
                    //
-                 }
-                 else
+                   //if( param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR) break;//eigcg_updates = false;
+                 } 
+                 else if(param.compute_null_vector != QUDA_COMPUTE_LOW_MODE_VECTOR)
                  {
                    if(!initCG && (r2 > stop)) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, *profile);
                    //param.tol     = param.cg_iterref_tol;
                    cg_updates    = true;
 
                    eigcg_updates = false;
+                 }
+                 else
+                 {
+                   warningQuda("\nStop iter refinement cycles.\n"); 
+                   break;
                  }
               }
            }//endof while loop
@@ -1390,6 +1495,8 @@ namespace quda {
      }
      //else: use deflated CG solver with proper restarting.
      else{
+        if(param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR) {printfQuda("\nWarning: nothing to do for the initCG solver.\n"); return;}
+
         double full_tol    = initCGparam.tol;
 
         double restart_tol = initCGparam.tol_restart;

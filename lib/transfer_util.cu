@@ -208,12 +208,11 @@ namespace quda {
     delete []check;
   }
 
-
   // Creates a block-ordered version of a ColorSpinorField, with parity blocking (for staggered fields)
   // N.B.: same as above but parity are separated (chirality).
   template <bool toBlock, int nVec, class Complex, class FieldOrder>
-  void blockCBOrderV(Complex *out, FieldOrder &in,
-		   const int *geo_map, const int *geo_bs,
+  void blockKSOrderV(Complex *out, FieldOrder &in,
+		   const int *geo_map, const int *geo_bs, int spin_bs,
 		   const cpuColorSpinorField &V) {
     //Compute the size of each block
     int geoBlockSize = 1;
@@ -222,7 +221,7 @@ namespace quda {
     const int geoBlockSizeCB = geoBlockSize / 2; //parity block size
 
     int x[QUDA_MAX_DIM];    // global coordinates
-    int y_cb[QUDA_MAX_DIM]; // local coordinates within a block (parity site ordering)
+    int y[QUDA_MAX_DIM]; // local coordinates within a block (parity site ordering)
 
     int checkLength = in.Nparity() * in.VolumeCB() * in.Ncolor() * in.Nvec();
     int *check = new int[checkLength];
@@ -236,35 +235,47 @@ namespace quda {
 	V.LatticeIndex(x, i);
 	//Compute the geometric offset within a block 
 	// (x fastest direction, t is slowest direction, non-parity ordered)
-	int blockOffsetCB = 0;
-	for (int d=in.Ndim()-1; d>=1; d--) {
-	  y_cb[d] = x[d]%geo_bs[d];
-	  blockOffsetCB *= geo_bs[d];
-	  blockOffsetCB += y_cb[d];
+	int blockOffset = 0;
+
+	for (int d=in.Ndim()-1; d>=0; d--) {
+	  y[d] = x[d]%geo_bs[d];
+	  blockOffset *= geo_bs[d];
+	  blockOffset += y[d];
 	}
         //
-        y_cb[0] = (x[0]%geo_bs[0]) / 2;
-        blockOffsetCB *= (geo_bs[0] / 2);
-	blockOffsetCB += y_cb[0];
+	if(spin_bs != 0) blockOffset /= 2;
 
 	//Take the block-ordered offset from the coarse grid offset (geo_map) 
 	//A.S.: geo_map introduced for the full site ordering, so ok to use it for the offset
 	int offset = geo_map[i]*nVec*geoBlockSize*in.Ncolor();
+        int index = 0;
 
 	for (int v=0; v<in.Nvec(); v++) {
 	  for (int c=0; c<in.Ncolor(); c++) {
-	    int index = offset +                                // geo block
-	      parity * nVec * geoBlockSizeCB * in.Ncolor() + // chiral block
+//
+            if(spin_bs == 0)//we don't block parity components
+            {
+               index = offset +                                // geo block
+                             v * geoBlockSize * in.Ncolor() + // vector
+                                  blockOffset * in.Ncolor() + // local (parity) geometry
+                                                               c;   // color
+            }
+            else
+            {
+	       index = offset +                                // geo block
+	       parity * nVec * geoBlockSizeCB * in.Ncolor() + // chiral block
 	                     v * geoBlockSizeCB * in.Ncolor() + // vector
-	                          blockOffsetCB * in.Ncolor() + // local (parity) geometry
+	                          blockOffset * in.Ncolor() + // local (parity) geometry
 	                                                       c;   // color
-	  if (toBlock) out[index] = in(parity, x_cb, 0, c, v); // going to block order
-	  else in(parity, x_cb, 0, c, v) = out[index]; // coming from block order
+            } 
+
+	    if (toBlock) out[index] = in(parity, x_cb, 0, c, v); // going to block order
+	    else in(parity, x_cb, 0, c, v) = out[index]; // coming from block order
 	    
-	  check[count++] = index;
+	    check[count++] = index;
+          }  
         }
       }
-     }
     }
 
     if (count != checkLength) {
@@ -274,8 +285,6 @@ namespace quda {
 
     delete []check;
   }
-
-
 
 
   // Orthogonalise the nc vectors v[] of length n
@@ -328,12 +337,10 @@ namespace quda {
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
 
-    int chiralBlocks = V.Nspin() != 1 ? vOrder.Nspin() / spin_bs : 2 ; 
+    int chiralBlocks = V.Nspin() != 1 ? vOrder.Nspin() / spin_bs : ( (spin_bs == 1) ? 2 : 1 ); //chiral blocks for staggered are just parity components
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
 
-    if(V.Nspin() == 1) spin_bs = 1;//just to be safe
-
-    if(V.Nspin() != 1 || (V.Nspin() == 1 && V.SiteSubset() == QUDA_PARITY_SITE_SUBSET)){//FIXME : this is not good, think about a separate parameter to distinguish staggered stuff!
+    if(V.Nspin() != 1){
       int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
     
@@ -342,12 +349,12 @@ namespace quda {
       blockOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
     }
     else{
-      int blocksize = (geo_blocksize * vOrder.Ncolor()) / 2; //parity block size
+      int blocksize = (geo_blocksize * vOrder.Ncolor()) / chiralBlocks; //parity block size?
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
-      blockCBOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, V);
+      blockKSOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
       blockGramSchmidt<double,Float,nVec>(Vblock, numblocks, blocksize);  
-      blockCBOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, V);    
+      blockKSOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
    
     }
     delete []Vblock;

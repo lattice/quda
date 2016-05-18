@@ -691,6 +691,8 @@ namespace quda {
 
 //    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
     virtual void StoreRitzVecs(void *host_buffer, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
+    virtual void ExtractRitzVecs(std::vector<ColorSpinorField*> &B, const int nev, bool exact = false, bool cleanResources = false) = 0;//internal method
+    virtual void ExtractSingleRitzVec(ColorSpinorField* out, const int id, QudaParity parity = QUDA_INVALID_PARITY) = 0;//internal method
 
     virtual void CleanResources() = 0;
 
@@ -772,6 +774,10 @@ namespace quda {
     //
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
     //
+    void ExtractRitzVecs(std::vector<ColorSpinorField*> &B, const int nev, bool exact = false, bool cleanResources = false);//cpu fields
+    //
+    void ExtractSingleRitzVec(ColorSpinorField* out, const int id, QudaParity parity = QUDA_INVALID_PARITY);//internal method
+    //
     void CleanResources();
 
     void LoadEigenvectors(DeflationParam *param, int max_nevs, double tol = 1e-3);
@@ -818,6 +824,10 @@ namespace quda {
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
     //
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
+    //
+    void ExtractRitzVecs(std::vector<ColorSpinorField*> &B, const int nev, bool exact = false, bool cleanResources = false) {};//cpu fields
+    //
+    void ExtractSingleRitzVec(ColorSpinorField* out, const int id, QudaParity parity = QUDA_INVALID_PARITY) {};//internal method
     //
     void CleanResources();
     //

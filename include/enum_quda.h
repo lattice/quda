@@ -392,6 +392,7 @@ extern "C" {
   typedef enum QudaComputeNullVector_s {
     QUDA_COMPUTE_NULL_VECTOR_NO,    
     QUDA_COMPUTE_NULL_VECTOR_YES,
+    QUDA_COMPUTE_LOW_MODE_VECTOR,
     QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
   } QudaComputeNullVector;
 

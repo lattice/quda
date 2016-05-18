@@ -327,6 +327,12 @@ namespace quda {
     void generateNullVectors(std::vector<ColorSpinorField*> B);
 
     /**
+       @brief Generate the low-mode vectors for even-odd preconditioned staggered 
+       @param B Generated low-mode vectors
+     */
+    void computeLowModeVectors(std::vector<ColorSpinorField*> B);
+
+    /**
        @brief Return the total flops done on this and all coarser levels.
      */
     double flops() const;
@@ -412,16 +418,17 @@ namespace quda {
     Dirac *dSmooth;
     Dirac *dSmoothSloppy;
 
-    DiracM *m;
-    DiracM *mSmooth;
-    DiracM *mSmoothSloppy;
+    DiracMatrix *m;
+    DiracMatrix *mSmooth;
+    DiracMatrix *mSmoothSloppy;
 
-    //For the fine-grid level even-odd staggered:
+    //for the eigensolvers:
     Dirac *dEigen;
     Dirac *dEigenSloppy;
 
-    DiracMdagM *ksmSmooth;
-    DiracMdagM *ksmSmoothSloppy;
+    //for the full precision mv in eigensolvers:
+    DiracMatrix *mEigen;
+    DiracMatrix *mEigenSloppy;
 
     std::vector<ColorSpinorField*> B;
 
@@ -444,14 +451,14 @@ namespace quda {
       if (m) delete m;
       if (mSmooth) delete mSmooth;
       if (mSmoothSloppy) delete mSmoothSloppy;
-      if (ksmSmooth) delete ksmSmooth;
-      if (ksmSmoothSloppy) delete ksmSmoothSloppy;
-
+      //
       if (d) delete d;
       if (dSmooth) delete dSmooth;
       if (dSmoothSloppy && dSmoothSloppy != dSmooth) delete dSmoothSloppy;
+      //
       if (dEigen) delete dEigen;
       if (dEigenSloppy && dEigenSloppy != dEigen) delete dEigenSloppy;
+
       profile.TPSTOP(QUDA_PROFILE_FREE);
     }
   };

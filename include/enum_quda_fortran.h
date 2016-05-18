@@ -350,6 +350,7 @@
 #define QudaComputeNullVector integer(4)
 #define QUDA_COMPUTE_NULL_VECTOR_NO  0 
 #define QUDA_COMPUTE_NULL_VECTOR_YES 1
+#define QUDA_COMPUTE_LOW_MODE_VECTOR 2
 #define QUDA_COMPUTE_NULL_VECTOR_INVALID QUDA_INVALID_ENUM
 
 #define QudaBoolean integer(4)

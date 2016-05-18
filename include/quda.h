@@ -340,6 +340,9 @@ extern "C" {
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
     QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL];
 
+    /** Experimental : the type of null solve to do on top grid (e/o preconditioning or not)*/
+    QudaSolveType null_solve_type;
+
     /** The type of multigrid cycle to perform at each level */
     QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
 
@@ -363,6 +366,9 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
+
+    /**< The precision used by the input fermion fields in the eigensolver */
+    QudaPrecision eigensolver_precision;//hack to use full precision eigensolver. Then will be used for mixed precision eigensolver 
  
     /** Whether to generate on all levels or just on level 0 */
     QudaBoolean generate_all_levels; 

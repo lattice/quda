@@ -196,6 +196,12 @@ namespace quda {
     const ColorSpinorField& Vectors() const { return *V_h; }
 
     /**
+     * Returns a const reference to the B container
+     * @return The B field const reference
+     */
+    const std::vector<ColorSpinorField*>& RawVectors() const {return B;}
+
+    /**
      * Returns the number of near nullvectors
      * @return Nvec
      */

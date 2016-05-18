@@ -2164,7 +2164,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 }
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
-  : m(nullptr), mSmooth(nullptr), mSmoothSloppy(nullptr), ksmSmooth(nullptr), ksmSmoothSloppy(nullptr), profile(profile) {
+  : m(nullptr), mSmooth(nullptr), mSmoothSloppy(nullptr), dEigen(nullptr), dEigenSloppy(nullptr), mEigen(nullptr), mEigenSloppy(nullptr), profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
 
@@ -2214,22 +2214,46 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
     (mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
   setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
   dSmooth = Dirac::create(diracSmoothParam);
-  if((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE){
-    ksmSmooth  = new DiracMdagM(*dSmooth);
-  }else{
-    mSmooth   = new DiracM(*dSmooth);
-  }
+  mSmooth = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE) ? static_cast<DiracMatrix*>( new DiracMdagM(*dSmooth) ) : static_cast<DiracMatrix*>( new DiracM(*dSmooth) );
 
   // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
   DiracParam diracSmoothSloppyParam;
   setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
-  if((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE){
-    ksmSmoothSloppy = new DiracMdagM(*dSmoothSloppy);
-  }else{
-    mSmoothSloppy   = new DiracM(*dSmoothSloppy);
+  mSmoothSloppy = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE) ? static_cast<DiracMatrix*>( new DiracMdagM(*dSmoothSloppy)) : static_cast<DiracMatrix*>( new DiracM(*dSmoothSloppy) );
+
+  if(mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR && mg_param.eigensolver_precision == param->cuda_prec)
+  {
+    DiracParam diracEigenParam;
+    setDiracParam(diracEigenParam, param, mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? fine_grid_pc_solve : !fine_grid_pc_solve);
+    dEigen   = Dirac::create(diracEigenParam);
+    mEigen   = mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? static_cast<DiracMatrix*>( new DiracMdagM(*dEigen) ) : static_cast<DiracMatrix*>( new DiracM(*dEigen) );
+
+    if( mg_param.null_solve_type == mg_param.smoother_solve_type[0] ) 
+    {
+      mEigenSloppy = mSmooth;
+    }
+    else
+    {
+      DiracParam diracEigenSloppyParam;
+      setDiracSloppyParam(diracEigenParam, param, mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? fine_grid_pc_solve : !fine_grid_pc_solve);
+      dEigenSloppy   = Dirac::create(diracEigenSloppyParam);
+      mEigenSloppy   = mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? static_cast<DiracMatrix*>( new DiracMdagM(*dEigenSloppy) ) : static_cast<DiracMatrix*>(  new DiracM(*dEigenSloppy) );
+    }
   }
-  
+  else if(mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR && mg_param.eigensolver_precision == param->cuda_prec_sloppy)
+  {
+    if(mg_param.null_solve_type == mg_param.smoother_solve_type[0])
+    {
+      mEigen       = mSmooth;
+      mEigenSloppy = mSmoothSloppy;
+    }
+    else 
+    {
+      errorQuda("\nCurrently not implemented.\n");
+    }
+  }
+ 
   printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
   ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
@@ -2239,10 +2263,9 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
 
   // fill out the MG parameters for the fine level
-  if( ksmSmooth == nullptr )//
-    mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
-  else
-    mgParam = new MGParam(mg_param, B, *m, *ksmSmooth, *ksmSmoothSloppy);
+  mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
+
+  if( mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR ) mgParam->setMatEigen( *mEigen, *mEigenSloppy );
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);

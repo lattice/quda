@@ -8,6 +8,7 @@
 namespace quda {
 
 #ifdef GPU_MULTIGRID
+#define STAGG_CPU_DEBUG
 
   using namespace quda::colorspinor;
 
@@ -39,7 +40,7 @@ namespace quda {
     { }
   };
 
-
+#ifndef STAGG_CPU_DEBUG
   /**
      Rotates from the fine-color basis into the coarse-color basis.
      A.S.: also works for staggered (fineSpin = 1)
@@ -66,6 +67,26 @@ namespace quda {
       }
     }
   }
+#else //STAGG_CPU_DEBUG
+  /**
+     Rotates from the fine-color basis into the coarse-color basis.
+     A.S.: also works for staggered (fineSpin = 1)
+  */
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, int coarse_colors_per_thread,
+	    class FineColor, class Rotator>
+  __device__ __host__ inline void rotateCoarseColor(complex<Float> *out, const FineColor &in, const Rotator &V,
+						    int parity, int nParity, int x_cb, int c_coarse) {
+    const int spinor_parity = (nParity == 2) ? parity : 0;
+    const int v_parity = (V.Nparity() == 2) ? parity : 0;
+    *out = 0.0;
+    for (int j = 0; j < fineColor; j++) {
+	*out += conj(V(v_parity, x_cb, 0/*s=0*/, j, c_coarse)) * in(spinor_parity, x_cb, 0/*s=0*/, j);
+    }
+  }
+
+#endif //END STAGG_CPU_DEBUG
+
+#ifndef STAGG_CPU_DEBUG
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int coarse_colors_per_thread, typename Arg>
   void Restrict(Arg arg) {
@@ -112,6 +133,48 @@ namespace quda {
 
     return;
   }
+
+#else
+
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int coarse_colors_per_thread, typename Arg>
+  void Restrict(Arg arg) {
+    for (int parity_coarse=0; parity_coarse<2; parity_coarse++) 
+      for (int x_coarse_cb=0; x_coarse_cb<arg.out.VolumeCB(); x_coarse_cb++)
+	for (int s=0; s<coarseSpin; s++) 
+	  for (int c=0; c<coarseColor; c++)
+	    arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
+
+    // loop over fine degrees of freedom
+    for (int parity=0; parity<arg.nParity; parity++) {
+      parity = (arg.nParity == 2) ? parity : arg.parity;
+
+      for (int x_cb=0; x_cb<arg.in.VolumeCB(); x_cb++) {
+
+	int x = parity*arg.in.VolumeCB() + x_cb;
+	int x_coarse = arg.fine_to_coarse[x];
+	int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
+	int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
+
+        for (int c_coarse = 0; c_coarse < coarseColor; c_coarse++) {
+          complex<Float> tmp;
+          rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>(&tmp, arg.in, arg.V, parity, arg.nParity, x_cb, c_coarse);
+
+          if(fineSpin == 1)
+          {
+            int staggered_coarse_spin = parity;
+            arg.out(parity_coarse,x_coarse_cb,staggered_coarse_spin, c_coarse) += tmp;
+          }
+          else
+          {
+            errorQuda("\nDisabled.\n");
+          }
+        }
+      }
+    }
+
+    return;
+  }
+#endif //END STAGG_CPU_DEBUG
 
   /**
      struct which acts as a wrapper to a vector of data.
@@ -392,8 +455,11 @@ namespace quda {
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
     // this seems like a reasonable value for both fine and coarse grids
+#ifndef STAGG_CPU_DEBUG
     constexpr int coarse_colors_per_thread = 2;
-
+#else
+    constexpr int coarse_colors_per_thread = 1;
+#endif
     Arg arg(Out, In, V, fine_to_coarse, coarse_to_fine, parity, in);
     RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread> restrictor(arg, out, in, Location(out, in, v));
     restrictor.apply(0);
