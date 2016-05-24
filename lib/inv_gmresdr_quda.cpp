@@ -730,7 +730,7 @@ namespace quda {
 
     while(j < m)//we allow full cycle
     {
-      cudaColorSpinorField *Av = &Vm->Component(j+1);
+      cudaColorSpinorField *Av = dynamic_cast<cudaColorSpinorField*>( &Vm->Component(j+1));
 
       (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);
 
@@ -878,7 +878,7 @@ namespace quda {
      while(j < m) //we allow full cycle
      {
        //pointer aliasing:
-       cudaColorSpinorField *Av = &Vm->Component(j+1);
+       cudaColorSpinorField *Av = dynamic_cast<cudaColorSpinorField*>(&Vm->Component(j+1));
 
        (*sloppy_mat)(*Av, Vm->Component(j), *ctmp1_p, *ctmp2_p);
        //
@@ -1208,7 +1208,7 @@ namespace quda {
 
       while(j < m)//we allow full cycle
       {
-        cudaColorSpinorField *Av = &Vm->Component(j+1);
+        cudaColorSpinorField *Av = dynamic_cast<cudaColorSpinorField*>(&Vm->Component(j+1));
 
         (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);//must be matDefl
 
