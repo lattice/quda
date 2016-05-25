@@ -576,6 +576,9 @@ namespace quda
     size_t regSize = sizeof(float);
 
       #ifdef GPU_CONTRACT
+        if (Location(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
+          errorQuda("Error: CPU fields not supported for covariant derivative");
+
         if(in->Precision() == QUDA_HALF_PRECISION)
           errorQuda("Error: Half precision not supported");
 
@@ -586,9 +589,11 @@ namespace quda
         profile.TPSTART(QUDA_PROFILE_INIT);
 
         if(in->Precision() == QUDA_SINGLE_PRECISION)
-          covdev = new CovDevCuda<float, float4>(out, &gauge, in, parity, mu);
+          covdev = new CovDevCuda<float, float4>(static_cast<cudaColorSpinorField*>(out), &gauge,
+                                                 static_cast<const cudaColorSpinorField*>(in), parity, mu);
         else if(in->Precision	() == QUDA_DOUBLE_PRECISION) {
-	  covdev = new CovDevCuda<double, double2>(out, &gauge, in, parity, mu);
+	  covdev = new CovDevCuda<double, double2>(static_cast<cudaColorSpinorField*>(out), &gauge,
+                                                   static_cast<const cudaColorSpinorField*>(in), parity, mu);
 	  regSize = sizeof(double);
         }
         profile.TPSTOP(QUDA_PROFILE_INIT);
