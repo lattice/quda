@@ -383,6 +383,9 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    // pointers to fields to avoid multiple creation overhead
+    ColorSpinorField *yp, *rp, *App, *tmpp;
+    bool init;
 
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
