@@ -715,6 +715,20 @@ namespace quda {
     return field;
   }
 
+  ColorSpinorField* ColorSpinorField::Create(const ColorSpinorField &src, const ColorSpinorParam &param) {
+
+    ColorSpinorField *field = NULL;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuColorSpinorField(src, param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaColorSpinorField(src, param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
 						   QudaFieldLocation new_location) {
     ColorSpinorParam coarseParam(*this);
