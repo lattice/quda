@@ -70,6 +70,14 @@ namespace quda {
     return y;
   }
 
+  __host__ __device__ inline double2 operator*(const double2 a, const double2 x) {
+    double2 y;
+    y.x = a.x*x.x-a.y*x.y;
+    y.y = a.x*x.y+a.y*x.x;
+    return y;
+  }
+
+
   __host__ __device__ inline float2 operator+(const float2 x, const float2 y) {
     float2 z;
     z.x = x.x + y.x;

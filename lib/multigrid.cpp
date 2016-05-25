@@ -94,7 +94,7 @@ namespace quda {
 				    param.matSmoothSloppy, param.matSmoothSloppy, profile);
     }
 
-    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && (param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type != QUDA_NORMOP_PC_SOLVE))
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && (param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE && param.smoother_solve_type != QUDA_NORMOP_PC_SOLVE))
       errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
 
     // create residual vectors
@@ -164,7 +164,8 @@ namespace quda {
       matCoarseResidual = new DiracM(*diracCoarseResidual);
 
       // create smoothing operators
-      diracParam.dirac = const_cast<Dirac*>(param.matSmooth.Expose());
+      //diracParam.dirac = const_cast<Dirac*>(param.matSmooth.Expose());
+      diracParam.dirac =  (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_SOLVE ) ? const_cast<Dirac*>(param.matResidual.Expose()) : const_cast<Dirac*>(param.matSmooth.Expose());
       diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE || param.mg_global.smoother_solve_type[param.level+1] == QUDA_NORMOP_PC_SOLVE) ?
 	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
 	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
@@ -340,7 +341,7 @@ namespace quda {
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
     double tol = std::pow(10.0, 4-2*csParam.precision);
-#if 0
+#if 1
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
@@ -359,7 +360,7 @@ namespace quda {
       if (deviation > tol) errorQuda("failed");
     }
 #endif 
-#if 1
+#if 0 //in emulation mode this does not work
     printfQuda("Checking 1 > || (1 - P (P^\\dagger D P) P^\\dagger D v_k || / || v_k || for %d vectors\n", 
 	       param.Nvec);
 
@@ -386,12 +387,13 @@ namespace quda {
     printfQuda("L2 relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("failed");
 
+
     printfQuda("\n");
     printfQuda("Comparing native coarse operator to emulated operator\n");
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     zero(*tmp_coarse);
     zero(*r_coarse);
-
+#if 0
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
 
@@ -438,7 +440,7 @@ namespace quda {
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
-    
+#endif    
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
@@ -460,7 +462,7 @@ namespace quda {
     if ( outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
 
-    if ( inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
+    if ( inner_solution_type == QUDA_MATPC_SOLUTION && (param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE && param.smoother_solve_type != QUDA_NORMOP_PC_SOLVE ))
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
     if ( debug ) printfQuda("entering V-cycle with x2=%e, r2=%e\n", norm2(x), norm2(b));
@@ -473,7 +475,23 @@ namespace quda {
 
       ColorSpinorField *out=nullptr, *in=nullptr;
 
-      ColorSpinorField &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *r : r->Even();
+     ColorSpinorField *y = nullptr;
+
+      if(r->Location() == QUDA_CPU_FIELD_LOCATION)
+      {
+         ColorSpinorParam csParam(x);
+         csParam.create = QUDA_ZERO_FIELD_CREATE;
+         csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+         if (x.SiteSubset() == QUDA_PARITY_SITE_SUBSET) csParam.x[0] *= 2;
+         y = static_cast<ColorSpinorField*> (new cudaColorSpinorField(csParam));
+      }
+      else
+      {
+         y = r;
+      }
+
+      //ColorSpinorField &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *r : r->Even();
+      ColorSpinorField &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *y : y->Even();
 
       // FIXME only need to make a copy if not preconditioning
       residual = b; // copy source vector since we will overwrite source with iterated residual
@@ -500,11 +518,15 @@ namespace quda {
       // FIXME this is currently borked if inner solver is preconditioned
       double r2 = 0.0;
       if (use_solver_residual) {
-	if (debug) r2 = norm2(*r);
+	//if (debug) r2 = norm2(*r);
+	if (debug) r2 = norm2(*y);
       } else {
-	param.matResidual(*r, x);
-	if (debug) r2 = xmyNorm(b, *r);
-	else axpby(1.0, b, -1.0, *r);
+	//param.matResidual(*r, x);
+	//if (debug) r2 = xmyNorm(b, *r);
+	//else axpby(1.0, b, -1.0, *r);
+	param.matResidual(*y, x);
+	if (debug) r2 = xmyNorm(b, *y);
+	else axpby(1.0, b, -1.0, *y);
       }
 
       // restrict to the coarse grid
@@ -519,14 +541,18 @@ namespace quda {
       if ( debug ) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
 
       // prolongate back to this grid
-      ColorSpinorField &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
+      //ColorSpinorField &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
+      ColorSpinorField &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? *y : y->Even(); // define according to inner solution type
       transfer->P(x_coarse_2_fine, *x_coarse); // repurpose residual storage
 
       xpy(x_coarse_2_fine, solution); // sum to solution FIXME - sum should be done inside the transfer operator
       if ( debug ) {
-	printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
+	//printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
+	//printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
+	//	   norm2(x), norm2(*r));
+	printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*y));
 	printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
-		   norm2(x), norm2(*r));
+		   norm2(x), norm2(*y));
       }
 
       // do the post smoothing
@@ -534,13 +560,17 @@ namespace quda {
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) {
 	in = b_tilde;
       } else { // this incurs unecessary copying
-	*r = b;
-	in = r;
+	//*r = b;
+	//in = r;
+	*y = b;
+	in = y;
       }
       //dirac.prepare(in, out, solution, residual, inner_solution_type);
       // we should keep a copy of the prepared right hand side as we've already destroyed it
       (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
       dirac.reconstruct(x, b, outer_solution_type);
+
+      if(r->Location() == QUDA_CPU_FIELD_LOCATION) { delete y;}
 
     } else { // do the coarse grid solve
       const Dirac &dirac = *(param.matSmooth.Expose());

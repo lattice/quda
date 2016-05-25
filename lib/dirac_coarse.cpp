@@ -2,6 +2,8 @@
 #include <multigrid.h>
 #include <algorithm>
 
+#define CPU_EMULATION
+
 namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
@@ -85,7 +87,7 @@ namespace quda {
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X_h = new cpuGaugeField(gParam);
     Xinv_h = new cpuGaugeField(gParam);
-
+#ifndef CPU_EMULATION
     dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer);
 
     if (enable_gpu) {
@@ -105,6 +107,7 @@ namespace quda {
       X_d->copy(*X_h);
       Xinv_d->copy(*Xinv_h);
     }
+#endif
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -173,6 +176,67 @@ namespace quda {
   {
     bool is_staggered = false;
     if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
+
+#ifdef CPU_EMULATION
+      bool single_parity_application = false;
+      bool mdagm_operator            = false;
+
+      {
+        if (!enable_gpu) errorQuda("Cannot apply coarse grid operator on GPU since enable_gpu has not been set");
+        const std::vector<ColorSpinorField*> &B = transfer->RawVectors();
+        const ColorSpinorField &tmp3 = *B[0];
+        ColorSpinorParam csParam(tmp3);
+
+        csParam.location = QUDA_CUDA_FIELD_LOCATION;
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        csParam.gammaBasis = tmp3.GammaBasis();
+        csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+        //horrible hack: fix it!
+
+        if(single_parity_application && csParam.siteSubset == QUDA_FULL_SITE_SUBSET)
+        {
+            csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+            csParam.x[0] /= 2;
+        }
+
+        ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
+        ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
+
+        transfer->P(*tmp1, in);
+
+        Dirac &dirac_tmp  = const_cast<Dirac&>(*dirac);
+
+        if (mdagm_operator)
+        {
+          if( csParam.siteSubset == QUDA_PARITY_SITE_SUBSET )
+          {
+            dirac->MdagM(*tmp2, *tmp1);
+          }
+          else
+          {
+            dirac->MdagM(tmp2->Even(), tmp1->Even());
+            double _m = dirac_tmp.Mass();
+            blas::ax(4*_m*_m, tmp1->Odd());
+            tmp2->Odd() = tmp1->Odd();
+          }
+        }
+        else
+        { 
+          double _m = dirac_tmp.Mass();
+          //
+          dirac->M(*tmp2, *tmp1);
+          blas::ax(2*_m, *tmp2);
+          //
+        }
+
+        transfer->R(out, *tmp2);
+
+        delete tmp1;
+        delete tmp2;
+
+        return;
+      }
+#endif
 
     if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
       if (!enable_gpu)

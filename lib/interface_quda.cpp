@@ -2450,10 +2450,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Normal-error solve requires Mat solution");
   }
 
-  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution))
+  //if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution))
+      //errorQuda("Multigrid preconditioning only supported for direct solves");
+  if (param->inv_type_precondition == QUDA_MG_INVERTER && ( ((param->dslash_type != QUDA_STAGGERED_DSLASH && param->dslash_type != QUDA_ASQTAD_DSLASH) && (!direct_solve || !mat_solution)) || ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (!(direct_solve || param->solve_type == QUDA_NORMOP_PC_SOLVE) || !mat_solution)) )  )
       errorQuda("Multigrid preconditioning only supported for direct solves");
 
-  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
+  if (mat_solution && !direct_solve && !norm_error_solve && ((param->dslash_type != QUDA_STAGGERED_DSLASH && param->dslash_type != QUDA_ASQTAD_DSLASH))) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b

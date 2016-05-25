@@ -20,6 +20,8 @@
 #include <mpi.h>
 #endif
 
+#include <qio_field.h>
+
 #ifdef MULTI_GPU
 #include <face_quda.h>
 #endif
@@ -47,10 +49,16 @@ extern bool tune;
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
+extern QudaReconstructType link_recon_precondition;
+extern QudaPrecision  prec_precondition;
+extern double mass;
+extern double mu;
+
+
+//QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+
 cpuColorSpinorField* in;
 cpuColorSpinorField* out;
 cpuColorSpinorField* ref;
@@ -74,18 +82,29 @@ extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 
-//mg:
 extern char latfile[];
 extern int niter;
-extern int nvec;
+extern int nvec[];
 extern int mg_levels;
 
+extern bool generate_nullspace;
+extern bool generate_all_levels;
 extern int nu_pre;
 extern int nu_post;
-extern int geo_block_size[];
+extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
 extern QudaInverterType precon_type;
-//mg
+
+ //Twisted mass flavor type
+extern QudaTwistFlavorType twist_flavor;
+
+extern QudaMatPCType matpc_type;
+extern QudaSolveType solve_type;
+
+QudaPrecision &cpu_prec = prec;
+QudaPrecision &cuda_prec = prec;
+QudaPrecision &cuda_prec_sloppy = prec_sloppy;
+QudaPrecision &cuda_prec_precondition = prec_precondition;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -105,189 +124,272 @@ void constructSpinorField(Float *res, const int Vol) {
   }
 }
 
-static void
-set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigridParam *mg_param,
-    int X1, int  X2, int X3, int X4,
-    QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
-    QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
-    double mass, double tol, int maxiter, double reliable_delta,
-    double tadpole_coeff
-    )
-{
-  gaugeParam->X[0] = X1;
-  gaugeParam->X[1] = X2;
-  gaugeParam->X[2] = X3;
-  gaugeParam->X[3] = X4;
 
-  gaugeParam->cpu_prec = cpu_prec;    
-  gaugeParam->cuda_prec = prec;
-  gaugeParam->reconstruct = link_recon;  
-  gaugeParam->cuda_prec_sloppy = prec_sloppy;
-  gaugeParam->reconstruct_sloppy = link_recon_sloppy;
-  gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gaugeParam->anisotropy = 1.0;
-  gaugeParam->tadpole_coeff = tadpole_coeff;
+void setGaugeParam(QudaGaugeParam &gaugeParam, double tadpole_coeff) {
+
+  gaugeParam.X[0] = xdim;
+  gaugeParam.X[1] = ydim;
+  gaugeParam.X[2] = zdim;
+  gaugeParam.X[3] = tdim;
+
+  gaugeParam.cpu_prec = cpu_prec;    
+  gaugeParam.cuda_prec = prec;
+  gaugeParam.reconstruct = link_recon;  
+  gaugeParam.cuda_prec_sloppy = prec_sloppy;
+  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+  gaugeParam.reconstruct_precondition = link_recon_precondition;
+  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gaugeParam.anisotropy = 1.0;
+  gaugeParam.tadpole_coeff = tadpole_coeff;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
 
-  gaugeParam->scale = dslash_type == QUDA_STAGGERED_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+  gaugeParam.scale = dslash_type == QUDA_STAGGERED_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
-  gaugeParam->t_boundary = QUDA_PERIODIC_T;//QUDA_ANTI_PERIODIC_T;
+  gaugeParam.t_boundary = QUDA_PERIODIC_T;//QUDA_ANTI_PERIODIC_T;
 #ifndef USE_QDP_LINKS
-  gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
+  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 #else
-  gaugeParam->gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
 #endif
-  gaugeParam->ga_pad = X1*X2*X3/2;
-
-  inv_param->verbosity = QUDA_VERBOSE;
-  inv_param->mass = mass;
-
-  // outer solver parameters
-  inv_param->inv_type = QUDA_GCR_INVERTER;
-  inv_param->tol = tol;
-  inv_param->tol_restart = 1e-3; 
-  inv_param->maxiter = 5000;
-  inv_param->reliable_delta = 1e-2;
-  inv_param->use_sloppy_partial_accumulator = false;
-  inv_param->pipeline = false;
-  //mg:
-  //Warning: Outer solver always has these parameters:
-  inv_param->solution_type = QUDA_MAT_SOLUTION;//QUDA_MATPCDAG_MATPC_SOLUTION
-  inv_param->solve_type = QUDA_DIRECT_SOLVE;//QUDA_NORMOP_PC_SOLVE
-  //
-  inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param->dagger = QUDA_DAG_NO;
-  inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;  
-  
-#if __COMPUTE_CAPABILITY__ >= 200
-  if(tol_hq == 0 && tol == 0){
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
-  }
-  // require both L2 relative and heavy quark residual to determine convergence
-  inv_param->residual_type = static_cast<QudaResidualType_s>(0);
-  inv_param->residual_type = (tol != 0) ? static_cast<QudaResidualType_s> ( inv_param->residual_type | QUDA_L2_RELATIVE_RESIDUAL) : inv_param->residual_type;
-  inv_param->residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param->residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param->residual_type;
-
-  inv_param->tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
-#else
-  if(tol == 0){
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
-  }
-  // Pre Fermi architecture only supports L2 relative residual norm
-  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
+  gaugeParam.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3]/2;
+  int y_face_size = gaugeParam.X[0]*gaugeParam.X[2]*gaugeParam.X[3]/2;
+  int z_face_size = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[3]/2;
+  int t_face_size = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]/2;
+  int pad_size = std::max(x_face_size, y_face_size);
+  pad_size = std::max(pad_size, z_face_size);
+  pad_size = std::max(pad_size, t_face_size);
+  gaugeParam.ga_pad = pad_size;    
 #endif
-  inv_param->Nsteps = 2; 
+}
 
-  inv_param->gcrNkrylov = 20;
 
-  // domain decomposition preconditioner parameters
-  inv_param->inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param->schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param->precondition_cycle = 1;
-  inv_param->tol_precondition = 1e-1;
-  inv_param->maxiter_precondition = 10;
-  inv_param->verbosity_precondition = QUDA_SILENT;
-  inv_param->cuda_prec_precondition = prec_sloppy;
-  inv_param->omega = 1.0; 
+void setMultigridParam(QudaMultigridParam &mg_param) {
+  QudaInvertParam &inv_param = *mg_param.invert_param;
 
-  inv_param->cpu_prec = cpu_prec;
-  inv_param->cuda_prec = prec; 
-  inv_param->cuda_prec_sloppy = prec_sloppy;
-  inv_param->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-  inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
-  inv_param->dirac_order = QUDA_DIRAC_ORDER;
+  for (int i=0; i<mg_levels-1; i++) printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
 
-  inv_param->dslash_type = dslash_type;
+  inv_param.Ls = 1;
 
-  inv_param->tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
-  inv_param->sp_pad = 0;//X1*X2*X3/2;
-  inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
 
-  inv_param->input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param->output_location = QUDA_CPU_FIELD_LOCATION;
-  
-  mg_param->invert_param = inv_param;
-  mg_param->n_level = mg_levels;
-  for (int i=0; i<mg_param->n_level; i++) {
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
+
+  inv_param.dslash_type = dslash_type;
+
+  //Free field!
+  inv_param.mass = mass;
+  inv_param.kappa = 1.0 / (2.0 * (4 + mass));
+
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+
+  inv_param.matpc_type = matpc_type;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;//fixed
+
+  inv_param.solve_type = QUDA_DIRECT_SOLVE;//fixed
+
+  mg_param.invert_param = &inv_param;
+  mg_param.n_level = mg_levels;
+  for (int i=0; i<mg_param.n_level; i++) {
     for (int j=0; j<QUDA_MAX_DIM; j++) {
-      mg_param->geo_block_size[i][j] = geo_block_size[j];
+      mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
-    mg_param->spin_block_size[i] = 1;
-    mg_param->n_vec[i] = nvec;
-    mg_param->nu_pre[i] = nu_pre;
-    mg_param->nu_post[i] = nu_post;
+    mg_param.spin_block_size[i] = 1;// 1 or 0 (1 for parity blocking)
+    mg_param.n_vec[i] =  nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.nu_pre[i] = nu_pre;
+    mg_param.nu_post[i] = nu_post;
 
-    mg_param->smoother[i] = precon_type;
+    mg_param.cycle_type[i] = QUDA_MG_CYCLE_VCYCLE;//QUDA_MG_CYCLE_RECURSIVE;
 
-    mg_param->smoother_tol[i] = 1e-4; // repurpose heavy-quark tolerance for now
+    mg_param.smoother[i] = precon_type;
 
-    mg_param->global_reduction[i] = QUDA_BOOLEAN_YES;
+    // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
+    mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
+
+    mg_param.global_reduction[i] = QUDA_BOOLEAN_YES;
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
-    mg_param->smoother_solve_type[i] = QUDA_DIRECT_SOLVE;
-    //mg_param->smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
+    // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
+    //mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
+    mg_param.smoother_solve_type[i] = QUDA_DIRECT_SOLVE; 
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
-//    mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION; // EVEN-ODD, not supported for the staggered
-    mg_param->coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION; 
 
-    mg_param->cycle_type[i] = QUDA_MG_CYCLE_VCYCLE;
+    // if we are using an outer even-odd preconditioned solve, then we
+    // use single parity injection into the coarse grid
+    mg_param.coarse_grid_solution_type[i] = (mg_param.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE || mg_param.smoother_solve_type[i] == QUDA_NORMOP_PC_SOLVE) ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;//QUDA_MATPCDAG_MATPC_SOLUTION
 
-    mg_param->omega[i] = 0.85; // over/under relaxation factor
+    mg_param.omega[i] = 0.85; // over/under relaxation factor
 
-    mg_param->location[i] = QUDA_CUDA_FIELD_LOCATION;
-    mg_param->global_reduction[i] = QUDA_BOOLEAN_YES;
+    //mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
+    mg_param.location[i] = QUDA_CPU_FIELD_LOCATION;
   }
- 
-  //mg_param->smoother_solve_type[0] = QUDA_NORMOP_PC_SOLVE; //or choose QUDA_DIRECT_SOLVE;
-  // coarsen the spin on the first restriction is undefined for staggered fields
-  mg_param->spin_block_size[0] = 0;
 
-  if(mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE) mg_param->smoother[0] = QUDA_CG_INVERTER; //or choose QUDA_GCR_INVERTER
+  mg_param.smoother_solve_type[0] = solve_type == QUDA_NORMOP_PC_SOLVE? QUDA_NORMOP_PC_SOLVE : mg_param.smoother_solve_type[0]; //or choose QUDA_DIRECT_SOLVE;
+  // coarsen the spin on the first restriction is undefined for staggered fields
+  mg_param.spin_block_size[0] = 0;
+
+  if(mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE || mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) 
+  { 
+     //mg_param.smoother[0] = QUDA_CG_INVERTER; //or choose QUDA_GCR_INVERTER
+     mg_param.smoother[0] = QUDA_MR_INVERTER; //or choose QUDA_GCR_INVERTER (WARNING: QUDA_MR_INVERTER works better...)
+     mg_param.coarse_grid_solution_type[0] = QUDA_MATPC_SOLUTION;//just to be safe.
+     ////mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;//remove
+  } 
+  //
+  //mg_param.null_solve_type = QUDA_DIRECT_SOLVE;
+  mg_param.null_solve_type = mg_param.smoother_solve_type[0];
 
   //number of the top-level smoothing:
-  mg_param->nu_pre[0] = 16;//nu_pre;
-  mg_param->nu_post[0] = 16;//nu_post;
+  mg_param.nu_pre[0] = nu_pre;
+  mg_param.nu_post[0] = nu_post;
 
   // coarse grid solver is GCR
-  mg_param->smoother[mg_levels-1] = QUDA_GCR_INVERTER;
-  mg_param->compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
-    : QUDA_COMPUTE_NULL_VECTOR_NO;
+  mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
 
-  mg_param->run_verify = QUDA_BOOLEAN_YES;
+//  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
+  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_LOW_MODE_VECTOR;
+ // mg_param.compute_null_vector = QUDA_COMPUTE_LOW_MODE_VECTOR;
+
+  //if (mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR) 
+    mg_param.eigensolver_precision = cuda_prec;
+
+  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES 
+   :  QUDA_BOOLEAN_NO;
+
+  mg_param.run_verify = QUDA_BOOLEAN_YES;
 
   // set file i/o parameters
-  strcpy(mg_param->vec_infile, vec_infile);
-  strcpy(mg_param->vec_outfile, vec_outfile);
+  strcpy(mg_param.vec_infile, vec_infile);
+  strcpy(mg_param.vec_outfile, vec_outfile);
+
+  // these need to tbe set for now but are actually ignored by the MG setup
+  // needed to make it pass the initialization test
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.tol = 1e-10;
+  inv_param.maxiter = 100;
+  inv_param.reliable_delta = 1e-10;
+  inv_param.gcrNkrylov = 16;//10
+
+  inv_param.verbosity = QUDA_SUMMARIZE;
+  //inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  //inv_param.verbosity_precondition = QUDA_VERBOSE;
+}
+
+void setInvertParam(QudaInvertParam &inv_param) {
+  inv_param.Ls = 1;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
+
+  inv_param.dslash_type = dslash_type;
+
+  //Free field!
+  inv_param.mass = mass;
+  inv_param.kappa = 1.0 / (2.0 * (4 + mass));
+
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+
+  // do we want full solution or single-parity solution
+// inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;  //QUDA_MAT_SOLUTION;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  // do we want to use an even-odd preconditioned solve or not
+  inv_param.solve_type = solve_type;//QUDA_NORMOP_PC_SOLVE?
+  inv_param.matpc_type = matpc_type;//QUDA_MATPC_EVEN_EVEN
+
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+
+  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  //inv_param.verbosity_precondition = QUDA_VERBOSE;
+
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;//MR->GCR
+  inv_param.gcrNkrylov = 20;
+  inv_param.tol = tol;
+
+  // require both L2 relative and heavy quark residual to determine convergence
+  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
+
+  // these can be set individually
+  for (int i=0; i<inv_param.num_offset; i++) {
+    inv_param.tol_offset[i] = inv_param.tol;
+    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+  }
+  inv_param.maxiter = niter;
+  inv_param.reliable_delta = 1e-4;
+
+  // domain decomposition preconditioner parameters
+  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 1;
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.omega = 1.0;
 
   return;
 }
 
 
-void mg_test(void)
+
+void mg_test(int argc, char** argv)
 {
-  QudaGaugeParam gaugeParam = newQudaGaugeParam();
-  QudaInvertParam inv_param = newQudaInvertParam();
+
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setGaugeParam(gauge_param, 0.8);
+
+  QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
+  mg_param.invert_param = &mg_inv_param;
 
-  set_params(&gaugeParam, &inv_param, &mg_param,
-      xdim, ydim, zdim, tdim,
-      cpu_prec, prec, prec_sloppy,
-      link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
-      0.8);
+  setMultigridParam(mg_param);
 
+
+  QudaInvertParam inv_param = newQudaInvertParam();
+  setInvertParam(inv_param);
+  //////////////////////////////////////////////////////////////
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
-  setDims(gaugeParam.X);
+  setDims(gauge_param.X);
   setSpinorSiteSize(6);
 
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   for (int dir = 0; dir < 4; dir++) {
     qdp_fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
     qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
@@ -295,31 +397,166 @@ void mg_test(void)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, 
-				 &gaugeParam, dslash_type);
+  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
+
+    void *inlinks=malloc(4*V*gaugeSiteSize*gSize);
+    void *inlink[4];
+
+    for (int dir = 0; dir < 4; dir++) {
+       inlink[dir] = (void*)((char*)inlinks + dir*V*gaugeSiteSize*gSize);
+    }
+
+    read_gauge_field(latfile, inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    construct_gauge_field(inlink, 2, gauge_param.cpu_prec, &gauge_param);
+    
+//see ./milc_qcd/generic_ks/fermion_links_fn_load_gpu.c
+//see ./milc_qcd/generic_ks/fermion_links_fn_load_milc.c
+// 'load_fn_links' ->  'load_imp_ferm_links' ->./milc_qcd/generic_ks/fermion_links_milc.c 
+#ifdef MULTI_GPU
+    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
+#else
+    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
+#endif
+
+    QudaGaugeParam gParam = newQudaGaugeParam();
+    for(int dir=0; dir<4; ++dir) gParam.X[dir] = gauge_param.X[dir];
+    gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = gauge_param.cpu_prec;
+    gParam.type = QUDA_GENERAL_LINKS;
+
+    gParam.reconstruct_sloppy = gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.gauge_order   = QUDA_MILC_GAUGE_ORDER;
+    gParam.t_boundary    = QUDA_PERIODIC_T;
+    gParam.gauge_fix     = QUDA_GAUGE_FIXED_NO;
+    gParam.scale         = 1.0;
+    gParam.anisotropy    = 1.0;
+    gParam.tadpole_coeff = 1.0;
+    gParam.scale         = 0;
+    gParam.ga_pad        = 0;
+    gParam.site_ga_pad   = 0;
+    gParam.mom_ga_pad    = 0;
+    gParam.llfat_ga_pad  = 0;
+
+    double act_path_coeff[6];
+
+    //fake parameters:
+    for(int i = 0;i < 6;i++){
+      act_path_coeff[i]= 0.1*i;
+    }
+//mass = 0.0102;l24t64
+//mass = 0.002426
+    act_path_coeff[0] = 1.0;
+    act_path_coeff[1] = -4.166667e-02;
+    act_path_coeff[2] = -6.250000e-02;
+    act_path_coeff[3] = 1.562500e-02;
+    act_path_coeff[4] = -2.604167e-03;
+    act_path_coeff[5] = -1.250000e-01;
+
+
+    computeKSLinkQuda( fatlink, longlink, NULL, inlinks, const_cast<double*>(act_path_coeff), &gParam, method);
+    //computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method);
+
+    freeGaugeQuda();
+
+    free(inlinks);
+  } else { // else generate a random SU(3) field
+
+//#define EXPERIMENTAL
+
+#ifndef EXPERIMENTAL
+#define GAUGE_TRANSFORM
+    const int gen_type = 1;
+
+    construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec, 
+				 &gauge_param, dslash_type);
+#ifdef GAUGE_TRANSFORM
+    void *su3_buffer=malloc(4*V*gaugeSiteSize*gSize);
+    void *su3_field[4];
+
+    for (int dir = 0; dir < 4; dir++) {
+       su3_field[dir] = (void*)((char*)su3_buffer + dir*V*gaugeSiteSize*gSize);
+    }
+
+    construct_gauge_field(su3_field, 1, gauge_param.cpu_prec, &gauge_param);
+
+    const int dir = 3;
+    transform_gauge_field(su3_field[dir], qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec, 
+				 &gauge_param, dslash_type);
+    
+    free(su3_buffer);
+#endif //GAUGE_TRANSFORM
 
 #ifndef USE_QDP_LINKS
-  for(int dir=0; dir<4; ++dir){
-    for(int i=0; i<V; ++i){
-      for(int j=0; j<gaugeSiteSize; ++j){
-        if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-          ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
-        }else{
-          ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+        for(int j=0; j<gaugeSiteSize; ++j){
+          if(gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION){
+            ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
+            ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+          }else{
+            ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
+            ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+          }
         }
       }
     }
-  }
+#endif //USE_QDP_LINKS
+
+#else //EXPERIMENTAL
+
+    void *inlinks=malloc(4*V*gaugeSiteSize*gSize);
+    void *inlink[4];
+
+    for (int dir = 0; dir < 4; dir++) {
+       inlink[dir] = (void*)((char*)inlinks + dir*V*gaugeSiteSize*gSize);
+    }
+    construct_gauge_field(inlink, 1, gauge_param.cpu_prec, &gauge_param);
+
+#ifdef MULTI_GPU
+    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
+#else
+    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
 #endif
+
+    QudaGaugeParam gParam = newQudaGaugeParam();
+    for(int dir=0; dir<4; ++dir) gParam.X[dir] = gauge_param.X[dir];
+    gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = gauge_param.cpu_prec;
+    gParam.type = QUDA_GENERAL_LINKS;
+
+    gParam.reconstruct_sloppy = gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.gauge_order   = QUDA_MILC_GAUGE_ORDER;
+    gParam.t_boundary    = QUDA_PERIODIC_T;
+    gParam.gauge_fix     = QUDA_GAUGE_FIXED_NO;
+    gParam.scale         = 1.0;
+    gParam.anisotropy    = 1.0;
+    gParam.tadpole_coeff = 1.0;
+    gParam.scale         = 0;
+    gParam.ga_pad        = 0;
+    gParam.site_ga_pad   = 0;
+    gParam.mom_ga_pad    = 0;
+    gParam.llfat_ga_pad  = 0;
+
+    double act_path_coeff[6];
+
+    act_path_coeff[0] = 1.0;
+    act_path_coeff[1] = -1e-06;
+    act_path_coeff[2] = -1e-06;
+    act_path_coeff[3] = 1e-05;
+    act_path_coeff[4] = -1e-06;
+    act_path_coeff[5] = -1e-4;
+
+    computeKSLinkQuda( fatlink, longlink, NULL, inlinks, const_cast<double*>(act_path_coeff), &gParam, method);
+    freeGaugeQuda();
+
+    free(inlinks);
+#endif
+  }
 
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=4;
   for(int d = 0; d < 4; d++) {
-    csParam.x[d] = gaugeParam.X[d];
+    csParam.x[d] = gauge_param.X[d];
   }
   
   csParam.precision = inv_param.cpu_prec;
@@ -351,22 +588,22 @@ void mg_test(void)
   int link_pad =  3*tmp_value;
 
   // FIXME: currently assume staggered is SU(3)
-  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+  gauge_param.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 #ifndef USE_QDP_LINKS
-  GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+  GaugeFieldParam cpuFatParam(fatlink, gauge_param);
 #else
-  GaugeFieldParam cpuFatParam(qdp_fatlink, gaugeParam);
+  GaugeFieldParam cpuFatParam(qdp_fatlink, gauge_param);
 #endif
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = (void**)cpuFat->Ghost();
 
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
 #ifndef USE_QDP_LINKS
-  GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+  GaugeFieldParam cpuLongParam(longlink, gauge_param);
 #else
-  GaugeFieldParam cpuLongParam(qdp_longlink, gaugeParam);
+  GaugeFieldParam cpuLongParam(qdp_longlink, gauge_param);
 #endif
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
@@ -377,31 +614,31 @@ void mg_test(void)
   int link_pad = 0;
 #endif
   
-  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+  gauge_param.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.ga_pad = fat_pad;
+  gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
-    gaugeParam.reconstruct = link_recon;
-    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
   } else {
-    gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct= gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
-  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
+  gauge_param.cuda_prec_precondition = QUDA_HALF_PRECISION;
 #ifndef USE_QDP_LINKS
-  loadGaugeQuda(fatlink, &gaugeParam);
+  loadGaugeQuda(fatlink, &gauge_param);
 #else
-  loadGaugeQuda(qdp_fatlink, &gaugeParam);
+  loadGaugeQuda(qdp_fatlink, &gauge_param);
 #endif
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-    gaugeParam.ga_pad = link_pad;
-    gaugeParam.reconstruct= link_recon;
-    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+    gauge_param.ga_pad = link_pad;
+    gauge_param.reconstruct= link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
 #ifndef USE_QDP_LINKS
-    loadGaugeQuda(longlink, &gaugeParam);
+    loadGaugeQuda(longlink, &gauge_param);
 #else
-    loadGaugeQuda(qdp_longlink, &gaugeParam);
+    loadGaugeQuda(qdp_longlink, &gauge_param);
 #endif
   }
 
@@ -436,7 +673,7 @@ void mg_test(void)
 //#else
   //matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
   double kappa = 1.0 / (2.0*mass);
-  mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), kappa, 0, inv_param.cpu_prec, gaugeParam.cpu_prec);
+  mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
 //#endif
   ax( kappa, in->V(), V*mySpinorSiteSize, inv_param.cpu_prec );
   mxpy(in->V(), ref->V(), V*mySpinorSiteSize, inv_param.cpu_prec);
@@ -555,7 +792,7 @@ int main(int argc, char** argv)
   
   printfQuda("dslash_type = %d\n", dslash_type);
 
-  mg_test();
+  mg_test(argc, argv);
 
   // finalize the communications layer
   finalizeComms();

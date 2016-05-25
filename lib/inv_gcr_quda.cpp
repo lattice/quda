@@ -234,24 +234,26 @@ namespace quda {
 
     if (param.precondition_cycle > 1) delete rM;
 
-    if (param.precision_sloppy != param.precision) {
-      delete x_sloppy;
-      delete r_sloppy;
-    }
+    if(init){
+      if (param.precision_sloppy != param.precision) {
+        delete x_sloppy;
+        delete r_sloppy;
+      }
 
-    if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
-      delete p_pre;
-      delete r_pre;
-    }
+      if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
+        delete p_pre;
+        delete r_pre;
+      }
 
-    for (int i=0; i<nKrylov; i++) {
-      delete p[i];
-      delete Ap[i];
-    }
+      for (int i=0; i<nKrylov; i++) {
+        delete p[i];
+        delete Ap[i];
+      }
 
-    delete tmpp;
-    delete rp;
-    delete yp;
+      delete tmpp;
+      delete rp;
+      delete yp;
+    }
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 

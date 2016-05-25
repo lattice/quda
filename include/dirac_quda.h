@@ -144,6 +144,8 @@ namespace quda {
     double Kappa() const { return kappa; }
     double Mass() const { return mass; }
 
+    void setMatPCType( QudaMatPCType matpctype ) { matpcType = matpctype; }
+
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 
 
