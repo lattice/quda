@@ -728,7 +728,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE || 
+      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
       inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()
@@ -2574,13 +2574,13 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_H2D);
 
-  std::vector<ColorSpinorField*> b;  // Cuda Solutions
-  b.resize(param->num_src);
-  std::vector<ColorSpinorField*> x;  // Cuda Solutions
-  x.resize(param->num_src);
-  std::vector<ColorSpinorField*> in;// = NULL;
+  // std::vector<ColorSpinorField*> b;  // Cuda Solutions
+  // b.resize(param->num_src);
+  // std::vector<ColorSpinorField*> x;  // Cuda Solutions
+  // x.resize(param->num_src);
+  std::vector<ColorSpinorField*> in;  // = NULL;
   in.resize(param->num_src);
-  std::vector<ColorSpinorField*> out;// = NULL;
+  std::vector<ColorSpinorField*> out;  // = NULL;
   out.resize(param->num_src);
 
   for(int i=0;i < param->num_src;i++){
@@ -2626,28 +2626,45 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // MW currently checked until here
 
   // download source
+  printfQuda("Setup b\n");
   ColorSpinorParam cudaParam(cpuParam, *param);
-  cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  for(int i=0; i < param->num_src; i++) {
-    b[i] = new cudaColorSpinorField(*h_b[i], cudaParam);
-  }
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.is_composite = true;
+  cudaParam.composite_dim = param->num_src;
 
+  printfQuda("Create b \n");
+  ColorSpinorField *b = ColorSpinorField::Create(cudaParam);
+
+
+
+
+  for(int i=0; i < param->num_src; i++) {
+    b->Component(i) = *h_b[i];
+  }
+  printfQuda("Done b \n");
+
+    ColorSpinorField *x;
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
         (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Initial guess not supported for two-pass solver");
     }
+    cudaParam.is_composite = true;
+    cudaParam.is_component = false;
+    cudaParam.composite_dim = param->num_src;
+
+    x = ColorSpinorField::Create(cudaParam);
     for(int i=0; i < param->num_src; i++) {
-      x[i] =  new cudaColorSpinorField(*h_x[i], cudaParam); // solution
+      x->Component(i) = *h_x[i];
     }
 
   } else { // zero initial guess
     // Create the solution fields filled with zero
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-    for(int i=0; i < param->num_src; i++) {
-      x[i] = new cudaColorSpinorField(cudaParam);
-    }
+      printfQuda("Create x \n");
+    x = ColorSpinorField::Create(cudaParam);
+      printfQuda("Done x \n");
  // solution
   }
 
@@ -2655,13 +2672,14 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   double * nb = new double[param->num_src];
   for(int i=0; i < param->num_src; i++) {
-    nb[i] = blas::norm2(*b[i]);
+    nb[i] = blas::norm2(b->Component(i));
+    printfQuda("Source %i: CPU = %g, CUDA copy = %g\n", i, nb[i], nb[i]);
     if (nb[i]==0.0) errorQuda("Source has zero norm");
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       double nh_b = blas::norm2(*h_b[i]);
       double nh_x = blas::norm2(*h_x[i]);
-      double nx = blas::norm2(*x[i]);
+      double nx = blas::norm2(x->Component(i));
       printfQuda("Source %i: CPU = %g, CUDA copy = %g\n", i, nh_b, nb[i]);
       printfQuda("Solution %i: CPU = %g, CUDA copy = %g\n", i, nh_x, nx);
     }
@@ -2672,19 +2690,19 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     for(int i=0; i < param->num_src; i++) {
-      blas::ax(1.0/sqrt(nb[i]), *b[i]);
-      blas::ax(1.0/sqrt(nb[i]), *x[i]);
+      blas::ax(1.0/sqrt(nb[i]), b->Component(i));
+      blas::ax(1.0/sqrt(nb[i]), x->Component(i));
     }
   }
 
   for(int i=0; i < param->num_src; i++) {
-    massRescale(*static_cast<cudaColorSpinorField*>(b[i]), *param);
+    massRescale(dynamic_cast<cudaColorSpinorField&>( b->Component(i) ), *param);
   }
 
   // MW: need to check what dirac.prepare does
   // for now let's just try looping of num_rhs already here???
   for(int i=0; i < param->num_src; i++) {
-    dirac.prepare(in[i], out[i], *x[i], *b[i], param->solution_type);
+    dirac.prepare(in[i], out[i], x->Component(i), b->Component(i), param->solution_type);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       double nin = blas::norm2(*(in[i]));
@@ -2780,22 +2798,22 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
     if (getVerbosity() >= QUDA_VERBOSE){
       for(int i=0; i < param->num_src; i++) {
-        double nx = blas::norm2(*x[i]);
+        double nx = blas::norm2(x->Component(i));
         printfQuda("Solution %i = %g\n",i, nx);
       }
     }
-  
+
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   for(int i=0; i< param->num_src; i++){
-    dirac.reconstruct(*x[i], *b[i], param->solution_type);
+    dirac.reconstruct(x->Component(i), b->Component(i), param->solution_type);
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     for(int i=0; i< param->num_src; i++){
       // rescale the solution
-      blas::ax(sqrt(nb[i]), *x[i]);
+      blas::ax(sqrt(nb[i]), x->Component(i));
     }
   }
 
@@ -2803,7 +2821,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   if (!param->make_resident_solution) {
     profileInvert.TPSTART(QUDA_PROFILE_D2H);
     for(int i=0; i< param->num_src; i++){
-      *h_x[i] = *x[i];
+      *h_x[i] = x->Component(i);
     }
     profileInvert.TPSTOP(QUDA_PROFILE_D2H);
   }
@@ -2818,7 +2836,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   if (getVerbosity() >= QUDA_VERBOSE){
     for(int i=0; i< param->num_src; i++){
-      double nx = blas::norm2(*x[i]);
+      double nx = blas::norm2(x->Component(i));
       double nh_x = blas::norm2(*h_x[i]);
       printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
     }
@@ -2827,9 +2845,9 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   //FIX need to make sure all deletes are correct again
   for(int i=0; i < param->num_src; i++){
     delete h_x[i];
-    delete x[i];
+    // delete x[i];
     delete h_b[i];
-    delete b[i];
+    // delete b[i];
   }
    delete [] hp_b;
    delete [] hp_x;
@@ -2839,6 +2857,8 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   delete d;
   delete dSloppy;
   delete dPre;
+  delete x;
+  delete b;
 
   popVerbosity();
 
@@ -5545,8 +5565,8 @@ void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatDagMatQuda(h_out, h_in, inv_param); }
-void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
-{ invertQuda(hp_x, hp_b, param); }    
+void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param)
+{ invertQuda(hp_x, hp_b, param); }
 void invert_multishift_quda_(void *hp_x[QUDA_MAX_MULTI_SHIFT], void *hp_b, QudaInvertParam *param)
 { invertMultiShiftQuda(hp_x, hp_b, param); }
 void new_quda_gauge_param_(QudaGaugeParam *param) {
