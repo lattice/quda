@@ -2578,15 +2578,15 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // b.resize(param->num_src);
   // std::vector<ColorSpinorField*> x;  // Cuda Solutions
   // x.resize(param->num_src);
-  std::vector<ColorSpinorField*> in;  // = NULL;
-  in.resize(param->num_src);
-  std::vector<ColorSpinorField*> out;  // = NULL;
-  out.resize(param->num_src);
+  ColorSpinorField* in;  // = NULL;
+  //in.resize(param->num_src);
+  ColorSpinorField* out;  // = NULL;
+  //out.resize(param->num_src);
 
-  for(int i=0;i < param->num_src;i++){
-    in[i] = NULL;
-    out[i] = NULL;
-  }
+  // for(int i=0;i < param->num_src;i++){
+  //   in[i] = NULL;
+  //   out[i] = NULL;
+  // }
 
   const int *X = cudaGauge->X();
 
@@ -2701,18 +2701,18 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
   // MW: need to check what dirac.prepare does
   // for now let's just try looping of num_rhs already here???
-  for(int i=0; i < param->num_src; i++) {
-    dirac.prepare(in[i], out[i], x->Component(i), b->Component(i), param->solution_type);
-
+  // for(int i=0; i < param->num_src; i++) {
+    dirac.prepare(in, out, *x, *b, param->solution_type);
+for(int i=0; i < param->num_src; i++) {
     if (getVerbosity() >= QUDA_VERBOSE) {
-      double nin = blas::norm2(*(in[i]));
-      double nout = blas::norm2(*(out[i]));
+      double nin = blas::norm2((in->Component(i)));
+      double nout = blas::norm2((out->Component(i)));
       printfQuda("Prepared source %i = %g\n", i, nin);
       printfQuda("Prepared solution %i = %g\n", i, nout);
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) {
-      double nin = blas::norm2(*(in[i]));
+      double nin = blas::norm2(in->Component(i));
       printfQuda("Prepared source %i post mass rescale = %g\n", i, nin);
     }
   }
@@ -2755,16 +2755,16 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 
     if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
       for(int i=0; i < param->num_src; i++) {
-        cudaColorSpinorField tmp(*(in[i]));
-        dirac.Mdag(*(in[i]), tmp);
+        cudaColorSpinorField tmp((in->Component(i)));
+        dirac.Mdag(in->Component(i), tmp);
       }
     } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(out,in);
+      solve->solve(*out,*in);
       for(int i=0; i < param->num_src; i++) {
-        blas::copy(*(in[i]), *(out[i]));
+        blas::copy(in->Component(i), out->Component(i));
       }
       solverParam.updateInvertParam(*param);
       delete solve;
@@ -2774,14 +2774,14 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(out,in);
+      solve->solve(*out,*in);
       solverParam.updateInvertParam(*param);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      (*solve)(out,in);
+      solve->solve(*out,*in);
       solverParam.updateInvertParam(*param);
       delete solve;
     } else { // norm_error_solve

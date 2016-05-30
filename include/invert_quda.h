@@ -320,7 +320,8 @@ namespace quda {
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
-    virtual void operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in);
+    virtual void solve(ColorSpinorField &out, ColorSpinorField &in);
+
 
     /**
        Solver factory
