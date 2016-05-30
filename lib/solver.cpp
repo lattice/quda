@@ -81,12 +81,12 @@ namespace quda {
 
 
   void Solver::solve(ColorSpinorField& out, ColorSpinorField& in){
-    for(int i=0; i < param.num_src; i++){
-      (*this)(out.Component(i),in.Component(i));
+    for (int i = 0; i < param.num_src; i++) {
+      (*this)(out.Component(i), in.Component(i));
       param.true_res_offset[i] = param.true_res;
       param.true_res_hq_offset[i] = param.true_res_hq;
     }
-  };
+  }
 
   double Solver::stopping(const double &tol, const double &b2, QudaResidualType residual_type) {
 

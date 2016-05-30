@@ -396,6 +396,7 @@ namespace quda {
     virtual ~CG();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void solve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
 
