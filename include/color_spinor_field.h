@@ -433,6 +433,7 @@ namespace quda {
     void OffsetIndex(int &i, int *y) const;
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
+    static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
     ColorSpinorField* CreateCoarse(const int *geoblockSize, int spinBlockSize, int Nvec,
 				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
     ColorSpinorField* CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
