@@ -388,7 +388,6 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     //MW: it might be useful to check what to do here.
     double b2[QUDA_MAX_MULTI_SHIFT];
-    bool zerocheck;
     for(int i=0; i< param.num_src; i++){
       b2[i]=blas::norm2(b.Component(i));
       if(b2[i] == 0){
@@ -422,11 +421,15 @@ namespace quda {
 
     const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
 
-    mat(r.Component(i), x.Component(i), y.Component(i));
+    // for(int i=0; i<param.num_src; i++)
+      mat(r.Component(i), x.Component(i), y.Component(i));
     double r2[QUDA_MAX_MULTI_SHIFT];
-    r2[0] = blas::xmyNorm(b.Component(i), r.Component(i));
+    // for(int i=0; i<param.num_src; i++){
+      r2[i] = blas::xmyNorm(b.Component(i), r.Component(i));
+      printfQuda("r2[%i] %e\n", i, r2[i]);
+    // }
+
     csParam.setPrecision(param.precision_sloppy);
-    printfQuda("r2[0] %e\n", r2[0]);
     // tmp2 only needed for multi-gpu Wilson-like kernels
     ColorSpinorField *tmp2_p = !mat.isStaggered() ?
     ColorSpinorField::Create(x, csParam) : &tmp;
@@ -479,28 +482,34 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    double r2_old;
+    double r2_old[QUDA_MAX_MULTI_SHIFT];
 
-    double stop = stopping(param.tol, b2[0], param.residual_type);  // stopping condition of solver
+    double stop = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
 
-    double heavy_quark_res = 0.0;  // heavy quark res idual
-    double heavy_quark_res_old = 0.0;  // heavy quark residual
+    double heavy_quark_res[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark res idual
+    double heavy_quark_res_old[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark residual
 
     if (use_heavy_quark_res) {
-      heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
-      heavy_quark_res_old = heavy_quark_res;   // heavy quark residual
+      heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
+      heavy_quark_res_old[i] = heavy_quark_res[i];   // heavy quark residual
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double alpha = 0.0;
-    double beta = 0.0;
-    double pAp;
+    double alpha[QUDA_MAX_MULTI_SHIFT] = {0.0};
+    double beta[QUDA_MAX_MULTI_SHIFT] = {0.0};
+    double pAp[QUDA_MAX_MULTI_SHIFT];;
     int rUpdate = 0;
 
-    double rNorm = sqrt(r2[0]);
-    double r0Norm = rNorm;
-    double maxrx = rNorm;
-    double maxrr = rNorm;
+    double rNorm[QUDA_MAX_MULTI_SHIFT];
+    double r0Norm[QUDA_MAX_MULTI_SHIFT];
+    double maxrx[QUDA_MAX_MULTI_SHIFT];
+    double maxrr[QUDA_MAX_MULTI_SHIFT];
+
+    rNorm[i] = sqrt(r2[i]);
+    r0Norm[i] = rNorm[i];
+    maxrx[i] = rNorm[i];
+    maxrr[i] = rNorm[i];
+
     double delta = param.delta;
 
     // this parameter determines how many consective reliable update
@@ -526,94 +535,95 @@ namespace quda {
 
     int k = 0;
 
-    PrintStats("CG", k, r2[0], b2[0], heavy_quark_res);
+    PrintStats("CG", k, r2[i], b2[i], heavy_quark_res[i]);
 
     int steps_since_reliable = 1;
-    bool converged = convergence(r2[0], heavy_quark_res, stop, param.tol_hq);
+    bool converged = convergence(r2[i], heavy_quark_res[i], stop, param.tol_hq);
+    double sigma[QUDA_MAX_MULTI_SHIFT];
 
     while ( !converged && k < param.maxiter ) {
       matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
-      double sigma;
+
 
       bool breakdown = false;
       if (param.pipeline) {
         double3 triplet = blas::tripleCGReduction(rSloppy.Component(i), Ap.Component(i), p.Component(i));
-        r2[0] = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
-        r2_old = r2[0];
-        alpha = r2[0] / pAp;
-        sigma = alpha*(alpha * Ap2 - pAp);
-        if (sigma < 0.0 || steps_since_reliable == 0) { // sigma condition has broken down
-          r2[0] = blas::axpyNorm(-alpha, Ap.Component(i), rSloppy.Component(i));
-          sigma = r2[0];
+        r2[i] = triplet.x; double Ap2 = triplet.y; pAp[i] = triplet.z;
+        r2_old[i] = r2[i];
+        alpha[i] = r2[i] / pAp[i];
+        sigma[i] = alpha[i]*(alpha[i] * Ap2 - pAp[i]);
+        if (sigma[i] < 0.0 || steps_since_reliable == 0) { // sigma condition has broken down
+          r2[i] = blas::axpyNorm(-alpha[i], Ap.Component(i), rSloppy.Component(i));
+          sigma[i] = r2[i];
           breakdown = true;
         }
 
-        r2[0] = sigma;
+        r2[i] = sigma[i];
       } else {
-        r2_old = r2[0];
-        pAp = blas::reDotProduct(p.Component(i), Ap.Component(i));
-        alpha = r2[0] / pAp;
+        r2_old[i] = r2[i];
+        pAp[i] = blas::reDotProduct(p.Component(i), Ap.Component(i));
+        alpha[i] = r2[i] / pAp[i];
         // here we are deploying the alternative beta computation
-        Complex cg_norm = blas::axpyCGNorm(-alpha, Ap.Component(i), rSloppy.Component(i));
-        r2[0] = real(cg_norm);  // (r_new, r_new)
-        sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2[0];  // use r2 if (r_k+1, r_k+1-r_k) breaks
+        Complex cg_norm = blas::axpyCGNorm(-alpha[i], Ap.Component(i), rSloppy.Component(i));
+        r2[i] = real(cg_norm);  // (r_new, r_new)
+        sigma[i] = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2[i];  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
 
       // reliable update conditions
-      rNorm = sqrt(r2[0]);
-      if (rNorm > maxrx) maxrx = rNorm;
-      if (rNorm > maxrr) maxrr = rNorm;
-      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+      rNorm[i] = sqrt(r2[i]);
+      if (rNorm[i] > maxrx[i]) maxrx[i] = rNorm[i];
+      if (rNorm[i] > maxrr[i]) maxrr[i] = rNorm[i];
+      int updateX = (rNorm[i] < delta * r0Norm[i] && r0Norm[i] <= maxrx[i]) ? 1 : 0;
+      int updateR = ((rNorm[i] < delta * maxrr[i] && r0Norm[i] <= maxrr[i]) || updateX) ? 1 : 0;
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if ( convergence(r2[0], heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol ) updateX = 1;
+      if ( convergence(r2[i], heavy_quark_res[i], stop, param.tol_hq) && param.delta >= param.tol ) updateX = 1;
 
       // For heavy-quark inversion force a reliable update if we continue after
-      if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2[0], heavy_quark_res, stop, param.tol_hq) and param.delta >= param.tol ) {
+      if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2[i], heavy_quark_res[i], stop, param.tol_hq) and param.delta >= param.tol ) {
         updateX = 1;
       }
 
       if ( !(updateR || updateX )) {
-        beta = sigma / r2_old;  // use the alternative beta computation
+        beta[i] = sigma[i] / r2_old[i];  // use the alternative beta computation
 
         if (param.pipeline && !breakdown)
-        blas::tripleCGUpdate(alpha, beta, Ap.Component(i), rSloppy.Component(i), xSloppy.Component(i), p.Component(i));
+        blas::tripleCGUpdate(alpha[i], beta[i], Ap.Component(i), rSloppy.Component(i), xSloppy.Component(i), p.Component(i));
         else
-        blas::axpyZpbx(alpha, p.Component(i), xSloppy.Component(i), rSloppy.Component(i), beta);
+        blas::axpyZpbx(alpha[i], p.Component(i), xSloppy.Component(i), rSloppy.Component(i), beta[i]);
 
 
         if (use_heavy_quark_res && (k % heavy_quark_check) == 0) {
           if (&x != &xSloppy) {
             blas::copy(tmp, y);   //  FIXME: check whether copy works here
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i)).z);
+            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i)).z);
           } else {
             blas::copy(r, rSloppy);  //  FIXME: check whether copy works here
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x.Component(i), y.Component(i), r.Component(i)).z);
+            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(x.Component(i), y.Component(i), r.Component(i)).z);
           }
         }
 
         steps_since_reliable++;
       } else {
-        blas::axpy(alpha, p.Component(i), xSloppy.Component(i));
+        blas::axpy(alpha[i], p.Component(i), xSloppy.Component(i));
         blas::copy(x, xSloppy); // nop when these pointers alias
 
         blas::xpy(x.Component(i), y.Component(i)); // swap these around?
         mat(r.Component(i), y.Component(i), x.Component(i), tmp3.Component(i)); //  here we can use x as tmp
-        r2[0] = blas::xmyNorm(b.Component(i), r.Component(i));
+        r2[i] = blas::xmyNorm(b.Component(i), r.Component(i));
 
         blas::copy(rSloppy, r); //nop when these pointers alias
         blas::zero(xSloppy);
 
         // calculate new reliable HQ resididual
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+        if (use_heavy_quark_res) heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
 
         // break-out check if we have reached the limit of the precision
-        if (sqrt(r2[0]) > r0Norm && updateX) { // reuse r0Norm for this
+        if (sqrt(r2[i]) > r0Norm[i] && updateX) { // reuse r0Norm for this
           resIncrease++;
           resIncreaseTotal++;
           warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-          sqrt(r2[0]), r0Norm, resIncreaseTotal);
+          sqrt(r2[i]), r0Norm[i], resIncreaseTotal);
           if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
@@ -630,9 +640,9 @@ namespace quda {
           delta = 0;
           warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
           heavy_quark_restart = true;
-          if (heavy_quark_res > heavy_quark_res_old) {
+          if (heavy_quark_res[i] > heavy_quark_res_old[i]) {
             hqresIncrease++;
-            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res[i], heavy_quark_res_old[i]);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
               warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
@@ -641,10 +651,10 @@ namespace quda {
           }
         }
 
-        rNorm = sqrt(r2[0]);
-        maxrr = rNorm;
-        maxrx = rNorm;
-        r0Norm = rNorm;
+        rNorm[i] = sqrt(r2[i]);
+        maxrr[i] = rNorm[i];
+        maxrx[i] = rNorm[i];
+        r0Norm[i] = rNorm[i];
         rUpdate++;
 
         if (use_heavy_quark_res and heavy_quark_restart) {
@@ -653,31 +663,31 @@ namespace quda {
           heavy_quark_restart = false;
         } else {
           // explicitly restore the orthogonality of the gradient vector
-          double rp = blas::reDotProduct(rSloppy.Component(i), p.Component(i)) / (r2[0]);
+          double rp = blas::reDotProduct(rSloppy.Component(i), p.Component(i)) / (r2[i]);
           blas::axpy(-rp, rSloppy.Component(i), p.Component(i));
 
-          beta = r2[0] / r2_old;
-          blas::xpay(rSloppy.Component(i), beta, p.Component(i));
+          beta[i] = r2[i] / r2_old[i];
+          blas::xpay(rSloppy.Component(i), beta[i], p.Component(i));
         }
 
 
         steps_since_reliable = 0;
-        heavy_quark_res_old = heavy_quark_res;
+        heavy_quark_res_old[i] = heavy_quark_res[i];
       }
 
       breakdown = false;
       k++;
 
-      PrintStats("CG", k, r2[0], b2[0], heavy_quark_res);
+      PrintStats("CG", k, r2[i], b2[i], heavy_quark_res[i]);
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-      converged = convergence(r2[0], heavy_quark_res, stop, param.tol_hq);
+      converged = convergence(r2[i], heavy_quark_res[i], stop, param.tol_hq);
 
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
         // L2 is concverged or precision maxed out for L2
-        bool L2done = L2breakdown or convergenceL2(r2[0], heavy_quark_res, stop, param.tol_hq);
+        bool L2done = L2breakdown or convergenceL2(r2[i], heavy_quark_res[i], stop, param.tol_hq);
         // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-        bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2[0], heavy_quark_res, stop, param.tol_hq);
+        bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2[i], heavy_quark_res[i], stop, param.tol_hq);
         converged = L2done and HQdone;
       }
 
@@ -702,12 +712,12 @@ namespace quda {
 
     // compute the true residuals
     mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
-    param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[0]);
+    param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2[0], b2[0]);
+    PrintSummary("CG", k, r2[i], b2[i]);
 
     // reset the flops counters
     blas::flops = 0;
