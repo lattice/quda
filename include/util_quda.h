@@ -27,6 +27,7 @@ void popVerbosity();
 
 char *getPrintBuffer();
 
+
 // Note that __func__ is part of C++11 and has long been supported by GCC.
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0)
@@ -86,7 +87,7 @@ char *getPrintBuffer();
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
 	  getOutputPrefix(), getLastTuneKey().name,			     \
 	  getLastTuneKey().volume, getLastTuneKey().aux);		     \
-  exit(1);								     \
+  comm_abort(1);								     \
 } while (0)
 
 #define warningQuda(...) do {                                 \
