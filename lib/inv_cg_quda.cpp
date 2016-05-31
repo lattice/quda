@@ -371,19 +371,11 @@ namespace quda {
   }
 
   void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
-    printfQuda("CG solve ... \n");
-    // for (int i = 0; i < param.num_src; i++) {
-    //   (*this)(x.Component(i), b.Component(i));
-    //   param.true_res_offset[i] = param.true_res;
-    //   param.true_res_hq_offset[i] = param.true_res_hq;
-    // }
-
-    // for now return early
-
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
     errorQuda("Not supported");
 
     profile.TPSTART(QUDA_PROFILE_INIT);
+    errorQuda("Not supported");
 
     // Check to see that we're not trying to invert on a zero-field source
     //MW: it might be useful to check what to do here.
