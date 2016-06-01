@@ -375,7 +375,7 @@ namespace quda {
     errorQuda("Not supported");
 
     profile.TPSTART(QUDA_PROFILE_INIT);
-    errorQuda("Not supported");
+
 
     // Check to see that we're not trying to invert on a zero-field source
     //MW: it might be useful to check what to do here.
@@ -647,24 +647,28 @@ namespace quda {
           }
         }
 
-        // break-out check if we have reached the limit of the precision
-        if (sqrt(r2[i]) > r0Norm[i] && updateX) { // reuse r0Norm for this
-          resIncrease++;
-          resIncreaseTotal++;
-          warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-          sqrt(r2[i]), r0Norm[i], resIncreaseTotal);
-          if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
-            if (use_heavy_quark_res) {
-              L2breakdown = true;
-            } else {
-              warningQuda("CG: solver exiting due to too many true residual norm increases");
-              break;
+        // MW: FIXME as this probably goes terribly wrong right now
+        for(int i = 0; i<param.num_src; i++){
+          // break-out check if we have reached the limit of the precision
+          if (sqrt(r2[i]) > r0Norm[i] && updateX) { // reuse r0Norm for this
+            resIncrease++;
+            resIncreaseTotal++;
+            warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2[i]), r0Norm[i], resIncreaseTotal);
+            if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+              if (use_heavy_quark_res) {
+                L2breakdown = true;
+              } else {
+                warningQuda("CG: solver exiting due to too many true residual norm increases");
+                break;
+              }
             }
+          } else {
+            resIncrease = 0;
           }
-        } else {
-          resIncrease = 0;
         }
-        // if L2 broke down already we turn off reliable updates and restart the CG
+      // if L2 broke down already we turn off reliable updates and restart the CG
+      for(int i = 0; i<param.num_src; i++){
         if (use_heavy_quark_res and L2breakdown) {
           delta = 0;
           warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
@@ -679,12 +683,14 @@ namespace quda {
             }
           }
         }
+      }
 
         for(int i=0; i<param.num_src; i++){
           rNorm[i] = sqrt(r2[i]);
           maxrr[i] = rNorm[i];
           maxrx[i] = rNorm[i];
           r0Norm[i] = rNorm[i];
+          heavy_quark_res_old[i] = heavy_quark_res[i];
         }
         rUpdate++;
 
@@ -703,9 +709,7 @@ namespace quda {
           }
         }
 
-
         steps_since_reliable = 0;
-        heavy_quark_res_old[i] = heavy_quark_res[i];
       }
 
       breakdown = false;
@@ -721,17 +725,21 @@ namespace quda {
 
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
-        // L2 is concverged or precision maxed out for L2
-        bool L2done = L2breakdown or convergenceL2(r2[i], heavy_quark_res[i], stop, param.tol_hq);
-        // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-        bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2[i], heavy_quark_res[i], stop, param.tol_hq);
-        converged = L2done and HQdone;
+        for(int i=0; i<param.num_src; i++){
+          // L2 is concverged or precision maxed out for L2
+          bool L2done = L2breakdown or convergenceL2(r2[i], heavy_quark_res[i], stop[i], param.tol_hq);
+          // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
+          bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2[i], heavy_quark_res[i], stop[i], param.tol_hq);
+          converged[i] = L2done and HQdone;
+        }
       }
 
     }
 
     blas::copy(x, xSloppy);
-    blas::xpy(y.Component(i), x.Component(i));
+    for(int i=0; i<param.num_src; i++){
+      blas::xpy(y.Component(i), x.Component(i));
+    }
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -748,13 +756,15 @@ namespace quda {
     printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals
-    mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
-    param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
-    param.true_res_offset[i] = param.true_res;
-    param.true_res_hq_offset[i] = param.true_res_hq;
+    for(int i=0; i<param.num_src; i++){
+      mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
+      param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
+      param.true_res_offset[i] = param.true_res;
+      param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2[i], b2[i]);
+      PrintSummary("CG", k, r2[i], b2[i]);
+    }
 
     // reset the flops counters
     blas::flops = 0;
