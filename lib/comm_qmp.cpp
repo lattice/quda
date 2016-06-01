@@ -1,5 +1,5 @@
 #include <qmp.h>
-
+#include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
 
@@ -289,11 +289,11 @@ void comm_start(MsgHandle *mh)
 
 void comm_wait(MsgHandle *mh)
 {
-  QMP_CHECK( QMP_wait(mh->handle) ); 
+  QMP_CHECK( QMP_wait(mh->handle) );
 }
 
 
-int comm_query(MsgHandle *mh) 
+int comm_query(MsgHandle *mh)
 {
   return (QMP_is_complete(mh->handle) == QMP_TRUE);
 }
@@ -302,13 +302,13 @@ int comm_query(MsgHandle *mh)
 void comm_allreduce(double* data)
 {
   QMP_CHECK( QMP_sum_double(data) );
-} 
+}
 
 
 void comm_allreduce_max(double* data)
 {
   QMP_CHECK( QMP_max_double(data) );
-} 
+}
 
 
 void comm_allreduce_array(double* data, size_t size)
@@ -331,11 +331,14 @@ void comm_broadcast(void *data, size_t nbytes)
 
 void comm_barrier(void)
 {
-  QMP_CHECK( QMP_barrier() );  
+  QMP_CHECK( QMP_barrier() );
 }
 
 
 void comm_abort(int status)
 {
+  #ifdef HOST_DEBUG
+  raise(SIGINT);
+  #endif
   QMP_abort(status);
 }
