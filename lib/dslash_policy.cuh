@@ -7,6 +7,7 @@ const map& getTuneCache();
 void disableProfileCount();
 void enableProfileCount();
 
+void setPolicyTuning(bool);
 
 /**
  * Arrays used for the dynamic scheduling.
@@ -1087,10 +1088,11 @@ struct DslashFactory {
        }
 
        enableProfileCount();
+       setPolicyTuning(true);
      }
    }
 
-   virtual ~DslashPolicyTune() { }
+   virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
    void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
