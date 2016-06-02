@@ -129,7 +129,7 @@ namespace quda {
     double delta = param.delta;
 
     // this parameter determines how many consective reliable update
-    // reisudal increases we tolerate before terminating the solver,
+    // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
     const int maxResIncrease = (use_heavy_quark_res ? 0 : param.max_res_increase); // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
