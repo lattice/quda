@@ -413,8 +413,10 @@ namespace quda {
 
   //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
 
-    for(int i=0; i<param.num_src; i++)
+    for(int i=0; i<param.num_src; i++){
       mat(r.Component(i), x.Component(i), y.Component(i));
+    }
+
     double r2[QUDA_MAX_MULTI_SHIFT];
     for(int i=0; i<param.num_src; i++){
       r2[i] = blas::xmyNorm(b.Component(i), r.Component(i));
@@ -432,9 +434,14 @@ namespace quda {
       r_sloppy = &r;
     } else {
       // will that work ?
-      csParam.create = QUDA_COPY_FIELD_CREATE;
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.print();
       r_sloppy = ColorSpinorField::Create(r, csParam);
+      for(int i=0; i<param.num_src; i++){
+        blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
+      }
     }
+
 
     ColorSpinorField *x_sloppy;
     if (param.precision_sloppy == x.Precision() ||
@@ -548,7 +555,12 @@ namespace quda {
         matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
       }
 
+
       bool breakdown = false;
+      // FIXME: need to check breakdown
+      // current implementation sets breakdown to true for pipelined CG if one rhs triggers breakdown
+      // this is probably ok
+
       for(int i=0; i<param.num_src; i++){
         if (param.pipeline) {
           double3 triplet = blas::tripleCGReduction(rSloppy.Component(i), Ap.Component(i), p.Component(i));
@@ -573,22 +585,22 @@ namespace quda {
           sigma[i] = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2[i];  // use r2 if (r_k+1, r_k+1-r_k) breaks
         }
       }
-      int updateX;
-      int updateR;
+      bool updateX=false;
+      bool updateR=false;
       // reliable update conditions
       for(int i=0; i<param.num_src; i++){
         rNorm[i] = sqrt(r2[i]);
         if (rNorm[i] > maxrx[i]) maxrx[i] = rNorm[i];
         if (rNorm[i] > maxrr[i]) maxrr[i] = rNorm[i];
-        updateX = (rNorm[i] < delta * r0Norm[i] && r0Norm[i] <= maxrx[i]) ? 1 : 0;
-        updateR = ((rNorm[i] < delta * maxrr[i] && r0Norm[i] <= maxrr[i]) || updateX) ? 1 : 0;
+        updateX = (rNorm[i] < delta * r0Norm[i] && r0Norm[i] <= maxrx[i]) ? true : updateX;
+        updateR = ((rNorm[i] < delta * maxrr[i] && r0Norm[i] <= maxrr[i]) || updateX) ? true : updateR;
 
         // force a reliable update if we are within target tolerance (only if doing reliable updates)
-        if ( convergence(r2[i], heavy_quark_res[i], stop[i], param.tol_hq) && param.delta >= param.tol ) updateX = 1;
+        if ( convergence(r2[i], heavy_quark_res[i], stop[i], param.tol_hq) && param.delta >= param.tol ) updateX = true;
 
         // For heavy-quark inversion force a reliable update if we continue after
         if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2[i], heavy_quark_res[i], stop[i], param.tol_hq) and param.delta >= param.tol ) {
-          updateX = 1;
+          updateX = true;
         }
       }
 
@@ -637,8 +649,10 @@ namespace quda {
           r2[i] = blas::xmyNorm(b.Component(i), r.Component(i));
         }
 
-        blas::copy(rSloppy, r); //nop when these pointers alias
-        blas::zero(xSloppy);
+        for(int i=0; i<param.num_src; i++){
+          blas::copy(rSloppy.Component(i), r.Component(i)); //nop when these pointers alias
+          blas::zero(xSloppy.Component(i));
+        }
 
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res){

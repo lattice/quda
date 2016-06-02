@@ -403,8 +403,7 @@ int main(int argc, char **argv)
 //    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
 //  } else {
     invertMultiSrcQuda(spinorOutMulti, spinorIn, &inv_param);
-    invertQuda(spinorOutMulti[0], spinorIn[0], &inv_param);
-//  }
+
 
   // stop the timer
   time0 += clock();
@@ -417,6 +416,10 @@ int main(int argc, char **argv)
   }
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+
+   for(int i = 0; i < inv_param.num_src ; i++){
+     invertQuda(spinorOutMulti[i], spinorIn[i], &inv_param);
+   }
 
 //  if (true) {
 //    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
