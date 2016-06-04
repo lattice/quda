@@ -26,7 +26,7 @@ endif()
 
 #define tests
 
-if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_DOMAIN_WALL})
+if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_CLOVER} OR ${QUDA_DIRAC_TWISTED_MASS} OR ${QUDA_DIRAC_TWISTED_CLOVER} OR ${QUDA_DIRAC_DOMAIN_WALL})
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
 
