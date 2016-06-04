@@ -27,10 +27,10 @@ endif()
 #define tests
 
 if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_DOMAIN_WALL})
-  cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp)
+  cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
 
-  cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
 endif()
 
@@ -46,7 +46,7 @@ if(${QUDA_DIRAC_STAGGERED})
 endif()
 
 if(${QUDA_MULTIGRID})
-  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(multigrid_invert_test ${TEST_LIBS})
 
   cuda_add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)

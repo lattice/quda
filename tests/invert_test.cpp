@@ -424,11 +424,16 @@ int main(int argc, char **argv)
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         tm_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
                  inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
-      } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      } else if (dslash_type == QUDA_WILSON_DSLASH) {
         wil_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.matpc_type, 0,
                   inv_param.cpu_prec, gauge_param);
         wil_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
                   inv_param.cpu_prec, gauge_param);
+      } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+        clover_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.matpc_type, 0,
+		     inv_param.cpu_prec, gauge_param);
+        clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
+		     inv_param.cpu_prec, gauge_param);
       } else {
         printfQuda("Domain wall not supported for multi-shift\n");
         exit(-1);
@@ -464,8 +469,10 @@ int main(int argc, char **argv)
     
 	  tm_ndeg_mat(evenOut, oddOut, gauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0, inv_param.cpu_prec, gauge_param);	
 	}
-      } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      } else if (dslash_type == QUDA_WILSON_DSLASH) {
         wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
+      } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+        clover_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
@@ -504,9 +511,12 @@ int main(int argc, char **argv)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-      } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-        wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
+      } else if (dslash_type == QUDA_WILSON_DSLASH) {
+        wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
                   inv_param.cpu_prec, gauge_param);
+      } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+        clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
+		     inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
@@ -551,11 +561,16 @@ int main(int argc, char **argv)
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         tm_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
                  inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
-      } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      } else if (dslash_type == QUDA_WILSON_DSLASH) {
         wil_matpc(spinorTmp, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
                   inv_param.cpu_prec, gauge_param);
         wil_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
                   inv_param.cpu_prec, gauge_param);
+      } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+        clover_matpc(spinorTmp, gauge, clover, clover_inv, spinorOut, inv_param.kappa,
+		     inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+        clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa,
+		     inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
       } else {
         errorQuda("Unsupported dslash_type");
       }
