@@ -571,7 +571,7 @@ namespace quda
      Again a half precision implementation was straightforwad, but I don't think it would be useful
   */
 
-  void covDev(cudaColorSpinorField *out, cudaGaugeField &gauge, const cudaColorSpinorField *in, const int parity, const int mu, TimeProfile &profile) {
+  void covDev(ColorSpinorField *out, cudaGaugeField &gauge, const ColorSpinorField *in, const int parity, const int mu, TimeProfile &profile) {
     DslashCuda *covdev = 0;
     size_t regSize = sizeof(float);
 
