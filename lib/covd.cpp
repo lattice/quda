@@ -17,7 +17,7 @@ namespace quda {
 
   CovD::~CovD() { }
 
-  void CovD::Apply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void CovD::Apply(ColorSpinorField &out, const ColorSpinorField &in, 
 		       const QudaParity parity, const int mu)
   {
     checkParitySpinor(in, out);
@@ -28,7 +28,7 @@ namespace quda {
     flops += 144ll*in.Volume();
   }
 
-  void CovD::M(cudaColorSpinorField &out, const cudaColorSpinorField &in, const int mu)
+  void CovD::M(ColorSpinorField &out, const ColorSpinorField &in, const int mu)
   {
     checkFullSpinor(out, in);
 
@@ -36,7 +36,7 @@ namespace quda {
     Apply(static_cast<cudaColorSpinorField&>(out.Even()), static_cast<const cudaColorSpinorField&>(in.Odd()),  QUDA_EVEN_PARITY, mu);
   }
 
-  void CovD::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void CovD::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (in.Nspin() != 4) {
       errorQuda("Only Wilson-like fermions supported at this moment");
@@ -73,7 +73,7 @@ namespace quda {
     }
   }
 
-  void CovD::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void CovD::checkFullSpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not full fields: in = %d, out = %d", 
@@ -81,7 +81,7 @@ namespace quda {
     } 
   }
 
-  void CovD::checkSpinorAlias(const cudaColorSpinorField &a, const cudaColorSpinorField &b) const {
+  void CovD::checkSpinorAlias(const ColorSpinorField &a, const ColorSpinorField &b) const {
     if (a.V() == b.V()) errorQuda("Aliasing pointers");
   }
 
