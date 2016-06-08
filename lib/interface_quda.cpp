@@ -5717,7 +5717,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
  * @param cType Contraction type, allows for volume or time-slice contractions.
  * @param tC    Time-slice to contract in case the contraction is in a single time-slice.
  */
-void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType)
+void contract(const ColorSpinorField &x, const ColorSpinorField &y, void *ctrn, const QudaContractType cType)
 {
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     contractCuda(x.Even(), y.Even(), ((double2*)ctrn), cType, QUDA_EVEN_PARITY, profileContract);
@@ -5726,11 +5726,11 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
     contractCuda(x.Even(), y.Even(), ((float2*) ctrn), cType, QUDA_EVEN_PARITY, profileContract);
     contractCuda(x.Odd(),  y.Odd(),  ((float2*) ctrn), cType, QUDA_ODD_PARITY,  profileContract);
   } else {
-    errorQuda("Precision not supported for contractions\n");
+    errorQuda("Half precision not supported for contractions\n");
   }
 }
 
-void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType, const int tC)
+void contract(const ColorSpinorField &x, const ColorSpinorField &y, void *ctrn, const QudaContractType cType, const int tC)
 {
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     contractCuda(x.Even(), y.Even(), ((double2*)ctrn), cType, tC, QUDA_EVEN_PARITY, profileContract);
@@ -5739,7 +5739,7 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
     contractCuda(x.Even(), y.Even(), ((float2*) ctrn), cType, tC, QUDA_EVEN_PARITY, profileContract);
     contractCuda(x.Odd(),  y.Odd(),  ((float2*) ctrn), cType, tC, QUDA_ODD_PARITY,  profileContract);
   } else {
-    errorQuda("Precision not supported for contractions\n");
+    errorQuda("Half precision not supported for contractions\n");
   }
 }
 
