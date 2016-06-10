@@ -321,10 +321,10 @@ void init(int argc, char **argv) {
     construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
   }
 
-  spinor->Source(QUDA_RANDOM_SOURCE);
+  spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
+    double norm = 1.0; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     if (test_type == 2 || test_type == 4) {
@@ -647,7 +647,7 @@ void dslashRef() {
   } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     switch (test_type) {
     case 0:
-      clover_dslash(spinorTmp->V(), hostGauge, hostClover, spinor->V(), parity, dagger, inv_param.cpu_prec, gauge_param);
+      clover_dslash(spinorRef->V(), hostGauge, hostCloverInv, spinor->V(), parity, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case 1:
       clover_matpc(spinorRef->V(), hostGauge, hostClover, hostCloverInv, spinor->V(), inv_param.kappa, inv_param.matpc_type,

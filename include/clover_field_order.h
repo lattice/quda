@@ -144,7 +144,7 @@ namespace quda {
           complex<Float> tmp(a[parity][idx], a[parity][idx+1]);
           return tmp;
 	} else {
-	  // requesting upper triangular so return conjuate transpose
+	  // requesting upper triangular so return conjugate transpose
 	  return conj(operator()(parity,x,s_col,s_row,c_col,c_row) );
 	}
       }
