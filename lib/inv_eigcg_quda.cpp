@@ -38,7 +38,7 @@ namespace quda {
      Complex *proj_matrix; //VH A V
 
      QudaPrecision           ritz_prec;             //keep it right now.
-     cudaColorSpinorFieldSet    *cudaRitzVectors;      //device buffer for Ritz vectors
+     ColorSpinorFieldSet    *cudaRitzVectors;      //device buffer for Ritz vectors
      double *ritz_values;
 
      int ld;                 //projection matrix leading dimension
@@ -70,7 +70,7 @@ namespace quda {
         eigv_param.is_composite  = true;
         eigv_param.composite_dim = tot_dim;
   
-        cudaRitzVectors = new cudaColorSpinorFieldSet(eigv_param);
+        cudaRitzVectors = ColorSpinorFieldSet::Create (eigv_param);
 
 
         return;
@@ -143,7 +143,7 @@ namespace quda {
 
         CleanDeviceRitzVectors();
 
-        cudaRitzVectors = new cudaColorSpinorFieldSet(cudaEigvParam);
+        cudaRitzVectors = ColorSpinorFieldSet::Create(cudaEigvParam);
 
         cur_dim = nev;
         cuda_ritz_alloc = true;
@@ -187,9 +187,9 @@ namespace quda {
 
       //methods
       void FillLanczosDiag(const int _2nev);
-      void FillLanczosOffDiag(const int _2nev, cudaColorSpinorField *v, cudaColorSpinorFieldSet *u, double inv_sqrt_r2);
+      void FillLanczosOffDiag(const int _2nev, ColorSpinorField *v, ColorSpinorFieldSet *u, double inv_sqrt_r2);
       //
-      void CheckEigenvalues(const cudaColorSpinorFieldSet *Vm, const DiracMatrix &matDefl, const int restart_num);//this method is designed to monitor eigcg effeciency, not for production runs
+      void CheckEigenvalues(const ColorSpinorFieldSet *Vm, const DiracMatrix &matDefl, const int restart_num);//this method is designed to monitor eigcg effeciency, not for production runs
    };
 
    template<typename Float, typename CudaComplex>
@@ -296,7 +296,7 @@ namespace quda {
  }
 
   template<typename Float, typename CudaComplex>
-  void EigCGArgs<Float, CudaComplex>::FillLanczosOffDiag(const int _2nev, cudaColorSpinorField *v, cudaColorSpinorFieldSet *u, double inv_sqrt_r2)
+  void EigCGArgs<Float, CudaComplex>::FillLanczosOffDiag(const int _2nev, ColorSpinorField *v, ColorSpinorFieldSet *u, double inv_sqrt_r2)
   {
     if(v->Precision() != u->Precision()) errorQuda("\nIncorrect precision...\n");
     for (int i = 0; i < _2nev; i++){
@@ -309,7 +309,7 @@ namespace quda {
 
   //not implemented
   template<typename Float, typename CudaComplex>
-  void EigCGArgs<Float, CudaComplex>::CheckEigenvalues(const cudaColorSpinorFieldSet *Vm, const DiracMatrix &matDefl, const int restart_num)
+  void EigCGArgs<Float, CudaComplex>::CheckEigenvalues(const ColorSpinorFieldSet *Vm, const DiracMatrix &matDefl, const int restart_num)
   {
     printfQuda("\nPrint eigenvalue accuracy after %d restart.\n", restart_num);
 
@@ -319,13 +319,14 @@ namespace quda {
     ColorSpinorParam csParam(Vm->Component(0));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
-    cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
+    ColorSpinorField *W   = ColorSpinorField::Create(csParam);
+    ColorSpinorField *W2  = ColorSpinorField::Create(csParam);
 
-    cudaColorSpinorField tmp (*W, csParam);
+    ColorSpinorField *tmp1_p = ColorSpinorField::Create(*W, csParam);
+    ColorSpinorField &tmp = *tmp1_p;
 
-    cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
-    cudaColorSpinorField &tmp2   = *tmp2_p;
+    ColorSpinorField *tmp2_p = !matDefl.isStaggered() ? ColorSpinorField::Create(*W, csParam) : tmp1_p;
+    ColorSpinorField &tmp2   = *tmp2_p;
 
     Complex alpha;
 
@@ -378,7 +379,9 @@ namespace quda {
 
     }
 
-    if (&tmp2 != &tmp) delete tmp2_p;
+    if (&tmp2 != tmp1_p) delete tmp2_p;
+
+    delete tmp1_p;
 
     delete W;
     //
@@ -450,7 +453,7 @@ namespace quda {
  * This is a solo precision solver.
 */
 
-  int IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b)
+  int IncEigCG::EigCG(ColorSpinorField &x, ColorSpinorField &b)
   {
 
     if (eigcg_precision != x.Precision()) errorQuda("\nInput/output field precision is incorrect (solver precision: %u spinor precision: %u).\n", eigcg_precision, x.Precision());
@@ -469,30 +472,35 @@ namespace quda {
       return 0;
     }
 
-    cudaColorSpinorField r(b);
+    ColorSpinorField *rp = ColorSpinorField::Create(b);
+    ColorSpinorField &r = *rp;
 
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(b, csParam);
+    ColorSpinorField *yp = ColorSpinorField::Create(b, csParam);
+    ColorSpinorField &y = *yp;
     //mat(r, x, y);
     //double r2 = xmyNorm(b, r);//compute residual
 
     csParam.setPrecision(eigcg_precision);
 
-    cudaColorSpinorField Ap(x, csParam);
+    ColorSpinorField *App = ColorSpinorField::Create (x, csParam);
+    ColorSpinorField &Ap = *App;
 
-    cudaColorSpinorField tmp(x, csParam);
+    ColorSpinorField *tmp1_p = ColorSpinorField::Create (x, csParam);
+    ColorSpinorField &tmp = *tmp1_p;
     //matSloppy(r, x, tmp, tmp2);
     //double r2 = xmyNorm(b, r);//compute residual
 
     // tmp2 only needed for multi-gpu Wilson-like kernels
-    cudaColorSpinorField *tmp2_p = (!mat->isStaggered()) ? new cudaColorSpinorField(x, csParam) : &tmp;
-    cudaColorSpinorField &tmp2 = *tmp2_p;
+    ColorSpinorField *tmp2_p = (!mat->isStaggered()) ? ColorSpinorField::Create(x, csParam) : tmp1_p;
+    ColorSpinorField &tmp2 = *tmp2_p;
 
     (*matSloppy)(r, x, tmp, tmp2);
     double r2 = xmyNorm(b, r);//compute residual
 
-    cudaColorSpinorField p(r);
+    ColorSpinorField *pp = ColorSpinorField::Create (r);
+    ColorSpinorField &p = *pp;
 
     zero(y);
 
@@ -530,7 +538,7 @@ namespace quda {
        csParam.is_composite = true;
        csParam.composite_dim = param.m;
 
-       Vm = new cudaColorSpinorFieldSet(csParam); //search space for Ritz vectors
+       Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
 
        checkCudaError();
        printfQuda("\n..done.\n");
@@ -541,18 +549,10 @@ namespace quda {
     ColorSpinorParam eigParam(Vm->Component(0));
     eigParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    cudaColorSpinorField  *v0   = NULL; //temporary field.
+    ColorSpinorField *Ap0p = ColorSpinorField::Create (Ap);
+    ColorSpinorField &Ap0 = *Ap0p;
 
-    cudaColorSpinorField Ap0(Ap);
-
-    if(search_space_prec != param.precision_sloppy)
-    {
-       v0 = new cudaColorSpinorField(Vm->Component(0), eigParam); //temporary field.
-    }
-    else
-    {
-       v0 = &Ap0;//just an alias pointer
-    }
+    ColorSpinorField  *v0 = (search_space_prec != param.precision_sloppy) ? ColorSpinorField::Create(Vm->Component(0), eigParam) : Ap0p; //temporary field.
 
     //create EigCG objects:
     EigCGArgs<double, cuDoubleComplex> *eigcg_args = new EigCGArgs<double, cuDoubleComplex>(param.m, param.nev); //must be adjustable..
@@ -688,9 +688,15 @@ namespace quda {
     profile->TPSTART(QUDA_PROFILE_FREE);
 
     if (&tmp2 != &tmp) delete tmp2_p;
+    delete tmp1_p;
 
 //Clean EigCG resources:
     if(search_space_prec != param.precision_sloppy)  delete v0;
+
+    delete rp;
+    delete yp;
+    delete pp;
+    delete App;
 
     profile->TPSTOP(QUDA_PROFILE_FREE);
 
@@ -700,7 +706,7 @@ namespace quda {
 //END of eigcg solver.
 
 //Deflation space management:
-  void IncEigCG::CreateDeflationSpace(cudaColorSpinorField &eigcgSpinor, DeflationParam *&dpar)
+  void IncEigCG::CreateDeflationSpace(ColorSpinorField &eigcgSpinor, DeflationParam *&dpar)
   {
     printfQuda("\nCreate deflation space...\n");
 
@@ -784,13 +790,14 @@ namespace quda {
      ColorSpinorParam csParam(dpar->cudaRitzVectors->Component(0));
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
-     cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
+     ColorSpinorField *W   = ColorSpinorField::Create(csParam);
+     ColorSpinorField *W2  = ColorSpinorField::Create(csParam);
 
-     cudaColorSpinorField tmp (*W, csParam);
+     ColorSpinorField *tmp1_p = ColorSpinorField::Create(*W, csParam);
+     ColorSpinorField &tmp = *tmp1_p; 
 
-     cudaColorSpinorField *tmp2_p = !matDefl->isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
-     cudaColorSpinorField &tmp2   = *tmp2_p;
+     ColorSpinorField *tmp2_p = !matDefl->isStaggered() ? ColorSpinorField::Create(*W, csParam) : &tmp;
+     ColorSpinorField &tmp2   = *tmp2_p;
 
      for (int j = dpar->cur_dim; j < (dpar->cur_dim+addednev); j++)//
      {
@@ -816,6 +823,8 @@ namespace quda {
      printfQuda("\n.. done.\n");
 
      if (&tmp2 != &tmp) delete tmp2_p;
+
+     delete tmp1_p;
 
      delete W;
      delete W2;
@@ -843,13 +852,14 @@ namespace quda {
 
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
-     cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
+     ColorSpinorField *W   = ColorSpinorField::Create(csParam);
+     ColorSpinorField *W2  = ColorSpinorField::Create(csParam);
 
-     cudaColorSpinorField tmp (*W, csParam);
+     ColorSpinorField *tmp1_p = ColorSpinorField::Create (*W, csParam);
+     ColorSpinorField &tmp = *tmp1_p;
 
-     cudaColorSpinorField *tmp2_p = !matDefl->isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
-     cudaColorSpinorField &tmp2   = *tmp2_p;
+     ColorSpinorField *tmp2_p = !matDefl->isStaggered() ? ColorSpinorField::Create(*W, csParam) : &tmp;
+     ColorSpinorField &tmp2   = *tmp2_p;
 
      for(int i = 0; i < nevs_to_print; i++)//newnev
      {
@@ -876,6 +886,8 @@ namespace quda {
      }
 
      if (&tmp2 != &tmp) delete tmp2_p;
+
+     delete tmp1_p;
 
      delete W;
 
@@ -924,13 +936,14 @@ namespace quda {
      ColorSpinorParam csParam(dpar->cudaRitzVectors->Component(0));
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     cudaColorSpinorField *W   = new cudaColorSpinorField(csParam);
-     cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
+     ColorSpinorField *W   = ColorSpinorField::Create(csParam);
+     ColorSpinorField *W2  = ColorSpinorField::Create(csParam);
 
-     cudaColorSpinorField tmp (*W, csParam);
+     ColorSpinorField *tmp1_p =  ColorSpinorField::Create (*W, csParam);
+     ColorSpinorField &tmp = *tmp1_p;
 
-     cudaColorSpinorField *tmp2_p = !matDefl->isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
-     cudaColorSpinorField &tmp2   = *tmp2_p;
+     ColorSpinorField *tmp2_p = !matDefl->isStaggered() ? ColorSpinorField::Create(*W, csParam) : &tmp;
+     ColorSpinorField &tmp2   = *tmp2_p;
 
      if(eigcg_alloc == false){//or : search_space_prec != ritz_precision
 
@@ -942,7 +955,7 @@ namespace quda {
        csParam.is_composite = true;
        csParam.composite_dim = max_nevs;
 
-       Vm = new cudaColorSpinorFieldSet(csParam); //search space for Ritz vectors
+       Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
 
        checkCudaError();
        printfQuda("\n..done.\n");
@@ -995,6 +1008,7 @@ namespace quda {
      dpar->rtz_dim = idx;//idx never exceeds cur_dim.
 
      if (&tmp2 != &tmp) delete tmp2_p;
+     delete tmp1_p;
 
      delete W;
 
@@ -1007,7 +1021,7 @@ namespace quda {
      return;
   }
 
-  void IncEigCG::DeflateSpinor(cudaColorSpinorField &x, cudaColorSpinorField &b, DeflationParam *dpar, bool set2zero)
+  void IncEigCG::DeflateSpinor(ColorSpinorField &x, ColorSpinorField &b, DeflationParam *dpar, bool set2zero)
   {
     if(set2zero) zero(x);
     if(dpar->cur_dim == 0) return;//nothing to do
@@ -1019,8 +1033,8 @@ namespace quda {
     double check_nrm2 = norm2(b);
     printfQuda("\nSource norm (gpu): %1.15e\n", sqrt(check_nrm2));
 
-    cudaColorSpinorField *in  = NULL;
-    cudaColorSpinorField *out = NULL;
+    ColorSpinorField *in  = nullptr;
+    ColorSpinorField *out = nullptr;
 
     if(dpar->cudaRitzVectors->Precision() != x.Precision())
     {
@@ -1029,8 +1043,8 @@ namespace quda {
       //Create an eigenvector set:
       csParam.create   = QUDA_ZERO_FIELD_CREATE;
       //
-      in   = new cudaColorSpinorField(csParam);
-      out  = new cudaColorSpinorField(csParam);
+      in   = ColorSpinorField::Create(csParam);
+      out  = ColorSpinorField::Create(csParam);
 
       copy(*out, x);
       copy(*in, b);
@@ -1071,7 +1085,7 @@ namespace quda {
     return;
   }
 
-  void IncEigCG::DeflateSpinorReduced(cudaColorSpinorField &x, cudaColorSpinorField &b, DeflationParam *dpar, bool set2zero)
+  void IncEigCG::DeflateSpinorReduced(ColorSpinorField &x, ColorSpinorField &b, DeflationParam *dpar, bool set2zero)
   {
     if(set2zero) zero(x);
 
@@ -1080,8 +1094,8 @@ namespace quda {
     double check_nrm2 = norm2(b);
     printfQuda("\nSource norm (gpu): %1.15e\n", sqrt(check_nrm2));
 
-    cudaColorSpinorField *in  = NULL;
-    cudaColorSpinorField *out = NULL;
+    ColorSpinorField *in  = NULL;
+    ColorSpinorField *out = NULL;
 
     if(dpar->cudaRitzVectors->Precision() != x.Precision())
     {
@@ -1090,8 +1104,8 @@ namespace quda {
       //Create an eigenvector set:
       csParam.create   = QUDA_ZERO_FIELD_CREATE;
       //
-      in   = new cudaColorSpinorField(csParam);
-      out  = new cudaColorSpinorField(csParam);
+      in   = ColorSpinorField::Create(csParam);
+      out  = ColorSpinorField::Create(csParam);
 
       copy(*out, x);
       copy(*in, b);
@@ -1199,7 +1213,7 @@ namespace quda {
     return;
   }
 
-  void IncEigCG::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in)
+  void IncEigCG::operator()(ColorSpinorField *out, ColorSpinorField *in)
   {
      int eigcg_restarts = 0;
 
@@ -1256,8 +1270,8 @@ namespace quda {
            //
            cudaParam.setPrecision(eigcg_precision);
 
-           cudaColorSpinorField *outSloppy = new cudaColorSpinorField(cudaParam);
-           cudaColorSpinorField *inSloppy  = new cudaColorSpinorField(cudaParam);
+           ColorSpinorField *outSloppy = ColorSpinorField::Create(cudaParam);
+           ColorSpinorField *inSloppy  = ColorSpinorField::Create(cudaParam);
 
            copy(*inSloppy, *in);//input is outer residual
            copy(*outSloppy, *out);
@@ -1275,8 +1289,10 @@ namespace quda {
            //Construct(extend) projection matrix:
            ExpandDeflationSpace(defl_param, param.nev);
 
-           cudaColorSpinorField y(*in);//full precision accumulator
-           cudaColorSpinorField r(*in);//full precision residual
+           ColorSpinorField *yp = ColorSpinorField::Create(*in);//full precision accumulator
+           ColorSpinorField &y = *yp;
+           ColorSpinorField *rp = ColorSpinorField::Create(*in);//full precision residual
+           ColorSpinorField &r = *rp;
 
            //launch again eigcg:
            copy(*out, *outSloppy);
@@ -1375,6 +1391,9 @@ namespace quda {
            //
            param.secs   = tot_time;
 
+           delete yp;
+           delete rp;
+
         }//end of the mixed precision branch
 
         if(getVerbosity() >= QUDA_VERBOSE)
@@ -1398,9 +1417,10 @@ namespace quda {
 
         cudaParam.create = QUDA_ZERO_FIELD_CREATE;
 
-        cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam);
+        ColorSpinorField *W   = ColorSpinorField::Create(cudaParam);
 
-        cudaColorSpinorField tmp (*W, cudaParam);
+        ColorSpinorField *tmp1_p = ColorSpinorField::Create(*W, cudaParam);
+        ColorSpinorField &tmp = *tmp1_p; 
 
         Solver *initCG = 0;
 
@@ -1465,6 +1485,7 @@ namespace quda {
         //
         param.gflops += initCGparam.gflops;
 
+        delete tmp1_p;
         delete W;
      }
 
@@ -1489,8 +1510,8 @@ namespace quda {
      //
      cudaParam.create = QUDA_ZERO_FIELD_CREATE;
      //
-     cudaColorSpinorField   *final_r = new cudaColorSpinorField(cudaParam);
-     cudaColorSpinorField   *tmp2    = new cudaColorSpinorField(cudaParam);
+     ColorSpinorField   *final_r = ColorSpinorField::Create(cudaParam);
+     ColorSpinorField   *tmp2    = ColorSpinorField::Create(cudaParam);
 
 
      (*mat)(*final_r, *out, *tmp2);

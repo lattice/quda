@@ -49,7 +49,7 @@ namespace quda {
 
       //Objects required for the Galerkin projections
       Complex *projMat;  //host   projection matrix:
-      cudaColorSpinorFieldSet    *projVecs;      //device buffer for HRitz vectors
+      ColorSpinorFieldSet    *projVecs;      //device buffer for HRitz vectors
 
       //needed for MinRes Projection:
       Complex *projQRMat;
@@ -87,7 +87,7 @@ namespace quda {
         return;
       }
 
-      void LoadData(cudaColorSpinorField  *Vm, Complex *srcMat, const int nevs, const int ldn)
+      void LoadData(ColorSpinorField  *Vm, Complex *srcMat, const int nevs, const int ldn)
       {
 
          if(init_flag)                 errorQuda("Error: data was already initialized.");
@@ -121,7 +121,7 @@ namespace quda {
          csParam.is_composite   = true;
          csParam.composite_dim  = (nv+1);
 
-         projVecs  = new cudaColorSpinorFieldSet(csParam);//temporary field
+         projVecs  = ColorSpinorFieldSet::Create(csParam);//temporary field
 
          for(int i = 0; i < (nv+1); i++) copy(projVecs->Component(i), Vm->Component(i));
 
@@ -234,13 +234,13 @@ namespace quda {
       //
       void ComputeHarmonicRitzPairs();
 
-      void RestartVH(cudaColorSpinorFieldSet *Vm);
+      void RestartVH(ColorSpinorFieldSet *Vm);
 
       void PrepareDeflatedRestart(Complex *givensH, Complex *g, const bool use_deflated_cycles = true);
 
       void PrepareGivens(Complex *givensH, const int col, const bool use_deflated_cycles = true);
 
-      void UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorFieldSet *Vm, Complex *givensH, Complex *g, const int j);
+      void UpdateSolution(ColorSpinorField *x, ColorSpinorFieldSet *Vm, Complex *givensH, Complex *g, const int j);
    };
 
   GMResDRArgs::GMResDRArgs(int m, int ldm, int nev): GMResDR_magma_args(0), harVecs(0), harVals(0), sortedHarVecs(0), sortedHarVals(0), harMat(0), qrH(0), tauH(0), srtRes(0),
@@ -342,7 +342,7 @@ namespace quda {
 
 
 //Note: in fact, x is an accumulation field initialized to zero (if a sloppy field is used!) and has the same precision as Vm
- void GMResDRArgs::UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorFieldSet *Vm, Complex *givensH, Complex *g, const int j)
+ void GMResDRArgs::UpdateSolution(ColorSpinorField *x, ColorSpinorFieldSet *Vm, Complex *givensH, Complex *g, const int j)
  {
    //if (mixed_precision_GMResDR) zero(*x);//it's done in the main loop, no need for this
    memset(lsqSol, 0, (m+1)*sizeof(Complex));
@@ -400,7 +400,7 @@ namespace quda {
    return;
  }
 
- void GMResDRArgs::RestartVH(cudaColorSpinorFieldSet *Vm)
+ void GMResDRArgs::RestartVH(ColorSpinorFieldSet *Vm)
  {
    if(!init_flag) errorQuda("\nGMResDR resources were not allocated.\n");
 
@@ -537,7 +537,7 @@ namespace quda {
    csParam.is_composite  = true;
    csParam.composite_dim = param.m+1;
 
-   Vm = new cudaColorSpinorFieldSet(csParam); //search space for Ritz vectors
+   Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
 
    csParam.is_composite  = false;
    csParam.composite_dim = 0;
@@ -551,7 +551,7 @@ namespace quda {
    return;
  }
 
- void GMResDR::PerformProjection(cudaColorSpinorField &x_sloppy,  cudaColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar)
+ void GMResDR::PerformProjection(ColorSpinorField &x_sloppy,  ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar)
  {
     if(dpar->projType == QUDA_INVALID_PROJECTION)
     {
@@ -621,7 +621,7 @@ namespace quda {
    return;
  }
 
- void GMResDR::RunDeflatedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold /*=2.0*/)
+ void GMResDR::RunDeflatedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold /*=2.0*/)
  {
     bool use_deflated_cycles = true;
 
@@ -631,11 +631,13 @@ namespace quda {
 
     DiracMatrix *sloppy_mat = matSloppy;
 
-    cudaColorSpinorField r(*in); //high precision residual
+    ColorSpinorField *rp = ColorSpinorField::Create(*in); //high precision residual
+    ColorSpinorField &r = *rp;
     //
-    cudaColorSpinorField &x = *out;
+    ColorSpinorField &x = *out;
     //
-    cudaColorSpinorField y(*in); //high precision aux field
+    ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision aux field
+    ColorSpinorField &y = *yp;
 
     //Sloppy precision fields:
     ColorSpinorParam csParam(*in);//create spinor parameters
@@ -644,12 +646,12 @@ namespace quda {
 
     csParam.setPrecision(gmres_space_prec);
 
-    cudaColorSpinorField *r_sloppy, *x_sloppy;
+    ColorSpinorField *r_sloppy, *x_sloppy;
 
     if (mixed_precision_GMResDR)
     {
-       r_sloppy = new cudaColorSpinorField(r, csParam);
-       x_sloppy = new cudaColorSpinorField(x, csParam);
+       r_sloppy = ColorSpinorField::Create(r, csParam);
+       x_sloppy = ColorSpinorField::Create(x, csParam);
     }
     else
     {
@@ -657,13 +659,14 @@ namespace quda {
        x_sloppy = &x;
     }
 
-    cudaColorSpinorField tmp(*in, csParam);
+    ColorSpinorField *tmp1_p = ColorSpinorField::Create(*in, csParam);
+    ColorSpinorField &tmp = *tmp1_p;
 
-    cudaColorSpinorField *tmp2_p;
+    ColorSpinorField *tmp2_p;
 
-    tmp2_p = new cudaColorSpinorField(*in, csParam);
+    tmp2_p = ColorSpinorField::Create(*in, csParam);
 
-    cudaColorSpinorField &tmp2 = *tmp2_p;
+    ColorSpinorField &tmp2 = *tmp2_p;
 
     //Allocate Vm array:
     if(gmres_alloc == false) AllocateKrylovSubspace(csParam);
@@ -730,7 +733,7 @@ namespace quda {
 
     while(j < m)//we allow full cycle
     {
-      cudaColorSpinorField *Av = dynamic_cast<cudaColorSpinorField*>( &Vm->Component(j+1));
+      ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>( &Vm->Component(j+1));
 
       (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);
 
@@ -815,10 +818,10 @@ namespace quda {
    bool last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop);
 
    //For the deflated cycles: just pointer aliases, for the projected cycles: new (half precision) objects
-   cudaColorSpinorField *ctmp1_p = &tmp;
-   cudaColorSpinorField *ctmp2_p = tmp2_p;
+   ColorSpinorField *ctmp1_p = &tmp;
+   ColorSpinorField *ctmp2_p = tmp2_p;
 
-   cudaColorSpinorField *x_sloppy2 = x_sloppy;
+   ColorSpinorField *x_sloppy2 = x_sloppy;
 
    while(cycle_idx < max_cycles && !last_cycle)
    {
@@ -878,7 +881,7 @@ namespace quda {
      while(j < m) //we allow full cycle
      {
        //pointer aliasing:
-       cudaColorSpinorField *Av = dynamic_cast<cudaColorSpinorField*>(&Vm->Component(j+1));
+       ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>(&Vm->Component(j+1));
 
        (*sloppy_mat)(*Av, Vm->Component(j), *ctmp1_p, *ctmp2_p);
        //
@@ -976,11 +979,11 @@ namespace quda {
 
        AllocateKrylovSubspace(csParam);
 
-       x_sloppy2 = new cudaColorSpinorField(x, csParam);
+       x_sloppy2 = ColorSpinorField::Create(x, csParam);
 
-       ctmp1_p   = new cudaColorSpinorField(csParam);
+       ctmp1_p   = ColorSpinorField::Create(csParam);
 
-       ctmp2_p   = new cudaColorSpinorField(csParam);
+       ctmp2_p   = ColorSpinorField::Create(csParam);
 
        sloppy_mat = const_cast<DiracMatrix*> (matDefl);
 
@@ -1043,13 +1046,16 @@ namespace quda {
    }
 
    delete tmp2_p;
+   delete tmp1_p;
+   delete yp;
+   delete rp;
 
    profile->TPSTOP(QUDA_PROFILE_FREE);
 
    return;
  }
 
- void GMResDR::RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision)
+ void GMResDR::RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision)
  {
      bool mixed_precision_gmres = enforce_mixed_precision || (param.precision != param.precision_sloppy);
 
@@ -1057,37 +1063,39 @@ namespace quda {
 
      DiracMatrix *sloppy_mat;
 
-     cudaColorSpinorField r(*in); //high precision residual
+     ColorSpinorField *rp = ColorSpinorField::Create(*in); //high precision residual
+     ColorSpinorField &r  = *rp;
      //
-     cudaColorSpinorField &x = *out;
+     ColorSpinorField &x = *out;
      //
-     cudaColorSpinorField y(*in); //high precision aux field
+     ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision aux field
+     ColorSpinorField &y = *yp;
 
      //Sloppy precision fields:
      ColorSpinorParam csParam(*in);//create spinor parameters
 
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     cudaColorSpinorField *r_sloppy = NULL, *x_sloppy = NULL;
+     ColorSpinorField *r_sloppy = NULL, *x_sloppy = NULL;
 
      csParam.setPrecision(gmres_space_prec);//this is a solo precision solver
 
-     cudaColorSpinorField *r_sloppy_proj = NULL;
-     cudaColorSpinorField *x_sloppy_proj = NULL;
+     ColorSpinorField *r_sloppy_proj = NULL;
+     ColorSpinorField *x_sloppy_proj = NULL;
 
      if (mixed_precision_gmres)
      {
         if(gmres_space_prec != QUDA_HALF_PRECISION)
         {
-           r_sloppy_proj = new cudaColorSpinorField(r, csParam);
-           x_sloppy_proj = new cudaColorSpinorField(x, csParam);
+           r_sloppy_proj = ColorSpinorField::Create(r, csParam);
+           x_sloppy_proj = ColorSpinorField::Create(x, csParam);
         }
 
         csParam.setPrecision(QUDA_HALF_PRECISION);
 
         sloppy_mat = const_cast<DiracMatrix*> (matDefl);
-        r_sloppy = new cudaColorSpinorField(r, csParam);
-        x_sloppy = new cudaColorSpinorField(x, csParam);
+        r_sloppy = ColorSpinorField::Create(r, csParam);
+        x_sloppy = ColorSpinorField::Create(x, csParam);
      }
      else
      {
@@ -1099,13 +1107,14 @@ namespace quda {
      if(!r_sloppy_proj) r_sloppy_proj = r_sloppy;
      if(!x_sloppy_proj) x_sloppy_proj = x_sloppy;
 
-     cudaColorSpinorField tmp(*in, csParam);
+     ColorSpinorField *tmp1_p = ColorSpinorField::Create(*in, csParam);
+     ColorSpinorField &tmp = *tmp1_p;
 
-     cudaColorSpinorField *tmp2_p;
+     ColorSpinorField *tmp2_p;
 
-     tmp2_p = new cudaColorSpinorField(*in, csParam);
+     tmp2_p = ColorSpinorField::Create(*in, csParam);
 
-     cudaColorSpinorField &tmp2 = *tmp2_p;
+     ColorSpinorField &tmp2 = *tmp2_p;
 
      //Allocate Vm array:
      if(gmres_alloc == false)
@@ -1208,7 +1217,7 @@ namespace quda {
 
       while(j < m)//we allow full cycle
       {
-        cudaColorSpinorField *Av = dynamic_cast<cudaColorSpinorField*>(&Vm->Component(j+1));
+        ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>(&Vm->Component(j+1));
 
         (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);//must be matDefl
 
@@ -1326,7 +1335,11 @@ namespace quda {
      }
    }
 
+   delete tmp1_p; 
    delete tmp2_p;
+
+   delete yp;
+   delete rp;
 
    profile->TPSTOP(QUDA_PROFILE_FREE);
 
@@ -1334,7 +1347,7 @@ namespace quda {
 
  }
 
- void GMResDR::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in)
+ void GMResDR::operator()(ColorSpinorField *out, ColorSpinorField *in)
  {
    if(!defl_param)
    {
