@@ -333,7 +333,7 @@ namespace quda {
 	  twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
 				  static_cast<cudaColorSpinorField*>(tmp1), QUDA_EVEN_PARITY, dagger,
 				  &static_cast<const cudaColorSpinorField&>(in),
-				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa, 0.0, 0.0, commDim, profile);
+				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa2, 0.0, 0.0, commDim, profile);
 
           flops += (1320ll+96ll)*in.Volume();	 
         } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
@@ -341,7 +341,7 @@ namespace quda {
 	  twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
 				  static_cast<const cudaColorSpinorField*>(tmp1), QUDA_ODD_PARITY, dagger,
 				  &static_cast<const cudaColorSpinorField&>(in),
-				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa, 0.0, 0.0, commDim, profile);
+				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa2, 0.0, 0.0, commDim, profile);
           flops += (1320ll+96ll)*in.Volume();
         }else { // symmetric preconditioning
           errorQuda("Invalid matpcType");
@@ -386,27 +386,27 @@ namespace quda {
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
         src = &(x.Odd());
-        TwistCloverInv(*src, b.Odd(), 1);
+        TwistCloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
         DiracWilson::DslashXpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa);
-        TwistCloverInv(*src, *tmp1, 0);
+        TwistCloverInv(*src, *tmp1, QUDA_EVEN_PARITY);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD) {
         // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
         src = &(x.Even());
-        TwistCloverInv(*src, b.Even(), 0);
+        TwistCloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
         DiracWilson::DslashXpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa);
-        TwistCloverInv(*src, *tmp1, 1);
+        TwistCloverInv(*src, *tmp1, QUDA_ODD_PARITY);
         sol = &(x.Odd());
       } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D_eo A_oo^-1 b_o
         src = &(x.Odd());
-        TwistCloverInv(*tmp1, b.Odd(), 1); // safe even when *tmp1 = b.odd
+        TwistCloverInv(*tmp1, b.Odd(), QUDA_ODD_PARITY); // safe even when *tmp1 = b.odd
         DiracWilson::DslashXpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // src = b_o + k D_oe A_ee^-1 b_e
         src = &(x.Even());
-        TwistCloverInv(*tmp1, b.Even(), 0); // safe even when *tmp1 = b.even
+        TwistCloverInv(*tmp1, b.Even(), QUDA_EVEN_PARITY); // safe even when *tmp1 = b.even
         DiracWilson::DslashXpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa);
         sol = &(x.Odd());
       } else {
@@ -436,11 +436,11 @@ namespace quda {
       if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
         DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-        TwistCloverInv(x.Odd(), *tmp1, 1);
+        TwistCloverInv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
       } else if (matpcType == QUDA_MATPC_ODD_ODD ||   matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // x_e = A_ee^-1 (b_e + k D_eo x_o)
         DiracWilson::DslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-        TwistCloverInv(x.Even(), *tmp1, 0);
+        TwistCloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
       } else {
         errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
       }

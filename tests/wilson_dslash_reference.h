@@ -28,6 +28,16 @@ extern "C" {
 		QudaTwistFlavorType flavor, QudaMatPCType matpc_type,
 		int daggerBit, QudaPrecision precision, QudaGaugeParam &param);
 
+  void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa,
+		 double mu, QudaTwistFlavorType flavor, int oddBit, QudaMatPCType matpc_type,
+		 int daggerBit, QudaPrecision sprecision, QudaGaugeParam &param);
+
+  void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu,
+	       QudaTwistFlavorType flavor, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
+
+  void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu, QudaTwistFlavorType flavor,
+                 QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
+
   void tm_ndeg_dslash(void *res1, void *res2, void **gaugeFull, void *spinorField1, void *spinorField2,
 		      double kappa, double mu,  double epsilon, int oddBit, int daggerBit, QudaMatPCType matpc_type,
 		      QudaPrecision precision, QudaGaugeParam &gauge_param);

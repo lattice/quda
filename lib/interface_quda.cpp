@@ -753,9 +753,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   CloverFieldParam clover_param;
   CloverField *in=NULL;
-#ifndef DYNAMIC_CLOVER
   CloverField *inInv=NULL;
-#endif
 
   if(!device_calc){
     // create a param for the cpu clover field
@@ -781,23 +779,22 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       cpuParam.inverse = false;
       cpuParam.cloverInv = NULL;
       cpuParam.clover = h_clover;
+      cpuParam.twisted = true;
       cpuParam.mu2 = 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu;
       in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
         static_cast<CloverField*>(new cpuCloverField(cpuParam)) :
         static_cast<CloverField*>(new cudaCloverField(cpuParam));
 
-#ifndef DYNAMIC_CLOVER
       cpuParam.cloverInv = h_clovinv;
       cpuParam.clover = NULL;
       cpuParam.twisted = true;
-      cpuParam.direct = true;
-      cpuParam.inverse = false;
+      cpuParam.direct = false;
+      cpuParam.inverse = true;
       cpuParam.mu2 = 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu;
 
       inInv = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
         static_cast<CloverField*>(new cpuCloverField(cpuParam)) :
         static_cast<CloverField*>(new cudaCloverField(cpuParam));
-#endif
     } else {
       in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
         static_cast<CloverField*>(new cpuCloverField(cpuParam)) :
@@ -814,6 +811,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
 
     if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      clover_param.mu2 = 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu;
       clover_param.direct = true;
       clover_param.inverse = false;
       clover_param.twisted = true;
@@ -823,7 +821,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       clover_param.inverse = true;
       clover_param.twisted = true;
       cloverInvPrecise = new cudaCloverField(clover_param);
-//      clover_param.twisted = false;
 #endif
     } else {
       cloverPrecise = new cudaCloverField(clover_param);
@@ -958,6 +955,41 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 #endif
   }
 
+  // need to copy back the inverse field for twisted-clover tests
+  if (h_clovinv && !device_calc && (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
+    // copy the inverted clover term into host application order on the device
+    clover_param.setPrecision(inv_param->clover_cpu_prec);
+    clover_param.direct = false;
+    clover_param.inverse = true;
+    clover_param.mu2 = 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu;
+    clover_param.twisted = true;
+
+    // this isn't really "epilogue" but this label suffices
+    profileClover.TPSTART(QUDA_PROFILE_EPILOGUE);
+#ifndef DYNAMIC_CLOVER
+    clover_param.order = inv_param->clover_order;
+    cudaCloverField hack(clover_param);
+    hack.copy(*cloverInvPrecise);
+#else
+    cudaCloverField *hackOfTheHack = new cudaCloverField(clover_param);	// Hack of the hack
+    hackOfTheHack->copy(*cloverPrecise);
+    cloverInvert(*hackOfTheHack, inv_param->compute_clover_trlog, QUDA_CUDA_FIELD_LOCATION);
+    clover_param.order = inv_param->clover_order;
+    cudaCloverField hack(clover_param);
+    hack.copy(*hackOfTheHack);
+    delete hackOfTheHack;
+#endif
+    profileClover.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+    // copy the field into the host application's clover field
+    profileClover.TPSTART(QUDA_PROFILE_D2H);
+    qudaMemcpy((char*)(inInv->V(true)), (char*)(hack.V(true)),
+        inInv->Bytes(), cudaMemcpyDeviceToHost);
+    profileClover.TPSTOP(QUDA_PROFILE_D2H);
+
+    checkCudaError();
+  }
+
   // need to copy back the odd inverse field into the application clover field
   if (!h_clovinv && pc_solve && !device_calc) {
     // copy the inverted clover term into host application order on the device
@@ -984,9 +1016,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   if(!device_calc)
   {
     if (in) delete in; // delete object referencing input field
-#ifndef DYNAMIC_CLOVER
     if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inInv) delete inInv;
-#endif
   }
 
   popVerbosity();
