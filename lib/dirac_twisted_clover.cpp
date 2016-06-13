@@ -333,7 +333,7 @@ namespace quda {
 	  twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
 				  static_cast<cudaColorSpinorField*>(tmp1), QUDA_EVEN_PARITY, dagger,
 				  &static_cast<const cudaColorSpinorField&>(in),
-				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa, 0.0, 0.0, commDim, profile);
+				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa2, 0.0, 0.0, commDim, profile);
 
           flops += (1320ll+96ll)*in.Volume();	 
         } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
@@ -341,7 +341,7 @@ namespace quda {
 	  twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
 				  static_cast<const cudaColorSpinorField*>(tmp1), QUDA_ODD_PARITY, dagger,
 				  &static_cast<const cudaColorSpinorField&>(in),
-				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa, 0.0, 0.0, commDim, profile);
+				  QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, kappa2, 0.0, 0.0, commDim, profile);
           flops += (1320ll+96ll)*in.Volume();
         }else { // symmetric preconditioning
           errorQuda("Invalid matpcType");
