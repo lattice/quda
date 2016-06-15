@@ -255,8 +255,8 @@ namespace quda {
     long long flops() const { return 0; } 
     long long bytes() const { return 2*arg.clover.volumeCB*(arg.inverse.Bytes() + arg.clover.Bytes()); } 
 
-    void preTune() { if (arg.clover.clover[0] == arg.inverse.clover[0]) arg.inverse.save(); }
-    void postTune() { if (arg.clover.clover[0] == arg.inverse.clover[0]) arg.inverse.load(); }
+    void preTune() { if (arg.clover.clover == arg.inverse.clover) arg.inverse.save(); }
+    void postTune() { if (arg.clover.clover == arg.inverse.clover) arg.inverse.load(); }
 
   };
 
