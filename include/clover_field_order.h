@@ -252,8 +252,12 @@ namespace quda {
     template <typename Float, int length, int N>
       struct FloatNOrder {
 	typedef typename mapper<Float>::type RegType;
-	Float *clover[2];
-	float *norm[2];
+	typedef typename VectorType<Float,N>::type Vector;
+
+	Float *clover;
+	float *norm;
+	size_t offset;
+	size_t norm_offset;
 	const int volumeCB;
 	const int stride;
 
@@ -261,30 +265,38 @@ namespace quda {
 	const Float mu2;
 
 	size_t bytes;
+	size_t norm_bytes;
 	void *backup_h; //! host memory for backing up the field when tuning
+	void *backup_norm_h; //! host memory for backing up norm when tuning
 
-      FloatNOrder(const CloverField &clover, bool inverse, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()),
-	  twisted(clover.Twisted()), mu2(clover.Mu2()), bytes(clover.Bytes()), backup_h(nullptr) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
-	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
-	this->norm[0] = norm_ ? norm_ : (float*)(clover.Norm(inverse));
-	this->norm[1] = (float*)((char*)this->norm[0] + clover.NormBytes()/2);
-      }
+        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, float *norm_=0) :
+	  offset(clover.Bytes()/(2*sizeof(Float))), norm_offset(clover.NormBytes()/(2*sizeof(float))),
+	  volumeCB(clover.VolumeCB()), stride(clover.Stride()),
+	  twisted(clover.Twisted()), mu2(clover.Mu2()), bytes(clover.Bytes()),
+	  norm_bytes(clover.NormBytes()), backup_h(nullptr), backup_norm_h(nullptr)
+	{
+	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
+	  this->norm = norm_ ? norm_ : (float*)(clover.Norm(is_inverse));
+	}
       
 	bool  Twisted()	const	{return twisted;}
 	Float Mu2()	const	{return mu2;}
 	
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
-	  const int M=length/(N*2);
+	  const int M = length/(N*2);
+#pragma unroll
 	  for (int chirality=0; chirality<2; chirality++) {
+#pragma unroll
 	    for (int i=0; i<M; i++) {
-	      for (int j=0; j<N; j++) {
-		int intIdx = (chirality*M + i)*N + j; // internal dof index
-		int padIdx = intIdx / N;
-		copy(v[(chirality*M+i)*N+j], clover[parity][(padIdx*stride + x)*N + intIdx%N]);
-		if (sizeof(Float)==sizeof(short)) v[(chirality*M+i)*N+j] *= norm[parity][chirality*stride + x];
-	      }
+	      // first do vectorized copy from memory
+	      Vector vecTmp = vector_load<Vector>(clover + parity*offset, x + stride*(chirality*M+i));
+	      // second do scalar copy converting into register type
+	      for (int j=0; j<N; j++) copy(v[(chirality*M+i)*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
 	    }
+
+	    if (sizeof(Float)==sizeof(short))
+#pragma unroll
+	      for (int i=0; i<length/2; i++) v[chirality*(length/2)+i] *= norm[parity*norm_offset + chirality*stride + x];
 	  }
 	}
   
@@ -293,25 +305,32 @@ namespace quda {
 	  RegType scale[2];
 	  if (sizeof(Float)==sizeof(short)) {
 	    const int M = length/2;
+#pragma unroll
 	    for (int chi=0; chi<2; chi++) { // chirality
 	      scale[chi] = 0.0;
+#pragma unroll
 	      for (int i=0; i<M; i++) 
 		scale[chi] = fabs(v[chi*M+i]) > scale[chi] ? fabs(v[chi*M+i]) : scale[chi];
-	      norm[parity][chi*stride + x] = scale[chi];
+	      norm[parity*norm_offset + chi*stride + x] = scale[chi];
 	    }
 	  }
 
 	  const int M=length/(N*2);
 	  for (int chirality=0; chirality<2; chirality++) {
+
+#pragma unroll
 	    for (int i=0; i<M; i++) {
-	      for (int j=0; j<N; j++) {
-		int intIdx = (chirality*M + i)*N + j;
-		int padIdx = intIdx / N;
-		if (sizeof(Float)==sizeof(short))
-		  copy(clover[parity][(padIdx*stride + x)*N + intIdx%N], v[(chirality*M+i)*N+j] / scale[chirality]);
-		else
-		  copy(clover[parity][(padIdx*stride + x)*N + intIdx%N], v[(chirality*M+i)*N+j]);
-	      }
+	      Vector vecTmp;
+	      // first do scalar copy converting into storage type and rescaling if necessary
+	      if (sizeof(Float)==sizeof(short))
+#pragma unroll
+		for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[(chirality*M+i)*N+j] / scale[chirality]);
+	      else
+#pragma unroll
+		for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[(chirality*M+i)*N+j]);
+
+	      // second do vectorized copy into memory
+	      reinterpret_cast<Vector*>(clover + parity*offset)[x + stride*(chirality*M+i)] = vecTmp;
 	    }
 	  }
 	}
@@ -322,7 +341,11 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-	  cudaMemcpy(backup_h, clover[0], bytes, cudaMemcpyDeviceToHost);
+	  cudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+	  if (norm_bytes) {
+	    backup_norm_h = safe_malloc(norm_bytes);
+	    cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+	  }
 	  checkCudaError();
 	}
 
@@ -330,9 +353,14 @@ namespace quda {
 	   @brief Restore the field from the host after tuning
 	*/
 	void load() {
-	  cudaMemcpy(clover[0], backup_h, bytes, cudaMemcpyHostToDevice);
+	  cudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
 	  host_free(backup_h);
 	  backup_h = nullptr;
+	  if (norm_bytes) {
+	    cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+	    host_free(backup_norm_h);
+	    backup_norm_h = nullptr;
+	  }
 	  checkCudaError();
 	}
 
