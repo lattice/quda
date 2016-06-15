@@ -75,6 +75,8 @@ extern char latfile[];
 
 extern bool kernel_pack_t;
 
+QudaVerbosity verbosity = QUDA_VERBOSE;
+
 void init(int argc, char **argv) {
 
   cuda_prec = prec;
@@ -252,8 +254,6 @@ void init(int argc, char **argv) {
     hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
   }
 
-  setVerbosity(QUDA_VERBOSE);
-
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
 
@@ -337,7 +337,7 @@ void init(int argc, char **argv) {
     }
   } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     // We are not so aggressive with the random clover term here because we need to invert it, so it must make some sense
-    double norm = 0.2; // clover components are random numbers in the range (-norm, norm)
+    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
@@ -345,6 +345,15 @@ void init(int argc, char **argv) {
   printfQuda("done.\n"); fflush(stdout);
   
   initQuda(device);
+
+  if (tune) {
+    setTuning(QUDA_TUNE_YES);
+    printfQuda("Tuning...\n");
+  }
+
+  // set verbosity prior to loadGaugeQuda
+  setVerbosity(verbosity);
+  inv_param.verbosity = verbosity;
 
   printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
@@ -981,8 +990,6 @@ int main(int argc, char **argv)
   for (int i=0; i<attempts; i++) {
 
     if (tune) { // warm-up run
-      printfQuda("Tuning...\n");
-      setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...\n", niter);
