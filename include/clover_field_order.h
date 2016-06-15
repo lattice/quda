@@ -259,9 +259,12 @@ namespace quda {
 
 	const bool twisted;
 	const Float mu2;
-	
+
+	size_t bytes;
+	void *backup_h; //! host memory for backing up the field when tuning
+
       FloatNOrder(const CloverField &clover, bool inverse, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()),
-	  twisted(clover.Twisted()), mu2(clover.Mu2()) {
+	  twisted(clover.Twisted()), mu2(clover.Mu2()), bytes(clover.Bytes()), backup_h(nullptr) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
 	this->norm[0] = norm_ ? norm_ : (float*)(clover.Norm(inverse));
@@ -313,12 +316,33 @@ namespace quda {
 	  }
 	}
 
+	/**
+	   @brief Backup the field to the host when tuning
+	*/
+	void save() {
+	  if (backup_h) errorQuda("Already allocated host backup");
+	  backup_h = safe_malloc(bytes);
+	  cudaMemcpy(backup_h, clover[0], bytes, cudaMemcpyDeviceToHost);
+	  checkCudaError();
+	}
+
+	/**
+	   @brief Restore the field from the host after tuning
+	*/
+	void load() {
+	  cudaMemcpy(clover[0], backup_h, bytes, cudaMemcpyHostToDevice);
+	  host_free(backup_h);
+	  backup_h = nullptr;
+	  checkCudaError();
+	}
+
 	size_t Bytes() const {
 	  size_t bytes = length*sizeof(Float);
 	  if (sizeof(Float)==sizeof(short)) bytes += 2*sizeof(float);
 	  return bytes;
 	}
       };
+
 
     /**
        QDP ordering for clover fields
