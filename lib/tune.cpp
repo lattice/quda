@@ -599,7 +599,7 @@ namespace quda {
       }
 
       if (best_time == FLT_MAX) {
-	errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
+	errorQuda("Auto-tuning failed for %s with %s at vol=%s, error %s", key.name, key.aux, key.volume, cudaGetErrorString(error));
       }
       if (verbosity >= QUDA_VERBOSE) {
 	printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
