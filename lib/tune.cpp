@@ -536,7 +536,7 @@ namespace quda {
     } else if (!tuning) {
 
       TuneParam best_param;
-      cudaError_t error;
+      cudaError_t error = cudaSuccess;
       cudaEvent_t start, end;
       float elapsed_time, best_time;
       time_t now;
