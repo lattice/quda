@@ -4,7 +4,7 @@
 #include <launch_kernel.cuh>
 #include <face_quda.h>
 #include <atomic.cuh>
-#include <cub/cub.cuh> 
+#include <cub_helper.cuh>
 
 namespace quda {
 
@@ -13,27 +13,24 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
 
   template <typename Clover>
-  struct CloverInvertArg {
+  struct CloverInvertArg : public ReduceArg<double2> {
     const Clover clover;
     Clover inverse;
     bool computeTraceLog;
-    double * const trlogA_h;
-    double *trlogA_d;
 //extra attributes for twisted mass clover
     bool twist;
     double mu2;
-    CloverInvertArg(Clover &inverse, const Clover &clover, bool computeTraceLog=0, double* const trlogA=0) :
-      inverse(inverse), clover(clover), computeTraceLog(computeTraceLog), trlogA_h(trlogA), twist(clover.Twisted()), mu2(clover.Mu2()){
-      cudaHostGetDevicePointer(&trlogA_d, trlogA_h, 0); // set the matching device pointer
-    }
+    CloverInvertArg(Clover &inverse, const Clover &clover, bool computeTraceLog=0) :
+      ReduceArg<double2>(), inverse(inverse), clover(clover), computeTraceLog(computeTraceLog),
+      twist(clover.Twisted()), mu2(clover.Mu2()) { }
   };
 
   /**
      Use a Cholesky decomposition to invert the clover matrix
      Here we use an inplace inversion which hopefully reduces register pressure
    */
-  template <int blockSize, typename Float, typename Clover>
-  __device__ __host__ double cloverInvertCompute(CloverInvertArg<Clover> arg, int x, int parity) {
+  template <int blockSize, typename Float, typename Clover, bool computeTrLog, bool twist>
+  __device__ __host__ inline double cloverInvertCompute(CloverInvertArg<Clover> arg, int x, int parity) {
 
     Float A[72];
     double trlogA = 0.0; 
@@ -50,14 +47,14 @@ namespace quda {
       // hack into the right order as MILC just to copy algorithm directly
       // FIXME use native ordering in the Cholseky 
       // factor of two is inherent to QUDA clover storage
-      for (int i=0; i<6; i++) diag[i] = 2.0*A[ch*36+i];
+      constexpr Float two = static_cast<Float>(2.0);
+      for (int i=0; i<6; i++) diag[i] = two*A[ch*36+i];
 
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-      for (int i=0; i<15; i++) tri[idtab[i]] = complex<Float>(2.0*A[ch*36+6+2*i], 2.0*A[ch*36+6+2*i+1]);
+      for (int i=0; i<15; i++) tri[idtab[i]] = complex<Float>(two*A[ch*36+6+2*i], two*A[ch*36+6+2*i+1]);
 
-//Compute (T^2 + mu2) first, then invert (not optimized!):
-      if(arg.twist)
-      {
+      //Compute (T^2 + mu2) first, then invert (not optimized!):
+      if (twist) {
          complex<Float> aux[15];//hmmm, better to reuse A-regs...
          //another solution just to define (but compiler may not be happy with this, swapping everything in
          //the global buffer):
@@ -103,10 +100,10 @@ namespace quda {
          diag[4] = (Float)arg.mu2+diag[4]*diag[4]+norm(tri[ 6])+norm(tri[ 7])+norm(tri[ 8])+norm(tri[ 9])+norm(tri[14]);
          diag[5] = (Float)arg.mu2+diag[5]*diag[5]+norm(tri[10])+norm(tri[11])+norm(tri[12])+norm(tri[13])+norm(tri[14]);
 
-        //update off-diagonal elements:
+	 //update off-diagonal elements:
          for(int i = 0; i < 15; i++) tri[i] = aux[i];
       }
-//
+
       for (int j=0; j<6; j++) {
 	diag[j] = sqrt(diag[j]);
 	tmp[j] = 1.0 / diag[j];
@@ -128,7 +125,7 @@ namespace quda {
       }
       
       /* Accumulate trlogA */
-      for (int j=0;j<6;j++) trlogA += (double)2.0*log((double)(diag[j]));
+      if (computeTrLog) for (int j=0;j<6;j++) trlogA += 2.0*log((double)(diag[j]));
 
       /* Now use forward and backward substitution to construct inverse */
       complex<Float> v1[6];
@@ -165,9 +162,10 @@ namespace quda {
 	}
       }
 
-      for (int i=0; i<6; i++) A[ch*36+i] = 0.5 * diag[i];
+      constexpr Float half = static_cast<Float>(0.5);
+      for (int i=0; i<6; i++) A[ch*36+i] = half * diag[i];
       for (int i=0; i<15; i++) {
-	A[ch*36+6+2*i] = 0.5*tri[idtab[i]].real(); A[ch*36+6+2*i+1] = 0.5*tri[idtab[i]].imag();
+	A[ch*36+6+2*i] = half*tri[idtab[i]].real(); A[ch*36+6+2*i+1] = half*tri[idtab[i]].imag();
       }
     }	     
 
@@ -177,67 +175,82 @@ namespace quda {
     return trlogA;
   }
 
-  template <int blockSize, typename Float, typename Clover>
+  template <int blockSize, typename Float, typename Clover, bool computeTrLog, bool twist>
   void cloverInvert(CloverInvertArg<Clover> arg) {  
     for (int parity=0; parity<2; parity++) {
       for (int x=0; x<arg.clover.volumeCB; x++) {
 	// should make this thread safe if we ever apply threads to cpu code
-	double trlogA = cloverInvertCompute<blockSize, Float>(arg, x, parity);
-	if (arg.computeTraceLog) arg.trlogA_h[parity] += trlogA;
+	double trlogA = cloverInvertCompute<blockSize,Float,Clover,computeTrLog,twist>(arg, x, parity);
+	if (computeTrLog) {
+	  if (parity) arg.result_h[0].y += trlogA;
+	  else arg.result_h[0].x += trlogA;
+	}
       }
     }
   }
 
-  template <int blockSize, typename Float, typename Clover>
+  template <int blockSize, typename Float, typename Clover, bool computeTrLog, bool twist>
+  __launch_bounds__(2*blockSize)
   __global__ void cloverInvertKernel(CloverInvertArg<Clover> arg) {  
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    //if (idx >= arg.clover.volumeCB) return;
-    int parity = blockIdx.y;
-    double trlogA = 0.0;
-    if (idx < arg.clover.volumeCB) trlogA = cloverInvertCompute<blockSize, Float>(arg, idx, parity);
+    int parity = threadIdx.y;
+    double trlogA_parity = 0.0;
+    if (idx < arg.clover.volumeCB)
+      trlogA_parity = cloverInvertCompute<blockSize,Float,Clover,computeTrLog,twist>(arg, idx, parity);
+    double2 trlogA = parity ? make_double2(0.0,trlogA_parity) : make_double2(trlogA_parity, 0.0);
 
-    if (arg.computeTraceLog) {
-      typedef cub::BlockReduce<double, blockSize> BlockReduce;
-      __shared__ typename BlockReduce::TempStorage temp_storage;
-      double aggregate = BlockReduce(temp_storage).Sum(trlogA);
-      if (threadIdx.x == 0) atomicAdd(arg.trlogA_d+parity, aggregate);
-    }
-
+    if (computeTrLog) reduce2d<blockSize,2>(arg, trlogA);
   }
 
   template <typename Float, typename Clover>
-  class CloverInvert : Tunable {
+  class CloverInvert : TunableLocalParity {
     CloverInvertArg<Clover> arg;
     const CloverField &meta; // used for meta data only
     const QudaFieldLocation location;
 
   private:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
-
     bool tuneSharedBytes() const { return false; } // Don't tune the shared memory
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.clover.volumeCB; }
 
   public:
     CloverInvert(CloverInvertArg<Clover> &arg, const CloverField &meta, QudaFieldLocation location) 
       : arg(arg), meta(meta), location(location) { 
-      writeAuxString("stride=%d,prec=%lu",arg.clover.stride,sizeof(Float));
+      writeAuxString("stride=%d,prec=%lu,trlog=%s,twist=%s", arg.clover.stride, sizeof(Float),
+		     arg.computeTraceLog ? "true" : "false", arg.twist ? "true" : "false");
     }
     virtual ~CloverInvert() { ; }
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      arg.trlogA_h[0] = 0.0; arg.trlogA_h[1] = 0.0;
+      arg.result_h[0] = make_double2(0.,0.);
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-	tp.grid.y = 2; // for parity
-	LAUNCH_KERNEL(cloverInvertKernel, tp, stream, arg, Float, Clover);
+	if (arg.computeTraceLog) {
+	  if (arg.twist) {
+	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, tp, stream, arg, Float, Clover, true, true);
+	  } else {
+	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, tp, stream, arg, Float, Clover, true, false);
+	  }
+	} else {
+	  if (arg.twist) {
+	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, tp, stream, arg, Float, Clover, false, true);
+	  } else {
+	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, tp, stream, arg, Float, Clover, false, false);
+	  }
+	}
       } else {
-	cloverInvert<1, Float, Clover>(arg);
-      }
-      if (arg.computeTraceLog) {
-	cudaDeviceSynchronize();
-	reduceDoubleArray(arg.trlogA_h, 2);
+	if (arg.computeTraceLog) {
+	  if (arg.twist) {
+	    cloverInvert<1, Float, Clover, true, true>(arg);
+	  } else {
+	    cloverInvert<1, Float, Clover, true, false>(arg);
+	  }
+	} else {
+	  if (arg.twist) {
+	    cloverInvert<1, Float, Clover, false, true>(arg);
+	  } else {
+	    cloverInvert<1, Float, Clover, false, false>(arg);
+	  }
+	}
       }
     }
 
@@ -263,10 +276,16 @@ namespace quda {
   template <typename Float, typename Clover>
   void cloverInvert(Clover inverse, const Clover clover, bool computeTraceLog, 
 		    double* const trlog, const CloverField &meta, QudaFieldLocation location) {
-    CloverInvertArg<Clover> arg(inverse, clover, computeTraceLog, trlog);
+    CloverInvertArg<Clover> arg(inverse, clover, computeTraceLog);
     CloverInvert<Float,Clover> invert(arg, meta, location);
     invert.apply(0);
-    cudaDeviceSynchronize();
+
+    if (arg.computeTraceLog) {
+      cudaDeviceSynchronize();
+      comm_allreduce_array((double*)arg.result_h, 2);
+      trlog[0] = arg.result_h[0].x;
+      trlog[1] = arg.result_h[0].y;
+    }
   }
 
   template <typename Float>
