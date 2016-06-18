@@ -144,6 +144,7 @@ void init(int argc, char **argv) {
 
   inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 2;
   
+  inv_param.solve_type = (test_type == 2 || test_type == 4) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE;
   inv_param.matpc_type = matpc_type;
   inv_param.dagger = dagger;
   not_dagger = (QudaDagType)((dagger + 1)%2);
@@ -231,20 +232,7 @@ void init(int argc, char **argv) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = 1.5*inv_param.kappa;
-    //if (test_type > 0) {
-      hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
-      hostCloverInv = hostClover; // fake it
-      /*} else {
-      hostClover = NULL;
-      hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
-      }*/
-  } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
@@ -326,22 +314,10 @@ void init(int argc, char **argv) {
 
   spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    double norm = 1.0; // clover components are random numbers in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
+  double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
+  double diag = 1.0; // constant added to the diagonal
+  construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
 
-    if (test_type == 2 || test_type == 4) {
-      construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
-    } else {
-      construct_clover_field(hostCloverInv, norm, diag, inv_param.clover_cpu_prec);
-    }
-  } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    // We are not so aggressive with the random clover term here because we need to invert it, so it must make some sense
-    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
-
-    construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
-  }
   printfQuda("done.\n"); fflush(stdout);
   
   initQuda(device);
@@ -360,6 +336,9 @@ void init(int argc, char **argv) {
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     printfQuda("Sending clover field to GPU\n");
+    inv_param.compute_clover_inverse = 1;
+    inv_param.return_clover_inverse = 1;
+
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
 
@@ -457,8 +436,8 @@ void end() {
   delete spinorTmp;
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
-  if((dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) {
-    if (hostClover != hostCloverInv && hostClover) free(hostClover);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    free(hostClover);
     free(hostCloverInv);
   }
   endQuda();
