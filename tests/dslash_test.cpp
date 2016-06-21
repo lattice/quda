@@ -70,6 +70,7 @@ extern QudaDagType dagger;
 QudaDagType not_dagger;
 
 extern bool compute_clover;
+extern double clover_coeff;
 
 extern bool verify_results;
 extern int niter;
@@ -239,7 +240,7 @@ void init(int argc, char **argv) {
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = 1.5*inv_param.kappa;
+    inv_param.clover_coeff = clover_coeff;
     hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
     hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
   }
