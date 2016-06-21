@@ -695,6 +695,8 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+  if (!gaugePrecise) errorQuda("Cannot call loadCloverQuda with no resident gauge field");
+
   profileClover.TPSTART(QUDA_PROFILE_TOTAL);
   bool device_calc = false; // calculate clover and inverse on the device?
 
@@ -703,18 +705,16 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if (!initialized) errorQuda("QUDA not initialized");
 
-  if (!h_clover && !h_clovinv) {
-    if (inv_param->clover_coeff != 0) {
-      device_calc = true;
-    } else {
-      errorQuda("loadCloverQuda() called with neither clover term nor inverse and clover coefficient not set");
-    }
+  if ( (!h_clover && !h_clovinv) || inv_param->compute_clover ) {
+    device_calc = true;
+    if (inv_param->clover_coeff == 0.0) errorQuda("called with neither clover term nor inverse and clover coefficient not set");
+    if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
   }
 
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION)  errorQuda("Half precision not supported on CPU");
   if (gaugePrecise == NULL) errorQuda("Gauge field must be loaded before clover");
   if ((inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) && (inv_param->dslash_type != QUDA_TWISTED_CLOVER_DSLASH)) {
-    errorQuda("Wrong dslash_type in loadCloverQuda()");
+    errorQuda("Wrong dslash_type %d in loadCloverQuda()", inv_param->dslash_type);
   }
 
   // determines whether operator is preconditioned when calling invertQuda()
@@ -767,7 +767,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   CloverField *in = nullptr;
 
-  if (!device_calc) {
+  if (!device_calc || inv_param->return_clover || inv_param->return_clover_inverse) {
     // create a param for the cpu clover field
     profileClover.TPSTART(QUDA_PROFILE_INIT);
     CloverFieldParam inParam(clover_param);
@@ -778,13 +778,13 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     inParam.clover = h_clover;
     inParam.cloverInv = h_clovinv;
     inParam.create = QUDA_REFERENCE_FIELD_CREATE;
-
     in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
       static_cast<CloverField*>(new cpuCloverField(inParam)) :
       static_cast<CloverField*>(new cudaCloverField(inParam));
-
     profileClover.TPSTOP(QUDA_PROFILE_INIT);
+  }
 
+  if (!device_calc) {
     profileClover.TPSTART(QUDA_PROFILE_H2D);
     cloverPrecise->copy(*in, h_clovinv && !inv_param->compute_clover_inverse ? true : false);
     profileClover.TPSTOP(QUDA_PROFILE_H2D);
@@ -841,12 +841,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     cloverPrecondition = cloverSloppy;
   }
 
-  // if requested, copy back the inverse field
-  if (h_clovinv && inv_param->compute_clover_inverse && inv_param->return_clover_inverse) {
+  // if requested, copy back the clover / inverse field
+  if ( inv_param->return_clover || inv_param->return_clover_inverse ) {
+    if (!h_clover && !h_clovinv) errorQuda("Requested clover field return but no clover host pointers set");
+
     // copy the inverted clover term into host application order on the device
     clover_param.setPrecision(inv_param->clover_cpu_prec);
-    clover_param.direct = false;
-    clover_param.inverse = true;
+    clover_param.direct = (h_clover && inv_param->return_clover);
+    clover_param.inverse = (h_clovinv && inv_param->return_clover_inverse);
 
     // this isn't really "epilogue" but this label suffices
     profileClover.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -854,7 +856,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if (!dynamic_clover) {
       clover_param.order = inv_param->clover_order;
       hack = new cudaCloverField(clover_param);
-      hack->copy(*cloverPrecise); // FIXME this will lead to an initial redundant copy that is overwritten
+      hack->copy(*cloverPrecise); // FIXME this can lead to an redundant copies if we're not copying back direct + inverse
     } else {
       cudaCloverField *hackOfTheHack = new cudaCloverField(clover_param);	// Hack of the hack
       hackOfTheHack->copy(*cloverPrecise, false);
@@ -865,15 +867,19 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       }
       clover_param.order = inv_param->clover_order;
       hack = new cudaCloverField(clover_param);
-      hack->copy(*hackOfTheHack); // FIXME this will lead to an initial redundant copy that is overwritten
+      hack->copy(*hackOfTheHack); // FIXME this can lead to an redundant copies if we're not copying back direct + inverse
       delete hackOfTheHack;
     }
     profileClover.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     // copy the field into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
-    qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)),
-	       in->Bytes(), cudaMemcpyDeviceToHost);
+    if (inv_param->return_clover) {
+      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), cudaMemcpyDeviceToHost);
+    }
+    if (inv_param->return_clover_inverse) {
+      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), cudaMemcpyDeviceToHost);
+    }
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
 
     delete hack;
