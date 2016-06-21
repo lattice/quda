@@ -69,6 +69,8 @@ extern QudaPrecision prec;
 extern QudaDagType dagger;
 QudaDagType not_dagger;
 
+extern bool compute_clover;
+
 extern bool verify_results;
 extern int niter;
 extern char latfile[];
@@ -275,15 +277,11 @@ void init(int argc, char **argv) {
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
 
-  if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH)
-  {
+  if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] /= 2;
-
-  } else
-  {
-    if (test_type < 2 || test_type ==3) {
+  } else {
+    if (test_type < 2 || test_type == 3) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /= 2;
     } else {
@@ -317,6 +315,7 @@ void init(int argc, char **argv) {
   double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
   double diag = 1.0; // constant added to the diagonal
   construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
+  memcpy(hostCloverInv, hostClover, V*cloverSiteSize*inv_param.clover_cpu_prec);
 
   printfQuda("done.\n"); fflush(stdout);
   
@@ -335,9 +334,12 @@ void init(int argc, char **argv) {
   loadGaugeQuda(hostGauge, &gauge_param);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    printfQuda("Sending clover field to GPU\n");
-    inv_param.compute_clover_inverse = 1;
-    inv_param.return_clover_inverse = 1;
+    if (compute_clover) printfQuda("Computing clover field on GPU\n");
+    else printfQuda("Sending clover field to GPU\n");
+    inv_param.compute_clover = compute_clover;
+    inv_param.return_clover = compute_clover;
+    inv_param.compute_clover_inverse = compute_clover;
+    inv_param.return_clover_inverse = compute_clover;
 
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
