@@ -253,6 +253,8 @@ namespace quda {
       struct FloatNOrder {
 	typedef typename mapper<Float>::type RegType;
 	typedef typename VectorType<Float,N>::type Vector;
+	static const int M=length/(N*2); // number of short vectors per chiral block
+	static const int block=length/2; // chiral block size
 
 	Float *clover;
 	float *norm;
@@ -282,57 +284,82 @@ namespace quda {
 	bool  Twisted()	const	{return twisted;}
 	Float Mu2()	const	{return mu2;}
 	
-	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
-	  const int M = length/(N*2);
+	/**
+	   @brief Load accessor for a single chiral block
+	   @param[out] v Vector of loaded elements
+	   @param[in] x Checkerboarded site index
+	   @param[in] parity Field parity
+	   @param[in] chirality Chiral block index
+	 */
+	__device__ __host__ inline void load(RegType v[block], int x, int parity, int chirality) const {
 #pragma unroll
-	  for (int chirality=0; chirality<2; chirality++) {
+	  for (int i=0; i<M; i++) {
+	    // first do vectorized copy from memory
+	    Vector vecTmp = vector_load<Vector>(clover + parity*offset, x + stride*(chirality*M+i));
+	    // second do scalar copy converting into register type
 #pragma unroll
-	    for (int i=0; i<M; i++) {
-	      // first do vectorized copy from memory
-	      Vector vecTmp = vector_load<Vector>(clover + parity*offset, x + stride*(chirality*M+i));
-	      // second do scalar copy converting into register type
-	      for (int j=0; j<N; j++) copy(v[(chirality*M+i)*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
-	    }
-
-	    if (sizeof(Float)==sizeof(short))
-#pragma unroll
-	      for (int i=0; i<length/2; i++) v[chirality*(length/2)+i] *= norm[parity*norm_offset + chirality*stride + x];
+	    for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
 	  }
+
+	  if (sizeof(Float)==sizeof(short))
+#pragma unroll
+	    for (int i=0; i<block; i++) v[i] *= norm[parity*norm_offset + chirality*stride + x];
 	}
   
-	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
+	/**
+	   @brief Store accessor for a single chiral block
+	   @param[out] v Vector of elements to be stored
+	   @param[in] x Checkerboarded site index
+	   @param[in] parity Field parity
+	   @param[in] chirality Chiral block index
+	 */
+	__device__ __host__ inline void save(const RegType v[block], int x, int parity, int chirality) {
 	  // find the norm of each chiral block
-	  RegType scale[2];
+	  RegType scale = 0.0;
 	  if (sizeof(Float)==sizeof(short)) {
-	    const int M = length/2;
 #pragma unroll
-	    for (int chi=0; chi<2; chi++) { // chirality
-	      scale[chi] = 0.0;
-#pragma unroll
-	      for (int i=0; i<M; i++) 
-		scale[chi] = fabs(v[chi*M+i]) > scale[chi] ? fabs(v[chi*M+i]) : scale[chi];
-	      norm[parity*norm_offset + chi*stride + x] = scale[chi];
-	    }
+	    for (int i=0; i<block; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
+	    norm[parity*norm_offset + chirality*stride + x] = scale;
 	  }
 
-	  const int M=length/(N*2);
-	  for (int chirality=0; chirality<2; chirality++) {
+#pragma unroll
+	  for (int i=0; i<M; i++) {
+	    Vector vecTmp;
+	    // first do scalar copy converting into storage type and rescaling if necessary
+	    if (sizeof(Float)==sizeof(short))
+#pragma unroll
+	      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[i*N+j] / scale);
+	    else
+#pragma unroll
+	      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[i*N+j]);
 
-#pragma unroll
-	    for (int i=0; i<M; i++) {
-	      Vector vecTmp;
-	      // first do scalar copy converting into storage type and rescaling if necessary
-	      if (sizeof(Float)==sizeof(short))
-#pragma unroll
-		for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[(chirality*M+i)*N+j] / scale[chirality]);
-	      else
-#pragma unroll
-		for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[(chirality*M+i)*N+j]);
-
-	      // second do vectorized copy into memory
-	      reinterpret_cast<Vector*>(clover + parity*offset)[x + stride*(chirality*M+i)] = vecTmp;
-	    }
+	    // second do vectorized copy into memory
+	    reinterpret_cast<Vector*>(clover + parity*offset)[x + stride*(chirality*M+i)] = vecTmp;
 	  }
+	}
+
+	/**
+	   @brief Load accessor for the clover matrix
+	   @param[out] v Vector of loaded elements
+	   @param[in] x Checkerboarded site index
+	   @param[in] parity Field parity
+	   @param[in] chirality Chiral block index
+	 */
+	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
+#pragma unroll
+	  for (int chirality=0; chirality<2; chirality++) load(&v[chirality*36], x, parity, chirality);
+	}
+
+	/**
+	   @brief Store accessor for the clover matrix
+	   @param[out] v Vector of elements to be stored
+	   @param[in] x Checkerboarded site index
+	   @param[in] parity Field parity
+	   @param[in] chirality Chiral block index
+	 */
+	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
+#pragma unroll
+	  for (int chirality=0; chirality<2; chirality++) save(&v[chirality*36], x, parity, chirality);
 	}
 
 	/**
