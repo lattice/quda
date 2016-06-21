@@ -506,9 +506,9 @@ std::cout << "mRR" << mRR << std::endl;
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double alpha[QUDA_MAX_MULTI_SHIFT] = {0.0};
-    double beta[QUDA_MAX_MULTI_SHIFT] = {0.0};
-    double pAp[QUDA_MAX_MULTI_SHIFT];;
+      MatrixXd  alpha = MatrixXd::Zero(param.num_src,param.num_src);
+      MatrixXd  beta = MatrixXd::Zero(param.num_src,param.num_src);
+      MatrixXd  pAp(param.num_src, param.num_src);
     int rUpdate = 0;
 
     double rNorm[QUDA_MAX_MULTI_SHIFT];
@@ -572,30 +572,41 @@ std::cout << "mRR" << mRR << std::endl;
       // current implementation sets breakdown to true for pipelined CG if one rhs triggers breakdown
       // this is probably ok
 
-      for(int i=0; i<param.num_src; i++){
-        if (param.pipeline) {
+
+      if (param.pipeline) {
+        for(int i=0; i<param.num_src; i++){
+          //MW: ignore this for now
           double3 triplet = blas::tripleCGReduction(rSloppy.Component(i), Ap.Component(i), p.Component(i));
-          r2(i,i) = triplet.x; double Ap2 = triplet.y; pAp[i] = triplet.z;
+          r2(i,i) = triplet.x; double Ap2 = triplet.y; pAp(i,i) = triplet.z;
           r2_old(i,i) = r2(i,i);
-          alpha[i] = r2(i,i) / pAp[i];
-          sigma(i,i) = alpha[i]*(alpha[i] * Ap2 - pAp[i]);
+          alpha(i,i) = r2(i,i) / pAp(i,i);
+          sigma(i,i) = alpha(i,i)*(alpha(i,i) * Ap2 - pAp(i,i));
           if (sigma(i,i) < 0.0 || steps_since_reliable == 0) { // sigma condition has broken down
-            r2(i,i) = blas::axpyNorm(-alpha[i], Ap.Component(i), rSloppy.Component(i));
+            r2(i,i) = blas::axpyNorm(-alpha(i,i), Ap.Component(i), rSloppy.Component(i));
             sigma(i,i) = r2(i,i);
             breakdown = true;
           }
 
           r2(i,i) = sigma(i,i);
-        } else {
-          r2_old(i,i) = r2(i,i);
-          pAp[i] = blas::reDotProduct(p.Component(i), Ap.Component(i));
-          alpha[i] = r2(i,i) / pAp[i];
+        }
+      } else {
+        r2_old = r2;
+        for(int i=0; i<param.num_src; i++){
+          for(int j=0; j < param.num_src; j++){
+            // r2_old(i,i) = r2(i,i);
+            pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
+          }
+          //MW: continue here
+          alpha(i,i) = r2(i,i) / pAp(i,i);
           // here we are deploying the alternative beta computation
-          Complex cg_norm = blas::axpyCGNorm(-alpha[i], Ap.Component(i), rSloppy.Component(i));
+          Complex cg_norm = blas::axpyCGNorm(-alpha(i,i), Ap.Component(i), rSloppy.Component(i));
+          // r2(i,i) needs to be transformed to r_i, r_j, cg_norm no longer useful here?
           r2(i,i) = real(cg_norm);  // (r_new, r_new)
           sigma(i,i) = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2(i,i);  // use r2 if (r_k+1, r_k+1-r_k) breaks
+
         }
       }
+
       bool updateX=false;
       bool updateR=false;
       // reliable update conditions
@@ -617,16 +628,16 @@ std::cout << "mRR" << mRR << std::endl;
 
       if ( !(updateR || updateX )) {
         for(int i=0; i<param.num_src; i++){
-          beta[i] = sigma(i,i) / r2_old(i,i);  // use the alternative beta computation
+          beta(i,i) = sigma(i,i) / r2_old(i,i);  // use the alternative beta computation
         }
 
         if (param.pipeline && !breakdown)
         for(int i=0; i<param.num_src; i++){
-          blas::tripleCGUpdate(alpha[i], beta[i], Ap.Component(i), rSloppy.Component(i), xSloppy.Component(i), p.Component(i));
+          blas::tripleCGUpdate(alpha(i,i), beta(i,i), Ap.Component(i), rSloppy.Component(i), xSloppy.Component(i), p.Component(i));
         }
         else
         for(int i=0; i<param.num_src; i++){
-          blas::axpyZpbx(alpha[i], p.Component(i), xSloppy.Component(i), rSloppy.Component(i), beta[i]);
+          blas::axpyZpbx(alpha(i,i), p.Component(i), xSloppy.Component(i), rSloppy.Component(i), beta(i,i));
         }
 
         if (use_heavy_quark_res && (k % heavy_quark_check) == 0) {
@@ -646,7 +657,7 @@ std::cout << "mRR" << mRR << std::endl;
         steps_since_reliable++;
       } else {
         for(int i=0; i<param.num_src; i++){
-          blas::axpy(alpha[i], p.Component(i), xSloppy.Component(i));
+          blas::axpy(alpha(i,i), p.Component(i), xSloppy.Component(i));
         }
         blas::copy(x, xSloppy); // nop when these pointers alias
 
@@ -729,8 +740,8 @@ std::cout << "mRR" << mRR << std::endl;
             double rp = blas::reDotProduct(rSloppy.Component(i), p.Component(i)) / (r2(i,i));
             blas::axpy(-rp, rSloppy.Component(i), p.Component(i));
 
-            beta[i] = r2(i,i) / r2_old(i,i);
-            blas::xpay(rSloppy.Component(i), beta[i], p.Component(i));
+            beta(i,i) = r2(i,i) / r2_old(i,i);
+            blas::xpay(rSloppy.Component(i), beta(i,i), p.Component(i));
           }
         }
 
