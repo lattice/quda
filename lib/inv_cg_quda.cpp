@@ -433,6 +433,11 @@ std::cout << "mRR" << mRR << std::endl;
       r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
       printfQuda("r2[%i] %e\n", i, r2(i,i));
     }
+    for(int i=0; i<param.num_src; i++){
+      for(int j=0; j<param.num_src; j++){
+        r2(i,j) = blas::reDotProduct(r.Component(i), r.Component(j));
+      }
+    }
 
     csParam.setPrecision(param.precision_sloppy);
     // tmp2 only needed for multi-gpu Wilson-like kernels
@@ -594,18 +599,41 @@ std::cout << "mRR" << mRR << std::endl;
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j < param.num_src; j++){
             // r2_old(i,i) = r2(i,i);
-            pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
+            if (i==j) pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
+            else pAp(i,j) = 0.;
+            // r2(i,j) = blas::reDotProduct(rSloppy.Component(i), rSloppy.Component(j));
           }
-          //MW: continue here
-          alpha(i,i) = r2(i,i) / pAp(i,i);
-          // here we are deploying the alternative beta computation
-          Complex cg_norm = blas::axpyCGNorm(-alpha(i,i), Ap.Component(i), rSloppy.Component(i));
-          // r2(i,i) needs to be transformed to r_i, r_j, cg_norm no longer useful here?
-          r2(i,i) = real(cg_norm);  // (r_new, r_new)
-          sigma(i,i) = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2(i,i);  // use r2 if (r_k+1, r_k+1-r_k) breaks
+        }
+        //MW: continue here
+        // for(int i=0; i<param.num_src; i++){
+        //   alpha(i,i) = r2(i,i) / pAp(i,i);
+        // }
+        alpha = pAp.inverse() * r2;
+        for(int i=0; i<param.num_src; i++){
+          for(int j=0; j < param.num_src; j++)
+            if (i != j) alpha(i,j) = 0.;
+        }
+        if(k==1){
+          std::cout << "pAp " << std::endl <<pAp << std::endl;
+          std::cout << "pAp^-1 " << std::endl <<pAp.inverse() << std::endl;
+          std::cout << "r2 " << std::endl <<r2 << std::endl;
+          std::cout << "alpha " << std::endl <<alpha << std::endl;
+          std::cout << "pAp^-1r2" << std::endl << pAp.inverse()*r2 << std::endl;
+        }
+        // here we are deploying the alternative beta computation
+        for(int i=0; i<param.num_src; i++){
+          for(int j=0; j < param.num_src; j++){
+            Complex cg_norm = blas::axpyCGNorm(-alpha(i,j), Ap.Component(i), rSloppy.Component(j));
 
+            // r2(i,j) = blas::reDotProduct(rSloppy.Component(i), rSloppy.Component(j));
+
+            // r2(i,i) needs to be transformed to r_i, r_j, cg_norm no longer useful here?
+            r2(i,j) = real(cg_norm);  // (r_new, r_new)
+            sigma(i,j) = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2(i,j);  // use r2 if (r_k+1, r_k+1-r_k) breaks
+          }
         }
       }
+
 
       bool updateX=false;
       bool updateR=false;
