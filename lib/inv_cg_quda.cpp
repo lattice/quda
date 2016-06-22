@@ -240,6 +240,7 @@ namespace quda {
 
         steps_since_reliable++;
       } else {
+
         blas::axpy(alpha, p, xSloppy);
         blas::copy(x, xSloppy); // nop when these pointers alias
 
@@ -433,6 +434,7 @@ std::cout << "mRR" << mRR << std::endl;
       r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
       printfQuda("r2[%i] %e\n", i, r2(i,i));
     }
+    // MW need to initalize the full r2 matrix here
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
         r2(i,j) = blas::reDotProduct(r.Component(i), r.Component(j));
@@ -482,6 +484,8 @@ std::cout << "mRR" << mRR << std::endl;
     csParam.setPrecision(param.precision_sloppy);
     ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
     ColorSpinorField &p = *pp;
+    ColorSpinorField* ppnew = ColorSpinorField::Create(rSloppy, csParam);
+    ColorSpinorField &pnew = *ppnew;
 
     if (&x != &xSloppy) {
       blas::copy(y, x);
@@ -528,7 +532,7 @@ std::cout << "mRR" << mRR << std::endl;
       maxrr[i] = rNorm[i];
     }
 
-    double delta = param.delta;
+    double delta = 0;//MW: hack no reliable updates param.delta;
 
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
@@ -598,10 +602,7 @@ std::cout << "mRR" << mRR << std::endl;
         r2_old = r2;
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j < param.num_src; j++){
-            // r2_old(i,i) = r2(i,i);
-            if (i==j) pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
-            else pAp(i,j) = 0.;
-            // r2(i,j) = blas::reDotProduct(rSloppy.Component(i), rSloppy.Component(j));
+            pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
           }
         }
         //MW: continue here
@@ -609,10 +610,10 @@ std::cout << "mRR" << mRR << std::endl;
         //   alpha(i,i) = r2(i,i) / pAp(i,i);
         // }
         alpha = pAp.inverse() * r2;
-        for(int i=0; i<param.num_src; i++){
-          for(int j=0; j < param.num_src; j++)
-            if (i != j) alpha(i,j) = 0.;
-        }
+        // for(int i=0; i<param.num_src; i++){
+        //   for(int j=0; j < param.num_src; j++)
+        //     if (i != j) alpha(i,j) = 0.;
+        // }
         if(k==1){
           std::cout << "pAp " << std::endl <<pAp << std::endl;
           std::cout << "pAp^-1 " << std::endl <<pAp.inverse() << std::endl;
@@ -623,15 +624,24 @@ std::cout << "mRR" << mRR << std::endl;
         // here we are deploying the alternative beta computation
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j < param.num_src; j++){
-            Complex cg_norm = blas::axpyCGNorm(-alpha(i,j), Ap.Component(i), rSloppy.Component(j));
+            // cg_norm is flawed here as update of R is not yet completed
+            //
+            Complex cg_norm = blas::axpyCGNorm(-alpha(j,i), Ap.Component(j), rSloppy.Component(i));
 
             // r2(i,j) = blas::reDotProduct(rSloppy.Component(i), rSloppy.Component(j));
 
             // r2(i,i) needs to be transformed to r_i, r_j, cg_norm no longer useful here?
-            r2(i,j) = real(cg_norm);  // (r_new, r_new)
-            sigma(i,j) = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2(i,j);  // use r2 if (r_k+1, r_k+1-r_k) breaks
+            // r2(i,j) = real(cg_norm);  // (r_new, r_new)
+            // sigma(i,j) = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2(i,j);  // use r2 if (r_k+1, r_k+1-r_k) breaks
           }
         }
+        // MW need to calculate the full r2 matrix here, after update. Not sure how to do alternative sigma yet ...
+        for(int i=0; i<param.num_src; i++){
+          for(int j=0; j<param.num_src; j++){
+            r2(i,j) = blas::reDotProduct(r.Component(i), r.Component(j));
+          }
+        }
+        sigma = r2;
       }
 
 
@@ -655,17 +665,40 @@ std::cout << "mRR" << mRR << std::endl;
       }
 
       if ( !(updateR || updateX )) {
-        for(int i=0; i<param.num_src; i++){
-          beta(i,i) = sigma(i,i) / r2_old(i,i);  // use the alternative beta computation
-        }
+        // for(int i=0; i<param.num_src; i++){
+        //   beta(i,i) = sigma(i,i) / r2_old(i,i);  // use the alternative beta computation
+        // }
+        beta = r2_old.inverse() * sigma;
 
         if (param.pipeline && !breakdown)
         for(int i=0; i<param.num_src; i++){
           blas::tripleCGUpdate(alpha(i,i), beta(i,i), Ap.Component(i), rSloppy.Component(i), xSloppy.Component(i), p.Component(i));
         }
-        else
-        for(int i=0; i<param.num_src; i++){
-          blas::axpyZpbx(alpha(i,i), p.Component(i), xSloppy.Component(i), rSloppy.Component(i), beta(i,i));
+        else{
+          for(int i=0; i<param.num_src; i++){
+            for(int j=0; j<param.num_src; j++){
+              //MW: probably need to split this into to separate updates here. For now better save, optimize later
+              // x[i] = alpha*p[i] + x[i]; p[i] = r[i] + beta*p[i]
+              // x = p, y = x, z =r . We can only update X after p update has been completed
+
+              //blas::axpyZpbx(alpha(i,i), p.Component(i), xSloppy.Component(i), rSloppy.Component(i), beta(i,i));
+              blas::axpy(alpha(j,i),p.Component(j),xSloppy.Component(i));
+            }
+          }
+          for(int i=0; i < param.num_src; i++){
+            blas::copy(pnew.Component(i), rSloppy.Component(i)); // do we need components here?
+          }
+          for(int i=0; i<param.num_src; i++){
+            for(int j=0;j<param.num_src; j++){
+              double rcoeff= (j==0?1.0:0.0);
+              // order of updating p might be relevant here
+              blas::axpy(beta(j,i),p.Component(j),pnew.Component(i));
+              // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
+            }
+          }
+          for(int i=0; i < param.num_src; i++){
+            blas::copy(p.Component(i), pnew.Component(i));
+          }
         }
 
         if (use_heavy_quark_res && (k % heavy_quark_check) == 0) {
@@ -684,6 +717,7 @@ std::cout << "mRR" << mRR << std::endl;
 
         steps_since_reliable++;
       } else {
+                printfQuda("reliable update\n");
         for(int i=0; i<param.num_src; i++){
           blas::axpy(alpha(i,i), p.Component(i), xSloppy.Component(i));
         }
