@@ -313,10 +313,12 @@ void init(int argc, char **argv) {
 
   spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
-  double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
-  double diag = 1.0; // constant added to the diagonal
-  construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
-  memcpy(hostCloverInv, hostClover, V*cloverSiteSize*inv_param.clover_cpu_prec);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
+    double diag = 1.0; // constant added to the diagonal
+    construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
+    memcpy(hostCloverInv, hostClover, V*cloverSiteSize*inv_param.clover_cpu_prec);
+  }
 
   printfQuda("done.\n"); fflush(stdout);
   
