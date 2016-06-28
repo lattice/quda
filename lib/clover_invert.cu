@@ -47,11 +47,11 @@ namespace quda {
       // FIXME use native ordering in the Cholseky 
       // factor of two is inherent to QUDA clover storage
       constexpr Float two = static_cast<Float>(2.0);
-      for (int i=0; i<6; i++) diag[i] = two*A[ch*36+i];
+      for (int i=0; i<6; i++) diag[i] = two*A[i];
 
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
 #pragma unroll
-      for (int i=0; i<15; i++) tri[idtab[i]] = complex<Float>(two*A[ch*36+6+2*i], two*A[ch*36+6+2*i+1]);
+      for (int i=0; i<15; i++) tri[idtab[i]] = complex<Float>(two*A[6+2*i], two*A[6+2*i+1]);
 
       //Compute (T^2 + mu2) first, then invert (not optimized!):
       if (twist) {
@@ -147,9 +147,9 @@ namespace quda {
       }
 
       constexpr Float half = static_cast<Float>(0.5);
-      for (int i=0; i<6; i++) A[ch*36+i] = half * diag[i];
+      for (int i=0; i<6; i++) A[i] = half * diag[i];
 #pragma unroll
-      for (int i=0; i<15; i++) { A[ch*36+6+2*i] = half*tri[idtab[i]].real(); A[ch*36+6+2*i+1] = half*tri[idtab[i]].imag(); }
+      for (int i=0; i<15; i++) { A[6+2*i] = half*tri[idtab[i]].real(); A[6+2*i+1] = half*tri[idtab[i]].imag(); }
 
       // save the inverted matrix
       arg.inverse.save(A, x, parity, ch);
