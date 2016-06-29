@@ -332,6 +332,7 @@ namespace quda {
       arg.inC.load(static_cast<Complex*>(C.data), bulk_cb_idx);
       
       const unsigned int ghost_idx = arg.ghostOffset[dim] + ghostIndexFromCoords(x, arg.X, dim, arg.displacement) + cb_idx;
+
       arg.inB_shift.loadGhost(static_cast<Complex*>(projected_tmp.data), ghost_idx, dim);
       B_shift = projected_tmp.reconstruct(dim, 1);
       result = outerProdSpinTrace(B_shift,A);
@@ -528,7 +529,7 @@ namespace quda {
 #ifdef MULTI_GPU
     const unsigned int Npad = x.Ncolor()*x.Nspin()*2/x.FieldOrder();
     for(int dir=0; dir<4; ++dir){
-      ghostOffset[dir] = Npad*(x.Even().GhostOffset(dir) + x.Even().Stride());
+      ghostOffset[dir] = Npad*(x.Even().GhostOffset(dir));
     }
 #endif
 
