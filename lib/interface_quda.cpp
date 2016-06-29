@@ -4635,47 +4635,48 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  for(int mu=0; mu<4; mu++) {
-    for(int nu=0;nu<4;nu++)
-      if(nu!=mu) {
-	computeCloverSigmaTrace(trace, *cloverPrecise, mu, nu,  QUDA_CUDA_FIELD_LOCATION);
+  for (int mu=0; mu<4; mu++) {
+    for (int nu=0; nu<mu; nu++) {
+      computeCloverSigmaTrace(trace, *cloverPrecise, nu, mu, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedGauge(traceEx, trace, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to traceEx
 
-	copyExtendedGauge(traceEx, trace, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to traceEx
+      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+      profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
 
-	profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-	profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
+      traceEx.exchangeExtendedGhost(R,true);
 
-	traceEx.exchangeExtendedGhost(R,true);
+      profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
+      profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-	profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
-	profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+      cloverDerivative(cudaForce, gaugeEx, traceEx, mu, nu, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
+      cloverDerivative(cudaForce, gaugeEx, traceEx, nu, mu, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
+    }
+  }
 
-	cloverDerivative(cudaForce, gaugeEx, traceEx, mu, nu, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
+  /* Now the U dA/dU terms */
+  for (int mu=0; mu<4; mu++) {
+    for (int nu=0;nu<mu;nu++) {
+      for(int shift = 0; shift < nvector; shift++){
+	double ferm_epsilon = 2.0*dt*coeff[shift];
+	computeCloverSigmaOprod(oprod, *(cudaQuarkX[shift]), *(cudaQuarkP[shift]), ferm_epsilon, nu, mu, shift);
       }
+      copyExtendedGauge(oprodEx, oprod, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to oprod
 
-    /* Now the U dA/dU terms */
-    for(int nu=0;nu<4;nu++)
-      if(nu!=mu) {
-	for(int shift = 0; shift < nvector; shift++){
-	  double ferm_epsilon = 2.0*dt*coeff[shift];
-	  computeCloverSigmaOprod(oprod, *(cudaQuarkX[shift]), *(cudaQuarkP[shift]), ferm_epsilon, mu, nu, shift);
-        }
+      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+      profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
 
-	copyExtendedGauge(oprodEx, oprod, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to oprod
+      oprodEx.exchangeExtendedGhost(R,true);
 
-	profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-	profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
+      profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
+      profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-	oprodEx.exchangeExtendedGhost(R,true);
+      cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, -kappa2*ck, QUDA_ODD_PARITY, 1);
+      cloverDerivative(cudaForce, gaugeEx, oprodEx, nu, mu, -kappa2*ck, QUDA_ODD_PARITY, 1);
 
-	profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
-	profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-
-	cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, -kappa2*ck, QUDA_ODD_PARITY, 1);
-	cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, ck, QUDA_EVEN_PARITY, 1);
-      } /* end loop over nu & endif( nu != mu )*/
-
-  } // end loop over mu
+      cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, ck, QUDA_EVEN_PARITY, 1);
+      cloverDerivative(cudaForce, gaugeEx, oprodEx, nu, mu, ck, QUDA_EVEN_PARITY, 1);
+    }
+  } /* end loop over nu & endif( nu != mu )*/
 
   updateMomentum(cudaMom, -1.0, cudaForce);
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);

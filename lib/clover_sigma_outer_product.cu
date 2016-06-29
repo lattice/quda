@@ -39,9 +39,7 @@ namespace quda {
 			GaugeField &meta) : length(meta.VolumeCB()), parity(parity), 
 					    inA(inA), inB(inB), oprod(oprod), 
 					    coeff(coeff), mu(mu), nu(nu), count(count)
-    {
-
-    }
+    { }
   };
 
   template<typename real, typename Output, typename InputA, typename InputB>
@@ -56,7 +54,7 @@ namespace quda {
 #if (CUDA_VERSION < 6000)
     if (idx >= arg.length) idx = arg.length - 1;
 #else
-    while(idx<arg.length){
+    while (idx<arg.length) {
 #endif // CUDA_VERSION
       arg.inA.load(static_cast<Complex*>(A.data), idx);
       arg.inB.load(static_cast<Complex*>(B.data), idx);

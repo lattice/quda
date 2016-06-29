@@ -37,28 +37,15 @@ namespace quda {
       int dir1 = arg.dir1;
       int dir2 = arg.dir2;
 
-
-      Float sign = 1;
-      if(dir2 < dir1){
-        int tmp = dir2;
-        dir2 = dir1;
-        dir1 = tmp;
-        sign = -1;
-      }
-
-
       Float diag[2][6];
       complex<Float> tri[2][15];
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
       complex<Float> ctmp;
 
-      if(parity==0){
-        arg.clover1.load(A,x,parity);
-      }else{
-        arg.clover2.load(A,x,parity);
-      }
+      if (parity==0) arg.clover1.load(A,x,parity);
+      else arg.clover2.load(A,x,parity);
 
-      for(int ch=0; ch<2; ++ch){
+      for (int ch=0; ch<2; ++ch) {
         // factor of two is inherent to QUDA clover storage
         for (int i=0; i<6; i++) diag[ch][i] = 2.0*A[ch*36+i];
         for (int i=0; i<15; i++) tri[ch][idtab[i]] = complex<Float>(2.0*A[ch*36+6+2*i], 2.0*A[ch*36+6+2*i+1]);
@@ -66,22 +53,21 @@ namespace quda {
 
 
       // X, Y
-      if(dir1 == 0){
-        if(dir2 == 1){
-          for(int j=0; j<3; ++j){
+      if (dir1 == 0) {
+        if (dir2 == 1) {
+          for (int j=0; j<3; ++j) {
             mat(j,j).y = diag[0][j+3] + diag[1][j+3] - diag[0][j] - diag[1][j];  
           }
 
           // triangular part
           int jk=0;
-          for(int j=1; j<3; ++j){
+          for (int j=1; j<3; ++j) {
             int jk2 = (j+3)*(j+2)/2 + 3;
-            for(int k=0; k<j; ++k){
+            for (int k=0; k<j; ++k) {
               ctmp = tri[0][jk2] + tri[1][jk2] - tri[0][jk] - tri[1][jk];
 
               mat(j,k).x = -ctmp.imag();
               mat(j,k).y =  ctmp.real();
-
               mat(k,j).x =  ctmp.imag();
               mat(k,j).y =  ctmp.real();
 
@@ -90,23 +76,21 @@ namespace quda {
           } // X Y
 
 
-        }else if(dir2 == 2){
+        } else if (dir2 == 2) {
 
-          for(int j=0; j<3; ++j){
+          for (int j=0; j<3; ++j) {
             int jk = (j+3)*(j+2)/2;
-            for(int k=0; k<3; ++k){
+            for (int k=0; k<3; ++k) {
               int kj = (k+3)*(k+2)/2 + j;
-              ctmp = conj(tri[0][kj]) - tri[0][jk] + conj(tri[1][kj]) - tri[1][jk];
-              mat(j,k).x = ctmp.real();
-              mat(j,k).y = ctmp.imag();
+              mat(j,k) = conj(tri[0][kj]) - tri[0][jk] + conj(tri[1][kj]) - tri[1][jk];
               jk++;
             }
           } // X Z
 
-        }else if(dir2 == 3){
-          for(int j=0; j<3; ++j){
+        } else if (dir2 == 3) {
+          for (int j=0; j<3; ++j) {
             int jk = (j+3)*(j+2)/2;
-            for(int k=0; k<3; ++k){
+            for (int k=0; k<3; ++k) {
               int kj = (k+3)*(k+2)/2 + j;
               ctmp = conj(tri[0][kj]) + tri[0][jk] - conj(tri[1][kj]) - tri[1][jk]; 
               mat(j,k).x = -ctmp.imag();
@@ -117,11 +101,11 @@ namespace quda {
 
         } // dir2 == 3 // X T
 
-      }else if(dir1 == 1){
-        if(dir2 == 2){ // Y Z
-          for(int j=0; j<3; ++j){
+      } else if (dir1 == 1) {
+        if (dir2 == 2) { // Y Z
+          for (int j=0; j<3; ++j) {
             int jk = (j+3)*(j+2)/2;
-            for(int k=0; k<3; ++k){
+            for (int k=0; k<3; ++k) {
               int kj = (k+3)*(k+2)/2 + j;
               ctmp = conj(tri[0][kj]) + tri[0][jk] + conj(tri[1][kj]) + tri[1][jk];
               mat(j,k).x =  ctmp.imag();
@@ -129,28 +113,26 @@ namespace quda {
               jk++;
             }
           }
-        }else if(dir2 == 3){ // Y T
-          for(int j=0; j<3; ++j){
+        } else if (dir2 == 3){ // Y T
+          for (int j=0; j<3; ++j) {
             int jk = (j+3)*(j+2)/2;
-            for(int k=0; k<3; ++k){
+            for (int k=0; k<3; ++k) {
               int kj = (k+3)*(k+2)/2 + j;
-              ctmp = conj(tri[0][kj]) - tri[0][jk] - conj(tri[1][kj]) + tri[1][jk];
-              mat(j,k).x = ctmp.real();
-              mat(j,k).y = ctmp.imag();
+              mat(j,k) = conj(tri[0][kj]) - tri[0][jk] - conj(tri[1][kj]) + tri[1][jk];
               jk++;
             }
           }
         } // dir2 == 3
       } // dir1 == 1
-      else if(dir1 == 2){
-        if(dir2 == 3){
-          for(int j=0; j<3; ++j){
+      else if (dir1 == 2){
+        if (dir2 == 3) {
+          for (int j=0; j<3; ++j) {
             mat(j,j).y = diag[0][j] - diag[0][j+3] - diag[1][j] + diag[1][j+3];
           }
           int jk=0;
-          for(int j=1; j<3; ++j){
+          for (int j=1; j<3; ++j) {
             int jk2 = (j+3)*(j+2)/2 + 3;
-            for(int k=0; k<j; ++k){
+            for (int k=0; k<j; ++k) {
               ctmp = tri[0][jk] - tri[0][jk2] - tri[1][jk] + tri[1][jk2];
               mat(j,k).x = -ctmp.imag();
               mat(j,k).y =  ctmp.real();
@@ -162,8 +144,6 @@ namespace quda {
           }
         }
       }
-      // if we dir1 and dir2 were swapped, multiply by -1
-      mat *= sign;
 
       arg.gauge.save((Float*)(mat.data), x, 0, parity);
 

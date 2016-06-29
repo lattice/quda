@@ -95,12 +95,14 @@ namespace quda {
 
       // load Oprod
       arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), 0, arg.parity);
+      if (nu < mu) Oprod1 *= static_cast<real>(-1.0);
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
       thisForce = U1*U2*conj(U3)*conj(U4)*Oprod1;
 
       d[mu]++; d[nu]++;
       arg.oprod.load((real*)(Oprod2.data), linkIndexShift(x, d, X), 0, arg.parity);
+      if (nu < mu) Oprod2 *= static_cast<real>(-1.0);
       d[mu]--; d[nu]--;
 
       if(isConjugate) Oprod2 -= conj(Oprod2);
@@ -131,6 +133,7 @@ namespace quda {
       // load opposite parity Oprod
       d[nu]++;
       arg.oprod.load((real*)(Oprod3.data), linkIndexShift(y, d, X), 0, arg.parity);
+      if (nu < mu) Oprod3 *= static_cast<real>(-1.0);
       d[nu]--;
 
       if(isConjugate) Oprod3 -= conj(Oprod3);
@@ -139,6 +142,7 @@ namespace quda {
       // load Oprod(x+mu)
       d[mu]++;
       arg.oprod.load((real*)(Oprod4.data), linkIndexShift(y, d, X), 0, arg.parity);
+      if (nu < mu) Oprod4 *= static_cast<real>(-1.0);
       d[mu]--;
 
       if(isConjugate) Oprod4 -= conj(Oprod4);
@@ -174,6 +178,7 @@ namespace quda {
       // load Oprod(x+mu)
       d[mu]++;
       arg.oprod.load((real*)(Oprod1.data), linkIndexShift(y, d, X), 0, arg.parity);
+      if (nu < mu) Oprod1 *= static_cast<real>(-1.0);
       d[mu]--;    
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
@@ -182,6 +187,7 @@ namespace quda {
 
       d[nu]--;
       arg.oprod.load((real*)(Oprod2.data), linkIndexShift(y, d, X), 0, arg.parity);
+      if (nu < mu) Oprod2 *= static_cast<real>(-1.0);
       d[nu]++;
 
       if(isConjugate) Oprod2 -= conj(Oprod2);
@@ -212,12 +218,14 @@ namespace quda {
 
       d[mu]++; d[nu]--;
       arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), 0, arg.parity);
+      if (nu < mu) Oprod1 *= static_cast<real>(-1.0);
       d[mu]--; d[nu]++;
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
       thisForce -= conj(U1)*U2*Oprod1*U3*conj(U4);
 
       arg.oprod.load((real*)(Oprod4.data), linkIndexShift(x, d, X), 0, arg.parity);
+      if (nu < mu) Oprod4 *= static_cast<real>(-1.0);
 
       if(isConjugate) Oprod4 -= conj(Oprod4);
       thisForce -= Oprod4*conj(U1)*U2*U3*conj(U4);
