@@ -13,47 +13,33 @@ namespace quda {
     struct FmunuArg {
       int threads; // number of active threads required
       int X[4]; // grid dimensions
-#ifdef MULTI_GPU
       int border[4]; 
-#endif
       Fmunu f;
       Gauge gauge;
     
-    FmunuArg(Fmunu& f, Gauge &gauge, const GaugeField &meta)
-      : threads(meta.Volume()), f(f), gauge(gauge) { 
-      for(int dir=0; dir<4; ++dir) X[dir] = meta.X()[dir];
-      
-#ifdef MULTI_GPU
-      for(int dir=0; dir<4; ++dir){
-	border[dir] = 2;
+    FmunuArg(Fmunu& f, Gauge &gauge, const GaugeField &meta, const GaugeField &meta_ex)
+      : threads(meta.VolumeCB()), f(f), gauge(gauge) {
+      for (int dir=0; dir<4; ++dir) {
+	X[dir] = meta.X()[dir];
+	border[dir] = (meta_ex.X()[dir] - X[dir])/2;
       }
-#endif
     }
   };
 
   template <typename Float, typename Fmunu, typename GaugeOrder>
-    __host__ __device__ void computeFmunuCore(FmunuArg<Float,Fmunu,GaugeOrder>& arg, int idx) {
+  __host__ __device__ void computeFmunuCore(FmunuArg<Float,Fmunu,GaugeOrder>& arg, int parity, int idx) {
 
       typedef Matrix<complex<Float>,3> Link;
 
-      // compute spacetime dimensions and parity
-      int parity = 0;
-      if(idx >= arg.threads/2){
-        parity = 1;
-        idx -= arg.threads/2;
-      }
-
       int X[4];
-      for(int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
+      for (int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
 
       int x[4];
       getCoords(x, idx, X, parity);
-#ifdef MULTI_GPU
       for(int dir=0; dir<4; ++dir){
 	x[dir] += arg.border[dir];
 	X[dir] += 2*arg.border[dir];
       }
-#endif
 
       for (int mu=0; mu<4; mu++) {
         for (int nu=0; nu<mu; nu++) {
@@ -85,7 +71,6 @@ namespace quda {
             // complete the plaquette
             F = Ftmp * conj(U4);
           }
-
 
           { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
             Link U1, U2, U3, U4;
@@ -193,7 +178,6 @@ namespace quda {
 
             // sum this contribution to Fmunu
             F += Ftmp;
-
           }
           // 3 matrix additions, 12 matrix-matrix multiplications, 8 matrix conjugations
           // Each matrix conjugation involves 9 unary minus operations but these ar not included in the operation count
@@ -205,10 +189,9 @@ namespace quda {
           
           { 
             F -= conj(F); // 18 real subtractions + one matrix conjugation
-            F *= 1.0/8.0; // 18 real multiplications
+            F *= static_cast<Float>(0.125); // 18 real multiplications
             // 36 floating point operations here
           }
-          
 
           int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
 	  arg.f.save((Float*)(F.data), idx, munu_idx, parity);
@@ -222,30 +205,28 @@ namespace quda {
   template<typename Float, typename Fmunu, typename Gauge>
   __global__ void computeFmunuKernel(FmunuArg<Float,Fmunu,Gauge> arg){
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
-    if(idx >= arg.threads) return;
-    computeFmunuCore(arg,idx);
+    int parity = threadIdx.y;
+    if (idx >= arg.threads) return;
+    computeFmunuCore(arg,parity,idx);
   }
   
   template<typename Float, typename Fmunu, typename Gauge>
-  void computeFmunuCPU(FmunuArg<Float,Fmunu,Gauge>& arg){
-    for(int idx=0; idx<arg.threads; idx++){
-      computeFmunuCore(arg,idx);
+  void computeFmunuCPU(FmunuArg<Float,Fmunu,Gauge>& arg) {
+    for (int parity=0; parity<2; parity++) {
+      for (int idx=0; idx<arg.threads; idx++) {
+	computeFmunuCore(arg,parity,idx);
+      }
     }
   }
 
 
   template<typename Float, typename Fmunu, typename Gauge>
-    class FmunuCompute : Tunable {
+    class FmunuCompute : TunableLocalParity {
       FmunuArg<Float,Fmunu,Gauge> arg;
       const GaugeField &meta;
       const QudaFieldLocation location;
 
       private: 
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-      bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-      bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
       unsigned int minThreads() const { return arg.threads; }
 
       public:
@@ -268,7 +249,6 @@ namespace quda {
 	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
-
       std::string paramString(const TuneParam &param) const {
         std::stringstream ps;
         ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
@@ -278,16 +258,16 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return (2430 + 36)*6*arg.threads; }
-      long long bytes() const { return (4*4*18 + 18)*6*arg.threads*sizeof(Float); } //  Ignores link reconstruction
+      long long flops() const { return (2430 + 36)*6*2*arg.threads; }
+      long long bytes() const { return ((16*arg.gauge.Bytes() + arg.f.Bytes())*6*2*arg.threads); } //  Ignores link reconstruction
 
     }; // FmunuCompute
 
 
 
   template<typename Float, typename Fmunu, typename Gauge>
-  void computeFmunu(Fmunu f_munu, Gauge gauge, const GaugeField &meta, QudaFieldLocation location) {
-    FmunuArg<Float,Fmunu,Gauge> arg(f_munu, gauge, meta);
+  void computeFmunu(Fmunu f_munu, Gauge gauge, const GaugeField &meta, const GaugeField &meta_ex, QudaFieldLocation location) {
+    FmunuArg<Float,Fmunu,Gauge> arg(f_munu, gauge, meta, meta_ex);
     FmunuCompute<Float,Fmunu,Gauge> fmunuCompute(arg, meta, location);
     fmunuCompute.apply(0);
     cudaDeviceSynchronize();
@@ -302,13 +282,13 @@ namespace quda {
 
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);
+	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge, location);
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
-	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);
+	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge, location);
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
-	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);
+	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, gauge, location);
 	} else {
 	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
 	}
