@@ -31,7 +31,7 @@ namespace quda {
 
 	for(int dir=0; dir<nDim; ++dir) {
 	  x[dir] = u.X()[dir];
-	  r[dir] = u.X()[dir];
+	  r[dir] = u.R()[dir];
 	}
       }
 

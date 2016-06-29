@@ -30,14 +30,16 @@ namespace quda {
 
     bool conjugate;      
 
-    CloverDerivArg(const Force& force, const Gauge& gauge, const Oprod& oprod, const int *X, 
-		   int mu, int nu, double coeff, int parity, bool conjugate) :  
+    CloverDerivArg(const Force& force, const Gauge& gauge, const Oprod& oprod,
+		   const int *X, const int *E, int mu, int nu,
+		   double coeff, int parity, bool conjugate) :
       mu(mu), nu(nu), coeff(coeff), parity(parity), volumeCB(force.volumeCB), 
       force(force), gauge(gauge), oprod(oprod), conjugate(conjugate)
     {
-      for(int dir=0; dir<4; ++dir) this->X[dir] = X[dir];
-      //for(int dir=0; dir<4; ++dir) border[dir] =  commDimPartitioned(dir) ? 2 : 0;
-      for(int dir=0; dir<4; ++dir) border[dir] = 2;
+      for(int dir=0; dir<4; ++dir) {
+	this->X[dir] = X[dir];
+	this->border[dir] = (E[dir] - X[dir])/2;
+      }
     }
   };
 
@@ -51,7 +53,7 @@ namespace quda {
 
     int index = threadIdx.x + blockIdx.x*blockDim.x;
 
-    if(index >= arg.volumeCB) return;
+    if (index >= arg.volumeCB) return;
 
     int x[4];
     int y[4];
@@ -318,13 +320,13 @@ namespace quda {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	  typedef CloverDerivArg<Float,F,G,O> Arg;
-	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
+	  Arg arg(F(force), G(gauge), O(oprod), force.X(), oprod.X(), mu, nu, coeff, parity, conjugate);
 	  CloverDerivative<Float, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	  typedef CloverDerivArg<Float,F,G,O> Arg;
-	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
+	  Arg arg(F(force), G(gauge), O(oprod), force.X(), oprod.X(), mu, nu, coeff, parity, conjugate);
 	  CloverDerivative<Float, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
 	}else{
@@ -347,6 +349,11 @@ void cloverDerivative(cudaGaugeField &force,
 #ifdef GPU_CLOVER_DIRAC
   assert(oprod.Geometry() == QUDA_SCALAR_GEOMETRY);
   assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
+
+  for (int d=0; d<4; d++) {
+    if (oprod.X()[d] != gauge.X()[d])
+      errorQuda("Incompatible extended dimensions d=%d gauge=%d oprod=%d", d, gauge.X()[d], oprod.X()[d]);
+  }
 
   int device_parity = (parity == QUDA_EVEN_PARITY) ? 0 : 1;
 
