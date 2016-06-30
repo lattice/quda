@@ -262,29 +262,25 @@ namespace quda {
      Compute the outer product from the solver solution fields arising
      from the diagonal term of the fermion bilinear in direction mu,nu.
 
-     @param oprod Computed outer product field (scalar matrix field)
+     @param oprod Computed outer product field (tensor matrix field)
      @param x Solution field (both parities)
      @param p Intermediate vectors (both parities)
      @coeff coeff Multiplicative coefficient (e.g., dt * residiue)
-     @param mu mu direction
-     @param nu nu direction
      @param update If update>1 then read/write to oprod field else just over write
   */
   void computeCloverSigmaOprod(cudaGaugeField& oprod,
 			       cudaColorSpinorField& x,  
 			       cudaColorSpinorField& p,
-			       const double coeff, int mu, int nu, int update);
+			       const double coeff, int update);
   /**
      Compute the matrix field necessary for the force calculation from
-     the clover trace action.
+     the clover trace action.  This computes a tensor field [mu,nu].
 
-     @param output The computed matrix field (scalar)
+     @param output The computed matrix field (tensor matrix field)
      @param clover The input clover field
-     @param mu mu direction
-     @param nu nu direction
      @param location The location of the computation
    */
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, int mu, int nu, QudaFieldLocation location);
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, QudaFieldLocation location);
 
   /**
      Compute the derivative of the clover matrix in the direction

@@ -71,6 +71,7 @@ namespace quda {
 
     const int& mu = arg.mu;
     const int& nu = arg.nu;
+    int tidx = mu > nu ? (mu-1)*mu/2 + nu : (nu-1)*nu/2 + mu;
 
     Link thisForce, otherForce;
 
@@ -96,14 +97,14 @@ namespace quda {
       arg.gauge.load((real*)(U4.data), linkIndexShift(x, d, X), nu, arg.parity);
 
       // load Oprod
-      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), tidx, arg.parity);
       if (nu < mu) Oprod1 *= static_cast<real>(-1.0);
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
       thisForce = U1*U2*conj(U3)*conj(U4)*Oprod1;
 
       d[mu]++; d[nu]++;
-      arg.oprod.load((real*)(Oprod2.data), linkIndexShift(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod2.data), linkIndexShift(x, d, X), tidx, arg.parity);
       if (nu < mu) Oprod2 *= static_cast<real>(-1.0);
       d[mu]--; d[nu]--;
 
@@ -134,7 +135,7 @@ namespace quda {
 
       // load opposite parity Oprod
       d[nu]++;
-      arg.oprod.load((real*)(Oprod3.data), linkIndexShift(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod3.data), linkIndexShift(y, d, X), tidx, arg.parity);
       if (nu < mu) Oprod3 *= static_cast<real>(-1.0);
       d[nu]--;
 
@@ -143,7 +144,7 @@ namespace quda {
 
       // load Oprod(x+mu)
       d[mu]++;
-      arg.oprod.load((real*)(Oprod4.data), linkIndexShift(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod4.data), linkIndexShift(y, d, X), tidx, arg.parity);
       if (nu < mu) Oprod4 *= static_cast<real>(-1.0);
       d[mu]--;
 
@@ -179,7 +180,7 @@ namespace quda {
 
       // load Oprod(x+mu)
       d[mu]++;
-      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(y, d, X), tidx, arg.parity);
       if (nu < mu) Oprod1 *= static_cast<real>(-1.0);
       d[mu]--;    
 
@@ -188,7 +189,7 @@ namespace quda {
       otherForce -= conj(U1)*U2*U3*Oprod1*conj(U4);
 
       d[nu]--;
-      arg.oprod.load((real*)(Oprod2.data), linkIndexShift(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod2.data), linkIndexShift(y, d, X), tidx, arg.parity);
       if (nu < mu) Oprod2 *= static_cast<real>(-1.0);
       d[nu]++;
 
@@ -219,14 +220,14 @@ namespace quda {
       arg.gauge.load((real*)(U4.data), linkIndexShift(x, d, X), mu, arg.parity);
 
       d[mu]++; d[nu]--;
-      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), tidx, arg.parity);
       if (nu < mu) Oprod1 *= static_cast<real>(-1.0);
       d[mu]--; d[nu]++;
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
       thisForce -= conj(U1)*U2*Oprod1*U3*conj(U4);
 
-      arg.oprod.load((real*)(Oprod4.data), linkIndexShift(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod4.data), linkIndexShift(x, d, X), tidx, arg.parity);
       if (nu < mu) Oprod4 *= static_cast<real>(-1.0);
 
       if(isConjugate) Oprod4 -= conj(Oprod4);
@@ -347,7 +348,7 @@ void cloverDerivative(cudaGaugeField &force,
 		      int mu, int nu, double coeff, QudaParity parity, int conjugate)
 {
 #ifdef GPU_CLOVER_DIRAC
-  assert(oprod.Geometry() == QUDA_SCALAR_GEOMETRY);
+  assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
   assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
 
   for (int d=0; d<4; d++) {

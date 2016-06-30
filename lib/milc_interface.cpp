@@ -1197,31 +1197,6 @@ void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, do
 }
 
 
-void qudaCloverTrace(void* out, void* clover, int mu, int nu)
-{
-  qudamilc_called<true>(__func__);
-  computeCloverTraceQuda(out, clover, mu, nu, const_cast<int*>(localDim));
-  qudamilc_called<false>(__func__);
-  return;
-}
-
-
-
-void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, double coeff, int precision, int parity, int conjugate)
-{
-  qudamilc_called<true>(__func__);
-  QudaParity qudaParity = (parity==2) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
-
-  computeCloverDerivativeQuda(out, gauge, oprod, mu, nu, coeff, qudaParity, &gaugeParam, conjugate);
-  qudamilc_called<false>(__func__);
-  return;
-}
-
-
-
 void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs_t &inv_args,
     int external_precision, int quda_precision) {
 
