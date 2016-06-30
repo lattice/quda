@@ -536,14 +536,15 @@ namespace quda {
 
     int spin = 0;
     switch (a.Geometry()) {
-      case QUDA_SCALAR_GEOMETRY:
-        spin = 1;
-        break;
-      case QUDA_VECTOR_GEOMETRY:
-        spin = a.Ndim();
-        break;
-      default:
-        errorQuda("Unsupported field geometry %d", a.Geometry());
+    case QUDA_SCALAR_GEOMETRY:
+    case QUDA_TENSOR_GEOMETRY:
+      spin = 1;
+      break;
+    case QUDA_VECTOR_GEOMETRY:
+      spin = a.Ndim();
+      break;
+    default:
+      errorQuda("Unsupported field geometry %d", a.Geometry());
     }
 
     if (a.Precision() == QUDA_HALF_PRECISION) 
@@ -553,7 +554,7 @@ namespace quda {
       errorQuda("Unsupported field reconstruct %d", a.Reconstruct());
 
     ColorSpinorParam spinor_param;
-    spinor_param.nColor = a.Reconstruct()/2;
+    spinor_param.nColor = a.Reconstruct()/2 * (a.Geometry() == QUDA_TENSOR_GEOMETRY ? 6 : 1);
     spinor_param.nSpin = spin;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
