@@ -202,7 +202,7 @@ namespace quda {
       }
       size = isGhost ? faceMax : arg.volume/2;
 #ifndef FINE_GRAINED_ACCESS
-      writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
+      writeAuxString("out_stride=%d,in_stride=%d,geometry=%d", arg.out.stride, arg.in.stride, arg.in.geometry);
 #endif
     }
 

@@ -20,12 +20,16 @@ namespace quda {
     int fBody[nDim][nDim];
     int fBuf[nDim][nDim];
     int localParity[nDim];
+    int threads;
     ExtractGhostExArg(const Order &order, const int *X_, const int *R_, 
 		      const int *surfaceCB_, 
 		      const int *A0_, const int *A1_, const int *B0_, const int *B1_, 
 		      const int *C0_, const int *C1_, const int fBody_[nDim][nDim], 
 		      const int fBuf_[nDim][nDim], const int *localParity_) 
-  : order(order) { 
+      : order(order), threads(0) {
+
+      threads = R_[dim]*(A1_[dim]-A0_[dim])*(B1_[dim]-B0_[dim])*(C1_[dim]-C0_[dim])*order.geometry;
+
       for (int d=0; d<nDim; d++) {
 	X[d] = X_[d];
 	R[d] = R_[d];
@@ -152,13 +156,12 @@ namespace quda {
 	// one parity but parity alternates between threads
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
+	if (X >= arg.threads) return;
 
 	int dA = arg.A1[dim]-arg.A0[dim];
 	int dB = arg.B1[dim]-arg.B0[dim];
 	int dC = arg.C1[dim]-arg.C0[dim];
 	int D0 = extract ? dir*arg.X[dim] + (1-dir)*arg.R[dim] : dir*(arg.X[dim] + arg.R[dim]); 
-
-	if (X >= arg.R[dim]*dA*dB*dC*arg.order.geometry) return;
 
 	// thread order is optimized to maximize coalescing
 	// X = (((g*R + d) * dA + a)*dB + b)*dC + c
@@ -206,8 +209,8 @@ namespace quda {
       int dB = arg.B1[dim]-arg.B0[dim];
       int dC = arg.C1[dim]-arg.C0[dim];
       size = arg.R[dim]*dA*dB*dC*arg.order.geometry;
-      writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d",
-		     sizeof(Float),arg.order.stride, extract, dim);
+      writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d,geometry=%d",
+		     sizeof(Float),arg.order.stride, extract, dim, arg.order.geometry);
     }
     virtual ~ExtractGhostEx() { ; }
   
