@@ -289,14 +289,12 @@ namespace quda {
 
      @param force The compute force field (read/write update)
      @param gauge The input gauge field
-     @param oprod The input outer-product field
-     @param mu mu direction
-     @param nu nu direction
+     @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
      @param parity The field parity we are working on 
      @param conjugate Whether to set oprod = oprod - conj(oprod) or not
    */
-  void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, double coeff, QudaParity parity, int conjugate);
+  void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity, int conjugate);
 
 } // namespace quda
 

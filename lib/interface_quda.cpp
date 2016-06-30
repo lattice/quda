@@ -4568,12 +4568,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  for (int mu=0; mu<4; mu++) {
-    for (int nu=0; nu<mu; nu++) {
-      cloverDerivative(cudaForce, gaugeEx, traceEx, mu, nu, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
-      cloverDerivative(cudaForce, gaugeEx, traceEx, nu, mu, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
-    }
-  }
+  cloverDerivative(cudaForce, gaugeEx, traceEx, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
 
   /* Now the U dA/dU terms */
   for(int shift = 0; shift < nvector; shift++){
@@ -4590,15 +4585,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  for (int mu=0; mu<4; mu++) {
-    for (int nu=0;nu<mu;nu++) {
-      cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, -kappa2*ck, QUDA_ODD_PARITY, 1);
-      cloverDerivative(cudaForce, gaugeEx, oprodEx, nu, mu, -kappa2*ck, QUDA_ODD_PARITY, 1);
-
-      cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, ck, QUDA_EVEN_PARITY, 1);
-      cloverDerivative(cudaForce, gaugeEx, oprodEx, nu, mu, ck, QUDA_EVEN_PARITY, 1);
-    }
-  } /* end loop over nu & endif( nu != mu )*/
+  cloverDerivative(cudaForce, gaugeEx, oprodEx, -kappa2*ck, QUDA_ODD_PARITY, 1);
+  cloverDerivative(cudaForce, gaugeEx, oprodEx, ck, QUDA_EVEN_PARITY, 1);
 
   updateMomentum(cudaMom, -1.0, cudaForce);
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
