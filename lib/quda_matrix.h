@@ -246,6 +246,9 @@ namespace quda {
     }
 
 
+  /**
+     @brief Generic implementation of matrix multiplication
+  */
   template<class T, int N>
     __device__ __host__ inline
     Matrix<T,N> operator*(const Matrix<T,N> &a, const Matrix<T,N> &b)
@@ -262,8 +265,10 @@ namespace quda {
       return result;
     }
 
-  template<class T>
-    __device__ __host__ inline
+  /**
+     @brief Specialization of N=3 matrix multiplication
+   */
+  template<class T>  __device__ __host__ inline
     Matrix<T,3> operator*(const Matrix<T,3> &a, const Matrix<T,3> &b)
     {
       Matrix<T,3> result;
@@ -271,7 +276,69 @@ namespace quda {
       for (int i=0; i<3; i++) {
 #pragma unroll
 	for (int k=0; k<3; k++) {
-	  result(i,k) = a(i,0) * b(0,k) + a(i,1) * b(1,k) + a(i,2) * b(2,k);
+	  result(i,k)  = a(i,0) * b(0,k);
+	  result(i,k) += a(i,1) * b(1,k);
+	  result(i,k) += a(i,2) * b(2,k);
+	}
+      }
+      return result;
+    }
+
+  /**
+     @brief FP32 specialization of N=3 matrix multiplication that will issue optimal fma instructions
+   */
+  template<>  __device__ __host__ inline
+    Matrix<complex<float>,3> operator*(const Matrix<complex<float>,3> &a, const Matrix<complex<float>,3> &b)
+    {
+      Matrix<complex<float>,3> result;
+#pragma unroll
+      for (int i=0; i<3; i++) {
+#pragma unroll
+	for (int k=0; k<3; k++) {
+	  result(i,k).x  = a(i,0).real() * b(0,k).real();
+	  result(i,k).x -= a(i,0).imag() * b(0,k).imag();
+	  result(i,k).y  = a(i,0).real() * b(0,k).imag();
+	  result(i,k).y += a(i,0).imag() * b(0,k).real();
+
+	  result(i,k).x += a(i,1).real() * b(1,k).real();
+	  result(i,k).x -= a(i,1).imag() * b(1,k).imag();
+	  result(i,k).y += a(i,1).real() * b(1,k).imag();
+	  result(i,k).y += a(i,1).imag() * b(1,k).real();
+
+	  result(i,k).x += a(i,2).real() * b(2,k).real();
+	  result(i,k).x -= a(i,2).imag() * b(2,k).imag();
+	  result(i,k).y += a(i,2).real() * b(2,k).imag();
+	  result(i,k).y += a(i,2).imag() * b(2,k).real();
+	}
+      }
+      return result;
+    }
+
+  /**
+     @brief FP64 specialization of N=3 matrix multiplication that will issue optimal fma instructions
+   */
+  template<> __device__ __host__ inline
+    Matrix<complex<double>,3> operator*(const Matrix<complex<double>,3> &a, const Matrix<complex<double>,3> &b)
+    {
+      Matrix<complex<double>,3> result;
+#pragma unroll
+      for (int i=0; i<3; i++) {
+#pragma unroll
+	for (int k=0; k<3; k++) {
+	  result(i,k).x  = a(i,0).real() * b(0,k).real();
+	  result(i,k).x -= a(i,0).imag() * b(0,k).imag();
+	  result(i,k).y  = a(i,0).real() * b(0,k).imag();
+	  result(i,k).y += a(i,0).imag() * b(0,k).real();
+
+	  result(i,k).x += a(i,1).real() * b(1,k).real();
+	  result(i,k).x -= a(i,1).imag() * b(1,k).imag();
+	  result(i,k).y += a(i,1).real() * b(1,k).imag();
+	  result(i,k).y += a(i,1).imag() * b(1,k).real();
+
+	  result(i,k).x += a(i,2).real() * b(2,k).real();
+	  result(i,k).x -= a(i,2).imag() * b(2,k).imag();
+	  result(i,k).y += a(i,2).real() * b(2,k).imag();
+	  result(i,k).y += a(i,2).imag() * b(2,k).real();
 	}
       }
       return result;
