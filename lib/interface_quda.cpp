@@ -182,9 +182,6 @@ static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 
 
-//!<Profiler for createClover>
-static TimeProfile profileCloverCreate("createCloverQuda");
-
 //!<Profiler for computeCloverForceQuda
 static TimeProfile profileCloverForce("computeCloverForceQuda");
 
@@ -698,6 +695,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   if (!gaugePrecise) errorQuda("Cannot call loadCloverQuda with no resident gauge field");
 
   profileClover.TPSTART(QUDA_PROFILE_TOTAL);
+  profileClover.TPSTART(QUDA_PROFILE_INIT);
   bool device_calc = false; // calculate clover and inverse on the device?
 
   pushVerbosity(inv_param->verbosity);
@@ -769,7 +767,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if (!device_calc || inv_param->return_clover || inv_param->return_clover_inverse) {
     // create a param for the cpu clover field
-    profileClover.TPSTART(QUDA_PROFILE_INIT);
     CloverFieldParam inParam(clover_param);
     inParam.precision = inv_param->clover_cpu_prec;
     inParam.order = inv_param->clover_order;
@@ -781,17 +778,17 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
       static_cast<CloverField*>(new cpuCloverField(inParam)) :
       static_cast<CloverField*>(new cudaCloverField(inParam));
-    profileClover.TPSTOP(QUDA_PROFILE_INIT);
   }
+  profileClover.TPSTOP(QUDA_PROFILE_INIT);
 
   if (!device_calc) {
     profileClover.TPSTART(QUDA_PROFILE_H2D);
     cloverPrecise->copy(*in, h_clovinv && !inv_param->compute_clover_inverse ? true : false);
     profileClover.TPSTOP(QUDA_PROFILE_H2D);
   } else {
-    profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
+    profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
     createCloverQuda(inv_param);
-    profileClover.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileClover.TPSTART(QUDA_PROFILE_TOTAL);
   }
 
   // inverted clover term is required when applying preconditioned operator
@@ -886,7 +883,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     checkCudaError();
   }
 
+  profileClover.TPSTART(QUDA_PROFILE_FREE);
   if (in) delete in; // delete object referencing input field
+  profileClover.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
 
@@ -1132,7 +1131,6 @@ void endQuda(void)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     profileInit.Print();
     profileGauge.Print();
-    profileCloverCreate.Print();
     profileClover.Print();
     profileInvert.Print();
     profileMulti.Print();
@@ -2336,12 +2334,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   dirac.reconstruct(*x, *b, param->solution_type);
-  profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution
     blas::ax(sqrt(nb), *x);
   }
+  profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   if (!param->make_resident_solution) {
     profileInvert.TPSTART(QUDA_PROFILE_D2H);
@@ -2349,11 +2347,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     profileInvert.TPSTOP(QUDA_PROFILE_D2H);
   }
 
+  profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->make_resident_solution) {
     for (unsigned int i=0; i<solutionResident.size(); i++) {
       if (solutionResident[i]) delete solutionResident[i];
     }
     solutionResident.resize(1);
+
     solutionResident[0] = static_cast<cudaColorSpinorField*>(x);
   }
 
@@ -2362,6 +2362,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nh_x = blas::norm2(*h_x);
     printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
   }
+  profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+  profileInvert.TPSTART(QUDA_PROFILE_FREE);
 
   delete h_b;
   delete h_x;
@@ -2371,6 +2374,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete d;
   delete dSloppy;
   delete dPre;
+
+  profileInvert.TPSTART(QUDA_PROFILE_FREE);
 
   popVerbosity();
 
@@ -2394,6 +2399,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   setTuning(param->tune);
 
   profileMulti.TPSTART(QUDA_PROFILE_TOTAL);
+  profileMulti.TPSTART(QUDA_PROFILE_INIT);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
@@ -2512,6 +2518,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     h_x[i] = ColorSpinorField::Create(cpuParam);
   }
 
+  profileMulti.TPSTOP(QUDA_PROFILE_INIT);
   profileMulti.TPSTART(QUDA_PROFILE_H2D);
   // Now I need a colorSpinorParam for the device
   ColorSpinorParam cudaParam(cpuParam, *param);
@@ -2520,12 +2527,16 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
   profileMulti.TPSTOP(QUDA_PROFILE_H2D);
 
+  profileMulti.TPSTART(QUDA_PROFILE_INIT);
   // Create the solution fields filled with zero
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   for(int i=0; i < param->num_offset; i++) {
     x[i] = new cudaColorSpinorField(cudaParam);
   }
+  profileMulti.TPSTOP(QUDA_PROFILE_INIT);
 
+
+  profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
   // Check source norms
   double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Solution has zero norm");
@@ -2541,6 +2552,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   massRescale(*b, *param);
+  profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   // use multi-shift CG
   {
@@ -2553,8 +2565,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // check each shift has the desired tolerance and use sequential CG to refine
 
+  profileMulti.TPSTART(QUDA_PROFILE_INIT);
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField r(*b, cudaParam);
+  profileMulti.TPSTOP(QUDA_PROFILE_INIT);
+
 #define REFINE_INCREASING_MASS
 #ifdef REFINE_INCREASING_MASS
   for(int i=0; i < param->num_offset; i++) {
@@ -2677,6 +2692,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
   profileMulti.TPSTOP(QUDA_PROFILE_D2H);
 
+  profileMulti.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->make_resident_solution) {
     for (unsigned int i=0; i<solutionResident.size(); i++) {
       if (solutionResident[i]) delete solutionResident[i];
@@ -2687,7 +2703,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       solutionResident[i] = static_cast<cudaColorSpinorField*>(x[i]);
     }
   }
+  profileMulti.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
+  profileMulti.TPSTART(QUDA_PROFILE_FREE);
   for(int i=0; i < param->num_offset; i++){
     delete h_x[i];
     if (!param->make_resident_solution) delete x[i];
@@ -2701,6 +2719,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   delete d;
   delete dSloppy;
   delete dPre;
+  profileMulti.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
 
@@ -3414,8 +3433,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
 void createCloverQuda(QudaInvertParam* invertParam)
 {
-  profileCloverCreate.TPSTART(QUDA_PROFILE_TOTAL);
-  profileCloverCreate.TPSTART(QUDA_PROFILE_INIT);
+  profileClover.TPSTART(QUDA_PROFILE_TOTAL);
+  profileClover.TPSTART(QUDA_PROFILE_INIT);
   if (!cloverPrecise) errorQuda("Clover field not allocated");
 
   int y[4];
@@ -3436,17 +3455,17 @@ void createCloverQuda(QudaInvertParam* invertParam)
   cudaGaugeField *cudaGaugeExtended = NULL;
   if (extendedGaugeResident) {
     cudaGaugeExtended = extendedGaugeResident;
-    profileCloverCreate.TPSTOP(QUDA_PROFILE_INIT);
+    profileClover.TPSTOP(QUDA_PROFILE_INIT);
   } else {
     cudaGaugeExtended = new cudaGaugeField(gParamEx);
 
     // copy gaugePrecise into the extended device gauge field
     copyExtendedGauge(*cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
 
-    profileCloverCreate.TPSTOP(QUDA_PROFILE_INIT);
-    profileCloverCreate.TPSTART(QUDA_PROFILE_COMMS);
+    profileClover.TPSTOP(QUDA_PROFILE_INIT);
+    profileClover.TPSTART(QUDA_PROFILE_COMMS);
     cudaGaugeExtended->exchangeExtendedGhost(R,redundant_comms);
-    profileCloverCreate.TPSTOP(QUDA_PROFILE_COMMS);
+    profileClover.TPSTOP(QUDA_PROFILE_COMMS);
   }
 
 #ifdef MULTI_GPU
@@ -3455,21 +3474,21 @@ void createCloverQuda(QudaInvertParam* invertParam)
   GaugeField *gauge = gaugePrecise;
 #endif
 
-  profileCloverCreate.TPSTART(QUDA_PROFILE_INIT);
+  profileClover.TPSTART(QUDA_PROFILE_INIT);
   // create the Fmunu field
   GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
   tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField Fmunu(tensorParam);
-  profileCloverCreate.TPSTOP(QUDA_PROFILE_INIT);
+  profileClover.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileCloverCreate.TPSTART(QUDA_PROFILE_COMPUTE);
+  profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
   computeFmunu(Fmunu, *gauge, QUDA_CUDA_FIELD_LOCATION);
   computeClover(*cloverPrecise, Fmunu, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
-  profileCloverCreate.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileClover.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  profileCloverCreate.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
 
   // FIXME always preserve the extended gauge
   extendedGaugeResident = cudaGaugeExtended;
@@ -4328,12 +4347,11 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   using namespace quda;
   profileCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
 
   checkGaugeParam(gauge_param);
-
   if (!gaugePrecise) errorQuda("No resident gauge field");
 
-  profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
   GaugeFieldParam fParam(0, *gauge_param);
   // create the host momentum field
   fParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -4355,10 +4373,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   fParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaGaugeField cudaForce(fParam);
-
-  profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
-
-  profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
 
   ColorSpinorParam qParam;
   qParam.nColor = 3;
@@ -4387,8 +4401,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // need expose this to interface
 
-  profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
-
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
   DiracParam diracParam;
@@ -4404,6 +4416,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
       errorQuda("solutionResident.size() %lu does not match number of shifts %d",
 		solutionResident.size(), nvector);
   }
+
+  profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
 
   // loop over different quark fields
   for(int i=0; i<nvector; ++i){
@@ -4421,10 +4435,17 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
       x.Even() = cpuQuarkX;
       profileCloverForce.TPSTOP(QUDA_PROFILE_H2D);
 
+      profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
       gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Even()), static_cast<cudaColorSpinorField*>(&x.Even()));
+      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     } else {
+      profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
       x.Even() = *(solutionResident[i]);
+      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+      profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
       delete solutionResident[i];
+      profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
     }
     profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
@@ -4438,17 +4459,18 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Even()), static_cast<cudaColorSpinorField*>(&p.Even()));
     gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Odd()), static_cast<cudaColorSpinorField*>(&p.Odd()));
 
-    profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-
     checkCudaError();
 
-    profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
     computeCloverForce(cudaForce, *gaugePrecise, x, p, 2.0*dt*coeff[i]*kappa2);
     profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
+  profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
   if (inv_param->use_resident_solution) solutionResident.clear();
   delete dirac;
+  profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
 
   cudaGaugeField &gaugeEx = *extendedGaugeResident;
 
@@ -4463,6 +4485,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   cudaGaugeField oprodEx(fParam);
   cudaGaugeField &traceEx = oprodEx;
+
+  profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
 
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -4505,7 +4529,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   cudaMom.saveCPUField(cpuMom,QUDA_CPU_FIELD_LOCATION);
   profileCloverForce.TPSTOP(QUDA_PROFILE_D2H);
 
-  profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
 
   for (int i=0; i<nvector; i++) {
     delete cudaQuarkX[i];
@@ -4515,6 +4539,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   delete []cudaQuarkP;
 
   checkCudaError();
+
+  profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
+
   return;
 }
 
