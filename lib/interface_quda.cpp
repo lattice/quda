@@ -3270,8 +3270,15 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   gParam.pad = 0;
 
 #ifdef MULTI_GPU
+  // do extended fill so we can reuse this extended gauge field if needed
+  bool no_comms_fill = (qudaGaugeParam->make_resident_gauge) ? true : false;
+  int R[4] = {0, 0, 0, 0};
+
   GaugeFieldParam gParamEx(gParam);
-  for (int d=0; d<4; d++) gParamEx.x[d] = gParam.x[d] + 4;
+  for (int d=0; d<4; d++) {
+    R[d] = 2 * (no_comms_fill | commDimPartitioned(d));
+    gParamEx.x[d] = gParam.x[d] + 2*R[d];
+  }
 #endif
 
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -3316,13 +3323,10 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   cudaGaugeField *cudaGauge = new cudaGaugeField(gParamEx);
 
   copyExtendedGauge(*cudaGauge, *cudaSiteLink, QUDA_CUDA_FIELD_LOCATION);
-  int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
 
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMMS);
-  // do extended fill so we can reuse this extended gauge field if needed
-  bool no_comms_fill =  (qudaGaugeParam->make_resident_gauge) ? true : false;
   cudaGauge->exchangeExtendedGhost(R, no_comms_fill);
   profileGaugeForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
@@ -3361,8 +3365,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  gauge_force_cuda(*cudaMom, eb3, *cudaGauge, qudaGaugeParam, input_path_buf,
-		   path_length, loop_coeff, num_paths, max_length);
+  gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
   profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (qudaGaugeParam->return_result_mom) {
