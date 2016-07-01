@@ -159,14 +159,14 @@ namespace quda {
     size_t bytes[QUDA_MAX_DIM];
     // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if (!(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
       bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
       send[d] = safe_malloc(2 * bytes[d]);
       recv[d] = safe_malloc(2 * bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if (!(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
       //extract into a contiguous buffer
       extractExtendedGaugeGhost(*this, d, R, send, true);
 
@@ -206,7 +206,7 @@ namespace quda {
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if (!(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
       host_free(send[d]);
       host_free(recv[d]);
     }

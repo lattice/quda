@@ -231,7 +231,7 @@ namespace quda {
     size_t bytes[QUDA_MAX_DIM];
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
       // store both parities and directions in each
       bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
       send_d[d] = device_malloc(2 * bytes[d]);
@@ -284,7 +284,7 @@ namespace quda {
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
 
       // FIXME why does this break if the order is switched?
       // prepost the receives
@@ -339,7 +339,7 @@ namespace quda {
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
 
       if (commDimPartitioned(d)) {
 	comm_free(mh_send_fwd[d]);
