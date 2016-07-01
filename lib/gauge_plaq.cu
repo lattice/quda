@@ -15,25 +15,22 @@ namespace quda {
   template <typename Gauge>
   struct GaugePlaqArg : public ReduceArg<double2> {
     int threads; // number of active threads required
-    int X[4]; // grid dimensions
-#ifdef MULTI_GPU
+    int E[4]; // extended grid dimensions
+    int X[4]; // true grid dimensions
     int border[4]; 
-#endif
     Gauge dataOr;
     
     GaugePlaqArg(const Gauge &dataOr, const GaugeField &data)
       : ReduceArg<double2>(), dataOr(dataOr)
     {
-
-#ifdef MULTI_GPU
-        for(int dir=0; dir<4; ++dir){
-          border[dir] = data.R()[dir];
-	  X[dir] = data.X()[dir] - border[dir]*2;
-        }
-#else
-        for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
-#endif
-	threads = X[0]*X[1]*X[2]*X[3]/2;
+      int R = 0;
+      for (int dir=0; dir<4; ++dir){
+	border[dir] = data.R()[dir];
+	E[dir] = data.X()[dir];
+	X[dir] = data.X()[dir] - border[dir]*2;
+	R += border[dir];
+      }
+      threads = X[0]*X[1]*X[2]*X[3]/2;
     }
   };
 
@@ -46,31 +43,23 @@ namespace quda {
     double2 plaq = make_double2(0.0,0.0);
 
     if(idx < arg.threads) {
-      int X[4];
-      for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
-
       int x[4];
-      getCoords(x, idx, X, parity);
-#ifdef MULTI_GPU
-      for(int dr=0; dr<4; ++dr) {
-	x[dr] += arg.border[dr];
-	X[dr] += 2*arg.border[dr];
-      }
-#endif
+      getCoords(x, idx, arg.X, parity);
+      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
       int dx[4] = {0, 0, 0, 0};
       for (int mu = 0; mu < 3; mu++) {
 	for (int nu = (mu+1); nu < 3; nu++) {
 	  Matrix<Complex,3> U1, U2, U3, U4, tmpM;
 
-	  arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
+	  arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,arg.E), mu, parity);
 	  dx[mu]++;
-	  arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
+	  arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,arg.E), nu, 1-parity);
 	  dx[mu]--;
 	  dx[nu]++;
-	  arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
+	  arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,arg.E), mu, 1-parity);
 	  dx[nu]--;
-	  arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity);
+	  arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,arg.E), nu, parity);
 
 	  tmpM = U1 * U2;
 	  tmpM = tmpM * conj(U3);
@@ -81,14 +70,14 @@ namespace quda {
 
 	Matrix<Complex,3> U1, U2, U3, U4, tmpM;
 
-	arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
+	arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,arg.E), mu, parity);
 	dx[mu]++;
-	arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), 3, 1-parity);
+	arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,arg.E), 3, 1-parity);
 	dx[mu]--;
 	dx[3]++;
-	arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
+	arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,arg.E), mu, 1-parity);
 	dx[3]--;
-	arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), 3, parity);
+	arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,arg.E), 3, parity);
 
 	tmpM = U1 * U2;
 	tmpM = tmpM * conj(U3);
