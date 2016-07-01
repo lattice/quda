@@ -83,6 +83,10 @@ using namespace quda;
 static cudaGaugeField* cudaStapleField = NULL;
 static cudaGaugeField* cudaStapleField1 = NULL;
 
+static int R[4] = {0, 0, 0, 0};
+// setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
+static bool redundant_comms = true;
+
 //for MAGMA lib:
 #include <blas_magma.h>
 
@@ -467,6 +471,8 @@ void initQudaMemory()
   cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
   loadTuneCache(getVerbosity());
+
+  for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 
   profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -3126,7 +3132,8 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   QudaGaugeParam qudaGaugeParam_ex_buf;
   QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;
   memcpy(qudaGaugeParam_ex, param, sizeof(QudaGaugeParam));
-  for(int dir=0; dir<4; ++dir){ qudaGaugeParam_ex->X[dir] = param->X[dir]+4; }
+  int R[4] = {2, 2, 2, 2};
+  for(int dir=0; dir<4; ++dir){ qudaGaugeParam_ex->X[dir] = param->X[dir]+2*R[dir]; }
 
   // fat-link padding
   setFatLinkPadding(method, param);
@@ -3197,7 +3204,6 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     profileFatLink.TPSTART(QUDA_PROFILE_COMMS);
     copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
 #ifdef MULTI_GPU
-    int R[4] = {2, 2, 2, 2};
     cudaInLinkEx->exchangeExtendedGhost(R,true);
 #endif
     profileFatLink.TPSTOP(QUDA_PROFILE_COMMS);
@@ -3271,14 +3277,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
 #ifdef MULTI_GPU
   // do extended fill so we can reuse this extended gauge field if needed
-  bool no_comms_fill = (qudaGaugeParam->make_resident_gauge) ? true : false;
-  int R[4] = {0, 0, 0, 0};
-
   GaugeFieldParam gParamEx(gParam);
-  for (int d=0; d<4; d++) {
-    R[d] = 2 * (no_comms_fill | commDimPartitioned(d));
-    gParamEx.x[d] = gParam.x[d] + 2*R[d];
-  }
+  for (int d=0; d<4; d++) gParamEx.x[d] = gParam.x[d] + 2*R[d];
 #endif
 
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -3327,7 +3327,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
 
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMMS);
-  cudaGauge->exchangeExtendedGhost(R, no_comms_fill);
+  cudaGauge->exchangeExtendedGhost(R,redundant_comms);
   profileGaugeForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
 #endif
@@ -3418,7 +3418,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
   profileCloverCreate.TPSTART(QUDA_PROFILE_INIT);
   if (!cloverPrecise) errorQuda("Clover field not allocated");
 
-  int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
   int y[4];
   for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2*R[dir];
   int pad = 0;
@@ -3446,7 +3445,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
 
     profileCloverCreate.TPSTOP(QUDA_PROFILE_INIT);
     profileCloverCreate.TPSTART(QUDA_PROFILE_COMMS);
-    cudaGaugeExtended->exchangeExtendedGhost(R,true);
+    cudaGaugeExtended->exchangeExtendedGhost(R,redundant_comms);
     profileCloverCreate.TPSTOP(QUDA_PROFILE_COMMS);
   }
 
@@ -4459,7 +4458,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   cudaGaugeField &trace = oprod;
 
   // create extended oprod field
-  int R[4] = {2,2,2,2};
   for (int i=0; i<4; i++) fParam.x[i] += 2*R[i];
   fParam.nFace = 1; // breaks with out this - why?
 
@@ -4474,7 +4472,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
 
-  traceEx.exchangeExtendedGhost(R,true);
+  traceEx.exchangeExtendedGhost(R,redundant_comms);
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -4491,7 +4489,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
 
-  oprodEx.exchangeExtendedGhost(R,true);
+  oprodEx.exchangeExtendedGhost(R,redundant_comms);
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -4961,7 +4959,6 @@ void plaqQuda (double plq[3])
     data = extendedGaugeResident;
   } else {
     int y[4];
-    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
     for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2*R[dir];
     int pad = 0;
     GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
@@ -4980,7 +4977,7 @@ void plaqQuda (double plq[3])
     profilePlaq.TPSTOP(QUDA_PROFILE_INIT);
 
     profilePlaq.TPSTART(QUDA_PROFILE_COMMS);
-    data->exchangeExtendedGhost(R,true);
+    data->exchangeExtendedGhost(R,redundant_comms);
     profilePlaq.TPSTOP(QUDA_PROFILE_COMMS);
 
     profilePlaq.TPSTART(QUDA_PROFILE_INIT);
@@ -5013,7 +5010,6 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   int y[4];
 
 #ifdef MULTI_GPU
-  int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
   for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
   GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
                          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
@@ -5042,7 +5038,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 
 #ifdef MULTI_GPU
   copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-  gaugeSmeared->exchangeExtendedGhost(R,true);
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 #else
   gaugeSmeared->copy(*gaugePrecise);
 #endif
@@ -5058,7 +5054,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   for (unsigned int i=0; i<nSteps; i++) {
       cudaGaugeTemp->copy(*gaugeSmeared);
 #ifdef MULTI_GPU
-      cudaGaugeTemp->exchangeExtendedGhost(R,true);
+      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
 #endif
       APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha, QUDA_CUDA_FIELD_LOCATION);
   }
@@ -5066,7 +5062,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   delete cudaGaugeTemp;
 
 #ifdef MULTI_GPU
-  gaugeSmeared->exchangeExtendedGhost(R,true);
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 #endif
 
   if (getVerbosity() == QUDA_VERBOSE) {
@@ -5089,7 +5085,6 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   int y[4];
 
 #ifdef MULTI_GPU
-  int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
   for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
   GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
                          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
@@ -5118,7 +5113,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 
 #ifdef MULTI_GPU
   copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-  gaugeSmeared->exchangeExtendedGhost(R,true);
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 #else
   gaugeSmeared->copy(*gaugePrecise);
 #endif
@@ -5134,7 +5129,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   for (unsigned int i=0; i<nSteps; i++) {
       cudaGaugeTemp->copy(*gaugeSmeared);
 #ifdef MULTI_GPU
-      cudaGaugeTemp->exchangeExtendedGhost(R,true);
+      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
 #endif
       STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, QUDA_CUDA_FIELD_LOCATION);
   }
@@ -5142,7 +5137,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   delete cudaGaugeTemp;
 
 #ifdef MULTI_GPU
-  gaugeSmeared->exchangeExtendedGhost(R,true);
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 #endif
 
   if (getVerbosity() == QUDA_VERBOSE) {
@@ -5207,8 +5202,6 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
   else{
 
     int y[4];
-    int R[4] = {0,0,0,0};
-    for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
     for(int dir=0; dir<4; ++dir) y[dir] = cudaInGauge->X()[dir] + 2 * R[dir];
     int pad = 0;
     GaugeFieldParam gParamEx(y, cudaInGauge->Precision(), gParam.reconstruct,
@@ -5222,7 +5215,7 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
     cudaGaugeField *cudaInGaugeEx = new cudaGaugeField(gParamEx);
 
     copyExtendedGauge(*cudaInGaugeEx, *cudaInGauge, QUDA_CUDA_FIELD_LOCATION);
-    cudaInGaugeEx->exchangeExtendedGhost(R,false);
+    cudaInGaugeEx->exchangeExtendedGhost(R,redundant_comms);
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
     gaugefixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
@@ -5395,7 +5388,6 @@ double qChargeCuda ()
   } else {
     if (!gaugeSmeared) {
       int y[4];
-      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
       for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
       int pad = 0;
       GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
@@ -5411,7 +5403,7 @@ double qChargeCuda ()
       data = new cudaGaugeField(gParamEx);
 
       copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-      data->exchangeExtendedGhost(R,true);
+      data->exchangeExtendedGhost(R,redundant_comms);
       extendedGaugeResident = data;
       cudaDeviceSynchronize();
     } else {
