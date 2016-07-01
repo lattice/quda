@@ -291,6 +291,11 @@ namespace quda {
       param.block.y = 2;
     }
 
+    void defaultTuneParam(TuneParam &param) const {
+      Tunable::defaultTuneParam(param);
+      param.block.y = 2;
+    }
+
   };
   
   /**
@@ -302,8 +307,8 @@ namespace quda {
   class TunableVectorY : public Tunable {
 
   protected:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    virtual unsigned int sharedBytesPerThread() const { return 0; }
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     // don't tune the grid dimension
     bool tuneGridDim() const { return false; }
@@ -329,7 +334,7 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y <= vector_length) {
+	if (param.block.y < vector_length) {
 	  param.block.y++;
 	  param.grid.y = (vector_length + param.block.y - 1) / param.block.y;
 	  return true;
