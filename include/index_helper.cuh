@@ -9,7 +9,8 @@ namespace quda {
      @param dx 4-d shift index
      @param X Full lattice dimensions
    */
-  static __device__ __host__ inline int linkIndexShift(int x[], int dx[], const int X[4]) {
+  template <typename I>
+  static __device__ __host__ inline int linkIndexShift(int x[], I dx[], const int X[4]) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
