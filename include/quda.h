@@ -795,21 +795,10 @@ extern "C" {
   double momActionQuda(void* momentum, QudaGaugeParam* param);
 
   /**
-   * Take a gauge field on the host, load it onto the device and extend it.
-   * Return a pointer to the extended gauge field object.
-   *
-   * @param gauge The CPU gauge field (optional - if set to 0 then the gauge field zeroed)
-   * @param geometry The geometry of the matrix field to create (1 - scaler, 4 - vector, 6 - tensor)
-   * @param param The parameters of the external field and the field to be created
-   * @return Pointer to the gauge field (cast as a void*)
-   */
-  void* createExtendedGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param);
-
-  /**
    * Allocate a gauge (matrix) field on the device and optionally download a host gauge field.
    *
    * @param gauge The host gauge field (optional - if set to 0 then the gauge field zeroed)
-   * @param geometry The geometry of the matrix field to create (1 - scaler, 4 - vector, 6 - tensor)
+   * @param geometry The geometry of the matrix field to create (1 - scalar, 4 - vector, 6 - tensor)
    * @param param The parameters of the external field and the field to be created
    * @return Pointer to the gauge field (cast as a void*)
    */
@@ -823,16 +812,6 @@ extern "C" {
    * @param param The parameters of the host and device fields
    */
   void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
-
-  /**
-   * Take a gauge field on the device and copy to the extended gauge
-   * field.  The precisions and reconstruct types can differ between
-   * the input and output field, but they must be compatible (same volume, geometry).
-   *
-   * @param outGauge Pointer to the output extended device gauge field (QUDA extended device field)
-   * @param inGauge Pointer to the input device gauge field (QUDA gauge field)
-   */
-  void  extendGaugeFieldQuda(void* outGauge, void* inGauge);
 
   /**
    * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.

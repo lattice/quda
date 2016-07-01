@@ -3362,7 +3362,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
   gauge_force_cuda(*cudaMom, eb3, *cudaGauge, qudaGaugeParam, input_path_buf,
-      path_length, loop_coeff, num_paths, max_length);
+		   path_length, loop_coeff, num_paths, max_length);
   profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (qudaGaugeParam->return_result_mom) {
@@ -3521,102 +3521,6 @@ void saveGaugeFieldQuda(void* gauge, void* inGauge, QudaGaugeParam* param){
   cpuGaugeField cpuGauge(gParam);
   cudaGauge->saveCPUField(cpuGauge,QUDA_CPU_FIELD_LOCATION);
 }
-
-
-void* createExtendedGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
-{
-  profileExtendedGauge.TPSTART(QUDA_PROFILE_TOTAL);
-
-  if (param->use_resident_gauge && extendedGaugeResident && geometry == 4) {
-    profileExtendedGauge.TPSTOP(QUDA_PROFILE_TOTAL);
-    return extendedGaugeResident;
-  }
-
-  profileExtendedGauge.TPSTART(QUDA_PROFILE_INIT);
-
-  QudaFieldGeometry geom = QUDA_INVALID_GEOMETRY;
-  if (geometry == 1) {
-    geom = QUDA_SCALAR_GEOMETRY;
-  } else if(geometry == 4) {
-    geom = QUDA_VECTOR_GEOMETRY;
-  } else {
-    errorQuda("Only scalar and vector geometries are supported");
-  }
-
-  cpuGaugeField* cpuGauge = NULL;
-  cudaGaugeField* cudaGauge = NULL;
-
-
-  // Create the unextended cpu field
-  GaugeFieldParam gParam(0, *param);
-  gParam.order          =  QUDA_MILC_GAUGE_ORDER;
-  gParam.pad            = 0;
-  gParam.link_type      = param->type;
-  gParam.ghostExchange  = QUDA_GHOST_EXCHANGE_NO;
-  gParam.create         = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge          = gauge;
-  gParam.geometry       = geom;
-
-  if(gauge){
-    cpuGauge  = new cpuGaugeField(gParam);
-    // Create the unextended GPU field
-    gParam.order  = QUDA_FLOAT2_GAUGE_ORDER;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    cudaGauge     = new cudaGaugeField(gParam);
-    profileExtendedGauge.TPSTOP(QUDA_PROFILE_INIT);
-
-    // load the data into the unextended device field
-    profileExtendedGauge.TPSTART(QUDA_PROFILE_H2D);
-    cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
-    profileExtendedGauge.TPSTOP(QUDA_PROFILE_H2D);
-
-    profileExtendedGauge.TPSTART(QUDA_PROFILE_INIT);
-  }
-
-  QudaGaugeParam param_ex;
-  memcpy(&param_ex, param, sizeof(QudaGaugeParam));
-  for(int dir=0; dir<4; ++dir) param_ex.X[dir] = param->X[dir]+4;
-  GaugeFieldParam gParam_ex(0, param_ex);
-  gParam_ex.link_type     = param->type;
-  gParam_ex.geometry      = geom;
-  gParam_ex.order         = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam_ex.create        = QUDA_ZERO_FIELD_CREATE;
-  gParam_ex.pad           = 0;
-  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  // create the extended gauge field
-  cudaGaugeField* cudaGaugeEx = new cudaGaugeField(gParam_ex);
-
-  // copy data from the interior into the border region
-  if(gauge) copyExtendedGauge(*cudaGaugeEx, *cudaGauge, QUDA_CUDA_FIELD_LOCATION);
-
-  profileExtendedGauge.TPSTOP(QUDA_PROFILE_INIT);
-  if(gauge){
-    int R[4] = {2,2,2,2};
-    // communicate
-    profileExtendedGauge.TPSTART(QUDA_PROFILE_COMMS);
-    cudaGaugeEx->exchangeExtendedGhost(R, true);
-    profileExtendedGauge.TPSTOP(QUDA_PROFILE_COMMS);
-    if (cpuGauge) delete cpuGauge;
-    if (cudaGauge) delete cudaGauge;
-  }
-  profileExtendedGauge.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  return cudaGaugeEx;
-}
-
-// extend field on the GPU
-void extendGaugeFieldQuda(void* out, void* in){
-  cudaGaugeField* inGauge   = reinterpret_cast<cudaGaugeField*>(in);
-  cudaGaugeField* outGauge  = reinterpret_cast<cudaGaugeField*>(out);
-
-  copyExtendedGauge(*outGauge, *inGauge, QUDA_CUDA_FIELD_LOCATION);
-
-  int R[4] = {2,2,2,2};
-  outGauge->exchangeExtendedGhost(R,true);
-
-  return;
-}
-
 
 
 void destroyGaugeFieldQuda(void* gauge){

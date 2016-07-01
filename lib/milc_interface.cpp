@@ -1109,28 +1109,6 @@ void qudaEigCGInvert(int external_precision,
 
 static int clover_alloc = 0;
 
-static inline void* createExtendedGaugeField(void* gauge, int geometry, int precision, int resident)
-{
-  qudamilc_called<true>(__func__);
-  QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
-      (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
-  gaugeParam.use_resident_gauge = resident ? 1 : 0;
-  qudamilc_called<false>(__func__);
-  return createExtendedGaugeFieldQuda(gauge, geometry, &gaugeParam);
-}
-
-void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
-{
-  return createExtendedGaugeField(gauge, geometry, precision, 0);
-}
-
-void* qudaResidentExtendedGaugeField(void* gauge, int geometry, int precision)
-{
-  return createExtendedGaugeField(gauge, geometry, precision, 1);
-}
-
-
 void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
 {
   qudamilc_called<true>(__func__);
