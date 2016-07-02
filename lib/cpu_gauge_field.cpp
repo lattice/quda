@@ -231,7 +231,7 @@ namespace quda {
       resizeBufferPinned(bytes,0);
 
       // this copies over both even and odd
-      cudaMemcpy(bufferPinned[0], static_cast<const cudaGaugeField&>(src).Gauge_p(),
+      qudaMemcpy(bufferPinned[0], static_cast<const cudaGaugeField&>(src).Gauge_p(),
 		 bytes, cudaMemcpyDeviceToHost);
       checkCudaError();
 

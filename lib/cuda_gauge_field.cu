@@ -330,8 +330,8 @@ namespace quda {
 	cudaMemcpyAsync(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice, streams[1]);
 #endif      
       } else { // if just doing a local exchange to fill halo then need to swap faces
-	cudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], send_d[d], bytes[d], cudaMemcpyDeviceToDevice);
-	cudaMemcpy(recv_d[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], send_d[d], bytes[d], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(recv_d[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToDevice);
       }
 
       // inject back into the gauge field
@@ -453,7 +453,7 @@ namespace quda {
 #ifdef GPU_DIRECT
       cudaMemcpyAsync(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost, streams[0]);
 #else
-      cudaMemcpy(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost);
+      qudaMemcpy(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost);
 #endif
 
       //unpack odd data kernel
@@ -462,7 +462,7 @@ namespace quda {
       cudaMemcpyAsync(cpuGauge + 4*volumeCB*Nint, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
       for(int i=0; i<2; i++) cudaStreamSynchronize(streams[i]);
 #else
-      cudaMemcpy(cpuGauge + 4*volumeCB*Nint, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
+      qudaMemcpy(cpuGauge + 4*volumeCB*Nint, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);
 #endif
 
       device_free(unpacked);

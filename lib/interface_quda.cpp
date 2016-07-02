@@ -85,7 +85,7 @@ static cudaGaugeField* cudaStapleField1 = NULL;
 
 static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
-static bool redundant_comms = true;
+static bool redundant_comms = false;
 
 //for MAGMA lib:
 #include <blas_magma.h>
