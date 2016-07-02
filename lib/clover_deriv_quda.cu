@@ -273,8 +273,9 @@ namespace quda {
   public:
     CloverDerivative(const Arg &arg, const GaugeField &meta)
       : arg(arg), meta(meta) {
-      writeAuxString("threads=%d,prec=%lu,fstride=%d,gstride=%d,ostride=%d",
-		     arg.volumeCB,sizeof(Float),arg.force.stride,arg.gauge.stride,arg.oprod.stride);
+      writeAuxString("conj=%d,threads=%d,prec=%lu,fstride=%d,gstride=%d,ostride=%d",
+		     arg.conjugate,arg.volumeCB,sizeof(Float),arg.force.stride,
+		     arg.gauge.stride,arg.oprod.stride);
     }
     virtual ~CloverDerivative() {}
 
