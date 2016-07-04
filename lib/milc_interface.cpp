@@ -1547,7 +1547,9 @@ void qudaCloverMultishiftInvert(int external_precision,
   }
 
   // if doing a pure double-precision multi-shift solve don't use reliable updates
-  double reliable_delta = (inv_args.mixed_precision == 1 || quda_precision == 1) ? 1e-1 : 0.0;
+  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
+                                     ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
+  double reliable_delta = (use_mixed_precision) ? 1e-1 : 0.0;
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
   invertParam.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
@@ -1570,11 +1572,17 @@ void qudaCloverMultishiftInvert(int external_precision,
 
   invertParam.make_resident_solution = inv_args.make_resident_solution;
 
-  invertMultiShiftQuda(solutionArray, source, &invertParam);
+  if (num_offsets==1 && offset[0] == 0) {
+    invertQuda(solutionArray[0], source, &invertParam);
+    *final_residual = invertParam.true_res;
+  } else {
+    invertMultiShiftQuda(solutionArray, source, &invertParam);
+    for (int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];
+  }
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  for(int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];
+
   qudamilc_called<false>(__func__, verbosity);
   return;
 } // qudaCloverMultishiftInvert
