@@ -10,6 +10,26 @@
 
 namespace quda {
 
+  CloverFieldParam::CloverFieldParam(const CloverField &a)
+    : LatticeFieldParam(),
+      direct(false),
+      inverse(false),
+      clover(NULL),
+      norm(NULL),
+      cloverInv(NULL),
+      invNorm(NULL),
+      twisted(a.Twisted()),
+      mu2(a.Mu2()),
+      order(a.Order()),
+      create(QUDA_NULL_FIELD_CREATE)
+      {
+	precision = a.Precision();
+	nDim = a.Ndim();
+	pad = a.Pad();
+	siteSubset = QUDA_FULL_SITE_SUBSET;
+	for(int dir=0; dir<nDim; ++dir) x[dir] = a.X()[dir];
+      }
+
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
     clover(0), norm(0), cloverInv(0), invNorm(0), order(param.order), create(param.create),

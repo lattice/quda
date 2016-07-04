@@ -35,6 +35,8 @@ namespace quda {
       clover(param.clover), norm(param.norm),
       cloverInv(param.cloverInv), invNorm(param.invNorm),
       twisted(param.twisted), mu2(param.mu2) { }
+
+    CloverFieldParam(const CloverField &field);
   };
 
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param);
