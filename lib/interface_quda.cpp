@@ -892,6 +892,47 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void loadSloppyCloverQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondition)
+{
+
+  if (cloverPrecise) {
+    // create the mirror sloppy clover field
+    CloverFieldParam clover_param(*cloverPrecise);
+    clover_param.setPrecision(prec_sloppy);
+
+    if (cloverPrecise->V(false) != cloverPrecise->V(true)) {
+      clover_param.direct = true;
+      clover_param.inverse = true;
+    } else {
+      clover_param.direct = false;
+      clover_param.inverse = true;
+    }
+
+    if (cloverSloppy) errorQuda("cloverSloppy already exists");
+
+    if (clover_param.precision != cloverPrecise->Precision()) {
+      cloverSloppy = new cudaCloverField(clover_param);
+      cloverSloppy->copy(*cloverPrecise, clover_param.inverse);
+    } else {
+      cloverSloppy = cloverPrecise;
+    }
+
+    // switch the parameteres for creating the mirror preconditioner clover field
+    clover_param.setPrecision(prec_precondition);
+
+    if (cloverPrecondition) errorQuda("cloverPrecondition already exists");
+
+    // create the mirror preconditioner clover field
+    if (clover_param.precision != cloverSloppy->Precision()) {
+      cloverPrecondition = new cudaCloverField(clover_param);
+      cloverPrecondition->copy(*cloverSloppy, clover_param.inverse);
+    } else {
+      cloverPrecondition = cloverSloppy;
+    }
+  }
+
+}
+
 void freeGaugeQuda(void)
 {
   if (!initialized) errorQuda("QUDA not initialized");
@@ -1072,6 +1113,16 @@ void freeCloverQuda(void)
   cloverPrecondition = NULL;
   cloverSloppy = NULL;
   cloverPrecise = NULL;
+}
+
+void freeSloppyCloverQuda(void)
+{
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (cloverPrecondition != cloverSloppy && cloverPrecondition) delete cloverPrecondition;
+  if (cloverSloppy != cloverPrecise && cloverSloppy) delete cloverSloppy;
+
+  cloverPrecondition = NULL;
+  cloverSloppy = NULL;
 }
 
 void endQuda(void)
@@ -1766,6 +1817,27 @@ bool canReuseResidentGauge(QudaInvertParam *param){
 }
 }
 
+void checkClover(QudaInvertParam *param) {
+
+  if (param->dslash_type != QUDA_CLOVER_WILSON_DSLASH && param->dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
+    return;
+  }
+
+  if (param->cuda_prec != cloverPrecise->Precision()) {
+    errorQuda("Solve precision %d doesn't match clover precision %d", param->cuda_prec, cloverPrecise->Precision());
+  }
+
+  if (param->cuda_prec_sloppy != cloverSloppy->Precision() ||
+      param->cuda_prec_precondition != cloverPrecondition->Precision()) {
+    freeSloppyCloverQuda();
+    loadSloppyCloverQuda(param->cuda_prec_sloppy, param->cuda_prec_precondition);
+  }
+
+  if (cloverPrecise == NULL) errorQuda("Precise gauge field doesn't exist");
+  if (cloverSloppy == NULL) errorQuda("Sloppy gauge field doesn't exist");
+  if (cloverPrecondition == NULL) errorQuda("Precondition gauge field doesn't exist");
+}
+
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
 
   if (param->cuda_prec != gaugePrecise->Precision()) {
@@ -1783,8 +1855,8 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
     if (gaugePrecise == NULL) errorQuda("Precise gauge field doesn't exist");
     if (gaugeSloppy == NULL) errorQuda("Sloppy gauge field doesn't exist");
     if (gaugePrecondition == NULL) errorQuda("Precondition gauge field doesn't exist");
-    if(param->overlap){
-      if(gaugeExtended == NULL) errorQuda("Extended gauge field doesn't exist");
+    if (param->overlap) {
+      if (gaugeExtended == NULL) errorQuda("Extended gauge field doesn't exist");
     }
     cudaGauge = gaugePrecise;
   } else {
@@ -1799,21 +1871,23 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
     if (gaugeFatPrecise == NULL) errorQuda("Precise gauge fat field doesn't exist");
     if (gaugeFatSloppy == NULL) errorQuda("Sloppy gauge fat field doesn't exist");
     if (gaugeFatPrecondition == NULL) errorQuda("Precondition gauge fat field doesn't exist");
-    if(param->overlap){
+    if (param->overlap) {
       if(gaugeFatExtended == NULL) errorQuda("Extended gauge fat field doesn't exist");
     }
 
     if (gaugeLongPrecise == NULL) errorQuda("Precise gauge long field doesn't exist");
     if (gaugeLongSloppy == NULL) errorQuda("Sloppy gauge long field doesn't exist");
     if (gaugeLongPrecondition == NULL) errorQuda("Precondition gauge long field doesn't exist");
-    if(param->overlap){
+    if (param->overlap) {
       if(gaugeLongExtended == NULL) errorQuda("Extended gauge long field doesn't exist");
     }
     cudaGauge = gaugeFatPrecise;
   }
+
+  checkClover(param);
+
   return cudaGauge;
 }
-
 
 void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse)
 {
@@ -2375,7 +2449,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
 
-  profileInvert.TPSTART(QUDA_PROFILE_FREE);
+  profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
 
