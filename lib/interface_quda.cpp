@@ -960,7 +960,6 @@ void freeGaugeQuda(void)
   if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
   if (gaugeFatPrecise) delete gaugeFatPrecise;
 
-
   gaugeFatPrecondition = NULL;
   gaugeFatSloppy = NULL;
   gaugeFatPrecise = NULL;
@@ -2613,7 +2612,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
   // Check source norms
   double nb = blas::norm2(*b);
-  if (nb==0.0) errorQuda("Solution has zero norm");
+  if (nb==0.0) errorQuda("Source has zero norm");
 
   if(getVerbosity() >= QUDA_VERBOSE ) {
     double nh_b = blas::norm2(*h_b);
@@ -3201,7 +3200,7 @@ namespace quda {
 
 void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method)
 {
-#ifdef GPU_FAT_LINK
+#ifdef GPU_FATLINK
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
 
