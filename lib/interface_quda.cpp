@@ -520,6 +520,27 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) :
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
 
+  // free any current gauge field before new allocations to reduce memory overhead
+  switch (param->type) {
+    case QUDA_WILSON_LINKS:
+      if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
+      if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
+      if (gaugePrecise && !param->use_resident_gauge) delete gaugePrecise;
+      break;
+    case QUDA_ASQTAD_FAT_LINKS:
+      if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
+      if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
+      if (gaugeFatPrecise && !param->use_resident_gauge) delete gaugeFatPrecise;
+      break;
+    case QUDA_ASQTAD_LONG_LINKS:
+      if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
+      if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
+      if (gaugeLongPrecise) delete gaugeLongPrecise;
+      break;
+    default:
+      errorQuda("Invalid gauge type %d", param->type);
+  }
+
   // if not preserving then copy the gauge field passed in
   cudaGaugeField *precise = NULL;
 
@@ -608,9 +629,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   switch (param->type) {
     case QUDA_WILSON_LINKS:
-      if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
-      if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
-      if (gaugePrecise) delete gaugePrecise;
       gaugePrecise = precise;
       gaugeSloppy = sloppy;
       gaugePrecondition = precondition;
@@ -618,9 +636,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       if(param->overlap) gaugeExtended = extended;
       break;
     case QUDA_ASQTAD_FAT_LINKS:
-      if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
-      if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
-      if (gaugeFatPrecise) delete gaugeFatPrecise;
       gaugeFatPrecise = precise;
       gaugeFatSloppy = sloppy;
       gaugeFatPrecondition = precondition;
@@ -631,9 +646,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       }
       break;
     case QUDA_ASQTAD_LONG_LINKS:
-      if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
-      if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
-      if (gaugeLongPrecise) delete gaugeLongPrecise;
       gaugeLongPrecise = precise;
       gaugeLongSloppy = sloppy;
       gaugeLongPrecondition = precondition;
@@ -644,7 +656,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       }
       break;
     default:
-      errorQuda("Invalid gauge type");
+      errorQuda("Invalid gauge type %d", param->type);
   }
 
 
