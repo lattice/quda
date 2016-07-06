@@ -608,21 +608,21 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   switch (param->type) {
     case QUDA_WILSON_LINKS:
-      //if (gaugePrecise) errorQuda("Precise gauge field already allocated");
+      if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
+      if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
+      if (gaugePrecise) delete gaugePrecise;
       gaugePrecise = precise;
-      //if (gaugeSloppy) errorQuda("Sloppy gauge field already allocated");
       gaugeSloppy = sloppy;
-      //if (gaugePrecondition) errorQuda("Precondition gauge field already allocated");
       gaugePrecondition = precondition;
 
       if(param->overlap) gaugeExtended = extended;
       break;
     case QUDA_ASQTAD_FAT_LINKS:
-      if (gaugeFatPrecise) errorQuda("Precise gauge fat field already allocated");
+      if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
+      if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
+      if (gaugeFatPrecise) delete gaugeFatPrecise;
       gaugeFatPrecise = precise;
-      if (gaugeFatSloppy) errorQuda("Sloppy gauge fat field already allocated");
       gaugeFatSloppy = sloppy;
-      if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
       gaugeFatPrecondition = precondition;
 
       if(param->overlap){
@@ -631,12 +631,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       }
       break;
     case QUDA_ASQTAD_LONG_LINKS:
-      if (gaugeLongPrecise) errorQuda("Precise gauge long field already allocated");
+      if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
+      if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
+      if (gaugeLongPrecise) delete gaugeLongPrecise;
       gaugeLongPrecise = precise;
-      if (gaugeLongSloppy) errorQuda("Sloppy gauge long field already allocated");
       gaugeLongSloppy = sloppy;
-      if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
       gaugeLongPrecondition = precondition;
+
       if(param->overlap){
         if(gaugeLongExtended) errorQuda("Extended gauge long field already allocated");
    	gaugeLongExtended = extended;
