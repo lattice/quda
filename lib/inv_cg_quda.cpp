@@ -201,7 +201,7 @@ namespace quda {
         // here we are deploying the alternative beta computation
         Complex cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
         r2 = real(cg_norm);  // (r_new, r_new)
-        sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
+        sigma = r2;//imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
 
       // reliable update conditions
@@ -375,6 +375,7 @@ namespace quda {
   }
 
   void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
+    const bool use_block = false;
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
     errorQuda("Not supported");
 
@@ -443,10 +444,12 @@ namespace quda {
       r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
       printfQuda("r2[%i] %e\n", i, r2(i,i));
     }
-    // MW need to initalize the full r2 matrix here
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0; j<param.num_src; j++){
-        r2(i,j) = blas::reDotProduct(r.Component(i), r.Component(j));
+    if(use_block){
+      // MW need to initalize the full r2 matrix here
+      for(int i=0; i<param.num_src; i++){
+        for(int j=0; j<param.num_src; j++){
+          r2(i,j) = blas::reDotProduct(r.Component(i), r.Component(j));
+        }
       }
     }
 
@@ -614,7 +617,10 @@ namespace quda {
         r2_old = r2;
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j < param.num_src; j++){
-            pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
+            if(use_block or i==j)
+              pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
+            else
+              pAp(i,j) = 0.;
           }
         }
 
@@ -645,7 +651,10 @@ namespace quda {
         // MW need to calculate the full r2 matrix here, after update. Not sure how to do alternative sigma yet ...
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j<param.num_src; j++){
-            r2(i,j) = blas::reDotProduct(r.Component(i), r.Component(j));
+            if(use_block or i==j)
+              r2(i,j) = blas::reDotProduct(r.Component(i), r.Component(j));
+            else
+              r2(i,j) = 0.;
           }
         }
         sigma = r2;
