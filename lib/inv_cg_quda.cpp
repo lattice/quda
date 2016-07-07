@@ -380,14 +380,12 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 
-using Eigen::MatrixXd;
+    using Eigen::MatrixXd;
 
-MatrixXd mPAP(param.num_src,param.num_src);
-MatrixXd mRR(param.num_src,param.num_src);
+    MatrixXd mPAP(param.num_src,param.num_src);
+    MatrixXd mRR(param.num_src,param.num_src);
 
 
-std::cout << "mPAP" << mPAP << std::endl;
-std::cout << "mRR" << mRR << std::endl;
     // Check to see that we're not trying to invert on a zero-field source
     //MW: it might be useful to check what to do here.
     double b2[QUDA_MAX_MULTI_SHIFT];
@@ -402,6 +400,17 @@ std::cout << "mRR" << mRR << std::endl;
         return;
       }
     }
+    // double r2[QUDA_MAX_MULTI_SHIFT];
+    MatrixXd b2m(param.num_src,param.num_src);
+
+    // just to check details of b
+    for(int i=0; i<param.num_src; i++){
+      for(int j=0; j<param.num_src; j++){
+        b2m(i,j) = blas::reDotProduct(b.Component(i), b.Component(j));
+      }
+    }
+
+    std::cout << "b2m\n" <<  b2m << std::endl;
 
     ColorSpinorParam csParam(x);
     if (!init) {
@@ -422,7 +431,7 @@ std::cout << "mRR" << mRR << std::endl;
     ColorSpinorField &tmp = *tmpp;
 
 
-  //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
+    //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
 
     for(int i=0; i<param.num_src; i++){
       mat(r.Component(i), x.Component(i), y.Component(i));
@@ -453,7 +462,6 @@ std::cout << "mRR" << mRR << std::endl;
     } else {
       // will that work ?
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.print();
       r_sloppy = ColorSpinorField::Create(r, csParam);
       for(int i=0; i<param.num_src; i++){
         blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
@@ -515,9 +523,12 @@ std::cout << "mRR" << mRR << std::endl;
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-      MatrixXd  alpha = MatrixXd::Zero(param.num_src,param.num_src);
-      MatrixXd  beta = MatrixXd::Zero(param.num_src,param.num_src);
-      MatrixXd  pAp(param.num_src, param.num_src);
+    MatrixXd alpha = MatrixXd::Zero(param.num_src,param.num_src);
+    MatrixXd beta = MatrixXd::Zero(param.num_src,param.num_src);
+    MatrixXd gamma = MatrixXd::Identity(param.num_src,param.num_src);
+
+    MatrixXd pAp(param.num_src, param.num_src);
+    MatrixXd pTp(param.num_src, param.num_src);
     int rUpdate = 0;
 
     double rNorm[QUDA_MAX_MULTI_SHIFT];
@@ -583,6 +594,7 @@ std::cout << "mRR" << mRR << std::endl;
 
 
       if (param.pipeline) {
+        errorQuda("pipeline not implemented");
         for(int i=0; i<param.num_src; i++){
           //MW: ignore this for now
           double3 triplet = blas::tripleCGReduction(rSloppy.Component(i), Ap.Component(i), p.Component(i));
@@ -605,15 +617,10 @@ std::cout << "mRR" << mRR << std::endl;
             pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
           }
         }
-        //MW: continue here
-        // for(int i=0; i<param.num_src; i++){
-        //   alpha(i,i) = r2(i,i) / pAp(i,i);
-        // }
-        alpha = pAp.inverse() * r2;
-        // for(int i=0; i<param.num_src; i++){
-        //   for(int j=0; j < param.num_src; j++)
-        //     if (i != j) alpha(i,j) = 0.;
-        // }
+
+        alpha = pAp.inverse() * gamma.transpose() * r2;
+        std::cout << "alpha\n" << alpha << std::endl;
+
         if(k==1){
           std::cout << "pAp " << std::endl <<pAp << std::endl;
           std::cout << "pAp^-1 " << std::endl <<pAp.inverse() << std::endl;
@@ -668,7 +675,9 @@ std::cout << "mRR" << mRR << std::endl;
         // for(int i=0; i<param.num_src; i++){
         //   beta(i,i) = sigma(i,i) / r2_old(i,i);  // use the alternative beta computation
         // }
-        beta = r2_old.inverse() * sigma;
+        beta = gamma.inverse() * r2_old.inverse() * sigma;
+
+        std::cout << "beta\n" << beta << std::endl;
 
         if (param.pipeline && !breakdown)
         for(int i=0; i<param.num_src; i++){
@@ -685,9 +694,20 @@ std::cout << "mRR" << mRR << std::endl;
               blas::axpy(alpha(j,i),p.Component(j),xSloppy.Component(i));
             }
           }
+          // set to zero
           for(int i=0; i < param.num_src; i++){
-            blas::copy(pnew.Component(i), rSloppy.Component(i)); // do we need components here?
+            blas::ax(0,pnew.Component(i)); // do we need components here?
           }
+          // add r
+          for(int i=0; i<param.num_src; i++){
+            for(int j=0;j<param.num_src; j++){
+              double rcoeff= (j==0?1.0:0.0);
+              // order of updating p might be relevant here
+              blas::axpy(gamma(j,i),r.Component(j),pnew.Component(i));
+              // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
+            }
+          }
+          beta = beta * gamma;
           for(int i=0; i<param.num_src; i++){
             for(int j=0;j<param.num_src; j++){
               double rcoeff= (j==0?1.0:0.0);
@@ -696,10 +716,24 @@ std::cout << "mRR" << mRR << std::endl;
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
             }
           }
+
           for(int i=0; i < param.num_src; i++){
             blas::copy(p.Component(i), pnew.Component(i));
           }
+
+          for(int i=0; i<param.num_src; i++){
+            for(int j=0; j<param.num_src; j++){
+              pTp(i,j) = blas::reDotProduct(p.Component(i), p.Component(j));
+            }
+          }
+          std::cout << " pTp " << std::endl << pTp << std::endl;
+          Eigen::ColPivHouseholderQR<MatrixXd> qr(pTp);
+          // gamma = qr.householderQ();
+          // gamma = gamma.transpose().eval();
+          std::cout <<  "QR" << gamma<<  std::endl << "QP " << gamma.transpose()*gamma << std::endl;;
+
         }
+
 
         if (use_heavy_quark_res && (k % heavy_quark_check) == 0) {
           if (&x != &xSloppy) {
@@ -717,7 +751,7 @@ std::cout << "mRR" << mRR << std::endl;
 
         steps_since_reliable++;
       } else {
-                printfQuda("reliable update\n");
+        printfQuda("reliable update\n");
         for(int i=0; i<param.num_src; i++){
           blas::axpy(alpha(i,i), p.Component(i), xSloppy.Component(i));
         }
@@ -765,23 +799,23 @@ std::cout << "mRR" << mRR << std::endl;
             resIncrease = 0;
           }
         }
-      // if L2 broke down already we turn off reliable updates and restart the CG
-      for(int i = 0; i<param.num_src; i++){
-        if (use_heavy_quark_res and L2breakdown) {
-          delta = 0;
-          warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
-          heavy_quark_restart = true;
-          if (heavy_quark_res[i] > heavy_quark_res_old[i]) {
-            hqresIncrease++;
-            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res[i], heavy_quark_res_old[i]);
-            // break out if we do not improve here anymore
-            if (hqresIncrease > hqmaxresIncrease) {
-              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
-              break;
+        // if L2 broke down already we turn off reliable updates and restart the CG
+        for(int i = 0; i<param.num_src; i++){
+          if (use_heavy_quark_res and L2breakdown) {
+            delta = 0;
+            warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
+            heavy_quark_restart = true;
+            if (heavy_quark_res[i] > heavy_quark_res_old[i]) {
+              hqresIncrease++;
+              warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res[i], heavy_quark_res_old[i]);
+              // break out if we do not improve here anymore
+              if (hqresIncrease > hqmaxresIncrease) {
+                warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
+                break;
+              }
             }
           }
         }
-      }
 
         for(int i=0; i<param.num_src; i++){
           rNorm[i] = sqrt(r2(i,i));
