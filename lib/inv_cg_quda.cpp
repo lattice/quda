@@ -375,7 +375,7 @@ namespace quda {
   }
 
   void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
-    const bool use_block = false;
+    const bool use_block = true;
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
     errorQuda("Not supported");
 
@@ -546,7 +546,7 @@ namespace quda {
       maxrr[i] = rNorm[i];
     }
 
-    double delta = 0;//MW: hack no reliable updates param.delta;
+    double delta = param.delta;//MW: hack no reliable updates param.delta;
 
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
@@ -668,16 +668,22 @@ namespace quda {
         rNorm[i] = sqrt(r2(i,i));
         if (rNorm[i] > maxrx[i]) maxrx[i] = rNorm[i];
         if (rNorm[i] > maxrr[i]) maxrr[i] = rNorm[i];
-        updateX = (rNorm[i] < delta * r0Norm[i] && r0Norm[i] <= maxrx[i]) ? true : updateX;
-        updateR = ((rNorm[i] < delta * maxrr[i] && r0Norm[i] <= maxrr[i]) || updateX) ? true : updateR;
+        updateX = (rNorm[i] < delta * r0Norm[i] && r0Norm[i] <= maxrx[i]) ? (false||updateX) : true;
+        updateR = ((rNorm[i] < delta * maxrr[i] && r0Norm[i] <= maxrr[i]) || updateX) ? (false||updateR) : true;
 
-        // force a reliable update if we are within target tolerance (only if doing reliable updates)
-        if ( convergence(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq) && param.delta >= param.tol ) updateX = true;
-
-        // For heavy-quark inversion force a reliable update if we continue after
-        if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq) and param.delta >= param.tol ) {
-          updateX = true;
-        }
+        // // force a reliable update if we are within target tolerance (only if doing reliable updates)
+        // if ( convergence(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq) && param.delta >= param.tol ) updateX = true;
+        //
+        // // For heavy-quark inversion force a reliable update if we continue after
+        // if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq) and param.delta >= param.tol ) {
+        //   updateX = true;
+        // }
+      }
+      if ( (updateR || updateX )) {
+        printfQuda("Suppressing reliable update %i %i\n",updateX,updateR);
+        updateX=false;
+        updateR=false;
+        printfQuda("Suppressing reliable update %i %i\n",updateX,updateR);
       }
 
       if ( !(updateR || updateX )) {

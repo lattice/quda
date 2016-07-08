@@ -233,7 +233,7 @@ int main(int argc, char **argv)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 0;// 1e-1;
+  inv_param.reliable_delta =  1e-1;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.max_res_increase = 1;
 
