@@ -241,6 +241,7 @@ namespace quda {
         steps_since_reliable++;
       } else {
 
+        printfQuda("\t * Reliable update \n");
         blas::axpy(alpha, p, xSloppy);
         blas::copy(x, xSloppy); // nop when these pointers alias
 
@@ -529,6 +530,7 @@ namespace quda {
     MatrixXd alpha = MatrixXd::Zero(param.num_src,param.num_src);
     MatrixXd beta = MatrixXd::Zero(param.num_src,param.num_src);
     MatrixXd gamma = MatrixXd::Identity(param.num_src,param.num_src);
+    //  gamma = gamma * 2.0;
 
     MatrixXd pAp(param.num_src, param.num_src);
     MatrixXd pTp(param.num_src, param.num_src);
@@ -624,7 +626,7 @@ namespace quda {
           }
         }
 
-        alpha = pAp.inverse() * gamma.transpose() * r2;
+        alpha = pAp.inverse() * gamma.transpose().inverse() * r2;
         std::cout << "alpha\n" << alpha << std::endl;
 
         if(k==1){
@@ -663,13 +665,18 @@ namespace quda {
 
       bool updateX=false;
       bool updateR=false;
+//      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? true : false;
+//      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? true : false;
+//
+// printfQuda("Checking reliable update %i %i\n",updateX,updateR);
       // reliable update conditions
       for(int i=0; i<param.num_src; i++){
         rNorm[i] = sqrt(r2(i,i));
         if (rNorm[i] > maxrx[i]) maxrx[i] = rNorm[i];
         if (rNorm[i] > maxrr[i]) maxrr[i] = rNorm[i];
-        updateX = (rNorm[i] < delta * r0Norm[i] && r0Norm[i] <= maxrx[i]) ? (false||updateX) : true;
-        updateR = ((rNorm[i] < delta * maxrr[i] && r0Norm[i] <= maxrr[i]) || updateX) ? (false||updateR) : true;
+        updateX = (rNorm[i] < delta * r0Norm[i] && r0Norm[i] <= maxrx[i]) ? true : false;
+        updateR = ((rNorm[i] < delta * maxrr[i] && r0Norm[i] <= maxrr[i]) || updateX) ? true : false;
+        // printfQuda("Checking reliable update %i %i %i\n",i, updateX,updateR);
 
         // // force a reliable update if we are within target tolerance (only if doing reliable updates)
         // if ( convergence(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq) && param.delta >= param.tol ) updateX = true;
@@ -690,7 +697,7 @@ namespace quda {
         // for(int i=0; i<param.num_src; i++){
         //   beta(i,i) = sigma(i,i) / r2_old(i,i);  // use the alternative beta computation
         // }
-        beta = gamma.inverse() * r2_old.inverse() * sigma;
+        beta = gamma * r2_old.inverse() * sigma;
 
         std::cout << "beta\n" << beta << std::endl;
 
@@ -709,6 +716,9 @@ namespace quda {
               blas::axpy(alpha(j,i),p.Component(j),xSloppy.Component(i));
             }
           }
+          gamma = MatrixXd::Identity(param.num_src,param.num_src) * (k+1);
+          gamma(0,1) = 1.;
+
           // set to zero
           for(int i=0; i < param.num_src; i++){
             blas::ax(0,pnew.Component(i)); // do we need components here?
@@ -716,13 +726,12 @@ namespace quda {
           // add r
           for(int i=0; i<param.num_src; i++){
             for(int j=0;j<param.num_src; j++){
-              double rcoeff= (j==0?1.0:0.0);
               // order of updating p might be relevant here
-              blas::axpy(gamma(j,i),r.Component(j),pnew.Component(i));
+              blas::axpy(gamma.inverse().eval()(j,i),r.Component(j),pnew.Component(i));
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
             }
           }
-          beta = beta * gamma;
+          beta = beta * gamma.inverse();
           for(int i=0; i<param.num_src; i++){
             for(int j=0;j<param.num_src; j++){
               double rcoeff= (j==0?1.0:0.0);
@@ -745,7 +754,7 @@ namespace quda {
           Eigen::ColPivHouseholderQR<MatrixXd> qr(pTp);
           // gamma = qr.householderQ();
           // gamma = gamma.transpose().eval();
-          std::cout <<  "QR" << gamma<<  std::endl << "QP " << gamma.transpose()*gamma << std::endl;;
+          std::cout <<  "QR" << gamma<<  std::endl << "QP " << gamma.inverse()*gamma << std::endl;;
 
         }
 
