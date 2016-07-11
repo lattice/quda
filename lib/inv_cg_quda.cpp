@@ -740,15 +740,39 @@ namespace quda {
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
             }
           }
-          // set to zero
-          for(int i=0; i < param.num_src; i++){
-            blas::ax(0,p.Component(i)); // do we need components here?
+          // now need to do something with the p's
+
+          for(int i=0; i< param.num_src; i++){
+            blas::copy(p.Component(i), pnew.Component(i));
           }
-          for(int i=0; i<param.num_src; i++){
-            for(int j=0;j<param.num_src; j++){
-              // order of updating p might be relevant here
-              blas::axpy(gamma.inverse().eval()(j,i),pnew.Component(j),p.Component(i));
-              // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
+
+
+
+          for(int i=0; i < param.num_src; i++){
+            double n = blas::norm2(p.Component(i));
+            blas::ax(1/sqrt(n),p.Component(i));
+            for(int j=i+1; j < param.num_src; j++) {
+              double ri=blas::reDotProduct(p.Component(i),p.Component(j));
+              blas::axpy(-ri,p.Component(i),p.Component(j));
+
+            }
+          }
+
+          // // set to zero
+          // for(int i=0; i < param.num_src; i++){
+          //   blas::ax(0,p.Component(i)); // do we need components here?
+          // }
+          // for(int i=0; i<param.num_src; i++){
+          //   for(int j=0;j<param.num_src; j++){
+          //     // order of updating p might be relevant here
+          //     blas::axpy(gamma.inverse().eval()(j,i),pnew.Component(j),p.Component(i));
+          //     // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
+          //   }
+          // }
+          gamma = MatrixXd::Zero(param.num_src,param.num_src);
+          for ( int i = 0; i < param.num_src; i++){
+            for (int j=i; j < param.num_src; j++){
+              gamma(i,j) = blas::reDotProduct(p.Component(i),pnew.Component(j));
             }
           }
 
@@ -758,7 +782,7 @@ namespace quda {
             }
           }
           std::cout << " pTp " << std::endl << pTp << std::endl;
-          Eigen::ColPivHouseholderQR<MatrixXd> qr(pTp);
+
           // gamma = qr.householderQ();
           // gamma = gamma.transpose().eval();
           std::cout <<  "QR" << gamma<<  std::endl << "QP " << gamma.inverse()*gamma << std::endl;;
