@@ -725,13 +725,13 @@ namespace quda {
           }
           // add r
           for(int i=0; i<param.num_src; i++){
-            for(int j=0;j<param.num_src; j++){
+            // for(int j=0;j<param.num_src; j++){
               // order of updating p might be relevant here
-              blas::axpy(gamma.inverse().eval()(j,i),r.Component(j),pnew.Component(i));
+              blas::axpy(1.0,r.Component(i),pnew.Component(i));
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
-            }
+            // }
           }
-          beta = beta * gamma.inverse();
+          // beta = beta * gamma.inverse();
           for(int i=0; i<param.num_src; i++){
             for(int j=0;j<param.num_src; j++){
               double rcoeff= (j==0?1.0:0.0);
@@ -740,9 +740,16 @@ namespace quda {
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
             }
           }
-
+          // set to zero
           for(int i=0; i < param.num_src; i++){
-            blas::copy(p.Component(i), pnew.Component(i));
+            blas::ax(0,p.Component(i)); // do we need components here?
+          }
+          for(int i=0; i<param.num_src; i++){
+            for(int j=0;j<param.num_src; j++){
+              // order of updating p might be relevant here
+              blas::axpy(gamma.inverse().eval()(j,i),pnew.Component(j),p.Component(i));
+              // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
+            }
           }
 
           for(int i=0; i<param.num_src; i++){
