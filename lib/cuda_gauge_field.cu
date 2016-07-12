@@ -246,7 +246,7 @@ namespace quda {
       if (!commDimPartitioned(d)) continue;
       total_bytes += 4*bytes[d]; // (2 from send/recv) x (2 from fwd/back)
     }
-    void *buffer = allocatePinned(total_bytes);
+    void *buffer = total_bytes > 0 ? allocatePinned(total_bytes) : nullptr;
 
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
@@ -338,7 +338,7 @@ namespace quda {
     }
 
 #ifndef GPU_COMMS
-    freePinned(buffer);
+    if (total_bytes > 0) freePinned(buffer);
 #endif
 
     for (int d=0; d<nDim; d++) {
