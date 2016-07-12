@@ -92,6 +92,8 @@ static bool redundant_comms = false;
 
 static bool InitMagma = false;
 
+static const QudaFieldLocation reorder_location = QUDA_CUDA_FIELD_LOCATION;
+
 void openMagma(){
 
    if(!InitMagma){
@@ -696,7 +698,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 
   profileGauge.TPSTART(QUDA_PROFILE_D2H);
-  cudaGauge->saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaGauge->saveCPUField(cpuGauge, reorder_location);
   profileGauge.TPSTOP(QUDA_PROFILE_D2H);
 
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -3407,7 +3409,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
 
     profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
-    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
+    cudaSiteLink->loadCPUField(*cpuSiteLink, reorder_location);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
   }
 
@@ -3464,7 +3466,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     gParamMom.precision = qudaGaugeParam->cuda_prec;
     gParamMom.create = QUDA_ZERO_FIELD_CREATE;
     cudaMom = new cudaGaugeField(gParamMom);
-    if (!qudaGaugeParam->overwrite_mom) cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+    if (!qudaGaugeParam->overwrite_mom) cudaMom->loadCPUField(*cpuMom, reorder_location);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -3475,7 +3477,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   if (qudaGaugeParam->return_result_mom) {
     profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
-    cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+    cudaMom->saveCPUField(*cpuMom, reorder_location);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
   }
 
@@ -4612,7 +4614,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   // copy the outer product field back to the host
   profileCloverForce.TPSTART(QUDA_PROFILE_D2H);
-  cudaMom.saveCPUField(cpuMom,QUDA_CPU_FIELD_LOCATION);
+  cudaMom.saveCPUField(cpuMom, reorder_location);
   profileCloverForce.TPSTOP(QUDA_PROFILE_D2H);
 
   profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
@@ -4683,7 +4685,7 @@ void updateGaugeFieldQuda(void* gauge,
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_H2D);
 
   if (!param->use_resident_gauge) {   // load fields onto the device
-    cudaInGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+    cudaInGauge->loadCPUField(*cpuGauge, reorder_location);
   } else { // or use resident fields already present
     if (!gaugePrecise) errorQuda("No resident gauge field allocated");
     cudaInGauge = gaugePrecise;
@@ -4691,7 +4693,7 @@ void updateGaugeFieldQuda(void* gauge,
   }
 
   if (!param->use_resident_mom) {
-    cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+    cudaMom->loadCPUField(*cpuMom, reorder_location);
   } else {
     if (!momResident) errorQuda("No resident mom field allocated");
     cudaMom = momResident;
@@ -4709,7 +4711,7 @@ void updateGaugeFieldQuda(void* gauge,
   if (param->return_result_gauge) {
     // copy the gauge field back to the host
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_D2H);
-    cudaOutGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+    cudaOutGauge->saveCPUField(*cpuGauge, reorder_location);
     profileGaugeUpdate.TPSTOP(QUDA_PROFILE_D2H);
   }
 
