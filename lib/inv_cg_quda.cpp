@@ -586,6 +586,36 @@ namespace quda {
     }
     MatrixXd sigma(param.num_src,param.num_src);
 
+
+    for(int i=0; i < param.num_src; i++){
+      double n = blas::norm2(p.Component(i));
+      blas::ax(1/sqrt(n),p.Component(i));
+      for(int j=i+1; j < param.num_src; j++) {
+        double ri=blas::reDotProduct(p.Component(i),p.Component(j));
+        blas::axpy(-ri,p.Component(i),p.Component(j));
+
+      }
+    }
+
+
+    gamma = MatrixXd::Zero(param.num_src,param.num_src);
+    for ( int i = 0; i < param.num_src; i++){
+      for (int j=i; j < param.num_src; j++){
+        gamma(i,j) = blas::reDotProduct(p.Component(i),pnew.Component(j));
+      }
+    }
+
+    for(int i=0; i<param.num_src; i++){
+      for(int j=0; j<param.num_src; j++){
+        pTp(i,j) = blas::reDotProduct(p.Component(i), p.Component(j));
+      }
+    }
+    std::cout << " pTp " << std::endl << pTp << std::endl;
+
+    // gamma = qr.householderQ();
+    // gamma = gamma.transpose().eval();
+    std::cout <<  "QR" << gamma<<  std::endl << "QP " << gamma.inverse()*gamma << std::endl;;
+
     while ( !allconverged && k < param.maxiter ) {
       for(int i=0; i<param.num_src; i++){
         matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
@@ -716,8 +746,8 @@ namespace quda {
               blas::axpy(alpha(j,i),p.Component(j),xSloppy.Component(i));
             }
           }
-          gamma = MatrixXd::Identity(param.num_src,param.num_src) * (k+1);
-          gamma(0,1) = 1.;
+          // gamma = MatrixXd::Identity(param.num_src,param.num_src) * (k+1);
+          // gamma(0,1) = 1.;
 
           // set to zero
           for(int i=0; i < param.num_src; i++){
@@ -735,7 +765,7 @@ namespace quda {
           for(int i=0; i<param.num_src; i++){
             for(int j=0;j<param.num_src; j++){
               double rcoeff= (j==0?1.0:0.0);
-              // order of updating p might be relevant here
+              // order of updating p might be relevant hereq
               blas::axpy(beta(j,i),p.Component(j),pnew.Component(i));
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
             }
@@ -758,17 +788,7 @@ namespace quda {
             }
           }
 
-          // // set to zero
-          // for(int i=0; i < param.num_src; i++){
-          //   blas::ax(0,p.Component(i)); // do we need components here?
-          // }
-          // for(int i=0; i<param.num_src; i++){
-          //   for(int j=0;j<param.num_src; j++){
-          //     // order of updating p might be relevant here
-          //     blas::axpy(gamma.inverse().eval()(j,i),pnew.Component(j),p.Component(i));
-          //     // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
-          //   }
-          // }
+
           gamma = MatrixXd::Zero(param.num_src,param.num_src);
           for ( int i = 0; i < param.num_src; i++){
             for (int j=i; j < param.num_src; j++){
