@@ -437,7 +437,7 @@ namespace quda {
       void *buffer = create_gauge_buffer(src.Bytes(), src.Order());
       size_t ghost_bytes[4];
       for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * src.Reconstruct() * src.Precision();
-      void **ghost_buffer = create_ghost_buffer(ghost_bytes, src.Order());
+      void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order()) : nullptr;
 
       if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
 	for (int d=0; d<4; d++) {
@@ -448,13 +448,13 @@ namespace quda {
       }
 
       if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	  src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD)
+	  src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	for (int d=0; d<4; d++)
 	  qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
 
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
       free_gauge_buffer(buffer, src.Order());
-      free_ghost_buffer(ghost_buffer, src.Order());
+      if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order());
 #endif
     } else {
       errorQuda("Invalid gauge field type");
