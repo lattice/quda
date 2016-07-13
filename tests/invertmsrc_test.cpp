@@ -87,13 +87,41 @@ display_test_info()
 
 }
 
+
+void
+usage_extra(char** argv )
+{
+printfQuda("Extra options:\n");
+printfQuda("    --num_src n                             # Numer of sources used\n");
+
+
+return ;
+}
+
+
 int main(int argc, char **argv)
 {
+
+  int num_src=2;
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }
+
+
+
+
+    if( strcmp(argv[i], "--num_src") == 0){
+      if (i+1 >= argc){
+        usage(argv);
+      }
+      num_src= atoi(argv[i+1]);
+      i++;
+      continue;
+    }
+
+
     printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -183,7 +211,7 @@ int main(int argc, char **argv)
 
   // offsets used only by multi-shift solver
   inv_param.num_offset = 12;
-  inv_param.num_src=2;
+  inv_param.num_src= num_src;
   double offset[12] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
@@ -314,7 +342,7 @@ int main(int argc, char **argv)
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
