@@ -406,10 +406,10 @@ int main(int argc, char **argv)
     for (int j=0; j<inv_param.num_src; j++) {
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
     //((float*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn[j])[i] = rand() / (float)RAND_MAX;
+    for (int i=0; i<inv_param.Ls*V; i++) ((float*)spinorIn[j])[i*spinorSiteSize+j] = rand() / (float)RAND_MAX;
   } else {
     //((double*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn[j])[i] = rand() / (double)RAND_MAX;
+    for (int i=0; i<inv_param.Ls*V; i++) ((double*)spinorIn[j])[i*spinorSiteSize+j] = rand() / (double)RAND_MAX;
   }
     }
   // start the timer

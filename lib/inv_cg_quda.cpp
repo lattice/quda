@@ -432,10 +432,10 @@ namespace quda {
     }
 
     // double r2[QUDA_MAX_MULTI_SHIFT];
-    MatrixXd r2(param.num_src,param.num_src);
+    MatrixXcd r2(param.num_src,param.num_src);
     for(int i=0; i<param.num_src; i++){
       r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
-      printfQuda("r2[%i] %e\n", i, r2(i,i));
+      printfQuda("r2[%i] %e\n", i, r2(i,i).real());
     }
 
 
@@ -500,7 +500,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    MatrixXd r2_old(param.num_src, param.num_src);
+    MatrixXcd r2_old(param.num_src, param.num_src);
     double heavy_quark_res[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark res idual
     double heavy_quark_res_old[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark residual
     double stop[QUDA_MAX_MULTI_SHIFT];
@@ -514,13 +514,13 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    MatrixXd alpha = MatrixXd::Zero(param.num_src,param.num_src);
-    MatrixXd beta = MatrixXd::Zero(param.num_src,param.num_src);
-    MatrixXd gamma = MatrixXd::Zero(param.num_src,param.num_src);
-    MatrixXd C = MatrixXd::Zero(param.num_src,param.num_src);
-    MatrixXd S = MatrixXd::Identity(param.num_src,param.num_src);
+    MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
+    MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
+    MatrixXcd gamma = MatrixXcd::Zero(param.num_src,param.num_src);
+    MatrixXcd C = MatrixXcd::Zero(param.num_src,param.num_src);
+    MatrixXcd S = MatrixXcd::Identity(param.num_src,param.num_src);
     MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
-    MatrixXd pAp = MatrixXd::Identity(param.num_src,param.num_src);
+    MatrixXcd pAp = MatrixXcd::Identity(param.num_src,param.num_src);
     //  gamma = gamma * 2.0;
 
 
@@ -532,7 +532,7 @@ namespace quda {
     double maxrr[QUDA_MAX_MULTI_SHIFT];
 
     for(int i = 0; i < param.num_src; i++){
-      rNorm[i] = sqrt(r2(i,i));
+      rNorm[i] = sqrt(r2(i,i).real());
       r0Norm[i] = rNorm[i];
       maxrx[i] = rNorm[i];
       maxrr[i] = rNorm[i];
@@ -564,34 +564,34 @@ namespace quda {
     int k = 0;
 
     for(int i=0; i<param.num_src; i++){
-      PrintStats("CG", k, r2(i,i), b2[i], heavy_quark_res[i]);
+      PrintStats("CG", k, r2(i,i).real(), b2[i], heavy_quark_res[i]);
     }
 
     int steps_since_reliable = 1;
     bool allconverged = true;
     bool converged[QUDA_MAX_MULTI_SHIFT];
     for(int i=0; i<param.num_src; i++){
-      converged[i] = convergence(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq);
+      converged[i] = convergence(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
       allconverged = allconverged && converged[i];
     }
-    MatrixXd sigma(param.num_src,param.num_src);
+    MatrixXcd sigma(param.num_src,param.num_src);
 
     // QR decomposition -- in the first iteration we can do the QR decomposition on P
     for(int i=0; i < param.num_src; i++){
       double n = blas::norm2(p.Component(i));
       blas::ax(1/sqrt(n),p.Component(i));
       for(int j=i+1; j < param.num_src; j++) {
-        double ri=blas::reDotProduct(p.Component(i),p.Component(j));
-        blas::axpy(-ri,p.Component(i),p.Component(j));
+        std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+        blas::caxpy(-ri,p.Component(i),p.Component(j));
 
       }
     }
 
 
-    C = MatrixXd::Zero(param.num_src,param.num_src);
+    C = MatrixXcd::Zero(param.num_src,param.num_src);
     for ( int i = 0; i < param.num_src; i++){
       for (int j=i; j < param.num_src; j++){
-        C(i,j) = blas::reDotProduct(p.Component(i),r.Component(j));
+        C(i,j) = blas::cDotProduct(p.Component(i),r.Component(j));
       }
     }
 
@@ -629,7 +629,7 @@ namespace quda {
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j < param.num_src; j++){
             // if(use_block or i==j)
-              pAp(i,j) = blas::reDotProduct(p.Component(i), Ap.Component(j));
+              pAp(i,j) = blas::cDotProduct(p.Component(i), Ap.Component(j));
             // else
             //   pAp(i,j) = 0.;
           }
@@ -646,7 +646,7 @@ namespace quda {
             // x = p, y = x, z =r . We can only update X after p update has been completed
 
             //blas::axpyZpbx(alpha(i,i), p.Component(i), xSloppy.Component(i), rSloppy.Component(i), beta(i,i));
-            blas::axpy(alpha(j,i),p.Component(j),xSloppy.Component(i));
+            blas::caxpy(alpha(j,i),p.Component(j),xSloppy.Component(i));
           }
         }
 
@@ -656,7 +656,7 @@ namespace quda {
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j < param.num_src; j++){
 
-            Complex cg_norm = blas::axpyCGNorm(-beta(j,i), Ap.Component(j), rSloppy.Component(i));
+            blas::caxpy(-beta(j,i), Ap.Component(j), rSloppy.Component(i));
 
           }
         }
@@ -671,23 +671,23 @@ namespace quda {
           double n = blas::norm2(rSloppy.Component(i));
           blas::ax(1/sqrt(n),rSloppy.Component(i));
           for(int j=i+1; j < param.num_src; j++) {
-            double ri=blas::reDotProduct(rSloppy.Component(i),rSloppy.Component(j));
-            blas::axpy(-ri,rSloppy.Component(i),rSloppy.Component(j));
+            std::complex<double> ri=blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
+            blas::caxpy(-ri,rSloppy.Component(i),rSloppy.Component(j));
 
           }
         }
 
 
-        S = MatrixXd::Zero(param.num_src,param.num_src);
+        S = MatrixXcd::Zero(param.num_src,param.num_src);
         for ( int i = 0; i < param.num_src; i++){
           for (int j=i; j < param.num_src; j++){
-            S(i,j) = blas::reDotProduct(rSloppy.Component(i),rnew.Component(j));
+            S(i,j) = blas::cDotProduct(rSloppy.Component(i),rnew.Component(j));
           }
         }
 
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j<param.num_src; j++){
-            pTp(i,j) = blas::reDotProduct(rSloppy.Component(i), rSloppy.Component(j));
+            pTp(i,j) = blas::cDotProduct(rSloppy.Component(i), rSloppy.Component(j));
           }
         }
         std::cout << " rTr " << std::endl << pTp << std::endl;
@@ -705,7 +705,7 @@ namespace quda {
           for(int i=0; i<param.num_src; i++){
             // for(int j=0;j<param.num_src; j++){
               // order of updating p might be relevant here
-              blas::axpy(1.0,rSloppy.Component(i),rnew.Component(i));
+              blas::caxpy(1.0,rSloppy.Component(i),rnew.Component(i));
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
             // }
           }
@@ -713,7 +713,7 @@ namespace quda {
           for(int i=0; i<param.num_src; i++){
             for(int j=0;j<param.num_src; j++){
               // order of updating p might be relevant hereq
-              blas::axpy(S(i,j),p.Component(j),rnew.Component(i));
+              blas::caxpy(std::conj(S(i,j)),p.Component(j),rnew.Component(i));
               // blas::axpby(rcoeff,rSloppy.Component(i),beta(i,j),p.Component(j));
             }
           }
@@ -724,7 +724,7 @@ namespace quda {
 
           for(int i=0; i<param.num_src; i++){
             for(int j=0; j<param.num_src; j++){
-              pTp(i,j) = blas::reDotProduct(p.Component(i), p.Component(j));
+              pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
             }
           }
 
@@ -971,14 +971,14 @@ namespace quda {
 
       allconverged = true;
       for (int j=0; j<param.num_src; j++ ){
-        r2(j,j) = C(0,j)*C(0,j);
+        r2(j,j) = C(0,j)*conj(C(0,j));
         for(int i=1; i < param.num_src; i++)
-          r2(j,j) += C(i,j) * C(i,j);
+          r2(j,j) += C(i,j) * conj(C(i,j));
       }
       for(int i=0; i<param.num_src; i++){
-        PrintStats("CG", k, r2(i,i), b2[i], heavy_quark_res[i]);
+        PrintStats("CG", k, r2(i,i).real(), b2[i], heavy_quark_res[i]);
         // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-        converged[i] = convergence(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq);
+        converged[i] = convergence(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
         allconverged = allconverged && converged[i];
       }
 
@@ -986,9 +986,9 @@ namespace quda {
       if (use_heavy_quark_res) {
         for(int i=0; i<param.num_src; i++){
           // L2 is concverged or precision maxed out for L2
-          bool L2done = L2breakdown or convergenceL2(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq);
+          bool L2done = L2breakdown or convergenceL2(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
           // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-          bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2(i,i), heavy_quark_res[i], stop[i], param.tol_hq);
+          bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
           converged[i] = L2done and HQdone;
         }
       }
@@ -1022,7 +1022,7 @@ namespace quda {
       param.true_res_offset[i] = param.true_res;
       param.true_res_hq_offset[i] = param.true_res_hq;
 
-      PrintSummary("CG", k, r2(i,i), b2[i]);
+      PrintSummary("CG", k, r2(i,i).real(), b2[i]);
     }
 
     // reset the flops counters
