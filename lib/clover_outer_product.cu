@@ -32,32 +32,26 @@ namespace quda {
   }
   
   
-#ifdef MULTI_GPU
   static cudaEvent_t packEnd;
   static cudaEvent_t gatherEnd[4];
   static cudaEvent_t scatterEnd[4];
-#endif
   static cudaEvent_t oprodStart;
   static cudaEvent_t oprodEnd;
 
 
   void createCloverForceEvents(){
-#ifdef MULTI_GPU
     cudaEventCreate(&packEnd, cudaEventDisableTiming);
     createEventArray(gatherEnd, cudaEventDisableTiming);
     createEventArray(scatterEnd, cudaEventDisableTiming);
-#endif
     cudaEventCreate(&oprodStart, cudaEventDisableTiming);
     cudaEventCreate(&oprodEnd, cudaEventDisableTiming);
     return;
   }
 
   void destroyCloverForceEvents(){
-#ifdef MULTI_GPU
     destroyEventArray(gatherEnd);
     destroyEventArray(scatterEnd);
     cudaEventDestroy(packEnd);
-#endif
     cudaEventDestroy(oprodStart);
     cudaEventDestroy(oprodEnd);
     return;
@@ -214,47 +208,6 @@ namespace quda {
   }
 
 
-  __device__  int ghostIndexFromCoords(const int x[4], const int X[4], unsigned int dir, const int shift)
-    {
-      int ghost_idx;
-      /*
-	FIXME The below could be absorbed into the ghost offset values as
-	all they are just offsets to get to the forward face from
-	starting at the backward face.
-
-	The factor of 6 comes from being spin projected, with Float2
-	indexing assumed.  This needs to be fixed for single precision
-	(Float4) indexing.
-       */
-      if(shift > 0){
-        if((x[dir] + shift) >= X[dir]){
-          switch(dir){
-            case 0:
-	      ghost_idx = 6*(X[3]*X[2]*X[1])/2;
-              break;          
-            case 1:
-	      ghost_idx = 6*(X[3]*X[2]*X[0])/2;
-              break;
-            case 2:
-	      ghost_idx = 6*(X[3]*X[1]*X[0])/2;
-              break;
-            case 3:
-	      ghost_idx = 6*(X[2]*X[1]*X[0])/2;
-              break;
-            default:
-              break;
-          } // switch
-        } // x[dir] + shift[dir] >= X[dir]
-      }else{ // shift < 0
-	ghost_idx = 0;
-      } // shift < 0
-
-      return ghost_idx;
-    }
-
-
-
-
   __device__ __forceinline__
   int neighborIndex(const unsigned int& cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int& parity, 
 		    const int X[4]){    
@@ -262,12 +215,10 @@ namespace quda {
     int x[4]; 
     coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
     
-#ifdef MULTI_GPU
     for(int dim = 0; dim<4; ++dim){
       if(partitioned[dim])
 	if( (x[dim]+shift[dim])<0 || (x[dim]+shift[dim])>=X[dim]) return -1;
     }
-#endif
     
     for(int dim=0; dim<4; ++dim){
       x[dim] = shift[dim] ? (x[dim]+shift[dim] + X[dim]) % X[dim] : x[dim];
@@ -285,7 +236,7 @@ namespace quda {
     ColorSpinor<real,3,4> A, B_shift, C, D_shift;
     Matrix<Complex,3> U, result, temp;
 
-    while(idx<arg.length){
+    while (idx<arg.length){
       arg.inA.load(static_cast<Complex*>(A.data), idx);
       arg.inC.load(static_cast<Complex*>(C.data), idx);
       
@@ -325,13 +276,13 @@ namespace quda {
     Matrix<Complex,3> U, result, temp;
     
     int x[4];
-    while(cb_idx<arg.length){
+    while (cb_idx<arg.length){
       coordsFromIndex(x, cb_idx, arg.X, dim, arg.displacement, arg.parity); 
       const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
       arg.inA.load(static_cast<Complex*>(A.data), bulk_cb_idx);
       arg.inC.load(static_cast<Complex*>(C.data), bulk_cb_idx);
       
-      const unsigned int ghost_idx = arg.ghostOffset[dim] + ghostIndexFromCoords(x, arg.X, dim, arg.displacement) + cb_idx;
+      const unsigned int ghost_idx = arg.ghostOffset[dim] + cb_idx;
 
       arg.inB_shift.loadGhost(static_cast<Complex*>(projected_tmp.data), ghost_idx, dim);
       B_shift = projected_tmp.reconstruct(dim, 1);
@@ -477,10 +428,17 @@ namespace quda {
   void computeCloverForceCuda(Output force, Gauge gauge, cudaGaugeField& out, 
 			      InputA& inA, InputB& inB, InputC &inC, InputD &inD,
 			      cudaColorSpinorField& src1, cudaColorSpinorField& src2,
-			      const unsigned int parity, const int faceVolumeCB[4], 
-			      const unsigned int ghostOffset[4], const double coeff)
-    {
+			      const unsigned int parity, const int faceVolumeCB[4], const double coeff)
+  {
       cudaEventRecord(oprodStart, streams[Nstream-1]);
+
+      unsigned int ghostOffset[4] = {0,0,0,0};
+      for (int dir=0; dir<4; ++dir) {
+	if (src1.GhostOffset(dir) != src2.GhostOffset(dir))
+	  errorQuda("Mismatched ghost offset[%d] %d != %d", dir, src1.GhostOffset(dir), src2.GhostOffset(dir));
+	ghostOffset[dir] = (src1.GhostOffset(dir,1))/src1.FieldOrder(); // offset we want is the forwards one
+      }
+
       // Create the arguments for the interior kernel 
       CloverForceArg<Float,Output,Gauge,InputA,InputB,InputC,InputD> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, coeff, inA, inB, inC, inD, gauge, force, out);
       CloverForce<Float,Output,Gauge,InputA,InputB,InputC,InputD> oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
@@ -493,18 +451,16 @@ namespace quda {
       arg.length = src1.VolumeCB();
       oprod.apply(0); 
 
-#ifdef MULTI_GPU
       for (int i=3; i>=0; i--) {
 	if (commDimPartitioned(i)) {
 	  // update parameters for this exterior kernel
 	  arg.kernelType = OPROD_EXTERIOR_KERNEL;
 	  arg.dir = i;
 	  arg.length = faceVolumeCB[i];
-	  arg.displacement = 1;
+	  arg.displacement = 1; // forwards displacement
 	  oprod.apply(0); 
 	}
       } // i=3,..,0 
-#endif
     } // computeCloverForceCuda
 
 #endif // GPU_CLOVER_FORCE
@@ -525,15 +481,8 @@ namespace quda {
     if(force.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", force.Order());    
 
-    unsigned int ghostOffset[4] = {0,0,0,0};
-#ifdef MULTI_GPU
-    const unsigned int Npad = x.Ncolor()*x.Nspin()*2/x.FieldOrder();
-    for(int dir=0; dir<4; ++dir){
-      ghostOffset[dir] = Npad*(x.Even().GhostOffset(dir));
-    }
-#endif
-
-    if(x.Precision() != force.Precision()) errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), force.Precision());
+    if(x.Precision() != force.Precision())
+      errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), force.Precision());
 
     createCloverForceEvents(); // FIXME not actually used
 
@@ -544,46 +493,48 @@ namespace quda {
       ColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
       ColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
       
-      if(x.Precision() == QUDA_DOUBLE_PRECISION){
+      if (x.Precision() == QUDA_DOUBLE_PRECISION) {
 	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
 	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
-	Spinor<double2, double2, double2, 12, 0, 0> spinorC(inC);
-	Spinor<double2, double2, double2, 12, 0, 1> spinorD(inD);
+	Spinor<double2, double2, double2, 12, 0, 2> spinorC(inC);
+	Spinor<double2, double2, double2, 12, 0, 3> spinorD(inD);
 	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
 					 gauge::FloatNOrder<double,18, 2, 18>(U),
 					 force, spinorA, spinorB, spinorC, spinorD,
 					 static_cast<cudaColorSpinorField&>(inB),
 					 static_cast<cudaColorSpinorField&>(inD),
-					 parity, inB.GhostFace(), ghostOffset, coeff);
+					 parity, inB.GhostFace(), coeff);
 	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
 					 gauge::FloatNOrder<double,18, 2, 12>(U),
 					 force, spinorA, spinorB, spinorC, spinorD,
 					 static_cast<cudaColorSpinorField&>(inB),
 					 static_cast<cudaColorSpinorField&>(inD),
-					 parity, inB.GhostFace(), ghostOffset, coeff);
+					 parity, inB.GhostFace(), coeff);
 	} else {
 	  errorQuda("Unsupported recontruction type");
 	}
-      }else if(x.Precision() == QUDA_SINGLE_PRECISION){
-#if 0
+      } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+#if 0 // FIXME - Spinor class expect float4 pointer not Complex pointer
 	Spinor<float4, float4, float4, 6, 0, 0> spinorA(inA);
 	Spinor<float4, float4, float4, 6, 0, 1> spinorB(inB);
+	Spinor<float4, float4, float4, 6, 0, 2> spinorC(inC);
+	Spinor<float4, float4, float4, 6, 0, 3> spinorD(inD);
 	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  computeCloverForceCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(force),
 					gauge::FloatNOrder<float, 18, 2, 18>(U),
 					force, spinorA, spinorB, spinorC, spinorD,
 					static_cast<cudaColorSpinorField&>(inB),
 					static_cast<cudaColorSpinorField&>(inD),
-					parity, inB.GhostFace(), ghostOffset, coeff);
+					parity, inB.GhostFace(), coeff);
 	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  computeCloverForceCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(force),
 					gauge::FloatNOrder<float, 18, 4, 12>(U),
 					force, spinorA, spinorB, spinorC, spinorD,
 					static_cast<cudaColorSpinorField&>(inB),
 					static_cast<cudaColorSpinorField&>(inD),
-					parity, inB.GhostFace(), ghostOffset, coeff);
+					parity, inB.GhostFace(), coeff);
 	}
 #endif
       } else {

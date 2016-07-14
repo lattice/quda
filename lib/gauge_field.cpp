@@ -17,7 +17,6 @@ namespace quda {
     gauge(NULL),
     create(QUDA_NULL_FIELD_CREATE),
     geometry(u.Geometry()),
-    pinned(0),
     compute_fat_link_max(false),
     ghostExchange(u.GhostExchange()),
     staggeredPhaseType(u.StaggeredPhase()),
@@ -80,7 +79,7 @@ namespace quda {
     }
 
 
-    if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
+    if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.  
       int half_phase_bytes = (length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
       int half_gauge_bytes = (length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
@@ -91,7 +90,7 @@ namespace quda {
       phase_offset = half_gauge_bytes;
       phase_bytes = half_phase_bytes*2;
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
-    }else{
+    } else {
       bytes = length*precision;
       bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }

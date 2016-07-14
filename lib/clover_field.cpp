@@ -251,9 +251,8 @@ namespace quda {
       if (src.V(false))	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION);
       if (src.V(true)) copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION);
     } else if (typeid(src) == typeid(cpuCloverField)) {
-      resizeBufferPinned(bytes + norm_bytes);
-      void *packClover = bufferPinned[0];
-      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
+      void *packClover = allocatePinned(bytes + norm_bytes);
+      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
       
       if (src.V(false)) {
 	copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
@@ -268,6 +267,8 @@ namespace quda {
 	if (precision == QUDA_HALF_PRECISION) 
 	  qudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
+
+      freePinned(packClover);
     } else {
       errorQuda("Invalid clover field type");
     }
@@ -282,9 +283,8 @@ namespace quda {
 
     // we know we are copying from GPU to CPU here, so for now just
     // assume that reordering is on CPU
-    resizeBufferPinned(bytes + norm_bytes);
-    void *packClover = bufferPinned[0];
-    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
+    void *packClover = allocatePinned(bytes + norm_bytes);
+    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
 
     // first copy over the direct part (if it exists)
     if (V(false) && cpu.V(false)) {
@@ -292,8 +292,7 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION)
 	qudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
-    }
-    else if((V(false) && !cpu.V(false)) || (!V(false) && cpu.V(false))) {
+    } else if((V(false) && !cpu.V(false)) || (!V(false) && cpu.V(false))) {
       errorQuda("Mismatch between Clover field GPU V(false) and CPU.V(false)");
     }
 
@@ -303,11 +302,11 @@ namespace quda {
 	if (precision == QUDA_HALF_PRECISION)
 	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
-    }
-    else if((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
+    } else if ((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");
     } 
 
+    freePinned(packClover);
   }
 
   /**
