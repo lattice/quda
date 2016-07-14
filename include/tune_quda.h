@@ -20,13 +20,15 @@ namespace quda {
     dim3 block;
     dim3 grid;
     int shared_bytes;
-    dim3 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
     float time;
     long long n_calls;
 
-  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(1, 1, 1), time(FLT_MAX), n_calls(0) { }
+  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
+      aux = make_int4(1,1,1,1);
+    }
 
     TuneParam(const TuneParam &param)
       : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
@@ -174,7 +176,7 @@ namespace quda {
 	ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
 	ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
 	ps << "shared=" << param.shared_bytes << ", ";
-	ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << ")";
+	ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
 	return ps.str();
       }
 

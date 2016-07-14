@@ -78,7 +78,7 @@ namespace quda {
       if (check < 0 || check >= key.name_n) errorQuda("Error writing name string");
       check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
       if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string");
-      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y >> param.aux.z >> param.time;
+      ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y >> param.aux.z >> param.aux.w >> param.time;
       ls.ignore(1); // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
       param.comment += "\n"; // our convention is to include the newline, since ctime() likes to do this
@@ -101,7 +101,7 @@ namespace quda {
       out << std::setw(16) << key.volume << "\t" << key.name << "\t" << key.aux << "\t";
       out << param.block.x << "\t" << param.block.y << "\t" << param.block.z << "\t";
       out << param.grid.x << "\t" << param.grid.y << "\t" << param.grid.z << "\t";
-      out << param.shared_bytes << "\t" << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t";
+      out << param.shared_bytes << "\t" << param.aux.x << "\t" << param.aux.y << "\t" << param.aux.z << "\t" << param.aux.w << "\t";
       out << param.time << "\t" << param.comment; // param.comment ends with a newline
     }
   }
@@ -339,7 +339,7 @@ namespace quda {
        cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
-      cache_file << std::setw(16) << "volume" << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\taux.x\taux.y\taux.z\ttime\tcomment" << std::endl;
+      cache_file << std::setw(16) << "volume" << "\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\taux.x\taux.y\taux.z\taux.w\ttime\tcomment" << std::endl;
       serializeTuneCache(cache_file);
       cache_file.close();
 
@@ -563,11 +563,11 @@ namespace quda {
 	cudaEventRecord(start, 0);
 	for (int i=0; i<tunable.tuningIter(); i++) {
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
 		       param.block.x, param.block.y, param.block.z,
 		       param.grid.x, param.grid.y, param.grid.z,
 		       param.shared_bytes,
-		       param.aux.x, param.aux.y, param.aux.z);
+		       param.aux.x, param.aux.y, param.aux.z, param.aux.w);
 	  }
 	  tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	}
