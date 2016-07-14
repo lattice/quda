@@ -487,13 +487,13 @@ enum IndexType {
 };
 
 // compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
-  template <IndexType idxType, typename Int>
-static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &x, Int &y, Int &z, Int &t, 
-						       const int &cb_idx, const int &parity, const int X[])
+template <IndexType idxType, int Bx=1, int By=1, int Bz=1, int Bt=1>
+static __device__ __forceinline__ void coordsFromIndex(int &idx, int &x, int &y, int &z, int &t,
+						       int &cb_idx, const int &parity, const int X[])
 {
-  int LX = X[0];
-  int LY = X[1];
-  int LZ = X[2];
+  const int LX = X[0];
+  const int LY = X[1];
+  const int LZ = X[2];
   int &XYZ = X3X2X1; // X[2]*X[1]*X[0]
   int &XY = X2X1; // X[1]*X[0]
 
@@ -565,15 +565,46 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, Int &x, Int &y,
     //   idx += (parity + t + z + y) & 1;
     //   x = idx % X;
     // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = idx / LX;
-    x = idx - aux1 * LX;
+#if 0 // tiled indexing - experimental and disabled for now
+    const int LT = X[3];
+    int aux1 =  idx / Bx;
+    int aux2 = aux1 / By;
+    int aux3 = aux2 / Bz;
+    int aux4 = aux3 / Bt;
+    int aux5 = aux4 / (LX/Bx);
+    int aux6 = aux5 / (LY/By);
+    int aux7 = aux6 / (LZ/Bz);
+    int aux8 = aux7 / (LT/Bt);
+
+    x =       idx - aux1 * Bx;
+    y =      aux1 - aux2 * By;
+    z =      aux2 - aux3 * Bz;
+    t =      aux3 - aux4 * Bt;
+
+    x += Bx*(aux4 - aux5 * (LX/Bx));
+    y += By*(aux5 - aux6 * (LY/By));
+    z += Bz*(aux6 - aux7 * (LZ/Bz));
+    t += Bt*(aux7 - aux8 * (LT/Bt));
+
+    aux1 = (parity + t + z + y) & 1;
+    x += aux1;
+
+    // update cb_idx for the swizzled coordinate
+    cb_idx = (((t*LZ+z)*LY+y)*LX+x) >> 1;
+    idx = 2*cb_idx + aux1;
+#else
+    int aux1 =  idx / LX;
     int aux2 = aux1 / LY;
+    int aux3 = aux2 / LZ;
+
+    x =  idx - aux1 * LX;
     y = aux1 - aux2 * LY;
-    t = aux2 / LZ;
-    z = aux2 - t * LZ;
+    z = aux2 - aux3 * LZ;
+    t = aux3;
     aux1 = (parity + t + z + y) & 1;
     x += aux1;
     idx += aux1;
+#endif
   } else if (idxType == EVEN_Y /*!(LY & 1)*/) { // Y even
     t = idx / XYZ;
     z = (idx / XY) % LZ;
