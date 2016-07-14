@@ -1052,7 +1052,7 @@ struct DslashFactory {
 
 
  // which policies are we going to tune over?
- static constexpr unsigned int n_policy = 2;
+ static constexpr int n_policy = 2;
  static constexpr QudaDslashPolicy policy[n_policy] = { QUDA_DSLASH2, QUDA_FUSED_DSLASH };
 
  class DslashPolicyTune : public Tunable {
@@ -1080,7 +1080,7 @@ struct DslashFactory {
      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
        disableProfileCount();
 
-       for (unsigned int i=0; i<n_policy; i++) {
+       for (int i=0; i<n_policy; i++) {
 	 DslashPolicyImp* dslashImp = DslashFactory::create(policy[i]);
 	 (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
 	 delete dslashImp;
