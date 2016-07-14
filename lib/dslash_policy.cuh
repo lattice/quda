@@ -1077,7 +1077,7 @@ struct DslashFactory {
    {
      // before we do policy tuning we must ensure the kernel
      // constituents have been tuned since we can't do nested tuning
-     if (getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+     if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
        disableProfileCount();
 
        for (unsigned int i=0; i<n_policy; i++) {
