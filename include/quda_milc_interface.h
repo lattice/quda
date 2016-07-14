@@ -172,6 +172,8 @@ extern "C" {
 		    double* const final_fermilab_residual,
 		    int* num_iters);
 
+
+
   /**
    * Solve Ax=b using an improved staggered operator with a
    * domain-decomposition preconditioner.  All fields are fields
@@ -209,6 +211,22 @@ extern "C" {
 		  double* const final_resid,
 		  double* const final_rel_resid,
 		  int* num_iters);
+
+      void qudaInvertMsrc(int external_precision,
+          int quda_precision,
+          double mass,
+          QudaInvertArgs_t inv_args,
+          double target_residual,
+          double target_fermilab_residual,
+          const void* const fatlink,
+          const void* const longlink,
+          const double tadpole,
+          void** sourceArray,
+          void** solutionArray,
+          double* const final_residual,
+          double* const final_fermilab_residual,
+          int* num_iters,
+          int num_src);
 
  /**
    * Solve  using an improved
