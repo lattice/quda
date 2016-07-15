@@ -98,11 +98,6 @@ namespace quda {
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
-    virtual bool advanceTuneParam(TuneParam &param) const
-    {
-      return advanceBlockDim(param) || advanceGridDim(param) || advanceAux(param);
-    }
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
