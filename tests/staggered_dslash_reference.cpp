@@ -47,7 +47,9 @@ template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *spinorField, 
 		     int oddBit, int daggerBit) 
 {
-  for (int i=0; i<Vh*1*3*2; i++) res[i] = 0.0;
+  const int nSrc = Ls; // Ls should already be set
+
+  for (int i=0; i<Vh*mySpinorSiteSize*nSrc; i++) res[i] = 0.0;
   
   gFloat *fatlinkEven[4], *fatlinkOdd[4];
   gFloat *longlinkEven[4], *longlinkOdd[4];
@@ -58,36 +60,38 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *s
     longlinkEven[dir] =longlink[dir];
     longlinkOdd[dir] = longlink[dir] + Vh*gaugeSiteSize;    
   }
-  
-  for (int i = 0; i < Vh; i++) {
-    memset(res + i*mySpinorSiteSize, 0, mySpinorSiteSize*sizeof(sFloat));
-    for (int dir = 0; dir < 8; dir++) {
-      gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
-      gFloat* longlnk = gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3);
-      
-      sFloat *first_neighbor_spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
-      sFloat *third_neighbor_spinor = spinorNeighbor(i, dir, oddBit, spinorField, 3);
-      
-      
-      sFloat gaugedSpinor[mySpinorSiteSize];
-      
-      if (dir % 2 == 0){
-	su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-	sum(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);	    
-	su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
-	sum(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);		
-      } else {
-	su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-	sub(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);       	
-	
-	su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
-	sub(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
-      }	    	    
-    }
-    if (daggerBit){
-      negx(&res[i*mySpinorSiteSize], mySpinorSiteSize);
-    }
-  }
+
+  for (int xs=0; xs<nSrc; xs++) {
+
+    for (int i = 0; i < Vh; i++) {
+      int sid = i + xs*Vh;
+      int offset = mySpinorSiteSize*sid;
+
+      for (int dir = 0; dir < 8; dir++) {
+	gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
+	gFloat* longlnk = gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3);
+
+	sFloat *first_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 1, mySpinorSiteSize);
+	sFloat *third_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, spinorField, 3, mySpinorSiteSize);
+
+	sFloat gaugedSpinor[mySpinorSiteSize];
+
+	if (dir % 2 == 0){
+	  su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	  su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
+	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	} else {
+	  su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	  su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
+	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	}
+      }
+
+      if (daggerBit) negx(&res[offset], mySpinorSiteSize);
+    } // 4-d volume
+  } // right-hand-side
   
 }
 
@@ -269,11 +273,10 @@ template <typename sFloat, typename gFloat>
 void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** longlink, 
 			    gFloat** ghostFatlink, gFloat** ghostLonglink,
 			    sFloat *spinorField, sFloat** fwd_nbr_spinor, 
-			    sFloat** back_nbr_spinor, int oddBit, int daggerBit)
+			    sFloat** back_nbr_spinor, int oddBit, int daggerBit, int nSrc)
 {
-  for (int i=0; i<Vh*1*3*2; i++) res[i] = 0.0;
+  for (int i=0; i<Vh*mySpinorSiteSize*nSrc; i++) res[i] = 0.0;
 
-  int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
   gFloat *fatlinkEven[4], *fatlinkOdd[4];
   gFloat *longlinkEven[4], *longlinkOdd[4];
   gFloat *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
@@ -286,43 +289,42 @@ void dslashReference_mg4dir(sFloat *res, gFloat **fatlink, gFloat** longlink,
     longlinkOdd[dir] = longlink[dir] + Vh*gaugeSiteSize;
     
     ghostFatlinkEven[dir] = ghostFatlink[dir];
-    ghostFatlinkOdd[dir] = ghostFatlink[dir] + Vsh[dir]*gaugeSiteSize;
+    ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir]/2)*gaugeSiteSize;
     ghostLonglinkEven[dir] = ghostLonglink[dir];
-    ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3*Vsh[dir]*gaugeSiteSize;
+    ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3*(faceVolume[dir]/2)*gaugeSiteSize;
   }
 
-  for (int i = 0; i < Vh; i++) {
-    memset(res + i*mySpinorSiteSize, 0, mySpinorSiteSize*sizeof(sFloat));
-    for (int dir = 0; dir < 8; dir++) {
-      gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
-      gFloat* longlnk = gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3);
+  for (int xs=0; xs<nSrc; xs++) {
 
-      sFloat *first_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, 3);
-      sFloat *third_neighbor_spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, 3);
+    for (int i = 0; i < Vh; i++) {
+      int sid = i + xs*Vh;
+      int offset = mySpinorSiteSize*sid;
 
-      sFloat gaugedSpinor[mySpinorSiteSize];
-
-
-      if (dir % 2 == 0){
-        su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-        sum(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
-        su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
-        sum(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);                                                        
-      }
-      else{
-        su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
-        sub(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
-
-        su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
-        sub(&res[i*mySpinorSiteSize], &res[i*mySpinorSiteSize], gaugedSpinor, mySpinorSiteSize);
+      for (int dir = 0; dir < 8; dir++) {
+	gFloat* fatlnk = gaugeLink_mg4dir(i, dir, oddBit, fatlinkEven, fatlinkOdd, ghostFatlinkEven, ghostFatlinkOdd, 1, 1);
+	gFloat* longlnk = gaugeLink_mg4dir(i, dir, oddBit, longlinkEven, longlinkOdd, ghostLonglinkEven, ghostLonglinkOdd, 3, 3);
 	
+	sFloat *first_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, 3, mySpinorSiteSize);
+	sFloat *third_neighbor_spinor = spinorNeighbor_5d_mgpu<QUDA_4D_PC>(sid, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 3, 3, mySpinorSiteSize);
+
+	sFloat gaugedSpinor[mySpinorSiteSize];
+
+	if (dir % 2 == 0){
+	  su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	  su3Mul(gaugedSpinor, longlnk, third_neighbor_spinor);
+	  sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	} else {
+	  su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	  su3Tmul(gaugedSpinor, longlnk, third_neighbor_spinor);
+	  sub(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
+	}
       }
 
-    }
-    if (daggerBit){
-      negx(&res[i*mySpinorSiteSize], mySpinorSiteSize);
-    }
-  }
+      if (daggerBit) negx(&res[offset], mySpinorSiteSize);
+    } // 4-d volume
+  } // right-hand-side
 
 }
 
@@ -332,8 +334,7 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
 			     void** ghost_longlink, cpuColorSpinorField* in, int oddBit, int daggerBit, 
 			     QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
-  const int Nsrc = out->X(4);
-  const int nFace = 3;
+  const int nSrc = in->X(4);
 
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
@@ -349,35 +350,23 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
   void** fwd_nbr_spinor = in->fwdGhostFaceBuffer;
   void** back_nbr_spinor = in->backGhostFaceBuffer;
 
-  for (int i=0; i<Nsrc; i++) {
-    void *In = static_cast<char*>(in->V()) + i * 6 * sPrecision * (in->VolumeCB() / Nsrc);
-    void *Out = static_cast<char*>(out->V()) + i * 6 * sPrecision * (in->VolumeCB() / Nsrc);
-
-    void *fwd_ghost[4], *back_ghost[4];
-    for (int d=0; d<4; d++) {
-      fwd_ghost[d] = static_cast<char*>(fwd_nbr_spinor[d]) + i * 6 * nFace * sPrecision * (in->SurfaceCB(d) / Nsrc);
-      back_ghost[d] = static_cast<char*>(back_nbr_spinor[d]) + i * 6 * nFace * sPrecision * (in->SurfaceCB(d) / Nsrc);
-    }
-
-    if (sPrecision == QUDA_DOUBLE_PRECISION) {
-      if (gPrecision == QUDA_DOUBLE_PRECISION) {
-	dslashReference_mg4dir((double*)Out, (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
-			       (double*)In, (double**)fwd_ghost, (double**)back_ghost, oddBit, daggerBit);
-      } else {
-	dslashReference_mg4dir((double*)Out, (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-			       (double*)In, (double**)fwd_ghost, (double**)back_ghost, oddBit, daggerBit);
-      }
+  if (sPrecision == QUDA_DOUBLE_PRECISION) {
+    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+      dslashReference_mg4dir((double*)out->V(), (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
+			     (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc);
     } else {
-      if (gPrecision == QUDA_DOUBLE_PRECISION) {
-	dslashReference_mg4dir((float*)Out, (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
-			       (float*)In, (float**)fwd_ghost, (float**)back_ghost, oddBit, daggerBit);
-      } else {
-	dslashReference_mg4dir((float*)Out, (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-			       (float*)In, (float**)fwd_ghost, (float**)back_ghost, oddBit, daggerBit);
+      dslashReference_mg4dir((double*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
+			     (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit, nSrc);
       }
+  } else {
+    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+      dslashReference_mg4dir((float*)out->V(), (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
+			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc);
+    } else {
+      dslashReference_mg4dir((float*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
+			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit, nSrc);
     }
   }
-  
   
 }
 

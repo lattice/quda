@@ -95,6 +95,7 @@ void init()
   gaugeParam.X[3] = X[3] = tdim;
 
   setDims(gaugeParam.X);
+  dw_setDims(gaugeParam.X,Nsrc); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -373,13 +374,7 @@ void staggeredDslashRef()
       staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
 			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-      for (int i=0; i<Nsrc; i++) {
-	void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
-	void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
-
-	staggered_dslash(out, fatlink, longlink, in, parity, dagger,
-			 inv_param.cpu_prec, gaugeParam.cpu_prec);
-      }
+      staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif    
       break;
     case 1: 
@@ -388,12 +383,7 @@ void staggeredDslashRef()
 			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
-      for (int i=0; i<Nsrc; i++) {
-	void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
-	void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
-	staggered_dslash(out, fatlink, longlink, in, parity, dagger,
-			 inv_param.cpu_prec, gaugeParam.cpu_prec);
-      }
+      staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif
       break;
     case 2:
