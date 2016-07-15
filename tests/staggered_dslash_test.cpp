@@ -364,44 +364,34 @@ double dslashCUDA(int niter) {
 void staggeredDslashRef()
 {
 
-#ifndef MULTI_GPU
-  int cpu_parity = 0;
-#endif
-
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
   fflush(stdout);
   switch (test_type) {
     case 0:    
 #ifdef MULTI_GPU
-
       staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
-          spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-      cpu_parity = 0; //EVEN
-
       for (int i=0; i<Nsrc; i++) {
 	void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
 	void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
 
-	staggered_dslash(out, fatlink, longlink, in, cpu_parity, dagger, 
+	staggered_dslash(out, fatlink, longlink, in, parity, dagger,
 			 inv_param.cpu_prec, gaugeParam.cpu_prec);
       }
 #endif    
-
-
       break;
     case 1: 
 #ifdef MULTI_GPU
       staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
-          spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);    
+			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
-      cpu_parity=1; //ODD
       for (int i=0; i<Nsrc; i++) {
 	void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
 	void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
-	staggered_dslash(out, fatlink, longlink, in, cpu_parity, dagger, 
+	staggered_dslash(out, fatlink, longlink, in, parity, dagger,
 			 inv_param.cpu_prec, gaugeParam.cpu_prec);
       }
 #endif
