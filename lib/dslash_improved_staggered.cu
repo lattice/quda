@@ -105,9 +105,8 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
-      dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 				(sFloat*)out->V(), (float*)out->Norm(), 
 				fat0, fat1, long0, long1, phase0, phase1, 
 				(sFloat*)in->V(), (float*)in->Norm(), 

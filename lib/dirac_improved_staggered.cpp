@@ -40,6 +40,10 @@ namespace quda {
 
   void DiracImprovedStaggered::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
   {
+    if (in.Ndim() != 5 || out.Ndim() != 5) {
+      errorQuda("Staggered dslash requires 5-d fermion fields");
+    }
+
     if (in.Precision() != out.Precision()) {
       errorQuda("Input and output spinor precisions don't match in dslash_quda");
     }
