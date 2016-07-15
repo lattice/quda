@@ -1577,6 +1577,7 @@ QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
+int Nsrc = 1;
 bool tune = true;
 int niter = 100;
 int test_type = 0;
@@ -1679,6 +1680,7 @@ void usage(char** argv )
   printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
+  printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
   printf("    --help                                    # Print out this message\n"); 
 
   usage_extra(argv); 
@@ -2262,6 +2264,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--nsrc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    Nsrc= atoi(argv[i+1]);
+    if (Nsrc < 1 || Nsrc > 64){
+      printf("ERROR: invalid number of sources (%d)\n", Nsrc);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--test") == 0){
     if (i+1 >= argc){
       usage(argv);

@@ -73,6 +73,7 @@ extern bool verify_results;
 extern bool kernel_pack_t;
 
 int X[4];
+extern int Nsrc; // number of spinors to apply to simultaneously
 
 Dirac* dirac;
 
@@ -142,10 +143,12 @@ void init()
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
-  csParam.nDim=4;
+  csParam.nDim=5;
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gaugeParam.X[d];
   }
+  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
   if (test_type < 2) {
@@ -360,9 +363,6 @@ double dslashCUDA(int niter) {
 
 void staggeredDslashRef()
 {
-#ifndef MULTI_GPU
-  int cpu_parity = 0;
-#endif
 
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
@@ -370,27 +370,30 @@ void staggeredDslashRef()
   switch (test_type) {
     case 0:    
 #ifdef MULTI_GPU
-
       staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
-          spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-      cpu_parity = 0; //EVEN
-      staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
-          inv_param.cpu_prec, gaugeParam.cpu_prec);
+      for (int i=0; i<Nsrc; i++) {
+	void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
+	void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
 
+	staggered_dslash(out, fatlink, longlink, in, parity, dagger,
+			 inv_param.cpu_prec, gaugeParam.cpu_prec);
+      }
 #endif    
-
-
       break;
     case 1: 
 #ifdef MULTI_GPU
       staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
-          spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);    
+			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 
 #else
-      cpu_parity=1; //ODD
-      staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
-          inv_param.cpu_prec, gaugeParam.cpu_prec);
+      for (int i=0; i<Nsrc; i++) {
+	void *in = (char*)spinor->V() + i * 6 * inv_param.cpu_prec * (spinor->Volume() / Nsrc);
+	void *out = (char*)spinorRef->V() + i * 6 * inv_param.cpu_prec * (spinorRef->Volume() / Nsrc);
+	staggered_dslash(out, fatlink, longlink, in, parity, dagger,
+			 inv_param.cpu_prec, gaugeParam.cpu_prec);
+      }
 #endif
       break;
     case 2:
@@ -444,6 +447,7 @@ static int dslashTest()
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
     double spinor_out_norm2 =  blas::norm2(*spinorOut);
+
     if (!transfer) {
       double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
       printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n",  spinor_ref_norm2, cuda_spinor_out_norm2,

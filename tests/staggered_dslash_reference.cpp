@@ -332,13 +332,15 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
 			     void** ghost_longlink, cpuColorSpinorField* in, int oddBit, int daggerBit, 
 			     QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
+  const int Nsrc = out->X(4);
+  const int nFace = 3;
 
   QudaParity otherparity = QUDA_INVALID_PARITY;
-  if (oddBit == QUDA_EVEN_PARITY){
+  if (oddBit == QUDA_EVEN_PARITY) {
     otherparity = QUDA_ODD_PARITY;
-  }else if (oddBit == QUDA_ODD_PARITY){
+  } else if (oddBit == QUDA_ODD_PARITY) {
     otherparity = QUDA_EVEN_PARITY;
-  }else{
+  } else {
     errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
   }
 
@@ -347,23 +349,32 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
   void** fwd_nbr_spinor = in->fwdGhostFaceBuffer;
   void** back_nbr_spinor = in->backGhostFaceBuffer;
 
-  if (sPrecision == QUDA_DOUBLE_PRECISION) {
-    if (gPrecision == QUDA_DOUBLE_PRECISION){
-      dslashReference_mg4dir((double*)out->V(), (double**)fatlink, (double**)longlink,  
-			     (double**)ghost_fatlink, (double**)ghost_longlink, (double*)in->V(), 
-			     (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
-    } else {
-      dslashReference_mg4dir((double*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-			     (double*)in->V(), (double**)fwd_nbr_spinor, (double**)back_nbr_spinor, oddBit, daggerBit);
+  for (int i=0; i<Nsrc; i++) {
+    void *In = static_cast<char*>(in->V()) + i * 6 * sPrecision * (in->VolumeCB() / Nsrc);
+    void *Out = static_cast<char*>(out->V()) + i * 6 * sPrecision * (in->VolumeCB() / Nsrc);
+
+    void *fwd_ghost[4], *back_ghost[4];
+    for (int d=0; d<4; d++) {
+      fwd_ghost[d] = static_cast<char*>(fwd_nbr_spinor[d]) + i * 6 * nFace * sPrecision * (in->SurfaceCB(d) / Nsrc);
+      back_ghost[d] = static_cast<char*>(back_nbr_spinor[d]) + i * 6 * nFace * sPrecision * (in->SurfaceCB(d) / Nsrc);
     }
-  }
-  else{
-    if (gPrecision == QUDA_DOUBLE_PRECISION){
-      dslashReference_mg4dir((float*)out->V(), (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
-			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
-    }else{
-      dslashReference_mg4dir((float*)out->V(), (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
-			     (float*)in->V(), (float**)fwd_nbr_spinor, (float**)back_nbr_spinor, oddBit, daggerBit);
+
+    if (sPrecision == QUDA_DOUBLE_PRECISION) {
+      if (gPrecision == QUDA_DOUBLE_PRECISION) {
+	dslashReference_mg4dir((double*)Out, (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
+			       (double*)In, (double**)fwd_ghost, (double**)back_ghost, oddBit, daggerBit);
+      } else {
+	dslashReference_mg4dir((double*)Out, (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
+			       (double*)In, (double**)fwd_ghost, (double**)back_ghost, oddBit, daggerBit);
+      }
+    } else {
+      if (gPrecision == QUDA_DOUBLE_PRECISION) {
+	dslashReference_mg4dir((float*)Out, (double**)fatlink, (double**)longlink, (double**)ghost_fatlink, (double**)ghost_longlink,
+			       (float*)In, (float**)fwd_ghost, (float**)back_ghost, oddBit, daggerBit);
+      } else {
+	dslashReference_mg4dir((float*)Out, (float**)fatlink, (float**)longlink, (float**)ghost_fatlink, (float**)ghost_longlink,
+			       (float*)In, (float**)fwd_ghost, (float**)back_ghost, oddBit, daggerBit);
+      }
     }
   }
   

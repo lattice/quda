@@ -13,9 +13,7 @@ enum KernelType {
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
     int X[4];
-#ifdef GPU_DOMAIN_WALL_DIRAC 
     int Ls;
-#endif
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension

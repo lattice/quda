@@ -34,8 +34,6 @@
 #define spinorFloat2 float2
 //float2 I0, I1, I2;
 
-
-
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -224,35 +222,25 @@
 #define VOLATILE volatile
 #endif
 
-/*
+#ifdef PARALLEL_DIR
+
+extern __shared__ spinorFloat s_data[];
+
 // output spinor
 #if (DD_PREC == 0)
-#if (__COMPUTE_CAPABILITY__ >= 200)
-#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi
+#define SHARED_STRIDE 16 // to avoid bank conflicts on Fermi+
 #else
-#define SHARED_STRIDE  8 // to avoid bank conflicts on G80 and GT200
+#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi+
 #endif
-extern __shared__ spinorFloat sd_data[];
-VOLATILE spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
-  + (threadIdx.x % SHARED_STRIDE);
-#else
-#if (__COMPUTE_CAPABILITY__ >= 200)
-#define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi
-#else
-#define SHARED_STRIDE 16 // to avoid bank conflicts on G80 and GT200
-#endif
-  extern __shared__ spinorFloat ss_data[];
-VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
-  + (threadIdx.x % SHARED_STRIDE);
-#endif
-  // output spinor
-#define o00_re s[0*SHARED_STRIDE]
-#define o00_im s[1*SHARED_STRIDE]
-#define o01_re s[2*SHARED_STRIDE]
-#define o01_im s[3*SHARED_STRIDE]
-#define o02_re s[4*SHARED_STRIDE]
-#define o02_im s[5*SHARED_STRIDE]
-*/
+
+VOLATILE spinorFloat *s = s_data + 
+  SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*((threadIdx.x+blockDim.x*threadIdx.y)/SHARED_STRIDE)
+  + ((threadIdx.x+blockDim.x*threadIdx.y) % SHARED_STRIDE);
+
+#endif // PARALLEL_DIR
+
+
+// output spinor
 spinorFloat o00_re;
 spinorFloat o00_im;
 spinorFloat o01_re;
@@ -364,8 +352,10 @@ spinorFloat o02_im;
 #endif
 
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
-  if(sid >= param.threads) return;
+  if (sid >= param.threads) return;
 
+  int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
+  if (src_idx >= param.Ls) return;
 
   const int X1X0 = X[1]*X[0];
   const int X2X1X0 = X[2]*X1X0;
@@ -416,6 +406,9 @@ int fat_sign = 1;
 int long_sign = 1;
 #endif
 
+#ifdef PARALLEL_DIR
+if (threadId.z & 1)
+#endif // PARALLEL_DIR
 {
   //direction: +X
 
@@ -435,7 +428,7 @@ int long_sign = 1;
   {
     int sp_idx_1st_nbr = ((y[0]==(X[0]-1)) ? full_idx-(X[0]-1) : full_idx+1) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -480,7 +473,7 @@ int long_sign = 1;
     int sp_idx_3rd_nbr = ((y[0] >= (X[0]-3)) ? full_idx-(X[0]-3) : full_idx+3) >> 1;
     READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx, long_stride);        
     READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -512,9 +505,12 @@ int long_sign = 1;
 
 #endif
 
-} // direction: +X
+ } // direction: +X
 
 
+#ifdef PARALLEL_DIR
+if (!(threadIdx.z & 1))
+#endif // PARALLEL_DIR
 {
   // direction: -X
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
@@ -538,7 +534,7 @@ int long_sign = 1;
     }
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -589,7 +585,7 @@ int long_sign = 1;
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 		
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 		
-    int nbr_idx3 = sp_idx_3rd_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
     int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -623,6 +619,9 @@ int long_sign = 1;
 
 
 
+#ifdef PARALLEL_DIR
+if (threadIdx.z & 1) 
+#endif // PARALLEL_DIR
 {
   //direction: +Y
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
@@ -641,7 +640,7 @@ int long_sign = 1;
   {
     int sp_idx_1st_nbr = ((y[1]==(X[1]-1)) ? full_idx-(X1X0-X[0]) : full_idx+X[0]) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -686,8 +685,8 @@ int long_sign = 1;
     int sp_idx_3rd_nbr = ((y[1] >= (X[1]-3) ) ? full_idx-(X[1]-3)*X[0] : full_idx+3*X[0]) >> 1;    
     READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr;
-    int stride3 = param.sp_stride;        
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
 #endif	 
@@ -717,6 +716,10 @@ int long_sign = 1;
 #endif
 }
 
+
+#ifdef PARALLEL_DIR
+if (!(threadIdx.z & 1)) 
+#endif // PARALLEL_DIR
 {
   //direction: -Y
 
@@ -741,7 +744,7 @@ int long_sign = 1;
     }    
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -792,8 +795,8 @@ int long_sign = 1;
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 
-    int nbr_idx3 = sp_idx_3rd_nbr;
-    int stride3 = param.sp_stride;    
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
+    int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
 #endif	 
@@ -823,6 +826,9 @@ int long_sign = 1;
 #endif
 }
 
+#ifdef PARALLEL_DIR
+if (threadIdx.z&1)
+#endif // PARALLEL_DIR
 {
   //direction: +Z
 
@@ -842,7 +848,7 @@ int long_sign = 1;
   {
     int sp_idx_1st_nbr = ((y[2]==(X[2]-1)) ? full_idx-(X[2]-1)*X1X0 : full_idx+X1X0) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -887,7 +893,7 @@ int long_sign = 1;
     int sp_idx_3rd_nbr = ((y[2]>= (X[2]-3))? full_idx -(X[2]-3)*X1X0: full_idx + 3*X1X0)>> 1;    
     READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx, long_stride);
-    int nbr_idx3 = sp_idx_3rd_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
     int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -919,6 +925,10 @@ int long_sign = 1;
 
 }
 
+
+#ifdef PARALLEL_DIR
+if (!(threadIdx.z & 1)) 
+#endif // PARALLEL_DIR
 {
   //direction: -Z
 
@@ -944,7 +954,7 @@ int long_sign = 1;
     }    
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -995,7 +1005,7 @@ int long_sign = 1;
 #endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);         
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);         
-    int nbr_idx3 = sp_idx_3rd_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -1026,6 +1036,10 @@ int long_sign = 1;
 #endif
 }
 
+
+#ifdef PARALLEL_DIR
+if (threadIdx.z & 1) 
+#endif // PARALLEL_DIR
 {
   //direction: +T
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
@@ -1044,7 +1058,7 @@ int long_sign = 1;
   {    
     int sp_idx_1st_nbr = ((y[3]==(X[3]-1)) ? full_idx-(X[3]-1)*X2X1X0 : full_idx+X2X1X0) >> 1;
     READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -1090,7 +1104,7 @@ int long_sign = 1;
     int sp_idx_3rd_nbr = ((y[3]>=(X[3]-3))? full_idx -(X[3]-3)*X2X1X0 : full_idx + 3*X2X1X0)>> 1;     
     READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx, long_stride);    
     READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx, long_stride);    
-    int nbr_idx3 = sp_idx_3rd_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -1121,6 +1135,9 @@ int long_sign = 1;
 #endif
 }
 
+#ifdef PARALLEL_DIR
+if (!(threadIdx.z & 1)) 
+#endif // PARALLEL_DIR
 {
   //direction: -T
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
@@ -1139,7 +1156,7 @@ int long_sign = 1;
   {
     int sp_idx_1st_nbr = ((y[3]==0)    ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
     int fat_idx = sp_idx_1st_nbr;    
-    int nbr_idx1 = sp_idx_1st_nbr;
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
@@ -1189,7 +1206,7 @@ int long_sign = 1;
   {
     int sp_idx_3rd_nbr = ((y[3]<3) ? full_idx + (X[3]-3)*X2X1X0: full_idx - 3*X2X1X0) >> 1;
     int long_idx = sp_idx_3rd_nbr;
-    int nbr_idx3 = sp_idx_3rd_nbr;
+    int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
     int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx3 = nbr_idx3;
@@ -1223,9 +1240,35 @@ int long_sign = 1;
     o01_im -= B1_im;
     o02_re -= B2_re;
     o02_im -= B2_im;
-  }        
+ 
+#ifdef PARALLEL_DIR
+    // send the backward gathers to shared memory
+    s[0*SHARED_STRIDE] = o00_re;
+    s[1*SHARED_STRIDE] = o00_im;
+    s[2*SHARED_STRIDE] = o01_re;
+    s[3*SHARED_STRIDE] = o01_im;
+    s[4*SHARED_STRIDE] = o02_re;
+    s[5*SHARED_STRIDE] = o02_im;
+#endif // PARALLEL_DIR
+
+ }        
 #endif
 }
+
+#ifdef PARALLEL_DIR
+__syncthreads();
+
+// add the forward gathers to the backward gathers and save
+if (threadIdx.z & 1) {
+  o00_re += s[0*SHARED_STRIDE];
+  o00_im += s[1*SHARED_STRIDE];
+  o01_re += s[2*SHARED_STRIDE];
+  o01_im += s[3*SHARED_STRIDE];
+  o02_re += s[4*SHARED_STRIDE];
+  o02_im += s[5*SHARED_STRIDE];
+#else
+  {
+#endif // PARALLEL_DIR
 
 
 #if (DD_DAG == 1)
@@ -1243,7 +1286,7 @@ int long_sign = 1;
 #ifdef DSLASH_AXPY
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
-  READ_ACCUM(ACCUMTEX,sid);
+  READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
   o00_re = -o00_re + a*accum0.x;
   o00_im = -o00_im + a*accum0.y;
   o01_re = -o01_re + a*accum1.x;
@@ -1259,7 +1302,7 @@ if (kernel_type == INTERIOR_KERNEL){
   o02_im = -o02_im;
 }
 #else
-READ_ACCUM(ACCUMTEX,sid);
+READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
 o00_re = -o00_re + a*accum0.x;
 o00_im = -o00_im + a*accum0.y;
 o01_re = -o01_re + a*accum1.x;
@@ -1272,14 +1315,14 @@ o02_im = -o02_im + a*accum2.y;
 #ifdef MULTI_GPU
 //if (kernel_type == EXTERIOR_KERNEL_T){
 if (kernel_type != INTERIOR_KERNEL){
-  READ_AND_SUM_SPINOR(INTERTEX, sid);
+  READ_AND_SUM_SPINOR(INTERTEX, sid + src_idx*Vh);
 }
 #endif
 
 
 // write spinor field back to device memory
-WRITE_SPINOR(out, sid, param.sp_stride);
-
+WRITE_SPINOR(out, sid + src_idx*Vh, param.sp_stride);
+  }
 
 // undefine to prevent warning when precision is changed
 #undef time_boundary
