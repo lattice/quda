@@ -1540,6 +1540,7 @@ void qudaCloverInvert(int external_precision,
   invertParam.tol =  target_residual;
   invertParam.tol_hq = target_fermilab_residual;
   if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
+  invertParam.clover_coeff = clover_coeff;
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;

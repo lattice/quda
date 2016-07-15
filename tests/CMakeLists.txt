@@ -26,11 +26,11 @@ endif()
 
 #define tests
 
-if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_DOMAIN_WALL})
-  cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp)
+if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_CLOVER} OR ${QUDA_DIRAC_TWISTED_MASS} OR ${QUDA_DIRAC_TWISTED_CLOVER} OR ${QUDA_DIRAC_DOMAIN_WALL})
+  cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
 
-  cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
 
   cuda_add_executable(invertmsrc_test invertmsrc_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
@@ -41,10 +41,10 @@ cuda_add_executable(deflation_test deflation_test.cpp wilson_dslash_reference.cp
 target_link_libraries(deflation_test ${TEST_LIBS})
 
 if(${QUDA_DIRAC_STAGGERED})
-  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp   staggered_dslash_reference.cpp)
+  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
 
-  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp  staggered_dslash_reference.cpp  blas_reference.cpp)
+  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
 
   cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp  staggered_dslash_reference.cpp  blas_reference.cpp)
@@ -52,7 +52,7 @@ if(${QUDA_DIRAC_STAGGERED})
 endif()
 
 if(${QUDA_MULTIGRID})
-  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(multigrid_invert_test ${TEST_LIBS})
 
   cuda_add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)

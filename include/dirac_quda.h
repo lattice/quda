@@ -33,7 +33,6 @@ namespace quda {
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
     cudaCloverField *clover;
-    cudaCloverField *cloverInv;
   
     double mu; // used by twisted mass only
     double epsilon; //2nd tm parameter (used by twisted mass only)
@@ -49,7 +48,7 @@ namespace quda {
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), cloverInv(0), mu(0.0), epsilon(0.0),
+      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0),
       tmp1(0), tmp2(0)
     {
 
@@ -537,7 +536,6 @@ namespace quda {
     double mu;
     double epsilon;
     cudaCloverField &clover;
-    cudaCloverField &cloverInv;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
