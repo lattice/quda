@@ -72,6 +72,8 @@ extern double mass; // the mass of the Dirac operator
 
 extern double mass;
 
+
+int num_src;
 static void end();
 
 template<typename Float>
@@ -127,7 +129,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter...
   inv_param->maxiter = 500000;
-  inv_param->reliable_delta = 1e-1;
+  inv_param->reliable_delta = 0;//1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
 
@@ -317,7 +319,7 @@ invert_test(void)
       }
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
       #define NUM_SRC 20
-      inv_param.num_src=16;
+      inv_param.num_src=num_src;
       void* outArray[NUM_SRC];
       void* inArray[NUM_SRC];
       int len;
@@ -570,17 +572,29 @@ usage_extra(char** argv )
   printfQuda("                                                3: Even even spinor multishift CG inverter\n");
   printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
   printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
+  printfQuda("    --num_src n                             # Numer of sources used\n");
 
   return ;
 }
 int main(int argc, char** argv)
 {
+
+  num_src=4;
   for (int i = 1; i < argc; i++) {
 
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }
 
+
+        if( strcmp(argv[i], "--num_src") == 0){
+          if (i+1 >= argc){
+            usage(argv);
+          }
+          num_src= atoi(argv[i+1]);
+          i++;
+          continue;
+        }
 
 
     if( strcmp(argv[i], "--cpu_prec") == 0){
