@@ -376,8 +376,10 @@ namespace quda {
   }
 
 
-#if 1
+#if BCGRQ
 void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
+
+  printfQuda("BCGrQ Solver\n");
 
   if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
@@ -1037,14 +1039,15 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   }
 
-#endif
-
-  #if 0
-
+#else
+#define BLOCKCG_GS 1
   void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
-
-
+#ifdef BLOCKCG_GS
+    printfQuda("BCGdQ Solver\n");
+    #else
+    printfQuda("BCQ Solver\n");
+    #endif
     const bool use_block = true;
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
     errorQuda("Not supported");
@@ -1063,8 +1066,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // Check to see that we're not trying to invert on a zero-field source
     //MW: it might be useful to check what to do here.
     double b2[QUDA_MAX_MULTI_SHIFT];
+    double b2avg=0;
+    double r2avg=0;
     for(int i=0; i< param.num_src; i++){
       b2[i]=blas::norm2(b.Component(i));
+      b2avg += b2[i];
       if(b2[i] == 0){
         profile.TPSTOP(QUDA_PROFILE_INIT);
         errorQuda("Warning: inverting on zero-field source\n");
@@ -1083,8 +1089,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         b2m(i,j) = blas::cDotProduct(b.Component(i), b.Component(j));
       }
     }
-
+#ifdef MWVERBOSE
     std::cout << "b2m\n" <<  b2m << std::endl;
+#endif
 
     ColorSpinorParam csParam(x);
     if (!init) {
@@ -1246,9 +1253,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     int k = 0;
 
     for(int i=0; i<param.num_src; i++){
-      PrintStats("CG", k, r2(i,i).real(), b2[i], heavy_quark_res[i]);
+      r2avg+=r2(i,i).real();
     }
-
+    PrintStats("CG", k, r2avg, b2avg, heavy_quark_res[0]);
     int steps_since_reliable = 1;
     bool allconverged = true;
     bool converged[QUDA_MAX_MULTI_SHIFT];
@@ -1258,40 +1265,39 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
     MatrixXcd sigma(param.num_src,param.num_src);
 
-
+#ifdef BLOCKCG_GS
 // begin ignore Gram-Schmidt for now
 
-    // for(int i=0; i < param.num_src; i++){
-    //   double n = blas::norm2(p.Component(i));
-    //   blas::ax(1/sqrt(n),p.Component(i));
-    //   for(int j=i+1; j < param.num_src; j++) {
-    //     std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
-    //     blas::caxpy(-ri,p.Component(i),p.Component(j));
-    //
-    //   }
-    // }
-    //
-    //
-    // gamma = MatrixXcd::Zero(param.num_src,param.num_src);
-    // for ( int i = 0; i < param.num_src; i++){
-    //   for (int j=i; j < param.num_src; j++){
-    //     gamma(i,j) = blas::cDotProduct(p.Component(i),pnew.Component(j));
-    //   }
-    // }
+    for(int i=0; i < param.num_src; i++){
+      double n = blas::norm2(p.Component(i));
+      blas::ax(1/sqrt(n),p.Component(i));
+      for(int j=i+1; j < param.num_src; j++) {
+        std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+        blas::caxpy(-ri,p.Component(i),p.Component(j));
+
+      }
+    }
+
+
+    gamma = MatrixXcd::Zero(param.num_src,param.num_src);
+    for ( int i = 0; i < param.num_src; i++){
+      for (int j=i; j < param.num_src; j++){
+        gamma(i,j) = blas::cDotProduct(p.Component(i),pnew.Component(j));
+      }
+    }
+#endif
     // end ignore Gram-Schmidt for now
 
-
+#ifdef MWVERBOSE
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
         pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
       }
     }
+
     std::cout << " pTp " << std::endl << pTp << std::endl;
-
-    // gamma = qr.householderQ();
-    // gamma = gamma.transpose().eval();
     std::cout <<  "QR" << gamma<<  std::endl << "QP " << gamma.inverse()*gamma << std::endl;;
-
+#endif
     while ( !allconverged && k < param.maxiter ) {
       for(int i=0; i<param.num_src; i++){
         matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
@@ -1333,6 +1339,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         }
 
         alpha = pAp.inverse() * gamma.adjoint().inverse() * r2;
+#ifdef MWVERBOSE
         std::cout << "alpha\n" << alpha << std::endl;
 
         if(k==1){
@@ -1342,19 +1349,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           std::cout << "alpha " << std::endl <<alpha << std::endl;
           std::cout << "pAp^-1r2" << std::endl << pAp.inverse()*r2 << std::endl;
         }
+#endif
         // here we are deploying the alternative beta computation
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j < param.num_src; j++){
-            // cg_norm is flawed here as update of R is not yet completed
-            //
-            //Complex cg_norm =
+
             blas::caxpy(-alpha(j,i), Ap.Component(j), rSloppy.Component(i));
-
-            // r2(i,j) = blas::reDotProduct(rSloppy.Component(i), rSloppy.Component(j));
-
-            // r2(i,i) needs to be transformed to r_i, r_j, cg_norm no longer useful here?
-            // r2(i,j) = real(cg_norm);  // (r_new, r_new)
-            // sigma(i,j) = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2(i,j);  // use r2 if (r_k+1, r_k+1-r_k) breaks
           }
         }
         // MW need to calculate the full r2 matrix here, after update. Not sure how to do alternative sigma yet ...
@@ -1394,10 +1394,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         // }
       }
       if ( (updateR || updateX )) {
-        printfQuda("Suppressing reliable update %i %i\n",updateX,updateR);
+        // printfQuda("Suppressing reliable update %i %i\n",updateX,updateR);
         updateX=false;
         updateR=false;
-        printfQuda("Suppressing reliable update %i %i\n",updateX,updateR);
+        // printfQuda("Suppressing reliable update %i %i\n",updateX,updateR);
       }
 
       if ( !(updateR || updateX )) {
@@ -1405,9 +1405,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         //   beta(i,i) = sigma(i,i) / r2_old(i,i);  // use the alternative beta computation
         // }
         beta = gamma * r2_old.inverse() * sigma;
-
+#ifdef MWVERBOSE
         std::cout << "beta\n" << beta << std::endl;
-
+#endif
         if (param.pipeline && !breakdown)
         errorQuda("pipeline not implemented");
         //for(int i=0; i<param.num_src; i++){
@@ -1455,25 +1455,27 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           }
 
 
+#ifdef BLOCKCG_GS
+          for(int i=0; i < param.num_src; i++){
+            double n = blas::norm2(p.Component(i));
+            blas::ax(1/sqrt(n),p.Component(i));
+            for(int j=i+1; j < param.num_src; j++) {
+              std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+              blas::caxpy(-ri,p.Component(i),p.Component(j));
 
-          // for(int i=0; i < param.num_src; i++){
-          //   double n = blas::norm2(p.Component(i));
-          //   blas::ax(1/sqrt(n),p.Component(i));
-          //   for(int j=i+1; j < param.num_src; j++) {
-          //     std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
-          //     blas::caxpy(-ri,p.Component(i),p.Component(j));
-          //
-          //   }
-          // }
-          //
-          //
-          // gamma = MatrixXcd::Zero(param.num_src,param.num_src);
-          // for ( int i = 0; i < param.num_src; i++){
-          //   for (int j=i; j < param.num_src; j++){
-          //     gamma(i,j) = blas::cDotProduct(p.Component(i),pnew.Component(j));
-          //   }
-          // }
+            }
+          }
 
+
+          gamma = MatrixXcd::Zero(param.num_src,param.num_src);
+          for ( int i = 0; i < param.num_src; i++){
+            for (int j=i; j < param.num_src; j++){
+              gamma(i,j) = blas::cDotProduct(p.Component(i),pnew.Component(j));
+            }
+          }
+#endif
+
+#ifdef MWVERBOSE
           for(int i=0; i<param.num_src; i++){
             for(int j=0; j<param.num_src; j++){
               pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
@@ -1484,7 +1486,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           // gamma = qr.householderQ();
           // gamma = gamma.transpose().eval();
           std::cout <<  "QR" << gamma<<  std::endl << "QP " << gamma.inverse()*gamma << std::endl;;
-
+#endif
         }
 
 
@@ -1601,12 +1603,14 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       k++;
 
       allconverged = true;
+      r2avg=0;
       for(int i=0; i<param.num_src; i++){
-        PrintStats("CG", k, r2(i,i).real(), b2[i], heavy_quark_res[i]);
+        r2avg+= r2(i,i).real();
         // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
         converged[i] = convergence(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
         allconverged = allconverged && converged[i];
       }
+      PrintStats("CG", k, r2avg, b2avg, heavy_quark_res[0]);
 
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
