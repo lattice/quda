@@ -1,68 +1,183 @@
-#include <unistd.h>
 #include <qmp.h>
-#include <comm_quda.h>
+#include <csignal>
 #include <quda_internal.h>
-#include <util_quda.h>
+#include <comm_quda.h>
 
-struct CommQMP {
+#define QMP_CHECK(qmp_call) do {                     \
+  QMP_status_t status = qmp_call;                    \
+  if (status != QMP_SUCCESS)                         \
+    errorQuda("(QMP) %s", QMP_error_string(status)); \
+} while (0)
+
+struct MsgHandle_s {
   QMP_msgmem_t mem;
   QMP_msghandle_t handle;
 };
 
-extern int getGpuCount();
+static int gpuid = -1;
+static bool peer2peer_enabled[2][4] = { {false,false,false,false},
+                                        {false,false,false,false} };
+static bool peer2peer_init = false;
 
-#define QMP_CHECK(a)							\
-  {QMP_status_t status;							\
-  if ((status = a) != QMP_SUCCESS)					\
-    errorQuda("QMP returned with error %s", QMP_error_string(status) );	\
+// While we can emulate an all-gather using QMP reductions, this
+// scales horribly as the number of nodes increases, so for
+// performance we just call MPI directly
+#define USE_MPI_GATHER
+
+#ifdef USE_MPI_GATHER
+#include <mpi.h>
+#endif
+
+void get_hostnames(char *hostname_recv_buf) {
+  // determine which GPU this rank will use
+  char *hostname = comm_hostname();
+
+#ifdef USE_MPI_GATHER
+  MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD);
+#else
+  // Abuse reductions to emulate all-gather.  We need to copy the
+  // local hostname to all other nodes
+  // this isn't very scalable though
+  for (int i=0; i<comm_size(); i++) {
+    int data[128];
+    for (int j=0; j<128; j++) {
+      data[j] = (i == comm_rank()) ? hostname[j] : 0;
+      QMP_sum_int(data+j);
+      hostname_recv_buf[i*128 + j] = data[j];
+    }
   }
+#endif
 
-static char hostname[128] = "undetermined";
-
-void comm_create(int argc, char **argv)
-{
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
 }
 
-void comm_init(void)
+
+void get_gpuid(int *gpuid_recv_buf) {
+
+#ifdef USE_MPI_GATHER
+  MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD);
+#else
+  // Abuse reductions to emulate all-gather.  We need to copy the
+  // local hostname to all other nodes
+  for (int i=0; i<comm_size(); i++) {
+    int data = (i == comm_rank()) ? gpuid : 0;
+    QMP_sum_int(&data);
+    gpuid_recv_buf[i] = data;
+  }
+#endif
+}
+
+
+void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
   if ( QMP_is_initialized() != QMP_TRUE ) {
-    errorQuda("QMP is not initialized");
+    errorQuda("QMP has not been initialized");
   }
 
-  static int firsttime = 1;
-  if (!firsttime) return;
-  firsttime = 0;
+  int grid_size = 1;
+  for (int i = 0; i < ndim; i++) {
+    grid_size *= dims[i];
+  }
+  if (grid_size != QMP_get_number_of_nodes()) {
+    errorQuda("Communication grid size declared via initCommsGridQuda() does not match"
+              " total number of QMP nodes (%d != %d)", grid_size, QMP_get_number_of_nodes());
+  }
 
-  gethostname(hostname, 128);
-  hostname[127] = '\0';
+  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
+  comm_set_default_topology(topo);
+
+  // determine which GPU this rank will use
+  char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
+  get_hostnames(hostname_recv_buf);
+
+  gpuid = 0;
+  for (int i = 0; i < comm_rank(); i++) {
+    if (!strncmp(comm_hostname(), &hostname_recv_buf[128*i], 128)) {
+      gpuid++;
+    }
+  }
+
+  int device_count;
+  cudaGetDeviceCount(&device_count);
+  if (device_count == 0) {
+    errorQuda("No CUDA devices found");
+  }
+  if (gpuid >= device_count) {
+    errorQuda("Too few GPUs available on %s", comm_hostname());
+  }
+
+  comm_peer2peer_init(hostname_recv_buf);
+
+  host_free(hostname_recv_buf);
 }
 
-void comm_cleanup()
+
+void comm_peer2peer_init(const char* hostname_recv_buf)
 {
-  QMP_finalize_msg_passing();
+  if (peer2peer_init) return;
+
+  bool disable_peer_to_peer = false;
+  char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
+    if (getVerbosity() > QUDA_SILENT)
+      printfQuda("Disabling peer-to-peer access\n");
+    disable_peer_to_peer = true;
+  }
+
+  if (!peer2peer_init && !disable_peer_to_peer) {
+
+    // first check that the local GPU supports UVA
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop,gpuid);
+    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return;
+
+    comm_set_neighbor_ranks();
+
+    char *hostname = comm_hostname();
+    int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
+
+    get_gpuid(gpuid_recv_buf);
+
+    for(int dir=0; dir<2; ++dir){ // forward/backward directions
+      for(int dim=0; dim<4; ++dim){
+	int neighbor_rank = comm_neighbor_rank(dir,dim);
+	if(neighbor_rank == comm_rank()) continue;
+
+	// if the neighbors are on the same
+	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
+	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+	  int canAccessPeer[2];
+	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+	  if(canAccessPeer[0]*canAccessPeer[1]){
+	    peer2peer_enabled[dir][dim] = true;
+	    if (getVerbosity() > QUDA_SILENT)
+	      printf("Peer-to-peer enabled for rank %d gpu=%d with neighbor %d gpu=%d dir=%d, dim=%d\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+	  }
+	} // on the same node
+      } // different dimensions - x, y, z, t
+    } // different directions - forward/backward
+
+    host_free(gpuid_recv_buf);
+  }
+
+  peer2peer_init = true;
+
+  checkCudaError();
+  return;
 }
 
-void comm_exit(int ret)
-{
-  if (ret) QMP_abort(ret);
+
+bool comm_peer2peer_enabled(int dir, int dim){
+  return peer2peer_enabled[dir][dim];
 }
 
-char *comm_hostname(void)
-{
-  return hostname;
-}
-
-int comm_gpuid()
-{
-  return comm_rank() % getGpuCount();
-}
 
 int comm_rank(void)
 {
   return QMP_get_node_number();
 }
+
 
 int comm_size(void)
 {
@@ -70,96 +185,160 @@ int comm_size(void)
 }
 
 
-void* comm_declare_send_relative(void *buffer, int i, int dir, size_t bytes)
+int comm_gpuid(void)
 {
-  CommQMP* comm = (CommQMP*)safe_malloc(sizeof(CommQMP));
-  comm->mem = QMP_declare_msgmem(buffer, bytes);
-  if( comm->mem == NULL ) errorQuda("Unable to allocate send message mem");
-  comm->handle = QMP_declare_send_relative(comm->mem, i, dir, 0);
-  if( comm->handle == NULL ) errorQuda("Unable to allocate send message handle");
-  return (void*)comm;
+  return gpuid;
 }
 
-void* comm_declare_receive_relative(void *buffer, int i, int dir, size_t bytes)
+
+/**
+ * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
-  CommQMP* comm = (CommQMP*)safe_malloc(sizeof(CommQMP));
-  comm->mem = QMP_declare_msgmem(buffer, bytes);
-  if( comm->mem == NULL ) errorQuda("Unable to receive receive message mem");
-  comm->handle = QMP_declare_receive_relative(comm->mem, i, dir, 0);
-  if( comm->handle == NULL ) errorQuda("Unable to allocate receive message handle");
-  return (void*)comm;
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_msgmem(buffer, nbytes);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_declare_send_to(mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
 }
 
-
-void comm_free(void *comm) {
-  CommQMP *qmp = (CommQMP*)comm;
-  QMP_free_msghandle(qmp->handle);
-  QMP_free_msgmem(qmp->mem);
-  host_free(qmp);
-}
-
-void comm_barrier(void)
+/**
+ * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
-  QMP_CHECK(QMP_barrier());  
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_msgmem(buffer, nbytes);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
 }
 
-//we always reduce one double value
+
+/**
+ * Declare a message handle for strided sending to a node displaced in
+ * (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
+					       size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_strided_msgmem(buffer, blksize, nblocks, stride);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_declare_send_to(mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
+}
+
+/**
+ * Declare a message handle for strided receiving from a node
+ * displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
+						  size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_strided_msgmem(buffer, blksize, nblocks, stride);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
+}
+
+
+void comm_free(MsgHandle *mh)
+{
+  QMP_free_msghandle(mh->handle);
+  QMP_free_msgmem(mh->mem);
+  host_free(mh);
+}
+
+
+void comm_start(MsgHandle *mh)
+{
+  QMP_CHECK( QMP_start(mh->handle) );
+}
+
+
+void comm_wait(MsgHandle *mh)
+{
+  QMP_CHECK( QMP_wait(mh->handle) );
+}
+
+
+int comm_query(MsgHandle *mh)
+{
+  return (QMP_is_complete(mh->handle) == QMP_TRUE);
+}
+
+
 void comm_allreduce(double* data)
 {
-  QMP_CHECK(QMP_sum_double(data));
-} 
+  QMP_CHECK( QMP_sum_double(data) );
+}
+
+
+void comm_allreduce_max(double* data)
+{
+  QMP_CHECK( QMP_max_double(data) );
+}
+
+
+void comm_allreduce_array(double* data, size_t size)
+{
+  QMP_CHECK( QMP_sum_double_array(data, size) );
+}
+
 
 void comm_allreduce_int(int* data)
 {
-  QMP_CHECK(QMP_sum_int(data));
+  QMP_CHECK( QMP_sum_int(data) );
 }
 
-//reduce n double value
-void comm_allreduce_array(double* data, size_t len)
-{
-  QMP_CHECK(QMP_sum_double_array(data,len));
-}
-
-//we always reduce one double value
-void comm_allreduce_max(double* data)
-{
-  QMP_CHECK(QMP_max_double(data));
-} 
 
 void comm_broadcast(void *data, size_t nbytes)
 {
-  QMP_CHECK(QMP_broadcast(data, nbytes));
+  QMP_CHECK( QMP_broadcast(data, nbytes) );
 }
 
-void comm_set_gridsize(const int *X, int nDim)
+
+void comm_barrier(void)
 {
-  if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
-
-  QMP_CHECK(QMP_declare_logical_topology(X, nDim));
+  QMP_CHECK( QMP_barrier() );
 }
 
-void comm_start(void *request)
+
+void comm_abort(int status)
 {
-  CommQMP *qmp = (CommQMP*)request;
-  QMP_CHECK(QMP_start(qmp->handle));
+  #ifdef HOST_DEBUG
+  raise(SIGINT);
+  #endif
+  QMP_abort(status);
 }
-
-int comm_query(void* request) 
-{
-  CommQMP *qmp = (CommQMP*)request;
-  if (QMP_is_complete(qmp->handle) == QMP_TRUE) return 1;
-  return 0;
-}
-
-void comm_wait(void *request)
-{
-  CommQMP *qmp = (CommQMP*)request;
-  QMP_CHECK(QMP_wait(qmp->handle)); 
-}
-
-static int manual_set_partition[4] ={0, 0, 0, 0};
-int comm_dim(int dir) { return QMP_get_logical_dimensions()[dir]; }
-int comm_coords(int dir) { return QMP_get_logical_coordinates()[dir]; }
-int comm_dim_partitioned(int dir){ return (manual_set_partition[dir] || ((comm_dim(dir) > 1)));}
-void comm_dim_partitioned_set(int dir){ manual_set_partition[dir] = 1; }
-

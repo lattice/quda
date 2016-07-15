@@ -5,3 +5,11 @@
 *~
 tests/*_test
 make.inc
+milc_interface/*
+*#*
+*.pyc
+tunecache.tsv
+profile.tsv
+config.log
+CMakeCache.txt
+CMakeFiles

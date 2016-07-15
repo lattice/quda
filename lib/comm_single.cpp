@@ -1,57 +1,64 @@
 /**
-   Dummy communications layer for single GPU backend.
+ * Dummy communications layer for single-GPU backend.
  */
 
 #include <stdlib.h>
+#include <csignal>
 #include <comm_quda.h>
 
-static char hostname[128] = "undetermined";
+void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
+{
+  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
+  comm_set_default_topology(topo);
+}
 
-void comm_create(int argc, char **argv);
+void comm_peer2peer_init(const char *hostname_buf) {}
 
-void comm_init() { ; }
+bool comm_peer2peer_enabled(int die, int dim) { return false; }
 
-void comm_cleanup() { ; }
+int comm_rank(void) { return 0; }
 
-void comm_exit() { ; }
+int comm_size(void) { return 1; }
 
-char *comm_hostname(void) { return hostname; }
+int comm_gpuid(void) { return 0; }
 
-int comm_rank() { return 0; }
+MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
+{ return NULL; }
 
-int comm_size() { return 1; }
+MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
+{ return NULL; }
 
-void* comm_declare_send_relative(void *buffer, int i, int dir, size_t bytes) 
-{ return (void*)0; }
-void* comm_declare_receive_relative(void *buffer, int i, int dir, size_t bytes) 
-{ return (void*)0; }
+MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
+					       size_t blksize, int nblocks, size_t stride)
+{ return NULL; }
 
-void comm_free(void *comm) { ; }
+MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
+						  size_t blksize, int nblocks, size_t stride)
+{ return NULL; }
 
-void comm_start(void *comm) { ; }
+void comm_free(MsgHandle *mh) {}
 
-void comm_wait(void *comm) { ; }
+void comm_start(MsgHandle *mh) {}
 
-int comm_query(void *comm) { return 1; }
+void comm_wait(MsgHandle *mh) {}
 
-int comm_dim_partitioned(int dir) { return 0;} 
+int comm_query(MsgHandle *mh) { return 1; }
 
-void comm_dim_partitioned_set(int dir) { ; }
+void comm_allreduce(double* data) {}
 
-int comm_dim(int dir) { return 1; }
+void comm_allreduce_max(double* data) {}
 
-int comm_coords(int dir) { return 0; }
+void comm_allreduce_array(double* data, size_t size) {}
 
-void comm_allreduce(double* data) { ; } 
+void comm_allreduce_int(int* data) {}
 
-void comm_allreduce_int(int* data) { ; }
+void comm_broadcast(void *data, size_t nbytes) {}
 
-void comm_allreduce_array(double* data, size_t size) { ; }
+void comm_barrier(void) {}
 
-void comm_allreduce_max(double* data) { ; } 
-
-void comm_barrier(void) { ; }
-
-void comm_broadcast(void *data, size_t nbytes) { ; }
-
-void comm_set_gridsize(const int *X, int nDim) { ; }
+void comm_abort(int status) {
+  #ifdef HOST_DEBUG
+  raise(SIGINT);
+  #endif
+  exit(status);
+}

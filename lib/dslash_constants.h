@@ -1,7 +1,102 @@
+enum KernelType {
+  INTERIOR_KERNEL = 5,
+  EXTERIOR_KERNEL_ALL = 6,
+  EXTERIOR_KERNEL_X = 0,
+  EXTERIOR_KERNEL_Y = 1,
+  EXTERIOR_KERNEL_Z = 2,
+  EXTERIOR_KERNEL_T = 3,
+  KERNEL_POLICY = 7
+};
+
+  struct DslashParam {
+    char do_not_delete; // work around for bug in CUDA 6.5
+    int threads; // the desired number of active threads
+    int parity;  // Even-Odd or Odd-Even
+    int X[4];
+    int Ls;
+    KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+    int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+    int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
+    int ghostOffset[QUDA_MAX_DIM+1][2];
+    int ghostNormOffset[QUDA_MAX_DIM+1][2];
+    int sp_stride; // spinor stride
+#ifdef GPU_CLOVER_DIRAC
+    int cl_stride; // clover stride
+#endif
+#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
+    int fl_stride; // twisted-mass flavor stride
+#endif
+#ifdef GPU_STAGGERED_DIRAC
+    int gauge_stride;
+    int long_gauge_stride;
+    float fat_link_max;
+#endif 
+#ifdef MULTI_GPU
+    int threadDimMapLower[4];
+    int threadDimMapUpper[4];
+#endif
+
+#ifdef USE_TEXTURE_OBJECTS
+    cudaTextureObject_t inTex;
+    cudaTextureObject_t inTexNorm;
+    cudaTextureObject_t ghostTex;
+    cudaTextureObject_t ghostTexNorm;
+    cudaTextureObject_t xTex;
+    cudaTextureObject_t xTexNorm;
+    cudaTextureObject_t outTex;
+    cudaTextureObject_t outTexNorm;
+    cudaTextureObject_t gauge0Tex; // also applies to fat gauge
+    cudaTextureObject_t gauge1Tex; // also applies to fat gauge
+    cudaTextureObject_t longGauge0Tex;
+    cudaTextureObject_t longGauge1Tex;
+    cudaTextureObject_t longPhase0Tex;
+    cudaTextureObject_t longPhase1Tex;
+    cudaTextureObject_t cloverTex;
+    cudaTextureObject_t cloverNormTex;
+    cudaTextureObject_t cloverInvTex;
+    cudaTextureObject_t cloverInvNormTex;
+#endif
+
+    void print() {
+      printfQuda("threads = %d\n", threads);
+      printfQuda("parity = %d\n", parity);
+      printfQuda("X = {%d, %d, %d, %d}\n", X[0], X[1], X[2], X[3]);
+#ifdef GPU_DOMAIN_WALL_DIRAC
+      printfQuda("Ls = %d\n", Ls);
+#endif
+      printfQuda("commDim = {%d, %d, %d, %d}\n", commDim[0], commDim[1], commDim[2], commDim[3]);
+      printfQuda("ghostDim = {%d, %d, %d, %d}\n", ghostDim[0], ghostDim[1], ghostDim[2], ghostDim[3]);
+      printfQuda("ghostOffset = {{%d, %d}, {%d, %d}, {%d, %d}, {%d, %d}}\n", ghostOffset[0][0], ghostOffset[0][1], 
+                                                                              ghostOffset[1][0], ghostOffset[1][1],
+                                                                              ghostOffset[2][0], ghostOffset[2][1],
+                                                                              ghostOffset[3][0], ghostOffset[3][1]);
+      printfQuda("ghostNormOffset = {{%d, %d}, {%d, %d}, {%d, %d}, {%d, %d}}\n", ghostNormOffset[0][0], ghostNormOffset[0][1], 
+                                                                                 ghostNormOffset[1][0], ghostNormOffset[1][1],
+                                                                                 ghostNormOffset[2][0], ghostNormOffset[2][1],
+                                                                                 ghostNormOffset[3][0], ghostNormOffset[3][1]);
+      printfQuda("kernel_type = %d\n", kernel_type);
+      printfQuda("sp_stride = %d\n", sp_stride);
+#ifdef GPU_CLOVER_DIRAC
+      printfQuda("cl_stride = %d\n", cl_stride);
+#endif
+    }
+  };
+
+  static DslashParam dslashParam;
+
+
+
+#ifdef MULTI_GPU
+  static double twist_a = 0.0;
+  static double twist_b = 0.0;
+#endif
+
+
 #define MAX(a,b) ((a)>(b) ? (a):(b))
 
 typedef struct fat_force_stride_s {
   int fat_ga_stride;
+  int long_ga_stride;
   int site_ga_stride;
   int staple_stride;
   int mom_ga_stride;
@@ -60,10 +155,10 @@ __constant__ int X3X2X1_3;
 __constant__ int Vh;
 __constant__ int Vs;
 __constant__ int Vsh;
-__constant__ int sp_stride;
+//__constant__ int sp_stride;
 __constant__ int ga_stride;
-__constant__ int cl_stride;
-__constant__ int ghostFace[QUDA_MAX_DIM];
+//__constant__ int cl_stride;
+__constant__ int ghostFace[QUDA_MAX_DIM+1];
 
 __constant__ int fat_ga_stride;
 __constant__ int long_ga_stride;
@@ -72,7 +167,9 @@ __constant__ float fat_ga_max;
 __constant__ int gauge_fixed;
 
 // domain wall constants
-__constant__ int Ls;
+//__constant__ int Ls;
+__constant__ double m5_d;
+__constant__ float m5_f;
 
 // single precision constants
 __constant__ float anisotropy_f;
@@ -109,15 +206,16 @@ __constant__ fat_force_const_t fl; //fatlink
 __constant__ fat_force_const_t gf; //gauge force
 __constant__ fat_force_const_t hf; //hisq force
 
-
-void initLatticeConstants(const LatticeField &lat)
+void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 {
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
+
   checkCudaError();
 
   int volumeCB = lat.VolumeCB();
   cudaMemcpyToSymbol(Vh, &volumeCB, sizeof(int));  
 
-  Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
+  int Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
   cudaMemcpyToSymbol(Vs, &Vspatial, sizeof(int));
 
   int half_Vspatial = Vspatial;
@@ -280,20 +378,23 @@ void initLatticeConstants(const LatticeField &lat)
   cudaMemcpyToSymbol(E3E2E1, &E3E2E1_h, sizeof(int));
   cudaMemcpyToSymbol(Vh_ex, &Vh_ex_h, sizeof(int));  
 
-  // copy a few of the constants needed by tuneLaunch()
-  dslashConstants.x[0] = L1;
-  dslashConstants.x[1] = L2;
-  dslashConstants.x[2] = L3;
-  dslashConstants.x[3] = L4;
-
   checkCudaError();
+
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
 
-void initGaugeConstants(const cudaGaugeField &gauge) 
+void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile) 
 {
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
+
   int ga_stride_h = gauge.Stride();
   cudaMemcpyToSymbol(ga_stride, &ga_stride_h, sizeof(int));  
+
+  // set fat link stride and max (used by naive staggered)
+  cudaMemcpyToSymbol(fat_ga_stride, &ga_stride_h, sizeof(int)); 
+  float link_max_h = gauge.LinkMax();
+  cudaMemcpyToSymbol(fat_ga_max, &link_max_h, sizeof(float));
 
   int gf = (gauge.GaugeFixed() == QUDA_GAUGE_FIXED_YES);
   cudaMemcpyToSymbol(gauge_fixed, &(gf), sizeof(int));
@@ -304,17 +405,12 @@ void initGaugeConstants(const cudaGaugeField &gauge)
   double t_bc = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol(t_boundary, &(t_bc), sizeof(double));
 
-  double coeff_h = -24.0*gauge.Tadpole()*gauge.Tadpole();
-  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
-
   float anisotropy_fh = gauge.Anisotropy();
   cudaMemcpyToSymbol(anisotropy_f, &(anisotropy_fh), sizeof(float));
 
   float t_bc_f = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol(t_boundary_f, &(t_bc_f), sizeof(float));
 
-  float coeff_fh = -24.0*gauge.Tadpole()*gauge.Tadpole();
-  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
 
   // constants used by the READ_GAUGE() macros in read_gauge.h
   float2 An2_h = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
@@ -325,73 +421,118 @@ void initGaugeConstants(const cudaGaugeField &gauge)
   cudaMemcpyToSymbol(No2, &(No2_h), sizeof(float2));
 
   checkCudaError();
+
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
-
-/**
- * This routine gets called often, so be sure not to set any constants unnecessarily
- * or introduce synchronization (e.g., via checkCudaError()).
- */
-void initSpinorConstants(const cudaColorSpinorField &spinor)
+void initDslashConstants(TimeProfile &profile)
 {
-  static int last_sp_stride = -1;
-  static int last_Ls = -1;
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
 
-  int sp_stride_h = spinor.Stride();
-  if (sp_stride_h != last_sp_stride) {
-    cudaMemcpyToSymbol(sp_stride, &sp_stride_h, sizeof(int));
-    checkCudaError();
-    last_sp_stride = sp_stride_h;
-  }
-  
-  // for domain wall:
-  if (spinor.Ndim() == 5) {
-    int Ls_h = spinor.X(4);
-    if (Ls_h != last_Ls) {
-      cudaMemcpyToSymbol(Ls, &Ls_h, sizeof(int));  
-      dslashConstants.Ls = Ls_h; // needed by tuneLaunch()
-      checkCudaError();
-      last_Ls = Ls_h;
-    }
-  }
-}
-
-
-void initDslashConstants()
-{
   float pi_f_h = M_PI;
   cudaMemcpyToSymbol(pi_f, &pi_f_h, sizeof(float));
 
   // temporary additions (?) for checking Ron's T-packing kernel with old multi-gpu kernel
 
-  double tProjScale_h = (kernelPackT ? 1.0 : 2.0);
+  double tProjScale_h = (getKernelPackT() ? 1.0 : 2.0);
   cudaMemcpyToSymbol(tProjScale, &tProjScale_h, sizeof(double));
 
   float tProjScale_fh = (float)tProjScale_h;
   cudaMemcpyToSymbol(tProjScale_f, &tProjScale_fh, sizeof(float));
 
+  // set these for naive staggered
+  float coeff_fh = 1.0;
+  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
+
+  double coeff_h = 1.0;
+  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
+  
   checkCudaError();
+
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
 }
 
-
-void initCloverConstants (const cudaCloverField &clover)
+void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge,
+			    TimeProfile &profile)
 {
-  int cl_stride_h = clover.Stride();
-  cudaMemcpyToSymbol(cl_stride, &cl_stride_h, sizeof(int));  
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
 
-  checkCudaError();
-}
-
-
-void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge)
-{
   int fat_ga_stride_h = fatgauge.Stride();
   int long_ga_stride_h = longgauge.Stride();
   float fat_link_max_h = fatgauge.LinkMax();
   
+  float coeff_fh = 1.0/longgauge.Scale();
+  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
+
+  double coeff_h = 1.0/longgauge.Scale();
+  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
+
   cudaMemcpyToSymbol(fat_ga_stride, &fat_ga_stride_h, sizeof(int));  
   cudaMemcpyToSymbol(long_ga_stride, &long_ga_stride_h, sizeof(int));  
   cudaMemcpyToSymbol(fat_ga_max, &fat_link_max_h, sizeof(float));
 
   checkCudaError();
+
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
+}
+
+//For initializing the coefficients used in MDWF
+__constant__ double mdwf_b5_d[QUDA_MAX_DWF_LS];
+__constant__ double mdwf_c5_d[QUDA_MAX_DWF_LS];
+
+__constant__ float mdwf_b5_f[QUDA_MAX_DWF_LS];
+__constant__ float mdwf_c5_f[QUDA_MAX_DWF_LS];
+
+void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h, TimeProfile &profile)
+{
+  profile.TPSTART(QUDA_PROFILE_CONSTANT);
+
+  static int last_Ls = -1;
+  if (dim_s != last_Ls) {
+    float b_5_f[QUDA_MAX_DWF_LS];
+    float c_5_f[QUDA_MAX_DWF_LS];
+    for (int i=0; i<dim_s; i++) {
+      b_5_f[i] = (float)b_5[i];
+      c_5_f[i] = (float)c_5[i];
+    }
+
+    cudaMemcpyToSymbol(mdwf_b5_d, b_5, dim_s*sizeof(double));
+    cudaMemcpyToSymbol(mdwf_c5_d, c_5, dim_s*sizeof(double));
+    cudaMemcpyToSymbol(mdwf_b5_f, b_5_f, dim_s*sizeof(float));
+    cudaMemcpyToSymbol(mdwf_c5_f, c_5_f, dim_s*sizeof(float));
+    checkCudaError();
+    last_Ls = dim_s;
+  }
+
+  static double last_m5 = 99999;
+  if (m5h != last_m5) {
+    float m5h_f = (float)m5h;
+    cudaMemcpyToSymbol(m5_d, &m5h, sizeof(double));
+    cudaMemcpyToSymbol(m5_f, &m5h_f, sizeof(float));
+    checkCudaError();
+    last_m5 = m5h;
+  }
+
+  profile.TPSTOP(QUDA_PROFILE_CONSTANT);
+}
+
+void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {
+  initLatticeConstants(gauge, profile);
+  initGaugeConstants(gauge, profile);
+  initDslashConstants(profile);
+}
+
+void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
+		   const int dagger, const QudaTwistGamma5Type twist) {
+  if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+    a = 2.0 * kappa * mu;
+    b = 1.0;
+  } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+    a = -2.0 * kappa * mu;
+    b = 1.0 / (1.0 + a*a);
+  } else {
+    errorQuda("Twist type %d not defined\n", twist);
+  }
+  if (dagger) a *= -1.0;
+
 }

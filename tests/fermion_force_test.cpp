@@ -9,7 +9,6 @@
 #include "misc.h"
 #include "fermion_force_reference.h"
 #include "fermion_force_quda.h"
-#include "hw_quda.h"
 #include <sys/time.h>
 #include <dslash_quda.h>
 
@@ -24,13 +23,14 @@ cudaGaugeField *cudaMom = NULL;
 cpuGaugeField *cpuMom = NULL;
 cpuGaugeField *refMom = NULL;
 
-static FullHw cudaHw;
+cudaColorSpinorField *cudaHw = NULL;
+cpuColorSpinorField *cpuHw = NULL;
+
 static QudaGaugeParam gaugeParam;
-static void* hw; //the array of half_wilson_vector
 
 extern int gridsize_from_cmdline[];
 
-int verify_results = 0;
+extern bool verify_results;
 
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
@@ -58,7 +58,8 @@ fermion_force_init()
   gaugeParam.cpu_prec = link_prec;
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
-    
+  gaugeParam.anisotropy = 1.0;
+
   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
   GaugeFieldParam gParam(0, gaugeParam);
@@ -96,15 +97,18 @@ fermion_force_init()
   site_link_sanity_check(siteLink, V, gaugeParam.cpu_prec, &gaugeParam);
 #endif
 
-  //gaugeParam.site_ga_pad = gaugeParam.ga_pad = 0;
-  //gaugeParam.reconstruct = link_recon;
-
+  gParam.pad = 0;
   gParam.precision = gaugeParam.cuda_prec;
   gParam.reconstruct = link_recon;
+  gParam.order = (gaugeParam.cuda_prec == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_GAUGE_ORDER 
+    : (link_recon == QUDA_RECONSTRUCT_12) ? QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
   cudaGauge = new cudaGaugeField(gParam);
+
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
 
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.precision = gaugeParam.cpu_prec;
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   cpuMom = new cpuGaugeField(gParam);
   refMom = new cpuGaugeField(gParam);
 
@@ -113,18 +117,28 @@ fermion_force_init()
 
   memcpy(refMom->Gauge_p(), cpuMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize*gaugeParam.cpu_prec);
     
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.precision = gaugeParam.cuda_prec;
   cudaMom = new cudaGaugeField(gParam);
     
-  hw = malloc(4*cpuGauge->Volume()*hwSiteSize*gaugeParam.cpu_prec);
-  if (hw == NULL){
-    fprintf(stderr, "ERROR: malloc failed for hw\n");
-    exit(1);	
-  }
-  createHwCPU(hw, hw_prec);
+  ColorSpinorParam hwParam;
+  hwParam.nColor = 3;
+  hwParam.nSpin = 2;
+  hwParam.nDim = 4;
+  for (int d=0; d<4; d++) hwParam.x[d] = gaugeParam.X[d];
+  hwParam.precision = cpu_hw_prec;
+  hwParam.pad = 0;
+  hwParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  hwParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  hwParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  hwParam.create = QUDA_ZERO_FIELD_CREATE;
 
-  cudaHw = createHwQuda(gaugeParam.X, hw_prec);
-    
+  cpuHw = new cpuColorSpinorField(hwParam);
+
+  hwParam.precision = hw_prec;
+  hwParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  cudaHw = new cudaColorSpinorField(hwParam);
+
   return;
 }
 
@@ -138,19 +152,25 @@ fermion_force_end()
   delete cpuMom;
   delete refMom;
 
-  freeHwQuda(cudaHw);
-  free(hw);
+  delete cudaHw;
+  delete cpuHw;
   
   endQuda();
 }
 
+namespace quda {
+  namespace fermionforce {
+    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
+  }
+}
 
 static int 
 fermion_force_test(void) 
 {
  
   fermion_force_init();
-  initLatticeConstants(*cudaGauge);
+  TimeProfile profile("dummy");
+  fermionforce::initLatticeConstants(*cudaGauge, profile);
   fermion_force_init_cuda(&gaugeParam);
 
     
@@ -172,11 +192,10 @@ fermion_force_test(void)
   // download the gauge field to the GPU
   cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
-  loadHwToGPU(cudaHw, hw, cpu_hw_prec);
-
+  *cudaHw = *cpuHw;
     
   if (verify_results){	
-    fermion_force_reference(eps, weight1, weight2, act_path_coeff, hw, cpuGauge->Gauge_p(), refMom->Gauge_p());
+    fermion_force_reference(eps, weight1, weight2, act_path_coeff, cpuHw->V(), cpuGauge->Gauge_p(), refMom->Gauge_p());
   }
     
     
@@ -191,7 +210,7 @@ fermion_force_test(void)
   cudaDeviceSynchronize();    
 
   gettimeofday(&t0, NULL);
-  fermion_force_cuda(eps, weight1, weight2, act_path_coeff, cudaHw, *cudaGauge, *cudaMom, &gaugeParam);
+  fermion_force_cuda(eps, weight1, weight2, act_path_coeff, *cudaHw, *cudaGauge, *cudaMom, &gaugeParam);
   cudaDeviceSynchronize();
   gettimeofday(&t1, NULL);
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
@@ -255,17 +274,11 @@ main(int argc, char **argv)
       continue;
     }
         
-    if( strcmp(argv[i], "--verify") == 0){
-      verify_results=1;
-      continue;	    
-    }	
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
 
-#ifdef MULTI_GPU
-    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
-#endif
+  initComms(argc, argv, gridsize_from_cmdline);
 
   link_prec = prec;
 
@@ -274,18 +287,14 @@ main(int argc, char **argv)
   int accuracy_level = fermion_force_test();
   printfQuda("accuracy_level=%d\n", accuracy_level);
     
-
-#ifdef MULTI_GPU
-    endCommsQuda();
-#endif
+  finalizeComms();
     
-    int ret;
-    if(accuracy_level >=3 ){
-      ret = 0;
-    }else{
-      ret = 1; //we delclare the test failed
-    }
-
-    
+  int ret;
+  if(accuracy_level >=3 ){
+    ret = 0;
+  }else{
+    ret = 1; //we delclare the test failed
+  }
+  
   return ret;
 }

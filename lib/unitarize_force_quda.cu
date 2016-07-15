@@ -4,69 +4,82 @@
 #include <iomanip>
 #include <cuda.h>
 #include <gauge_field.h>
+#include <tune_quda.h>
 
+#include <tune_quda.h>
 #include <quda_matrix.h>
-#include <svd_quda.h>
+#include <gauge_field_order.h>
+
+#ifdef GPU_HISQ_FORCE
+
+// work around for CUDA 7.0 bug on OSX
+#if defined(__APPLE__) && CUDA_VERSION >= 7000 && CUDA_VERSION < 7050
+#define EXPONENT_TYPE Real
+#else
+#define EXPONENT_TYPE int
+#endif
 
 namespace quda{
+namespace {
+  #include <svd_quda.h>
+}
+
+namespace { // anonymous
+#include <svd_quda.h>
+}
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
 
-// constants - File scope only
-__constant__ double DEV_HISQ_UNITARIZE_EPS;
-__constant__ double DEV_HISQ_FORCE_FILTER;
-__constant__ double DEV_MAX_DET_ERROR;
-__constant__ bool DEV_REUNIT_ALLOW_SVD;
-__constant__ bool DEV_REUNIT_SVD_ONLY;
-__constant__ double DEV_REUNIT_SVD_REL_ERROR;
-__constant__ double DEV_REUNIT_SVD_ABS_ERROR;
+  static double unitarize_eps;
+  static double force_filter;
+  static double max_det_error;
+  static bool   allow_svd;
+  static bool   svd_only;
+  static double svd_rel_error;
+  static double svd_abs_error;
 
 
- 
-static double HOST_HISQ_UNITARIZE_EPS;
-static double HOST_HISQ_FORCE_FILTER;
-static double HOST_MAX_DET_ERROR;
-static bool   HOST_REUNIT_ALLOW_SVD;
-static bool   HOST_REUNIT_SVD_ONLY;
-static double HOST_REUNIT_SVD_REL_ERROR;
-static double HOST_REUNIT_SVD_ABS_ERROR;
+  namespace fermion_force {
 
+    template <typename F, typename G>
+    struct UnitarizeForceArg {
+      int threads;
+      F force;
+      F force_old;
+      G gauge;
+      int *fails;
+      const double unitarize_eps;
+      const double force_filter;
+      const double max_det_error;
+      const int allow_svd;
+      const int svd_only;
+      const double svd_rel_error;
+      const double svd_abs_error;
 
-
- 
-  namespace fermion_force{
-
-
-    void setUnitarizeForceConstants(double unitarize_eps_h, double hisq_force_filter_h, 
-				    double max_det_error_h, bool allow_svd_h, bool svd_only_h,
-				    double svd_rel_error_h, double svd_abs_error_h)
-    {
-
-      // not_set is only initialised once
-      static bool not_set=true;
-		
-      if(not_set){
-	cudaMemcpyToSymbol(DEV_HISQ_UNITARIZE_EPS, &unitarize_eps_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_HISQ_FORCE_FILTER, &hisq_force_filter_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_MAX_DET_ERROR, &max_det_error_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_REUNIT_ALLOW_SVD, &allow_svd_h, sizeof(bool));
-	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ONLY, &svd_only_h, sizeof(bool));
-	cudaMemcpyToSymbol(DEV_REUNIT_SVD_REL_ERROR, &svd_rel_error_h, sizeof(double));
-	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ABS_ERROR, &svd_abs_error_h, sizeof(double));
-	
-	HOST_HISQ_UNITARIZE_EPS = unitarize_eps_h;
-	HOST_HISQ_FORCE_FILTER = hisq_force_filter_h;
-	HOST_MAX_DET_ERROR = max_det_error_h;     
-	HOST_REUNIT_ALLOW_SVD = allow_svd_h;
-	HOST_REUNIT_SVD_ONLY = svd_only_h;
-	HOST_REUNIT_SVD_REL_ERROR = svd_rel_error_h;
-	HOST_REUNIT_SVD_ABS_ERROR = svd_abs_error_h;
-
-	not_set = false;
+      UnitarizeForceArg(const F &force, const F &force_old, const G &gauge, const GaugeField &meta, int *fails,
+			double unitarize_eps, double force_filter, double max_det_error, int allow_svd,
+			int svd_only, double svd_rel_error, double svd_abs_error)
+	: threads(1), force(force), force_old(force_old), gauge(gauge), fails(fails), unitarize_eps(unitarize_eps),
+	  force_filter(force_filter), max_det_error(max_det_error), allow_svd(allow_svd),
+	  svd_only(svd_only), svd_rel_error(svd_rel_error), svd_abs_error(svd_abs_error)
+      {
+	for(int dir=0; dir<4; ++dir) threads *= meta.X()[dir];
       }
-      checkCudaError();
-      return;
+    };
+
+
+    void setUnitarizeForceConstants(double unitarize_eps_, double force_filter_,
+				    double max_det_error_, bool allow_svd_, bool svd_only_,
+				    double svd_rel_error_, double svd_abs_error_)
+    {
+      unitarize_eps = unitarize_eps_;
+      force_filter = force_filter_;
+      max_det_error = max_det_error_;
+      allow_svd = allow_svd_;
+      svd_only = svd_only_;
+      svd_rel_error = svd_rel_error_;
+      svd_abs_error = svd_abs_error_;
     }
 
 
@@ -106,18 +119,18 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC00(const Real & u, const Real & v, const Real & w){
-      Real result =   -pow(w,3)*pow(u,6)
-	+ 3*v*pow(w,3)*pow(u,4)
-	+ 3*pow(v,4)*w*pow(u,4)
-	-   pow(v,6)*pow(u,3)
-	- 4*pow(w,4)*pow(u,3)
-	- 12*pow(v,3)*pow(w,2)*pow(u,3)
-	+ 16*pow(v,2)*pow(w,3)*pow(u,2)
-	+ 3*pow(v,5)*w*pow(u,2)
-	- 8*v*pow(w,4)*u
-	- 3*pow(v,4)*pow(w,2)*u
-	+ pow(w,5)
-	+ pow(v,3)*pow(w,3);
+      Real result = -pow(w,static_cast<EXPONENT_TYPE>(3)) * pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ 3*v*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(4))
+	+ 3*pow(v,static_cast<EXPONENT_TYPE>(4))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	-   pow(v,static_cast<EXPONENT_TYPE>(6))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 4*pow(w,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 12*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 16*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 3*pow(v,static_cast<EXPONENT_TYPE>(5))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 8*v*pow(w,static_cast<EXPONENT_TYPE>(4))*u
+	- 3*pow(v,static_cast<EXPONENT_TYPE>(4))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ pow(w,static_cast<EXPONENT_TYPE>(5))
+	+ pow(v,static_cast<EXPONENT_TYPE>(3))*pow(w,static_cast<EXPONENT_TYPE>(3));
 
       return result;
     }
@@ -125,82 +138,82 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC01(const Real & u, const Real & v, const Real & w){
-      Real result =  - pow(w,2)*pow(u,7)
-	- pow(v,2)*w*pow(u,6)
-	+ pow(v,4)*pow(u,5)   // This was corrected!
-	+ 6*v*pow(w,2)*pow(u,5)
-	- 5*pow(w,3)*pow(u,4)    // This was corrected!
-	- pow(v,3)*w*pow(u,4)
-	- 2*pow(v,5)*pow(u,3)
-	- 6*pow(v,2)*pow(w,2)*pow(u,3)
-	+ 10*v*pow(w,3)*pow(u,2)
-	+ 6*pow(v,4)*w*pow(u,2)
-	- 3*pow(w,4)*u
-	- 6*pow(v,3)*pow(w,2)*u
-	+ 2*pow(v,2)*pow(w,3);
+      Real result =  - pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(7))
+	- pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ pow(v,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(5))   // This was corrected!
+	+ 6*v*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	- 5*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(4))    // This was corrected!
+	- pow(v,static_cast<EXPONENT_TYPE>(3))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- 2*pow(v,static_cast<EXPONENT_TYPE>(5))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 6*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 10*v*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 6*pow(v,static_cast<EXPONENT_TYPE>(4))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 3*pow(w,static_cast<EXPONENT_TYPE>(4))*u
+	- 6*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ 2*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC02(const Real & u, const Real & v, const Real & w){
-      Real result =   pow(w,2)*pow(u,5)
-	+ pow(v,2)*w*pow(u,4)
-	- pow(v,4)*pow(u,3)
-	- 4*v*pow(w,2)*pow(u,3)
-	+ 4*pow(w,3)*pow(u,2)
-	+ 3*pow(v,3)*w*pow(u,2)
-	- 3*pow(v,2)*pow(w,2)*u
-	+ v*pow(w,3);
+      Real result =   pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	+ pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- pow(v,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 4*v*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 4*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 3*pow(v,static_cast<EXPONENT_TYPE>(3))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 3*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ v*pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC11(const Real & u, const Real & v, const Real & w){
-      Real result = - w*pow(u,8)
-	- pow(v,2)*pow(u,7)
-	+ 7*v*w*pow(u,6)
-	+ 4*pow(v,3)*pow(u,5)
-	- 5*pow(w,2)*pow(u,5)
-	- 16*pow(v,2)*w*pow(u,4)
-	- 4*pow(v,4)*pow(u,3)
-	+ 16*v*pow(w,2)*pow(u,3)
-	- 3*pow(w,3)*pow(u,2)
-	+ 12*pow(v,3)*w*pow(u,2)
-	- 12*pow(v,2)*pow(w,2)*u
-	+ 3*v*pow(w,3);
+      Real result = - w*pow(u,static_cast<EXPONENT_TYPE>(8))
+	- pow(v,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(7))
+	+ 7*v*w*pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ 4*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	- 5*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5))
+	- 16*pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- 4*pow(v,static_cast<EXPONENT_TYPE>(4))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 16*v*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	- 3*pow(w,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(2))
+	+ 12*pow(v,static_cast<EXPONENT_TYPE>(3))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 12*pow(v,static_cast<EXPONENT_TYPE>(2))*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ 3*v*pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC12(const Real & u, const Real & v, const Real & w){
-      Real result =  w*pow(u,6)
-	+ pow(v,2)*pow(u,5) // Fixed this!
-	- 5*v*w*pow(u,4)  // Fixed this!
-	- 2*pow(v,3)*pow(u,3)
-	+ 4*pow(w,2)*pow(u,3)
-	+ 6*pow(v,2)*w*pow(u,2)
-	- 6*v*pow(w,2)*u
-	+ pow(w,3);
+      Real result =  w*pow(u,static_cast<EXPONENT_TYPE>(6))
+	+ pow(v,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(5)) // Fixed this!
+	- 5*v*w*pow(u,static_cast<EXPONENT_TYPE>(4))  // Fixed this!
+	- 2*pow(v,static_cast<EXPONENT_TYPE>(3))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 4*pow(w,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 6*pow(v,static_cast<EXPONENT_TYPE>(2))*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 6*v*pow(w,static_cast<EXPONENT_TYPE>(2))*u
+	+ pow(w,static_cast<EXPONENT_TYPE>(3));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC22(const Real & u, const Real & v, const Real & w){
-      Real result = - w*pow(u,4)
-	- pow(v,2)*pow(u,3)
-	+ 3*v*w*pow(u,2)
-	- 3*pow(w,2)*u;
+      Real result = - w*pow(u,static_cast<EXPONENT_TYPE>(4))
+	- pow(v,static_cast<EXPONENT_TYPE>(2))*pow(u,static_cast<EXPONENT_TYPE>(3))
+	+ 3*v*w*pow(u,static_cast<EXPONENT_TYPE>(2))
+	- 3*pow(w,static_cast<EXPONENT_TYPE>(2))*u;
       return result;
     }
 
     template <class Real>
     __device__ __host__
     void  DerivativeCoefficients<Real>::set(const Real & u, const Real & v, const Real & w){
-      const Real & denominator = 2.0*pow(w*(u*v-w),3); 
+      const Real & denominator = 2.0*pow(w*(u*v-w),static_cast<EXPONENT_TYPE>(3));
       b[0] = computeC00(u,v,w)/denominator;
       b[1] = computeC01(u,v,w)/denominator;
       b[2] = computeC02(u,v,w)/denominator;
@@ -211,15 +224,17 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     }
 
 
-    template<class Cmplx>
+    template<class Float>
     __device__ __host__
-    void accumBothDerivatives(Matrix<Cmplx,3>* result, const Matrix<Cmplx,3> & left, const Matrix<Cmplx,3> & right, const Matrix<Cmplx,3> & outer_prod)
+    void accumBothDerivatives(Matrix<complex<Float>,3>* result, const Matrix<complex<Float>,3> &left,
+			      const Matrix<complex<Float>,3> &right, const Matrix<complex<Float>,3> &outer_prod)
     {
-      const typename RealTypeId<Cmplx>::Type temp = 2.0*getTrace(left*outer_prod).x;
+      const Float temp = (2.0*getTrace(left*outer_prod)).real();;
       for(int k=0; k<3; ++k){
 	for(int l=0; l<3; ++l){
 	  // Need to write it this way to get it to work 
 	  // on the CPU. Not sure why.
+	  // FIXME check this is true
 	  result->operator()(k,l).x += temp*right(k,l).x;
 	  result->operator()(k,l).y += temp*right(k,l).y;
 	}
@@ -246,9 +261,9 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     __device__ __host__
     T getAbsMin(const T* const array, int size){
       T min = fabs(array[0]);
-      for(int i=1; i<size; ++i){
+      for (int i=1; i<size; ++i) {
         T abs_val = fabs(array[i]);
-        if((abs_val) < min){ min = abs_val; }   
+        if ((abs_val) < min){ min = abs_val; }
       }
       return min;
     }
@@ -276,22 +291,17 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
     // Compute the reciprocal square root of the matrix q
     // Also modify q if the eigenvalues are dangerously small.
-    template<class Cmplx> 
+    template<class Float, typename Arg>
     __device__  __host__ 
-    void reciprocalRoot(Matrix<Cmplx,3>* res, DerivativeCoefficients<typename RealTypeId<Cmplx>::Type>* deriv_coeffs, 
-			typename RealTypeId<Cmplx>::Type f[3], Matrix<Cmplx,3> & q, int *unitarization_failed){
+    void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
+			Float f[3], Matrix<complex<Float>,3> & q, Arg &arg) {
 
-      Matrix<Cmplx,3> qsq, tempq;
+      Matrix<complex<Float>,3> qsq, tempq;
 
-      typename RealTypeId<Cmplx>::Type c[3];
-      typename RealTypeId<Cmplx>::Type g[3];
+      Float c[3];
+      Float g[3];
 
-#ifdef __CUDA_ARCH__
-#define REUNIT_SVD_ONLY DEV_REUNIT_SVD_ONLY
-#else
-#define REUNIT_SVD_ONLY HOST_REUNIT_SVD_ONLY
-#endif
-      if(!REUNIT_SVD_ONLY){
+      if(!arg.svd_only){
 	qsq = q*q;
 	tempq = qsq*q;
 
@@ -300,18 +310,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	c[2] = getTrace(tempq).x/3.0;
 
 	g[0] = g[1] = g[2] = c[0]/3.;
-	typename RealTypeId<Cmplx>::Type r,s,theta;
+	Float r,s,theta;
 	s = c[1]/3. - c[0]*c[0]/18;
 	r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
 
-#ifdef __CUDA_ARCH__
-#define HISQ_UNITARIZE_EPS DEV_HISQ_UNITARIZE_EPS
-#else
-#define HISQ_UNITARIZE_EPS HOST_HISQ_UNITARIZE_EPS
-#endif
-
-	typename RealTypeId<Cmplx>::Type cosTheta = r/sqrt(s*s*s);
-	if(fabs(s) < HISQ_UNITARIZE_EPS){
+	Float cosTheta = r/sqrt(s*s*s);
+	if (fabs(s) < arg.unitarize_eps) {
 	  cosTheta = 1.;
 	  s = 0.0; 
 	}
@@ -337,66 +341,44 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	// too often, we expect pretty good performance.
 	//
 
-#ifdef __CUDA_ARCH__
-#define REUNIT_ALLOW_SVD DEV_REUNIT_ALLOW_SVD
-#define REUNIT_SVD_REL_ERROR DEV_REUNIT_SVD_REL_ERROR
-#define REUNIT_SVD_ABS_ERROR DEV_REUNIT_SVD_ABS_ERROR
-#else // cpu
-#define REUNIT_ALLOW_SVD HOST_REUNIT_ALLOW_SVD
-#define REUNIT_SVD_REL_ERROR HOST_REUNIT_SVD_REL_ERROR
-#define REUNIT_SVD_ABS_ERROR HOST_REUNIT_SVD_ABS_ERROR
-#endif
-
-      if(REUNIT_ALLOW_SVD){
+      if (arg.allow_svd) {
 	bool perform_svd = true;
-	if(!REUNIT_SVD_ONLY){
-	  const typename RealTypeId<Cmplx>::Type det = getDeterminant(q).x;
-	  if( fabs(det) >= REUNIT_SVD_ABS_ERROR){  
-	    if( checkRelativeError(g[0]*g[1]*g[2],det,REUNIT_SVD_REL_ERROR) ) perform_svd = false;
+	if (!arg.svd_only) {
+	  const Float det = getDeterminant(q).x;
+	  if( fabs(det) >= arg.svd_abs_error) {
+	    if( checkRelativeError(g[0]*g[1]*g[2],det,arg.svd_rel_error) ) perform_svd = false;
 	  }
 	}	
 
 	if(perform_svd){	
-	  Matrix<Cmplx,3> tmp2;
+	  Matrix<complex<Float>,3> tmp2;
 	  // compute the eigenvalues using the singular value decomposition
-	  computeSVD<Cmplx>(q,tempq,tmp2,g);
+	  computeSVD<Float>(q,tempq,tmp2,g);
 	  // The array g contains the eigenvalues of the matrix q
 	  // The determinant is the product of the eigenvalues, and I can use this
 	  // to check the SVD
-	  const typename RealTypeId<Cmplx>::Type determinant = getDeterminant(q).x;
-	  const typename RealTypeId<Cmplx>::Type gprod = g[0]*g[1]*g[2];
+	  const Float determinant = getDeterminant(q).x;
+	  const Float gprod = g[0]*g[1]*g[2];
 	  // Check the svd result for errors
-#ifdef __CUDA_ARCH__
-#define MAX_DET_ERROR DEV_MAX_DET_ERROR
-#else
-#define MAX_DET_ERROR HOST_MAX_DET_ERROR
-#endif
-	  if(fabs(gprod - determinant) > MAX_DET_ERROR){
-#if  (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__ >= 200))
-	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), MAX_DET_ERROR);
+	  if (fabs(gprod - determinant) > arg.max_det_error) {
+	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
 	    printLink(q);
-#endif
 
 #ifdef __CUDA_ARCH__
-	    atomicAdd(unitarization_failed,1);
+	    atomicAdd(arg.fails, 1);
 #else
-	    (*unitarization_failed)++;
+	    (*arg.fails)++;
 #endif
 	  } 
 	} // perform_svd?
 
       } // REUNIT_ALLOW_SVD?
 
-#ifdef __CUDA_ARCH__
-#define HISQ_FORCE_FILTER DEV_HISQ_FORCE_FILTER
-#else
-#define HISQ_FORCE_FILTER HOST_HISQ_FORCE_FILTER
-#endif	
-      typename RealTypeId<Cmplx>::Type delta = getAbsMin(g,3);
-      if(delta < HISQ_FORCE_FILTER){
-	for(int i=0; i<3; ++i){ 
-	  g[i]     += HISQ_FORCE_FILTER; 
-	  q(i,i).x += HISQ_FORCE_FILTER;
+      Float delta = getAbsMin(g,3);
+      if (delta < arg.force_filter) {
+	for (int i=0; i<3; ++i) {
+	  g[i]     += arg.force_filter;
+	  q(i,i).x += arg.force_filter;
 	}
 	qsq = q*q; // recalculate Q^2
       }
@@ -404,7 +386,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       // At this point we have finished with the c's 
       // use these to store sqrt(g)
-      for(int i=0; i<3; ++i) c[i] = sqrt(g[i]);
+      for (int i=0; i<3; ++i) c[i] = sqrt(g[i]);
 
       // done with the g's, use these to store u, v, w
       g[0] = c[0]+c[1]+c[2];
@@ -414,10 +396,10 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       // set the derivative coefficients!
       deriv_coeffs->set(g[0], g[1], g[2]);
 
-      const typename RealTypeId<Cmplx>::Type & denominator  = g[2]*(g[0]*g[1]-g[2]); 
+      const Float& denominator  = g[2]*(g[0]*g[1]-g[2]);
       c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1]))/denominator;
       c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1])/denominator;
-      c[2] =  g[0]/denominator;
+      c[2] = g[0]/denominator;
 
       tempq = c[1]*q + c[2]*qsq;
       // Add a real scalar
@@ -436,21 +418,22 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
 
     // "v" denotes a "fattened" link variable
-    template<class Cmplx>
+    template<class Float, typename Arg>
     __device__ __host__
-    void getUnitarizeForceSite(const Matrix<Cmplx,3> & v, const Matrix<Cmplx,3> & outer_prod, Matrix<Cmplx,3>* result, int *unitarization_failed)
+    void getUnitarizeForceSite(Matrix<complex<Float>,3>& result, const Matrix<complex<Float>,3> & v,
+			       const Matrix<complex<Float>,3> & outer_prod, Arg &arg)
     {
-      typename RealTypeId<Cmplx>::Type f[3]; 
-      typename RealTypeId<Cmplx>::Type b[6];
+      typedef Matrix<complex<Float>,3> Link;
+      Float f[3];
+      Float b[6];
 
-      Matrix<Cmplx,3> v_dagger = conj(v);  // okay!
-      Matrix<Cmplx,3> q   = v_dagger*v;    // okay!
+      Link v_dagger = conj(v);  // okay!
+      Link q   = v_dagger*v;    // okay!
+      Link rsqrt_q;
 
-      Matrix<Cmplx,3> rsqrt_q;
+      DerivativeCoefficients<Float> deriv_coeffs;
 
-      DerivativeCoefficients<typename RealTypeId<Cmplx>::Type> deriv_coeffs;
-
-      reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed);
+      reciprocalRoot<Float>(&rsqrt_q, &deriv_coeffs, f, q, arg); // approx 529 flops (assumes no SVD)
 
       // Pure hack here
       b[0] = deriv_coeffs.getB00();
@@ -460,237 +443,212 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       b[4] = deriv_coeffs.getB12();
       b[5] = deriv_coeffs.getB22();
 
-
-      Matrix<Cmplx,3> & local_result = *result;
-
-      local_result = rsqrt_q*outer_prod;
+      result = rsqrt_q*outer_prod;
 
       // We are now finished with rsqrt_q
-      Matrix<Cmplx,3> qv_dagger  = q*v_dagger;
-      Matrix<Cmplx,3> vv_dagger  = v*v_dagger; 
-      Matrix<Cmplx,3> vqv_dagger = v*qv_dagger;
-      Matrix<Cmplx,3> temp = f[1]*vv_dagger + f[2]*vqv_dagger;
-
+      Link qv_dagger  = q*v_dagger;
+      Link vv_dagger  = v*v_dagger;
+      Link vqv_dagger = v*qv_dagger;
+      Link temp = f[1]*vv_dagger + f[2]*vqv_dagger;
 
       temp = f[1]*v_dagger + f[2]*qv_dagger;
-      Matrix<Cmplx,3> conj_outer_prod = conj(outer_prod);
-
+      Link conj_outer_prod = conj(outer_prod);
 
       temp = f[1]*v + f[2]*v*q;
-      local_result = local_result + outer_prod*temp*v_dagger + f[2]*q*outer_prod*vv_dagger;
+      result = result + outer_prod*temp*v_dagger + f[2]*q*outer_prod*vv_dagger;
+      result = result + v_dagger*conj_outer_prod*conj(temp) + f[2]*qv_dagger*conj_outer_prod*v_dagger;
 
-      local_result = local_result + v_dagger*conj_outer_prod*conj(temp) + f[2]*qv_dagger*conj_outer_prod*v_dagger;
+      Link qsqv_dagger = q*qv_dagger;
+      Link pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
+      accumBothDerivatives(&result, v, pv_dagger, outer_prod); // 41 flops
 
+      Link rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
+      Link vq = v*q;
+      accumBothDerivatives(&result, vq, rv_dagger, outer_prod); // 41 flops
 
-      // now done with vv_dagger, I think
-      Matrix<Cmplx,3> qsqv_dagger = q*qv_dagger;
-      Matrix<Cmplx,3> pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
-      accumBothDerivatives(&local_result, v, pv_dagger, outer_prod);
+      Link sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
+      Link vqsq = vq*q;
+      accumBothDerivatives(&result, vqsq, sv_dagger, outer_prod); // 41 flops
 
-      Matrix<Cmplx,3> rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
-      Matrix<Cmplx,3> vq = v*q;
-      accumBothDerivatives(&local_result, vq, rv_dagger, outer_prod);
-
-      Matrix<Cmplx,3> sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
-      Matrix<Cmplx,3> vqsq = vq*q;
-      accumBothDerivatives(&local_result, vqsq, sv_dagger, outer_prod);
       return;
+      // 4528 flops - 17 matrix multiplies (198 flops each) + reciprocal root (approx 529 flops) + accumBothDerivatives (41 each) + miscellaneous
     } // get unit force term
 
 
-
-    template<class Cmplx>
-    __global__ void getUnitarizeForceField(const int threads, const Cmplx* link_even, const Cmplx* link_odd,
-					   const Cmplx* old_force_even, const Cmplx* old_force_odd,
-					   Cmplx* force_even, Cmplx* force_odd,
-					   int* unitarization_failed)
+    template<typename Float, typename Arg>
+    __global__ void getUnitarizeForceField(Arg arg)
     {
-       
-      int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
-      // The number of GPU threads is equal to the local volume
-      const int HALF_VOLUME = threads/2;
-      if(mem_idx >= threads) return;
-	
-      Cmplx* force;
-      const Cmplx* link;
-      const Cmplx* old_force;
-
-      force = force_even;
-      link = link_even;
-      old_force = old_force_even;
-      if(mem_idx >= HALF_VOLUME){
-	      mem_idx = mem_idx - HALF_VOLUME;
-	      force = force_odd;
-	      link = link_odd;
-	      old_force = old_force_odd;
+      int idx = blockIdx.x*blockDim.x + threadIdx.x;
+      if(idx >= arg.threads) return;
+      int parity = 0;
+      if(idx >= arg.threads/2) {
+	parity = 1;
+	idx -= arg.threads/2;
       }
-
 
       // This part of the calculation is always done in double precision
-      Matrix<double2,3> v, result, oprod;
-           
+      Matrix<complex<double>,3> v, result, oprod;
+      Matrix<complex<Float>,3> v_tmp, result_tmp, oprod_tmp;
+
       for(int dir=0; dir<4; ++dir){
-	loadLinkVariableFromArray(old_force, dir, mem_idx, HALF_VOLUME, &oprod);
-	loadLinkVariableFromArray(link, dir, mem_idx, HALF_VOLUME, &v);
+	arg.force_old.load((Float*)(oprod_tmp.data), idx, dir, parity);
+	arg.gauge.load((Float*)(v_tmp.data), idx, dir, parity);
+	v = v_tmp;
+	oprod = oprod_tmp;
 
-	getUnitarizeForceSite<double2>(v, oprod, &result, unitarization_failed); 
+	getUnitarizeForceSite<double>(result, v, oprod, arg);
+	result_tmp = result;
 
-	writeLinkVariableToArray(result, dir, mem_idx, HALF_VOLUME, force); 
-      }
+	arg.force.save((Float*)(result_tmp.data), idx, dir, parity);
+      } // 4*4528 flops per site
       return;
     } // getUnitarizeForceField
 
 
-    void unitarizeForceCPU(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
+    template <typename Float, typename Arg>
+    void unitarizeForceCPU(Arg &arg) {
+      Matrix<complex<double>,3> v, result, oprod;
+      Matrix<complex<Float>,3> v_tmp, result_tmp, oprod_tmp;
+
+      for (int parity=0; parity<2; parity++) {
+	for (int i=0; i<arg.threads/2; i++) {
+	  for (int dir=0; dir<4; dir++) {
+	    arg.force_old.load((Float*)(oprod_tmp.data), i, dir, parity);
+	    arg.gauge.load((Float*)(v_tmp.data), i, dir, parity);
+	    v = v_tmp;
+	    oprod = oprod_tmp;
+
+	    getUnitarizeForceSite<double>(result, v, oprod, arg);
+
+	    result_tmp = result;
+	    arg.force.save((Float*)(result_tmp.data), i, dir, parity);
+	  }
+	}
+      }
+    }
+
+    void unitarizeForceCPU(cpuGaugeField& newForce, const cpuGaugeField& oldForce, const cpuGaugeField& gauge)
     {
-      
       int num_failures = 0;	
-      Matrix<double2,3> old_force, new_force, v;
+      Matrix<complex<double>,3> old_force, new_force, v;
 
-      // I can change this code to make it much more compact
-
-      const QudaGaugeFieldOrder order = cpuGauge.Order();
-
-      if(order == QUDA_MILC_GAUGE_ORDER){
-        for(int i=0; i<cpuGauge.Volume(); ++i){
-	  for(int dir=0; dir<4; ++dir){
-	    if(param.cpu_prec == QUDA_SINGLE_PRECISION){
-	      copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
-	      copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
-	    }else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
-	      copyArrayToLink(&old_force, ((double*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
-	      copyArrayToLink(&v, ((double*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((double*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
-	    } // precision?
-	  } // dir
-        } // i
-      }else if(order == QUDA_QDP_GAUGE_ORDER){
-        for(int dir=0; dir<4; ++dir){
-          for(int i=0; i<cpuGauge.Volume(); ++i){
-	    if(param.cpu_prec == QUDA_SINGLE_PRECISION){
-	      copyArrayToLink(&old_force, ((float**)(cpuOldForce.Gauge_p()))[dir] + i*18);
-	      copyArrayToLink(&v, ((float**)(cpuGauge.Gauge_p()))[dir] + i*18);
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((float**)(cpuNewForce->Gauge_p()))[dir] + i*18, new_force);
-	    }else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
-	      copyArrayToLink(&old_force, ((double**)(cpuOldForce.Gauge_p()))[dir] + i*18);
-	      copyArrayToLink(&v, ((double**)(cpuGauge.Gauge_p()))[dir] + i*18);
-	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
-	      copyLinkToArray(((double**)(cpuNewForce->Gauge_p()))[dir] + i*18, new_force);
-	    }
-          }
-        }
-      }else{
+      if (gauge.Order() == QUDA_MILC_GAUGE_ORDER) {
+	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
+	  typedef gauge::MILCOrder<double,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<double>(arg);
+	} else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
+	  typedef gauge::MILCOrder<float,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<float>(arg);
+	} else {
+	  errorQuda("Precision = %d not supported", gauge.Precision());
+	}
+      } else if (gauge.Order() == QUDA_QDP_GAUGE_ORDER) {
+	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
+	  typedef gauge::QDPOrder<double,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<double>(arg);
+	} else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
+	  typedef gauge::QDPOrder<float,18> G;
+	  UnitarizeForceArg<G,G> arg(G(newForce), G(oldForce), G(gauge), gauge, &num_failures, unitarize_eps, force_filter,
+				     max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+	  unitarizeForceCPU<float>(arg);
+	} else {
+	  errorQuda("Precision = %d not supported", gauge.Precision());
+	}
+      } else {
         errorQuda("Only MILC and QDP gauge orders supported\n");
       }
+
+      if (num_failures) errorQuda("Unitarization failed, failures = %d", num_failures);
       return;
     } // unitarize_force_cpu
 
-    class UnitarizeForceCuda : public Tunable {
+    template <typename Float, typename Arg>
+    class UnitarizeForce : public Tunable {
     private:
-      const cudaGaugeField &oldForce;
-      const cudaGaugeField &gauge;
-      cudaGaugeField &newForce;
-      int *fails;
+      Arg &arg;
+      const GaugeField &meta;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-
-      // generalize Tunable::advanceBlockDim() to also set gridDim, with extra checking to ensure that gridDim isn't too large for the device
-      bool advanceBlockDim(TuneParam &param) const
-      {
-	const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-	const unsigned int max_blocks = deviceProp.maxGridSize[0];
-	const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
-	const int step = deviceProp.warpSize;
-	const int threads = gauge.Volume();
-	bool ret;
-	param.block.x += step;
-	if (param.block.x > max_threads || sharedBytesPerThread()*param.block.x > max_shared) {
-	  param.block = dim3((threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-	  param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	ret = false;
-	} else {
-	  ret = true;
-	}
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-	return ret;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return arg.threads; }
 
     public:
-      UnitarizeForceCuda(const cudaGaugeField& oldForce, const cudaGaugeField& gauge,  
-			 cudaGaugeField& newForce, int* fails) : 
-	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { ; }
-      virtual ~UnitarizeForceCuda() { ; }
+      UnitarizeForce(Arg &arg, const GaugeField& meta) : arg(arg), meta(meta) {
+	writeAuxString("threads=%d,prec=%lu,stride=%d", meta.Volume(), meta.Precision(), meta.Stride());
+      }
+      virtual ~UnitarizeForce() { ; }
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-
-	if(gauge.Precision() == QUDA_SINGLE_PRECISION){
-	  getUnitarizeForceField<<<tp.grid,tp.block>>>(gauge.Volume(), (const float2*)gauge.Even_p(), (const float2*)gauge.Odd_p(),
-						       (const float2*)oldForce.Even_p(), (const float2*)oldForce.Odd_p(),
-						       (float2*)newForce.Even_p(), (float2*)newForce.Odd_p(), 
-						       fails);
-	}else if(gauge.Precision() == QUDA_DOUBLE_PRECISION){
-	  getUnitarizeForceField<<<tp.grid,tp.block>>>(gauge.Volume(), (const double2*)gauge.Even_p(), (const double2*)gauge.Odd_p(),
-						       (const double2*)oldForce.Even_p(), (const double2*)oldForce.Odd_p(),
-						       (double2*)newForce.Even_p(), (double2*)newForce.Odd_p(), 
-						       fails);      
-	}
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	getUnitarizeForceField<Float><<<tp.grid,tp.block>>>(arg);
       }
       
       void preTune() { ; }
-      void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
+      void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
       
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-	const unsigned int max_blocks = deviceProp.maxGridSize[0];
-	const int threads = gauge.Volume();
-	const int step = deviceProp.warpSize;
-	param.block = dim3((threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-	param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-	param.shared_bytes = sharedBytesPerThread()*param.block.x > sharedBytesPerBlock(param) ?
-	  sharedBytesPerThread()*param.block.x : sharedBytesPerBlock(param);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const {
-	initTuneParam(param);
-      }
-      
-      long long flops() const { return 0; } // FIXME: add flops counter
-      
-      TuneKey tuneKey() const {
-	std::stringstream vol, aux;
-	vol << gauge.X()[0] << "x";
-	vol << gauge.X()[1] << "x";
-	vol << gauge.X()[2] << "x";
-	vol << gauge.X()[3] << "x";
-	aux << "threads=" << gauge.Volume() << ",prec=" << gauge.Precision();
-	aux << "stride=" << gauge.Stride();
-	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }  
-    }; // UnitarizeForceCuda
+      long long flops() const { return 4ll*4528*meta.Volume(); }
+      long long bytes() const { return 4ll * arg.threads * (arg.force.Bytes() + arg.force_old.Bytes() + arg.gauge.Bytes()); }
 
-    void unitarizeForceCuda(const QudaGaugeParam &param, cudaGaugeField &cudaOldForce,
-                            cudaGaugeField &cudaGauge, cudaGaugeField *cudaNewForce, int* unitarization_failed) {
-      UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    }; // UnitarizeForce
+
+    template<typename Float, typename Gauge>
+    void unitarizeForce(Gauge newForce, const Gauge oldForce, const Gauge gauge,
+			const GaugeField &meta, int* fails, long long *flops) {
+
+      UnitarizeForceArg<Gauge,Gauge> arg(newForce, oldForce, gauge, meta, fails, unitarize_eps, force_filter,
+					 max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
+      UnitarizeForce<Float,UnitarizeForceArg<Gauge,Gauge> > unitarizeForce(arg, meta);
       unitarizeForce.apply(0);
+      cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
+      if(flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }
-    
-    
+
+    void unitarizeForce(cudaGaugeField &newForce, const cudaGaugeField &oldForce, const cudaGaugeField &gauge,
+			int* fails, long long *flops) {
+
+      if (oldForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
+	errorQuda("Force field should not use reconstruct %d", oldForce.Reconstruct());
+
+      if (newForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
+	errorQuda("Force field should not use reconstruct %d", newForce.Reconstruct());
+
+      if (oldForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
+	errorQuda("Gauge field should not use reconstruct %d", gauge.Reconstruct());
+
+      if (gauge.Precision() != oldForce.Precision() || gauge.Precision() != newForce.Precision())
+	errorQuda("Mixed precision not supported");
+
+      if (gauge.Order() != oldForce.Order() || gauge.Order() != newForce.Order())
+	errorQuda("Mixed data ordering not supported");
+
+      if (gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
+	  typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type G;
+	  unitarizeForce<double>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	} else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
+	  typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type G;
+	  unitarizeForce<float>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	}
+      } else {
+	errorQuda("Data order %d not supported", gauge.Order());
+      }
+
+    }
+
   } // namespace fermion_force
+
 } // namespace quda
 
 
+#endif

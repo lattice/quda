@@ -1,283 +1,256 @@
 #include <quda_internal.h>
 #include <quda_matrix.h>
+#include <tune_quda.h>
 #include <clover_field.h>
 #include <gauge_field.h>
+#include <gauge_field_order.h>
+#include <clover_field_order.h>
 
 namespace quda {
 
-  struct CloverParam {
+#ifdef GPU_CLOVER_DIRAC
+
+  template<typename Float, typename Clover, typename Fmunu>
+  struct CloverArg {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
-    int gaugeLengthCB; // half length (include checkerboard spacetime, color, complex, direction)
-    int gaugeStride; // stride used on gauge field
-    int FmunuLengthCB; // half length (include checkerboard spacetime, color, complex, direction)
-    int FmunuStride; // stride used on Fmunu field
+#ifdef MULTI_GPU
+    int border[4]; 
+#endif
+    double cloverCoeff;
+
+    Clover clover;
+    Fmunu f;
+    
+    CloverArg(Clover &clover, Fmunu& f, const GaugeField &meta, double cloverCoeff)
+      : threads(meta.Volume()), 
+        cloverCoeff(cloverCoeff),
+        clover(clover),
+	f(f)
+    { 
+      for(int dir=0; dir<4; ++dir) X[dir] = meta.X()[dir];
+      
+#ifdef MULTI_GPU
+      for(int dir=0; dir<4; ++dir){
+	border[dir] = 2;
+      }
+#endif
+    }
   };
-  
-  /**
-     linkIndex computes the spacetime index of the link with coordinate
-     y = x + dx.
 
-     @param x - coordinate in spacetime
-     @param dx - coordinate offsets in spacetime
-     @param param - CloverParam struct
+  /*
+    Put into clover order
+    Upper-left block (chirality index 0)
+       /                                                                                \
+       |  1 + c*I*(F[0,1] - F[2,3]) ,     c*I*(F[1,2] - F[0,3]) + c*(F[0,2] + F[1,3])   |
+       |                                                                                |
+       |  c*I*(F[1,2] - F[0,3]) - c*(F[0,2] + F[1,3]),   1 - c*I*(F[0,1] - F[2,3])      |
+       |                                                                                |
+       \                                                                                /
+
+       /
+       | 1 - c*I*(F[0] - F[5]),   -c*I*(F[2] - F[3]) - c*(F[1] + F[4])
+       |
+       |  -c*I*(F[2] -F[3]) + c*(F[1] + F[4]),   1 + c*I*(F[0] - F[5])
+       |
+       \
+
+     Lower-right block (chirality index 1)
+
+       /                                                                  \
+       |  1 - c*I*(F[0] + F[5]),  -c*I*(F[2] + F[3]) - c*(F[1] - F[4])    |
+       |                                                                  |
+       |  -c*I*(F[2]+F[3]) + c*(F[1]-F[4]),     1 + c*I*(F[0] + F[5])     |
+       \                                                                  /
   */
-  __device__ inline int linkIndex(int x[], int dx[], const CloverParam &param) {
-    int y[4];
-    for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + param.X[i]-1) % param.X[i];
-    int idx = (((y[3]*param.X[2] + y[2])*param.X[1] + y[1])*param.X[0] + y[0]) >> 1;
-    return idx;
-  }
 
-  /**
-     Construct the field-strength tensor field Fmunu
-     First pass only supports no reconstruct for expediency 
-     
-     @param Fmunu - Pointer to field-strength tensor array.  Result is stored here.
-     @param gauge - Pointer to gauge field.
-     @param param - CloverParam struct
-  */
-  template <typename Cmplx>
-  __global__ void computeFmunuKernel(Cmplx *Fmunu, const Cmplx *gauge, const CloverParam param) {
+  // Core routine for constructing clover term from field strength
+  template<typename Float, typename Clover, typename Fmunu>
+    __device__ __host__
+  void cloverComputeCore(CloverArg<Float,Clover,Fmunu>& arg, int idx){
 
-    // this is a full lattice index
-    int X = blockIdx.x * blockDim.x + threadIdx.x;
-    if (X >= param.threads) return;
-  
-    // thread ordering
-    // X = (((parity*X4 + x4)*X3 + x3)*X2 + x2)*X1h + x1h
-    // with x1 = 2*x1h + parity  
+      int parity = 0;  
+      if(idx >= arg.threads/2){
+        parity = 1;
+        idx -= arg.threads/2;
+      }
+      typedef complex<Float> Complex;
 
-    // For multi-gpu these need to have offets added on
-    // keep X[d] as the true local problem
+      // Load the field-strength tensor from global memory
+      Matrix<Complex,3> F[6];
+      for(int i=0; i<6; ++i){
+	arg.f.load((Float*)(F[i].data), idx, i, parity);
+      }
 
-    // compute spacetime dimensions and parity
-    int aux1 = X / (param.X[0]/2);
-    int x[4];
-    x[0] = X - aux1 * (param.X[0]/2); // this is chbd x
-    int aux2 = aux1 / param.X[1];
-    x[1] = aux1 - aux2 * param.X[1];
-    int aux3 = aux2 / param.X[2];
-    x[2] = aux2 - aux3 * param.X[2];
-    int parity = aux3 / param.X[3];
-    x[3] = aux3 - parity * param.X[3];
-    x[0] += parity; // now this is the full index
-
-    for (int mu=0; mu<4; mu++) {
-      for (int nu=0; nu<mu; nu++) {
-	Matrix<Cmplx,3> F;
-	setZero(&F);
-
-	{ // positive mu, nu
-	  
-	  // load U(x)_(+mu)
-	  Matrix<Cmplx,3> U1;
-	  int dx[4] = {0, 0, 0, 0};
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, mu, linkIndex(x, dx, param), 
-				    param.gaugeStride, &U1);
-	  
-	  // load U(x+mu)_(+nu)
-	  Matrix<Cmplx,3> U2;
-	  dx[mu]++;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U2);
-	  dx[mu]--;
-	  
-	  Matrix<Cmplx,3> Ftmp = U2 * U1;
-	  
-	  // load U(x+nu)_(+mu)
-	  Matrix<Cmplx,3> U3;
-	  dx[nu]++;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, mu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U3);
-	  dx[nu]--;
-	  
-	  Ftmp = conj(U3) * Ftmp;
-	  
-	  // load U(x)_(+nu)
-	  Matrix<Cmplx,3> U4;
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U4);
-	  
-	  // complete the plaquette
-	  Ftmp = conj(U4) * Ftmp;
-	  
-	  // sum this contribution to Fmunu
-	  F += Ftmp + conj(Ftmp);
-	}
-
-	{ // positive mu, negative nu
-	  
-	  // load U(x)_(+mu)
-	  Matrix<Cmplx,3> U1;
-	  int dx[4] = {0, 0, 0, 0};
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, mu, linkIndex(x, dx, param), 
-				    param.gaugeStride, &U1);
-	  
-	  // load U(x+mu)_(-nu) = U(x+mu-nu)_(+nu)
-	  Matrix<Cmplx,3> U2;
-	  dx[mu]++;
-	  dx[nu]--;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U2);
-	  dx[nu]++;
-	  dx[mu]--;
-	  
-	  Matrix<Cmplx,3> Ftmp = conj(U2) * U1;
-	  
-	  // load U(x-nu)_mu
-	  Matrix<Cmplx,3> U3;
-	  dx[nu]--;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, mu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U3);
-	  dx[nu]++;
-	  
-	  Ftmp = conj(U3) * Ftmp;
-	  
-	  // load U(x)_(-nu) = U(x-nu)_(+nu)
-	  Matrix<Cmplx,3> U4;
-	  dx[nu]--;
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U4);
-	  dx[nu]++;
-	  
-	  // complete the plaquette
-	  Ftmp = U4 * Ftmp;
-	  
-	  // sum this contribution to Fmunu
-	  F += Ftmp + conj(Ftmp);
-	}
+      Complex I; I.x = 0; I.y = 1.0;
+      Complex coeff; coeff.x = 0; coeff.y = arg.cloverCoeff;
+      Matrix<Complex,3> block1[2];
+      Matrix<Complex,3> block2[2];
+      block1[0] =  coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops 
+      block1[1] =  coeff*(F[0]+F[5]); // 72 floating-point ops 
+      block2[0] =  arg.cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
+      block2[1] =  arg.cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
 
 
-	{ // negative mu, positive nu
-	  
-	  // load U(x)_(-mu)
-	  Matrix<Cmplx,3> U1;
-	  int dx[4] = {0, 0, 0, 0};
-	  dx[mu]--;
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, mu, linkIndex(x, dx, param), 
-				    param.gaugeStride, &U1);
-	  dx[mu]++;
+      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
+      Float diag[6];
+      Complex triangle[15];
 
-	  // load U(x-mu)_(+nu)
-	  Matrix<Cmplx,3> U2;
-	  dx[mu]--;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U2);
-	  dx[mu]++;
-	  
-	  Matrix<Cmplx,3> Ftmp = U2 * conj(U1);
-	  
-	  // load U(x+nu)_(+mu)
-	  Matrix<Cmplx,3> U3;
-	  dx[nu]++;
-	  dx[mu]--;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, mu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U3);
-	  dx[mu]++;
-	  dx[nu]--;
-	  
-	  Ftmp = U3 * Ftmp;
-	  
-	  // load U(x)_(+nu)
-	  Matrix<Cmplx,3> U4;
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U4);
-	  
-	  // complete the plaquette
-	  Ftmp = conj(U4) * Ftmp;
-	  
-	  // sum this contribution to Fmunu
-	  F += Ftmp + conj(Ftmp);
-	}
+      // This uses lots of unnecessary memory
+      for(int ch=0; ch<2; ++ch){ 
+        // c = 0(1) => positive(negative) chiral block
+        // Compute real diagonal elements
+        for(int i=0; i<3; ++i){
+          diag[i]   = 1.0 - block1[ch](i,i).x;
+          diag[i+3] = 1.0 + block1[ch](i,i).x;
+        }
 
-	{ // negative mu, negative nu
-	  
-	  // load U(x)_(-mu)
-	  Matrix<Cmplx,3> U1;
-	  int dx[4] = {0, 0, 0, 0};
-	  dx[mu]--;
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, mu, linkIndex(x, dx, param), 
-				    param.gaugeStride, &U1);
-	  dx[mu]++;
-
-	  // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
-	  Matrix<Cmplx,3> U2;
-	  dx[mu]--;
-	  dx[nu]--;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U2);
-	  dx[nu]++;
-	  dx[mu]++;
-	  
-	  Matrix<Cmplx,3> Ftmp = conj(U2) * conj(U1);
-	  
-	  // load U(x-nu)_mu
-	  Matrix<Cmplx,3> U3;
-	  dx[mu]--;
-	  dx[nu]--;
-	  loadLinkVariableFromArray(gauge+((parity+1)&1)*param.gaugeLengthCB, mu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U3);
-	  dx[nu]++;
-	  dx[mu]++;
-	  
-	  Ftmp = U3 * Ftmp;
-	  
-	  // load U(x)_(-nu) = U(x-nu)_(+nu)
-	  Matrix<Cmplx,3> U4;
-	  dx[nu]--;
-	  loadLinkVariableFromArray(gauge+parity*param.gaugeLengthCB, nu, linkIndex(x,dx,param), 
-				    param.gaugeStride, &U4);
-	  dx[nu]++;
-	  
-	  // complete the plaquette
-	  Ftmp = U4 * Ftmp;
-	  
-	  // sum this contribution to Fmunu
-	  F += Ftmp + conj(Ftmp);
-	}
+        // Compute off diagonal components
+        // First row
+        triangle[0]  = - block1[ch](1,0);
+        // Second row
+        triangle[1]  = - block1[ch](2,0);
+        triangle[2]  = - block1[ch](2,1);
+        // Third row
+        triangle[3]  =   block2[ch](0,0);
+        triangle[4]  =   block2[ch](0,1);
+        triangle[5]  =   block2[ch](0,2);
+        // Fourth row 
+        triangle[6]  =   block2[ch](1,0);
+        triangle[7]  =   block2[ch](1,1);
+        triangle[8]  =   block2[ch](1,2);
+        triangle[9]  =   block1[ch](1,0);
+        // Fifth row
+        triangle[10] =   block2[ch](2,0);
+        triangle[11] =   block2[ch](2,1);
+        triangle[12] =   block2[ch](2,2);
+        triangle[13] =   block1[ch](2,0);
+        triangle[14] =   block1[ch](2,1);
 
 
-	int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
-	writeLinkVariableToArray(F, munu_idx, X/2, param.FmunuStride, Fmunu+parity*param.FmunuLengthCB);
+	Float A[36];
+        for(int i=0; i<6; ++i) A[i] = static_cast<Float>(0.5)*diag[i];
+
+        for(int i=0; i<15; ++i){
+          A[6+2*i]     = 0.5*triangle[idtab[i]].x;
+          A[6+2*i + 1] = 0.5*triangle[idtab[i]].y;
+        } 
+	arg.clover.save(A, idx, parity, ch);
+      } // ch
+      // 84 floating-point ops
+
+      return;
+    }
+
+
+  template<typename Float, typename Clover, typename Fmunu>
+    __global__
+  void cloverComputeKernel(CloverArg<Float,Clover,Fmunu> arg){
+      int idx = threadIdx.x + blockIdx.x*blockDim.x;
+      if(idx >= arg.threads) return;
+      cloverComputeCore(arg, idx);
+    }
+
+  template<typename Float, typename Clover, typename Fmunu>
+  void cloverComputeCPU(CloverArg<Float,Clover,Fmunu> arg){
+      for(int idx=0; idx<arg.threads; ++idx){
+        cloverComputeCore(arg, idx);
       }
     }
 
+
+  template<typename Float, typename Clover, typename Fmunu>
+    class CloverCompute : Tunable {
+    CloverArg<Float,Clover,Fmunu> arg;
+      const GaugeField &meta;
+      const QudaFieldLocation location;
+
+      private: 
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+      bool tuneSharedBytes() const { return false; } // Don't tune the shared memory.
+      bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+      unsigned int minThreads() const { return arg.threads; }
+
+      public:
+      CloverCompute(CloverArg<Float,Clover,Fmunu> &arg, const GaugeField &meta, QudaFieldLocation location) 
+        : arg(arg), meta(meta), location(location) {
+	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
+      }
+
+      virtual ~CloverCompute() {}
+
+      void apply(const cudaStream_t &stream) {
+        if(location == QUDA_CUDA_FIELD_LOCATION){
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+        } else { // run the CPU code
+          cloverComputeCPU(arg);
+        }
+      }
+
+      TuneKey tuneKey() const {
+	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
+      }
+
+      std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
+        std::stringstream ps;
+        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+        ps << "shared=" << param.shared_bytes;
+        return ps.str();
+      }
+
+      void preTune(){}
+      void postTune(){}
+      long long flops() const { return 480*arg.threads; } 
+      long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } 
+    };
+
+
+
+  template<typename Float, typename Clover, typename Fmunu>
+  void computeClover(Clover clover, Fmunu f, const GaugeField &meta, Float cloverCoeff, QudaFieldLocation location){
+    CloverArg<Float,Clover,Fmunu> arg(clover, f, meta, cloverCoeff);
+    CloverCompute<Float,Clover,Fmunu> cloverCompute(arg, meta, location);
+    cloverCompute.apply(0);
+    checkCudaError();
+    cudaDeviceSynchronize();
   }
 
-  void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge) {
+  template<typename Float>
+  void computeClover(CloverField &clover, const GaugeField &f, Float cloverCoeff, QudaFieldLocation location){
+    if (f.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+      if (clover.isNative()) {
+	typedef typename clover_mapper<Float>::type C;
+	computeClover(C(clover,0), gauge::FloatNOrder<Float,18,2,18>(f), f, cloverCoeff, location);  
+      } else {
+	errorQuda("Clover field order %d not supported", clover.Order());
+      } // clover order
+    } else {
+      errorQuda("Fmunu field order %d not supported", f.Precision());
+    }
+  }
+
+#endif
+
+  void computeClover(CloverField &clover, const GaugeField& f, double cloverCoeff, QudaFieldLocation location){
 
 #ifdef GPU_CLOVER_DIRAC
-    using namespace quda;
-
-    // first create the field-strength tensor
-    int pad = 0;
-    GaugeFieldParam tensor_param(gauge.X(), gauge.Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
-    cudaGaugeField Fmunu(tensor_param);
-
-    // set the kernel parameters
-    CloverParam param;
-    param.threads = gauge.Volume();
-    for (int i=0; i<4; i++) param.X[i] = gauge.X()[i];
-    param.gaugeLengthCB = gauge.Length() / 2; 
-    param.gaugeStride = gauge.Stride();
-    param.FmunuLengthCB = Fmunu.Length() / 2;
-    param.FmunuStride = Fmunu.Stride();
-
-    dim3 blockDim(32, 1, 1);
-    dim3 gridDim((param.threads + blockDim.x - 1) / blockDim.x, 1, 1);
-
-    if (gauge.Precision() == QUDA_DOUBLE_PRECISION) { 
-      computeFmunuKernel<<<gridDim,blockDim>>>((double2*)Fmunu.Gauge_p(), (double2*)gauge.Gauge_p(), param);
-    } else {
-      computeFmunuKernel<<<gridDim,blockDim>>>((float2*)Fmunu.Gauge_p(), (float2*)gauge.Gauge_p(), param);
+    if(clover.Precision() != f.Precision()){
+      errorQuda("Fmunu precision %d must match gauge precision %d", clover.Precision(), f.Precision());
     }
 
-    // Now contract this into the clover term
-
-
+    if (clover.Precision() == QUDA_DOUBLE_PRECISION){
+      computeClover<double>(clover, f, cloverCoeff, location);
+    } else if(clover.Precision() == QUDA_SINGLE_PRECISION) {
+      computeClover<float>(clover, f, cloverCoeff, location);
+    } else {
+      errorQuda("Precision %d not supported", clover.Precision());
+    }
+    return;
 #else
-    errorQuda("Clover dslash has not been built");
+    errorQuda("Clover has not been built");
 #endif
 
   }

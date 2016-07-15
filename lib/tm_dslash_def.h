@@ -31,13 +31,15 @@
 #define DD_LOOP
 #define DD_DAG 0
 #define DD_XPAY 0
+//!
+#define DD_TWIST 0
 #define DD_RECON 0
 #define DD_PREC 0
 #endif
 
 // set options for current iteration
 
-#define DD_NAME_F twistedMassDslash
+//#define DD_NAME_F twistedMassDslash
 
 #if (DD_DAG==0) // no dagger
 #define DD_DAG_F
@@ -45,12 +47,21 @@
 #define DD_DAG_F Dagger
 #endif
 
+//!
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#else
+#elif (DD_XPAY==1)
 #define DSLASH_XPAY
 #define DD_XPAY_F Xpay
 #endif
+
+#if (DD_TWIST==0) // twisted input 
+#define DD_NAME_F twistedMassTwistInvDslash
+#define TWIST_INV_DSLASH
+#else
+#define DD_NAME_F twistedMassDslash
+#endif
+//!
 
 #if (DD_PREC == 0)
 #define DD_PARAM4 const double a, const double b, const double2 *x, const float *xNorm, const DslashParam param
@@ -154,7 +165,7 @@
 
 #if (DD_PREC==0) // double-precision fields
 
-#define TPROJSCALE tProjScale
+//#define TPROJSCALE tProjScale
 
 // double-precision gauge field
 #if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
@@ -186,8 +197,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
@@ -203,7 +216,7 @@
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
-#if (DD_XPAY==1)
+#if (DD_XPAY!=0)
 #if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_DOUBLE
@@ -222,7 +235,7 @@
 
 #elif (DD_PREC==1) // single-precision fields
 
-#define TPROJSCALE tProjScale_f
+//#define TPROJSCALE tProjScale_f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -258,8 +271,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle
+#define GHOSTSPINORTEX ghostSpinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -274,7 +289,7 @@
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
-#if (DD_XPAY==1)
+#if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_SINGLE
@@ -292,7 +307,7 @@
 
 #else             // half-precision fields
 
-#define TPROJSCALE tProjScale_f
+//#define TPROJSCALE tProjScale_f
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -326,8 +341,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
+#define GHOSTSPINORTEX ghostSpinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -344,7 +361,8 @@
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
-#if (DD_XPAY==1)
+//!0513
+#if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_HALF
@@ -363,21 +381,18 @@
 
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
 #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
 // define the kernel
-
+//!051013
 template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
      (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tm_dslash_dagger_gt200_core.h"
@@ -385,7 +400,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "tm_dslash_gt200_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tm_dslash_dagger_gt200_core.h"
@@ -393,12 +408,31 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "tm_dslash_gt200_core.h"
 #endif
 
-#else  // fall-back is original G80 
+#endif
+
+}
+
+#ifdef MULTI_GPU
+template <>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
-#include "tm_dslash_dagger_g80_core.h"
+#include "tm_fused_exterior_dslash_dagger_gt200_core.h"
 #else
-#include "tm_dslash_g80_core.h"
+#include "tm_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#else // no shared memory blocking
+
+#if DD_DAG
+#include "tm_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "tm_fused_exterior_dslash_gt200_core.h"
 #endif
 
 #endif
@@ -406,6 +440,97 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #endif
 
 }
+#endif // MULTI_GPU
+
+
+//NEW
+#if (DD_XPAY==1) && (DD_TWIST==1)
+#define TWIST_XPAY
+
+//redefine kernel name:
+#undef DD_NAME_F 
+#define DD_NAME_F twistedMassDslashTwist
+  
+template <KernelType kernel_type>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
+
+#if DD_DAG
+#include "tm_dslash_dagger_gt200_core.h"
+#else
+#include "tm_dslash_gt200_core.h"
+#endif
+
+#else // no shared memory blocking
+
+#if DD_DAG
+#include "tm_dslash_dagger_gt200_core.h"
+#else
+#include "tm_dslash_gt200_core.h"
+#endif
+
+#endif
+
+#endif
+
+}
+
+template <>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
+
+#if DD_DAG
+#include "tm_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "tm_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#else // no shared memory blocking
+
+#if DD_DAG
+#include "tm_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "tm_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#endif
+
+#endif
+
+}
+
+#undef TWIST_XPAY
+#endif //(DD_XPAY==0) && (DD_TWIST==1)
+
+
+//BEGIN DUMMY KERNEL (remove it later)
+#if (DD_XPAY==0) && (DD_TWIST==1)
+#define TWIST_XPAY
+
+//redefine kernel name:
+#undef DD_NAME_F 
+#define DD_NAME_F twistedMassDslashTwist
+  
+template <KernelType kernel_type>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+
+#endif
+
+}
+#undef TWIST_XPAY
+#endif //(DD_XPAY==0) && (DD_TWIST==1)
+//END DUMMY KERNEL
 
 #endif
 
@@ -423,6 +548,10 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_FUNC
 
 #undef DSLASH_XPAY
+
+//!
+#undef TWIST_INV_DSLASH
+//!
 #undef READ_GAUGE_MATRIX
 #undef RECONSTRUCT_GAUGE_MATRIX
 #undef GAUGE0TEX
@@ -431,6 +560,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
+#undef GHOSTSPINORTEX
 #undef READ_INTERMEDIATE_SPINOR
 #undef INTERTEX
 #undef READ_ACCUM
@@ -441,7 +571,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #undef SPINOR_HOP
 
-#undef TPROJSCALE
+//#undef TPROJSCALE
 
 // prepare next set of options, or clean up after final iteration
 
@@ -451,6 +581,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #else
 #undef DD_DAG
 #define DD_DAG 0
+
+#if (DD_TWIST==0)
+#undef DD_TWIST
+#define DD_TWIST 1
+#else
+#undef DD_TWIST
+#define DD_TWIST 0
 
 #if (DD_XPAY==0)
 #undef DD_XPAY
@@ -480,6 +617,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #undef DD_LOOP
 #undef DD_DAG
+#undef DD_TWIST
 #undef DD_XPAY
 #undef DD_RECON
 #undef DD_PREC
@@ -487,6 +625,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_XPAY
+#endif // DD_TWIST
 #endif // DD_DAG
 
 #ifdef DD_LOOP

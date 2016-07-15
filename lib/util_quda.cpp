@@ -26,6 +26,15 @@ void setVerbosity(QudaVerbosity verbosity)
   verbosity_ = verbosity;
 }
 
+
+static QudaTune tune_;
+
+QudaTune getTuning() { return tune_; }
+void setTuning(QudaTune tune)
+{
+  tune_ = tune;
+}
+
 void setOutputPrefix(const char *prefix)
 {
   strncpy(prefix_, prefix, MAX_PREFIX_SIZE);

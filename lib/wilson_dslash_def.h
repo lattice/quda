@@ -33,7 +33,6 @@
 #define DD_XPAY 0
 #define DD_RECON 0
 #define DD_PREC 0
-#define DD_CLOVER 0
 #endif
 
 // set options for current iteration
@@ -203,8 +202,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
@@ -294,8 +295,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle
+#define GHOSTSPINORTEX ghostSpinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -380,8 +383,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
+#define GHOSTSPINORTEX ghostSpinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -436,9 +441,6 @@
 
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
 #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
@@ -451,7 +453,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
   // build Wilson or clover as appropriate
 #if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #ifdef DSLASH_CLOVER_XPAY
 
@@ -471,7 +473,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared-memory blocking
 
 #ifdef DSLASH_CLOVER_XPAY
 
@@ -491,35 +493,68 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #endif
 
-#else  // fall-back is original G80 
-
-#ifdef DSLASH_CLOVER_XPAY
-
-#if DD_DAG
-#include "asym_wilson_clover_dslash_dagger_g80_core.h"
-#else
-#include "asym_wilson_clover_dslash_g80_core.h"
-#endif
-
-#else
-
-#if DD_DAG
-#include "wilson_dslash_dagger_g80_core.h"
-#else
-#include "wilson_dslash_g80_core.h"
-#endif
-
-#endif // DSLASH_CLOVER_XPAY
-
-
-#endif // __COMPUTE_CAPABILITY
+#endif // SHARED_WILSON_DSLASH
 
 
 #endif // DD_CLOVER
 
 }
 
+#ifdef MULTI_GPU
+template <>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+  (DD_PARAM_OUT DD_PARAM_GAUGE DD_PARAM_CLOVER DD_PARAM_IN DD_PARAM_XPAY const DslashParam param) {
+
+  // build Wilson or clover as appropriate
+#if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
+
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_fused_exterior_dslash_dagger_fermi_core.h"
+#else
+#include "asym_wilson_clover_fused_exterior_dslash_fermi_core.h"
 #endif
+
+#else
+
+#if DD_DAG
+#include "wilson_fused_exterior_dslash_dagger_fermi_core.h"
+#else
+#include "wilson_fused_exterior_dslash_fermi_core.h"
+#endif
+
+#endif
+
+#else // no shared-memory blocking
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "asym_wilson_clover_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#else
+
+#if DD_DAG
+#include "wilson_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "wilson_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#endif
+
+#endif // SHARED_WILSON_DSLASH
+
+
+#endif // DD_CLOVER
+
+}
+#endif // MULTI_GPU
 
 // clean up
 
@@ -544,6 +579,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
+#undef GHOSTSPINORTEX
 #undef READ_INTERMEDIATE_SPINOR
 #undef INTERTEX
 #undef WRITE_SPINOR
@@ -593,26 +629,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_PREC
 #define DD_PREC 2
 #else
-#undef DD_PREC
-#define DD_PREC 0
-
-#if (DD_CLOVER==0)
-#undef DD_CLOVER
-#define DD_CLOVER 1
-#elif (DD_CLOVER==1)
-#undef DD_CLOVER
-#define DD_CLOVER 2
-
-#else
 
 #undef DD_LOOP
 #undef DD_DAG
 #undef DD_XPAY
 #undef DD_RECON
 #undef DD_PREC
-#undef DD_CLOVER
 
-#endif // DD_CLOVER
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_XPAY

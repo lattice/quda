@@ -5,7 +5,14 @@
 #include <stdlib.h>
 #include <enum_quda.h>
 #include <comm_quda.h>
+#include <tune_key.h>
 
+QudaTune getTuning();
+
+/**
+   @param tune Sets the whether to tune the cuda kernels or not
+*/
+void setTuning(QudaTune tune);
 
 QudaVerbosity getVerbosity();
 char *getOutputPrefix();
@@ -20,7 +27,14 @@ void popVerbosity();
 
 char *getPrintBuffer();
 
+
 // Note that __func__ is part of C++11 and has long been supported by GCC.
+
+#define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0)
+#define printfZero(...)	do {						\
+    if (threadIdx.x + blockDim.x*blockIdx.x==0) printf(__VA_ARGS__);	\
+  } while (0)
+
 
 #ifdef MULTI_GPU
 
@@ -38,18 +52,23 @@ char *getPrintBuffer();
   fprintf(getOutputFile(), __VA_ARGS__);                                     \
   fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n", \
           comm_rank(), comm_hostname(), __LINE__, __func__);                 \
+  fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
+	  getOutputPrefix(), getLastTuneKey().name,			     \
+	  getLastTuneKey().volume, getLastTuneKey().aux);	             \
   fflush(getOutputFile());                                                   \
-  comm_exit(1);                                                              \
+  comm_abort(1);                                                             \
 } while (0)
 
 #define warningQuda(...) do {                                   \
-  sprintf(getPrintBuffer(), __VA_ARGS__);			\
-  if (comm_rank() == 0) {                                       \
-    fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-    fprintf(getOutputFile(), "%s", getPrintBuffer());		\
-    fprintf(getOutputFile(), "\n");                             \
-    fflush(getOutputFile());                                    \
-  }                                                             \
+  if (getVerbosity() > QUDA_SILENT) {				\
+    sprintf(getPrintBuffer(), __VA_ARGS__);			\
+    if (comm_rank() == 0) {					\
+      fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix());	\
+      fprintf(getOutputFile(), "%s", getPrintBuffer());			\
+      fprintf(getOutputFile(), "\n");					\
+      fflush(getOutputFile());						\
+    }									\
+  }									\
 } while (0)
 
 #else
@@ -60,19 +79,24 @@ char *getPrintBuffer();
   fflush(getOutputFile());                           \
 } while (0)
 
-#define errorQuda(...) do {                                 \
-  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix()); \
-  fprintf(getOutputFile(), __VA_ARGS__);                    \
-  fprintf(getOutputFile(), " (" __FILE__ ":%d in %s())\n",  \
-	  __LINE__, __func__);                              \
-  exit(1);                                                  \
+#define errorQuda(...) do {						     \
+  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());		     \
+  fprintf(getOutputFile(), __VA_ARGS__);				     \
+  fprintf(getOutputFile(), " (" __FILE__ ":%d in %s())\n",		     \
+	  __LINE__, __func__);						     \
+  fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
+	  getOutputPrefix(), getLastTuneKey().name,			     \
+	  getLastTuneKey().volume, getLastTuneKey().aux);		     \
+  comm_abort(1);								     \
 } while (0)
 
 #define warningQuda(...) do {                                 \
-  fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-  fprintf(getOutputFile(), __VA_ARGS__);                      \
-  fprintf(getOutputFile(), "\n");                             \
-  fflush(getOutputFile());                                    \
+  if (getVerbosity() > QUDA_SILENT) {			      \
+    fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
+    fprintf(getOutputFile(), __VA_ARGS__);                      \
+    fprintf(getOutputFile(), "\n");                             \
+    fflush(getOutputFile());                                    \
+  }								\
 } while (0)
 
 #endif // MULTI_GPU

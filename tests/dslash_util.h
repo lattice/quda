@@ -2,6 +2,7 @@
 #define _DSLASH_UTIL_H
 
 #include <test_util.h>
+#include <comm_quda.h>
 
 template <typename Float>
 static inline void sum(Float *dst, Float *a, Float *b, int cnt) {
@@ -21,11 +22,18 @@ static inline void ax(Float *dst, Float a, Float *x, int cnt) {
     dst[i] = a * x[i];
 }
 
-// performs the operation y[i] = x[i] + a*y[i]
+// performs the operation y[i] = a*x[i] + y[i]
 template <typename Float>
-static inline void xpay(Float *x, Float a, Float *y, int len) {
-  for (int i=0; i<len; i++) y[i] = x[i] + a*y[i];
+static inline void axpy(Float a, Float *x, Float *y, int len) {
+  for (int i=0; i<len; i++) y[i] = a*x[i] + y[i];
 }
+
+// performs the operation y[i] = a*x[i] + b*y[i]
+template <typename Float>
+static inline void axpby(Float a, Float *x, Float b, Float *y, int len) {
+  for (int i=0; i<len; i++) y[i] = a*x[i] + b*y[i];
+}
+
 // performs the operation y[i] = a*x[i] - y[i]
 template <typename Float>
 static inline void axmy(Float *x, Float a, Float *y, int len) {
@@ -173,7 +181,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     case 1:
       { //-X direction
         int new_x1 = (x1 - d + X1 )% X1;
-        if (x1 -d < 0){
+        if (x1 -d < 0 && comm_dim_partitioned(0)){
 	  ghostGaugeField = (oddBit?ghostGaugeEven[0]: ghostGaugeOdd[0]);
 	  int offset = (n_ghost_faces + x1 -d)*X4*X3*X2/2 + (x4*X3*X2 + x3*X2+x2)/2;
 	  return &ghostGaugeField[offset*(3*3*2)];
@@ -184,7 +192,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     case 3:
       { //-Y direction
         int new_x2 = (x2 - d + X2 )% X2;
-        if (x2 -d < 0){
+        if (x2 -d < 0 && comm_dim_partitioned(1)){
           ghostGaugeField = (oddBit?ghostGaugeEven[1]: ghostGaugeOdd[1]);
           int offset = (n_ghost_faces + x2 -d)*X4*X3*X1/2 + (x4*X3*X1 + x3*X1+x1)/2;
           return &ghostGaugeField[offset*(3*3*2)];
@@ -196,7 +204,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     case 5:
       { //-Z direction
         int new_x3 = (x3 - d + X3 )% X3;
-        if (x3 -d < 0){
+        if (x3 -d < 0 && comm_dim_partitioned(2)){
           ghostGaugeField = (oddBit?ghostGaugeEven[2]: ghostGaugeOdd[2]);
           int offset = (n_ghost_faces + x3 -d)*X4*X2*X1/2 + (x4*X2*X1 + x2*X1+x1)/2;
           return &ghostGaugeField[offset*(3*3*2)];
@@ -207,7 +215,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
     case 7:
       { //-T direction
         int new_x4 = (x4 - d + X4)% X4;
-        if (x4 -d < 0){
+        if (x4 -d < 0 && comm_dim_partitioned(3)){
           ghostGaugeField = (oddBit?ghostGaugeEven[3]: ghostGaugeOdd[3]);
           int offset = (n_ghost_faces + x4 -d)*X1*X2*X3/2 + (x3*X2*X1 + x2*X1+x1)/2;
           return &ghostGaugeField[offset*(3*3*2)];
@@ -245,18 +253,17 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
   case 0://+X
     {
       int new_x1 = (x1 + nb)% X1;
-      if(x1+nb >=X1){
+      if(x1+nb >=X1 && comm_dim_partitioned(0) ){
         int offset = ( x1 + nb -X1)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
         return fwd_nbr_spinor[0] + offset*mySpinorSiteSize;
       }
       j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
       break;
-
     }
   case 1://-X
     {
       int new_x1 = (x1 - nb + X1)% X1;
-      if(x1 - nb < 0){ 
+      if(x1 - nb < 0 && comm_dim_partitioned(0)){
         int offset = ( x1+nFace- nb)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
         return back_nbr_spinor[0] + offset*mySpinorSiteSize;
       } 
@@ -266,7 +273,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
   case 2://+Y
     {
       int new_x2 = (x2 + nb)% X2;
-      if(x2+nb >=X2){
+      if(x2+nb >=X2 && comm_dim_partitioned(1)){
         int offset = ( x2 + nb -X2)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
         return fwd_nbr_spinor[1] + offset*mySpinorSiteSize;
       } 
@@ -276,7 +283,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
   case 3:// -Y
     {
       int new_x2 = (x2 - nb + X2)% X2;
-      if(x2 - nb < 0){ 
+      if(x2 - nb < 0 && comm_dim_partitioned(1)){
         int offset = ( x2 + nFace -nb)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
         return back_nbr_spinor[1] + offset*mySpinorSiteSize;
       } 
@@ -286,7 +293,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
   case 4://+Z
     {
       int new_x3 = (x3 + nb)% X3;
-      if(x3+nb >=X3){
+      if(x3+nb >=X3 && comm_dim_partitioned(2)){
         int offset = ( x3 + nb -X3)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
         return fwd_nbr_spinor[2] + offset*mySpinorSiteSize;
       } 
@@ -296,7 +303,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
   case 5://-Z
     {
       int new_x3 = (x3 - nb + X3)% X3;
-      if(x3 - nb < 0){ 
+      if(x3 - nb < 0 && comm_dim_partitioned(2)){
         int offset = ( x3 + nFace -nb)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
         return back_nbr_spinor[2] + offset*mySpinorSiteSize;
       }
@@ -307,7 +314,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
     {
       j = neighborIndex_mg(i, oddBit, +nb, 0, 0, 0);
       int x4 = x4_mg(i, oddBit);
-      if ( (x4 + nb) >= Z[3]){
+      if ( (x4 + nb) >= Z[3]  && comm_dim_partitioned(3)){
         int offset = (x4+nb - Z[3])*Vsh_t;
         return &fwd_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
       }
@@ -317,7 +324,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
     {
       j = neighborIndex_mg(i, oddBit, -nb, 0, 0, 0);
       int x4 = x4_mg(i, oddBit);
-      if ( (x4 - nb) < 0){
+      if ( (x4 - nb) < 0 && comm_dim_partitioned(3)){
         int offset = ( x4 - nb +nFace)*Vsh_t;
         return &back_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
       }

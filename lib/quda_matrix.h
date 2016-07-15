@@ -2,44 +2,17 @@
 #define _QUDA_MATRIX_H_
 
 #include <cstdio>
+
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
 #include <cuda.h>
 
-namespace quda{
+#include <float_vector.h>
 
-  // Given a real type T, returns the corresponding complex type
-  template<class T>
-    struct ComplexTypeId;
+#include <complex_quda.h>
 
-  template<>
-    struct ComplexTypeId<float>
-    {
-      typedef float2 Type;
-    };
-
-  template<>
-    struct ComplexTypeId<double>
-    {
-      typedef double2 Type;
-    };
-
-  template<class T> 
-    struct RealTypeId; 
-
-  template<>
-    struct RealTypeId<float2>
-    {
-      typedef float Type;
-    };
-
-  template<>
-    struct RealTypeId<double2>
-    {
-      typedef double Type;
-    };
-
+namespace quda {
 
   template<class T, class U>
     struct PromoteTypeId
@@ -47,32 +20,28 @@ namespace quda{
       typedef T Type;
     };
 
-
   template<>
-    struct PromoteTypeId<float2, float>
+    struct PromoteTypeId<complex<float>, float>
     {
-      typedef float2 Type;
+      typedef complex<float> Type;
     };
 
-
   template<>
-    struct PromoteTypeId<float, float2>
+    struct PromoteTypeId<float, complex<float> >
     {
-      typedef float2 Type;
+      typedef complex<float> Type;
     };
 
-
   template<>
-    struct PromoteTypeId<double2, double>
+    struct PromoteTypeId<complex<double>, double>
     {
-      typedef double2 Type;
+      typedef complex<double> Type;
     };
 
-
   template<>
-    struct PromoteTypeId<double, double2>
+    struct PromoteTypeId<double, complex<double> >
     {
-      typedef double2 Type;
+      typedef complex<double> Type;
     };
 
   template<>
@@ -98,138 +67,6 @@ namespace quda{
     {
       typedef float Type;
     };
-
-
-
-
-  template<class Cmplx>
-    __device__ __host__ inline 
-    Cmplx makeComplex(const typename RealTypeId<Cmplx>::Type & a, const typename RealTypeId<Cmplx>::Type & b)
-    {
-      Cmplx z;
-      z.x = a; z.y = b;
-      return z;
-    }
-
-
-  __device__ __host__ inline
-    double2 makeComplex(const double & a, const double & b){
-      return make_double2(a,b);
-    }
-
-  __device__ __host__ inline
-    float2 makeComplex(const float & a, const float & b){
-      return make_float2(a,b);
-    } 
-
-
-  template<class Cmplx> 
-  __device__ __host__ inline Cmplx & operator+=(Cmplx & a, const Cmplx & b){
-    a.x += b.x; 
-    a.y += b.y;
-    return a;
-  }
- 
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator+(const Cmplx & a, const Cmplx & b){
-      return makeComplex(a.x+b.x,a.y+b.y);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator-(const Cmplx & a, const Cmplx & b)
-    {
-      return makeComplex(a.x-b.x,a.y-b.y);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator*(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
-    {
-      return makeComplex(a.x*scalar,a.y*scalar);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator/(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
-    {
-      return makeComplex(a.x/scalar,a.y/scalar);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator+(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
-    {
-      return makeComplex(a.x+scalar,a.y);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator+(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & a)
-    {
-      return makeComplex(a.x+scalar,a.y);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator-(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
-    {
-      return makeComplex(a.x-scalar,a.y);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator-(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & a)
-    {
-      return makeComplex(scalar-a.x,-a.y);
-    }
-
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator*(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & b)
-    {
-      return operator*(b,scalar);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator*(const Cmplx & a, const Cmplx & b)
-    {
-      return makeComplex(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
-    }
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx conj(const Cmplx & a)
-    {
-      return makeComplex(a.x,-a.y);
-    }
-
-  __device__ __host__ inline double conj(const double & a)
-  {
-    return a;
-  }
-
-  __device__ __host__ inline float conj(const float & a)
-  {
-    return a;
-  }
-
-
-
-  template<class Cmplx>
-    __device__ __host__ inline
-    Cmplx getPreciseInverse(const Cmplx & z){
-      typename RealTypeId<Cmplx>::Type ratio, max, denom;
-      if( fabs(z.x) > fabs(z.y) ){ max = z.x; ratio = z.y/max; }else{ max=z.y; ratio = z.x/max; }
-      denom = max*max*(1 + ratio*ratio);
-      return makeComplex(z.x/denom, -z.y/denom);
-    }
-
-
-  // for printing
-  inline std::ostream & operator << (std::ostream & os, const float2 & z){
-    os << "(" << z.x << "," << z.y << ")";
-    return os;
-  }
-
-  inline std::ostream & operator << (std::ostream & os, const double2 & z){
-    os << "(" << z.x << "," << z.y << ")";
-    return os;
-  }
-
 
 
   template<class T>
@@ -288,6 +125,8 @@ namespace quda{
       public:
         T data[N*N];
 
+	__device__ __host__ Matrix() { for (int i=0; i<N*N; i++) zero(data[i]); }
+
         __device__ __host__ inline T const & operator()(int i, int j) const{
           return data[index<N>(i,j)];
         }
@@ -295,6 +134,24 @@ namespace quda{
         __device__ __host__ inline T & operator()(int i, int j){
           return data[index<N>(i,j)];
         }
+
+        __device__ __host__ inline T const & operator()(int i) const{
+          int j = i % N;
+          int k = i / N;
+          return data[index<N>(j,k)];
+        }
+
+        __device__ __host__ inline T& operator()(int i) {
+          int j = i % N;
+          int k = i / N;
+          return data[index<N>(j,k)];
+        }
+
+	template<class U>
+	  __device__ __host__ inline void operator=(const Matrix<U,N> & b) {
+	  for(int i=0; i<N*N; i++) data[i] = b.data[i];
+	}
+
     };
 
   template<class T>
@@ -336,6 +193,15 @@ namespace quda{
     }
 
 
+  template<class T, int N> 
+    __device__ __host__ inline Matrix<T,N> operator-=(Matrix<T,N> & a, const Matrix<T,N> & b)
+    {
+      for(int i=0; i<N*N; i++){
+        a.data[i] -= b.data[i];
+      }
+      return a;
+    }
+
 
   template<class T, int N>
     __device__ __host__ inline Matrix<T,N> operator-(const Matrix<T,N> & a, const Matrix<T,N> & b)
@@ -364,47 +230,94 @@ namespace quda{
       return scalar*a;
     }
 
+  template<class T, int N, class S>
+    __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const S & scalar){
+      a = scalar*a;
+      return a;
+    }
 
+  template<class T, int N>
+    __device__ __host__ inline Matrix<T,N> operator-(const Matrix<T,N> & a){
+      Matrix<T,N> result;
+      for(int i=0; i<(N*N); ++i){
+        result.data[i] = -1*a.data[i]; 
+      }
+      return result;
+    }
+
+
+  template<class T, int N>
+    __device__ __host__ inline
+    Matrix<T,N> operator*(const Matrix<T,N> &a, const Matrix<T,N> &b)
+    {
+      Matrix<T,N> result;
+      for (int i=0; i<N; i++) {
+	for (int k=0; k<N; k++) {
+	  result(i,k) = 0.0;
+	  for (int j=0; j<N; j++) {
+	    result(i,k) += a(i,j) * b(j,k);
+	  }
+	}
+      }
+      return result;
+    }
 
   template<class T>
     __device__ __host__ inline
-    Matrix<T,3> operator*(const Matrix<T,3> & a, const Matrix<T,3> & b)
+    Matrix<T,3> operator*(const Matrix<T,3> &a, const Matrix<T,3> &b)
     {
-      // The compiler has a hard time unrolling nested loops,
-      // so here I do it by hand. 
-      // I could do something more sophisticated in the future.
       Matrix<T,3> result;
-      result(0,0) = a(0,0)*b(0,0) + a(0,1)*b(1,0) + a(0,2)*b(2,0);
-      result(0,1) = a(0,0)*b(0,1) + a(0,1)*b(1,1) + a(0,2)*b(2,1);
-      result(0,2) = a(0,0)*b(0,2) + a(0,1)*b(1,2) + a(0,2)*b(2,2);
-      result(1,0) = a(1,0)*b(0,0) + a(1,1)*b(1,0) + a(1,2)*b(2,0);
-      result(1,1) = a(1,0)*b(0,1) + a(1,1)*b(1,1) + a(1,2)*b(2,1);
-      result(1,2) = a(1,0)*b(0,2) + a(1,1)*b(1,2) + a(1,2)*b(2,2);
-      result(2,0) = a(2,0)*b(0,0) + a(2,1)*b(1,0) + a(2,2)*b(2,0);
-      result(2,1) = a(2,0)*b(0,1) + a(2,1)*b(1,1) + a(2,2)*b(2,1);
-      result(2,2) = a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2);
+#pragma unroll
+      for (int i=0; i<3; i++) {
+#pragma unroll
+	for (int k=0; k<3; k++) {
+	  result(i,k) = a(i,0) * b(0,k) + a(i,1) * b(1,k) + a(i,2) * b(2,k);
+	}
+      }
+      return result;
+    }
+
+  template<class T, int N>
+    __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const Matrix<T,N>& b){
+
+    Matrix<T,N> c = a;
+    a = c*b;
+    return a;
+  }
+
+
+  // This is so that I can multiply real and complex matrice
+  template<class T, class U, int N>
+    __device__ __host__ inline
+    Matrix<typename PromoteTypeId<T,U>::Type,N> operator*(const Matrix<T,N> &a, const Matrix<U,N> &b)
+    {
+      Matrix<typename PromoteTypeId<T,U>::Type,N> result;
+      for (int i=0; i<N; i++) {
+	for (int k=0; k<N; k++) {
+	  result(i,k) = 0.0;
+	  for (int j=0; j<N; j++) {
+	    result(i,k) += a(i,j) * b(j,k);
+	  }
+	}
+      }
       return result;
     }
 
 
-  // This is so that I can multiply real and complex matrices
   template<class T, class U>
     __device__ __host__ inline
-    Matrix<typename PromoteTypeId<T,U>::Type,3> operator*(const Matrix<T,3> & a, const Matrix<U,3> & b)
+    Matrix<typename PromoteTypeId<T,U>::Type,3> operator*(const Matrix<T,3> &a, const Matrix<U,3> &b)
     {
       Matrix<typename PromoteTypeId<T,U>::Type,3> result;
-      result(0,0) = a(0,0)*b(0,0) + a(0,1)*b(1,0) + a(0,2)*b(2,0);
-      result(0,1) = a(0,0)*b(0,1) + a(0,1)*b(1,1) + a(0,2)*b(2,1);
-      result(0,2) = a(0,0)*b(0,2) + a(0,1)*b(1,2) + a(0,2)*b(2,2);
-      result(1,0) = a(1,0)*b(0,0) + a(1,1)*b(1,0) + a(1,2)*b(2,0);
-      result(1,1) = a(1,0)*b(0,1) + a(1,1)*b(1,1) + a(1,2)*b(2,1);
-      result(1,2) = a(1,0)*b(0,2) + a(1,1)*b(1,2) + a(1,2)*b(2,2);
-      result(2,0) = a(2,0)*b(0,0) + a(2,1)*b(1,0) + a(2,2)*b(2,0);
-      result(2,1) = a(2,0)*b(0,1) + a(2,1)*b(1,1) + a(2,2)*b(2,1);
-      result(2,2) = a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2);
+#pragma unroll
+      for (int i=0; i<3; i++) {
+#pragma unroll
+	for (int k=0; k<3; k++) {
+	  result(i,k) = a(i,0) * b(0,k) + a(i,1) * b(1,k) + a(i,2) * b(2,k);
+	}
+      }
       return result;
     }
-
 
 
   template<class T>
@@ -426,7 +339,7 @@ namespace quda{
       Matrix<T,N> result;
       for(int i=0; i<N; ++i){
         for(int j=0; j<N; ++j){
-          result(i,j) = conj(other(j,i));
+          result(i,j) = conj( other(j,i) );
         }
       }
       return result;
@@ -439,7 +352,7 @@ namespace quda{
     {
 
       const T & det = getDeterminant(u);
-      const T & det_inv = getPreciseInverse(det);
+      const T & det_inv = static_cast<typename T::value_type>(1.0)/det;
 
       T temp;
 
@@ -557,6 +470,20 @@ namespace quda{
     }
 
 
+  template<typename Complex,int N>
+    __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {
+    typedef typename Complex::value_type real;
+    // first make the matrix anti-hermitian
+    Matrix<Complex,N> am = m - conj(m);
+
+    // second make it traceless
+    real imag_trace = 0.0;
+    for (int i=0; i<N; i++) imag_trace += am(i,i).y;
+    for (int i=0; i<N; i++) {
+      am(i,i).y -= imag_trace/N;
+    }
+    m = 0.5*am;
+  }
 
 
 
@@ -610,6 +537,18 @@ namespace quda{
       return;
     }
 
+  template<class T, int N>
+    __device__ __host__ inline 
+    void outerProd(const T (&a)[N], const T (&b)[N], Matrix<T,N>* m){
+      for(int i=0; i<N; ++i){
+        const T conjb_i = conj(b[i]);
+        for(int j=0; j<N; ++j){
+          (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
+        }
+      }
+      return;
+    }
+
 
   // Need some print utilities
   template<class T, int N>
@@ -633,9 +572,9 @@ namespace quda{
     }
 
 
-  template<class T>
+  template<class T, class U>
     __device__ inline
-    void loadLinkVariableFromArray(const T* const array, int dir, int idx, int stride, Matrix<T,3> *link)
+    void loadLinkVariableFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<U,3> *link)
     {
       for(int i=0; i<9; ++i){
         link->data[i] = array[idx + (dir*9 + i)*stride];
@@ -644,25 +583,61 @@ namespace quda{
     }
 
 
-    __device__ inline  
-   void loadLinkVariableFromArray(const float2* const array, int dir, int idx, int stride, Matrix<double2,3> *link)
-   { 
-		 float2 single_temp; 
-	   for(int i=0; i<9; ++i){
+  template<class T, class U, int N>
+    __device__ inline 
+    void loadMatrixFromArray(const T* const array, const int idx, const int stride, Matrix<U,N> *mat)
+    {
+      for(int i=0; i<(N*N); ++i){
+        mat->data[i] = array[idx + i*stride];
+      }
+    }
+
+
+  __device__ inline  
+    void loadLinkVariableFromArray(const float2* const array, const int dir, const int idx, const int stride, Matrix<complex<double>,3> *link)
+    { 
+      float2 single_temp; 
+      for(int i=0; i<9; ++i){
         single_temp = array[idx + (dir*9 + i)*stride];
-				link->data[i].x = single_temp.x;
-				link->data[i].y = single_temp.y;
-		 }
-		 return;
-   }
-   
+        link->data[i].x = single_temp.x;
+        link->data[i].y = single_temp.y;
+      }
+      return;
+    }
 
 
 
+  template<class T, int N, class U>
+    __device__ inline 
+    void writeMatrixToArray(const Matrix<T,N>& mat, const int idx, const int stride, U* const array)
+    {
+      for(int i=0; i<(N*N); ++i){
+        array[idx + i*stride] = mat.data[i];
+      }
+    }
 
-  template<class T>
+  __device__ inline 
+    void appendMatrixToArray(const Matrix<complex<double>,3>& mat, const int idx, const int stride, double2* const array)
+    {
+      for(int i=0; i<9; ++i){
+        array[idx + i*stride].x += mat.data[i].x;
+        array[idx + i*stride].y += mat.data[i].y;
+      }
+    }
+
+  __device__ inline 
+    void appendMatrixToArray(const Matrix<complex<float>,3>& mat, const int idx, const int stride, float2* const array)
+    {
+      for(int i=0; i<9; ++i){
+        array[idx + i*stride].x += mat.data[i].x;
+        array[idx + i*stride].y += mat.data[i].y;
+      }
+    }
+
+
+  template<class T, class U>
     __device__ inline
-    void writeLinkVariableToArray(const Matrix<T,3> & link,  int dir, int idx, int stride, T* const array)
+    void writeLinkVariableToArray(const Matrix<T,3> & link, const int dir, const int idx, const int stride, U* const array)
     {
       for(int i=0; i<9; ++i){ 
         array[idx + (dir*9 + i)*stride] = link.data[i];
@@ -673,18 +648,86 @@ namespace quda{
 
 
 
-    __device__ inline 
-	  void writeLinkVariableToArray(const Matrix<double2,3> & link, int dir, int idx, int stride, float2* const array)
-   {
-	    float2 single_temp;
+  __device__ inline 
+    void writeLinkVariableToArray(const Matrix<complex<double>,3> & link, const int dir, const int idx, const int stride, float2* const array)
+    {
+      float2 single_temp;
 
       for(int i=0; i<9; ++i){ 
-				single_temp.x = link.data[i].x;
-				single_temp.y = link.data[i].y;
+        single_temp.x = link.data[i].x;
+        single_temp.y = link.data[i].y;
         array[idx + (dir*9 + i)*stride] = single_temp;
       }
-     return;
-   }
+      return;
+    }
+
+
+  template<class T>
+    __device__ inline
+    void loadMomentumFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<T,3> *mom)
+    {
+      T temp2[5];
+      temp2[0] = array[idx + dir*stride*5];
+      temp2[1] = array[idx + dir*stride*5 + stride];
+      temp2[2] = array[idx + dir*stride*5 + 2*stride];
+      temp2[3] = array[idx + dir*stride*5 + 3*stride];
+      temp2[4] = array[idx + dir*stride*5 + 4*stride];
+
+      mom->data[0].x = 0.;
+      mom->data[0].y = temp2[3].x;
+      mom->data[1] = temp2[0];
+      mom->data[2] = temp2[1];
+
+      mom->data[3].x = -mom->data[1].x;
+      mom->data[3].y =  mom->data[1].y;
+      mom->data[4].x = 0.;
+      mom->data[4].y = temp2[3].y;
+      mom->data[5]   = temp2[2];
+
+      mom->data[6].x = -mom->data[2].x;
+      mom->data[6].y =  mom->data[2].y;
+
+      mom->data[7].x = -mom->data[5].x;
+      mom->data[7].y =  mom->data[5].y;
+
+      mom->data[8].x = 0.;
+      mom->data[8].y = temp2[4].x;
+
+      return;
+    }
+
+
+
+  template<class T, class U>
+    __device__  inline 
+    void writeMomentumToArray(const Matrix<T,3> & mom, const int dir, const int idx, const U coeff, const int stride, T* const array)
+    {
+      typedef typename T::value_type real;
+      T temp2;
+      temp2.x = (mom.data[1].x - mom.data[3].x)*0.5*coeff;
+      temp2.y = (mom.data[1].y + mom.data[3].y)*0.5*coeff;
+      array[idx + dir*stride*5] = temp2;
+
+      temp2.x = (mom.data[2].x - mom.data[6].x)*0.5*coeff;
+      temp2.y = (mom.data[2].y + mom.data[6].y)*0.5*coeff;
+      array[idx + dir*stride*5 + stride] = temp2;
+
+      temp2.x = (mom.data[5].x - mom.data[7].x)*0.5*coeff;
+      temp2.y = (mom.data[5].y + mom.data[7].y)*0.5*coeff;
+      array[idx + dir*stride*5 + stride*2] = temp2;
+
+      const real temp = (mom.data[0].y + mom.data[4].y + mom.data[8].y)*0.3333333333333333333333333;
+      temp2.x =  (mom.data[0].y-temp)*coeff;
+      temp2.y =  (mom.data[4].y-temp)*coeff;
+      array[idx + dir*stride*5 + stride*3] = temp2;
+
+      temp2.x = (mom.data[8].y - temp)*coeff;
+      temp2.y = 0.0;
+      array[idx + dir*stride*5 + stride*4] = temp2;
+
+      return;
+    }
+
 
 
   template<class Cmplx> 
@@ -693,7 +736,7 @@ namespace quda{
     {
 
       const Cmplx & det = getDeterminant(u);
-      const Cmplx & det_inv = getPreciseInverse(det);
+      const Cmplx & det_inv = static_cast<typename Cmplx::value_type>(1.0)/det;
 
       Cmplx temp;
 
@@ -727,70 +770,262 @@ namespace quda{
       return;
     } 
   // template this! 
-        inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              (*link)(i,j).x = array[(i*3+j)*2];
-              (*link)(i,j).y = array[(i*3+j)*2 + 1];
-            }
-          }
-          return;
-        }
-	
-	template<class Cmplx, class Real>
-        inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              (*link)(i,j).x = array[(i*3+j)*2];
-              (*link)(i,j).y = array[(i*3+j)*2 + 1];
-            }
-          }
-          return;
-        }
-	
-        
-        // and this!
-        inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              array[(i*3+j)*2] = link(i,j).x;
-              array[(i*3+j)*2 + 1] = link(i,j).y;
-            }
-          }
-          return;
-        }
+  inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
+    for(int i=0; i<3; ++i){
+      for(int j=0; j<3; ++j){
+        (*link)(i,j).x = array[(i*3+j)*2];
+        (*link)(i,j).y = array[(i*3+j)*2 + 1];
+      }
+    }
+    return;
+  }
 
-        // and this!
-	template<class Cmplx, class Real>
-        inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              array[(i*3+j)*2] = link(i,j).x;
-              array[(i*3+j)*2 + 1] = link(i,j).y;
-            }
-          }
-          return;
+  template<class Cmplx, class Real>
+    inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
+      for(int i=0; i<3; ++i){
+        for(int j=0; j<3; ++j){
+          (*link)(i,j).x = array[(i*3+j)*2];
+          (*link)(i,j).y = array[(i*3+j)*2 + 1];
         }
+      }
+      return;
+    }
 
 
+  // and this!
+  inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
+    for(int i=0; i<3; ++i){
+      for(int j=0; j<3; ++j){
+        array[(i*3+j)*2] = link(i,j).x;
+        array[(i*3+j)*2 + 1] = link(i,j).y;
+      }
+    }
+    return;
+  }
 
-        // and this!
-	template<class Cmplx>
-	__host__ __device__ inline
-        void printLink(const Matrix<Cmplx,3>& link){
-#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
-          printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
-          printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
-          printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
-          printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
-          printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
-          printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
-          printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
-          printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
-          printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
-          printf("\n");
-#endif
+  // and this!
+  template<class Cmplx, class Real>
+    inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
+      for(int i=0; i<3; ++i){
+        for(int j=0; j<3; ++j){
+          array[(i*3+j)*2] = link(i,j).x;
+          array[(i*3+j)*2 + 1] = link(i,j).y;
         }
+      }
+      return;
+    }
+
+  template<class T>
+  __device__ __host__ inline Matrix<T,3> getSubTraceUnit(const Matrix<T,3>& a){
+    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
+    Matrix<T,3> res;
+    res(0,0) = a(0,0) - tr; res(0,1) = a(0,1); res(0,2) = a(0,2);
+    res(1,0) = a(1,0); res(1,1) = a(1,1) - tr; res(1,2) = a(1,2);
+    res(2,0) = a(2,0); res(2,1) = a(2,1); res(2,2) = a(2,2) - tr;
+    return res;
+  }
+
+  template<class T>
+  __device__ __host__ inline void SubTraceUnit(Matrix<T,3>& a){
+    T tr = (a(0,0) + a(1,1) + a(2,2)) / static_cast<T>(3.0);
+    a(0,0) -= tr; a(1,1) -= tr; a(2,2) -= tr;
+  }
+
+  template<class T>
+  __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
+    double sum = (double)(a(0,0).x * b(0,0).x  + a(0,0).y * b(0,0).y);
+    sum += (double)(a(0,1).x * b(0,1).x  + a(0,1).y * b(0,1).y);
+    sum += (double)(a(0,2).x * b(0,2).x  + a(0,2).y * b(0,2).y);
+    sum += (double)(a(1,0).x * b(1,0).x  + a(1,0).y * b(1,0).y);
+    sum += (double)(a(1,1).x * b(1,1).x  + a(1,1).y * b(1,1).y);
+    sum += (double)(a(1,2).x * b(1,2).x  + a(1,2).y * b(1,2).y);
+    sum += (double)(a(2,0).x * b(2,0).x  + a(2,0).y * b(2,0).y);
+    sum += (double)(a(2,1).x * b(2,1).x  + a(2,1).y * b(2,1).y);
+    sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
+    return sum;
+  }
+
+
+
+  // and this!
+  template<class Cmplx>
+    __host__ __device__ inline
+    void printLink(const Matrix<Cmplx,3>& link){
+      printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
+      printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
+      printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
+      printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
+      printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
+      printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
+      printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
+      printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
+      printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
+      printf("\n");
+    }
+
+  template<class Cmplx>
+  __device__ __host__
+  bool isUnitary(const Matrix<Cmplx,3>& matrix, double max_error)
+  {
+    const Matrix<Cmplx,3> identity = conj(matrix)*matrix;
+
+    for(int i=0; i<3; ++i){
+      if( fabs(identity(i,i).x - 1.0) > max_error || fabs(identity(i,i).y) > max_error) return false;
+      for(int j=i+1; j<3; ++j){
+	if( fabs(identity(i,j).x) > max_error || fabs(identity(i,j).y) > max_error
+	    ||  fabs(identity(j,i).x) > max_error || fabs(identity(j,i).y) > max_error ){
+	  return false;
+	}
+      }
+    }
+
+    for (int i=0; i<3; i++) {
+      for (int j=0; j<3; j++) {
+	if (isnan(matrix(i,j).x) || isnan(matrix(i,j).y)) return false;
+      }
+    }
+
+    return true;
+  }
+
+  template<class T> 
+    __device__  __host__ inline
+    void exponentiate_iQ(const Matrix<T,3>& M, Matrix<T,3>* exp_iM)
+    {
+      // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
+      // This algorithm is outlined in
+      // http://arxiv.org/pdf/hep-lat/0311018v1.pdf
+      // Equation numbers in the paper are referenced by [eq_no].
+
+      //Declarations
+      double inv3 = 1.0/3.0;
+      
+      double c0, c1, c0_max;
+      double2 Tr, f0, f1, f2;
+      double theta;
+      double u_p, w_p;  //u, w parameters.
+      Matrix<T,3> temp1, temp2;
+      
+      //[14] c0 = det(Q) = 1/3Tr(Q^3)
+      const T & det_M = getDeterminant(M);
+      c0 = det_M.x;      
+      //[15] c1 = 1/2Tr(Q^2)
+      // Q = Q^dag => Tr(Q^2) = Tr(QQ^dag) = sum_ab [Q_ab * Q_ab^*]
+      temp1 = M;
+      temp1 = temp1 * M;
+      Tr.x = getTrace(temp1).x;
+      Tr.y = getTrace(temp1).y;
+      Tr  = 0.5 * Tr;
+      c1 = Tr.x;
+      
+      //We now have the coeffiecients c0 and c1.
+      //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
+      //      where       fj = fj(c0,c1), j=0,1,2.
+      
+      //[17]
+      c0_max  = 2*pow(c1*inv3,1.5);
+      
+      //[25]
+      theta   = acos(c0/c0_max);
+      
+      //[23]
+      u_p = sqrt(c1*inv3)*cos(theta*inv3);
+      
+      //[24]
+      w_p = sqrt(c1)*sin(theta*inv3);
+      
+      //[29] Construct objects for fj = hj/(9u^2 - w^2).
+      double u_sq = u_p*u_p;
+      double w_sq = w_p*w_p;
+      double denom = 9*u_sq - w_sq;
+      double exp_iu_re = cos(u_p);
+      double exp_iu_im = sin(u_p);
+      double exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
+      double exp_2iu_im = 2*exp_iu_re*exp_iu_im;
+      double cos_w = cos(w_p);
+      double sinc_w;
+      double hj_re = 0.0;
+      double hj_im = 0.0;
+  
+      //[33] Added one more term to the series given in the paper.
+      if (w_p < 0.05 && w_p > -0.05) {      
+	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
+	sinc_w = 1.0-1.0/6.0*w_sq*(1-0.05*w_sq*(1-1.0/42.0*w_sq*(1-1.0/72.0*w_sq)));
+      }
+      else sinc_w = sin(w_p)/w_p;
+      
+    
+      //[34] Test for c0 < 0.
+      int parity = 0;
+      if(c0 < 0) {
+	c0 *= -1.0;
+	parity = 1;
+	//calculate fj with c0 > 0 and then convert all fj.
+      }
+      
+      //Get all the numerators for fj,
+      //[30] f0
+      hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
+      hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
+      f0.x = (hj_re/denom);
+      f0.y = (hj_im/denom);
+      
+      //[31] f1
+      hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
+      hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
+      f1.x = (hj_re/denom);
+      f1.y = (hj_im/denom);
+      
+      //[32] f2
+      hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
+      hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;  
+      f2.x = (hj_re/denom);
+      f2.y = (hj_im/denom);
+      
+      //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
+      if (parity == 1) {
+	f0.y *= -1.0; 
+	f1.x *= -1.0;
+	f2.y *= -1.0;
+      }
+      
+      T f0_c;
+      T f1_c;
+      T f2_c;
+      
+      f0_c.x = f0.x;
+      f0_c.y = f0.y;
+      
+      f1_c.x = f1.x;  
+      f1_c.y = f1.y;  
+      
+      f2_c.x = f2.y;
+      f2_c.y = f2.y;
+
+      //[19] Construct exp{iQ}
+      setZero(exp_iM);
+      Matrix<T,3> Unm;
+      setIdentity(&Unm);
+      // +f0*I
+      Unm = f0_c * Unm;
+      *exp_iM += Unm;
+      
+      // +f1*Q
+      temp1 = M;
+      temp1 = f1_c * temp1; 
+      *exp_iM += temp1;
+
+      // +f2Q^2
+      temp1 = M;
+      temp1 *= M;
+      setIdentity(&temp2);
+      temp2 = f2_c * temp2;
+      temp2 *= temp1;
+      *exp_iM += temp2;
+
+      return;
+    }
+
 
 } // end namespace quda
 #endif // _QUDA_MATRIX_H_

@@ -19,6 +19,9 @@ tune:
 gen:
 	$(MAKE) -C lib/ gen
 
+mpi_nvtx:
+	$(MAKE) -C lib/ mpi_nvtx
+
 clean:
 	$(MAKE) -C lib/ clean
 	$(MAKE) -C tests/ clean

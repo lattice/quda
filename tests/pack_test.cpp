@@ -37,6 +37,8 @@ extern QudaPrecision prec;
 extern char latfile[];
 extern int gridsize_from_cmdline[];
     
+extern bool tune;
+
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
 // where is the packing / unpacking taking place
@@ -91,8 +93,10 @@ void init() {
 
   initQuda(device);
 
-  csParam.precision = prec;
-  csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  setVerbosityQuda(QUDA_VERBOSE, "", stdout);
+  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
+
+  csParam.setPrecision(prec);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
 
@@ -118,6 +122,7 @@ void packTest() {
 
   printf("Sending fields to GPU...\n"); fflush(stdout);
   
+#ifdef BUILD_CPS_INTERFACE
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
     
@@ -142,7 +147,9 @@ void packTest() {
     double cpsGRtime = stopwatchReadSeconds();
     printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
   }
+#endif
 
+#ifdef BUILD_QDP_INTERFACE
   {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
     
@@ -167,6 +174,7 @@ void packTest() {
     double qdpGRtime = stopwatchReadSeconds();
     printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
   }
+#endif
 
   stopwatchStart();
 
@@ -179,9 +187,9 @@ void packTest() {
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
   
-  double spinor_norm = norm2(*spinor);
-  double cuda_spinor_norm = norm2(*cudaSpinor);
-  double spinor2_norm = norm2(*spinor2);
+  double spinor_norm = blas::norm2(*spinor);
+  double cuda_spinor_norm = blas::norm2(*cudaSpinor);
+  double spinor2_norm = blas::norm2(*spinor2);
 
   printf("Norm check: CPU = %e, CUDA = %e, CPU = %e\n",
 	 spinor_norm, cuda_spinor_norm, spinor2_norm);
@@ -202,12 +210,12 @@ int main(int argc, char **argv) {
     usage(argv);
   }
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
 
   init();
   packTest();
   end();
 
-  endCommsQuda();
+  finalizeComms();
 }
 

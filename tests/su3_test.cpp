@@ -5,7 +5,8 @@
 #include <test_util.h>
 #include <dslash_util.h>
 
-#include <gauge_qio.h>
+#include <qio_field.h>
+#include <util_quda.h>
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -14,6 +15,7 @@
 QudaGaugeParam param;
 void *gauge[4], *new_gauge[4];
 
+extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -37,6 +39,7 @@ void init() {
   param.reconstruct_sloppy = link_recon;
   
   param.type = QUDA_WILSON_LINKS;
+  param.tadpole_coeff = 0.8;
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
   param.X[0] = xdim;
@@ -68,6 +71,8 @@ void init() {
   }
 
   initQuda(device);
+  if (tune) setTuning(QUDA_TUNE_YES);
+
 }
 
 void end() {
@@ -78,6 +83,8 @@ void end() {
     free(gauge[dir]);
     free(new_gauge[dir]);
   }
+
+  finalizeComms();
 }
 
 extern void usage(char**);
@@ -93,6 +100,9 @@ void SU3Test(int argc, char **argv) {
     usage(argv);
   }
 
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
+
   init();
 
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
@@ -107,6 +117,14 @@ void SU3Test(int argc, char **argv) {
   loadGaugeQuda(gauge, &param);
   saveGaugeQuda(new_gauge, &param);
 
+#ifdef GPU_GAUGE_TOOLS
+  double plaq[3];
+  plaqQuda(plaq);
+  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+#else
+  printf("Skipping plaquette computation since gauge tools have not been compiled\n");
+#endif
+
   check_gauge(gauge, new_gauge, 1e-3, param.cpu_prec);
 
   end();
@@ -114,11 +132,7 @@ void SU3Test(int argc, char **argv) {
 
 int main(int argc, char **argv) {
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
-
   SU3Test(argc, argv);
-
-  endCommsQuda();
 
   return 0;
 }

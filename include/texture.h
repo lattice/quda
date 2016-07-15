@@ -4,6 +4,10 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <convert.h>
+#include <register_traits.h>
+#include <float_vector.h>
+
+// FIXME - it would be too hard to get this working on the host as well
 
 //namespace quda {
 
@@ -11,6 +15,8 @@
 
 template<typename OutputType, typename InputType>
 class Texture {
+
+  typedef typename quda::mapper<InputType>::type RegType;
 
 private: 
 #ifndef DIRECT_ACCESS_BLAS
@@ -22,13 +28,15 @@ private:
 public:
   Texture() : spinor(0) { }   
 #ifndef DIRECT_ACCESS_BLAS
-  Texture(const cudaColorSpinorField *x) : spinor(x->Tex()) { }
+  Texture(const cudaColorSpinorField *x, bool use_ghost = false)
+    : spinor(use_ghost ? x->GhostTex() : x->Tex()) { }
 #else
-  Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
+  Texture(const cudaColorSpinorField *x, bool use_ghost = false)
+    : spinor(use_ghost ? (const InputType*)(x->Ghost2()) : (const InputType*)(x->V())) { }
 #endif
   Texture(const Texture &tex) : spinor(tex.spinor) { }
   ~Texture() { }
-  
+
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
     return *this;
@@ -36,7 +44,11 @@ public:
   
 #ifndef DIRECT_ACCESS_BLAS
   __device__ inline OutputType fetch(unsigned int idx) 
-  { return tex1Dfetch<OutputType>(spinor, idx); }
+  { 
+    OutputType rtn;
+    copyFloatN(rtn, tex1Dfetch<RegType>(spinor, idx));
+    return rtn;
+  }
 #else
   __device__ inline OutputType fetch(unsigned int idx) 
   { OutputType out; copyFloatN(out, spinor[idx]); return out; } 
@@ -46,6 +58,9 @@ public:
 };
 
 #ifndef DIRECT_ACCESS_BLAS
+__device__ inline double fetch_double(int2 v)
+{ return __hiloint2double(v.y, v.x); }
+
 __device__ inline double2 fetch_double2(int4 v)
 { return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
 
@@ -61,12 +76,21 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 // legacy Texture references
 
 #if (__COMPUTE_CAPABILITY__ >= 130)
+
+  __inline__ __device__ double fetch_double(texture<int2, 1> t, int i)
+  {
+    int2 v = tex1Dfetch(t,i);
+    return __hiloint2double(v.y, v.x);
+  }
+
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
     int4 v = tex1Dfetch(t,i);
     return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
   }
 #else
+  __inline__ __device__ double fetch_double(texture<int2, 1> t, int i){ return 0.0; }
+
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
     // do nothing
@@ -76,8 +100,14 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
 #define MAX_TEXELS (1<<27)
 
-  template<typename OutputType, typename InputType, int tex_id>
-    class Texture {
+#define MAX_TEX_ID 4
+
+// dynamically keep track of texture references we've already bound to
+bool tex_id_table[MAX_TEX_ID] = { };
+
+template<typename OutputType, typename InputType, int tex_id>
+  class Texture {
+
   private: 
 #ifdef DIRECT_ACCESS_BLAS
   const InputType *spinor; // used when textures are disabled
@@ -93,13 +123,23 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
   { count++; } 
 
-  Texture(const cudaColorSpinorField *x)
+ Texture(const cudaColorSpinorField *x, bool use_ghost = false)
 #ifdef DIRECT_ACCESS_BLAS 
-  : spinor((const InputType*)x->V()), bytes(x->Bytes())
+   : spinor( use_ghost ? (const InputType*)(x->Ghost2()) : (const InputType*)(x->V())) { }
 #endif
   { 
     // only bind if bytes > 0
-    if (x->Bytes()) { bind((const InputType*)x->V(), x->Bytes()); bound = true; } 
+    if (x->Bytes()) { 
+      if (tex_id >= 0 && tex_id < MAX_TEX_ID) {
+	if (tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0]) {
+	  errorQuda("Already bound to this texture reference");
+	} else {
+	  tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0] = true;
+	}
+      }
+      if (use_ghost) bind((const InputType*)(x->Ghost2()), x->GhostBytes());
+      else bind((const InputType*)x->V(), x->Bytes()); bound = true;
+    } 
     count++;
   }
 
@@ -109,7 +149,11 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
   { count++; }
 
-  ~Texture() { if (bound && !--count) { unbind(); bound = false;} }
+  ~Texture() {
+    if (bound && !--count) {
+      unbind(); bound = false; tex_id_table[(tex_id >= 0 && tex_id < MAX_TEX_ID) ? tex_id : 0]=false;
+    }
+  }
 
   Texture& operator=(const Texture &tex) {
 #ifdef DIRECT_ACCESS_BLAS
@@ -125,7 +169,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
   //default should only be called if a tex_id is out of range
   __device__ inline OutputType fetch(unsigned int idx) { OutputType x; x.x =0; return x; };  
   __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
-  };
+};
 
   template<typename OutputType, typename InputType, int tex_id>  
     bool Texture<OutputType, InputType, tex_id>::bound = false;
@@ -173,24 +217,39 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
     { outtype out; copyFloatN(out, fetch_double2(tex_double2_##id,idx)); return out; }
 #endif
 
+#if defined(DIRECT_ACCESS_BLAS) || defined(FERMI_NO_DBLE_TEX)
+#define DEF_FETCH_DBLE_MIXED DEF_FETCH_DIRECT
+#else
+#define DEF_FETCH_DBLE_MIXED(outtype, intype, id)                      \
+  template<> __device__ inline outtype Texture<outtype,intype,id>::fetch(unsigned int idx) \
+  { outtype out; copyFloatN(out, tex1Dfetch(tex_##intype##_##id,idx)); return out; }
+#endif
+
 
 #define DEF_BIND_UNBIND_FETCH(outtype, intype, id)	\
   DEF_BIND_UNBIND(outtype, intype, id)			\
-    DEF_FETCH(outtype, intype, id)
+  DEF_FETCH(outtype, intype, id)
 
 
 #define DEF_ALL(id)				\
   DECL_TEX(id)					\
-    DEF_BIND_UNBIND_FETCH(float2, short2, id)	\
-    DEF_BIND_UNBIND_FETCH(float4, short4, id)	\
-    DEF_BIND_UNBIND_FETCH(float, float, id)	\
-    DEF_BIND_UNBIND_FETCH(float2, float2, id)	\
-    DEF_BIND_UNBIND_FETCH(float4, float4, id)	\
-    DEF_BIND_UNBIND(double2, double2, id)	\
-    DEF_BIND_UNBIND(float2, double2, id)	\
-    DEF_FETCH_DBLE(double2, double2, id)	\
-    DEF_FETCH_DBLE(float2, double2, id)
-
+  DEF_BIND_UNBIND_FETCH(float2, short2, id)	\
+  DEF_BIND_UNBIND_FETCH(float4, short4, id)	\
+  DEF_BIND_UNBIND_FETCH(float, float, id)	\
+  DEF_BIND_UNBIND_FETCH(float2, float2, id)	\
+  DEF_BIND_UNBIND_FETCH(float4, float4, id)	\
+  DEF_BIND_UNBIND(double2, double2, id)		\
+  DEF_BIND_UNBIND(float2, double2, id)		\
+  DEF_FETCH_DBLE(double2, double2, id)		\
+  DEF_FETCH_DBLE(float2, double2, id)		\
+  DEF_BIND_UNBIND(double2, float2, id)		\
+  DEF_BIND_UNBIND(double4, float4, id)		\
+  DEF_BIND_UNBIND(double2, short2, id)		\
+  DEF_BIND_UNBIND(double4, short4, id)		\
+  DEF_FETCH_DBLE_MIXED(double2, float2, id)	\
+  DEF_FETCH_DBLE_MIXED(double4, float4, id)	\
+  DEF_FETCH_DBLE_MIXED(double2, short2, id)	\
+  DEF_FETCH_DBLE_MIXED(double4, short4, id)
 
   // Declare the textures and define the member functions of the corresponding templated classes.
   DEF_ALL(0)
@@ -198,9 +257,6 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
   DEF_ALL(2)
   DEF_ALL(3)
   DEF_ALL(4)
-
-#define MAX_TEX_ID 4
-
 
 #undef DECL_TEX
 #undef DEF_BIND_UNBIND
@@ -276,36 +332,69 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 
   private:
     StoreType *spinor;
+    StoreType *ghost_spinor;
 #ifdef USE_TEXTURE_OBJECTS // texture objects
     Texture<InterType, StoreType> tex;
+    Texture<InterType, StoreType> ghostTex;
 #else
     Texture<InterType, StoreType, tex_id> tex;
+    Texture<InterType, StoreType, -1> ghostTex;
 #endif
     float *norm; // direct reads for norm
     int stride;
+    int ghost_stride[4];
 
   public:
-    Spinor() 
-      : spinor(0), tex(), norm(0), stride(0) { } // default constructor
+    Spinor() : spinor(0), ghost_spinor(0), tex(), ghostTex(), norm(0), stride(0) { } // default constructor
 
-    Spinor(const cudaColorSpinorField &x) 
-      : spinor((StoreType*)x.V()), tex(&x), norm((float*)x.Norm()),
-      stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+    // Spinor must only ever called with cudaColorSpinorField references!!!!
+    Spinor(const ColorSpinorField &x, int nFace=1) 
+      : spinor((StoreType*)x.V()), ghost_spinor((StoreType*)x.Ghost2()),
+        tex(&(static_cast<const cudaColorSpinorField&>(x))),
+        ghostTex(&(static_cast<const cudaColorSpinorField&>(x)), true),
+        norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+    {
+      checkTypes<RegType,InterType,StoreType>();
+      for (int d=0; d<4; d++) ghost_stride[d] = nFace*x.SurfaceCB(d);
+    }
 
     Spinor(const Spinor &st) 
-      : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
+      : spinor(st.spinor), ghost_spinor(st.ghost_spinor), tex(st.tex), ghostTex(st.ghostTex), norm(st.norm), stride(st.stride)
+      { for (int d=0; d<4; d++) ghost_stride[d] = st.ghost_stride[d]; }
+
+  /*Spinor(StoreType* spinor, float* norm, int stride) 
+    : spinor(spinor), norm(norm), stride(stride), ghost_stride({}) { checkTypes<RegType, InterType, StoreType>(); }*/
 
     Spinor& operator=(const Spinor &src) {
       if (&src != this) {
 	spinor = src.spinor;
+        ghost_spinor = src.ghost_spinor;
 	tex = src.tex;
+        ghostTex = src.ghostTex;
 	norm = src.norm;
 	stride = src.stride;
+	for (int d=0; d<4; d++) ghost_stride[d] = src.ghost_stride[d];
       }
       return *this;
     }
 
-    ~Spinor() { } /* on g80 / gt200 this must not be virtual */
+    void set(const cudaColorSpinorField &x){
+      spinor = (StoreType*)x.V();
+      ghost_spinor = (StoreType*)x.Ghost2();
+#ifdef USE_TEXTURE_OBJECTS 
+      tex = Texture<InterType, StoreType>(&x);
+      ghostTex = Texture<InterType, StoreType>(&x,true);
+#else
+      tex = Texture<InterType, StoreType, tex_id>(&x);
+      ghostTex = Texture<InterType, StoreType, tex_id>(&x,true);
+#endif      
+      norm = (float*)x.Norm();
+      stride = x.Length()/(N*REG_LENGTH);
+    
+      checkTypes<RegType,InterType,StoreType>();
+    }
+
+    ~Spinor() { }
 
     __device__ inline void load(RegType x[], const int i) {
       // load data into registers first using the storage order
@@ -341,11 +430,56 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 	}
       }
 #endif
-
       // now convert into desired register order
       convert<RegType, InterType>(x, y, N);
     }
 
+  /**
+     Load the ghost spinor.  For Wilson fermions, we assume that the
+     ghost is spin projected
+  */
+  __device__ inline void loadGhost(RegType x[], const int i, const int dim) {
+    // load data into registers first using the storage order
+    const int Nspin = (REG_LENGTH * N) / (3 * 2);
+    // if Wilson, then load only half the number of components
+    const int M = ((N * sizeof(RegType)) / sizeof(InterType)) / ((Nspin == 4) ? 2 : 1);
+    
+    InterType y[M];
+    
+    // If we are using tex references, then we can only use the predeclared texture ids
+#ifndef USE_TEXTURE_OBJECTS
+    if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
+#endif
+      // half precision types (FIXME - these don't look correct?)
+      if ( IS_SHORT(StoreType) ) { 
+	float xN = norm[i];
+#pragma unroll
+	for (int j=0; j<M; j++) y[j] = xN*ghostTex[i + j*ghost_stride[dim]];
+      } else { // other types
+#pragma unroll 
+	for (int j=0; j<M; j++) copyFloatN(y[j], ghostTex[i + j*ghost_stride[dim]]);
+      }
+#ifndef USE_TEXTURE_OBJECTS
+    } else { // default load when out of tex_id range
+      
+      if ( IS_SHORT(StoreType) ) { 
+	float xN = norm[i];
+#pragma unroll
+	for (int j=0; j<M; j++) {
+	  copyFloatN(y[j], ghost_spinor[i + j*ghost_stride[dim]]);
+	  y[j] *= xN;
+	}
+      } else { // other types
+#pragma unroll
+	for (int j=0; j<M; j++) copyFloatN(y[j],ghost_spinor[i + j*ghost_stride[dim]]);
+      }
+    }
+#endif
+    
+    // now convert into desired register order
+    convert<RegType, InterType>(x, y, N);
+  }
+  
     // default store used for simple fields
     __device__ inline void save(RegType x[], int i) {
       if (write) {
@@ -395,7 +529,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     void* V() { return (void*)spinor; }
     float* Norm() { return norm; }
 
-    QudaPrecision Precision() { 
+    QudaPrecision Precision() const { 
       QudaPrecision precision = QUDA_INVALID_PRECISION;
       if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
       else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
@@ -404,7 +538,8 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       return precision;
     }
 
-    int Stride() { return stride; }
+    int Stride() const { return stride; }
+    int Bytes() const { return N*sizeof(RegType); }
   };
 
 //} // namespace quda

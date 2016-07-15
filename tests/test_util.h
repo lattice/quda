@@ -10,7 +10,7 @@
 #define hwSiteSize    12 // real numbers per half wilson
 
 #ifdef __cplusplus
-extern "C" {
+//extern "C" {
 #endif
 
   extern int Z[4];
@@ -29,12 +29,21 @@ extern "C" {
   
   extern int mySpinorSiteSize;
 
+  void initComms(int argc, char **argv, const int *commDims);
+  void finalizeComms();
+  void initRand();
+
   void setDims(int *X);
   void dw_setDims(int *X, const int L5);
   void setSpinorSiteSize(int n);
+  int dimPartitioned(int dim);
 
   int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) ;
+  
+  int neighborIndex(int dim[], int index, int oddBit, int dx[]);
+  int neighborIndexFullLattice(int dim[], int index, int dx[]);  
+
   int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1);
 
@@ -42,11 +51,14 @@ extern "C" {
   void printGaugeElement(void *gauge, int X, QudaPrecision precision);
   
   int fullLatticeIndex(int i, int oddBit);
+  int fullLatticeIndex(int dim[], int index, int oddBit);
   int getOddBit(int X);
 
   void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
-    void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, QudaPrecision precision, QudaGaugeParam*);
-    void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
+  void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
+				    QudaPrecision precision, QudaGaugeParam*, 
+				    QudaDslashType dslash_type);
+  void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
   void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision);
   void createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) ;
 
@@ -76,6 +88,7 @@ extern "C" {
   // additions for dw (quickly hacked on)
   int fullLatticeIndex_4d(int i, int oddBit);
   int fullLatticeIndex_5d(int i, int oddBit);
+  int fullLatticeIndex_5d_4dpc(int i, int oddBit);
   int process_command_line_option(int argc, char** argv, int* idx);
 
   // use for some profiling
@@ -83,7 +96,7 @@ extern "C" {
   double stopwatchReadSeconds();
 
 #ifdef __cplusplus
-}
+//}
 #endif
 
 #endif // _TEST_UTIL_H

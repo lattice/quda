@@ -7,20 +7,38 @@
 extern "C" {
 #endif
     
-    void display_spinor(void* spinor, int len, int precision);
-    void display_link(void* link, int len, int precision);
-    int link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* gaugeParam);
-    int site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gaugeParam);
+  void display_spinor(void* spinor, int len, int precision);
+  void display_link(void* link, int len, int precision);
+  int link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* gaugeParam);
+  int site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gaugeParam);
+  
+  QudaReconstructType get_recon(char* s);
+  const char* get_recon_str(QudaReconstructType recon);
 
-    QudaReconstructType get_recon(char* s);
-    QudaPrecision   get_prec(char* s);
-    const char* get_prec_str(QudaPrecision prec);
-    const char* get_gauge_order_str(QudaGaugeFieldOrder order);
-    const char* get_recon_str(QudaReconstructType recon);
-    const char* get_test_type(int t);
-    const char* get_unitarization_str(bool svd_only);
-    QudaDslashType get_dslash_type(char* s);
-    const char* get_dslash_type_str(QudaDslashType type);
+  QudaPrecision   get_prec(char* s);
+  const char* get_prec_str(QudaPrecision prec);
+
+  const char* get_gauge_order_str(QudaGaugeFieldOrder order);
+  const char* get_test_type(int t);
+  const char* get_unitarization_str(bool svd_only);
+
+  QudaMassNormalization get_mass_normalization_type(char* s);
+  const char* get_mass_normalization_str(QudaMassNormalization);
+
+  QudaMatPCType get_matpc_type(char* s);
+  const char* get_matpc_str(QudaMatPCType);
+
+  QudaSolveType get_solve_type(char* s);
+  const char* get_solve_str(QudaSolveType);
+
+  QudaTwistFlavorType get_flavor_type(char* s);
+
+  QudaDslashType get_dslash_type(char* s);
+  const char* get_dslash_str(QudaDslashType type);
+
+  QudaInverterType get_solver_type(char* s);
+  const char* get_solver_str(QudaInverterType type);
+
   const char* get_quda_ver_str();
 #ifdef __cplusplus
 }

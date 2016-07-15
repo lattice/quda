@@ -50,6 +50,18 @@ double norm_2(void *v, int len, QudaPrecision precision) {
   else return norm2((float*)v, len);
 }
 
+// performs the operation y[i] = x[i] + a*y[i]
+template <typename Float>
+static inline void xpay(Float *x, Float a, Float *y, int len) {
+  for (int i=0; i<len; i++) y[i] = x[i] + a*y[i];
+}
+
+void xpay(void *x, double a, void *y, int length, QudaPrecision precision) {
+  if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)x, a, (double*)y, length);
+  else xpay((float*)x, (float)a, (float*)y, length);
+}
+
+
 
 /*
 

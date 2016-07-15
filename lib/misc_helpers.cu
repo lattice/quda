@@ -1,4 +1,5 @@
 
+#include <quda_internal.h>
 #include <misc_helpers.h>
 #define gaugeSiteSize 18
 #define BLOCKSIZE 64
@@ -147,6 +148,7 @@ namespace quda {
 			 cudaStream_t stream)
   {
     dim3 blockDim(BLOCKSIZE);
+
     if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
 #ifdef MULTI_GPU  
       size_t threads=Vh+ghostV;
@@ -185,7 +187,7 @@ namespace quda {
       default:
 	errorQuda("ERROR: half precision not support in %s\n", __FUNCTION__);
       }
-    }else if (cpu_order == QUDA_MILC_GAUGE_ORDER){    
+    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER){    
 #ifdef MULTI_GPU  
       int threads=4*(Vh+ghostV);
 #else
@@ -386,90 +388,97 @@ namespace quda {
   staple[idx + 8*mystride] = P8;			
 
 
+  struct GhostStapleParam {
+    const int in_stride;
+    int X[4];
+    GhostStapleParam(const int in_stride, const int X[4]) :
+      in_stride(in_stride) { 
+      for (int i=0 ;i<4; i++) this->X[i] = X[i];
+    }
+  };
+
 
   template<int dir, int whichway, typename Float2>
   __global__ void
-  collectGhostStapleKernel(Float2* in, const int oddBit,
-			   Float2* nbr_staple_gpu)
+  collectGhostStapleKernel(Float2 *out, Float2 *in, int parity, GhostStapleParam param)
   {
 
     int sid = blockIdx.x*blockDim.x + threadIdx.x;
-    int z1 = sid / X1h;
-    int x1h = sid - z1*X1h;
-    int z2 = z1 / X2;
-    int x2 = z1 - z2*X2;
-    int x4 = z2 / X3;
-    int x3 = z2 - x4*X3;
-    int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+    int z1 = sid / (param.X[0]>>1);
+    int x1h = sid - z1*(param.X[0]>>1);
+    int z2 = z1 / param.X[1];
+    int x2 = z1 - z2*param.X[1];
+    int x4 = z2 / param.X[2];
+    int x3 = z2 - x4*param.X[2];
+    int x1odd = (x2 + x3 + x4 + parity) & 1;
     int x1 = 2*x1h + x1odd;
-    //int X = 2*sid + x1odd;
 
-    READ_ST_STAPLE(in, sid, fl.staple_stride);
+    READ_ST_STAPLE(in, sid, param.in_stride);
     int ghost_face_idx;
   
     if ( dir == 0 && whichway == QUDA_BACKWARDS){
       if (x1 < 1){
-	ghost_face_idx = (x4*(X3*X2)+x3*X2 +x2)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X2/2);
+	ghost_face_idx = (x4*(param.X[2]*param.X[1])+x3*param.X[1] +x2)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[3]*param.X[2]*param.X[1]/2);
       }
     }
 
     if ( dir == 0 && whichway == QUDA_FORWARDS){
-      if (x1 >= X1 - 1){
-	ghost_face_idx = (x4*(X3*X2)+x3*X2 +x2)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X2/2);
+      if (x1 >= param.X[0] - 1){
+	ghost_face_idx = (x4*(param.X[2]*param.X[1])+x3*param.X[1] +x2)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[3]*param.X[2]*param.X[1]/2);
       }
     }
   
     if ( dir == 1 && whichway == QUDA_BACKWARDS){
       if (x2 < 1){
-	ghost_face_idx = (x4*X3*X1+x3*X1+x1)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X1/2);
+	ghost_face_idx = (x4*param.X[2]*param.X[0]+x3*param.X[0]+x1)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[3]*param.X[2]*param.X[0]/2);
       }
     }
 
     if ( dir == 1 && whichway == QUDA_FORWARDS){
-      if (x2 >= X2 - 1){
-	ghost_face_idx = (x4*X3*X1+x3*X1+x1)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X3*X1/2);
+      if (x2 >= param.X[1] - 1){
+	ghost_face_idx = (x4*param.X[2]*param.X[0]+x3*param.X[0]+x1)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[3]*param.X[2]*param.X[0]/2);
       }
     }
 
     if ( dir == 2 && whichway == QUDA_BACKWARDS){
       if (x3 < 1){
-	ghost_face_idx = (x4*X2*X1+x2*X1+x1)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X2*X1/2);
+	ghost_face_idx = (x4*param.X[1]*param.X[0]+x2*param.X[0]+x1)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[3]*param.X[1]*param.X[0]/2);
       }
     }
 
     if ( dir == 2 && whichway == QUDA_FORWARDS){
-      if (x3 >= X3 - 1){
-	ghost_face_idx = (x4*X2*X1 + x2*X1 + x1)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X4*X2*X1/2);
+      if (x3 >= param.X[2] - 1){
+	ghost_face_idx = (x4*param.X[1]*param.X[0] + x2*param.X[0] + x1)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[3]*param.X[1]*param.X[0]/2);
       }
     }
 
     if ( dir == 3 && whichway == QUDA_BACKWARDS){
       if (x4 < 1){
-	ghost_face_idx = (x3*X2*X1+x2*X1+x1)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X3*X2*X1/2);
+	ghost_face_idx = (x3*param.X[1]*param.X[0]+x2*param.X[0]+x1)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[2]*param.X[1]*param.X[0]/2);
       }
     }
   
     if ( dir == 3 && whichway == QUDA_FORWARDS){
-      if (x4 >= X4 - 1){
-	ghost_face_idx = (x3*X2*X1+x2*X1+x1)>>1;
-	WRITE_ST_STAPLE(nbr_staple_gpu, ghost_face_idx, X3*X2*X1/2);
+      if (x4 >= param.X[3] - 1){
+	ghost_face_idx = (x3*param.X[1]*param.X[0]+x2*param.X[0]+x1)>>1;
+	WRITE_ST_STAPLE(out, ghost_face_idx, param.X[2]*param.X[1]*param.X[0]/2);
       }
     }
 
   }
 
-
+  
   //@dir can be 0, 1, 2, 3 (X,Y,Z,T directions)
   //@whichway can be QUDA_FORWARDS, QUDA_BACKWORDS
   void
-  collectGhostStaple(int* X, void* even, void* odd, int volume, QudaPrecision precision,
+  collectGhostStaple(int* X, void* even, void* odd, int volumeCB, int stride, QudaPrecision precision,
 		     void* ghost_staple_gpu,		   
 		     int dir, int whichway, cudaStream_t* stream)
   {
@@ -480,7 +489,7 @@ namespace quda {
     Vsh_z = X[0]*X[1]*X[3]/2;
     Vsh_t = X[0]*X[1]*X[2]/2;  
     
-    dim3 gridDim(volume/BLOCKSIZE, 1, 1);
+    dim3 gridDim(volumeCB/BLOCKSIZE, 1, 1);
     dim3 blockDim(BLOCKSIZE, 1, 1);
     int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
     
@@ -493,18 +502,19 @@ namespace quda {
 
     int even_parity = 0;
     int odd_parity = 1;
+    GhostStapleParam param(stride, X);
   
     if (precision == QUDA_DOUBLE_PRECISION){
       switch(dir){
       case 0:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");
@@ -515,12 +525,12 @@ namespace quda {
       case 1:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");
@@ -531,12 +541,12 @@ namespace quda {
       case 2:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");
@@ -547,12 +557,12 @@ namespace quda {
       case 3:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)even, even_parity, (double2*)gpu_buf_even);
-	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)odd, odd_parity, (double2*)gpu_buf_odd);
+	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
+	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");
@@ -565,12 +575,12 @@ namespace quda {
       case 0:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<0, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<0, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");
@@ -581,12 +591,12 @@ namespace quda {
       case 1:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<1, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<1, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");
@@ -597,12 +607,12 @@ namespace quda {
       case 2:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<2, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");
@@ -613,12 +623,12 @@ namespace quda {
       case 3:
 	switch(whichway){
 	case QUDA_BACKWARDS:
-	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<3, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	case QUDA_FORWARDS:
-	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)even, even_parity, (float2*)gpu_buf_even);
-	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)odd, odd_parity, (float2*)gpu_buf_odd);
+	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_even, (float2*)even, even_parity, param);
+	  collectGhostStapleKernel<3, QUDA_FORWARDS><<<gridDim, blockDim, 0, *stream>>>((float2*)gpu_buf_odd, (float2*)odd, odd_parity, param);
 	  break;
 	default:
 	  errorQuda("Invalid whichway");

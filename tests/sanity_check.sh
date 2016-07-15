@@ -19,7 +19,7 @@ function basic_sanity_check {
 	    continue
         fi
 
-        if [ "$prog" = "llfat_test" -o "$prog" = "gauge_force_test" -o "$prog" = "fermion_force_test" -o "$prog"  = "hisq_paths_force_test" ]; then
+        if [ "$prog" = "llfat_test" -o "$prog" = "gauge_force_test" -o "$prog" = "fermion_force_test" ]; then
 	    extra_args="--verify"
         else
 	    extra_args=""
@@ -141,7 +141,7 @@ function complete_hisq_force_check {
     for prec in $precs; do
         for recon in $recons; do
                 for partition in $partitions; do
-                  cmd="$prog --sdim 4 --tdim 8 --prec $prec --recon $recon  --partition $partition --gauge-order $gauge_order --verify --tune false"
+                  cmd="$prog --sdim 4 --tdim 8 --prec $prec --recon $recon  --partition $partition --gauge-order $gauge_order --tune false"
                   echo -ne  $cmd  "\t"..."\t"
                   echo "----------------------------------------------------------" >>$OUTFILE
                   echo $cmd >> $OUTFILE
@@ -190,7 +190,7 @@ function complete_invert_check {
     prog="./staggered_invert_test"
     precs="double single half"
     recons="18 12"
-    tests="0 1 3 4 6"
+    tests="0 1 3 4"
     partitions="0 8 12 14 15"
 
    $prog --version |grep single >& /dev/null

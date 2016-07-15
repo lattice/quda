@@ -186,8 +186,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
@@ -258,8 +260,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle
+#define GHOSTSPINORTEX ghostSpinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -326,8 +330,10 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
+#define GHOSTSPINORTEX ghostSpinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -363,9 +369,6 @@
 
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
 #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
@@ -385,7 +388,20 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 }
 
+#ifdef MULTI_GPU
+template <>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_DOMAIN_WALL_DIRAC
+#if DD_DAG
+#include "dw_fused_exterior_dslash_dagger_core.h"
+#else
+#include "dw_fused_exterior_dslash_core.h"
 #endif
+#endif
+}
+#endif // MULTI_GPU
 
 // clean up
 
@@ -409,6 +425,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
 #undef SPINORTEX
+#undef GHOSTSPINORTEX
 #undef READ_INTERMEDIATE_SPINOR
 #undef INTERTEX
 #undef READ_ACCUM
