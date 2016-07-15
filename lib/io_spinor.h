@@ -643,7 +643,7 @@
   out[1*mystride+sid] = make_float2(o01_re, o01_im);	\
   out[2*mystride+sid] = make_float2(o02_re, o02_im);
 
-#define WRITE_ST_SPINOR_SHORT2(out, sid, mystride)					\
+#define WRITE_ST_SPINOR_SHORT2(out, sid, mystride)			\
   float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));			\
   float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im));			\
   float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im));			\
