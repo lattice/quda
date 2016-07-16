@@ -714,11 +714,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     PUSH_RANGE("LinearAlgebra",2)
     // mw this needs a lot of cleanup
     for(int i=0; i < param.num_src; i++){
-      blas::ax(0,rnew.Component(i)); // do we need components here?
+      // blas::ax(0,rnew.Component(i)); // do we need components here?
     }
     // add r
     for(int i=0; i<param.num_src; i++){
-      blas::caxpy(1.0,rSloppy.Component(i),rnew.Component(i));
+      // blas::caxpy(1.0,rSloppy.Component(i),rnew.Component(i));
+      blas::copy(rnew.Component(i),rSloppy.Component(i));
     }
       for(int i=0; i<param.num_src; i++){
         for(int j=0;j<param.num_src; j++){
