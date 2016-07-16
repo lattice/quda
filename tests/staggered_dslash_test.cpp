@@ -54,8 +54,6 @@ void *fatlink[4], *longlink[4];
 const void **ghost_fatlink, **ghost_longlink;
 #endif
 
-const int loops = 100;
-
 QudaParity parity;
 extern QudaDagType dagger;
 int transfer = 0; // include transfer time in the benchmark?
@@ -69,6 +67,7 @@ extern QudaPrecision prec;
 
 extern int device;
 extern bool verify_results;
+extern int niter;
 
 extern bool kernel_pack_t;
 
@@ -369,7 +368,7 @@ void staggeredDslashRef()
   printfQuda("Calculating reference implementation...");
   fflush(stdout);
   switch (test_type) {
-    case 0:    
+    case 0:
 #ifdef MULTI_GPU
       staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
 			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
@@ -377,7 +376,7 @@ void staggeredDslashRef()
       staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif    
       break;
-    case 1: 
+    case 1:
 #ifdef MULTI_GPU
       staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
 			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
@@ -420,12 +419,12 @@ static int dslashTest()
       setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
-    printfQuda("Executing %d kernel loops...", loops);	
+    printfQuda("Executing %d kernel loops...", niter);
 
     // reset flop counter
     dirac->Flops();
 
-    double secs = dslashCUDA(loops);
+    double secs = dslashCUDA(niter);
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
