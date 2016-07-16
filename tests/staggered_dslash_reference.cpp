@@ -175,7 +175,7 @@ Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat m
       dslashReference(outEven, fatlink, longlink, tmp, 0, daggerBit);
 	    
       // lastly apply the mass term
-      axmy(inEven, msq_x4, outEven, Vh*mySpinorSiteSize);
+      axmy(inEven, msq_x4, outEven, Ls*Vh*mySpinorSiteSize);
       break;
     }
   case QUDA_ODD_PARITY:
@@ -186,7 +186,7 @@ Matdagmat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat m
       dslashReference(outOdd, fatlink, longlink, tmp, 1, daggerBit);
 	    
       // lastly apply the mass term
-      axmy(inOdd, msq_x4, outOdd, Vh*mySpinorSiteSize);
+      axmy(inOdd, msq_x4, outOdd, Ls*Vh*mySpinorSiteSize);
       break;	
     }
 	
@@ -264,7 +264,7 @@ staggered_matpc(void *outEven, void **fatlink, void**longlink, void *inEven, dou
 
   // lastly apply the kappa term
   double kappa2 = -kappa*kappa;
-  xpay(inEven, kappa2, outEven, Vh*mySpinorSiteSize, sPrecision);
+  xpay(inEven, kappa2, outEven, Ls*Vh*mySpinorSiteSize, sPrecision);
 }
 
 #ifdef MULTI_GPU
@@ -373,7 +373,7 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
 void 
 matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink, 
 		 cpuColorSpinorField* in, double mass, int dagger_bit,
-		 QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity) 
+		 QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity)
 {
   //assert sPrecision and gPrecision must be the same
   if (sPrecision != gPrecision){
@@ -383,9 +383,9 @@ matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (parity == QUDA_EVEN_PARITY){
     otherparity = QUDA_ODD_PARITY;
-  }else if (parity == QUDA_ODD_PARITY){
+  } else if (parity == QUDA_ODD_PARITY) {
     otherparity = QUDA_EVEN_PARITY;
-  }else{
+  } else {
     errorQuda("ERROR: full parity not supported in function %s\n", __FUNCTION__);
   }
   
@@ -397,9 +397,9 @@ matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void
   
   double msq_x4 = mass*mass*4;
   if (sPrecision == QUDA_DOUBLE_PRECISION){
-    axmy((double*)in->V(), (double)msq_x4, (double*)out->V(), Vh*mySpinorSiteSize);
+    axmy((double*)in->V(), (double)msq_x4, (double*)out->V(), out->X(4)*Vh*mySpinorSiteSize);
   }else{
-    axmy((float*)in->V(), (float)msq_x4, (float*)out->V(), Vh*mySpinorSiteSize);    
+    axmy((float*)in->V(), (float)msq_x4, (float*)out->V(), out->X(4)*Vh*mySpinorSiteSize);
   }
 
 }
