@@ -15,10 +15,26 @@
 #include <iostream>
 
 #include <Eigen/Dense>
+#include "nvToolsExt.h"
 
+static const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+static const int num_colors = sizeof(colors)/sizeof(uint32_t);
+
+#define PUSH_RANGE(name,cid) { \
+  int color_id = cid; \
+  color_id = color_id%num_colors;\
+  nvtxEventAttributes_t eventAttrib = {0}; \
+  eventAttrib.version = NVTX_VERSION; \
+  eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = colors[color_id]; \
+  eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+  eventAttrib.message.ascii = name; \
+  nvtxRangePushEx(&eventAttrib); \
+}
+#define POP_RANGE nvtxRangePop();
 
 namespace quda {
-
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false) {
   }
@@ -374,7 +390,7 @@ namespace quda {
 
     return;
   }
-
+#define BCGRQ 1
 
 #if BCGRQ
 void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
@@ -619,16 +635,20 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #endif
 
   while ( !allconverged && k < param.maxiter ) {
+    PUSH_RANGE("Dslash",1)
     for(int i=0; i<param.num_src; i++){
       matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
     }
+    POP_RANGE
 
+    PUSH_RANGE("LinearAlgebra",2)
     bool breakdown = false;
     // FIXME: need to check breakdown
     //MW: here we can exploit that pAp is hermitian
     for(int i=0; i<param.num_src; i++){
-      for(int j=0; j < param.num_src; j++){
+      for(int j=i; j < param.num_src; j++){
         pAp(i,j) = blas::cDotProduct(p.Component(i), Ap.Component(j));
+        if (i!=j) pAp(j,i) = std::conj(pAp(i,j));
       }
     }
 
@@ -656,6 +676,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     for(int i=0; i< param.num_src; i++){
       blas::copy(rnew.Component(i), rSloppy.Component(i));
     }
+    POP_RANGE
+    PUSH_RANGE("GramSchmidt",3)
+
+
     for(int i=0; i < param.num_src; i++){
       n = blas::norm2(rSloppy.Component(i));
       blas::ax(1/sqrt(n),rSloppy.Component(i));
@@ -673,6 +697,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         S(i,j) = blas::cDotProduct(rSloppy.Component(i), rnew.Component(j));
       }
     }
+    POP_RANGE
     #ifdef MWVERBOSE
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
@@ -686,7 +711,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
     #endif
     // update p
-
+    PUSH_RANGE("LinearAlgebra",2)
     // mw this needs a lot of cleanup
     for(int i=0; i < param.num_src; i++){
       blas::ax(0,rnew.Component(i)); // do we need components here?
@@ -707,7 +732,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
 
       C = S * C;
-
+      POP_RANGE
       #ifdef MWVERBOSE
       for(int i=0; i<param.num_src; i++){
         for(int j=0; j<param.num_src; j++){
