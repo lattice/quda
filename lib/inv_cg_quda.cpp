@@ -645,6 +645,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     bool breakdown = false;
     // FIXME: need to check breakdown
     //MW: here we can exploit that pAp is hermitian
+    // this scales with (nsrc * (nsrc+1))/2
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
         pAp(i,j) = blas::cDotProduct(p.Component(i), Ap.Component(j));
@@ -681,8 +682,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
 
     for(int i=0; i < param.num_src; i++){
+      // scales with nsrc
       n = blas::norm2(rSloppy.Component(i));
       blas::ax(1/sqrt(n),rSloppy.Component(i));
+      // (nsrc * (nsrc-1))/2 + nsrc = (nsrc * (nsrc+1))/2
       for(int j=i+1; j < param.num_src; j++) {
         ri=blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
         blas::caxpy(-ri,rSloppy.Component(i),rSloppy.Component(j));
@@ -717,16 +720,20 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       // blas::ax(0,rnew.Component(i)); // do we need components here?
     }
     // add r
+    // scales with nsrc
     for(int i=0; i<param.num_src; i++){
-      // blas::caxpy(1.0,rSloppy.Component(i),rnew.Component(i));
       blas::copy(rnew.Component(i),rSloppy.Component(i));
     }
       for(int i=0; i<param.num_src; i++){
         for(int j=0;j<param.num_src; j++){
+          // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
           blas::caxpy(std::conj(S(i,j)),p.Component(j),rnew.Component(i));
+          // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
+          // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
+          // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
         }
       }
-
+      // copy sclae with nsrc
       for(int i=0; i < param.num_src; i++){
         blas::copy(p.Component(i),rnew.Component(i)); // do we need components here?
       }
