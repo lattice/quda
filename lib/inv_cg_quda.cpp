@@ -661,8 +661,20 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // update X
 
     for(int i = 0; i < param.num_src; i++){
-      for(int j = 0; j < param.num_src; j++){
-        blas::caxpy(alpha(j,i),  p.Component(j),xSloppy.Component(i));
+      // for(int j = 0; j < param.num_src; j++){
+      //   blas::caxpy(alpha(j,i),  p.Component(j),xSloppy.Component(i));
+      // }
+      const int j3 = param.num_src/3;
+      const int j2 = ((param.num_src%3)/2);
+      const int j1 = ((param.num_src%3)%2);
+      for (int j=0;j<j3;j++){
+        blas::caxpbypczpw(alpha(3*j,i),p.Component(3*j),alpha(3*j+1,i),p.Component(3*j+1),alpha(3*j+2,i),p.Component(3*j+2),xSloppy.Component(i));
+      }
+      for (int j=0;j<j2;j++){
+          blas::caxpbypz(alpha(3*j3+2*j,i),p.Component(3*j3+2*j),alpha(3*j3+2*j+1,i),p.Component(3*j3+2*j+1),xSloppy.Component(i));
+      }
+      for (int j=0; j<j1;j++){
+        blas::caxpy(alpha(3*j3+2*j2+j,i),p.Component(3*j3+2*j2+j),xSloppy.Component(i));
       }
     }
 
