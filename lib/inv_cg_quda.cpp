@@ -669,8 +669,20 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     beta = pAp.inverse();
     // here we are deploying the alternative beta computation
     for(int i=0; i<param.num_src; i++){
-      for(int j=0; j < param.num_src; j++){
-        blas::caxpy(-beta(j,i), Ap.Component(j), rSloppy.Component(i));
+      // for(int j=0; j < param.num_src; j++){
+      //   blas::caxpy(-beta(j,i), Ap.Component(j), rSloppy.Component(i));
+      // }
+      const int j3 = param.num_src/3;
+      const int j2 = ((param.num_src%3)/2);
+      const int j1 = ((param.num_src%3)%2);
+      for (int j=0;j<j3;j++){
+        blas::caxpbypczpw(-beta(3*j,i),Ap.Component(3*j),-beta(3*j+1,i),Ap.Component(3*j+1),-beta(3*j+2,i),Ap.Component(3*j+2),rSloppy.Component(i));
+      }
+      for (int j=0;j<j2;j++){
+          blas::caxpbypz(-beta(3*j3+2*j,i),Ap.Component(3*j3+2*j),-beta(3*j3+2*j+1,i),Ap.Component(3*j3+2*j+1),rSloppy.Component(i));
+      }
+      for (int j=0; j<j1;j++){
+        blas::caxpy(-beta(3*j3+2*j2+j,i),Ap.Component(3*j3+2*j2+j),rSloppy.Component(i));
       }
     }
 
