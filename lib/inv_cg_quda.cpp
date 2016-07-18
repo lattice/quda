@@ -724,14 +724,41 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     for(int i=0; i<param.num_src; i++){
       blas::copy(rnew.Component(i),rSloppy.Component(i));
     }
+
+    /**
+       Functor Performing the operation w[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
+    */
+
+      //caxpbypczpw  - Partition j j/3
+      //caxpbypz j%3/2
+      //caxpy (j%3)%3
+
       for(int i=0; i<param.num_src; i++){
-        for(int j=0;j<param.num_src; j++){
-          // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
-          blas::caxpy(std::conj(S(i,j)),p.Component(j),rnew.Component(i));
-          // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
-          // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
-          // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
+        // for(int j=0;j<param.num_src; j++){
+        //   // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
+        //   blas::caxpy(std::conj(S(i,j)),p.Component(j),rnew.Component(i));
+        //   // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
+        //   // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
+        //   // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
+        // }
+        const int j3 = param.num_src/3;
+        const int j2 = ((param.num_src%3)/2);
+        const int j1 = ((param.num_src%3)%2);
+        for (int j=0;j<j3;j++){
+          blas::caxpbypczpw(std::conj(S(i,3*j)),p.Component(3*j),std::conj(S(i,3*j+1)),p.Component(3*j+1),std::conj(S(i,3*j+2)),p.Component(3*j+2),rnew.Component(i));
         }
+        for (int j=0;j<j2;j++){
+            blas::caxpbypz(std::conj(S(i,3*j3+2*j)),p.Component(3*j3+2*j),std::conj(S(i,3*j3+2*j+1)),p.Component(3*j3+2*j+1),rnew.Component(i));
+        }
+        for (int j=0; j<j1;j++){
+          blas::caxpy(std::conj(S(i,3*j3+2*j2+j)),p.Component(3*j3+2*j2+j),rnew.Component(i));
+        }
+// for j in range(j3):
+//     print (3*j,3*j+1,3*j+2)
+// for j in range(j2):
+//     print (3*j3+2*j,3*j3+2*j+1)
+// for j in range(j1):
+//     print (3*j3+2*j2+j)
       }
       // copy sclae with nsrc
       for(int i=0; i < param.num_src; i++){
