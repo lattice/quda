@@ -40,6 +40,10 @@ void** ghost_fatlink, **ghost_longlink;
 
 extern int device;
 extern bool tune;
+extern int niter;
+extern int Nsrc; // number of spinors to apply to simultaneously
+
+
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
@@ -128,7 +132,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->inv_type = inv_type;
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter...
-  inv_param->maxiter = 500000;
+  inv_param->maxiter = niter;
   inv_param->reliable_delta = 0;//1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
@@ -230,11 +234,11 @@ invert_test(void)
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
-  csParam.nDim=4;
+  csParam.nDim=5;
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gaugeParam.X[d];
   }
-  csParam.x[0] /= 2;
+  csParam.x[4] = 1; // number of sources becomes the fifth dimension
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
@@ -319,7 +323,7 @@ invert_test(void)
       }
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
       #define NUM_SRC 20
-      inv_param.num_src=num_src;
+      inv_param.num_src=Nsrc; // number of spinors to apply to simultaneously
       void* outArray[NUM_SRC];
       void* inArray[NUM_SRC];
       int len;
@@ -371,6 +375,9 @@ invert_test(void)
       mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
       src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+
+      for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
+      for(int i=1; i < inv_param.num_offset;i++) delete spinorInArray[i];
 
       break;
 
@@ -572,7 +579,6 @@ usage_extra(char** argv )
   printfQuda("                                                3: Even even spinor multishift CG inverter\n");
   printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
   printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
-  printfQuda("    --num_src n                             # Numer of sources used\n");
 
   return ;
 }
@@ -586,15 +592,6 @@ int main(int argc, char** argv)
       continue;
     }
 
-
-        if( strcmp(argv[i], "--num_src") == 0){
-          if (i+1 >= argc){
-            usage(argv);
-          }
-          num_src= atoi(argv[i+1]);
-          i++;
-          continue;
-        }
 
 
     if( strcmp(argv[i], "--cpu_prec") == 0){

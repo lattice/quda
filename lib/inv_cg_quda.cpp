@@ -390,6 +390,8 @@ namespace quda {
 
     return;
   }
+
+// use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 
 #if BCGRQ
@@ -664,6 +666,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       // for(int j = 0; j < param.num_src; j++){
       //   blas::caxpy(alpha(j,i),  p.Component(j),xSloppy.Component(i));
       // }
+      // this is just a workaround to reduce LA overhead somewhat
       const int j3 = param.num_src/3;
       const int j2 = ((param.num_src%3)/2);
       const int j1 = ((param.num_src%3)%2);
@@ -698,12 +701,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
 
+
+    POP_RANGE
+    PUSH_RANGE("GramSchmidt",3)
     for(int i=0; i< param.num_src; i++){
       blas::copy(rnew.Component(i), rSloppy.Component(i));
     }
-    POP_RANGE
-    PUSH_RANGE("GramSchmidt",3)
-
 
     for(int i=0; i < param.num_src; i++){
       // scales with nsrc
@@ -737,25 +740,18 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // gamma = gamma.transpose().eval();
     std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
     #endif
+
     // update p
     PUSH_RANGE("LinearAlgebra",2)
     // mw this needs a lot of cleanup
-    for(int i=0; i < param.num_src; i++){
-      // blas::ax(0,rnew.Component(i)); // do we need components here?
-    }
+    // for(int i=0; i < param.num_src; i++){
+    //   // blas::ax(0,rnew.Component(i)); // do we need components here?
+    // }
     // add r
     // scales with nsrc
     for(int i=0; i<param.num_src; i++){
       blas::copy(rnew.Component(i),rSloppy.Component(i));
     }
-
-    /**
-       Functor Performing the operation w[i] = a*x[i] + b*y[i] + c*z[i] + w[i]
-    */
-
-      //caxpbypczpw  - Partition j j/3
-      //caxpbypz j%3/2
-      //caxpy (j%3)%3
 
       for(int i=0; i<param.num_src; i++){
         // for(int j=0;j<param.num_src; j++){
@@ -777,18 +773,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         for (int j=0; j<j1;j++){
           blas::caxpy(std::conj(S(i,3*j3+2*j2+j)),p.Component(3*j3+2*j2+j),rnew.Component(i));
         }
-// for j in range(j3):
-//     print (3*j,3*j+1,3*j+2)
-// for j in range(j2):
-//     print (3*j3+2*j,3*j3+2*j+1)
-// for j in range(j1):
-//     print (3*j3+2*j2+j)
+
       }
       // copy sclae with nsrc
       for(int i=0; i < param.num_src; i++){
         blas::copy(p.Component(i),rnew.Component(i)); // do we need components here?
       }
-
 
       C = S * C;
       POP_RANGE
@@ -803,11 +793,14 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       std::cout <<  "S " << S<<  std::endl << "C " << C << std::endl;
       #endif
 
-
-
-
-
-
+      // calculate the residuals for all shifts
+      r2avg=0;
+      for (int j=0; j<param.num_src; j++ ){
+        r2(j,j) = C(0,j)*conj(C(0,j));
+        for(int i=1; i < param.num_src; i++)
+          r2(j,j) += C(i,j) * conj(C(i,j));
+        r2avg += r2(j,j).real();
+      }
 
       //       bool updateX=false;
       //       bool updateR=false;
@@ -1040,13 +1033,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       k++;
 
       allconverged = true;
-      r2avg=0;
-      for (int j=0; j<param.num_src; j++ ){
-        r2(j,j) = C(0,j)*conj(C(0,j));
-        for(int i=1; i < param.num_src; i++)
-          r2(j,j) += C(i,j) * conj(C(i,j));
-        r2avg += r2(j,j).real();
-      }
+
 
       PrintStats("CG", k, r2avg / param.num_src, b2avg, heavy_quark_res[0]);
       for(int i=0; i<param.num_src; i++){
@@ -1112,6 +1099,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
     if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
     if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
+
+    delete rpnew;
 
     delete pp;
 
