@@ -165,17 +165,18 @@ static inline __device__ int indexFromFaceIndexExtended(int face_idx, const int 
   return idx >> 1;
 }
 
-// compute an index into the local volume from an index into the face (used by the face packing routines)
-// G.Shi: the spinor order in ghost region is different between wilson and staggered, thus different index
-//	  computing routine.
-  template <int dim, int nLayers, int face_num>
-static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int &face_volume,
-    const int &parity, const int X[])
+// compute an index into the local volume from an index into the face
+// (used by the face packing routines).  The spinor order in ghost
+// region is different between wilson and staggered, thus different
+// index computing routine.
+template <int dim, int nLayers, int face_num>
+static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const int &face_volume, const int &parity, const int X[])
 {
   // dimensions of the face
   int dims[3];
   int V = X[0]*X[1]*X[2]*X[3];
   int face_X = X[0], face_Y = X[1], face_Z = X[2]; // face_T = X[3];
+
   switch (dim) {
     case 0:
       face_X = nLayers;
@@ -191,9 +192,10 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int
       break;
     case 3:
       // face_T = nLayers;
-      dims[0]=X[0]; dims[1]=X[1]; dims[2]=X[3];
+      dims[0]=X[0]; dims[1]=X[1]; dims[2]=X[2];
       break;
   }
+
   int face_XYZ = face_X * face_Y * face_Z;
   int face_XY = face_X * face_Y;
 
@@ -201,7 +203,12 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int
   int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
 
   // reconstruct full face index from index into the checkerboard
-  face_idx *= 2;
+  face_idx_in *= 2;
+
+  // first compute src index, then find 4-d index from remainder
+  int s = face_idx_in / (dims[0]*dims[1]*dims[2]*nLayers);
+  int face_idx = face_idx_in - s*(dims[0]*dims[1]*dims[2]*nLayers);
+
   /*y,z,t here are face indexes in new order*/
   int aux1 = face_idx / dims[0];
   int aux2 = aux1 / dims[1];
@@ -235,9 +242,9 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int
       break;
   }
 
-  // return index into the checkerboard
 
-  return idx >> 1;
+  // return index into the checkerboard
+  return (idx + s*V) >> 1;
 }
 
   template <int dim, int nLayers, int face_num>
@@ -837,37 +844,31 @@ template <int dim, int nLayers, int face_num>
 static inline __device__ int indexFromDW4DFaceIndex(int face_idx, const int &face_volume,
 						    const int &parity, const int X[])
 {
-  // dimensions of the face (FIXME: optimize using constant cache)
-  //H.J. Kim.: note that in the case of DW fermions one is dealing with 4d faces
-  
   // intrinsic parity of the face depends on offset of first element, used for MPI DW as well
   int face_X = X[0], face_Y = X[1], face_Z = X[2], face_T = X[3];
-  int face_parity;  
   
   switch (dim) {
   case 0:
     face_X = nLayers;
-    face_parity = (parity + face_num * (X[0] - nLayers)) & 1;
     break;
   case 1:
     face_Y = nLayers;
-    face_parity = (parity + face_num * (X[1] - nLayers)) & 1;
     break;
   case 2:
     face_Z = nLayers;
-    face_parity = (parity + face_num * (X[2] - nLayers)) & 1;
     break;
   case 3:
     face_T = nLayers;    
-    face_parity = (parity + face_num * (X[3] - nLayers)) & 1;
     break;
   }
   
-  int face_XYZT = face_X * face_Y * face_Z * face_T;  
+  int face_XYZT = face_X * face_Y * face_Z * face_T;
   int face_XYZ = face_X * face_Y * face_Z;
   int face_XY = face_X * face_Y;
-  // reconstruct full face index from index into the checkerboard
 
+  int face_parity = (parity + face_num * (X[dim] - nLayers)) & 1;
+
+  // reconstruct full face index from index into the checkerboard
   face_idx *= 2;
 
   if (!(face_X & 1)) { // face_X even
@@ -904,26 +905,23 @@ static inline __device__ int indexFromDW4DFaceIndex(int face_idx, const int &fac
   // compute index into the full local volume
 
   int idx = face_idx;
-  int gap, aux;
+  int aux;
 
+  int gap = X[dim] - nLayers;
   switch (dim) {
   case 0:
-    gap = X[0] - nLayers;
     aux = face_idx / face_X;
     idx += (aux + face_num) * gap;
     break;
   case 1:
-    gap = X[1] - nLayers;
     aux = face_idx / face_XY;
     idx += (aux + face_num) * gap * face_X;
     break;
   case 2:
-    gap = X[2] - nLayers;
     aux = face_idx / face_XYZ;
     idx += (aux + face_num) * gap * face_XY;
     break;
   case 3:
-    gap = X[3] - nLayers;
     aux = face_idx / face_XYZT;
     idx += (aux + face_num) * gap * face_XYZ;
     break;

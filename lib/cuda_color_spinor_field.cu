@@ -780,7 +780,9 @@ namespace quda {
 
     } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) { // do multiple cudaMemcpys
 
-      int Nt_minus1_offset = (volume - nFace*ghostFace[3]); // N_t -1 = Vh-Vsh
+      const int x4 = nDim==5 ? x[4] : 1;
+      const int Nt_minus1_offset = (volumeCB - nFace*ghostFace[3])/x4; // N_t -1 = Vh-Vsh
+
       int offset = 0;
       if (nSpin == 1) {
 	offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset;
@@ -794,22 +796,26 @@ namespace quda {
 	else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
       }
     
+      size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
+      size_t dpitch = x4*len;
+      size_t spitch = stride*Nvec*precision;
+
       // QUDA Memcpy NPad's worth. 
       //  -- Dest will point to the right beginning PAD. 
       //  -- Each Pad has size Nvec*Vsh Floats. 
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
+      for (int s=0; s<x4; s++) { // loop over multiple 4-d volumes (if they exist)
+	void *dst = (char*)ghost_spinor + s*len;
+	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
-      void *dst = (char*)ghost_spinor;
-      void *src = (char*)v + offset*Nvec*precision;
-      size_t len = nFace*ghostFace[3]*Nvec*precision;
-      size_t spitch = stride*Nvec*precision;
-      cudaMemcpy2DAsync(dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
-
-      if (precision == QUDA_HALF_PRECISION) {
-	int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
-	void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision;
-	void *src = (char*)norm + norm_offset;
-	cudaMemcpyAsync(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream);
+	if (precision == QUDA_HALF_PRECISION) {
+	  size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
+	  int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
+	  void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision + s*len;
+	  void *src = (char*)norm + norm_offset + s*(volumeCB/x4)*sizeof(float);
+	  cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
+	}
       }
     }else{
       int flavorVolume = volume / 2;
@@ -1568,6 +1574,8 @@ namespace quda {
       // all goes here
       void* ghost_dst = (dir == 0) ? (void*)((char*)(backGhostSendDest[dim]) + precision*ghostOffset[dim][1]) :
 	(void*)((char*)(fwdGhostSendDest[dim]) + precision*ghostOffset[dim][0]);
+      void *ghost_norm_dst = (dir == 0) ? static_cast<char*>(backGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1] :
+	static_cast<char*>(fwdGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
 
       if (dim != 3 || getKernelPackT()) {
 	cudaMemcpyAsync(ghost_dst,
@@ -1576,8 +1584,10 @@ namespace quda {
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy to forward processor
       } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) {
-	// start the copy
-	int Nt_minus_offset = (volume - nFace*ghostFace[3]);
+
+	const int x4 = nDim==5 ? x[4] : 1;
+	const int Nt_minus_offset = (volumeCB - nFace*ghostFace[3])/x4;
+
 	int offset = 0;
 	if (nSpin == 1) {
 	  offset = (dir == 0) ? 0 : Nt_minus_offset;
@@ -1594,18 +1604,23 @@ namespace quda {
 	  }
 	}
 
-	void* src = (char*)v + offset*Nvec*precision;
-	size_t len = nFace*ghostFace[3]*Nvec*precision;
+	size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
+	size_t dpitch = x4*len;
 	size_t spitch = stride*Nvec*precision;
-	// start the copy
-	cudaMemcpy2DAsync(ghost_dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	if (precision == QUDA_HALF_PRECISION) {
-	  void *ghost_norm_dst = (dir == 0) ? static_cast<char*>(backGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1] :
-	    static_cast<char*>(fwdGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
-	  int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
-	  void* src = static_cast<char*>(norm) + norm_offset;
-	  cudaMemcpyAsync(ghost_norm_dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToDevice, *copy_stream);
+	for (int s=0; s<x4; s++) {
+	  void *dst = (char*)ghost_dst + s*len;
+	  void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	  // start the copy
+	  cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
+
+	  if (precision == QUDA_HALF_PRECISION) {
+	    size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
+	    int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
+	    void *dst = (char*)ghost_norm_dst + s*len;
+	    void *src = static_cast<char*>(norm) + norm_offset + s*(volumeCB/x4)*sizeof(float);
+	    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
+	  }
 	}
       } else { // twisted doublet
 	int flavorVolume = volume / 2;
@@ -1642,8 +1657,6 @@ namespace quda {
 	cudaMemcpy2DAsync(static_cast<char*>(ghost_dst)+len, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
 	if (precision == QUDA_HALF_PRECISION) {
-	  void *ghost_norm_dst = (dir == 0) ? static_cast<char*>(backGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1] :
-	    static_cast<char*>(fwdGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
 	  int norm_offset = (dir == 0) ? 0 : flavor1_Nt_minus1_offset*sizeof(float);
 	  void *src = static_cast<char*>(norm) + norm_offset;
 	  size_t dpitch = flavorTFace*sizeof(float);

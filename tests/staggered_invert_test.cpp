@@ -64,6 +64,8 @@ extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
 
+extern int Nsrc; // number of spinors to apply to simultaneously
+
 // Dirac operator type
 extern QudaDslashType dslash_type;
 
@@ -76,11 +78,13 @@ static void end();
 
 template<typename Float>
 void constructSpinorField(Float *res) {
-  for(int i = 0; i < Vh; i++) {
-    for (int s = 0; s < 1; s++) {
-      for (int m = 0; m < 3; m++) {
-        res[i*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-        res[i*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
+  for(int src=0; src<Nsrc; src++) {
+    for(int i = 0; i < Vh; i++) {
+      for (int s = 0; s < 1; s++) {
+	for (int m = 0; m < 3; m++) {
+	  res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
+	  res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
+	}
       }
     }
   }
@@ -131,7 +135,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
 
-
+  inv_param->Ls = Nsrc;
   
   if(tol_hq == 0 && tol == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
@@ -197,6 +201,7 @@ invert_test(void)
   initQuda(device);
 
   setDims(gaugeParam.X);
+  dw_setDims(gaugeParam.X,Nsrc); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -228,11 +233,10 @@ invert_test(void)
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
-  csParam.nDim=4;
-  for(int d = 0; d < 4; d++) {
-    csParam.x[d] = gaugeParam.X[d];
-  }
+  csParam.nDim=5;
+  for (int d = 0; d < 4; d++) csParam.x[d] = gaugeParam.X[d];
   csParam.x[0] /= 2;
+  csParam.x[4] = Nsrc;
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
@@ -305,7 +309,7 @@ invert_test(void)
   double src2=0;
   int ret = 0;
 
-
+  int len = Vh*Nsrc;
 
   switch(test_type){
     case 0: //even
@@ -322,8 +326,6 @@ invert_test(void)
       time0 += clock(); 
       time0 /= CLOCKS_PER_SEC;
 
-
-
 #ifdef MULTI_GPU    
       matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
           out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
@@ -331,9 +333,9 @@ invert_test(void)
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
 
-      mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
 
       break;
 
@@ -356,9 +358,9 @@ invert_test(void)
 #else
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);	
 #endif
-      mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
 
       break;
 
@@ -381,7 +383,6 @@ invert_test(void)
           inv_param.tol_hq_offset[i] = inv_param.tol_hq;
         }
         void* outArray[NUM_OFFSETS];
-        int len;
 
         cpuColorSpinorField* spinorOutArray[NUM_OFFSETS];
         spinorOutArray[0] = out;    
@@ -393,8 +394,6 @@ invert_test(void)
           outArray[i] = spinorOutArray[i]->V();
           inv_param.offset[i] = 4*masses[i]*masses[i];
         }
-
-        len=Vh;
 
         if (test_type == 3) {
           inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
