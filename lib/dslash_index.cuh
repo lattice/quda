@@ -487,9 +487,10 @@ enum IndexType {
 };
 
 // compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
-template <IndexType idxType, int Bx=1, int By=1, int Bz=1, int Bt=1>
+template <IndexType idxType, typename I>
 static __device__ __forceinline__ void coordsFromIndex(int &idx, int &x, int &y, int &z, int &t,
-						       int &cb_idx, const int &parity, const int X[])
+						       int &cb_idx, const int &parity, const int X[],
+						       const I block[4], const I grid[4])
 {
   const int LX = X[0];
   const int LY = X[1];
@@ -565,26 +566,25 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, int &x, int &y,
     //   idx += (parity + t + z + y) & 1;
     //   x = idx % X;
     // equivalent to the above, but with fewer divisions/mods:
-#if 0 // tiled indexing - experimental and disabled for now
-    const int LT = X[3];
-    int aux1 =  idx / Bx;
-    int aux2 = aux1 / By;
-    int aux3 = aux2 / Bz;
-    int aux4 = aux3 / Bt;
-    int aux5 = aux4 / (LX/Bx);
-    int aux6 = aux5 / (LY/By);
-    int aux7 = aux6 / (LZ/Bz);
-    int aux8 = aux7 / (LT/Bt);
+#if DSLASH_TUNE_TILE // tiled indexing - experimental and disabled for now
+    int aux1 =  idx / block[0];
+    int aux2 = aux1 / block[1];
+    int aux3 = aux2 / block[2];
+    int aux4 = aux3 / block[3];
+    int aux5 = aux4 / grid[0];
+    int aux6 = aux5 / grid[1];
+    int aux7 = aux6 / grid[2];
+    int aux8 = aux7 / grid[3];
 
-    x =       idx - aux1 * Bx;
-    y =      aux1 - aux2 * By;
-    z =      aux2 - aux3 * Bz;
-    t =      aux3 - aux4 * Bt;
+    x =       idx - aux1 * block[0];
+    y =      aux1 - aux2 * block[1];
+    z =      aux2 - aux3 * block[2];
+    t =      aux3 - aux4 * block[3];
 
-    x += Bx*(aux4 - aux5 * (LX/Bx));
-    y += By*(aux5 - aux6 * (LY/By));
-    z += Bz*(aux6 - aux7 * (LZ/Bz));
-    t += Bt*(aux7 - aux8 * (LT/Bt));
+    x += block[0]*(aux4 - aux5 * grid[0]);
+    y += block[1]*(aux5 - aux6 * grid[1]);
+    z += block[2]*(aux6 - aux7 * grid[2]);
+    t += block[3]*(aux7 - aux8 * grid[3]);
 
     aux1 = (parity + t + z + y) & 1;
     x += aux1;

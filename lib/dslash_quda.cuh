@@ -1,3 +1,4 @@
+#define DSLASH_TUNE_TILE
 
 static FaceBuffer *face[2];
 
@@ -383,10 +384,60 @@ public:
   {
     std::stringstream ps;
     ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "shared=" << param.shared_bytes;
+    ps << "shared=" << param.shared_bytes << ", ";
+    ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
     return ps.str();
   }
   virtual int Nface() { return 2; }
+
+#if defined(DSLASH_TUNE_TILE)
+  // Experimental autotuning of the thread ordering
+  bool advanceAux(TuneParam &param) const
+  {
+    if (in->Nspin()==1 || in->Ndim()==5) return false;
+    const int *X = in->X();
+
+    if (param.aux.w < X[3] && param.aux.x > 1 && param.aux.w < 2) {
+      do { param.aux.w++; } while( (X[3]) % param.aux.w != 0);
+      if (param.aux.w <= X[3]) return true;
+    } else {
+      param.aux.w = 1;
+
+      if (param.aux.z < X[2] && param.aux.x > 1 && param.aux.z < 8) {
+	do { param.aux.z++; } while( (X[2]) % param.aux.z != 0);
+	if (param.aux.z <= X[2]) return true;
+      } else {
+
+	param.aux.z = 1;
+	if (param.aux.y < X[1] && param.aux.x > 1 && param.aux.y < 32) {
+	  do { param.aux.y++; } while( X[1] % param.aux.y != 0);
+	  if (param.aux.y <= X[1]) return true;
+	} else {
+	  param.aux.y = 1;
+	  if (param.aux.x < (2*X[0]) && param.aux.x < 32) {
+	    do { param.aux.x++; } while( (2*X[0]) % param.aux.x != 0);
+	    if (param.aux.x <= (2*X[0]) ) return true;
+	  }
+	}
+      }
+    }
+    param.aux = make_int4(2,1,1,1);
+    return false;
+  }
+
+  void initTuneParam(TuneParam &param) const
+  {
+    Tunable::initTuneParam(param);
+    param.aux = make_int4(2,1,1,1);
+  }
+
+  /** sets default values for when tuning is disabled */
+  void defaultTuneParam(TuneParam &param) const
+  {
+    Tunable::defaultTuneParam(param);
+    param.aux = make_int4(2,1,1,1);
+  }
+#endif
 
   virtual void preTune()
   {

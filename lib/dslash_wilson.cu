@@ -86,36 +86,6 @@ namespace quda {
 
     virtual ~WilsonDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
-#define dk(BX,BY,BZ,BT) DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a)
-
-    //#define dk(BX,BY,BZ,BT) DSLASH(dslash, BX, BY, BZ, BT, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a)
-
-#define bz(x,y)								\
-    if (tp.aux.z==1) {dk(x,y,1,1);}					\
-    else if (tp.aux.z==2) {dk(x,y,2,1);}				\
-    else if (tp.aux.z==4) {dk(x,y,4,1);}				\
-    else if (tp.aux.z==8) {dk(x,y,8,1);}				\
-    else if (tp.aux.z==16) {dk(x,y,16,1);}				\
-    else if (tp.aux.z==32) {dk(x,y,32,1);}
-
-#define by(x)						\
-    {							\
-      if (tp.aux.y==1) { bz(x,1) }			\
-      else if (tp.aux.y==2) { bz(x,2) }			\
-      else if (tp.aux.y==4) { bz(x,4) }			\
-      else if (tp.aux.y==8) { bz(x,8) }			\
-      else if (tp.aux.y==16) { bz(x,16) }		\
-      else if (tp.aux.y==32) { bz(x,32) }		\
-    }
-
-#define bxbybz						\
-    if (tp.aux.x==1) { by(1) }				\
-    else if (tp.aux.x==2) { by(2) }			\
-    else if (tp.aux.x==4) { by(4) }			\
-    else if (tp.aux.x==8) { by(8) }			\
-    else if (tp.aux.x==16) { by(16) }			\
-    else if (tp.aux.x==32) { by(32) }
-
     void apply(const cudaStream_t &stream)
     {
 #ifdef SHARED_WILSON_DSLASH
@@ -123,66 +93,9 @@ namespace quda {
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      dk(1,1,1,1);
-      //bxbybz;
-    }
-
-#if 0
-    // Experimental autotuning of the thread ordering
-    bool advanceAux(TuneParam &param) const
-    {
-      const int *X = in->X();
-
-      if (param.aux.w < X[3] && param.aux.x > 1 && param.aux.w < 32 && 0) {
-
-	do { param.aux.w++; } while( (X[3]) % param.aux.w != 0);
-
-	if (param.aux.w <= X[3]) return true;
-      } else {
-	param.aux.w = 1;
-
-	if (param.aux.z < X[2] && param.aux.x > 1 && param.aux.z < 32) {
-
-	  do { param.aux.z++; } while( (X[2]) % param.aux.z != 0);
-
-	  if (param.aux.z <= X[2]) return true;
-
-	} else {
-	  param.aux.z = 1;
-
-	  if (param.aux.y < X[1] && param.aux.x > 1 && param.aux.y < 32) {
-
-	    do { param.aux.y++; } while( X[1] % param.aux.y != 0);
-
-	    if (param.aux.y <= X[1]) return true;
-	  } else {
-	    param.aux.y = 1;
-
-	    if (param.aux.x < (2*X[0]) && param.aux.x < 32) {
-
-	      do { param.aux.x++; } while( (2*X[0]) % param.aux.x != 0);
-
-	      if (param.aux.x <= (2*X[0]) ) return true;
-	    }
-	  }
-	}
-      }
-      param.aux = make_int4(1,1,1,1);
-      return false;
-    }
-#endif
-
-    void initTuneParam(TuneParam &param) const
-    {
-      SharedDslashCuda::initTuneParam(param);
-      param.aux = make_int4(1,1,1,1);
-    }
-
-    /** sets default values for when tuning is disabled */
-    void defaultTuneParam(TuneParam &param) const
-    {
-      SharedDslashCuda::defaultTuneParam(param);
-      param.aux = make_int4(1,1,1,1);
+      dslashParam.block[0] = tp.aux.x; dslashParam.block[1] = tp.aux.y; dslashParam.block[2] = tp.aux.z; dslashParam.block[3] = tp.aux.w;
+      for (int i=0; i<4; i++) dslashParam.grid[i] = ( (i==0 ? 2 : 1) * in->X(i)) / dslashParam.block[i];
+      DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a)
     }
 
   };
