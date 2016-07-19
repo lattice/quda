@@ -344,6 +344,8 @@ void init(int argc, char **argv) {
     inv_param.compute_clover_inverse = compute_clover;
     inv_param.return_clover_inverse = compute_clover;
 
+    if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) inv_param.return_clover_inverse = true;
+
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
 

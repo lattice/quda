@@ -15,9 +15,7 @@ enum KernelType {
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
     int X[4];
-#ifdef GPU_DOMAIN_WALL_DIRAC 
     int Ls;
-#endif
 
     int_fastdiv block[4]; // dslash tile block parameter
     int_fastdiv grid[4]; // dslash tile grid parameter
