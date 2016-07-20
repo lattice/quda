@@ -210,6 +210,7 @@ endif(QUDA_MULTIGRID)
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
   find_package(Eigen REQUIRED)
+  include_directories(${EIGEN_INCLUDE_DIRS})
   set(QUDA_NVTX ON)
 endif()
 
