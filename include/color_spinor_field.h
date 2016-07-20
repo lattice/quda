@@ -703,7 +703,7 @@ namespace quda {
     const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm; }
 #endif
 
-    // cudaColorSpinorField& Component(const int idx) const;
+    cudaColorSpinorField& Component(const int idx) const;
     void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
 
     void zero();

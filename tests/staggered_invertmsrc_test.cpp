@@ -76,8 +76,6 @@ extern double mass; // the mass of the Dirac operator
 
 extern double mass;
 
-
-int num_src;
 static void end();
 
 template<typename Float>
@@ -137,6 +135,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
 
+  inv_param->Ls = 1;
 
 
   if(tol_hq == 0 && tol == 0){
@@ -203,6 +202,7 @@ invert_test(void)
   initQuda(device);
 
   setDims(gaugeParam.X);
+  dw_setDims(gaugeParam.X,1); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -235,10 +235,9 @@ invert_test(void)
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=5;
-  for(int d = 0; d < 4; d++) {
-    csParam.x[d] = gaugeParam.X[d];
-  }
-  csParam.x[4] = 1; // number of sources becomes the fifth dimension
+  for (int d = 0; d < 4; d++) csParam.x[d] = gaugeParam.X[d];
+  csParam.x[0] /= 2;
+  csParam.x[4] = 1;
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
@@ -584,8 +583,6 @@ usage_extra(char** argv )
 }
 int main(int argc, char** argv)
 {
-
-  num_src=4;
   for (int i = 1; i < argc; i++) {
 
     if(process_command_line_option(argc, argv, &i) == 0){
