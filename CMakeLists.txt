@@ -10,6 +10,9 @@ set(CMAKE_CXX_STANDARD 11)
 # otherwise overwrite the existing makefiles
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
+# add a directory for cmake modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 
 
 find_package(Git)
@@ -117,6 +120,7 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
+set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
@@ -132,6 +136,8 @@ mark_as_advanced(QUDA_GPU_COMMS)
 mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
+mark_as_advanced(QUDA_BLOCKSOVER)
+mark_as_advanced(QUDA_MULTIGRID)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -200,6 +206,12 @@ endif()
 if (QUDA_MULTIGRID)
   add_definitions(-DGPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
+
+if(QUDA_BLOCKSOLVER)
+  add_definitions(-DBLOCKSOLVER)
+  find_package(Eigen REQUIRED)
+  set(QUDA_NVTX ON)
+endif()
 
 if(QUDA_POSIX_THREADS)
   add_definitions(-DPTHREADS)
@@ -278,8 +290,6 @@ if(QUDA_INTERFACE_NVTX)
   set(QUDA_NVTX ON)
 endif(QUDA_INTERFACE_NVTX)
 
-  set(QUDA_NVTX ON)
-#TODO: move to tests, check lib64
 if(QUDA_NVTX)
   FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
   LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
