@@ -331,10 +331,10 @@ invert_test(void)
       cpuColorSpinorField* spinorInArray[NUM_SRC];
       spinorOutArray[0] = out;
       spinorInArray[0] = in;
-      in = new cpuColorSpinorField(csParam);
-      out = new cpuColorSpinorField(csParam);
-      ref = new cpuColorSpinorField(csParam);
-      tmp = new cpuColorSpinorField(csParam);
+      // in = new cpuColorSpinorField(csParam);
+      // out = new cpuColorSpinorField(csParam);
+      // ref = new cpuColorSpinorField(csParam);
+      // tmp = new cpuColorSpinorField(csParam);
 
       if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
         constructSpinorField((float*)in->V());
@@ -375,8 +375,9 @@ invert_test(void)
       nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
       src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
 
-      for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
-      for(int i=1; i < inv_param.num_offset;i++) delete spinorInArray[i];
+      for(int i=1; i < inv_param.num_src;i++) delete spinorOutArray[i];
+      for(int i=1; i < inv_param.num_src;i++) delete spinorInArray[i];
+
 
       break;
 
