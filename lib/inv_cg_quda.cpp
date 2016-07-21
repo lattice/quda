@@ -14,6 +14,7 @@
 
 #include <iostream>
 
+#ifdef BLOCKSOLVER
 #include <Eigen/Dense>
 #include "nvToolsExt.h"
 
@@ -33,6 +34,14 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
   nvtxRangePushEx(&eventAttrib); \
 }
 #define POP_RANGE nvtxRangePop();
+
+#else
+
+#define PUSH_RANGE(name,cid)
+#define PIP_RANFE
+
+#endif
+
 
 namespace quda {
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -447,19 +456,15 @@ namespace quda {
     ColorSpinorField &tmp = *tmpp;
 
 
-    //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
     for(int i=0; i<param.num_src; i++){
       mat(r.Component(i), x.Component(i), y.Component(i));
     }
 
-    // double r2[QUDA_MAX_MULTI_SHIFT];
     MatrixXcd r2(param.num_src,param.num_src);
     for(int i=0; i<param.num_src; i++){
       r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
       printfQuda("r2[%i] %e\n", i, r2(i,i).real());
     }
-
-
 
 
     csParam.setPrecision(param.precision_sloppy);
@@ -516,15 +521,19 @@ namespace quda {
 
     const bool use_heavy_quark_res =
     (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    bool heavy_quark_restart = false;
+
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     MatrixXcd r2_old(param.num_src, param.num_src);
+    double stop[QUDA_MAX_MULTI_SHIFT];
+
+
     double heavy_quark_res[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark res idual
     double heavy_quark_res_old[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark residual
-    double stop[QUDA_MAX_MULTI_SHIFT];
+
+
 
     for(int i = 0; i < param.num_src; i++){
       stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
@@ -533,7 +542,10 @@ namespace quda {
         heavy_quark_res_old[i] = heavy_quark_res[i];   // heavy quark residual
       }
     }
-    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
+
+// FIXME heavy quark
+//    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
+//     bool heavy_quark_restart = false;
 
     MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
     MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
@@ -559,6 +571,9 @@ namespace quda {
       maxrr[i] = rNorm[i];
     }
 
+
+//FIXME:reliable updates currently not implemented
+/**
     double delta = param.delta;//MW: hack no reliable updates param.delta;
 
     // this parameter determines how many consective reliable update
@@ -573,7 +588,7 @@ namespace quda {
     int resIncrease = 0;
     int resIncreaseTotal = 0;
     int hqresIncrease = 0;
-
+*/
     // set this to true if maxResIncrease has been exceeded but when we use heavy quark residual we still want to continue the CG
     // only used if we use the heavy_quark_res
     bool L2breakdown = false;
