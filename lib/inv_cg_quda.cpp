@@ -730,7 +730,7 @@ namespace quda {
         // scales with nsrc
         n = blas::norm2(rSloppy.Component(i));
         blas::ax(1/sqrt(n),rSloppy.Component(i));
-        // (nsrc * (nsrc-1))/2 + nsrc = (nsrc * (nsrc+1))/2
+        // (nsrc * (nsrc-1))/2) * nsrc
         for(int j=i+1; j < param.num_src; j++) {
           ri=blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
           blas::caxpy(-ri,rSloppy.Component(i),rSloppy.Component(j));
@@ -1147,7 +1147,6 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 
-    using Eigen::MatrixXd;
     using Eigen::MatrixXcd;
 
 
@@ -1173,16 +1172,16 @@ namespace quda {
         return;
       }
     }
-    // double r2[QUDA_MAX_MULTI_SHIFT];
-    MatrixXcd b2m(param.num_src,param.num_src);
 
+    #ifdef MWVERBOSE
+    MatrixXcd b2m(param.num_src,param.num_src);
     // just to check details of b
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
         b2m(i,j) = blas::cDotProduct(b.Component(i), b.Component(j));
       }
     }
-    #ifdef MWVERBOSE
+
     std::cout << "b2m\n" <<  b2m << std::endl;
     #endif
 
@@ -1220,8 +1219,9 @@ namespace quda {
     if(use_block){
       // MW need to initalize the full r2 matrix here
       for(int i=0; i<param.num_src; i++){
-        for(int j=0; j<param.num_src; j++){
+        for(int j=i+1; j<param.num_src; j++){
           r2(i,j) = blas::cDotProduct(r.Component(i), r.Component(j));
+          r2(j,i) = std::conj(r2(i,j));
         }
       }
     }
@@ -1367,10 +1367,8 @@ namespace quda {
       for(int j=i+1; j < param.num_src; j++) {
         std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
         blas::caxpy(-ri,p.Component(i),p.Component(j));
-
       }
     }
-
 
     gamma = MatrixXcd::Zero(param.num_src,param.num_src);
     for ( int i = 0; i < param.num_src; i++){
