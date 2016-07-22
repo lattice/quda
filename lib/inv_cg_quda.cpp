@@ -226,7 +226,7 @@ namespace quda {
         // here we are deploying the alternative beta computation
         Complex cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
         r2 = real(cg_norm);  // (r_new, r_new)
-        sigma = r2;//imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
+        sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
 
       // reliable update conditions
