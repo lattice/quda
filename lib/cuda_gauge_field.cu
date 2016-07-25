@@ -366,10 +366,10 @@ namespace quda {
     gauge = gauge_;
   }
 
-  void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order) {
+  void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
     if (order == QUDA_QDP_GAUGE_ORDER) {
-      void **buffer = new void*[4];
-      for (int d=0; d<4; d++) buffer[d] = device_malloc(bytes/4);
+      void **buffer = new void*[geometry];
+      for (int d=0; d<geometry; d++) buffer[d] = device_malloc(bytes/geometry);
       return ((void*)buffer);
     } else {
       return device_malloc(bytes);
@@ -389,10 +389,9 @@ namespace quda {
 
   }
 
-  void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order) {
-
+  void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
     if (order == QUDA_QDP_GAUGE_ORDER) {
-      for (int d=0; d<4; d++) device_free(((void**)buffer)[d]);
+      for (int d=0; d<geometry; d++) device_free(((void**)buffer)[d]);
       delete []((void**)buffer);
     } else {
       device_free(buffer);
@@ -434,14 +433,14 @@ namespace quda {
       qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
       freePinned(buffer);
 #else // else on the CPU  (experimental - needs clean up)
-      void *buffer = create_gauge_buffer(src.Bytes(), src.Order());
+      void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
       size_t ghost_bytes[4];
-      for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * src.Reconstruct() * src.Precision();
+      for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * nInternal * src.Precision();
       void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order()) : nullptr;
 
       if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
-	for (int d=0; d<4; d++) {
-	  qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/4, cudaMemcpyHostToDevice);
+	for (int d=0; d<geometry; d++) {
+	  qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyHostToDevice);
 	}
       } else {
 	qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyHostToDevice);
@@ -453,7 +452,7 @@ namespace quda {
 	  qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
 
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
-      free_gauge_buffer(buffer, src.Order());
+      free_gauge_buffer(buffer, src.Order(), src.Geometry());
       if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order());
 #endif
     } else {
@@ -473,14 +472,14 @@ namespace quda {
   {
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
 
-      void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order());
+      void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
       if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
-	for (int d=0; d<4; d++) qudaMemcpy(((void**)buffer)[d], ((void**)cpu.gauge)[d], cpu.Bytes()/4, cudaMemcpyHostToDevice);
+	for (int d=0; d<geometry; d++) qudaMemcpy(((void**)buffer)[d], ((void**)cpu.gauge)[d], cpu.Bytes()/geometry, cudaMemcpyHostToDevice);
       } else {
 	qudaMemcpy(buffer, cpu.gauge, cpu.Bytes(), cudaMemcpyHostToDevice);
       }
       copyGenericGauge(*this, cpu, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
-      free_gauge_buffer(buffer, cpu.Order());
+      free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) {
 
@@ -496,14 +495,14 @@ namespace quda {
   {
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
 
-      void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order());
+      void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
       copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge);
       if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
-	for (int d=0; d<4; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/4, cudaMemcpyDeviceToHost);
+	for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDeviceToHost);
       } else {
 	qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDeviceToHost);
       }
-      free_gauge_buffer(buffer, cpu.Order());
+      free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
 
