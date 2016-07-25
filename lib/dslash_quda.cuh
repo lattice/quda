@@ -1,4 +1,4 @@
-#define DSLASH_TUNE_TILE
+//#define DSLASH_TUNE_TILE
 
 static FaceBuffer *face[2];
 
