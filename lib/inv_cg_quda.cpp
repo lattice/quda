@@ -200,8 +200,10 @@ namespace quda {
     bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
     while ( !converged && k < param.maxiter ) {
+      PUSH_RANGE("Dslash",1)
       matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
-
+POP_RANGE
+PUSH_RANGE("LinearAlgebra",2)
       double sigma;
 
       bool breakdown = false;
@@ -352,7 +354,7 @@ namespace quda {
         bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
         converged = L2done and HQdone;
       }
-
+POP_RANGE
     }
 
     blas::copy(x, xSloppy);
