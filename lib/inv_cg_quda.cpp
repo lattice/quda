@@ -621,12 +621,17 @@ POP_RANGE
     std::complex<double> ri;
     double n;
     C = MatrixXcd::Zero(param.num_src,param.num_src);
-    for ( int i = 0; i < param.num_src; i++){
-      for (int j=0; j < param.num_src; j++){
+    // for ( int i = 0; i < param.num_src; i++){
+    //   for (int j=0; j < param.num_src; j++){
+    //     r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+    //   }
+    // }
+    for(int i=0; i<param.num_src; i++){
+      for(int j=i; j < param.num_src; j++){
         r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+        if (i!=j) r2(j,i) = std::conj(r2(i,j));
       }
     }
-
 
     Eigen::LLT<MatrixXcd> lltOfA(r2); // compute the Cholesky decomposition of A
     MatrixXcd L = lltOfA.matrixL(); // retrieve factor L  in the decomposition
@@ -760,9 +765,10 @@ POP_RANGE
         blas::copy(rnew.Component(i), rSloppy.Component(i));
       }
 
-      for ( int i = 0; i < param.num_src; i++){
-        for (int j=0; j < param.num_src; j++){
-          r2(i,j) = blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
+      for(int i=0; i<param.num_src; i++){
+        for(int j=i; j < param.num_src; j++){
+          r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+          if (i!=j) r2(j,i) = std::conj(r2(i,j));
         }
       }
 
