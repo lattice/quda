@@ -404,7 +404,7 @@ POP_RANGE
 
   // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
   #define BCGRQ 1
-
+#define MWVERBOSE
   #if BCGRQ
   void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     #ifndef BLOCKSOLVER
@@ -620,16 +620,46 @@ POP_RANGE
 
     std::complex<double> ri;
     double n;
-
-    // QR decomposition -- in the first iteration we can do the QR decomposition on P
-    for(int i=0; i < param.num_src; i++){
-      n = blas::norm2(p.Component(i));
-      blas::ax(1/sqrt(n),p.Component(i));
-      for(int j=i+1; j < param.num_src; j++) {
-        ri=blas::cDotProduct(p.Component(i),p.Component(j));
-        blas::caxpy(-ri,p.Component(i),p.Component(j));
+    C = MatrixXcd::Zero(param.num_src,param.num_src);
+    for ( int i = 0; i < param.num_src; i++){
+      for (int j=0; j < param.num_src; j++){
+        r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
       }
     }
+
+
+    Eigen::LLT<MatrixXcd> lltOfA(r2); // compute the Cholesky decomposition of A
+    MatrixXcd L = lltOfA.matrixL(); // retrieve factor L  in the decomposition
+    MatrixXcd Linv = L.adjoint().inverse();
+// r2.llt().matrixL() should do as well
+    std::cout << "r2\n " << r2 << std::endl;
+    std::cout << "L\n " << L.adjoint() << std::endl;
+
+    for(int i=0; i<param.num_src; i++){
+      blas::zero(p.Component(i));
+      // blas::cax(Linv(i,0),p.Component(i));
+
+      for(int j=0;j<param.num_src; j++){
+        // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
+        blas::caxpy(Linv(j,i),r.Component(j),p.Component(i));
+        // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
+        // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
+        // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
+      }
+    }
+    // L.adjoint() is equal to C.
+    // C is <pnew, pold>
+    //std::cout << "L\n " << L.inverse() << std::endl;
+
+    // QR decomposition -- in the first iteration we can do the QR decomposition on P
+    // for(int i=0; i < param.num_src; i++){
+    //   n = blas::norm2(p.Component(i));
+    //   blas::ax(1/sqrt(n),p.Component(i));
+    //   for(int j=i+1; j < param.num_src; j++) {
+    //     ri=blas::cDotProduct(p.Component(i),p.Component(j));
+    //     blas::caxpy(-ri,p.Component(i),p.Component(j));
+    //   }
+    // }
 
 
     C = MatrixXcd::Zero(param.num_src,param.num_src);
@@ -653,6 +683,7 @@ POP_RANGE
       }
     }
     std::cout << " pTp  " << std::endl << pTp << std::endl;
+    std::cout << " L " << std::endl << L.adjoint() << std::endl;
     std::cout << " C " << std::endl << C << std::endl;
     #endif
 
