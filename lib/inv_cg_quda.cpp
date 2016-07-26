@@ -630,7 +630,8 @@ POP_RANGE
 
     Eigen::LLT<MatrixXcd> lltOfA(r2); // compute the Cholesky decomposition of A
     MatrixXcd L = lltOfA.matrixL(); // retrieve factor L  in the decomposition
-    MatrixXcd Linv = L.adjoint().inverse();
+    C = L.adjoint();
+    MatrixXcd Linv = C.inverse();
 // r2.llt().matrixL() should do as well
     std::cout << "r2\n " << r2 << std::endl;
     std::cout << "L\n " << L.adjoint() << std::endl;
@@ -662,12 +663,12 @@ POP_RANGE
     // }
 
 
-    C = MatrixXcd::Zero(param.num_src,param.num_src);
-    for ( int i = 0; i < param.num_src; i++){
-      for (int j=i; j < param.num_src; j++){
-        C(i,j) = blas::cDotProduct(p.Component(i),r.Component(j));
-      }
-    }
+    // C = MatrixXcd::Zero(param.num_src,param.num_src);
+    // for ( int i = 0; i < param.num_src; i++){
+    //   for (int j=i; j < param.num_src; j++){
+    //     C(i,j) = blas::cDotProduct(p.Component(i),r.Component(j));
+    //   }
+    // }
 
 
 
@@ -759,25 +760,53 @@ POP_RANGE
         blas::copy(rnew.Component(i), rSloppy.Component(i));
       }
 
-      for(int i=0; i < param.num_src; i++){
-        // scales with nsrc
-        n = blas::norm2(rSloppy.Component(i));
-        blas::ax(1/sqrt(n),rSloppy.Component(i));
-        // (nsrc * (nsrc-1))/2) * nsrc
-        for(int j=i+1; j < param.num_src; j++) {
-          ri=blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
-          blas::caxpy(-ri,rSloppy.Component(i),rSloppy.Component(j));
-
+      for ( int i = 0; i < param.num_src; i++){
+        for (int j=0; j < param.num_src; j++){
+          r2(i,j) = blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
         }
       }
 
 
-      S = MatrixXcd::Zero(param.num_src,param.num_src);
-      for (int i = 0; i < param.num_src; i++){
-        for (int j=i; j < param.num_src; j++){
-          S(i,j) = blas::cDotProduct(rSloppy.Component(i), rnew.Component(j));
+      Eigen::LLT<MatrixXcd> lltOfr2(r2); // compute the Cholesky decomposition of A
+      L = lltOfr2.matrixL(); // retrieve factor L  in the decomposition
+      S = L.adjoint();
+      MatrixXcd Linv = S.inverse();
+  // r2.llt().matrixL() should do as well
+      std::cout << "r2\n " << r2 << std::endl;
+      std::cout << "L\n " << L.adjoint() << std::endl;
+
+      for(int i=0; i<param.num_src; i++){
+        blas::zero(rSloppy.Component(i));
+        // blas::cax(Linv(i,0),p.Component(i));
+
+        for(int j=0;j<param.num_src; j++){
+          // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
+          blas::caxpy(Linv(j,i),rnew.Component(j),rSloppy.Component(i));
+          // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
+          // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
+          // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
         }
       }
+
+      // for(int i=0; i < param.num_src; i++){
+      //   // scales with nsrc
+      //   n = blas::norm2(rSloppy.Component(i));
+      //   blas::ax(1/sqrt(n),rSloppy.Component(i));
+      //   // (nsrc * (nsrc-1))/2) * nsrc
+      //   for(int j=i+1; j < param.num_src; j++) {
+      //     ri=blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
+      //     blas::caxpy(-ri,rSloppy.Component(i),rSloppy.Component(j));
+      //
+      //   }
+      // }
+      //
+      //
+      // S = MatrixXcd::Zero(param.num_src,param.num_src);
+      // for (int i = 0; i < param.num_src; i++){
+      //   for (int j=i; j < param.num_src; j++){
+      //     S(i,j) = blas::cDotProduct(rSloppy.Component(i), rnew.Component(j));
+      //   }
+      // }
       POP_RANGE
       #ifdef MWVERBOSE
       for(int i=0; i<param.num_src; i++){
