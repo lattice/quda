@@ -404,7 +404,7 @@ POP_RANGE
 
   // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
   #define BCGRQ 1
-#define MWVERBOSE
+//#define MWVERBOSE
   #if BCGRQ
   void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     #ifndef BLOCKSOLVER
@@ -638,9 +638,10 @@ POP_RANGE
     C = L.adjoint();
     MatrixXcd Linv = C.inverse();
 // r2.llt().matrixL() should do as well
+#ifdef MWVERBOSE
     std::cout << "r2\n " << r2 << std::endl;
     std::cout << "L\n " << L.adjoint() << std::endl;
-
+#endif
     for(int i=0; i<param.num_src; i++){
       blas::zero(p.Component(i));
       // blas::cax(Linv(i,0),p.Component(i));
@@ -778,8 +779,8 @@ POP_RANGE
       S = L.adjoint();
       MatrixXcd Linv = S.inverse();
   // r2.llt().matrixL() should do as well
-      std::cout << "r2\n " << r2 << std::endl;
-      std::cout << "L\n " << L.adjoint() << std::endl;
+      // std::cout << "r2\n " << r2 << std::endl;
+      // std::cout << "L\n " << L.adjoint() << std::endl;
 
       for(int i=0; i<param.num_src; i++){
         blas::zero(rSloppy.Component(i));
