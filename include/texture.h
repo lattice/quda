@@ -313,12 +313,6 @@ template<typename OutputType, typename InputType, int tex_id>
     return __fdividef(MAX_SHORT, c[0]);
   }
 
-  // the number of elements per virtual register
-#define REG_LENGTH (sizeof(RegType) / sizeof(((RegType*)0)->x))
-
-// whether the type is a shortN vector
-#define IS_SHORT(type) (sizeof( ((type*)0)->x ) == sizeof(short) )
-
   /**
      @param RegType Register type used in kernel
      @param InterType Intermediate format - RegType precision with StoreType ordering
@@ -327,8 +321,10 @@ template<typename OutputType, typename InputType, int tex_id>
      @param tex_id Which texture reference are we using.  A default of
      -1 disables textures on architectures that don't support texture objects.
   */
-template <typename RegType, typename InterType, typename StoreType, int N, int write, int tex_id=-1>
+template <typename RegType, typename StoreType, int N, int write, int tex_id=-1>
     class Spinor {
+
+  typedef typename bridge_mapper<RegType,StoreType>::type InterType;
 
   private:
     StoreType *spinor;
@@ -352,7 +348,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       : spinor((StoreType*)x.V()), ghost_spinor((StoreType*)x.Ghost2()),
         tex(&(static_cast<const cudaColorSpinorField&>(x))),
         ghostTex(&(static_cast<const cudaColorSpinorField&>(x)), true),
-        norm((float*)x.Norm()), stride(x.Length()/(N*REG_LENGTH))
+  norm((float*)x.Norm()), stride(x.Length()/(N*vec_length<RegType>::value))
     {
       checkTypes<RegType,InterType,StoreType>();
       for (int d=0; d<4; d++) ghost_stride[d] = nFace*x.SurfaceCB(d);
@@ -389,7 +385,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       ghostTex = Texture<InterType, StoreType, tex_id>(&x,true);
 #endif      
       norm = (float*)x.Norm();
-      stride = x.Length()/(N*REG_LENGTH);
+      stride = x.Length()/(N*vec_length<RegType>::value);
     
       checkTypes<RegType,InterType,StoreType>();
     }
@@ -398,7 +394,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 
     __device__ inline void load(RegType x[], const int i) {
       // load data into registers first using the storage order
-      const int M = (N * sizeof(RegType)) / sizeof(InterType);
+      constexpr int M = (N * vec_length<RegType>::value ) / vec_length<InterType>::value;
       InterType y[M];
 
       // If we are using tex references, then we can only use the predeclared texture ids
@@ -406,7 +402,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
 #endif
 	// half precision types
-	if ( IS_SHORT(StoreType) ) { 
+	if ( isHalf<StoreType>::value ) {
 	  float xN = norm[i];
 #pragma unroll
 	  for (int j=0; j<M; j++) y[j] = xN*tex[i + j*stride];
@@ -417,7 +413,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 #ifndef USE_TEXTURE_OBJECTS
       } else { // default load when out of tex_id range
 
-	if ( IS_SHORT(StoreType) ) { 
+	if ( isHalf<StoreType>::value ) {
 	  float xN = norm[i];
 #pragma unroll
 	  for (int j=0; j<M; j++) {
@@ -440,9 +436,9 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
   */
   __device__ inline void loadGhost(RegType x[], const int i, const int dim) {
     // load data into registers first using the storage order
-    const int Nspin = (REG_LENGTH * N) / (3 * 2);
+    const int Nspin = (N * vec_length<RegType>::value) / (3 * 2);
     // if Wilson, then load only half the number of components
-    const int M = ((N * sizeof(RegType)) / sizeof(InterType)) / ((Nspin == 4) ? 2 : 1);
+    constexpr int M = ((N * vec_length<RegType>::value ) / vec_length<InterType>::value) / ((Nspin == 4) ? 2 : 1);
     
     InterType y[M];
     
@@ -451,7 +447,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
 #endif
       // half precision types (FIXME - these don't look correct?)
-      if ( IS_SHORT(StoreType) ) { 
+      if ( isHalf<StoreType>::value ) {
 	float xN = norm[i];
 #pragma unroll
 	for (int j=0; j<M; j++) y[j] = xN*ghostTex[i + j*ghost_stride[dim]];
@@ -462,7 +458,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 #ifndef USE_TEXTURE_OBJECTS
     } else { // default load when out of tex_id range
       
-      if ( IS_SHORT(StoreType) ) { 
+      if ( isHalf<StoreType>::value ) {
 	float xN = norm[i];
 #pragma unroll
 	for (int j=0; j<M; j++) {
@@ -483,11 +479,11 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     // default store used for simple fields
     __device__ inline void save(RegType x[], int i) {
       if (write) {
-	const int M = (N * sizeof(RegType)) / sizeof(InterType);
+	constexpr int M = (N * vec_length<RegType>::value ) / vec_length<InterType>::value;
 	InterType y[M];
 	convert<InterType, RegType>(y, x, M);
 	
-	if ( IS_SHORT(StoreType) ) {
+	if ( isHalf<StoreType>::value ) {
 	  float C = store_norm<InterType, M>(norm, y, i);
 #pragma unroll
 	  for (int j=0; j<M; j++) copyFloatN(spinor[i+j*stride], C*y[j]);

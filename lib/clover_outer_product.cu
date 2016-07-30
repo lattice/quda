@@ -544,10 +544,10 @@ namespace quda {
       ColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
       
       if(x.Precision() == QUDA_DOUBLE_PRECISION){
-	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
-	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
-	Spinor<double2, double2, double2, 12, 0, 0> spinorC(inC);
-	Spinor<double2, double2, double2, 12, 0, 1> spinorD(inD);
+	Spinor<double2, double2, 12, 0, 0> spinorA(inA);
+	Spinor<double2, double2, 12, 0, 1> spinorB(inB);
+	Spinor<double2, double2, 12, 0, 0> spinorC(inC);
+	Spinor<double2, double2, 12, 0, 1> spinorD(inD);
 	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
 					 gauge::FloatNOrder<double,18, 2, 18>(U),
@@ -567,8 +567,8 @@ namespace quda {
 	}
       }else if(x.Precision() == QUDA_SINGLE_PRECISION){
 #if 0
-	Spinor<float4, float4, float4, 6, 0, 0> spinorA(inA);
-	Spinor<float4, float4, float4, 6, 0, 1> spinorB(inB);
+	Spinor<float4, float4, 6, 0, 0> spinorA(inA);
+	Spinor<float4, float4, 6, 0, 1> spinorB(inB);
 	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  computeCloverForceCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(force),
 					gauge::FloatNOrder<float, 18, 2, 18>(U),

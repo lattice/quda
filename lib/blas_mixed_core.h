@@ -151,88 +151,84 @@ public:
        return;
      }
     
-     // FIXME: use traits to encapsulate register type for shorts -
-     // will reduce template type parameters from 3 to 2
-
-
      size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
      size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
 
      if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
        if (x.Nspin() == 4) {
 	 const int M = 12;
-	 Spinor<double2,double4,float4,M,writeX,0> X(x);
-	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
-	 Spinor<double2,double4,float4,M,writeZ,2> Z(z);
-	 Spinor<double2,double4,float4,M,writeW,3> W(w);
+	 Spinor<double2,float4,M,writeX,0> X(x);
+	 Spinor<double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,float4,M,writeZ,2> Z(z);
+	 Spinor<double2,float4,M,writeW,3> W(w);
 	 Functor<double2, double2> f(a, b, c);
-	 BlasCuda<double2,M, Spinor<double2,double4,float4,M,writeX,0>, 
-	   Spinor<double2,double2,double2,M,writeY,1>, Spinor<double2,double4,float4,M,writeZ,2>,
-	   Spinor<double2,double4,float4,M,writeW,3>, Functor<double2, double2> > 
+	 BlasCuda<double2,M, Spinor<double2,float4,M,writeX,0>,
+	   Spinor<double2,double2,M,writeY,1>, Spinor<double2,float4,M,writeZ,2>,
+	   Spinor<double2,float4,M,writeW,3>, Functor<double2, double2> >
 	   blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	 blas.apply(*blasStream);
        } else if (x.Nspin() == 1) {
 	 const int M = 3;
-	 Spinor<double2,double2,float2,M,writeX,0> X(x);
-	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
-	 Spinor<double2,double2,float2,M,writeZ,2> Z(z);
-	 Spinor<double2,double2,float2,M,writeW,3> W(w);
+	 Spinor<double2,float2,M,writeX,0> X(x);
+	 Spinor<double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,float2,M,writeZ,2> Z(z);
+	 Spinor<double2,float2,M,writeW,3> W(w);
 	 Functor<double2, double2> f(a, b, c);
 	 BlasCuda<double2,M,
-	   Spinor<double2,double2,float2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
-	   Spinor<double2,double2,float2,M,writeZ,2>, Spinor<double2,double2,float2,M,writeW,3>,
+	   Spinor<double2,float2,M,writeX,0>, Spinor<double2,double2,M,writeY,1>,
+	   Spinor<double2,float2,M,writeZ,2>, Spinor<double2,float2,M,writeW,3>,
 	   Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	 blas.apply(*blasStream);
        }
      } else if (x.Precision() == QUDA_HALF_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
        if (x.Nspin() == 4) {
 	 const int M = 12;
-	 Spinor<double2,double4,short4,M,writeX,0> X(x);
-	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
-	 Spinor<double2,double4,short4,M,writeZ,2> Z(z);
-	 Spinor<double2,double4,short4,M,writeW,3> W(w);
+	 Spinor<double2,short4,M,writeX,0> X(x);
+	 Spinor<double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,short4,M,writeZ,2> Z(z);
+	 Spinor<double2,short4,M,writeW,3> W(w);
 	 Functor<double2, double2> f(a, b, c);
 	 BlasCuda<double2,M,
-	   Spinor<double2,double4,short4,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
-	   Spinor<double2,double4,short4,M,writeZ,2>, Spinor<double2,double4,short4,M,writeW,3>,
+	   Spinor<double2,short4,M,writeX,0>, Spinor<double2,double2,M,writeY,1>,
+	   Spinor<double2,short4,M,writeZ,2>, Spinor<double2,short4,M,writeW,3>,
 	   Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	 blas.apply(*blasStream);
        } else if (x.Nspin() == 1) {
 	 const int M = 3;
-	 Spinor<double2,double2,short2,M,writeX,0> X(x);
-	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
-	 Spinor<double2,double2,short2,M,writeZ,2> Z(z);
-	 Spinor<double2,double2,short2,M,writeW,3> W(w);
+	 Spinor<double2,short2,M,writeX,0> X(x);
+	 Spinor<double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,short2,M,writeZ,2> Z(z);
+	 Spinor<double2,short2,M,writeW,3> W(w);
 	 Functor<double2, double2> f(a, b, c);
 	 BlasCuda<double2,M,
-	   Spinor<double2,double2,short2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
-	   Spinor<double2,double2,short2,M,writeZ,2>, Spinor<double2,double2,short2,M,writeW,3>,
+	   Spinor<double2,short2,M,writeX,0>, Spinor<double2,double2,M,writeY,1>,
+	   Spinor<double2,short2,M,writeZ,2>, Spinor<double2,short2,M,writeW,3>,
 	   Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	 blas.apply(*blasStream);
        }
      } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
        if (x.Nspin() == 4) {
 	 const int M = 6;
-	 Spinor<float4,float4,short4,M,writeX,0> X(x);
-	 Spinor<float4,float4,float4,M,writeY,1> Y(y);
-	 Spinor<float4,float4,short4,M,writeZ,2> Z(z);
-	 Spinor<float4,float4,short4,M,writeW,3> W(w);
+	 Spinor<float4,short4,M,writeX,0> X(x);
+	 Spinor<float4,float4,M,writeY,1> Y(y);
+	 Spinor<float4,short4,M,writeZ,2> Z(z);
+	 Spinor<float4,short4,M,writeW,3> W(w);
 	 Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
 	 BlasCuda<float4,M,
-	   Spinor<float4,float4,short4,M,writeX,0>, Spinor<float4,float4,float4,M,writeY,1>,
-	   Spinor<float4,float4,short4,M,writeZ,2>, Spinor<float4,float4,short4,M,writeW,3>,
+	   Spinor<float4,short4,M,writeX,0>, Spinor<float4,float4,M,writeY,1>,
+	   Spinor<float4,short4,M,writeZ,2>, Spinor<float4,short4,M,writeW,3>,
 	   Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	 blas.apply(*blasStream);
        } else if (x.Nspin() == 1) {
 	 const int M = 3;
-	 Spinor<float2,float2,short2,M,writeX,0> X(x);
-	 Spinor<float2,float2,float2,M,writeY,1> Y(y);
-	 Spinor<float2,float2,short2,M,writeZ,2> Z(z);
-	 Spinor<float2,float2,short2,M,writeW,3> W(w);
+	 Spinor<float2,short2,M,writeX,0> X(x);
+	 Spinor<float2,float2,M,writeY,1> Y(y);
+	 Spinor<float2,short2,M,writeZ,2> Z(z);
+	 Spinor<float2,short2,M,writeW,3> W(w);
 	 Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
 	 BlasCuda<float2, M,
-	   Spinor<float2,float2,short2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>,
-	   Spinor<float2,float2,short2,M,writeZ,2>, Spinor<float2,float2,short2,M,writeW,3>,
+	   Spinor<float2,short2,M,writeX,0>, Spinor<float2,float2,M,writeY,1>,
+	   Spinor<float2,short2,M,writeZ,2>, Spinor<float2,short2,M,writeW,3>,
 	   Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	 blas.apply(*blasStream);
        }

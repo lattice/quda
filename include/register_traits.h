@@ -34,9 +34,35 @@ namespace quda {
   template<> struct mapper<float4> { typedef float4 type; };
   template<> struct mapper<short4> { typedef float4 type; };
 
+  template<typename,typename> struct bridge_mapper { };
+  template<> struct bridge_mapper<double2,double2> { typedef double2 type; };
+  template<> struct bridge_mapper<double2,float2> { typedef double2 type; };
+  template<> struct bridge_mapper<double2,short2> { typedef float2 type; };
+  template<> struct bridge_mapper<double2,float4> { typedef double4 type; };
+  template<> struct bridge_mapper<double2,short4> { typedef float4 type; };
+  template<> struct bridge_mapper<float4,double2> { typedef float2 type; };
+  template<> struct bridge_mapper<float4,float4> { typedef float4 type; };
+  template<> struct bridge_mapper<float4,short4> { typedef float4 type; };
+  template<> struct bridge_mapper<float2,double2> { typedef float2 type; };
+  template<> struct bridge_mapper<float2,float2> { typedef float2 type; };
+  template<> struct bridge_mapper<float2,short2> { typedef float2 type; };
+
+  template<typename> struct vec_length { static const int value = 0; };
+  template<> struct vec_length<double4> { static const int value = 4; };
+  template<> struct vec_length<double2> { static const int value = 2; };
+  template<> struct vec_length<double> { static const int value = 1; };
+  template<> struct vec_length<float4> { static const int value = 4; };
+  template<> struct vec_length<float2> { static const int value = 2; };
+  template<> struct vec_length<float> { static const int value = 1; };
+  template<> struct vec_length<short4> { static const int value = 4; };
+  template<> struct vec_length<short2> { static const int value = 2; };
+  template<> struct vec_length<short> { static const int value = 1; };
+
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
   template<> struct isHalf<short>{ static const bool value = true; };
+  template<> struct isHalf<short2>{ static const bool value = true; };
+  template<> struct isHalf<short4>{ static const bool value = true; };
 
   template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
 

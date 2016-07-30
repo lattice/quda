@@ -285,11 +285,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
 	if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 
-        Spinor<double2, double2, double2, M, writeX> X[N];
-        Spinor<double2, double2, double2, M, writeY> Y[N];
-        Spinor<double2, double2, double2, M, writeZ> Z[N];
-        Spinor<double2, double2, double2, M, writeW> W[N];
-        Spinor<double2, double2, double2, M, writeV> V[N];
+        Spinor<double2, double2, M, writeX> X[N];
+        Spinor<double2, double2, M, writeY> Y[N];
+        Spinor<double2, double2, M, writeZ> Z[N];
+        Spinor<double2, double2, M, writeW> W[N];
+        Spinor<double2, double2, M, writeV> V[N];
 
         for(int i=0; i<N; ++i){
           X[i].set(*x[i]);
@@ -300,9 +300,9 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         }
         Reducer<ReduceType, double2, double2> r(a,b);
         MultiReduceCuda<N, doubleN, ReduceType, ReduceSimpleType, double2, M,
-          Spinor<double2, double2, double2, M, writeX>, Spinor<double2, double2, double2, M, writeY>,
-          Spinor<double2, double2, double2, M, writeZ>, Spinor<double2, double2, double2, M, writeW>,
-          Spinor<double2, double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
+          Spinor<double2, double2, M, writeX>, Spinor<double2, double2, M, writeY>,
+          Spinor<double2, double2, M, writeZ>, Spinor<double2, double2, M, writeW>,
+          Spinor<double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
         reduce.apply(*blas::getStream());
 #else
@@ -312,11 +312,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 #ifdef GPU_STAGGERED_DIRAC
         const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 
-        Spinor<double2, double2, double2, M, writeX> X[N];
-        Spinor<double2, double2, double2, M, writeY> Y[N];
-        Spinor<double2, double2, double2, M, writeZ> Z[N];
-        Spinor<double2, double2, double2, M, writeW> W[N];
-        Spinor<double2, double2, double2, M, writeV> V[N];
+        Spinor<double2, double2, M, writeX> X[N];
+        Spinor<double2, double2, M, writeY> Y[N];
+        Spinor<double2, double2, M, writeZ> Z[N];
+        Spinor<double2, double2, M, writeW> W[N];
+        Spinor<double2, double2, M, writeV> V[N];
 
         for(int i=0; i<N; ++i){
           X[i].set(*x[i]);
@@ -328,9 +328,9 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 
         Reducer<ReduceType, double2, double2> r(a,b);
         MultiReduceCuda<N, doubleN, ReduceType, ReduceSimpleType, double2, M,
-          Spinor<double2, double2, double2, M, writeX>, Spinor<double2, double2, double2, M, writeY>,
-          Spinor<double2, double2, double2, M, writeZ>, Spinor<double2, double2, double2, M, writeW>,
-          Spinor<double2, double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
+          Spinor<double2, double2, M, writeX>, Spinor<double2, double2, M, writeY>,
+          Spinor<double2, double2, M, writeZ>, Spinor<double2, double2, M, writeW>,
+          Spinor<double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
             reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
         
         reduce.apply(*blas::getStream());
@@ -344,11 +344,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
         const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 
-        Spinor<float4, float4, float4, M, writeX> X[N];
-        Spinor<float4, float4, float4, M, writeY> Y[N];
-        Spinor<float4, float4, float4, M, writeZ> Z[N];
-        Spinor<float4, float4, float4, M, writeW> W[N];
-        Spinor<float4, float4, float4, M, writeV> V[N];
+        Spinor<float4, float4, M, writeX> X[N];
+        Spinor<float4, float4, M, writeY> Y[N];
+        Spinor<float4, float4, M, writeZ> Z[N];
+        Spinor<float4, float4, M, writeW> W[N];
+        Spinor<float4, float4, M, writeV> V[N];
 
         for(int i=0; i<N; ++i){
           X[i].set(*x[i]);
@@ -360,9 +360,9 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 
 	Reducer<ReduceType, float2, float4> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
 	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float4,M,
-	  Spinor<float4,float4,float4,M,writeX>, Spinor<float4,float4,float4,M,writeY>,
-	  Spinor<float4,float4,float4,M,writeZ>, Spinor<float4,float4,float4,M,writeW>,
-	  Spinor<float4,float4,float4,M,writeV>, Reducer<ReduceType, float2, float4> >
+	  Spinor<float4,float4,M,writeX>, Spinor<float4,float4,M,writeY>,
+	  Spinor<float4,float4,M,writeZ>, Spinor<float4,float4,M,writeW>,
+	  Spinor<float4,float4,M,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(4*M));
 	reduce.apply(*blas::getStream());
 #else
@@ -373,11 +373,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	const int M = siteUnroll ? 3 : 1; 
 	if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 
-      	Spinor<float2,float2,float2,M,writeX> X[N];
-        Spinor<float2,float2,float2,M,writeY> Y[N];
-        Spinor<float2,float2,float2,M,writeZ> Z[N];
-        Spinor<float2,float2,float2,M,writeW> W[N];
-        Spinor<float2,float2,float2,M,writeV> V[N];
+        Spinor<float2,float2,M,writeY> X[N];
+        Spinor<float2,float2,M,writeY> Y[N];
+        Spinor<float2,float2,M,writeZ> Z[N];
+        Spinor<float2,float2,M,writeW> W[N];
+        Spinor<float2,float2,M,writeV> V[N];
 
         for(int i=0; i<N; ++i){
           X[i].set(*x[i]);
@@ -389,9 +389,9 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 
 	Reducer<ReduceType, float2, float2> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
 	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float2,M,
-	  Spinor<float2,float2,float2,M,writeX>, Spinor<float2,float2,float2,M,writeY>,
-	  Spinor<float2,float2,float2,M,writeZ>, Spinor<float2,float2,float2,M,writeW>,
-	  Spinor<float2,float2,float2,M,writeV>, Reducer<ReduceType, float2, float2> >
+	  Spinor<float2,float2,M,writeX>, Spinor<float2,float2,M,writeY>,
+	  Spinor<float2,float2,M,writeZ>, Spinor<float2,float2,M,writeW>,
+	  Spinor<float2,float2,M,writeV>, Reducer<ReduceType, float2, float2> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
 	reduce.apply(*blas::getStream());
 #else
@@ -401,11 +401,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
     } else { // half precision
       if (x[0]->Nspin() == 4) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-        Spinor<float4,float4,short4,6,writeX> X[N];
-	Spinor<float4,float4,short4,6,writeY> Y[N];
-	Spinor<float4,float4,short4,6,writeZ> Z[N];
-	Spinor<float4,float4,short4,6,writeV> V[N];
-	Spinor<float4,float4,short4,6,writeV> W[N];
+        Spinor<float4,short4,6,writeX> X[N];
+	Spinor<float4,short4,6,writeY> Y[N];
+	Spinor<float4,short4,6,writeZ> Z[N];
+	Spinor<float4,short4,6,writeV> V[N];
+	Spinor<float4,short4,6,writeV> W[N];
 
         for(int i=0; i<N; ++i){
           X[i].set(*x[i]);
@@ -417,9 +417,9 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 
 	Reducer<ReduceType, float2, float4> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
 	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float4,6,
-	  Spinor<float4,float4,short4,6,writeX>, Spinor<float4,float4,short4,6,writeY>,
-	  Spinor<float4,float4,short4,6,writeZ>, Spinor<float4,float4,short4,6,writeW>,
-	  Spinor<float4,float4,short4,6,writeV>, Reducer<ReduceType, float2, float4> >
+	  Spinor<float4,short4,6,writeX>, Spinor<float4,short4,6,writeY>,
+	  Spinor<float4,short4,6,writeZ>, Spinor<float4,short4,6,writeW>,
+	  Spinor<float4,short4,6,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
 	reduce.apply(*blas::getStream());
 #else
@@ -427,11 +427,11 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 #endif
       } else if(x[0]->Nspin() == 1) { // staggered
 #ifdef GPU_STAGGERED_DIRAC
-        Spinor<float2,float2,short2,3,writeX> X[N];
-	Spinor<float2,float2,short2,3,writeY> Y[N];
-	Spinor<float2,float2,short2,3,writeZ> Z[N];
-	Spinor<float2,float2,short2,3,writeV> V[N];
-	Spinor<float2,float2,short2,3,writeV> W[N];
+        Spinor<float2,short2,3,writeX> X[N];
+	Spinor<float2,short2,3,writeY> Y[N];
+	Spinor<float2,short2,3,writeZ> Z[N];
+	Spinor<float2,short2,3,writeV> V[N];
+	Spinor<float2,short2,3,writeV> W[N];
 
         for(int i=0; i<N; ++i){
           X[i].set(*x[i]);
@@ -443,9 +443,9 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 
 	Reducer<ReduceType, float2, float2> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
 	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float2,3,
-	  Spinor<float2,float2,short2,3,writeX>, Spinor<float2,float2,short2,3,writeY>,
-	  Spinor<float2,float2,short2,3,writeZ>, Spinor<float2,float2,short2,3,writeW>,
-	  Spinor<float2,float2,short2,3,writeV>, Reducer<ReduceType, float2, float2> >
+	  Spinor<float2,short2,3,writeX>, Spinor<float2,short2,3,writeY>,
+	  Spinor<float2,short2,3,writeZ>, Spinor<float2,short2,3,writeW>,
+	  Spinor<float2,short2,3,writeV>, Reducer<ReduceType, float2, float2> >
 	  reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
 	reduce.apply(*blas::getStream());
 #else

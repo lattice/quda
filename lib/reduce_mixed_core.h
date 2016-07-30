@@ -58,9 +58,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       return even + odd;
     }
    
-    // FIXME: use traits to encapsulate register type for shorts -
-    // will reduce template type parameters from 3 to 2
-
     size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes(), v.Bytes()};
     size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes(), v.NormBytes()};
 
@@ -68,16 +65,16 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       if (x.Nspin() == 4){ //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 12; // determines how much work per thread to do
-	Spinor<double2,double4,float4,M,writeX> X(x);
-	Spinor<double2,double4,float4,M,writeY> Y(y);
-	Spinor<double2,double2,double2,M,writeZ> Z(z);
-	Spinor<double2,double4,float4,M,writeW> W(w);
-	Spinor<double2,double4,float4,M,writeV> V(v);
+	Spinor<double2,float4,M,writeX> X(x);
+	Spinor<double2,float4,M,writeY> Y(y);
+	Spinor<double2,double2,M,writeZ> Z(z);
+	Spinor<double2,float4,M,writeW> W(w);
+	Spinor<double2,float4,M,writeV> V(v);
 	Reducer<ReduceType, double2, double2> r(a,b);
 	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	  Spinor<double2,double4,float4,M,writeX>, Spinor<double2,double4,float4,M,writeY>,
-	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double4,float4,M,writeW>,
-	  Spinor<double2,double4,float4,M,writeV>, Reducer<ReduceType, double2, double2> >
+	  Spinor<double2,float4,M,writeX>, Spinor<double2,float4,M,writeY>,
+	  Spinor<double2,double2,M,writeZ>, Spinor<double2,float4,M,writeW>,
+	  Spinor<double2,float4,M,writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
 	reduce.apply(*blas::getStream());
 #else
@@ -87,16 +84,16 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
-	Spinor<double2,double2,float2,M,writeX> X(x);
-	Spinor<double2,double2,float2,M,writeY> Y(y);
-	Spinor<double2,double2,double2,M,writeZ> Z(z);
-	Spinor<double2,double2,float2,M,writeW> W(w);
-	Spinor<double2,double2,float2,M,writeV> V(v);
+	Spinor<double2,float2,M,writeX> X(x);
+	Spinor<double2,float2,M,writeY> Y(y);
+	Spinor<double2,double2,M,writeZ> Z(z);
+	Spinor<double2,float2,M,writeW> W(w);
+	Spinor<double2,float2,M,writeV> V(v);
 	Reducer<ReduceType, double2, double2> r(a,b);
 	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	  Spinor<double2,double2,float2,M,writeX>, Spinor<double2,double2,float2,M,writeY>,
-	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,float2,M,writeW>,
-	  Spinor<double2,double2,float2,M,writeV>, Reducer<ReduceType, double2, double2> >
+	  Spinor<double2,float2,M,writeX>, Spinor<double2,float2,M,writeY>,
+	  Spinor<double2,double2,M,writeZ>, Spinor<double2,float2,M,writeW>,
+	  Spinor<double2,float2,M,writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
 	reduce.apply(*blas::getStream());
 #else
@@ -107,16 +104,16 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       if (x.Nspin() == 4){ //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 12; // determines how much work per thread to do
-	Spinor<double2,double4,short4,M,writeX> X(x);
-	Spinor<double2,double4,short4,M,writeY> Y(y);
-	Spinor<double2,double2,double2,M,writeZ> Z(z);
-	Spinor<double2,double4,short4,M,writeW> W(w);
-	Spinor<double2,double4,short4,M,writeV> V(v);
+	Spinor<double2,short4,M,writeX> X(x);
+	Spinor<double2,short4,M,writeY> Y(y);
+	Spinor<double2,double2,M,writeZ> Z(z);
+	Spinor<double2,short4,M,writeW> W(w);
+	Spinor<double2,short4,M,writeV> V(v);
 	Reducer<ReduceType, double2, double2> r(a,b);
 	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	  Spinor<double2,double4,short4,M,writeX>, Spinor<double2,double4,short4,M,writeY>,
-	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double4,short4,M,writeW>,
-	  Spinor<double2,double4,short4,M,writeV>, Reducer<ReduceType, double2, double2> >
+	  Spinor<double2,short4,M,writeX>, Spinor<double2,short4,M,writeY>,
+	  Spinor<double2,double2,M,writeZ>, Spinor<double2,short4,M,writeW>,
+	  Spinor<double2,short4,M,writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
 	reduce.apply(*blas::getStream());
 #else
@@ -126,16 +123,16 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
-	Spinor<double2,double2,float2,M,writeX> X(x);
-	Spinor<double2,double2,float2,M,writeY> Y(y);
-	Spinor<double2,double2,double2,M,writeZ> Z(z);
-	Spinor<double2,double2,float2,M,writeW> W(w);
-	Spinor<double2,double2,float2,M,writeV> V(v);
+	Spinor<double2,float2,M,writeX> X(x);
+	Spinor<double2,float2,M,writeY> Y(y);
+	Spinor<double2,double2,M,writeZ> Z(z);
+	Spinor<double2,float2,M,writeW> W(w);
+	Spinor<double2,float2,M,writeV> V(v);
 	Reducer<ReduceType, double2, double2> r(a,b);
 	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	  Spinor<double2,double2,float2,M,writeX>, Spinor<double2,double2,float2,M,writeY>,
-	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,float2,M,writeW>,
-	  Spinor<double2,double2,float2,M,writeV>, Reducer<ReduceType, double2, double2> >
+	  Spinor<double2,float2,M,writeX>, Spinor<double2,float2,M,writeY>,
+	  Spinor<double2,double2,M,writeZ>, Spinor<double2,float2,M,writeW>,
+	  Spinor<double2,float2,M,writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
 	reduce.apply(*blas::getStream());
 #else
@@ -145,16 +142,16 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
     } else if (z.Precision() == QUDA_SINGLE_PRECISION) {
       if (x.Nspin() == 4){ //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
-	Spinor<float4,float4,short4,6,writeX,0> X(x);
-	Spinor<float4,float4,short4,6,writeY,1> Y(y);
-	Spinor<float4,float4,float4,6,writeZ,2> Z(z);
-	Spinor<float4,float4,short4,6,writeW,3> W(w);
-	Spinor<float4,float4,short4,6,writeV,4> V(v);
+	Spinor<float4,short4,6,writeX,0> X(x);
+	Spinor<float4,short4,6,writeY,1> Y(y);
+	Spinor<float4,float4,6,writeZ,2> Z(z);
+	Spinor<float4,short4,6,writeW,3> W(w);
+	Spinor<float4,short4,6,writeV,4> V(v);
 	Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
 	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,
-	  Spinor<float4,float4,short4,6,writeX,0>, Spinor<float4,float4,short4,6,writeY,1>,
-	  Spinor<float4,float4,float4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>,
-	  Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
+	  Spinor<float4,short4,6,writeX,0>, Spinor<float4,short4,6,writeY,1>,
+	  Spinor<float4,float4,6,writeZ,2>, Spinor<float4,short4,6,writeW,3>,
+	  Spinor<float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
 	  reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
 	reduce.apply(*blas::getStream());
 #else
@@ -162,16 +159,16 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #endif
       } else if (x.Nspin() == 1) {//staggered
 #ifdef GPU_STAGGERED_DIRAC
-	Spinor<float2,float2,short2,3,writeX,0> X(x);
-	Spinor<float2,float2,short2,3,writeY,1> Y(y);
-	Spinor<float2,float2,float2,3,writeZ,2> Z(z);
-	Spinor<float2,float2,short2,3,writeW,3> W(w);
-	Spinor<float2,float2,short2,3,writeV,4> V(v);
+	Spinor<float2,short2,3,writeX,0> X(x);
+	Spinor<float2,short2,3,writeY,1> Y(y);
+	Spinor<float2,float2,3,writeZ,2> Z(z);
+	Spinor<float2,short2,3,writeW,3> W(w);
+	Spinor<float2,short2,3,writeV,4> V(v);
 	Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
 	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,
-	  Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
-	  Spinor<float2,float2,float2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
-	  Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
+	  Spinor<float2,short2,3,writeX,0>, Spinor<float2,short2,3,writeY,1>,
+	  Spinor<float2,float2,3,writeZ,2>, Spinor<float2,short2,3,writeW,3>,
+	  Spinor<float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
 	  reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
 	reduce.apply(*blas::getStream());
 #else
