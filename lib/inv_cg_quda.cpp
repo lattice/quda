@@ -463,6 +463,7 @@ POP_RANGE
     }
 
     double r2avg=0;
+    MatrixXcd r2(param.num_src, param.num_src);
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
         r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
@@ -630,7 +631,7 @@ POP_RANGE
     }
 
     // Eigen::LLT<MatrixXcd> lltOfA(r2);  // compute the Cholesky decomposition of A
-    MatrixXcd L = r2.llt().matrixL()  // retrieve factor L  in the decomposition
+    MatrixXcd L = r2.llt().matrixL();  // retrieve factor L  in the decomposition
     C = L.adjoint();
     MatrixXcd Linv = C.inverse();
 // r2.llt().matrixL() should do as well
