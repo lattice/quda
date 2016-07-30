@@ -462,10 +462,16 @@ POP_RANGE
       mat(r.Component(i), x.Component(i), y.Component(i));
     }
 
-    MatrixXcd r2(param.num_src,param.num_src);
+    double r2avg=0;
     for(int i=0; i<param.num_src; i++){
-      r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
-      printfQuda("r2[%i] %e\n", i, r2(i,i).real());
+      for(int j=i; j < param.num_src; j++){
+        r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+        if (i!=j) r2(j,i) = std::conj(r2(i,j));
+        if (i==j) {
+          r2avg += r2(i,i).real();
+          printfQuda("r2[%i] %e\n", i, r2(i,i).real());
+        }
+      }
     }
 
 
@@ -600,13 +606,8 @@ POP_RANGE
     blas::flops = 0;
 
     int k = 0;
-    double r2avg=0;
-    for(int i = 0; i < param.num_src; i++){
-      r2avg += r2(i,i).real();
-    }
 
 
-    // PrintStats("CG", k, r2(i,i).real(), b2[i], heavy_quark_res[i]);
 
     PrintStats("CG", k, r2avg / param.num_src, b2avg, heavy_quark_res[0]);
     int steps_since_reliable = 1;
@@ -618,23 +619,18 @@ POP_RANGE
     }
     // MatrixXcd sigma(param.num_src,param.num_src);
 
-    std::complex<double> ri;
-    double n;
+
     C = MatrixXcd::Zero(param.num_src,param.num_src);
-    // for ( int i = 0; i < param.num_src; i++){
-    //   for (int j=0; j < param.num_src; j++){
-    //     r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-    //   }
-    // }
-    for(int i=0; i<param.num_src; i++){
-      for(int j=i; j < param.num_src; j++){
-        r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-        if (i!=j) r2(j,i) = std::conj(r2(i,j));
+
+    for(int i = 0; i<param.num_src; i++){
+      for(int j = i; j < param.num_src; j++){
+        r2(i,j) = blas::cDotProduct(r.Component(i), r.Component(j));
+        if (i !=j ) r2(j,i) = std::conj(r2(i,j));
       }
     }
 
-    Eigen::LLT<MatrixXcd> lltOfA(r2); // compute the Cholesky decomposition of A
-    MatrixXcd L = lltOfA.matrixL(); // retrieve factor L  in the decomposition
+    // Eigen::LLT<MatrixXcd> lltOfA(r2);  // compute the Cholesky decomposition of A
+    MatrixXcd L = r2.llt().matrixL()  // retrieve factor L  in the decomposition
     C = L.adjoint();
     MatrixXcd Linv = C.inverse();
 // r2.llt().matrixL() should do as well
@@ -677,12 +673,11 @@ POP_RANGE
     // }
 
 
-
+    // set r to QR decompoistion of r
     for(int i=0; i< param.num_src; i++){
       blas::copy(rSloppy.Component(i), p.Component(i));
     }
 
-    // set r to QR decompoistion of r
     #ifdef MWVERBOSE
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
@@ -704,8 +699,6 @@ POP_RANGE
       PUSH_RANGE("LinearAlgebra",2)
       bool breakdown = false;
       // FIXME: need to check breakdown
-      //MW: here we can exploit that pAp is hermitian
-      // this scales with (nsrc * (nsrc+1))/2
       for(int i=0; i<param.num_src; i++){
         for(int j=i; j < param.num_src; j++){
           pAp(i,j) = blas::cDotProduct(p.Component(i), Ap.Component(j));
@@ -778,13 +771,10 @@ POP_RANGE
       L = lltOfr2.matrixL(); // retrieve factor L  in the decomposition
       S = L.adjoint();
       MatrixXcd Linv = S.inverse();
-  // r2.llt().matrixL() should do as well
-      // std::cout << "r2\n " << r2 << std::endl;
-      // std::cout << "L\n " << L.adjoint() << std::endl;
 
       for(int i=0; i<param.num_src; i++){
         blas::zero(rSloppy.Component(i));
-        // blas::cax(Linv(i,0),p.Component(i));
+
 
         for(int j=0;j<param.num_src; j++){
           // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
@@ -792,6 +782,12 @@ POP_RANGE
           // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
           // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
           // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
+        }
+      }
+
+    for(int i=0; i<param.num_src; i++){
+      for(int j=0;j<param.num_src; j++){
+          blas::caxpy(Linv(j,i),rnew.Component(j),rSloppy.Component(i));
         }
       }
 
