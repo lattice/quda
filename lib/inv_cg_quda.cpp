@@ -38,7 +38,7 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #else
 
 #define PUSH_RANGE(name,cid)
-#define PIP_RANFE
+#define POP_RANGE
 
 #endif
 
