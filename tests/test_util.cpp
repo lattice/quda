@@ -2269,7 +2269,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc= atoi(argv[i+1]);
-    if (Nsrc < 1 || Nsrc > 64){
+    if (Nsrc < 1 || Nsrc > 128){
       printf("ERROR: invalid number of sources (%d)\n", Nsrc);
       usage(argv);
     }

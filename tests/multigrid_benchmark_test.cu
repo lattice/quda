@@ -26,6 +26,8 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern int niter;
 
+extern int Nsrc; // number of spinors to apply to simultaneously
+
 extern bool tune;
 extern bool verify_results;
 
@@ -66,7 +68,7 @@ void initFields(QudaPrecision prec)
   ColorSpinorParam param;
   param.nColor = Ncolor;
   param.nSpin = Nspin;
-  param.nDim = 4; // number of spacetime dimensions
+  param.nDim = 5; // number of spacetime dimensions
 
   param.pad = 0; // padding must be zero for cpu fields
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -74,6 +76,8 @@ void initFields(QudaPrecision prec)
   param.x[1] = ydim;
   param.x[2] = zdim;
   param.x[3] = tdim;
+  param.x[4] = Nsrc;
+  param.PCtype = QUDA_4D_PC;
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
