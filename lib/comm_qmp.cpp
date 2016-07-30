@@ -102,7 +102,13 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
     errorQuda("No CUDA devices found");
   }
   if (gpuid >= device_count) {
-    errorQuda("Too few GPUs available on %s", comm_hostname());
+    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
+    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
+      gpuid = gpuid%device_count;
+      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+    } else {
+      errorQuda("Too few GPUs available on %s", comm_hostname());
+    }
   }
 
   comm_peer2peer_init(hostname_recv_buf);
