@@ -286,7 +286,7 @@ namespace quda {
       if (param.x[d] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
-    volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
+    volumeCB = param.siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
     if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
       errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);

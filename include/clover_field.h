@@ -25,6 +25,16 @@ namespace quda {
       order = (precision == QUDA_DOUBLE_PRECISION) ? 
 	QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
     }
+
+    CloverFieldParam() :  LatticeFieldParam(),
+      direct(true), inverse(true), clover(nullptr), norm(nullptr),
+      cloverInv(nullptr), invNorm(nullptr), twisted(false), mu2(0.0) { }
+
+    CloverFieldParam(const CloverFieldParam &param) :  LatticeFieldParam(param),
+      direct(param.direct), inverse(param.inverse),
+      clover(param.clover), norm(param.norm),
+      cloverInv(param.cloverInv), invNorm(param.invNorm),
+      twisted(param.twisted), mu2(param.mu2) { }
   };
 
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param);

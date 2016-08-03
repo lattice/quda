@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+#include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
 
@@ -73,7 +74,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   // determine which GPU this MPI rank will use
   char *hostname = comm_hostname();
   char *hostname_recv_buf = (char *)safe_malloc(128*size);
-  
+
   MPI_CHECK( MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_WORLD) );
 
   gpuid = 0;
@@ -89,7 +90,13 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
     errorQuda("No CUDA devices found");
   }
   if (gpuid >= device_count) {
-    errorQuda("Too few GPUs available on %s", hostname);
+    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
+    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
+      gpuid = gpuid%device_count;
+      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+    } else {
+      errorQuda("Too few GPUs available on %s", comm_hostname());
+    }
   }
 
   comm_peer2peer_init(hostname_recv_buf);
@@ -278,7 +285,7 @@ void comm_wait(MsgHandle *mh)
 }
 
 
-int comm_query(MsgHandle *mh) 
+int comm_query(MsgHandle *mh)
 {
   int query;
   MPI_CHECK( MPI_Test(&(mh->request), &query, MPI_STATUS_IGNORE) );
@@ -292,7 +299,7 @@ void comm_allreduce(double* data)
   double recvbuf;
   MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
   *data = recvbuf;
-} 
+}
 
 
 void comm_allreduce_max(double* data)
@@ -300,7 +307,7 @@ void comm_allreduce_max(double* data)
   double recvbuf;
   MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD) );
   *data = recvbuf;
-} 
+}
 
 void comm_allreduce_array(double* data, size_t size)
 {
@@ -334,5 +341,8 @@ void comm_barrier(void)
 
 void comm_abort(int status)
 {
+  #ifdef HOST_DEBUG
+  raise(SIGINT);
+  #endif
   MPI_Abort(MPI_COMM_WORLD, status) ;
 }

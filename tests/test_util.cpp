@@ -1756,7 +1756,8 @@ QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_STAGGERED_DSLASH;
 char latfile[256] = "";
-bool tune = false;
+int Nsrc = 1;
+bool tune = true;
 int niter = 100;
 int test_type = 0;
 int nvec[QUDA_MAX_MG_LEVEL] = { 24 };
@@ -1770,6 +1771,8 @@ bool verify_results = true;
 double mass = 0.001;
 double mu = 0.1;
 double anisotropy = 1.0;
+double clover_coeff = 0.1;
+bool compute_clover = false;
 double tol = 1e-7;
 double tol_hq = 0.;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
@@ -1837,6 +1840,8 @@ void usage(char** argv )
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
+  printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
@@ -1856,6 +1861,7 @@ void usage(char** argv )
   printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
+  printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
   printf("    --help                                    # Print out this message\n"); 
 
   usage_extra(argv); 
@@ -2331,6 +2337,34 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--compute-clover") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    if (strcmp(argv[i+1], "true") == 0){
+      compute_clover = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      compute_clover = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid compute_clover type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--clover-coeff") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    clover_coeff = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mu") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2411,6 +2445,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--nsrc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    Nsrc= atoi(argv[i+1]);
+    if (Nsrc < 1 || Nsrc > 64){
+      printf("ERROR: invalid number of sources (%d)\n", Nsrc);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--test") == 0){
     if (i+1 >= argc){
       usage(argv);

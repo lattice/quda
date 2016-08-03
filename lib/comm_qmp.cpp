@@ -1,5 +1,5 @@
 #include <qmp.h>
-
+#include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
 
@@ -102,7 +102,13 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
     errorQuda("No CUDA devices found");
   }
   if (gpuid >= device_count) {
-    errorQuda("Too few GPUs available on %s", comm_hostname());
+    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
+    if (enable_mps_env && strcmp(enable_mps_env,"1") == 0) {
+      gpuid = gpuid%device_count;
+      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+    } else {
+      errorQuda("Too few GPUs available on %s", comm_hostname());
+    }
   }
 
   comm_peer2peer_init(hostname_recv_buf);
@@ -289,11 +295,11 @@ void comm_start(MsgHandle *mh)
 
 void comm_wait(MsgHandle *mh)
 {
-  QMP_CHECK( QMP_wait(mh->handle) ); 
+  QMP_CHECK( QMP_wait(mh->handle) );
 }
 
 
-int comm_query(MsgHandle *mh) 
+int comm_query(MsgHandle *mh)
 {
   return (QMP_is_complete(mh->handle) == QMP_TRUE);
 }
@@ -302,13 +308,13 @@ int comm_query(MsgHandle *mh)
 void comm_allreduce(double* data)
 {
   QMP_CHECK( QMP_sum_double(data) );
-} 
+}
 
 
 void comm_allreduce_max(double* data)
 {
   QMP_CHECK( QMP_max_double(data) );
-} 
+}
 
 
 void comm_allreduce_array(double* data, size_t size)
@@ -331,11 +337,14 @@ void comm_broadcast(void *data, size_t nbytes)
 
 void comm_barrier(void)
 {
-  QMP_CHECK( QMP_barrier() );  
+  QMP_CHECK( QMP_barrier() );
 }
 
 
 void comm_abort(int status)
 {
+  #ifdef HOST_DEBUG
+  raise(SIGINT);
+  #endif
   QMP_abort(status);
 }

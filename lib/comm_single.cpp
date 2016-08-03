@@ -3,6 +3,7 @@
  */
 
 #include <stdlib.h>
+#include <csignal>
 #include <comm_quda.h>
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
@@ -21,18 +22,18 @@ int comm_size(void) { return 1; }
 
 int comm_gpuid(void) { return 0; }
 
-MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes) 
+MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 { return NULL; }
 
-MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes) 
+MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
 { return NULL; }
 
-MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[], 
-					       size_t blksize, int nblocks, size_t stride) 
+MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
+					       size_t blksize, int nblocks, size_t stride)
 { return NULL; }
 
-MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[], 
-						  size_t blksize, int nblocks, size_t stride) 
+MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
+						  size_t blksize, int nblocks, size_t stride)
 { return NULL; }
 
 void comm_free(MsgHandle *mh) {}
@@ -55,4 +56,9 @@ void comm_broadcast(void *data, size_t nbytes) {}
 
 void comm_barrier(void) {}
 
-void comm_abort(int status) { exit(status); }
+void comm_abort(int status) {
+  #ifdef HOST_DEBUG
+  raise(SIGINT);
+  #endif
+  exit(status);
+}
