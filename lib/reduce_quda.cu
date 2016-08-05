@@ -124,6 +124,7 @@ namespace quda {
     namespace reduce {
 
 #include <texture.h>
+#include <reduce_core.cuh>
 #include <reduce_core.h>
 #include <reduce_mixed_core.h>
 
@@ -749,6 +750,7 @@ namespace quda {
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct HeavyQuarkResidualNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      typedef typename scalar<ReduceType>::type real;
       Float2 a;
       Float2 b;
       ReduceType aux;
@@ -757,14 +759,13 @@ namespace quda {
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	typedef typename ScalarType<ReduceType>::type scalar;
-	aux.x += norm2_<scalar>(x); aux.y += norm2_<scalar>(y);
+	aux.x += norm2_<real>(x); aux.y += norm2_<real>(y);
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
       __device__ __host__ void post(ReduceType &sum)
       {
-	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0;
+	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
       static int streams() { return 2; } //! total number of input and output streams
@@ -788,6 +789,7 @@ namespace quda {
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct xpyHeavyQuarkResidualNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+	typedef typename scalar<ReduceType>::type real;
       Float2 a;
       Float2 b;
       ReduceType aux;
@@ -796,14 +798,13 @@ namespace quda {
       __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-	typedef typename ScalarType<ReduceType>::type scalar;
-	aux.x += norm2_<scalar>(x + y); aux.y += norm2_<scalar>(z);
+	aux.x += norm2_<real>(x + y); aux.y += norm2_<real>(z);
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
       __device__ __host__ void post(ReduceType &sum)
       {
-	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0;
+	sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : static_cast<real>(1.0);
       }
 
       static int streams() { return 3; } //! total number of input and output streams

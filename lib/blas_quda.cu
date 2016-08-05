@@ -72,9 +72,10 @@ namespace quda {
 
     cudaStream_t* getStream() { return blasStream; }
 
+#include <blas_core.cuh>
+
 #include <blas_core.h>
 #include <blas_mixed_core.h>
-
 
     template <typename Float2, typename FloatN>
     struct BlasFunctor {

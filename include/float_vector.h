@@ -1,3 +1,5 @@
+#include <complex_quda.h>
+
 /**
    @file float_vector.h
 
@@ -235,6 +237,23 @@ namespace quda {
   __forceinline__ __host__ __device__ short2 make_shortN(const double2 &a) {
     return make_short2(a.x, a.y);
   }
+
+
+  /* Helper functions for converting between float2/double2 and complex */
+  template<typename Float2, typename Complex>
+    inline Float2 make_Float2(const Complex &a) { return (Float2)0; }
+
+  template<>
+    inline double2 make_Float2(const complex<double> &a) { return make_double2( a.real(), a.imag() ); }
+  template<>
+    inline double2 make_Float2(const complex<float> &a) { return make_double2( a.real(), a.imag() ); }
+  template<>
+    inline float2 make_Float2(const complex<double> &a) { return make_float2( a.real(), a.imag() ); }
+  template<>
+    inline float2 make_Float2(const complex<float> &a) { return make_float2( a.real(), a.imag() ); }
+
+  inline complex<double> make_Complex(const double2 &a) { return complex<double>(a.x, a.y); }
+  inline complex<float> make_Complex(const float2 &a) { return complex<float>(a.x, a.y); }
 
 }
 
