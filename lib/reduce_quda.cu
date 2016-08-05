@@ -175,7 +175,7 @@ namespace quda {
     double norm1(const ColorSpinorField &x) {
 #ifdef HOST_DEBUG
       ColorSpinorField &y = const_cast<ColorSpinorField&>(x); // FIXME
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm1,0,0,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,Norm1,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
 #else
 	errorQuda("L1 norm kernel only built when HOST_DEBUG is enabled");
@@ -211,7 +211,7 @@ namespace quda {
 
     double norm2(const ColorSpinorField &x) {
       ColorSpinorField &y = const_cast<ColorSpinorField&>(x);
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm2,0,0,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,Norm2,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
     }
 
@@ -242,7 +242,7 @@ namespace quda {
     };
 
     double reDotProduct(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,Dot,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -252,67 +252,67 @@ namespace quda {
 #else
     switch(x.size()){
       case 1:
-        reduce::multiReduceCuda<1,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<1,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 2:
-        reduce::multiReduceCuda<2,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<2,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 3:
-        reduce::multiReduceCuda<3,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<3,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 4:
-        reduce::multiReduceCuda<4,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<4,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 5:
-        reduce::multiReduceCuda<5,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<5,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 6:
-        reduce::multiReduceCuda<6,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<6,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 7:
-        reduce::multiReduceCuda<7,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<7,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 8:
-        reduce::multiReduceCuda<8,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<8,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 9:
-        reduce::multiReduceCuda<9,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<9,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 10:
-        reduce::multiReduceCuda<10,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<10,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 11:
-        reduce::multiReduceCuda<11,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<11,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 12:
-        reduce::multiReduceCuda<12,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<12,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 13:
-        reduce::multiReduceCuda<13,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<13,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 14:
-        reduce::multiReduceCuda<14,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<14,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 15:
-        reduce::multiReduceCuda<15,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<15,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 16:
-        reduce::multiReduceCuda<16,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<16,double,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       default:
@@ -346,7 +346,7 @@ namespace quda {
     };
 
     double2 reDotProductNormA(ColorSpinorField &x,ColorSpinorField &y){
-      return reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,DotNormA,0,0,0,0,0,false>
+      return reduce::reduceCuda<double2,QudaSumFloat2,DotNormA,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -366,7 +366,7 @@ namespace quda {
     };
 
     double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,axpyNorm2,0,1,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,axpyNorm2,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -386,7 +386,7 @@ namespace quda {
     };
 
     double axpyReDot(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,AxpyReDot,0,1,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,AxpyReDot,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -405,7 +405,7 @@ namespace quda {
     };
 
     double xmyNorm(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,xmyNorm2,0,1,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,xmyNorm2,0,1,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -443,7 +443,7 @@ namespace quda {
     };
 
     double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyNorm2,0,1,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,caxpyNorm2,0,1,0,0,0,false>
 	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -467,7 +467,7 @@ namespace quda {
 
     double caxpyXmazNormX(const Complex &a, ColorSpinorField &x,
 			  ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyxmaznormx,1,1,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,caxpyxmaznormx,1,1,0,0,0,false>
 	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
@@ -493,7 +493,7 @@ namespace quda {
 
     double cabxpyAxNorm(const double &a, const Complex &b,
 			ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,cabxpyaxnorm,1,1,0,0,0,false>
+      return reduce::reduceCuda<double,QudaSumFloat,cabxpyaxnorm,1,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, x, x, x);
     }
 
@@ -541,7 +541,7 @@ namespace quda {
 
 
     Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y) {
-      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
       return Complex(cdot.x, cdot.y);
     }
@@ -551,19 +551,19 @@ namespace quda {
 
       switch(x.size()){
       case 1:
-        reduce::multiReduceCuda<1,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 2:
-        reduce::multiReduceCuda<2,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<2,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 3:
-        reduce::multiReduceCuda<3,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<3,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       case 4:
-        reduce::multiReduceCuda<4,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       default:
@@ -592,7 +592,7 @@ namespace quda {
     };
 
     Complex xpaycDotzy(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z) {
-      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,xpaycdotzy,0,1,0,0,0,false>
+      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,xpaycdotzy,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
       return Complex(cdot.x, cdot.y);
     }
@@ -616,7 +616,7 @@ namespace quda {
 
 
     Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0,0,0,false>
+      double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,caxpydotzy,0,1,0,0,0,false>
 	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
       return Complex(cdot.x, cdot.y);
     }
@@ -646,7 +646,7 @@ namespace quda {
     };
 
     double3 cDotProductNormA(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormA,0,0,0,0,0,false>
+      return reduce::reduceCuda<double3,QudaSumFloat3,CdotNormA,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -675,7 +675,7 @@ namespace quda {
     };
 
     double3 cDotProductNormB(ColorSpinorField &x, ColorSpinorField &y) {
-      return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,CdotNormB,0,0,0,0,0,false>
+      return reduce::reduceCuda<double3,QudaSumFloat3,CdotNormB,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     }
 
@@ -699,10 +699,10 @@ namespace quda {
 					   ColorSpinorField &z, ColorSpinorField &w,
 					   ColorSpinorField &u) {
       if (x.Precision() != z.Precision()) {
-	return reduce::mixed::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
+	return reduce::mixed::reduceCuda<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
 	  (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
       } else {
-	return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
+	return reduce::reduceCuda<double3,QudaSumFloat3,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
 	  (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
       }
     }
@@ -730,7 +730,7 @@ namespace quda {
     };
 
     Complex axpyCGNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      double2 cg_norm = reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,axpyCGNorm2,0,1,0,0,0,false>
+      double2 cg_norm = reduce::reduceCuda<double2,QudaSumFloat2,axpyCGNorm2,0,1,0,0,0,false>
 	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
       return Complex(cg_norm.x, cg_norm.y);
     }
@@ -773,7 +773,7 @@ namespace quda {
     };
 
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r) {
-      double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
+      double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;
@@ -813,7 +813,7 @@ namespace quda {
 
     double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y,
 				      ColorSpinorField &r) {
-      double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
+      double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;
@@ -838,7 +838,7 @@ namespace quda {
     };
 
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,tripleCGReduction_,0,0,0,0,0,false>
+      return reduce::reduceCuda<double3,QudaSumFloat3,tripleCGReduction_,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 

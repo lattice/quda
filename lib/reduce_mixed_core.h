@@ -17,7 +17,7 @@ namespace mixed {
    @param ReduceType 
    @param siteUnroll - if this is true, then one site corresponds to exactly one thread
  */
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType,
+template <typename doubleN, typename ReduceType,
 	  template <typename ReducerType, typename Float, typename FloatN> class Reducer,
   int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
 doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x, 
@@ -34,7 +34,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       if (x.Nspin() == 4){ //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 12; // determines how much work per thread to do
-	value = reduce::reduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,float4,double2,M,Reducer,
+	value = reduce::reduceCuda<doubleN,ReduceType,double2,float4,double2,M,Reducer,
 	  writeX,writeY,writeZ,writeW,writeV>
 	  (a, b, x, y, z, w, v, x.Volume());
 #else
@@ -44,7 +44,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
-	value = reduce::reduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,float2,double2,M,Reducer,
+	value = reduce::reduceCuda<doubleN,ReduceType,double2,float2,double2,M,Reducer,
 	  writeX,writeY,writeZ,writeW,writeV>
 	  (a, b, x, y, z, w, v, reduce_length/(2*M));
 #else
@@ -55,7 +55,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 12; // determines how much work per thread to do
-	value = reduce::reduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,short4,double2,M,Reducer,
+	value = reduce::reduceCuda<doubleN,ReduceType,double2,short4,double2,M,Reducer,
 	  writeX,writeY,writeZ,writeW,writeV>
 	  (a, b, x, y, z, w, v, x.Volume());
 #else
@@ -65,7 +65,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = 3; // determines how much work per thread to do
 	const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
-	value = reduce::reduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,short2,double2,M,Reducer,
+	value = reduce::reduceCuda<doubleN,ReduceType,double2,short2,double2,M,Reducer,
 	  writeX,writeY,writeZ,writeW,writeV>
 	  (a, b, x, y, z, w, v, reduce_length/(2*M));
 #else
@@ -76,7 +76,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 6;
-	value = reduce::reduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,short4,float4,M,Reducer,
+	value = reduce::reduceCuda<doubleN,ReduceType,float4,short4,float4,M,Reducer,
 	  writeX,writeY,writeZ,writeW,writeV>
 	  (a, b, x, y, z, w, v, x.Volume());
 #else
@@ -85,7 +85,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       } else if (x.Nspin() == 1) {//staggered
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = 3;
-	value = reduce::reduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,short2,float2,M,Reducer,
+	value = reduce::reduceCuda<doubleN,ReduceType,float2,short2,float2,M,Reducer,
 	  writeX,writeY,writeZ,writeW,writeV>
 	  (a, b, x, y, z, w, v, x.Volume());
 #else

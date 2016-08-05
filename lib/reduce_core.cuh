@@ -30,9 +30,8 @@ struct ReductionArg : public ReduceArg<ReduceType> {
 /**
    Generic reduction kernel with up to four loads and three saves.
  */
-template <int block_size, typename ReduceType, typename ReduceSimpleType,
-	  typename FloatN, int M, typename SpinorX, typename SpinorY,
-	  typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template <int block_size, typename ReduceType, typename FloatN, int M, typename SpinorX,
+	  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
 
   unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
@@ -72,15 +71,14 @@ __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,Spi
 /**
    Generic reduction kernel launcher
 */
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN,
-  int M, typename SpinorX, typename SpinorY, typename SpinorZ,
-  typename SpinorW, typename SpinorV, typename Reducer>
+template <typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
+	  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> &arg,
 		     const TuneParam &tp, const cudaStream_t &stream) {
   if (tp.grid.x > REDUCE_MAX_BLOCKS)
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
-  LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,ReduceSimpleType,FloatN,M);
+  LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,FloatN,M);
 
   if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
@@ -96,9 +94,8 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 }
 
 
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN,
-  int M, typename SpinorX, typename SpinorY, typename SpinorZ,
-  typename SpinorW, typename SpinorV, typename Reducer>
+template <typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
+	  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 class ReduceCuda : public Tunable {
 
 private:
@@ -141,7 +138,7 @@ public:
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>(arg, tp, stream);
+    result = reduceLaunch<doubleN,ReduceType,FloatN,M>(arg, tp, stream);
   }
 
   void preTune() {
@@ -181,9 +178,8 @@ public:
 };
 
 
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType,
-	  typename RegType, typename StoreType, typename zType, int M,
-	  template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
+	  int M, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
 	  int writeX, int writeY, int writeZ, int writeW, int writeV>
 doubleN reduceCuda(const double2 &a, const double2 &b,
 		   ColorSpinorField &x, ColorSpinorField &y,
@@ -192,11 +188,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
 
   // FIXME implement this as a single kernel
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    doubleN even = reduceCuda<doubleN,ReduceType,ReduceSimpleType,
-			      RegType,StoreType,zType,M,Reducer,writeX,writeY,writeZ,writeW,writeV>
+    doubleN even = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
+      Reducer,writeX,writeY,writeZ,writeW,writeV>
       (a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even(), length);
-    doubleN odd = reduceCuda<doubleN,ReduceType,ReduceSimpleType,
-			     RegType,StoreType,zType,M,Reducer,writeX,writeY,writeZ,writeW,writeV>
+    doubleN odd = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
+      Reducer,writeX,writeY,writeZ,writeW,writeV>
       (a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Even(), length);
     return even + odd;
   }
@@ -235,7 +231,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
   Reducer<ReduceType, Float2, RegType> r( (Float2)vec2(a), (Float2)vec2(b));
   doubleN value;
 
-  ReduceCuda<doubleN,ReduceType,ReduceSimpleType,RegType,M,
+  ReduceCuda<doubleN,ReduceType,RegType,M,
     Spinor<RegType,StoreType,M,writeX,0>,
     Spinor<RegType,StoreType,M,writeY,1>,
     Spinor<RegType,    zType,M,writeZ,2>,

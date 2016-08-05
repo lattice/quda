@@ -23,8 +23,8 @@ template <int N, typename ReduceType, typename SpinorX, typename SpinorY,
 };
 
 
-template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
-  typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template<int block_size, int N, typename ReduceType, typename FloatN, int M,
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg){
 
     unsigned int gridSize = gridDim.x*blockDim.x;
@@ -62,8 +62,8 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
 
   } // multiReduceKernel
 
-template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN,
-int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template<int N, typename doubleN, typename ReduceType, typename FloatN, int M,
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 void multiReduceLaunch(doubleN result[], 
                        MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> &arg,
                        const TuneParam &tp, const cudaStream_t &stream){
@@ -71,7 +71,7 @@ void multiReduceLaunch(doubleN result[],
   if(tp.grid.x > REDUCE_MAX_BLOCKS)
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
-  LAUNCH_KERNEL(multiReduceKernel, tp, stream, arg, N, ReduceType, ReduceSimpleType, FloatN, M);
+  LAUNCH_KERNEL(multiReduceKernel, tp, stream, arg, N, ReduceType, FloatN, M);
 
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
   if(deviceProp.canMapHostMemory){
@@ -102,9 +102,8 @@ namespace detail
 template<unsigned num>
 struct num_to_string : detail::explode<num / 10, num % 10> {};
 
-template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType, 
-  typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, 
-  typename SpinorW, typename SpinorV, typename Reducer>
+template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
+  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   class MultiReduceCuda : public Tunable {
 
     private: 
@@ -148,7 +147,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 
       void apply(const cudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        multiReduceLaunch<N,doubleN,ReduceType,ReduceSimpleType,FloatN,M>(result,arg,tp,stream);
+        multiReduceLaunch<N,doubleN,ReduceType,FloatN,M>(result,arg,tp,stream);
       }
 
       bool advanceGridDim(TuneParam &param) const {
@@ -197,7 +196,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 
 
 
-template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType, 
+template<int N, typename doubleN, typename ReduceType,
   template <typename ReducerType, typename Float, typename FloatN> class Reducer,
   int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll> 
   void multiReduceCuda(doubleN result[], const double2& a, const double2& b,
@@ -234,7 +233,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         vpp.push_back(&vp[i]);
       }
 
-      multiReduceCuda<N, doubleN, ReduceType, ReduceSimpleType, Reducer, writeX,
+      multiReduceCuda<N, doubleN, ReduceType, Reducer, writeX,
         writeY, writeZ, writeW, writeV, siteUnroll>
           (evenResult, a, b, xpp, ypp, zpp, wpp, vpp);
 
@@ -252,7 +251,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         vpp.push_back(&vp[i]);
       }
 
-      multiReduceCuda<N, doubleN, ReduceType, ReduceSimpleType, Reducer, writeX,
+      multiReduceCuda<N, doubleN, ReduceType, Reducer, writeX,
         writeY, writeZ, writeW, writeV, siteUnroll> 
           (oddResult, a, b, xpp, ypp, zpp, wpp, vpp);
 
@@ -299,7 +298,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
           V[i].set(*v[i]);
         }
         Reducer<ReduceType, double2, double2> r(a,b);
-        MultiReduceCuda<N, doubleN, ReduceType, ReduceSimpleType, double2, M,
+        MultiReduceCuda<N, doubleN, ReduceType, double2, M,
           Spinor<double2, double2, M, writeX>, Spinor<double2, double2, M, writeY>,
           Spinor<double2, double2, M, writeZ>, Spinor<double2, double2, M, writeW>,
           Spinor<double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
@@ -327,7 +326,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         }
 
         Reducer<ReduceType, double2, double2> r(a,b);
-        MultiReduceCuda<N, doubleN, ReduceType, ReduceSimpleType, double2, M,
+        MultiReduceCuda<N, doubleN, ReduceType, double2, M,
           Spinor<double2, double2, M, writeX>, Spinor<double2, double2, M, writeY>,
           Spinor<double2, double2, M, writeZ>, Spinor<double2, double2, M, writeW>,
           Spinor<double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
@@ -359,7 +358,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         }
 
 	Reducer<ReduceType, float2, float4> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
-	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float4,M,
+	MultiReduceCuda<N,doubleN,ReduceType,float4,M,
 	  Spinor<float4,float4,M,writeX>, Spinor<float4,float4,M,writeY>,
 	  Spinor<float4,float4,M,writeZ>, Spinor<float4,float4,M,writeW>,
 	  Spinor<float4,float4,M,writeV>, Reducer<ReduceType, float2, float4> >
@@ -388,7 +387,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         }
 
 	Reducer<ReduceType, float2, float2> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
-	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float2,M,
+	MultiReduceCuda<N,doubleN,ReduceType,float2,M,
 	  Spinor<float2,float2,M,writeX>, Spinor<float2,float2,M,writeY>,
 	  Spinor<float2,float2,M,writeZ>, Spinor<float2,float2,M,writeW>,
 	  Spinor<float2,float2,M,writeV>, Reducer<ReduceType, float2, float2> >
@@ -416,7 +415,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         }
 
 	Reducer<ReduceType, float2, float4> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
-	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float4,6,
+	MultiReduceCuda<N,doubleN,ReduceType,float4,6,
 	  Spinor<float4,short4,6,writeX>, Spinor<float4,short4,6,writeY>,
 	  Spinor<float4,short4,6,writeZ>, Spinor<float4,short4,6,writeW>,
 	  Spinor<float4,short4,6,writeV>, Reducer<ReduceType, float2, float4> >
@@ -442,7 +441,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         }
 
 	Reducer<ReduceType, float2, float2> r(make_float2(a.x,a.y), make_float2(b.x,b.y));
-	MultiReduceCuda<N,doubleN,ReduceType,ReduceSimpleType,float2,3,
+	MultiReduceCuda<N,doubleN,ReduceType,float2,3,
 	  Spinor<float2,short2,3,writeX>, Spinor<float2,short2,3,writeY>,
 	  Spinor<float2,short2,3,writeZ>, Spinor<float2,short2,3,writeW>,
 	  Spinor<float2,short2,3,writeV>, Reducer<ReduceType, float2, float2> >
