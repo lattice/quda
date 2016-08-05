@@ -113,5 +113,3 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 
   return value;
 }
-
-#include "multi_reduce_core.h"

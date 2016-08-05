@@ -35,23 +35,21 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 
 #define REDUCE_MAX_BLOCKS 65536
 
-#define checkSpinor(a, b)						\
-  {									\
-    if (a.Precision() != b.Precision())					\
-      errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision()); \
-    if (a.Length() != b.Length())					\
-      errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
-    if (a.Stride() != b.Stride())					\
-      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
-  }
+void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
+  if (a.Precision() != b.Precision())
+    errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
+  if (a.Length() != b.Length())
+    errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
+  if (a.Stride() != b.Stride())
+    errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());
+}
 
-#define checkLength(a, b)						\
-  {									\
-    if (a.Length() != b.Length())					\
-      errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
-    if (a.Stride() != b.Stride())					\
-      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
-  }
+void checkLength(const ColorSpinorField &a, ColorSpinorField &b) {									\
+  if (a.Length() != b.Length())
+    errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
+  if (a.Stride() != b.Stride())
+    errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());
+}
 
 static struct {
   const char *vol_str;
@@ -127,6 +125,7 @@ namespace quda {
 #include <reduce_core.cuh>
 #include <reduce_core.h>
 #include <reduce_mixed_core.h>
+#include <multi_reduce_core.h>
 
     } // namespace reduce
 
