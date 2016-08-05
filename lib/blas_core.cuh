@@ -101,15 +101,15 @@ public:
     arg.W.load(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
   }
 
-  long long flops() const { return arg.f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
+  long long flops() const { return arg.f.flops()*vec_length<FloatN>::value*arg.length*M; }
   long long bytes() const
   {
     // bytes for low-precision vector
-    size_t base_bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    size_t base_bytes = arg.X.Precision()*vec_length<FloatN>::value*M;
     if (arg.X.Precision() == QUDA_HALF_PRECISION) base_bytes += sizeof(float);
 
     // bytes for high precision vector
-    size_t extra_bytes = arg.Y.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    size_t extra_bytes = arg.Y.Precision()*vec_length<FloatN>::value*M;
     if (arg.Y.Precision() == QUDA_HALF_PRECISION) extra_bytes += sizeof(float);
 
     // the factor two here assumes we are reading and writing to the high precision vector
@@ -134,9 +134,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     return;
   }
 
-  checkLength(x, y);
-  checkLength(x, z);
-  checkLength(x, w);
+  checkLength(x, y); checkLength(x, z); checkLength(x, w);
 
   if (!x.isNative()) {
     warningQuda("Device blas on non-native fields is not supported\n");

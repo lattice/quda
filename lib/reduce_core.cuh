@@ -157,16 +157,16 @@ public:
     arg.V.load(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
-  long long flops() const { return arg.r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
+  long long flops() const { return arg.r.flops()*vec_length<FloatN>::value*arg.length*M; }
 
   long long bytes() const
   {
     // bytes for low-precision vector
-    size_t base_bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    size_t base_bytes = arg.X.Precision()*vec_length<FloatN>::value*M;
     if (arg.X.Precision() == QUDA_HALF_PRECISION) base_bytes += sizeof(float);
 
     // bytes for high precision vector
-    size_t extra_bytes = arg.Y.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    size_t extra_bytes = arg.Y.Precision()*vec_length<FloatN>::value*M;
     if (arg.Y.Precision() == QUDA_HALF_PRECISION) extra_bytes += sizeof(float);
 
     // the factor two here assumes we are reading and writing to the high precision vector
@@ -197,10 +197,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
     return even + odd;
   }
 
-  checkLength(x, y);
-  checkLength(x, z);
-  checkLength(x, w);
-  checkLength(x, v);
+  checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x, v);
 
   if (!x.isNative()) {
     warningQuda("Device reductions on non-native fields is not supported\n");
@@ -228,7 +225,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
   typedef vector<Float,2> vec2;
-  Reducer<ReduceType, Float2, RegType> r( (Float2)vec2(a), (Float2)vec2(b));
+  Reducer<ReduceType, Float2, RegType> r((Float2)vec2(a), (Float2)vec2(b));
   doubleN value;
 
   ReduceCuda<doubleN,ReduceType,RegType,M,
