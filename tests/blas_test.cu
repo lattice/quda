@@ -31,7 +31,7 @@ extern bool verify_results;
 
 extern void usage(char** );
 
-const int Nkernels = 32;
+const int Nkernels = 33;
 
 using namespace quda;
 
@@ -353,6 +353,10 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::HeavyQuarkResidualNorm(*xD, *yD);
       break;
 
+    case 32:
+      for (int i=0; i < niter; ++i) blas::xpyHeavyQuarkResidualNorm(*xD, *yD, *zD);
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -415,7 +419,6 @@ double test(int kernel) {
     blas::axpy(a, *xD, *yD);
     blas::axpy(a, *xH, *yH);
     *zH = *yD;
-    printfQuda("axpy check %e %e\n", blas::norm2(*yH), blas::norm2(*zH));
     error = ERROR(y);
     break;
 
@@ -645,7 +648,17 @@ double test(int kernel) {
     *yD = *yH;
     { double3 d = blas::HeavyQuarkResidualNorm(*xD, *yD);
       double3 h = blas::HeavyQuarkResidualNorm(*xH, *yH);
-      error = fabs(d.x - h.x) / fabs(h.x) + 
+      error = fabs(d.x - h.x) / fabs(h.x) +
+	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+
+  case 32:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    { double3 d = blas::xpyHeavyQuarkResidualNorm(*xD, *yD, *zD);
+      double3 h = blas::xpyHeavyQuarkResidualNorm(*xH, *yH, *zH);
+      error = ERROR(y) + fabs(d.x - h.x) / fabs(h.x) +
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
@@ -689,8 +702,9 @@ const char *names[] = {
   "caxpyDotzy",
   "cDotProductNormA",
   "cDotProductNormB",
-  "caxpbypzYmbwcDotProductWYNormY",
-  "HeavyQuarkResidualNorm"
+  "caxpbypzYmbwcDotProductUYNormY",
+  "HeavyQuarkResidualNorm",
+  "xpyHeavyQuarkResidualNorm"
 };
 
 int main(int argc, char** argv)
@@ -825,8 +839,9 @@ INSTANTIATE_TEST_CASE_P(xpaycDotzy_half, BlasTest, ::testing::Values( make_int2(
 INSTANTIATE_TEST_CASE_P(caxpyDotzy_half, BlasTest, ::testing::Values( make_int2(0,27) ));
 INSTANTIATE_TEST_CASE_P(cDotProductNormA_half, BlasTest, ::testing::Values( make_int2(0,28) ));
 INSTANTIATE_TEST_CASE_P(cDotProductNormB_half, BlasTest, ::testing::Values( make_int2(0,29) ));
-INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_half, BlasTest, ::testing::Values( make_int2(0,30) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductUYNormY_half, BlasTest, ::testing::Values( make_int2(0,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,31) ));
+INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,32) ));
 
 // single precision
 INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
@@ -859,8 +874,9 @@ INSTANTIATE_TEST_CASE_P(xpaycDotzy_single, BlasTest, ::testing::Values( make_int
 INSTANTIATE_TEST_CASE_P(caxpyDotzy_single, BlasTest, ::testing::Values( make_int2(1,27) ));
 INSTANTIATE_TEST_CASE_P(cDotProductNormA_single, BlasTest, ::testing::Values( make_int2(1,28) ));
 INSTANTIATE_TEST_CASE_P(cDotProductNormB_single, BlasTest, ::testing::Values( make_int2(1,29) ));
-INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_single, BlasTest, ::testing::Values( make_int2(1,30) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductUYNormY_single, BlasTest, ::testing::Values( make_int2(1,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,31) ));
+INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,32) ));
 
 // double precision
 INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
@@ -893,6 +909,7 @@ INSTANTIATE_TEST_CASE_P(xpaycDotzy_double, BlasTest, ::testing::Values( make_int
 INSTANTIATE_TEST_CASE_P(caxpyDotzy_double, BlasTest, ::testing::Values( make_int2(2,27) ));
 INSTANTIATE_TEST_CASE_P(cDotProductNormA_double, BlasTest, ::testing::Values( make_int2(2,28) ));
 INSTANTIATE_TEST_CASE_P(cDotProductNormB_double, BlasTest, ::testing::Values( make_int2(2,29) ));
-INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_double, BlasTest, ::testing::Values( make_int2(2,30) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductUYNormY_double, BlasTest, ::testing::Values( make_int2(2,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,31) ));
+INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,32) ));
 
