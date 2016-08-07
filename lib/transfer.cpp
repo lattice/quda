@@ -285,6 +285,7 @@ namespace quda {
     } else {
       if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
 	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+      if (in.Location() == QUDA_CUDA_FIELD_LOCATION) input = coarse_tmp_h;
     }
 
     *input = in; // copy result to input field (aliasing handled automatically)
@@ -325,6 +326,7 @@ namespace quda {
     } else {
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
 	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+      if (out.Location() == QUDA_CUDA_FIELD_LOCATION) output = coarse_tmp_h;
     }
 
     *input = in;

@@ -2,7 +2,7 @@
 #include <multigrid.h>
 #include <algorithm>
 
-#define CPU_EMULATION
+const bool staggered_dslash_emulation =  true;
 
 namespace quda {
 
@@ -87,7 +87,9 @@ namespace quda {
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X_h = new cpuGaugeField(gParam);
     Xinv_h = new cpuGaugeField(gParam);
-#ifndef CPU_EMULATION
+
+    if(staggered_dslash_emulation) return;
+
     dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer);
 
     if (enable_gpu) {
@@ -107,7 +109,6 @@ namespace quda {
       X_d->copy(*X_h);
       Xinv_d->copy(*Xinv_h);
     }
-#endif
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -177,11 +178,12 @@ namespace quda {
     bool is_staggered = false;
     if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
 
-#ifdef CPU_EMULATION
-      bool single_parity_application = false;
-      bool mdagm_operator            = false;
+    if(staggered_dslash_emulation)
+    {
+        bool single_parity_application = false;
+        bool cg_mdagm_operator         = false;
+        bool fg_mdagm_operator         = false;
 
-      {
         if (!enable_gpu) errorQuda("Cannot apply coarse grid operator on GPU since enable_gpu has not been set");
         const std::vector<ColorSpinorField*> &B = transfer->RawVectors();
         const ColorSpinorField &tmp3 = *B[0];
@@ -204,9 +206,7 @@ namespace quda {
 
         transfer->P(*tmp1, in);
 
-        Dirac &dirac_tmp  = const_cast<Dirac&>(*dirac);
-
-        if (mdagm_operator)
+        if (cg_mdagm_operator)
         {
           if( csParam.siteSubset == QUDA_PARITY_SITE_SUBSET )
           {
@@ -215,18 +215,21 @@ namespace quda {
           else
           {
             dirac->MdagM(tmp2->Even(), tmp1->Even());
-            double _m = dirac_tmp.Mass();
-            blas::ax(4*_m*_m, tmp1->Odd());
+
+            blas::ax(4*dirac->Mass()*dirac->Mass(), tmp1->Odd());
             tmp2->Odd() = tmp1->Odd();
           }
         }
         else
         { 
-          double _m = dirac_tmp.Mass();
-          //
-          dirac->M(*tmp2, *tmp1);
-          blas::ax(2*_m, *tmp2);
-          //
+//#define HERMITIAN
+          //Non-hermitian version:
+          dirac->M(*tmp2, *tmp1);//WARNING: this may be hermitian, check dirac_staggered.cpp
+          //Hermitian version:
+#ifdef HERMITIAN          
+          blas::ax(-1.0, tmp2->Odd());
+#endif
+          if(fg_mdagm_operator) blas::ax(2*dirac->Mass(), *tmp2);
         }
 
         transfer->R(out, *tmp2);
@@ -235,8 +238,7 @@ namespace quda {
         delete tmp2;
 
         return;
-      }
-#endif
+    }
 
     if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
       if (!enable_gpu)
