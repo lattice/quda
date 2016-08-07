@@ -123,7 +123,6 @@ namespace quda {
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel-1) {
       QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
-      //QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
 
       // create transfer operator
       printfQuda("start creating transfer operator\n");
@@ -132,6 +131,7 @@ namespace quda {
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
       //transfer->setTransferGPU(false); // use this to force location of transfer
+      //transfer->setSiteSubset(QUDA_FULL_SITE_SUBSET , (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY);
       printfQuda("end creating transfer operator\n");
 
       // create coarse residual vector
@@ -177,30 +177,18 @@ namespace quda {
       // coarse null space vectors (dummy for now)
       printfQuda("Creating coarse null-space vectors\n");
       B_coarse = new std::vector<ColorSpinorField*>();
-      B_coarse->resize(param.Nvec);
+      int nVec_coarse = std::max(param.Nvec, param.mg_global.n_vec[param.level+1]);
+      B_coarse->resize(nVec_coarse);
 
-      for (int i=0; i<param.Nvec; i++) {
+      for (int i=0; i<nVec_coarse; i++)
 	(*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
-	zero(*(*B_coarse)[i]);
-	transfer->R(*(*B_coarse)[i], *(param.B[i]));
-#if 0
-	if (param.level != 99) {
-	  ColorSpinorParam csParam2(*(*B_coarse)[i]);
-	  csParam2.create = QUDA_ZERO_FIELD_CREATE;
-	  ColorSpinorField *tmp = ColorSpinorField::Create(csParam2);
-	  for (int s=i; s<(*B_coarse)[i]->Nspin(); s+=2) {
-	    for (int c=0; c<(*B_coarse)[i]->Ncolor(); c++) {
-	      tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
-	      //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, 2);                                                                                       
-	      //xpy(*tmp,*(*B_coarse)[i]);
-	    }
-	  }
-	  delete tmp;
-          (*B_coarse)[i]->Source(QUDA_RANDOM_SOURCE);                                                                                      
-          printfQuda("B_coarse[%d]\n", i);
-	}
-#endif
 
+      // if we're not generating on all levels then we need to propagate the vectors down
+      if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO) {
+	for (int i=0; i<param.Nvec; i++) {
+	  zero(*(*B_coarse)[i]);
+	  transfer->R(*(*B_coarse)[i], *(param.B[i]));
+	}
       }
 
       // create the next multigrid level
@@ -393,7 +381,7 @@ namespace quda {
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     zero(*tmp_coarse);
     zero(*r_coarse);
-#if 0
+
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp1, *tmp_coarse);
 
@@ -440,7 +428,7 @@ namespace quda {
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
-#endif    
+
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;

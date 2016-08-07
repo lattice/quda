@@ -328,6 +328,8 @@ namespace quda {
       r2 = blas::xmyNorm(b, r);
       blas::copy(y, x);
       if (&x == &xSloppy) blas::zero(x); // need to zero x when doing uni-precision solver
+      else blas::zero(xSloppy);
+      if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) b2 = r2;
     } else {
       blas::copy(r, b);
       r2 = b2;
@@ -336,7 +338,7 @@ namespace quda {
     }
 
     // Check to see that we're not trying to invert on a zero-field source
-    if (b2 == 0) {
+    if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
       profile.TPSTOP(QUDA_PROFILE_INIT);
       warningQuda("inverting on zero-field source\n");
       x = b;
@@ -454,6 +456,7 @@ namespace quda {
 
 	// recalculate residual in high precision
 	blas::copy(x, xSloppy);
+//printfQuda("\nSolution (Error): %1.15e\n", blas::norm2(xSloppy));
 	blas::xpy(x, y);
 	mat(r, y, x);
 	r2 = blas::xmyNorm(b, r);  

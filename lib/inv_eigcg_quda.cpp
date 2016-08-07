@@ -1358,7 +1358,7 @@ namespace quda {
            copy(*inSloppy, *in);//input is outer residual
            copy(*outSloppy, *out);
 
-           if (ext_tol < SINGLE_PRECISION_EPSILON) param.tol = SINGLE_PRECISION_EPSILON;//single precision eigcg tolerance
+           if (ext_tol < SINGLE_PRECISION_EPSILON) param.tol = 5e-5;//SINGLE_PRECISION_EPSILON;//single precision eigcg tolerance
 
            //the first eigcg cycle:
            eigcg_restarts = EigCG(*outSloppy, *inSloppy);
@@ -1479,7 +1479,9 @@ namespace quda {
            param.gflops += initCGparam.gflops;
            //
            param.secs   = tot_time;
-
+           //
+           eigcg_global_stop = 0.0;
+           param.tol         = ext_tol;           
         }//end of the mixed precision branch
 
         if(getVerbosity() >= QUDA_VERBOSE)

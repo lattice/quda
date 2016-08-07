@@ -352,6 +352,7 @@ namespace quda {
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
+     @param cloverInv[in] Inverse Clover field on fine grid (optional, only for twisted-clover)
      @param kappa[in] Kappa parameter
      @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
      @param matpc[in] The type of even-odd preconditioned fine-grid
@@ -360,7 +361,7 @@ namespace quda {
      even-odd preconditioned and we coarsen the full operator.
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover,
+		const cudaGaugeField &gauge, const cudaCloverField *clover, const cudaCloverField *cloverInv,
 		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
 
 
