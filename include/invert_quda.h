@@ -195,7 +195,7 @@ namespace quda {
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess), compute_null_vector(param.compute_null_vector),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
@@ -233,7 +233,7 @@ namespace quda {
 
     SolverParam(const SolverParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess), compute_null_vector(param.compute_null_vector),
       delta(param.delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
@@ -418,21 +418,9 @@ namespace quda {
       Solver *K;
       SolverParam Kparam; // parameters for preconditioner solve
 
-      int nKrylov;//corresponds to m_{max}+1, if nKrylov = 1 , use standard pcg
-      double *pAp;
-
-      std::vector<ColorSpinorField*> p;  // CG conjugate vectors
-      std::vector<ColorSpinorField*> Ap; // mat * conj.vectors 
-
     public:
       PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
                SolverParam &param, TimeProfile &profile);
-    /**
-       @param K Preconditioner
-     */
-      PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	SolverParam &param, TimeProfile &profile);
-
       virtual ~PreconCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
