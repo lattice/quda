@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <random>
 
 #include <test_util.h>
 #include <dslash_util.h>
@@ -124,6 +125,7 @@ void constructSpinorField(Float *res, const int Vol) {
   }
 }
 
+#define USE_QDP_LINKS
 
 void setGaugeParam(QudaGaugeParam &gaugeParam, double tadpole_coeff) {
 
@@ -240,11 +242,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.omega[i] = 0.85; // over/under relaxation factor
 
-    //mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
-    mg_param.location[i] = QUDA_CPU_FIELD_LOCATION;
+    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
+    //mg_param.location[i] = QUDA_CPU_FIELD_LOCATION;
   }
 
   mg_param.smoother_solve_type[0] = solve_type == QUDA_NORMOP_PC_SOLVE? QUDA_NORMOP_PC_SOLVE : mg_param.smoother_solve_type[0]; //or choose QUDA_DIRECT_SOLVE;
+  //mg_param.smoother_solve_type[0] = QUDA_NORMOP_PC_SOLVE;//enforce PC solve
   // coarsen the spin on the first restriction is undefined for staggered fields
   mg_param.spin_block_size[0] = 0;
 
@@ -256,21 +259,24 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
      ////mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;//remove
   } 
   //
-  //mg_param.null_solve_type = QUDA_DIRECT_SOLVE;
-  mg_param.null_solve_type = mg_param.smoother_solve_type[0];
+  mg_param.null_solve_type = QUDA_DIRECT_SOLVE;
+  //mg_param.null_solve_type = mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE ? mg_param.smoother_solve_type[0] : QUDA_NORMOP_PC_SOLVE;
 
   //number of the top-level smoothing:
   mg_param.nu_pre[0] = nu_pre;
   mg_param.nu_post[0] = nu_post;
 
   // coarse grid solver is GCR
+  //mg_param.smoother[mg_levels-1] = QUDA_CG_INVERTER; //QUDA_GCR_INVERTER;
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
 
 //  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_LOW_MODE_VECTOR;
- // mg_param.compute_null_vector = QUDA_COMPUTE_LOW_MODE_VECTOR;
+  //mg_param.compute_null_vector = QUDA_COMPUTE_LOW_MODE_VECTOR;
 
-  //if (mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR) 
+  if (mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR) 
+    mg_param.eigensolver_precision = cuda_prec;//??
+  else
     mg_param.eigensolver_precision = cuda_prec;
 
   mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES 
@@ -290,10 +296,10 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.reliable_delta = 1e-10;
   inv_param.gcrNkrylov = 16;//10
 
-  inv_param.verbosity = QUDA_SUMMARIZE;
-  //inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
-  //inv_param.verbosity_precondition = QUDA_VERBOSE;
+  //inv_param.verbosity = QUDA_SUMMARIZE;
+  inv_param.verbosity = QUDA_VERBOSE;
+  //inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  inv_param.verbosity_precondition = QUDA_VERBOSE;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -335,11 +341,11 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
-  //inv_param.verbosity_precondition = QUDA_VERBOSE;
+  //inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  inv_param.verbosity_precondition = QUDA_VERBOSE;
 
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;//MR->GCR
-  inv_param.gcrNkrylov = 20;
+  inv_param.gcrNkrylov = 24;
   inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine convergence
@@ -361,11 +367,14 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.maxiter_precondition = 1;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
+//needed to test the top level error bahaviour
+  //inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+  //inv_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
 
   return;
 }
 
-
+#define CHECK_PLAQUETTE
 
 void mg_test(int argc, char** argv)
 {
@@ -397,18 +406,60 @@ void mg_test(int argc, char** argv)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
+  void *inlinks=malloc(4*V*gaugeSiteSize*gSize);
+  void *inlink[4];
+
+  for (int dir = 0; dir < 4; dir++) {
+     inlink[dir] = (void*)((char*)inlinks + dir*V*gaugeSiteSize*gSize);
+  }
+
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-
-    void *inlinks=malloc(4*V*gaugeSiteSize*gSize);
-    void *inlink[4];
-
-    for (int dir = 0; dir < 4; dir++) {
-       inlink[dir] = (void*)((char*)inlinks + dir*V*gaugeSiteSize*gSize);
-    }
-
     read_gauge_field(latfile, inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(inlink, 2, gauge_param.cpu_prec, &gauge_param);
-    
+    //construct_gauge_field(inlink, 2, gauge_param.cpu_prec, &gauge_param);
+    construct_fat_long_gauge_field(inlink, nullptr, 3, gauge_param.cpu_prec, &gauge_param, dslash_type);
+    QudaGaugeParam gParam = newQudaGaugeParam();
+#ifdef CHECK_PLAQUETTE
+    gParam.gauge_order = QUDA_QDP_GAUGE_ORDER ;
+
+    gParam.X[0] = xdim;
+    gParam.X[1] = ydim;
+    gParam.X[2] = zdim;
+    gParam.X[3] = tdim;
+
+    gParam.anisotropy = 1.0;
+    gParam.type = QUDA_WILSON_LINKS;
+    gParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+
+    gParam.cpu_prec = cpu_prec;
+    gParam.cuda_prec = cuda_prec;
+    gParam.reconstruct = link_recon;
+    gParam.cuda_prec_sloppy = cuda_prec_sloppy;
+    gParam.reconstruct_sloppy = link_recon_sloppy;
+    gParam.cuda_prec_precondition = cuda_prec_precondition;
+    gParam.reconstruct_precondition = link_recon_precondition;
+    gParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+    gParam.ga_pad = 0;
+
+#ifdef MULTI_GPU
+    int x_face_size = gParam.X[1]*gParam.X[2]*gParam.X[3]/2;
+    int y_face_size = gParam.X[0]*gParam.X[2]*gParam.X[3]/2;
+    int z_face_size = gParam.X[0]*gParam.X[1]*gParam.X[3]/2;
+    int t_face_size = gParam.X[0]*gParam.X[1]*gParam.X[2]/2;
+    int pad_size = std::max(x_face_size, y_face_size);
+    pad_size = std::max(pad_size, z_face_size);
+    pad_size = std::max(pad_size, t_face_size);
+    gParam.ga_pad = pad_size;
+#endif
+    loadGaugeQuda( (void*)inlink,  &gParam );
+    printfQuda("\nLoaded fields\n");
+
+    double plq[3];
+    plaqQuda (plq); 
+    freeGaugeQuda();
+
+    printfQuda("\nPlaq : %le, %le, %le\n", plq[0], plq[1], plq[2]);
+#endif   
 //see ./milc_qcd/generic_ks/fermion_links_fn_load_gpu.c
 //see ./milc_qcd/generic_ks/fermion_links_fn_load_milc.c
 // 'load_fn_links' ->  'load_imp_ferm_links' ->./milc_qcd/generic_ks/fermion_links_milc.c 
@@ -418,7 +469,6 @@ void mg_test(int argc, char** argv)
     QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
 #endif
 
-    QudaGaugeParam gParam = newQudaGaugeParam();
     for(int dir=0; dir<4; ++dir) gParam.X[dir] = gauge_param.X[dir];
     gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = gauge_param.cpu_prec;
     gParam.type = QUDA_GENERAL_LINKS;
@@ -452,18 +502,35 @@ void mg_test(int argc, char** argv)
     act_path_coeff[5] = -1.250000e-01;
 
 
-    computeKSLinkQuda( fatlink, longlink, NULL, inlinks, const_cast<double*>(act_path_coeff), &gParam, method);
-    //computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method);
-
+    //computeKSLinkQuda( fatlink, longlink, NULL, inlinks, const_cast<double*>(act_path_coeff), &gParam, method);
+#ifdef USE_QDP_LINKS 
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink[dir], inlink[dir] , V*gaugeSiteSize*gSize);
+    }
+#else    
+    for(int dir=0; dir<4; ++dir){
+      double check_sum = 0.0;
+      for(int i=0; i<V; ++i){
+        for(int j=0; j<gaugeSiteSize; ++j){
+          if(gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION){
+            ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)inlink[dir])[i*gaugeSiteSize + j];
+            check_sum += ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j];
+          }else{
+            ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)inlink[dir])[i*gaugeSiteSize + j];
+          }
+        }
+      }
+    }
+#endif
     freeGaugeQuda();
 
-    free(inlinks);
+    //free(inlinks);
   } else { // else generate a random SU(3) field
 
 //#define EXPERIMENTAL
 
 #ifndef EXPERIMENTAL
-#define GAUGE_TRANSFORM
+//#define GAUGE_TRANSFORM
     const int gen_type = 1;
 
     construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec, 
@@ -485,30 +552,79 @@ void mg_test(int argc, char** argv)
     free(su3_buffer);
 #endif //GAUGE_TRANSFORM
 
+#ifdef CHECK_PLAQUETTE
+    QudaGaugeParam gParam = newQudaGaugeParam();
+    gParam.gauge_order = QUDA_QDP_GAUGE_ORDER ;
+
+    gParam.X[0] = xdim;
+    gParam.X[1] = ydim;
+    gParam.X[2] = zdim;
+    gParam.X[3] = tdim;
+
+    gParam.anisotropy = 1.0;
+    gParam.type = QUDA_WILSON_LINKS;
+    gParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+
+    gParam.cpu_prec = cpu_prec;
+    gParam.cuda_prec = cuda_prec;
+    gParam.reconstruct = link_recon;
+    gParam.cuda_prec_sloppy = cuda_prec_sloppy;
+    gParam.reconstruct_sloppy = link_recon_sloppy;
+    gParam.cuda_prec_precondition = cuda_prec_precondition;
+    gParam.reconstruct_precondition = link_recon_precondition;
+    gParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+    gParam.ga_pad = 0;
+
+#ifdef MULTI_GPU
+    int x_face_size = gParam.X[1]*gParam.X[2]*gParam.X[3]/2;
+    int y_face_size = gParam.X[0]*gParam.X[2]*gParam.X[3]/2;
+    int z_face_size = gParam.X[0]*gParam.X[1]*gParam.X[3]/2;
+    int t_face_size = gParam.X[0]*gParam.X[1]*gParam.X[2]/2;
+    int pad_size = std::max(x_face_size, y_face_size);
+    pad_size = std::max(pad_size, z_face_size);
+    pad_size = std::max(pad_size, t_face_size);
+    gParam.ga_pad = pad_size;
+#endif
+    loadGaugeQuda( (void*)qdp_fatlink,  &gParam );
+    printfQuda("\nLoaded fields\n");
+
+    double plq[3];
+    plaqQuda (plq);
+    freeGaugeQuda();
+
+    printfQuda("\nPlaq : %le, %le, %le\n", plq[0], plq[1], plq[2]);
+
+#endif
+
 #ifndef USE_QDP_LINKS
     for(int dir=0; dir<4; ++dir){
+      double check_sum = 0.0;
       for(int i=0; i<V; ++i){
         for(int j=0; j<gaugeSiteSize; ++j){
           if(gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION){
             ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
             ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+            check_sum += ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j];
           }else{
             ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
             ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
           }
         }
       }
+      printfQuda("\nCheck sum dir %d : %1.18e\n", dir, check_sum); 
     }
 #endif //USE_QDP_LINKS
 
 #else //EXPERIMENTAL
-
+/*
     void *inlinks=malloc(4*V*gaugeSiteSize*gSize);
     void *inlink[4];
 
     for (int dir = 0; dir < 4; dir++) {
        inlink[dir] = (void*)((char*)inlinks + dir*V*gaugeSiteSize*gSize);
     }
+*/
     construct_gauge_field(inlink, 1, gauge_param.cpu_prec, &gauge_param);
 
 #ifdef MULTI_GPU
@@ -547,9 +663,11 @@ void mg_test(int argc, char** argv)
     computeKSLinkQuda( fatlink, longlink, NULL, inlinks, const_cast<double*>(act_path_coeff), &gParam, method);
     freeGaugeQuda();
 
-    free(inlinks);
+    //free(inlinks);
 #endif
   }
+
+  free(inlinks);
 
   ColorSpinorParam csParam;
   csParam.nColor=3;
@@ -558,7 +676,7 @@ void mg_test(int argc, char** argv)
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gauge_param.X[d];
   }
-  
+
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
   csParam.siteSubset =  QUDA_FULL_SITE_SUBSET;// QUDA_PARITY_SITE_SUBSET;//
@@ -566,17 +684,23 @@ void mg_test(int argc, char** argv)
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;  
-  in = new cpuColorSpinorField(csParam);  
+
+  if(csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) csParam.x[0] /= 2;
+  in  = new cpuColorSpinorField(csParam);  
   out = new cpuColorSpinorField(csParam);  
   ref = new cpuColorSpinorField(csParam);  
   tmp = new cpuColorSpinorField(csParam);  
 
-  if(csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) csParam.x[0] /= 2;
-
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    constructSpinorField((float*)in->V(), in->Volume());    
+    if(  inv_param.use_init_guess == QUDA_USE_INIT_GUESS_YES && inv_param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
+      constructSpinorField((float*)out->V(), out->Volume());
+    else
+      constructSpinorField((float*)in->V(), in->Volume());    
   }else{
-    constructSpinorField((double*)in->V(), in->Volume());
+    if(  inv_param.use_init_guess == QUDA_USE_INIT_GUESS_YES && inv_param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
+      constructSpinorField((double*)out->V(), out->Volume());
+    else
+      constructSpinorField((double*)in->V(), in->Volume());
   }
 
 #ifdef MULTI_GPU
@@ -649,7 +773,7 @@ void mg_test(int argc, char** argv)
 
   if(inv_type != QUDA_GCR_INVERTER){
       inv_param.inv_type = QUDA_GCR_INVERTER;
-      inv_param.gcrNkrylov = 50;
+      inv_param.gcrNkrylov = 24;
   }
 
   printfQuda("\nMass %le\n", mg_param.invert_param->mass);

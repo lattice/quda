@@ -4,6 +4,11 @@
 #include <string.h>
 #include <short.h>
 
+#include <iostream>
+#include <fstream>
+
+#include <random>
+
 #if defined(QMP_COMMS)
 #include <qmp.h>
 #elif defined(MPI_COMMS)
@@ -23,7 +28,6 @@ using namespace std;
 #define YUP 1
 #define ZUP 2
 #define TUP 3
-
 
 int Z[4];
 int V;
@@ -773,9 +777,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	  sign= -1;
 	}
       }
-
-      for (int j=0;j < 6; j++){
-	gauge[d][i*gaugeSiteSize + 12+ j] *= sign;
+      for (int j = 0;j < 18; j++){
+	gauge[d][i*gaugeSiteSize + j] *= sign;
       }
     }
     //odd
@@ -803,9 +806,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	  sign = -1;
 	}
       }
-
-      for (int j=0;j < 6; j++){
-	gauge[d][(Vh+i)*gaugeSiteSize + 12 + j] *= sign;
+      for (int j=0;j < 18; j++){
+	gauge[d][(Vh+i)*gaugeSiteSize  + j] *= sign;
       }
     }
 
@@ -825,9 +827,9 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int i = 0; i < 6; i++) {
-	gauge[3][j*gaugeSiteSize+ 12+ i ] *= sign;
-	gauge[3][(Vh+j)*gaugeSiteSize+12 +i] *= sign;
+      for (int i = 0; i < 18; i++) {
+	gauge[3][j*gaugeSiteSize+ i ] *= sign;
+	gauge[3][(Vh+j)*gaugeSiteSize +i] *= sign;
       }
     }
   }
@@ -960,11 +962,11 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
     }
   }
 
-  if (param->type == QUDA_WILSON_LINKS){  
+  if (dslash_type == QUDA_WILSON_LINKS){  
     applyGaugeFieldScaling(res, Vh, param);
-  } else if (param->type == QUDA_ASQTAD_LONG_LINKS){
+  } else if (dslash_type == QUDA_ASQTAD_LONG_LINKS ||  dslash_type == QUDA_STAGGERED_DSLASH){
     applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
-  } else if (param->type == QUDA_ASQTAD_FAT_LINKS){
+  } else if (dslash_type == QUDA_ASQTAD_FAT_LINKS){
     for (int dir = 0; dir < 4; dir++){ 
       for (int i = 0; i < Vh; i++) {
 	for (int m = 0; m < 3; m++) { // last 2 rows
@@ -1057,11 +1059,17 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 }
 
 template <typename Float>
-static void constructWeakGaugeField(Float **res, QudaGaugeParam *param, double _mn, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
+static void constructWeakGaugeField(Float **res, QudaGaugeParam *param, int type, double _mn, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
     resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
+  }
+
+  if(type == 3)
+  {
+    applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
+    return;  
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -1127,13 +1135,16 @@ static void constructWeakGaugeField(Float **res, QudaGaugeParam *param, double _
         accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
       }
 
-    }
-  }
+    }//end volume
+  } //end directions
 
+
+  if(type == 2) return;
+ 
   if (param->type == QUDA_WILSON_LINKS){
     applyGaugeFieldScaling(res, Vh, param);
-  } else if (param->type == QUDA_ASQTAD_LONG_LINKS ||  dslash_type == QUDA_STAGGERED_DSLASH){
-    applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
+  } else if (param->type == QUDA_ASQTAD_LONG_LINKS || dslash_type == QUDA_STAGGERED_DSLASH){
+     applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
   } else if (param->type == QUDA_ASQTAD_FAT_LINKS){//???
     for (int dir = 0; dir < 4; dir++){
       for (int i = 0; i < Vh; i++) {
@@ -1147,9 +1158,9 @@ static void constructWeakGaugeField(Float **res, QudaGaugeParam *param, double _
         }
       }
     }
-
   }
-
+  
+  return;
 }
 
 void
@@ -1158,7 +1169,7 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
 			       QudaDslashType dslash_type)
 {
   if (type == 0) {
-    if (precision == QUDA_DOUBLE_PRECISION) {
+    if (precision == QUDA_DOUBLE_PRECISION) { //line 778
       constructUnitGaugeField((double**)fatlink, param, dslash_type);
       constructUnitGaugeField((double**)longlink, param, dslash_type);
     }else {
@@ -1166,25 +1177,27 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       constructUnitGaugeField((float**)longlink, param, dslash_type);
     }
   } else {
-    int seed = 777;
-    srand(seed);
-    const double _mn = 0.1;//0.25 still ok
+    int seed = 2227;
+    if( type != 3) srand(seed);
+    const double _mn = 1e-5;//0.25 still ok, default 0.1, 5e-3 looks ok (!)
 
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
       //constructGaugeField((double**)fatlink, param, dslash_type);
-      constructWeakGaugeField((double**)fatlink, param, _mn, dslash_type);
+      constructWeakGaugeField((double**)fatlink, param, type,  _mn, dslash_type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
       if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((double**)longlink, param, dslash_type);
     }else {
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
       //constructGaugeField((float**)fatlink, param, dslash_type);
-      constructWeakGaugeField((float**)fatlink, param, _mn, dslash_type);
+      constructWeakGaugeField((float**)fatlink, param, type, _mn, dslash_type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
       if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((float**)longlink, param, dslash_type);
     }
   }
+
+  if( type == 3) return;
 
   if(param->reconstruct == QUDA_RECONSTRUCT_9 || 
      param->reconstruct == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
@@ -1210,7 +1223,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
   }
 
   // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  if (dslash_type == QUDA_STAGGERED_DSLASH) { 
+  if (dslash_type == QUDA_STAGGERED_DSLASH || type == 2) { //little hack to test the code
+    warningQuda("Disable long links.\n");  
     for(int dir=0; dir<4; ++dir){
       for(int i=0; i<V; ++i){
 	for(int j=0; j<gaugeSiteSize; j+=2){
@@ -1248,20 +1262,20 @@ transform_gauge_field(void *su3_field, void **fatlink, void** longlink, int type
 
       if(precision == QUDA_DOUBLE_PRECISION){
           //
-          //typedef std::complex<double> Complex;
-          typedef double2 Complex;
+          //typedef std::complex<double> Cmplx;
+          typedef double2 Cmplx;
           void *site_fat_link = &((double*)fatlink[dir])[(par*Vh+i)*gaugeSiteSize];
-          quda::Matrix<Complex,3> *FL = static_cast<quda::Matrix<Complex,3>* > (site_fat_link);
+          quda::Matrix<Cmplx,3> *FL = static_cast<quda::Matrix<Cmplx,3>* > (site_fat_link);
 
           void *site_su3_field = &((double*)su3_field)[(par*Vh+i)*gaugeSiteSize];
-          quda::Matrix<Complex,3> *Omega = static_cast<quda::Matrix<Complex,3>* > (site_su3_field);
+          quda::Matrix<Cmplx,3> *Omega = static_cast<quda::Matrix<Cmplx,3>* > (site_su3_field);
 
           void *site_su3_field_dag = &((double*)su3_field)[(j_par*Vh+j)*gaugeSiteSize];
-          quda::Matrix<Complex,3> *tmp = static_cast<quda::Matrix<Complex,3>* > (site_su3_field_dag);
+          quda::Matrix<Cmplx,3> *tmp = static_cast<quda::Matrix<Cmplx,3>* > (site_su3_field_dag);
 
-          quda::Matrix<Complex,3> OmegaDag = conj(*tmp);
+          quda::Matrix<Cmplx,3> OmegaDag = conj(*tmp);
 
-          quda::Matrix<Complex,3> tmp2 = (*Omega)*(*FL);
+          quda::Matrix<Cmplx,3> tmp2 = (*Omega)*(*FL);
           (*FL) = tmp2*OmegaDag;
       }
       else{
@@ -1747,50 +1761,51 @@ QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_NO;
 QudaPrecision prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_precondition = QUDA_SINGLE_PRECISION;
+
 int xdim = 16;
 int ydim = 16;
 int zdim = 16;
 int tdim = 16;
-int Lsdim = 16;
+int Lsdim = 1;//default for staggered to avoid 5d fields
 QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_STAGGERED_DSLASH;
 char latfile[256] = "";
 int Nsrc = 1;
-bool tune = true;
-int niter = 100;
+bool tune = false;
+int niter = 10;
 int test_type = 0;
-int nvec[QUDA_MAX_MG_LEVEL] = { 24 };
+int nvec[QUDA_MAX_MG_LEVEL] = { 24, 12 };
 char vec_infile[256] = "";
 char vec_outfile[256] = "";
 QudaInverterType inv_type;
-QudaInverterType precon_type = QUDA_GCR_INVERTER;
+QudaInverterType precon_type = QUDA_GCR_INVERTER;//this choice is relevant for solve_type = QUDA_DIRECT_SOLVE  
 //QudaInverterType precon_type = QUDA_MR_INVERTER;
+//QudaInverterType precon_type = QUDA_BICGSTAB_INVERTER;
 int multishift = 0;
 bool verify_results = true;
-double mass = 0.001;
+double mass = 0.01;
 double mu = 0.1;
 double anisotropy = 1.0;
 double clover_coeff = 0.1;
 bool compute_clover = false;
-double tol = 1e-7;
-double tol_hq = 0.;
+double tol = 5e-7;
+double tol_hq = 1e-2;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_MASS_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
-QudaSolveType solve_type =  QUDA_NORMOP_PC_SOLVE;
-//QudaSolveType solve_type = QUDA_DIRECT_SOLVE;
+//QudaSolveType solve_type =  QUDA_NORMOP_PC_SOLVE;
+QudaSolveType solve_type = QUDA_DIRECT_SOLVE;
 
 int mg_levels = 2;
 
-int nu_pre = 4;
-int nu_post = 4;
+int nu_pre = 6;
+int nu_post = 6;
 bool generate_nullspace = true;
-bool generate_all_levels = true;
+bool generate_all_levels = false;//false
 
-int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { {4, 4, 4, 4, 4} };//[4][6]
-
+int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { {4, 4, 4, 4, 4}, {4, 4, 4, 4, 4} };//[4][6]
 static int dim_partitioned[4] = {0,0,0,0};
 
 int dimPartitioned(int dim)
@@ -2337,7 +2352,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--compute-clover") == 0){
+ if( strcmp(argv[i], "--compute-clover") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -2444,7 +2459,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--nsrc") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2457,7 +2472,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
     ret = 0;
     goto out;
-  }
+  }  
 
   if( strcmp(argv[i], "--test") == 0){
     if (i+1 >= argc){

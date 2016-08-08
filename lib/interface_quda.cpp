@@ -2143,8 +2143,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
   cpuParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuParam.precision = param->cuda_prec_sloppy;
-  B.resize(mg_param.n_vec[0]);
-  for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
+  B.reserve(mg_param.n_vec[0]);
+  for (int i=0; i<mg_param.n_vec[0]; i++) B.push_back( new cpuColorSpinorField(cpuParam) );
 
   // fill out the MG parameters for the fine level
   mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
