@@ -43,6 +43,15 @@ namespace quda {
     /** GPU copy of the block-normalized null-space components that define the prolongator */
     ColorSpinorField *V_d;
 
+    /** The Dirac operator to use for smoothed intergrid transfers, this will be optimized in future updates */
+    DiracMatrix *matSmoothTransfer;
+
+    /** smoothed transfer parameter */
+    std::complex<double> alpha;
+
+    /** A GPU temporary field with fine geometry and fine color we use for smoothed transfers */
+    ColorSpinorField *fine_smth_d; 
+
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
     ColorSpinorField *fine_tmp_h;
 
@@ -169,7 +178,7 @@ namespace quda {
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
+    Transfer(const std::vector<ColorSpinorField*> &B, DiracMatrix *matSmoothTransfer, double alpha, int Nvec, int *geo_bs, int spin_bs,
 	     bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */

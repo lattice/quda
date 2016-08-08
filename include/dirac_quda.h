@@ -149,7 +149,7 @@ namespace quda {
 
 
     QudaMatPCType getMatPCType() const { return matpcType; }
-//    QudaDagType getDagger() const { return dagger; }
+    QudaDagType getDagger() const { return dagger; }
     void Dagger(QudaDagType dag) { dagger = dag; }
 
     /**

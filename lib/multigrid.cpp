@@ -126,7 +126,9 @@ namespace quda {
 
       // create transfer operator
       printfQuda("start creating transfer operator\n");
-      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
+
+      Complex alpha = Complex(0.1, 0.8);//should extimate it
+      transfer = new Transfer(param.B, &param.matResidual, alpha, param.Nvec, param.geoBlockSize, param.spinBlockSize,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 

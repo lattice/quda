@@ -18,11 +18,12 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
 
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu, TimeProfile &profile)
-    : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
-      fine_to_coarse_h(0), coarse_to_fine_h(0), 
-      fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, DiracMatrix *matSmoothTransfer, std::complex<double> alpha, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu, TimeProfile &profile)
+    : B(B), Nvec(Nvec), V_h(nullptr), V_d(nullptr), matSmoothTransfer(nullptr), alpha(0.0, 0.0), fine_smth_d(nullptr), 
+      fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
+      fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), 
+      fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr), 
+      spin_bs(spin_bs), spin_map(nullptr), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
       flops_(0), profile(profile)
   {
@@ -140,6 +141,14 @@ namespace quda {
       *V_d = *V_h;
       printfQuda("Transferred prolongator to GPU\n");
     }
+
+    if(apha != 0.0)//for staggered multigrid
+    {
+      this->matSmoothTransfer = matSmoothTransfer;
+      this->alpha = alpha;
+      param = ColorSpinorParam(*fine_tmp_d);
+      fine_smth_d = ColorSpinorField::Create(param);
+    }
   }
 
   Transfer::~Transfer() {
@@ -150,6 +159,8 @@ namespace quda {
     if (fine_to_coarse_h) host_free(fine_to_coarse_h);
     if (V_h) delete V_h;
     if (V_d) delete V_d;
+
+    if (fine_smth_d) delete fine_smth_d;
 
     if (fine_tmp_h) delete fine_tmp_h;
     if (fine_tmp_d) delete fine_tmp_d;
@@ -300,6 +311,20 @@ namespace quda {
 
     Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
+    if(alpha.real() != 0.0 ||  alpha.imag() != 0.0)
+    {
+      if (use_gpu)
+      {
+         ColorSpinorField *fine_smth = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_smth_d : &fine_smth_d->Even();
+         matSmoothTransfer( *fine_smth, *output);
+         blas::caxpy(alpha, *fine_smth, *output);
+      }
+      else
+      {
+         warningQuda("\nSmoothed prolongator is disabled\n");
+      } 
+    }
+
     out = *output; // copy result to out field (aliasing handled automatically)
 
     flops_ += 8*in.Ncolor()*out.Ncolor()*out.VolumeCB()*out.SiteSubset();
@@ -330,6 +355,25 @@ namespace quda {
     }
 
     *input = in;
+
+    if(alpha.real() != 0.0 || alpha.imag() != 0.0)
+    {
+      if (use_gpu)
+      {
+         Dirac &dirac_smooth  = const_cast<Dirac&>(*(param.matSmoothTransfer->Expose()));
+         dirac_smooth.Dagger(QUDA_DAG_YES);
+
+         ColorSpinorField *fine_smth = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_smth_d : &fine_smth_d->Even();
+         matSmoothTransfer( *fine_smth, *input);
+         blas::caxpy(alpha.conj(), *fine_smth, *output);
+
+         dirac_smooth.Dagger(QUDA_DAG_NO);
+      }
+      else
+      {
+         warningQuda("\nSmoothed restrictor is disabled\n");
+      } 
+    }
 
     if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot restrict a full field since only have single parity null-space components");
