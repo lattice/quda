@@ -40,9 +40,9 @@ namespace quda {
     unsigned long long flops;
     unsigned long long bytes;
 
-    void zero(ColorSpinorField &a) { 
+    void zero(ColorSpinorField &a) {
       if (typeid(a) == typeid(cudaColorSpinorField)) {
-	static_cast<cudaColorSpinorField&>(a).zero(); 
+	static_cast<cudaColorSpinorField&>(a).zero();
       } else {
 	static_cast<cpuColorSpinorField&>(a).zero();
       }
@@ -60,11 +60,11 @@ namespace quda {
     void endReduce();
 
     void init()
-    { 
+    {
       blasStream = &streams[Nstream-1];
       initReduce();
     }
-  
+
     void end(void)
     {
       endReduce();
@@ -76,6 +76,12 @@ namespace quda {
 
 #include <blas_core.h>
 #include <blas_mixed_core.h>
+#ifdef BLOCKSOLVER
+// #include <Eigen/Dense>
+// using Eigen::MatrixXcd;
+#include <multi_blas_core.cuh>
+#include <multi_blas_core.h>
+#endif
 
     template <typename Float2, typename FloatN>
     struct BlasFunctor {
@@ -85,6 +91,16 @@ namespace quda {
 
       //! where the reduction is usually computed and any auxiliary operations
       virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) = 0;
+    };
+
+    template <int NXZ, int NYW, typename Float2, typename FloatN>
+    struct MultBlasFunctor {
+
+      //! pre-computation routine before the main loop
+      virtual __device__ __host__ void init() { ; }
+
+      //! where the reduction is usually computed and any auxiliary operations
+      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j) = 0;
     };
 
     /**
@@ -124,7 +140,7 @@ namespace quda {
     };
 
     void xpy(ColorSpinorField &x, ColorSpinorField &y) {
-      blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0), 
+      blasCuda<xpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
 			     make_double2(0.0, 0.0), x, y, x, x);
     }
 
@@ -146,7 +162,7 @@ namespace quda {
 	mixed::blasCuda<axpy_,0,1,0,0>(make_double2(a,0.0), make_double2(1.0,0.0), make_double2(0.0,0.0),
 				       x, y, x, x);
       } else {
-	blasCuda<axpy_,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
+	blasCuda<axpy_,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0),
 			       x, y, x, x);
       }
     }
@@ -180,7 +196,7 @@ namespace quda {
     };
 
     void mxpy(ColorSpinorField &x, ColorSpinorField &y) {
-      blasCuda<mxpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0), 
+      blasCuda<mxpy_,0,1,0,0>(make_double2(1.0, 0.0), make_double2(1.0, 0.0),
 			     make_double2(0.0, 0.0), x, y, x, x);
     }
 
@@ -197,7 +213,7 @@ namespace quda {
     };
 
     void ax(const double &a, ColorSpinorField &x) {
-      blasCuda<ax_,1,0,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0), 
+      blasCuda<ax_,1,0,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0),
 			   make_double2(0.0, 0.0), x, x, x, x);
     }
 
@@ -233,32 +249,55 @@ namespace quda {
     };
 
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
-      blasCuda<caxpy_,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0), 
+      blasCuda<caxpy_,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
 			       make_double2(0.0, 0.0), x, y, x, x);
     }
+
+#ifdef BLOCKSOLVER
+    template<int NXZ, int NYW, typename Float2, typename FloatN>
+    struct multcaxpy_ : public MultBlasFunctor<NXZ, NYW, Float2, FloatN> {
+      Float2 a[NXZ*NYW];
+      multcaxpy_(const Complex *a, const Float2 &b, const Float2 &c)  {
+        for (int i=0; i< NXZ*NYW; i++){
+          this->a[i] = make_double2(real(a[i]),imag(a[i]));
+        }
+      }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      { _caxpy(a[NXZ*j+i], x, y); }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 4; } //! flops per element
+    };
+
+    // const quda::Complex *, double2, double2, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField
+    void multcaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) {
+      multblasCuda<1,1,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+      make_double2(0.0, 0.0), x, y, x, x);
+    }
+
+#endif
 
     /**
        Functor to perform the operation y = a*x + b*y  (complex-valued)
     */
 
-    __device__ __host__ void _caxpby(const float2 &a, const float4 &x, const float2 &b, float4 &y)					
-    { float4 yy;								
-      yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
-      yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
-      yy.z = a.x*x.z; yy.z -= a.y*x.w; yy.z += b.x*y.z; yy.z -= b.y*y.w;	
-      yy.w = a.y*x.z; yy.w += a.x*x.w; yy.w += b.y*y.z; yy.w += b.x*y.w;	
+    __device__ __host__ void _caxpby(const float2 &a, const float4 &x, const float2 &b, float4 &y)
+    { float4 yy;
+      yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;
+      yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;
+      yy.z = a.x*x.z; yy.z -= a.y*x.w; yy.z += b.x*y.z; yy.z -= b.y*y.w;
+      yy.w = a.y*x.z; yy.w += a.x*x.w; yy.w += b.y*y.z; yy.w += b.x*y.w;
       y = yy; }
 
     __device__ __host__ void _caxpby(const float2 &a, const float2 &x, const float2 &b, float2 &y)
-    { float2 yy;								
-      yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
-      yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
+    { float2 yy;
+      yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;
+      yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;
       y = yy; }
 
-    __device__ __host__ void _caxpby(const double2 &a, const double2 &x, const double2 &b, double2 &y)				 
-    { double2 yy;								
-      yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
-      yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
+    __device__ __host__ void _caxpby(const double2 &a, const double2 &x, const double2 &b, double2 &y)
+    { double2 yy;
+      yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;
+      yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;
       y = yy; }
 
     template <typename Float2, typename FloatN>
@@ -273,7 +312,7 @@ namespace quda {
     };
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y) {
-      blasCuda<caxpby_,0,1,0,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)), 
+      blasCuda<caxpby_,0,1,0,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
 			       make_double2(0.0, 0.0), x, y, x, x);
     }
 
@@ -315,9 +354,9 @@ namespace quda {
       static int flops() { return 8; } //! flops per element
     };
 
-    void cxpaypbz(ColorSpinorField &x, const Complex &a, ColorSpinorField &y, 
+    void cxpaypbz(ColorSpinorField &x, const Complex &a, ColorSpinorField &y,
 		  const Complex &b, ColorSpinorField &z) {
-      blasCuda<cxpaypbz_,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)), 
+      blasCuda<cxpaypbz_,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
 				 make_double2(0.0, 0.0), x, y, z, z);
     }
 
@@ -336,19 +375,19 @@ namespace quda {
       static int flops() { return 10; } //! flops per element
     };
 
-    void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b, 
+    void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b,
 		   ColorSpinorField& z, const double &c) {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
-	mixed::blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+	mixed::blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0),
 					    make_double2(c,0.0),	x, y, z, x);
       } else {
-	// swap arguments around 
-	blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+	// swap arguments around
+	blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0),
 				     make_double2(c,0.0), x, y, z, x);
       }
     }
-  
+
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]
     */
@@ -370,7 +409,7 @@ namespace quda {
 	mixed::blasCuda<axpyZpbx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
 					   x, y, z, x);
       } else {
-	// swap arguments around 
+	// swap arguments around
 	blasCuda<axpyZpbx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
 				    x, y, z, x);
       }
@@ -391,9 +430,9 @@ namespace quda {
       static int flops() { return 12; } //! flops per element
     };
 
-    void caxpbypzYmbw(const Complex &a, ColorSpinorField &x, const Complex &b, 
+    void caxpbypzYmbw(const Complex &a, ColorSpinorField &x, const Complex &b,
 		      ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w) {
-      blasCuda<caxpbypzYmbw_,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)), 
+      blasCuda<caxpbypzYmbw_,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
 				     make_double2(0.0,0.0), x, y, z, w);
     }
 
@@ -411,10 +450,10 @@ namespace quda {
       static int flops() { return 5; } //! flops per element
     };
 
-    void cabxpyAx(const double &a, const Complex &b, 
+    void cabxpyAx(const double &a, const Complex &b,
 		  ColorSpinorField &x, ColorSpinorField &y) {
-      // swap arguments around 
-      blasCuda<cabxpyAx_,1,1,0,0>(make_double2(a,0.0), make_double2(REAL(b),IMAG(b)), 
+      // swap arguments around
+      blasCuda<cabxpyAx_,1,1,0,0>(make_double2(a,0.0), make_double2(REAL(b),IMAG(b)),
 				  make_double2(0.0,0.0), x, y, x, x);
     }
 
@@ -432,9 +471,9 @@ namespace quda {
       static int flops() { return 5; } //! flops per element
     };
 
-    void caxpbypz(const Complex &a, ColorSpinorField &x, const Complex &b, 
+    void caxpbypz(const Complex &a, ColorSpinorField &x, const Complex &b,
 		  ColorSpinorField &y, ColorSpinorField &z) {
-      blasCuda<caxpbypz_,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
+      blasCuda<caxpbypz_,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)),
 				  make_double2(0.0,0.0), x, y, z, z);
     }
 
@@ -454,16 +493,16 @@ namespace quda {
       static int flops() { return 5; } //! flops per element
     };
 
-    void caxpbypczpw(const Complex &a, ColorSpinorField &x, const Complex &b, 
-		     ColorSpinorField &y, const Complex &c, ColorSpinorField &z, 
+    void caxpbypczpw(const Complex &a, ColorSpinorField &x, const Complex &b,
+		     ColorSpinorField &y, const Complex &c, ColorSpinorField &z,
 		     ColorSpinorField &w) {
-      blasCuda<caxpbypczpw_,0,0,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
+      blasCuda<caxpbypczpw_,0,0,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)),
 				     make_double2(REAL(c),IMAG(c)), x, y, z, w);
     }
 
     /**
        double caxpyXmaz(c a, V x, V y, V z){}
-   
+
        First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
     */
@@ -477,9 +516,9 @@ namespace quda {
       static int flops() { return 8; } //! flops per element
     };
 
-    void caxpyXmaz(const Complex &a, ColorSpinorField &x, 
+    void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z) {
-      blasCuda<caxpyxmaz_,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), 
+      blasCuda<caxpyxmaz_,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0),
 				   make_double2(0.0, 0.0), x, y, z, x);
     }
 
@@ -525,9 +564,9 @@ namespace quda {
 
     /**
        double tripleCGUpdate(d a, d b, V x, V y, V z, V w){}
-   
+
        First performs the operation y[i] = y[i] + a*w[i]
-       Second performs the operation z[i] = z[i] - a*x[i] 
+       Second performs the operation z[i] = z[i] - a*x[i]
        Third performs the operation w[i] = z[i] + b*w[i]
     */
     template <typename Float2, typename FloatN>
@@ -541,18 +580,18 @@ namespace quda {
       static int flops() { return 6; } //! flops per element
     };
 
-    void tripleCGUpdate(const double &a, const double &b, ColorSpinorField &x, 
+    void tripleCGUpdate(const double &a, const double &b, ColorSpinorField &x,
 			ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w) {
       if (x.Precision() != y.Precision()) {
       // call hacked mixed precision kernel
-	mixed::blasCuda<tripleCGUpdate_,0,1,1,1>(make_double2(a,0.0), make_double2(b,0.0), 
+	mixed::blasCuda<tripleCGUpdate_,0,1,1,1>(make_double2(a,0.0), make_double2(b,0.0),
 						 make_double2(0.0,0.0), x, y, z, w);
       } else {
-	blasCuda<tripleCGUpdate_,0,1,1,1>(make_double2(a, 0.0), make_double2(b, 0.0), 
+	blasCuda<tripleCGUpdate_,0,1,1,1>(make_double2(a, 0.0), make_double2(b, 0.0),
 					  make_double2(0.0, 0.0), x, y, z, w);
       }
     }
-  
+
   } // namespace blas
 
 } // namespace quda

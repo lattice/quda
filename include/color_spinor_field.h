@@ -704,6 +704,7 @@ namespace quda {
 #endif
 
     cudaColorSpinorField& Component(const int idx) const;
+    CompositeColorSpinorField& Components() const;
     void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
 
     void zero();
