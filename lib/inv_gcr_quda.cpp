@@ -139,7 +139,33 @@ namespace quda {
 	    blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
 	  }
 	}
+      }
+      break;
+    case 5: // five-way pipelining
+      {
+	const int N = 5;
+	for (int i=0; i<k-(N-1); i+=N) {
+	  computeBeta(beta, Ap, i, N, k);
+	  blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
+	  blas::caxpbypz(-beta[i+3][k], *Ap[i+3], -beta[i+4][k], *Ap[i+4], *Ap[k]);
+	}
 
+	if (k%N != 0) { // need to update the remainder
+	  if ((k%N) % 4 == 0) {
+	    computeBeta(beta, Ap, k-4, 4, k);
+	    blas::caxpbypz(-beta[k-4][k], *Ap[k-4], -beta[k-3][k], *Ap[k-3], *Ap[k]);
+	    blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  } else if ((k%N) % 3 == 0) {
+	    computeBeta(beta, Ap, k-3, 3, k);
+	    blas::caxpbypczpw(-beta[k-3][k], *Ap[k-3], -beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  } else if ((k%N) % 2 == 0) {
+	    computeBeta(beta, Ap, k-2, 2, k);
+	    blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  } else {
+	    beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	    blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  }
+	}
       }
       break;
     default:
