@@ -1,3 +1,5 @@
+//#define WARP_MULTI_REDUCE
+
 template <int N, typename ReduceType, typename SpinorX, typename SpinorY, 
   typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   struct MultiReduceArg : public ReduceArg<ReduceType> {
@@ -22,24 +24,20 @@ template <int N, typename ReduceType, typename SpinorX, typename SpinorY,
   }
 };
 
-template<int block_size, int N, typename ReduceType, typename FloatN, int M,
-  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
-  __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
+template<int src, int N, typename FloatN, int M, typename ReduceType, typename Arg>
+  __device__ inline void compute(ReduceType &sum, Arg &arg, int idx) {
 
-  unsigned int gridSize = gridDim.x*blockDim.x;
-  unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-  unsigned int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
+  constexpr int k = src < N ? src : 0; // silence out-of-bounds compiler warning
 
-  ReduceType sum;
-  ::quda::zero(sum);
+  while (idx < arg.length) {
 
-  while (i < arg.length) {
     FloatN x[M], y[M], z[M], w[M], v[M];
-    arg.X[src_idx].load(x, i);
-    arg.Y[src_idx].load(y, i);
-    arg.Z[src_idx].load(z, i);
-    arg.W[src_idx].load(w, i);
-    arg.V[src_idx].load(v, i);
+
+    arg.X[k].load(x, idx);
+    arg.Y[k].load(y, idx);
+    arg.Z[k].load(z, idx);
+    arg.W[k].load(w, idx);
+    arg.V[k].load(v, idx);
 
     arg.r.pre();
 
@@ -48,16 +46,47 @@ template<int block_size, int N, typename ReduceType, typename FloatN, int M,
 
     arg.r.post(sum);
 
-    arg.X[src_idx].save(x, i);
-    arg.Y[src_idx].save(y, i);
-    arg.Z[src_idx].save(z, i);
-    arg.W[src_idx].save(w, i);
-    arg.V[src_idx].save(v, i);
+    arg.X[k].load(x, idx);
+    arg.Y[k].load(y, idx);
+    arg.Z[k].load(z, idx);
+    arg.W[k].load(w, idx);
+    arg.V[k].load(v, idx);
 
-    i += gridSize;
+    idx += gridDim.x*blockDim.x;
+ }
+
+}
+
+#ifdef WARP_MULTI_REDUCE
+template<int N, typename ReduceType, typename FloatN, int M,
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+#else
+  template<int block_size, int N, typename ReduceType, typename FloatN, int M,
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+#endif
+  __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
+
+  unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+  unsigned int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
+
+  ReduceType sum;
+  ::quda::zero(sum);
+
+  if (src_idx < N) {
+    switch(src_idx) {
+    case 0: compute<0,N,FloatN,M>(sum,arg,i); break;
+    case 1: compute<1,N,FloatN,M>(sum,arg,i); break;
+    case 2: compute<2,N,FloatN,M>(sum,arg,i); break;
+    case 3: compute<3,N,FloatN,M>(sum,arg,i); break;
+    case 4: compute<4,N,FloatN,M>(sum,arg,i); break;
+    }
   }
 
+#ifdef WARP_MULTI_REDUCE
+  ::quda::warp_reduce<ReduceType>(arg, sum, src_idx);
+#else
   ::quda::reduce<block_size, ReduceType>(arg, sum, src_idx);
+#endif
 
 } // multiReduceKernel
 
@@ -70,7 +99,11 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M,
   if(tp.grid.x > REDUCE_MAX_BLOCKS)
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
+#ifdef WARP_MULTI_REDUCE
+  multiReduceKernel<N,ReduceType,FloatN,M><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#else
   LAUNCH_KERNEL(multiReduceKernel, tp, stream, arg, N, ReduceType, FloatN, M);
+#endif
 
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
   if(deviceProp.canMapHostMemory){
@@ -142,11 +175,36 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
     multiReduceLaunch<N,doubleN,ReduceType,FloatN,M>(result,arg,tp,stream);
   }
 
+#ifdef WARP_MULTI_REDUCE
+  bool advanceBlockDim(TuneParam &param) const {
+    if (param.block.y < N) {
+      param.block.y++;
+      param.grid.y = (N + param.block.y - 1) / param.block.y;
+      return true;
+    } else {
+      param.block.y = 1;
+      param.grid.y = N;
+      return false;
+    }
+  }
+#endif
+
   bool advanceGridDim(TuneParam &param) const {
     bool rtn = Tunable::advanceGridDim(param);
     if (N > deviceProp.maxGridSize[1]) errorQuda("N=%d is greater than the maximum support grid size", N);
-    param.grid.y = N;
     return rtn;
+  }
+
+  void initTuneParam(TuneParam &param) const {
+    Tunable::initTuneParam(param);
+    param.block.y = 1;
+    param.grid.y = N;
+  }
+
+  void defaultTuneParam(TuneParam &param) const {
+    Tunable::defaultTuneParam(param);
+    param.block.y = 1;
+    param.grid.y = N;
   }
 
   void preTune() {
