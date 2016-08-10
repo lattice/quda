@@ -128,9 +128,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   // FIXME implement this as a single kernel
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     blasCuda<RegType,StoreType,yType,M,Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Even(), y.Even(), z.Even(), w.Even(), length);
+      (a, b, c, x.Even(), y.Even(), z.Even(), w.Even(), length/2);
     blasCuda<RegType,StoreType,yType,M,Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd(), length);
+      (a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd(), length/2);
     return;
   }
 
