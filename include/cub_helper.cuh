@@ -1,5 +1,6 @@
 #pragma once
 #include <float_vector.h>
+#include <generics/shfl.h>
 
 using namespace quda;
 #include <cub/cub.cuh>
@@ -114,6 +115,56 @@ namespace quda {
   template <int block_size, typename T>
   __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T>(arg, in, idx); }
 
+
+  __shared__ volatile bool isLastWarpDone[16];
+
+  /**
+     @brief Do a warp reduction, followed by a global reduction to the idx bin
+     @param arg Meta data needed for reduction
+     @param in Input data in registers for reduction
+     @param idx Bin in which the global (inter-CTA) reduction is done
+   */
+  template <typename T>
+  __device__ inline void warp_reduce(ReduceArg<T> arg, const T &in, const int idx=0) {
+
+    const int warp_size = 32;
+    T aggregate = in;
+#pragma unroll
+    for (int offset = warp_size/2; offset > 0; offset /= 2) aggregate += __shfl_down(aggregate, offset);
+
+    if (threadIdx.x == 0) {
+      arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
+      __threadfence(); // flush result
+
+      // increment global block counter
+      unsigned int value = atomicInc(&count[idx], gridDim.x);
+
+      // determine if last warp
+      if (threadIdx.y == 0) isLastBlockDone = (value == (gridDim.x-1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      unsigned int i = threadIdx.x;
+      T sum;
+      zero(sum);
+      while (i<gridDim.x) {
+	sum += arg.partial[idx*gridDim.x + i];
+	i += warp_size;
+      }
+
+#pragma unroll
+      for (int offset = warp_size/2; offset > 0; offset /= 2) sum += __shfl_down(sum, offset);
+
+      // write out the final reduced value
+      if (threadIdx.x == 0) {
+	arg.result_d[idx] = sum;
+	count[idx] = 0; // set to zero for next time
+      }
+    }
+  }
 
   /**
      struct which acts as a wrapper to a vector of data.
