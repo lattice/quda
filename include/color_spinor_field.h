@@ -418,6 +418,10 @@ namespace quda {
     ColorSpinorField& Component(const int idx) const;
     ColorSpinorField& Component(const int idx);
 
+    CompositeColorSpinorField& Components(){
+      return components;
+    };
+
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
     /**

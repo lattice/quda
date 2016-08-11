@@ -3,8 +3,8 @@
 /**
    @file float_vector.h
 
-   @section DESCRIPTION 
-   Inline device functions for elementary operations on short vectors, e.g., float4, etc. 
+   @section DESCRIPTION
+   Inline device functions for elementary operations on short vectors, e.g., float4, etc.
 */
 
 #pragma once
@@ -252,8 +252,17 @@ namespace quda {
   template<>
     inline float2 make_Float2(const complex<float> &a) { return make_float2( a.real(), a.imag() ); }
 
+    template<>
+      inline double2 make_Float2(const std::complex<double> &a) { return make_double2( a.real(), a.imag() ); }
+    template<>
+      inline double2 make_Float2(const std::complex<float> &a) { return make_double2( a.real(), a.imag() ); }
+    template<>
+      inline float2 make_Float2(const std::complex<double> &a) { return make_float2( a.real(), a.imag() ); }
+    template<>
+      inline float2 make_Float2(const std::complex<float> &a) { return make_float2( a.real(), a.imag() ); }
+
+
   inline complex<double> make_Complex(const double2 &a) { return complex<double>(a.x, a.y); }
   inline complex<float> make_Complex(const float2 &a) { return complex<float>(a.x, a.y); }
 
 }
-

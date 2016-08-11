@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include <cstring> // needed for memset
 
-#include <float_vector.h>
+
 
 #include <tune_quda.h>
 #include <typeinfo>
 
 #include <quda_internal.h>
+#include <float_vector.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
@@ -259,7 +260,7 @@ namespace quda {
       Float2 a[NXZ*NYW];
       multcaxpy_(const Complex *a, const Float2 &b, const Float2 &c)  {
         for (int i=0; i< NXZ*NYW; i++){
-          this->a[i] = make_double2(real(a[i]),imag(a[i]));
+          this->a[i] = make_Float2<Float2>(a[i]);
         }
       }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
@@ -271,7 +272,7 @@ namespace quda {
     // const quda::Complex *, double2, double2, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField
     void multcaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) {
       multblasCuda<1,1,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-      make_double2(0.0, 0.0), x, y, x, x);
+      make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
     }
 
 #endif
