@@ -178,7 +178,7 @@ namespace quda {
     bool is_staggered = false;
     if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
 
-    if(staggered_dslash_emulation)
+    if(is_staggered && staggered_dslash_emulation)
     {
         bool single_parity_application = false;
         bool cg_mdagm_operator         = false;
@@ -204,35 +204,47 @@ namespace quda {
         ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
         ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
 
+        csParam.extendDimensionality();
+
+        ColorSpinorField *tmp5 = ColorSpinorField::Create(csParam);
+        ColorSpinorField *tmp6 = ColorSpinorField::Create(csParam);
+
         transfer->P(*tmp1, in);
+
+        *tmp5 = *tmp1;
 
         if (cg_mdagm_operator)
         {
           if( csParam.siteSubset == QUDA_PARITY_SITE_SUBSET )
           {
-            dirac->MdagM(*tmp2, *tmp1);
+            dirac->MdagM(*tmp6, *tmp5);
           }
           else
           {
-            dirac->MdagM(tmp2->Even(), tmp1->Even());
+            dirac->MdagM(tmp6->Even(), tmp5->Even());
 
-            blas::ax(4*dirac->Mass()*dirac->Mass(), tmp1->Odd());
-            tmp2->Odd() = tmp1->Odd();
+            blas::ax(4*dirac->Mass()*dirac->Mass(), tmp5->Odd());
+            tmp6->Odd() = tmp5->Odd();
           }
         }
         else
         { 
 //#define HERMITIAN
           //Non-hermitian version:
-          dirac->M(*tmp2, *tmp1);//WARNING: this may be hermitian, check dirac_staggered.cpp
+          dirac->M(*tmp6, *tmp5);//WARNING: this may be hermitian, check dirac_staggered.cpp
           //Hermitian version:
 #ifdef HERMITIAN          
-          blas::ax(-1.0, tmp2->Odd());
+          blas::ax(-1.0, tmp6->Odd());
 #endif
-          if(fg_mdagm_operator) blas::ax(2*dirac->Mass(), *tmp2);
+          if(fg_mdagm_operator) blas::ax(2*dirac->Mass(), *tmp6);
         }
 
+        *tmp2 = *tmp6; 
+
         transfer->R(out, *tmp2);
+
+        delete tmp5;
+        delete tmp6;
 
         delete tmp1;
         delete tmp2;

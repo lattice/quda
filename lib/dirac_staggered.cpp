@@ -97,8 +97,13 @@ namespace quda {
   // Full staggered operator
   void DiracStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
+    double _2m = 2*mass; 
+    if(dagger == QUDA_DAG_YES) _2m *= -1.0;
+
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), _2m);  
+    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), _2m);
+
+    //if(dagger == QUDA_DAG_YES) blas::ax(-1.0, out);
   }
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

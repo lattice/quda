@@ -137,6 +137,7 @@ namespace quda {
     if (&src != this) {
       // keep current attributes unless unset
       if (!ColorSpinorField::init) { // note this will turn a reference field into a regular field
+        if(this->Ndim() != src.Ndim()) errorQuda("\nCannot copy fields with different dimensions\n");
 	destroy();
 	destroyComms(); // not sure if this necessary
 	ColorSpinorField::operator=(src);

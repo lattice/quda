@@ -76,7 +76,7 @@ namespace quda {
     }
 
     if (param.level==param.Nlevel-1) {
-      param_presmooth->Nkrylov = 20;
+      param_presmooth->Nkrylov = 32;
       param_presmooth->maxiter = 1000;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-8;
@@ -127,8 +127,8 @@ namespace quda {
       // create transfer operator
       printfQuda("start creating transfer operator\n");
 
-      Complex alpha = Complex(0.1, 0.8);//should extimate it
-      transfer = new Transfer(param.B, &param.matResidual, alpha, param.Nvec, param.geoBlockSize, param.spinBlockSize,
+      Complex alpha = Complex(0.00889, 1.0);//if zero: no smoothing
+      transfer = new Transfer(param.B, &param.matResidual, alpha,  param.Nvec, param.geoBlockSize, param.spinBlockSize,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -321,6 +321,9 @@ namespace quda {
   void MG::verify() {
     setOutputPrefix(prefix);
 
+    Complex alpha_tmp = transfer->Alpha();
+    transfer->SetAlpha(Complex(0.0, 0.0));
+
     // temporary fields used for verification
     ColorSpinorParam csParam(*r);
     csParam.create = QUDA_NULL_FIELD_CREATE;
@@ -329,6 +332,22 @@ namespace quda {
 
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
+
+    ColorSpinorField *tmp5 = nullptr; 
+    ColorSpinorField *tmp6 = nullptr; 
+    if(param.B[0]->Nspin() == 1)
+    {
+      csParam.extendDimensionality();
+      tmp5 = ColorSpinorField::Create(csParam);
+      tmp6 = ColorSpinorField::Create(csParam);
+      csParam.reduceDimensionality();
+    }
+    else
+    {
+      tmp5 = tmp1;
+      tmp6 = tmp2;
+    }
+
     double deviation;
     double tol = std::pow(10.0, 4-2*csParam.precision);
 #if 1
@@ -385,22 +404,28 @@ namespace quda {
     zero(*r_coarse);
 
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
-    transfer->P(*tmp1, *tmp_coarse);
+    transfer->P(*tmp1, *tmp_coarse);//convert 4d to 5d
+    if(param.B[0]->Nspin() == 1){
+      //if(csParam.location == QUDA_CPU_LOCATION) (static_cast<cpuColorSpinorField*>(tmp5))->copy(*tmp1);
+      //else (static_cast<cudaColorSpinorField*>(tmp5))->copy(*tmp1);
+      *tmp5 = *tmp1;
+    }
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
       const Dirac &dirac = *(param.matSmooth.Expose());
       double kappa = param.matResidual.Expose()->Kappa();
       if (param.level==0) {
-	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
-	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+	dirac.DslashXpay(tmp6->Even(), tmp5->Odd(), QUDA_EVEN_PARITY, tmp5->Even(), -kappa);
+	dirac.DslashXpay(tmp6->Odd(), tmp5->Even(), QUDA_ODD_PARITY, tmp5->Odd(), -kappa);
       } else { // this is a hack since the coarse Dslash doesn't proerly use the same xpay conventions yet
-	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
-	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+	dirac.DslashXpay(tmp6->Even(), tmp5->Odd(), QUDA_EVEN_PARITY, tmp5->Even(), 1.0);
+	dirac.DslashXpay(tmp6->Odd(), tmp5->Even(), QUDA_ODD_PARITY, tmp5->Odd(), 1.0);
       }
     } else {
-      param.matResidual(*tmp2,*tmp1);
+      param.matResidual(*tmp6,*tmp5);
     }
 
+    if(param.B[0]->Nspin() == 1) *tmp2 = *tmp6; //tmp2->copy(*tmp6);
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
 
@@ -435,6 +460,10 @@ namespace quda {
     delete tmp2;
     delete tmp_coarse;
 
+    if(param.B[0]->Nspin() == 1) {delete tmp5; delete tmp6;}
+
+    transfer->SetAlpha(alpha_tmp);
+
     if (param.level < param.Nlevel-2) coarse->verify();
   }
 
@@ -465,12 +494,13 @@ namespace quda {
 
       ColorSpinorField *out=nullptr, *in=nullptr;
 
-     ColorSpinorField *y = nullptr;
+      ColorSpinorField *y = nullptr;
 
       if(r->Location() == QUDA_CPU_FIELD_LOCATION)
       {
          ColorSpinorParam csParam(x);
          csParam.create = QUDA_ZERO_FIELD_CREATE;
+
          csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
          if (x.SiteSubset() == QUDA_PARITY_SITE_SUBSET) csParam.x[0] *= 2;
          y = static_cast<ColorSpinorField*> (new cudaColorSpinorField(csParam));
@@ -715,19 +745,34 @@ namespace quda {
 
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
 
-     if(param.B[0]->Nspin() == 1)  csParam.gammaBasis = param.B[0]->GammaBasis();//hack for staggered
+     if(param.B[0]->Nspin() == 1)  
+     {
+       csParam.extendDimensionality(); //convert 4d into 5d object
+       csParam.gammaBasis = param.B[0]->GammaBasis();//hack for staggered
+     }
      else csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+    cpuColorSpinorField *tmp_cpu_field = nullptr;
 
     // Generate sources and launch solver for each source:
     for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec) {
 	cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*nullvec);
 	curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
+        if(param.B[0]->Nspin() != 1) tmp_cpu_field = curr_nullvec;
+        else
+        {
+           csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+           csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+           csParam.v      = curr_nullvec->V();//take a pointer
+           tmp_cpu_field  = new cpuColorSpinorField(csParam);
+           csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+        }
 
 	csParam.create = QUDA_ZERO_FIELD_CREATE;
 	ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
 	//copy fields:
 	csParam.create = QUDA_COPY_FIELD_CREATE;
-	ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, csParam));
+	ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*tmp_cpu_field, csParam));
 
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
 #if 1 //for debug only!
@@ -758,7 +803,7 @@ namespace quda {
 #endif
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution norm squared = %g\n", norm2(*x));
 
-	*curr_nullvec = *x;
+	*tmp_cpu_field = *x;
 
         if (getVerbosity() >= QUDA_VERBOSE)
         {
@@ -792,6 +837,9 @@ namespace quda {
 
 	delete b;
 	delete x;
+
+        if(param.B[0]->Nspin() == 1) delete tmp_cpu_field;
+
       }//stop for-loop:
 
     saveVectors(B);

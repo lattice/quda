@@ -198,6 +198,7 @@ namespace quda {
       else 
         memcpy(v, src.v, bytes);
     } else {
+      if(this->Ndim() != src.Ndim()) errorQuda("\nCannot copy fields with different dimensionality\n");
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION);
     }
   }

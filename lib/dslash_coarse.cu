@@ -751,18 +751,22 @@ namespace quda {
       ApplyCoarse<Float,csOrder,gOrder,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 12) {
       ApplyCoarse<Float,csOrder,gOrder,12,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
+#if 0
     } else if (inA.Ncolor() == 16) {
       ApplyCoarse<Float,csOrder,gOrder,16,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 20) {
       ApplyCoarse<Float,csOrder,gOrder,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
+#endif
     } else if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 48) {
       ApplyCoarse<Float,csOrder,gOrder,48,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
+#if 0
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,csOrder,gOrder,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 96) {
       ApplyCoarse<Float,csOrder,gOrder,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
+#endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", inA.Ncolor());
     }

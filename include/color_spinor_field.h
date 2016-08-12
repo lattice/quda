@@ -139,7 +139,7 @@ namespace quda {
 	} else if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)) {
 	  nDim++;
 	  x[4] = 2;//for two flavors
-	} else if ((inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) && inv_param.Ls > 1) {
+	} else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
 	  nDim++;
 	  x[4] = inv_param.Ls;
 	}
@@ -199,6 +199,14 @@ namespace quda {
       if (native) fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ?
 	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
     }
+
+    /**
+    * 
+    * Currently, staggered multigrid does not work with 5-d fields, this is needed to convert 5-d into 4-d field and vice versa
+    */
+
+    void reduceDimensionality() { nDim--; }
+    void extendDimensionality() { nDim++; x[nDim-1] = 1; }
 
     void print() {
       printfQuda("nColor = %d\n", nColor);

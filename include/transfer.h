@@ -49,9 +49,6 @@ namespace quda {
     /** smoothed transfer parameter */
     std::complex<double> alpha;
 
-    /** A GPU temporary field with fine geometry and fine color we use for smoothed transfers */
-    ColorSpinorField *fine_smth_d; 
-
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
     ColorSpinorField *fine_tmp_h;
 
@@ -178,7 +175,7 @@ namespace quda {
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField*> &B, DiracMatrix *matSmoothTransfer, double alpha, int Nvec, int *geo_bs, int spin_bs,
+    Transfer(const std::vector<ColorSpinorField*> &B, DiracMatrix *matSmoothTransfer, std::complex<double> alpha, int Nvec, int *geo_bs, int spin_bs,
 	     bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */
@@ -209,6 +206,19 @@ namespace quda {
      * @return The B field const reference
      */
     const std::vector<ColorSpinorField*>& RawVectors() const {return B;}
+
+    /** 
+     * Returns smoothing parameter
+     *
+     */
+
+    const std::complex<double> Alpha() const {return alpha;}
+
+    /** 
+     * Set smoothing parameter 
+     */ 
+
+    void SetAlpha(std::complex<double> _alpha) { alpha = _alpha;}
 
     /**
      * Returns the number of near nullvectors

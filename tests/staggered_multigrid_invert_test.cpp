@@ -77,6 +77,8 @@ extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
 
+extern int Nsrc; // number of spinors to apply to simultaneously
+
 // Dirac operator type
 extern QudaDslashType dslash_type;
 
@@ -115,6 +117,7 @@ static void end();
 
 template<typename Float>
 void constructSpinorField(Float *res, const int Vol) {
+  for(int src=0; src<Nsrc; src++)
   for(int i = 0; i < Vol; i++) {
     for (int s = 0; s < 1; s++) {
       for (int m = 0; m < 3; m++) {
@@ -175,7 +178,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   for (int i=0; i<mg_levels-1; i++) printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
 
-  inv_param.Ls = 1;
+  inv_param.Ls = Nsrc;
 
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
@@ -213,6 +216,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   for (int i=0; i<mg_param.n_level; i++) {
     for (int j=0; j<QUDA_MAX_DIM; j++) {
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
+      mg_param.geo_block_size[i][4] = 1;//to be safe with 5th dimension 
     }
     mg_param.spin_block_size[i] = 1;// 1 or 0 (1 for parity blocking)
     mg_param.n_vec[i] =  nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
@@ -303,7 +307,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
-  inv_param.Ls = 1;
+  inv_param.Ls = Nsrc;
 
   inv_param.sp_pad = 0;
   inv_param.cl_pad = 0;
@@ -396,6 +400,7 @@ void mg_test(int argc, char** argv)
   initQuda(device);
 
   setDims(gauge_param.X);
+  dw_setDims(gauge_param.X,Nsrc); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

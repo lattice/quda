@@ -19,7 +19,7 @@ namespace quda {
   */
 
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, DiracMatrix *matSmoothTransfer, std::complex<double> alpha, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu, TimeProfile &profile)
-    : B(B), Nvec(Nvec), V_h(nullptr), V_d(nullptr), matSmoothTransfer(nullptr), alpha(0.0, 0.0), fine_smth_d(nullptr), 
+    : B(B), Nvec(Nvec), V_h(nullptr), V_d(nullptr), matSmoothTransfer(nullptr), alpha(0.0, 0.0),  
       fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
       fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), 
       fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr), 
@@ -142,12 +142,10 @@ namespace quda {
       printfQuda("Transferred prolongator to GPU\n");
     }
 
-    if(apha != 0.0)//for staggered multigrid
+    if( alpha.real() != 0.0 ||  alpha.imag() != 0.0 )//for staggered multigrid
     {
       this->matSmoothTransfer = matSmoothTransfer;
       this->alpha = alpha;
-      param = ColorSpinorParam(*fine_tmp_d);
-      fine_smth_d = ColorSpinorField::Create(param);
     }
   }
 
@@ -159,8 +157,6 @@ namespace quda {
     if (fine_to_coarse_h) host_free(fine_to_coarse_h);
     if (V_h) delete V_h;
     if (V_d) delete V_d;
-
-    if (fine_smth_d) delete fine_smth_d;
 
     if (fine_tmp_h) delete fine_tmp_h;
     if (fine_tmp_d) delete fine_tmp_d;
@@ -288,6 +284,8 @@ namespace quda {
     const ColorSpinorField *V = use_gpu ? V_d : V_h;
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
+    if(out.Ndim() == 5 || in.Ndim() == 5) errorQuda("\n5-d fileds are not supported.\n");
+
     if (use_gpu) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
       if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
@@ -315,9 +313,23 @@ namespace quda {
     {
       if (use_gpu)
       {
-         ColorSpinorField *fine_smth = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_smth_d : &fine_smth_d->Even();
-         matSmoothTransfer( *fine_smth, *output);
-         blas::caxpy(alpha, *fine_smth, *output);
+         ColorSpinorParam  csParam = ColorSpinorParam(*fine_tmp_d);
+         csParam.extendDimensionality();   
+         csParam.create = QUDA_ZERO_FIELD_CREATE;
+         csParam.siteSubset = out.SiteSubset();
+
+         ColorSpinorField *smoothed_5d_d    = ColorSpinorField::Create(csParam);
+         ColorSpinorField *prolongated_5d_d = ColorSpinorField::Create(csParam);
+
+         *prolongated_5d_d = *output;
+
+         (*matSmoothTransfer)( *smoothed_5d_d, *prolongated_5d_d);
+         blas::caxpy(-alpha, *smoothed_5d_d, *prolongated_5d_d);
+
+         *output = *prolongated_5d_d;
+         
+         delete smoothed_5d_d;
+         delete prolongated_5d_d; 
       }
       else
       {
@@ -343,6 +355,8 @@ namespace quda {
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
 
+    if(out.Ndim() == 5 || in.Ndim() == 5) errorQuda("\n5-d fileds are not supported.\n");
+
     if (use_gpu) {
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
       if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
@@ -360,12 +374,26 @@ namespace quda {
     {
       if (use_gpu)
       {
-         Dirac &dirac_smooth  = const_cast<Dirac&>(*(param.matSmoothTransfer->Expose()));
-         dirac_smooth.Dagger(QUDA_DAG_YES);
+         Dirac &dirac_smooth  = const_cast<Dirac&>(*(matSmoothTransfer->Expose()));
+         dirac_smooth.Dagger(QUDA_DAG_YES);//!
 
-         ColorSpinorField *fine_smth = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_smth_d : &fine_smth_d->Even();
-         matSmoothTransfer( *fine_smth, *input);
-         blas::caxpy(alpha.conj(), *fine_smth, *output);
+         ColorSpinorParam  csParam = ColorSpinorParam(*fine_tmp_d);
+         csParam.extendDimensionality();
+         csParam.create = QUDA_ZERO_FIELD_CREATE;
+         csParam.siteSubset = in.SiteSubset();
+
+         ColorSpinorField *smoothed_5d_d         = ColorSpinorField::Create(csParam);
+         ColorSpinorField *to_be_restricted_5d_d = ColorSpinorField::Create(csParam);
+
+         *to_be_restricted_5d_d = *input;
+
+         (*matSmoothTransfer)( *smoothed_5d_d, *to_be_restricted_5d_d);
+         blas::caxpy(conj(alpha), *smoothed_5d_d, *to_be_restricted_5d_d);//in fact, we compute -Ddagger
+
+         *input = *to_be_restricted_5d_d;
+
+         delete to_be_restricted_5d_d; 
+         delete smoothed_5d_d;
 
          dirac_smooth.Dagger(QUDA_DAG_NO);
       }
