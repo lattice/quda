@@ -12,7 +12,7 @@ template <int NXZ, int NYW, template < int MXZ, int MYW, typename Float, typenam
     if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
       const int M = 1;
-      multblasCuda<double2,double2,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
+      multblasCuda<NXZ,NYW,double2,double2,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
@@ -20,14 +20,14 @@ template <int NXZ, int NYW, template < int MXZ, int MYW, typename Float, typenam
       if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 1;
-	multblasCuda<float4,float4,float4,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(4*M));
+	multblasCuda<NXZ,NYW,float4,float4,float4,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(4*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
       } else if (x[0]->Nspin()==2 || x[0]->Nspin()==1) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
 	const int M = 1;
-	multblasCuda<float2,float2,float2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
+	multblasCuda<NXZ,NYW,float2,float2,float2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
@@ -37,14 +37,14 @@ template <int NXZ, int NYW, template < int MXZ, int MYW, typename Float, typenam
       if (x[0]->Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 6;
-	multblasCuda<float4,short4,short4,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	multblasCuda<NXZ,NYW,float4,short4,short4,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
       } else if (x[0]->Nspin() == 1) {//staggered
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = 3;
-	multblasCuda<float2,short2,short2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	multblasCuda<NXZ,NYW,float2,short2,short2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif

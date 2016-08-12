@@ -131,7 +131,7 @@ public:
     strcpy(name, num_to_string<NXZ>::value);
     strcat(name, num_to_string<NYW>::value);
     strcat(name, typeid(arg.f).name());
-    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_str);
+    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_tmp);
   }
 
   inline void apply(const cudaStream_t &stream) {
@@ -189,37 +189,43 @@ public:
   int tuningIter() const { return 3; }
 };
 
-template <typename RegType, typename StoreType, typename yType, int M,
+template <int NXZ, int NYW, typename RegType, typename StoreType, typename yType, int M,
 	  template <int,int,typename,typename> class Functor,
 	  int writeX, int writeY, int writeZ, int writeW>
 void multblasCuda(const Complex *a, const double2 &b, const double2 &c,
 CompositeColorSpinorField& x, CompositeColorSpinorField& y,
   CompositeColorSpinorField& z, CompositeColorSpinorField& w,
          int length) {
-           const int N=1;
+
   // FIXME implement this as a single kernel
   if (x[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     std::vector<cudaColorSpinorField> xp, yp, zp, wp;
     std::vector<ColorSpinorField*> xpp, ypp, zpp, wpp;
-    xp.reserve(N); yp.reserve(N); zp.reserve(N); wp.reserve(N);
-    xpp.reserve(N); ypp.reserve(N); zpp.reserve(N); wpp.reserve(N);
+    xp.reserve(NXZ); yp.reserve(NYW); zp.reserve(NXZ); wp.reserve(NYW);
+    xpp.reserve(NXZ); ypp.reserve(NYW); zpp.reserve(NXZ); wpp.reserve(NYW);
 
-    for (int i=0; i<N; i++) {
-      xp.push_back(x[i]->Even()); yp.push_back(y[i]->Even()); zp.push_back(z[i]->Even());
-      wp.push_back(w[i]->Even());
-      xpp.push_back(&xp[i]); ypp.push_back(&yp[i]); zpp.push_back(&zp[i]); wpp.push_back(&wp[i]);
+    for (int i=0; i<NXZ; i++) {
+      xp.push_back(x[i]->Even());zp.push_back(z[i]->Even());
+      xpp.push_back(&xp[i]); zpp.push_back(&zp[i]);
+    }
+    for (int i=0; i<NYW; i++) {
+      yp.push_back(y[i]->Even()); wp.push_back(w[i]->Even());
+      ypp.push_back(&yp[i]); ; wpp.push_back(&wp[i]);
     }
 
-    multblasCuda<RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
+    multblasCuda<NXZ, NYW, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
       (a, b, c, xpp, ypp, zpp, wpp, length);
 
-    for (int i=0; i<N; ++i) {
-      xp.push_back(x[i]->Odd()); yp.push_back(y[i]->Odd()); zp.push_back(z[i]->Odd());
-      wp.push_back(w[i]->Odd());
-      xpp.push_back(&xp[i]); ypp.push_back(&yp[i]); zpp.push_back(&zp[i]); wpp.push_back(&wp[i]);
+    for (int i=0; i<NXZ; ++i) {
+      xp.push_back(x[i]->Odd()); zp.push_back(z[i]->Odd());
+      xpp.push_back(&xp[i]);  zpp.push_back(&zp[i]);
+    }
+    for (int i=0; i<NYW; ++i) {
+      yp.push_back(y[i]->Odd()); wp.push_back(w[i]->Odd());
+      ypp.push_back(&yp[i]); wpp.push_back(&wp[i]);
     }
 
-    multblasCuda<RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
+    multblasCuda<NXZ, NYW, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
        (a, b, c, xpp, ypp, zpp, wpp, length);
 
     return;
@@ -240,29 +246,34 @@ CompositeColorSpinorField& x, CompositeColorSpinorField& y,
     strcat(blasStrings.aux_tmp, y[0]->AuxString());
   }
 
+  const int N = NXZ > NYW ? NXZ : NYW;
   size_t **bytes = new size_t*[N], **norm_bytes = new size_t*[N];
   for (int i=0; i<N; i++) {
     bytes[i] = new size_t[4]; norm_bytes[i] = new size_t[4];
-    bytes[i][0] = x[i]->Bytes(); bytes[i][1] = y[i]->Bytes(); bytes[i][2] = z[i]->Bytes();
-    bytes[i][3] = w[i]->Bytes();
-    norm_bytes[i][0] = x[i]->NormBytes(); norm_bytes[i][1] = y[i]->NormBytes(); norm_bytes[i][2] = z[i]->NormBytes();
-    norm_bytes[i][3] = w[i]->NormBytes();
+  }
+  for (int i=0; i<NXZ; i++) {
+    bytes[i][0] = x[i]->Bytes();  bytes[i][2] = z[i]->Bytes();
+    norm_bytes[i][0] = x[i]->NormBytes(); norm_bytes[i][2] = z[i]->NormBytes();
+  }
+  for (int i=0; i<NYW; i++) {
+    bytes[i][1] = y[i]->Bytes(); bytes[i][3] = w[i]->Bytes();
+    norm_bytes[i][1] = y[i]->NormBytes(); norm_bytes[i][3] = w[i]->NormBytes();
   }
 
-  Spinor<RegType,StoreType,M,writeX,0> X[N];
-  Spinor<RegType,    yType,M,writeY,1> Y[N];
-  Spinor<RegType,StoreType,M,writeZ,2> Z[N];
-  Spinor<RegType,StoreType,M,writeW,3> W[N];
+  Spinor<RegType,StoreType,M,writeX,0> X[NXZ];
+  Spinor<RegType,    yType,M,writeY,1> Y[NYW];
+  Spinor<RegType,StoreType,M,writeZ,2> Z[NXZ];
+  Spinor<RegType,StoreType,M,writeW,3> W[NYW];
 
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
   typedef vector<Float,2> vec2;
   //MWFIXME
-  for (int i=0; i<N; i++) { X[i].set(*x[i]); Y[i].set(*y[i]); Z[i].set(*z[i]); W[i].set(*w[i]);}
+  for (int i=0; i<NXZ; i++) { X[i].set(*x[i]); Z[i].set(*z[i]);}
+  for (int i=0; i<NYW; i++) { Y[i].set(*y[i]); W[i].set(*w[i]);}
+  Functor<NXZ,NYW,Float2, RegType> f( a, (Float2)vec2(b), (Float2)vec2(c));
 
-  Functor<1,1,Float2, RegType> f( a, (Float2)vec2(b), (Float2)vec2(c));
-
-  MultBlasCuda<1,1,RegType,M,
+  MultBlasCuda<NXZ,NYW,RegType,M,
     Spinor<RegType,StoreType,M,writeX,0>,
     Spinor<RegType,    yType,M,writeY,1>,
     Spinor<RegType,StoreType,M,writeZ,2>,

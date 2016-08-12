@@ -270,9 +270,24 @@ namespace quda {
     };
 
     // const quda::Complex *, double2, double2, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField
-    void multcaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) {
-      multblasCuda<1,1,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-      make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+    void multcaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, int N) {
+      switch (N){
+        case 2:
+          multblasCuda<2,2,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+        break;
+        case 4:
+          multblasCuda<4,4,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+        break;
+        case 8:
+          multblasCuda<8,8,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+        break;
+        default:
+        errorQuda("multcaxpy not implemented for N");
+
+      }
     }
 
 #endif
