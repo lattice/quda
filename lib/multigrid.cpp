@@ -77,7 +77,7 @@ namespace quda {
 
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 32;
-      param_presmooth->maxiter = 1000;
+      param_presmooth->maxiter = 600;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
@@ -127,7 +127,8 @@ namespace quda {
       // create transfer operator
       printfQuda("start creating transfer operator\n");
 
-      Complex alpha = Complex(0.00889, 1.0);//if zero: no smoothing
+      Complex alpha = Complex(0.00889, 12.1);//if zero: no smoothing
+      printfQuda("\nSmoothing params: %le %le\n", alpha.real(), alpha.imag());
       transfer = new Transfer(param.B, &param.matResidual, alpha,  param.Nvec, param.geoBlockSize, param.spinBlockSize,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
@@ -720,8 +721,8 @@ namespace quda {
     SolverParam solverParam(param);
 
     // set null-space generation options - need to expose these
-    solverParam.maxiter = 500;
-    solverParam.tol = 5e-4;
+    solverParam.maxiter = 1000;
+    solverParam.tol = 5e-5;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7;
     solverParam.inv_type = (param.level == 0 && param.matSmooth.isStaggered() && param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
@@ -782,7 +783,7 @@ namespace quda {
         {
           Dirac &dirac_tmp = const_cast<Dirac&>(dirac);
           double init_mass = dirac_tmp.Mass();
-          dirac_tmp.setMass((0.001*init_mass));//0.001=>0.0001
+          dirac_tmp.setMass((0.0*init_mass));//0.001=>0.0001
 	  solve = Solver::create(solverParam, param.matSmooth, param.matSmooth, param.matSmooth, profile);
 
           dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);

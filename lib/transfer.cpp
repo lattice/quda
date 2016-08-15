@@ -374,8 +374,8 @@ namespace quda {
     {
       if (use_gpu)
       {
-         Dirac &dirac_smooth  = const_cast<Dirac&>(*(matSmoothTransfer->Expose()));
-         dirac_smooth.Dagger(QUDA_DAG_YES);//!
+ //        Dirac &dirac_smooth  = const_cast<Dirac&>(*(matSmoothTransfer->Expose()));
+ //        dirac_smooth.Dagger(QUDA_DAG_YES);//!
 
          ColorSpinorParam  csParam = ColorSpinorParam(*fine_tmp_d);
          csParam.extendDimensionality();
@@ -388,14 +388,14 @@ namespace quda {
          *to_be_restricted_5d_d = *input;
 
          (*matSmoothTransfer)( *smoothed_5d_d, *to_be_restricted_5d_d);
-         blas::caxpy(conj(alpha), *smoothed_5d_d, *to_be_restricted_5d_d);//in fact, we compute -Ddagger
+         blas::caxpy(-conj(alpha), *smoothed_5d_d, *to_be_restricted_5d_d);//in fact, we compute -Ddagger
 
          *input = *to_be_restricted_5d_d;
 
          delete to_be_restricted_5d_d; 
          delete smoothed_5d_d;
 
-         dirac_smooth.Dagger(QUDA_DAG_NO);
+//         dirac_smooth.Dagger(QUDA_DAG_NO);
       }
       else
       {
