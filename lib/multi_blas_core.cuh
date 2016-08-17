@@ -269,8 +269,8 @@ CompositeColorSpinorField& x, CompositeColorSpinorField& y,
   typedef typename vector<Float,2>::type Float2;
   typedef vector<Float,2> vec2;
   //MWFIXME
-  for (int i=0; i<NXZ; i++) { X[i].set(*x[i]); Z[i].set(*z[i]);}
-  for (int i=0; i<NYW; i++) { Y[i].set(*y[i]); W[i].set(*w[i]);}
+  for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
+  for (int i=0; i<NYW; i++) { Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i])); W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));}
   Functor<NXZ,NYW,Float2, RegType> f( a, (Float2)vec2(b), (Float2)vec2(c));
 
   MultBlasCuda<NXZ,NYW,RegType,M,
