@@ -151,7 +151,8 @@ namespace quda {
    */
   template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __device__ __host__ inline void multiplyKSVUV(complex<Float> vuv[], Arg &arg, int parity, int x_cb, const int factor) {
-    //for (int i = 0; i < factor*coarseColor*coarseColor; i++) vuv[i] = 0.0;
+    
+    for (int i = 0; i < factor*coarseColor*coarseColor; i++) vuv[i] = 0.0;
 
     if (!from_coarse) { // fine grid is top level
 
@@ -227,7 +228,8 @@ namespace quda {
     const int factor = (arg.UVL == nullptr) ? 1 : 2;
     const int elements = !from_coarse ? factor*coarseColor*coarseColor : coarseSpin*coarseSpin*coarseColor*coarseColor;
 
-    complex<Float> *vuv = new complex<Float>[elements];//[factor*coarseColor*coarseColor]
+    //complex<Float> *vuv = new complex<Float>[elements]; 
+    complex<Float> vuv[2*coarseColor*coarseColor];//[factor*coarseColor*coarseColor]
     multiplyKSVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, factor);
 
     for(int c_row = 0; c_row < coarseColor; c_row++) { // Coarse Color row
@@ -237,7 +239,7 @@ namespace quda {
       }
     }
 
-    delete vuv;
+    //delete vuv;
   }
 
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
