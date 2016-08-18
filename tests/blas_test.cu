@@ -726,10 +726,15 @@ double test(int kernel) {
   blas::multcaxpy(A, *xmD, *ymD, nsrc);
   for (int i=0; i < nsrc; i++){
     for(int j=0; j < nsrc; j++){
-      blas::caxpy(A[i*nsrc+j], *(xmH[i]), *(ymH[i]));
+      blas::caxpy(A[nsrc*j+i], *(xmH[i]), *(ymH[j]));
     }
   }
-
+  error = 0;
+  for (int i=0; i < nsrc; i++){
+    error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
+  }
+  error/= nsrc;
+  break;
 
 
   default:
@@ -913,6 +918,7 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_half, BlasTest, ::testing::Values( make
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductUYNormY_half, BlasTest, ::testing::Values( make_int2(0,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,32) ));
+INSTANTIATE_TEST_CASE_P(multcaxpy_half, BlasTest, ::testing::Values( make_int2(0,33) ));
 
 // single precision
 INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
@@ -948,6 +954,7 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_single, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductUYNormY_single, BlasTest, ::testing::Values( make_int2(1,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,32) ));
+INSTANTIATE_TEST_CASE_P(multcaxpy_single, BlasTest, ::testing::Values( make_int2(1,33) ));
 
 // double precision
 INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
@@ -983,3 +990,4 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_double, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductUYNormY_double, BlasTest, ::testing::Values( make_int2(2,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,32) ));
+INSTANTIATE_TEST_CASE_P(multcaxpy_double, BlasTest, ::testing::Values( make_int2(2,33) ));

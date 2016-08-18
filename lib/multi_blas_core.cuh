@@ -37,10 +37,14 @@ Generic blas kernel with four loads and up to four stores.
 template <typename FloatN, int M, int NXZ, int NYW, typename SpinorX, typename SpinorY,
 typename SpinorZ, typename SpinorW, typename Functor>
 __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
+
+  // use i to loop over elements in kernel
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSizex = gridDim.x*blockDim.x;
   unsigned int gridSizey = gridDim.y*blockDim.y;
+
   unsigned int k = blockIdx.y*blockDim.y + threadIdx.y;
+
 
   arg.f.init();
 
@@ -51,19 +55,15 @@ __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,Spi
       arg.Y[k].load(y, i);
       arg.W[k].load(w, i);
 
-      for (unsigned int in_idx=0; i < arg.in_dim; in_idx++ ){
-        arg.X[in_idx].load(x, i);
-        arg.Z[in_idx].load(z, i);
-
+      for (int l=0; l < arg.in_dim; l++ ){
+        arg.X[l].load(x, i);
+        arg.Z[l].load(z, i);
 
         #pragma unroll
-        for (int j=0; j<M; j++) arg.f(x[j], y[j], z[j], w[j], i, k);
+        for (int j=0; j<M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
       }
-      // arg.X[out_idx].save(x, i);
       arg.Y[k].save(y, i);
-      // arg.Z[out_idx].save(z, i);
       arg.W[k].save(w, i);
-
 
       i += gridSizex;
     }
