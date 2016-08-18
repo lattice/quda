@@ -5,6 +5,9 @@
 #include <typeinfo>
 #include <multigrid_helper.cuh>
 
+// enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
+#define SWIZZLE
+
 namespace quda {
 
 #ifdef GPU_MULTIGRID
@@ -25,18 +28,19 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the input field (if single parity)
     const int nParity; // number of parities of input fine field
+    int swizzle; // swizzle factor for transposing blockIdx.x mappnig to coarse grid coordinate
 
     RestrictArg(Out &out, const In &in, const Rotator &V,
 		const int *fine_to_coarse, const int *coarse_to_fine,
 		int parity, const ColorSpinorField &meta) :
       out(out), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-      spin_map(), parity(parity), nParity(meta.SiteSubset())
+      spin_map(), parity(parity), nParity(meta.SiteSubset()), swizzle(1)
     { }
 
     RestrictArg(const RestrictArg<Out,In,Rotator,fineSpin,coarseSpin> &arg) :
       out(arg.out), in(arg.in), V(arg.V), 
       fine_to_coarse(arg.fine_to_coarse), coarse_to_fine(arg.coarse_to_fine), spin_map(),
-      parity(arg.parity), nParity(arg.nParity)
+      parity(arg.parity), nParity(arg.nParity), swizzle(arg.swizzle)
     { }
   };
 
@@ -53,19 +57,37 @@ namespace quda {
     const int spinor_parity = (nParity == 2) ? parity : 0;
     const int v_parity = (V.Nparity() == 2) ? parity : 0;
 
+#pragma unroll
     for (int s=0; s<fineSpin; s++)
+#pragma unroll
       for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
 	out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
       }
 
+#pragma unroll
     for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
       int i = coarse_color_block + coarse_color_local;
+#pragma unroll
       for (int s=0; s<fineSpin; s++) {
-	for (int j=0; j<fineColor; j++) {
-	  out[s*coarse_colors_per_thread + coarse_color_local] += conj(V(v_parity, x_cb, s, j, i)) * in(spinor_parity, x_cb, s, j);
+
+	constexpr int color_unroll = fineColor == 3 ? 3 : 2;
+
+	complex<Float> partial[color_unroll];
+#pragma unroll
+	for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
+
+#pragma unroll
+	for (int j=0; j<fineColor; j+=color_unroll) {
+#pragma unroll
+	  for (int k=0; k<color_unroll; k++)
+	    partial[k] += conj(V(v_parity, x_cb, s, j+k, i)) * in(spinor_parity, x_cb, s, j+k);
 	}
+
+#pragma unroll
+	for (int k=0; k<color_unroll; k++) out[s*coarse_colors_per_thread + coarse_color_local] += partial[k];
       }
     }
+
   }
 #else //STAGG_CPU_DEBUG
   /**
@@ -205,13 +227,30 @@ namespace quda {
      geometric block.  Each thread block corresponds to one geometric
      block, with number of threads equal to the number of fine grid
      points per aggregate, so each thread represents a fine-grid
-     point.  The look up table coarse_to_fine is the mapping to the
+     point.  The look up table coarse_to_fine is the mapping to
      each fine grid point.
   */
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int coarse_colors_per_thread,
 	    typename Arg, int block_size>
   __global__ void RestrictKernel(Arg arg) {
+
+#ifdef SWIZZLE
+    // the portion of the grid that is exactly divisible by the number of SMs
+    const int gridp = gridDim.x - gridDim.x % arg.swizzle;
+
     int x_coarse = blockIdx.x;
+    if (blockIdx.x < gridp) {
+      // this is the portion of the block that we are going to transpose
+      const int i = blockIdx.x % arg.swizzle;
+      const int j = blockIdx.x / arg.swizzle;
+
+      // tranpose the coordinates
+      x_coarse = i * (gridp / arg.swizzle) + j;
+    }
+#else
+    int x_coarse = blockIdx.x;
+#endif
+
     int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 
@@ -220,11 +259,11 @@ namespace quda {
 
     // threadIdx.x - fine checkboard offset
     // threadIdx.y - fine parity offset
-    // blockIdx.x  - which coarse block are we working on
+    // blockIdx.x  - which coarse block are we working on (swizzled to improve cache efficiency)
     // assume that coarse_to_fine look up map is ordered as (coarse-block-id + fine-point-id)
     // and that fine-point-id is parity ordered
     int parity = arg.nParity == 2 ? threadIdx.y : arg.parity;
-    int x_fine = arg.coarse_to_fine[ (blockIdx.x*2 + parity) * blockDim.x + threadIdx.x];
+    int x_fine = arg.coarse_to_fine[ (x_coarse*2 + parity) * blockDim.x + threadIdx.x];
     int x_fine_cb = x_fine - parity*arg.in.VolumeCB();
 
     int coarse_color_block = (blockDim.z*blockIdx.z + threadIdx.z) * coarse_colors_per_thread;
@@ -348,7 +387,7 @@ namespace quda {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	tp.block.y = arg.nParity;
+	arg.swizzle = tp.aux.x;
 
 	if (block_size == 8) {          // for 2x2x2x2 aggregates
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,8>
@@ -373,6 +412,9 @@ namespace quda {
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         } else if (block_size == 200) { // for 5x5x2x8  aggregates
           RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,200>
+          <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        } else if (block_size == 256) { // for 4x4x4x8  aggregates
+          RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,256>
           <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #if __COMPUTE_CAPABILITY__ >= 300
 	} else if (block_size == 432) { // for 6x6x6x4 aggregates
@@ -415,8 +457,25 @@ namespace quda {
       }
     }
 
+    int tuningIter() const { return 3; }
+
+    bool advanceAux(TuneParam &param) const
+    {
+#ifdef SWIZZLE
+      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+        param.aux.x++;
+	return true;
+      } else {
+        param.aux.x = 1;
+	return false;
+      }
+#else
+      return false;
+#endif
+    }
+
     // only tune shared memory per thread (disable tuning for block.z for now)
-    bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param); } //|| advanceBlockDim(param); }
+    bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param) || advanceAux(param); }
 
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
@@ -424,12 +483,13 @@ namespace quda {
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
-      param.block = dim3(block_size, 1, 1);
+      param.block = dim3(block_size, arg.nParity, 1);
       param.grid = dim3( (minThreads()+param.block.x-1) / param.block.x, 1, 1);
       param.shared_bytes = 0;
 
       param.block.z = 1;
       param.grid.z = coarseColor / coarse_colors_per_thread;
+      param.aux.x = 1; // swizzle factor
     }
 
     long long flops() const { return 8 * fineSpin * fineColor * coarseColor * arg.nParity*arg.in.VolumeCB(); }
@@ -454,12 +514,13 @@ namespace quda {
     fineSpinor   In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
-    // this seems like a reasonable value for both fine and coarse grids
 #ifndef STAGG_CPU_DEBUG
-    constexpr int coarse_colors_per_thread = 2;
+    // for fine grids (Nc=3) have more parallelism so can use more coarse strategy
+    constexpr int coarse_colors_per_thread = fineColor == 3 ? 8 : 2;
 #else
     constexpr int coarse_colors_per_thread = 1;
 #endif
+
     Arg arg(Out, In, V, fine_to_coarse, coarse_to_fine, parity, in);
     RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread> restrictor(arg, out, in, Location(out, in, v));
     restrictor.apply(0);
