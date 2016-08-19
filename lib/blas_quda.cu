@@ -265,6 +265,7 @@ namespace quda {
       }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       { _caxpy(a[NXZ*j+i], x, y); }
+      // { _caxpy(make_Float2<Float2>(std::complex<double>(1,0)), x, y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
     };
@@ -272,6 +273,10 @@ namespace quda {
     // const quda::Complex *, double2, double2, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField
     void multcaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, int N) {
       switch (N){
+        case 1:
+          multblasCuda<1,1,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+        break;
         case 2:
           multblasCuda<2,2,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
           make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());

@@ -28,11 +28,12 @@ extern int niter;
 
 extern bool tune;
 extern bool verify_results;
+extern int Nsrc;
 
 extern void usage(char** );
 
 const int Nkernels = 34;
-const int nsrc = 4;
+
 
 using namespace quda;
 
@@ -129,9 +130,9 @@ void initFields(int prec)
 
 
 
-  xmH.reserve(nsrc);
-  ymH.reserve(nsrc);
-  for(int cid = 0; cid < nsrc; cid++)
+  xmH.reserve(Nsrc);
+  ymH.reserve(Nsrc);
+  for(int cid = 0; cid < Nsrc; cid++)
   {
   xmH.push_back(new cpuColorSpinorField(param));
   ymH.push_back(new cpuColorSpinorField(param));
@@ -147,7 +148,7 @@ void initFields(int prec)
   static_cast<cpuColorSpinorField*>(zH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
   static_cast<cpuColorSpinorField*>(hH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
   static_cast<cpuColorSpinorField*>(lH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  for(int i=0; i<nsrc; i++){
+  for(int i=0; i<Nsrc; i++){
     static_cast<cpuColorSpinorField*>(xmH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
     static_cast<cpuColorSpinorField*>(ymH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
 }
@@ -187,7 +188,7 @@ void initFields(int prec)
 
   param.is_composite = true;
   param.is_component = false;
-  param.composite_dim = 4;
+  param.composite_dim = Nsrc;
 // create composite fields
 
   xmD = new cudaColorSpinorField(param);
@@ -218,7 +219,7 @@ void initFields(int prec)
     *zD = *zH;
     *hD = *hH;
     *lD = *lH;
-    // for (int i=0; i < nsrc; i++){
+    // for (int i=0; i < Nsrc; i++){
     //   xmD->Component(i) = *(xmH[i]);
     //   ymD->Component(i) = *(ymH[i]);
     // }
@@ -249,7 +250,7 @@ void freeFields()
   delete zH;
   delete hH;
   delete lH;
-  for (int i=0; i < nsrc; i++){
+  for (int i=0; i < Nsrc; i++){
     delete xmH[i];
     delete ymH[i];
   }
@@ -262,7 +263,7 @@ double benchmark(int kernel, const int niter) {
 
   double a, b, c;
   quda::Complex a2, b2, c2;
-  quda::Complex A[nsrc*nsrc];
+  quda::Complex * A = new quda::Complex[Nsrc*Nsrc];
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -408,7 +409,7 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 33:
-      for (int i=0; i < niter; ++i) blas::multcaxpy(A, *xmD,* ymD, nsrc);
+      for (int i=0; i < niter; ++i) blas::multcaxpy(A, *xmD,* ymD, Nsrc);
       // for (int i=0; i < niter; ++i)   blas::caxpy(a2, xmD->Component(1), ymD->Component(1));
       break;
 
@@ -423,7 +424,7 @@ double benchmark(int kernel, const int niter) {
   cudaEventElapsedTime(&runTime, start, end);
   cudaEventDestroy(start);
   cudaEventDestroy(end);
-
+  delete[] A;
   double secs = runTime / 1000;
   return secs;
 }
@@ -434,8 +435,16 @@ double test(int kernel) {
 
   double a = M_PI, b = M_PI*exp(1.0), c = sqrt(M_PI);
   quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
+  quda::Complex c1(1.,0.);
   double error = 0;
-  quda::Complex A[nsrc*nsrc];
+  quda::Complex * A = new quda::Complex[Nsrc*Nsrc];
+  for(int i=0; i < Nsrc*Nsrc; i++){
+    A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
+  }
+  // A[0] = a2;
+  // A[1] = 0.;
+  // A[2] = 0.;
+  // A[3] = 0.;
 
   switch (kernel) {
 
@@ -719,28 +728,30 @@ double test(int kernel) {
     break;
 
   case 33:
-  for (int i=0; i < nsrc; i++){
+  for (int i=0; i < Nsrc; i++){
     xmD->Component(i) = *(xmH[i]);
     ymD->Component(i) = *(ymH[i]);
   }
-  blas::multcaxpy(A, *xmD, *ymD, nsrc);
-  for (int i=0; i < nsrc; i++){
-    for(int j=0; j < nsrc; j++){
-      blas::caxpy(A[nsrc*j+i], *(xmH[i]), *(ymH[j]));
+
+  blas::multcaxpy(A, *xmD, *ymD, Nsrc);
+  for (int i=0; i < Nsrc; i++){
+    for(int j=0; j < Nsrc; j++){
+      blas::caxpy(A[Nsrc*i+j], *(xmH[i]), *(ymH[j]));
+      // blas::caxpy(c1, *(xmH[i]), *(ymH[j]));
     }
   }
   error = 0;
-  for (int i=0; i < nsrc; i++){
+  for (int i=0; i < Nsrc; i++){
     error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
   }
-  error/= nsrc;
+  // error/= Nsrc;
   break;
 
 
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
-
+  delete[] A;
   return error;
 }
 
@@ -819,7 +830,7 @@ int main(int argc, char** argv)
     printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
     initFields(prec);
 
-    for (int kernel = 33; kernel < Nkernels; kernel++) {
+    for (int kernel = 0; kernel < Nkernels; kernel++) {
       if (skip_kernel(prec, kernel)) continue;
 
       // do the initial tune

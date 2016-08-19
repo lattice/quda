@@ -48,27 +48,29 @@ __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,Spi
 
   arg.f.init();
 
-  while (k < arg.out_dim){
-    while (i < arg.length) {
-      FloatN x[M], y[M], z[M], w[M];
 
+  while (i < arg.length) {
+     if (k < NYW){
+      FloatN x[M], y[M], z[M], w[M];
       arg.Y[k].load(y, i);
       arg.W[k].load(w, i);
 
-      for (int l=0; l < arg.in_dim; l++ ){
+      #pragma unroll
+      for (int l=0; l < NXZ; l++ ){
         arg.X[l].load(x, i);
         arg.Z[l].load(z, i);
 
         #pragma unroll
-        for (int j=0; j<M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
+        for (int j=0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
       }
       arg.Y[k].save(y, i);
       arg.W[k].save(w, i);
 
-      i += gridSizex;
+    //   k += gridSizey;
     }
-    k += gridSizey;
+    i += gridSizex;
   }
+
 }
 
 namespace detail
@@ -140,12 +142,41 @@ public:
     multblasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
   }
 
-  bool advanceGridDim(TuneParam &param) const {
-      bool rtn = Tunable::advanceGridDim(param);
-    if (NYW > deviceProp.maxGridSize[1]) errorQuda("N=%d is greater than the maximum support grid size", NYW);
-    param.grid.y = NYW;
-    return rtn;
-  }
+  bool advanceBlockDim(TuneParam &param) const
+  {
+    const int nSrc = NYW;
+    const unsigned int max_shared = deviceProp.sharedMemPerBlock;
+    // first try to advance block.y (number of right-hand sides per block)
+    if (param.block.y < nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
+      sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
+      (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
+        param.block.y++;
+        param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
+        return true;
+      } else {
+        param.block.y = 1;
+        param.grid.y = nSrc;
+        bool rtn = Tunable::advanceBlockDim(param);
+        param.block.y = 1;
+        param.grid.y = nSrc;
+        return rtn;
+      }
+    }
+
+    // virtual unsigned int minThreads() const { return arg.length; }
+    // virtual bool tuneGridDim() const { return false; }
+
+    void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      param.block.y = 1;
+      param.grid.y = NYW;
+    }
+
+    void defaultTuneParam(TuneParam &param) const {
+      Tunable::defaultTuneParam(param);
+      param.block.y = NYW;
+      param.grid.y = 1;
+    }
 
   void preTune() {
     for(int i=0; i<NXZ; ++i){
