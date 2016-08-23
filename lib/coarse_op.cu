@@ -168,7 +168,7 @@ namespace quda {
     cpuGaugeField g(gf_param);
 
     //Copy the cuda gauge field to the cpu
-    gauge.saveCPUField(g, QUDA_CPU_FIELD_LOCATION);
+    gauge.saveCPUField(g);
 
     //Create a field UV which holds U*V.  Has the same structure as V.
     ColorSpinorParam UVparam(T.Vectors());

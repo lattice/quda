@@ -39,9 +39,9 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      gauge = device_malloc(bytes);  
+      gauge = device_malloc(bytes);
       if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
-    } else { 
+    } else {
       gauge = param.gauge;
     }
 
@@ -53,7 +53,7 @@ namespace quda {
     }
 
     if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
-      if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost(); 
+      if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost();
     }
 
     even = gauge;
@@ -423,53 +423,52 @@ namespace quda {
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
           static_cast<const cudaGaugeField&>(src).gauge);
     } else if (typeid(src) == typeid(cpuGaugeField)) {
-#if 0 // do reorder on the CPU
-      void *buffer = allocatePinned(bytes);
-      // copy field and ghost zone into buffer
-      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer,
-		       static_cast<const cpuGaugeField&>(src).gauge); 
+      if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
+	void *buffer = allocatePinned(bytes);
+	// copy field and ghost zone into buffer
+	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
 
-      // this copies over both even and odd
-      qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
-      freePinned(buffer);
-#else // else on the CPU  (experimental - needs clean up)
-      void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
-      size_t ghost_bytes[4];
-      for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * nInternal * src.Precision();
-      void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order()) : nullptr;
+	// this copies over both even and odd
+	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
+	freePinned(buffer);
+      } else { // else on the GPU
+	void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
+	size_t ghost_bytes[4];
+	int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
+	for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * srcNinternal * src.Precision();
+	void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order()) : nullptr;
 
-      if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
-	for (int d=0; d<geometry; d++) {
-	  qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyHostToDevice);
+	if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
+	  for (int d=0; d<geometry; d++) {
+	    qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyHostToDevice);
+	  }
+	} else {
+	  qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyHostToDevice);
 	}
-      } else {
-	qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyHostToDevice);
-      }
 
-      if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	  src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	for (int d=0; d<4; d++)
-	  qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
+	if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
+	    src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+	  for (int d=0; d<4; d++)
+	    qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
 
-      copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
-      free_gauge_buffer(buffer, src.Order(), src.Geometry());
-      if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order());
-#endif
+	copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
+	free_gauge_buffer(buffer, src.Order(), src.Geometry());
+	if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order());
+      } // reorder_location
     } else {
       errorQuda("Invalid gauge field type");
     }
 
     // if we have copied from a source without a pad then we need to exchange
-    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD &&
-	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
-      exchangeGhost(); 
-    }
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) exchangeGhost();
 
     checkCudaError();
   }
 
-  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
+  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu)
   {
+    QudaFieldLocation pack_location = reorder_location();
+
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
 
       void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
@@ -491,8 +490,10 @@ namespace quda {
 
   }
 
-  void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const
+  void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const
   {
+    QudaFieldLocation pack_location = reorder_location();
+
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
 
       void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());

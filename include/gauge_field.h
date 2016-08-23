@@ -306,8 +306,8 @@ namespace quda {
      */
     void copy(const GaugeField &src);
 
-    void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
-    void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
+    void loadCPUField(const cpuGaugeField &);
+    void saveCPUField(cpuGaugeField &) const;
 
     // (ab)use with care
     void* Gauge_p() { return gauge; }
@@ -343,8 +343,8 @@ namespace quda {
   class cpuGaugeField : public GaugeField {
 
     friend void cudaGaugeField::copy(const GaugeField &cpu);
-    friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &);
-    friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &) const;
+    friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu);
+    friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const;
 
   private:
     void **gauge; // the actual gauge field
