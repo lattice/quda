@@ -421,7 +421,9 @@ static int manual_set_partition[QUDA_MAX_DIM] = {0};
 
 void comm_dim_partitioned_set(int dim)
 { 
+#ifdef MULTI_GPU
   manual_set_partition[dim] = 1;
+#endif
 }
 
 
