@@ -232,7 +232,7 @@ namespace quda {
       public:
       FmunuCompute(FmunuArg<Float,Fmunu,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
         : arg(arg), meta(meta), location(location) {
-	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,sizeof(Float));
+	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,meta.Stride(),sizeof(Float));
       }
       virtual ~FmunuCompute() {}
 
@@ -249,17 +249,8 @@ namespace quda {
 	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
-      std::string paramString(const TuneParam &param) const {
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-      void preTune(){}
-      void postTune(){}
-      long long flops() const { return (2430 + 36)*6*2*arg.threads; }
-      long long bytes() const { return ((16*arg.gauge.Bytes() + arg.f.Bytes())*6*2*arg.threads); } //  Ignores link reconstruction
+    long long flops() const { return (2430 + 36)*6*2*(long long)arg.threads; }
+    long long bytes() const { return ((16*arg.gauge.Bytes() + arg.f.Bytes())*6*2*arg.threads); } //  Ignores link reconstruction
 
     }; // FmunuCompute
 
