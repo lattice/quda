@@ -78,7 +78,7 @@ bool skip_kernel(int precision, int kernel) {
   } else if (Nspin == 2 && kernel == 1) {
     // avoid low-precision copy if doing coarse fields
     return true;
-  } else if (Ncolor != 3 && kernel == 31) {
+  } else if (Ncolor != 3 && (kernel == 31 || kernel == 32)) {
     // only benchmark heavy-quark norm if doing 3 colors
     return true;
   } else if ((Nprec < 3) && (kernel == 0)) {

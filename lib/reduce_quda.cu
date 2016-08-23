@@ -521,7 +521,7 @@ namespace quda {
     __device__ __host__ void cdot_(ReduceType &sum, const float2 &a, const float2 &b) {
       typedef typename ScalarType<ReduceType>::type scalar;
       sum.x += (scalar)a.x*(scalar)b.x;
-      sum.y += (scalar)a.y*(scalar)b.y;
+      sum.x += (scalar)a.y*(scalar)b.y;
       sum.y += (scalar)a.x*(scalar)b.y;
       sum.y -= (scalar)a.y*(scalar)b.x;
     }

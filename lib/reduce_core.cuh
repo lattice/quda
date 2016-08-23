@@ -190,10 +190,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     doubleN even = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
       Reducer,writeX,writeY,writeZ,writeW,writeV>
-      (a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even(), length);
+      (a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even(), length/2);
     doubleN odd = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
       Reducer,writeX,writeY,writeZ,writeW,writeV>
-      (a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Even(), length);
+      (a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd(), length/2);
     return even + odd;
   }
 
