@@ -39,18 +39,20 @@ typename SpinorZ, typename SpinorW, typename Functor>
 __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
 
   // use i to loop over elements in kernel
-  unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
-  unsigned int gridSizex = gridDim.x*blockDim.x;
-  unsigned int gridSizey = gridDim.y*blockDim.y;
+  unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-  unsigned int k = blockIdx.y*blockDim.y + threadIdx.y;
+  const unsigned int gridSizex = gridDim.x * blockDim.x;
+  const unsigned int gridSizey = gridDim.y * blockDim.y;
+
+
 
 
   arg.f.init();
 
 
   while (i < arg.length) {
-     if (k < NYW){
+     unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
+     while (k < NYW){
       FloatN x[M], y[M], z[M], w[M];
       arg.Y[k].load(y, i);
       arg.W[k].load(w, i);
@@ -66,7 +68,7 @@ __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,Spi
       arg.Y[k].save(y, i);
       arg.W[k].save(w, i);
 
-    //   k += gridSizey;
+      k += gridSizey;
     }
     i += gridSizex;
   }
@@ -109,21 +111,14 @@ private:
 
   unsigned int sharedBytesPerThread() const { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+  bool tuneSharedBytes() const { return false; }
+  const unsigned int vector_length;
 
-  virtual bool advanceSharedBytes(TuneParam &param) const
-  {
-    TuneParam next(param);
-    advanceBlockDim(next); // to get next blockDim
-    int nthreads = next.block.x * next.block.y * next.block.z;
-    param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-      sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
-    return false;
-  }
 
 public:
   MultBlasCuda(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f,
 	   int length,  size_t **bytes,  size_t **norm_bytes) :
-  arg(X, Y, Z, W, f, length), X_h(), Y_h(), Z_h(), W_h(),
+  arg(X, Y, Z, W, f, length), X_h(), Y_h(), Z_h(), W_h(), vector_length(NYW),
     Xnorm_h(), Ynorm_h(), Znorm_h(), Wnorm_h(), bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
 
   virtual ~MultBlasCuda() { }
@@ -139,44 +134,56 @@ public:
   inline void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-    multblasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+    multblasKernel<FloatN,M,NXZ,NYW> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
   }
 
   bool advanceBlockDim(TuneParam &param) const
   {
-    const int nSrc = NYW;
-    const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-    // first try to advance block.y (number of right-hand sides per block)
-    if (param.block.y < nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
-      sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
-      (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
-        param.block.y++;
-        param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
-        return true;
-      } else {
-        param.block.y = 1;
-        param.grid.y = nSrc;
-        bool rtn = Tunable::advanceBlockDim(param);
-        param.block.y = 1;
-        param.grid.y = nSrc;
-        return rtn;
-      }
-    }
+    dim3 block = param.block;
+    dim3 grid = param.grid;
+    bool ret = Tunable::advanceBlockDim(param);
+    param.block.y = block.y;
+    param.grid.y = grid.y;
+    const unsigned int max_threads = maxBlockSize();
 
-    // virtual unsigned int minThreads() const { return arg.length; }
-    // virtual bool tuneGridDim() const { return false; }
-
-    void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = NYW;
+    if (ret) { // we advanced the block.x so we're done
+    return true;
+  }
+  else { // block.x (spacetime) was reset
+    if ((param.block.y  < vector_length) && (param.block.y +1) * param.grid.y <= vector_length){
+      param.block.y++;
+      return true;
     }
-
-    void defaultTuneParam(TuneParam &param) const {
-      Tunable::defaultTuneParam(param);
-      param.block.y = NYW;
-      param.grid.y = 1;
+    else{
+    if (param.grid.y  < vector_length){
+      param.grid.y++;
+      param.block.y=1;
+      return true;
     }
+  }
+    // we have run off the end so let's reset
+  param.block.y = 1;
+  param.grid.y = 1;
+  return false;
+}
+}
+
+
+
+  void initTuneParam(TuneParam &param) const
+  {
+    Tunable::initTuneParam(param);
+    param.block.y = 1;
+    param.grid.y = 1;
+  }
+
+  /** sets default values for when tuning is disabled */
+  void defaultTuneParam(TuneParam &param) const
+  {
+    Tunable::defaultTuneParam(param);
+    param.block.y = 1;
+    param.grid.y = vector_length;
+  }
 
   void preTune() {
     for(int i=0; i<NXZ; ++i){
@@ -199,9 +206,6 @@ public:
       arg.W[i].load(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
     }
   }
-
-
-
 
   long long flops() const { return arg.f.flops()*vec_length<FloatN>::value*arg.length*M; }
   long long bytes() const
