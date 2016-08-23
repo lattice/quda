@@ -123,18 +123,8 @@ namespace quda {
         return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
       }
 
-      std::string paramString(const TuneParam &param) const {
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-      void preTune(){}
-      void postTune(){}
       long long flops() const { return 6ll*2*arg.threads*(3*198+3); }
       long long bytes() const { return 6ll*4*2*arg.threads*arg.dataOr.Bytes(); } 
-
     }; 
 
   template<typename Float, typename Gauge>

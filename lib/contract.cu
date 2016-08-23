@@ -169,14 +169,6 @@ namespace quda {
       delete[] saveOut;
     }
 
-    std::string paramString(const TuneParam &param) const
-    {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-
     long long flops() const { return 120ll * x.VolumeCB(); }
     long long bytes() const { return x.Bytes() + x.NormBytes() + y.Bytes() + y.NormBytes(); }
   };

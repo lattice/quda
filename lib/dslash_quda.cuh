@@ -380,14 +380,6 @@ public:
   virtual TuneKey tuneKey() const  
   { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
 
-  std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
-  {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "shared=" << param.shared_bytes << ", ";
-    ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
-    return ps.str();
-  }
   virtual int Nface() { return 2; }
 
 #if defined(DSLASH_TUNE_TILE)
@@ -652,14 +644,6 @@ public:
 		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
     : DslashCuda(out, in, x, reconstruct, dagger) { ; }
   virtual ~SharedDslashCuda() { ; }
-  std::string paramString(const TuneParam &param) const // override and print out grid as well
-  {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
 
   virtual void initTuneParam(TuneParam &param) const
   {

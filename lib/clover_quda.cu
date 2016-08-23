@@ -194,15 +194,6 @@ namespace quda {
 	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
-      std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-      void preTune(){}
-      void postTune(){}
       long long flops() const { return 480*arg.threads; } 
       long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } 
     };

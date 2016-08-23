@@ -174,9 +174,12 @@ namespace quda {
       {
 	std::stringstream ps;
 	ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-	ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+	if (tuneGridDim()) ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
 	ps << "shared=" << param.shared_bytes << ", ";
-	ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
+
+	// determine if we are tuning the auxiliary dimension
+	TuneParam dummy; initTuneParam(dummy);
+	if (advanceAux(dummy)) ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
 	return ps.str();
       }
 
