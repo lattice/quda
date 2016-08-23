@@ -39,7 +39,7 @@ typename SpinorZ, typename SpinorW, typename Functor>
 __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
 
   // use i to loop over elements in kernel
-  unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+
 
   const unsigned int gridSizex = gridDim.x * blockDim.x;
   const unsigned int gridSizey = gridDim.y * blockDim.y;
@@ -48,11 +48,12 @@ __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,Spi
 
 
   arg.f.init();
+  unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
+  while (k < NYW){
+    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    while (i < arg.length) {
 
 
-  while (i < arg.length) {
-     unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
-     while (k < NYW){
       FloatN x[M], y[M], z[M], w[M];
       arg.Y[k].load(y, i);
       arg.W[k].load(w, i);
@@ -68,9 +69,10 @@ __global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,Spi
       arg.Y[k].save(y, i);
       arg.W[k].save(w, i);
 
-      k += gridSizey;
+
+      i += gridSizex;
     }
-    i += gridSizex;
+    k += gridSizey;
   }
 
 }
