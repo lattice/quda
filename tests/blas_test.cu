@@ -737,14 +737,13 @@ double test(int kernel) {
   for (int i=0; i < Nsrc; i++){
     for(int j=0; j < Nsrc; j++){
       blas::caxpy(A[Nsrc*i+j], *(xmH[i]), *(ymH[j]));
-      // blas::caxpy(c1, *(xmH[i]), *(ymH[j]));
     }
   }
   error = 0;
   for (int i=0; i < Nsrc; i++){
     error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
   }
-  // error/= Nsrc;
+  error/= Nsrc;
   break;
 
 
