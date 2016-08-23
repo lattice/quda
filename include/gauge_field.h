@@ -396,7 +396,7 @@ namespace quda {
      @param u The gauge field that we want the norm of
      @return The L1 norm of the gauge field
   */
-  double norm1(const cudaGaugeField &u);
+  double norm1(const GaugeField &u);
 
   /**
      This is a debugging function, where we cast a gauge field into a
@@ -404,7 +404,7 @@ namespace quda {
      @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const cudaGaugeField &u);
+  double norm2(const GaugeField &u);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

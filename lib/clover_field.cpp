@@ -7,6 +7,8 @@
 #include <quda_internal.h>
 #include <clover_field.h>
 #include <gauge_field.h>
+#include <color_spinor_field.h>
+#include <blas_quda.h>
 
 namespace quda {
 
@@ -375,6 +377,46 @@ namespace quda {
     output << "order = "     << param.order << std::endl;
     output << "create = "    << param.create << std::endl;
     return output;  // for multiple << operators.
+  }
+
+  ColorSpinorParam colorSpinorParam(const CloverField &a, bool inverse) {
+
+    if (a.Precision() == QUDA_HALF_PRECISION)
+      errorQuda("Casting a CloverField into ColorSpinorField not possible in half precision");
+
+    ColorSpinorParam spinor_param;
+    // 72 = 9 * 4 * 2
+    spinor_param.nColor = 9;
+    spinor_param.nSpin = 4;
+    spinor_param.nDim = a.Ndim();
+    for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
+    spinor_param.precision = a.Precision();
+    spinor_param.pad = a.Pad();
+    spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    spinor_param.fieldOrder = a.Precision() == QUDA_DOUBLE_PRECISION ?
+      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
+    spinor_param.v = (void*)a.V(inverse);
+    spinor_param.location = a.Location();
+    return spinor_param;
+  }
+
+  // Return the L2 norm squared of the clover field
+  double norm2(const CloverField &a, bool inverse) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
+    double nrm2 = blas::norm2(*b);
+    delete b;
+    return nrm2;
+  }
+
+  // Return the L1 norm of the clover field
+  double norm1(const CloverField &a, bool inverse) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
+    double nrm1 = blas::norm1(*b);
+    delete b;
+    return nrm1;
   }
 
 } // namespace quda

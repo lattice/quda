@@ -165,6 +165,23 @@ namespace quda {
     virtual ~cpuCloverField();
   };
 
+  /**
+     This is a debugging function, where we cast a clover field into a
+     spinor field so we can compute its L1 norm.
+     @param a The clover field that we want the norm of
+     @return The L1 norm of the gauge field
+  */
+  double norm1(const CloverField &u, bool inverse=false);
+
+  /**
+     This is a debugging function, where we cast a clover field into a
+     spinor field so we can compute its L2 norm.
+     @param a The clover field that we want the norm of
+     @return The L2 norm squared of the gauge field
+  */
+  double norm2(const CloverField &a, bool inverse=false);
+
+
   // lightweight struct used to send pointers to cuda driver code
   struct FullClover {
     void *even;
@@ -209,6 +226,7 @@ namespace quda {
 	}
     }
   };
+
 
   // driver for computing the clover field from the gauge field
   void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);

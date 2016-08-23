@@ -1,5 +1,6 @@
 #include <gauge_field.h>
 #include <typeinfo>
+#include <blas_quda.h>
 
 namespace quda {
 
@@ -262,6 +263,65 @@ namespace quda {
     output << "staggeredPhaseApplied = " << param.staggeredPhaseApplied << std::endl;
 
     return output;  // for multiple << operators.
+  }
+
+  ColorSpinorParam colorSpinorParam(const GaugeField &a) {
+   if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
+     errorQuda("Not implemented for this order %d", a.FieldOrder());
+
+    if (a.LinkType() == QUDA_COARSE_LINKS) errorQuda("Not implemented for coarse-link type");
+
+    int spin = 0;
+    switch (a.Geometry()) {
+    case QUDA_SCALAR_GEOMETRY:
+    case QUDA_TENSOR_GEOMETRY:
+      spin = 1;
+      break;
+    case QUDA_VECTOR_GEOMETRY:
+      spin = a.Ndim();
+      break;
+    default:
+      errorQuda("Unsupported field geometry %d", a.Geometry());
+    }
+
+    if (a.Precision() == QUDA_HALF_PRECISION)
+      errorQuda("Casting a GaugeField into ColorSpinorField not possible in half precision");
+
+    if (a.Reconstruct() == QUDA_RECONSTRUCT_13 || a.Reconstruct() == QUDA_RECONSTRUCT_9)
+      errorQuda("Unsupported field reconstruct %d", a.Reconstruct());
+
+    ColorSpinorParam spinor_param;
+    spinor_param.nColor = a.Reconstruct()/2 * (a.Geometry() == QUDA_TENSOR_GEOMETRY ? 6 : 1);
+    spinor_param.nSpin = spin;
+    spinor_param.nDim = a.Ndim();
+    for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
+    spinor_param.precision = a.Precision();
+    spinor_param.pad = a.Pad();
+    spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    spinor_param.fieldOrder = (a.Precision() == QUDA_DOUBLE_PRECISION || spinor_param.nSpin == 1) ?
+      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
+    spinor_param.v = (void*)a.Gauge_p();
+    spinor_param.location = a.Location();
+    return spinor_param;
+  }
+
+  // Return the L2 norm squared of the gauge field
+  double norm2(const GaugeField &a) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a));
+    double nrm2 = blas::norm2(*b);
+    delete b;
+    return nrm2;
+  }
+
+  // Return the L1 norm of the gauge field
+  double norm1(const GaugeField &a) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a));
+    double nrm1 = blas::norm1(*b);
+    delete b;
+    return nrm1;
   }
 
 } // namespace quda
