@@ -292,7 +292,7 @@ namespace quda {
     void preTune() { arg.force.save(); } 
     void postTune(){ arg.force.load(); } 
 
-    long long flops() const { return 16 * 198 * 12 * arg.volumeCB; }
+    long long flops() const { return 16 * 198 * 12 * (long long)arg.volumeCB; }
     long long bytes() const { return (16*arg.gauge.Bytes() + 8*arg.oprod.Bytes() + 4*arg.force.Bytes()) * 12 * arg.volumeCB; }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -341,6 +341,7 @@ namespace quda {
     } else {
       errorQuda("Force order %d not supported", force.Order());
     } // force / oprod order
+    cudaDeviceSynchronize();
   }
 #endif // GPU_CLOVER
 
