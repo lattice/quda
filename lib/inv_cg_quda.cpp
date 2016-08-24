@@ -774,20 +774,26 @@ POP_RANGE
       L = lltOfr2.matrixL(); // retrieve factor L  in the decomposition
       S = L.adjoint();
       MatrixXcd Linv = S.inverse();
-
+#if NOTMULTCAXPY
       for(int i=0; i<param.num_src; i++){
         blas::zero(rSloppy.Component(i));
-
-
         for(int j=0;j<param.num_src; j++){
-          // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
           blas::caxpy(Linv(j,i),rnew.Component(j),rSloppy.Component(i));
-          // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
-          // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
-          // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
         }
       }
+#else
+      // temporary hack
+      quda::Complex * AA = new quda::Complex[param.num_src*param.num_src];
+      for(int i=0; i<param.num_src; i++){
+        blas::zero(rSloppy.Component(i));
+        for(int j=0;j<param.num_src; j++){
+          AA[i*param.num_src + j] = Linv(i,j);
+        }
+      }
+      blas::multcaxpy(AA,rnew,rSloppy,param.num_src);
 
+      delete[] AA;
+#endif
       // for(int i=0; i < param.num_src; i++){
       //   // scales with nsrc
       //   n = blas::norm2(rSloppy.Component(i));
@@ -832,29 +838,42 @@ POP_RANGE
       for(int i=0; i<param.num_src; i++){
         blas::copy(rnew.Component(i),rSloppy.Component(i));
       }
-
+#if NOTMULTCAXPY
       for(int i=0; i<param.num_src; i++){
-        // for(int j=0;j<param.num_src; j++){
+        for(int j=0;j<param.num_src; j++){
         //   // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
-        //   blas::caxpy(std::conj(S(i,j)),p.Component(j),rnew.Component(i));
+          blas::caxpy(std::conj(S(i,j)),p.Component(j),rnew.Component(i));
         //   // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
         //   // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
         //   // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
+        }
+        // const int j3 = param.num_src/3;
+        // const int j2 = ((param.num_src%3)/2);
+        // const int j1 = ((param.num_src%3)%2);
+        // for (int j=0;j<j3;j++){
+        //   blas::caxpbypczpw(std::conj(S(i,3*j)),p.Component(3*j),std::conj(S(i,3*j+1)),p.Component(3*j+1),std::conj(S(i,3*j+2)),p.Component(3*j+2),rnew.Component(i));
         // }
-        const int j3 = param.num_src/3;
-        const int j2 = ((param.num_src%3)/2);
-        const int j1 = ((param.num_src%3)%2);
-        for (int j=0;j<j3;j++){
-          blas::caxpbypczpw(std::conj(S(i,3*j)),p.Component(3*j),std::conj(S(i,3*j+1)),p.Component(3*j+1),std::conj(S(i,3*j+2)),p.Component(3*j+2),rnew.Component(i));
-        }
-        for (int j=0;j<j2;j++){
-          blas::caxpbypz(std::conj(S(i,3*j3+2*j)),p.Component(3*j3+2*j),std::conj(S(i,3*j3+2*j+1)),p.Component(3*j3+2*j+1),rnew.Component(i));
-        }
-        for (int j=0; j<j1;j++){
-          blas::caxpy(std::conj(S(i,3*j3+2*j2+j)),p.Component(3*j3+2*j2+j),rnew.Component(i));
-        }
+        // for (int j=0;j<j2;j++){
+        //   blas::caxpbypz(std::conj(S(i,3*j3+2*j)),p.Component(3*j3+2*j),std::conj(S(i,3*j3+2*j+1)),p.Component(3*j3+2*j+1),rnew.Component(i));
+        // }
+        // for (int j=0; j<j1;j++){
+        //   blas::caxpy(std::conj(S(i,3*j3+2*j2+j)),p.Component(3*j3+2*j2+j),rnew.Component(i));
+        // }
 
       }
+#else
+      // temporary hack
+      quda::Complex * AB = new quda::Complex[param.num_src*param.num_src];
+      for(int i=0; i<param.num_src; i++){
+        // blas::zero(rSloppy.Component(i));
+        for(int j=0;j<param.num_src; j++){
+          AB[i*param.num_src + j] = std::conj(S(j,i));
+        }
+      }
+      blas::multcaxpy(AB,p,rnew,param.num_src);
+
+      delete[] AB;
+#endif
       // copy sclae with nsrc
       for(int i=0; i < param.num_src; i++){
         blas::copy(p.Component(i),rnew.Component(i)); // do we need components here?
