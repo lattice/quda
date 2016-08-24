@@ -2,7 +2,7 @@
 #include <multigrid.h>
 #include <algorithm>
 
-const bool staggered_dslash_emulation =  true;
+const bool staggered_dslash_emulation =  false;
 
 namespace quda {
 

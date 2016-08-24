@@ -836,6 +836,54 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
 }
 
+template <typename Float>
+void applyU1FieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
+{
+  int X1 =param->X[0];
+  int X2 =param->X[1];
+  int X3 =param->X[2];
+
+  // apply the staggered phases
+  {
+    //even
+    for (int i = 0; i < Vh; i++) {
+
+      int index = fullLatticeIndex(i, 0);
+      int i4 = index /(X3*X2*X1);
+      int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
+      int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
+      int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
+      int sign = 1;
+
+      if (i1 % 2 == 1) sign= -1;
+
+      for (int j = 0;j < 18; j++) gauge[1][i*gaugeSiteSize + j] *= sign;
+    }
+
+    //odd
+    for (int i = 0; i < Vh; i++) {
+
+      int index = fullLatticeIndex(i, 1);
+      int i4 = index /(X3*X2*X1);
+      int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
+      int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
+      int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
+      int sign = 1;
+
+      if (i1 % 2 == 1) sign= -1;
+
+      for (int j = 0;j < 18; j++) gauge[1][(Vh+i)*gaugeSiteSize  + j] *= sign;
+    }
+  }
+
+  // Apply boundary conditions to temporal links
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+     errorQuda("\nAnti-periodic BC is not supported.\n");
+  }
+
+}
+
+
 /*
 template <typename Float>
 static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
@@ -962,7 +1010,7 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
     }
   }
 
-  if (dslash_type == QUDA_WILSON_LINKS){  
+  if (dslash_type == QUDA_WILSON_DSLASH){  
     applyGaugeFieldScaling(res, Vh, param);
   } else if (dslash_type == QUDA_ASQTAD_LONG_LINKS ||  dslash_type == QUDA_STAGGERED_DSLASH){
     applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
@@ -1163,6 +1211,150 @@ static void constructWeakGaugeField(Float **res, QudaGaugeParam *param, int type
   return;
 }
 
+
+//U1
+template <typename Float>
+static void constructU1GaugeField(Float **res, QudaGaugeParam *param, int type, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
+  Float *resOdd[4], *resEven[4];
+  for (int dir = 0; dir < 4; dir++) {
+    resEven[dir] = res[dir];
+    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
+  }
+
+  if(type == 3)  errorQuda("\nUnsupported gauge field load type.\n");
+
+  double beta = 6;//10
+
+  unsigned int seed1 = 1337u;
+
+  std::mt19937 generator(seed1);
+
+  std::normal_distribution<double> distribution(0.0, 1.0/sqrt(beta));
+
+  std::complex<double> *gbuff = nullptr;
+
+  printfQuda("\nGenerating 2D field in Z = 0, T = 0 subspace and angle standard deviation %le\n", 1.0/sqrt(beta));
+
+  printf("\n/phihome/astrel/Configs/2d/l64t64b60_heatbath.dat.\n");
+  string input_file ="/phihome/astrel/Configs/2d/l64t64b60_heatbath.dat";
+
+
+  gbuff = new std::complex<double>[(2*Z[0]*Z[1])];
+  double phase_tmp;   
+  fstream in_file;
+   
+  if(type == 2)//to read the field!
+  {
+    in_file.open(input_file,ios::in); 
+    for(int x =0;x< Z[0];x++)
+    {
+      for(int y =0;y< Z[1];y++)
+      {
+        for(int mu=0; mu<2; mu++)
+        {
+           in_file >> phase_tmp;
+           gbuff[y*2*Z[0]+x*2+mu] = std::polar(1.0,phase_tmp);
+        }
+      }
+    }
+    in_file.close();
+  }
+
+  for (int dir = 0; dir <= 1; dir++) {
+
+    memset ( resEven[dir], 0, Vh*gaugeSiteSize*sizeof(Float));
+    memset ( resOdd[dir],  0, Vh*gaugeSiteSize*sizeof(Float));
+
+    printfQuda("\nLoading U1 links in %d direction..\n", dir);
+
+    for (int i = 0; i < Vh; i++) {
+      int Y = fullLatticeIndex(i, 0);//need just single parity
+      int x4 = (Y/(Z[2]*Z[1]*Z[0])) % Z[3];
+      int x3 = (Y/(Z[1]*Z[0])) % Z[2];
+
+      if(!(x3 == 0 && x4 == 0)) continue;//we work with x3 = 0 x4 = 0 subspace
+
+      const int m  = 0;
+      const int n  = 0;
+
+      if(type != 2)
+      {
+        std::complex<double> plr = (type == 0) ? std::polar(1.0, distribution(generator)) : std::complex<double>(1.0, 0.0);
+        resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = plr.real();
+        resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = plr.imag();
+
+        plr =  (type == 0) ? std::polar(1.0, distribution(generator)) : std::complex<double>(1.0, 0.0);
+        resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0]  = plr.real();
+        resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1]  = plr.imag();
+      }
+      else //load U1
+      { 
+        int x2 = (Y/Z[0]) % Z[1];
+        int x1 = (Y % Z[0]);
+        int Y_odd = fullLatticeIndex(i, 1);//odd parity
+        int x1_odd = (Y_odd % Z[0]);
+
+        //load even links
+        std::complex<double> plr = gbuff[x2*2*Z[0]+x1*2+dir];
+        resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = plr.real();
+        resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = plr.imag();
+        //load odd links
+        plr = gbuff[x2*2*Z[0]+x1_odd*2+dir];
+        resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0]  = plr.real();
+        resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1]  = plr.imag();
+      }//type 2
+    }//Vh
+  }//dirs
+
+  if(gbuff != nullptr) delete [] gbuff; 
+
+//check plaquette:
+
+  std::complex<double> plaq = 0.0;
+  std::complex<double> tmp_plaq = 0.0;
+
+  int dx[4] = {1, 0, 0, 0};
+  int dy[4] = {0, 1, 0, 0};
+
+  for (int par = 0; par < 2; par++)
+  for (int i = 0; i < Vh; i++) {
+
+    int jpx     = neighborIndex(i, par, dx[3], dx[2], dx[1], dx[0]);
+    //int jpx_par = 1 - par;
+    int jpt     = neighborIndex(i, par, dy[3], dy[2], dy[1], dy[0]);
+    //int jpt_par = 1 - par;
+
+    if( par == 0 )
+    {
+      tmp_plaq = std::complex<double>(resEven[0][i*(3*3*2) + 0], resEven[0][i*(3*3*2) + 1] ) * std::complex<double>(resOdd[1][jpx*(3*3*2) + 0], resOdd[1][jpx*(3*3*2) + 1] ) 
+                 * std::complex<double>(resOdd[0][jpt*(3*3*2) + 0], -resOdd[0][jpt*(3*3*2) + 1] ) * std::complex<double>(resEven[1][i*(3*3*2) + 0], -resEven[1][i*(3*3*2) + 1] );
+    }
+    else
+    {
+      tmp_plaq = std::complex<double>(resOdd[0][i*(3*3*2) + 0], resOdd[0][i*(3*3*2) + 1] ) * std::complex<double>(resEven[1][jpx*(3*3*2) + 0], resEven[1][jpx*(3*3*2) + 1] )   
+                 * std::complex<double>(resEven[0][jpt*(3*3*2) + 0], -resEven[0][jpt*(3*3*2) + 1] ) * std::complex<double>(resOdd[1][i*(3*3*2) + 0], -resOdd[1][i*(3*3*2) + 1] );
+    }
+
+    plaq += tmp_plaq;
+  }
+
+  tmp_plaq = (plaq / ((double)(Z[0]*Z[1])));
+
+  printfQuda( "\nCheck plaquette : (%1.15f, %1.15f)\n", tmp_plaq.real(), tmp_plaq.imag());
+
+
+  if(type == 2) return;
+ 
+  if (dslash_type == QUDA_STAGGERED_DSLASH){
+    applyU1FieldScaling(res, Vh, param);
+  } else {
+    errorQuda("\n2d Dslash operator is not supported..\n"); 
+  }
+  
+  return;
+}
+
+
 void
 construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
 			       QudaPrecision precision, QudaGaugeParam* param,
@@ -1241,6 +1433,51 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
   }
 
 }
+
+void
+construct_u1_gauge_field(void **fatlink, void** longlink, int type, 
+			       QudaPrecision precision, QudaGaugeParam* param,
+			       QudaDslashType dslash_type)
+{
+  if (precision == QUDA_DOUBLE_PRECISION) {
+      // if doing naive staggered then set to long links so that the staggered phase is applied
+      param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+      //constructGaugeField((double**)fatlink, param, dslash_type);
+      constructU1GaugeField((double**)fatlink, param, type, dslash_type);
+  }else {
+      param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+      //constructGaugeField((float**)fatlink, param, dslash_type);
+      constructU1GaugeField((float**)fatlink, param, type, dslash_type);
+  }
+
+  if( type == 3) return;
+
+  if(param->reconstruct == QUDA_RECONSTRUCT_9 || 
+     param->reconstruct == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
+     errorQuda("\nReconstruction is not supported.\n");
+  }
+
+  // set all links to zero to emulate the 1-link operator (needed for host comparison)
+  if (dslash_type == QUDA_STAGGERED_DSLASH || type == 2) { //little hack to test the code
+    warningQuda("Disable long links.\n");  
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+	for(int j=0; j<gaugeSiteSize; j+=2){
+	  if(precision == QUDA_DOUBLE_PRECISION){
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }else{
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }
+	} 
+      }
+    }
+  }
+
+  return; 
+}
+
 
 #include "../lib/quda_matrix.h"
 
@@ -1762,8 +1999,8 @@ QudaPrecision prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_precondition = QUDA_SINGLE_PRECISION;
 
-int xdim = 16;
-int ydim = 16;
+int xdim = 64;
+int ydim = 64;
 int zdim = 16;
 int tdim = 16;
 int Lsdim = 1;//default for staggered to avoid 5d fields
@@ -1775,7 +2012,7 @@ int Nsrc = 1;
 bool tune = false;
 int niter = 10;
 int test_type = 0;
-int nvec[QUDA_MAX_MG_LEVEL] = { 24, 12 };
+int nvec[QUDA_MAX_MG_LEVEL] = { 4, 12 };
 char vec_infile[256] = "";
 char vec_outfile[256] = "";
 QudaInverterType inv_type;

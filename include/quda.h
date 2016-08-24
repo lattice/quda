@@ -394,6 +394,9 @@ extern "C" {
     /**< The time taken by the multigrid solver setup */
     double secs;
 
+    /**< Experimental: for 2d U1 tests */
+    bool _2d_u1_emulation;
+
   } QudaMultigridParam;
 
 

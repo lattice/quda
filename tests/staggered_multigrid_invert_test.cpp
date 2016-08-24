@@ -109,23 +109,57 @@ QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 
+const bool _2d_u1_emulation = true;
+int latt_dim[4] = {0} ; 
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
 
 static void end();
 
+unsigned gseed = 3377u;
+
 template<typename Float>
 void constructSpinorField(Float *res, const int Vol) {
+
+  std::mt19937 gen(gseed);
+  std::normal_distribution<> dist(0.0, 1.0);
+
   for(int src=0; src<Nsrc; src++)
-  for(int i = 0; i < Vol; i++) {
-    for (int s = 0; s < 1; s++) {
+  {
+    for(int x = 0; x < Vol; x++) {
       for (int m = 0; m < 3; m++) {
-        res[i*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-        res[i*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
+        res[x*(1*3*2) + m*(2) + 0] = !_2d_u1_emulation ? dist(gen) : 0.0;
+        res[x*(1*3*2) + m*(2) + 1] = !_2d_u1_emulation ? dist(gen) : 0.0;
       }
     }
+
+    if(_2d_u1_emulation)
+    {
+      Float *inEven = res;
+      Float *inOdd  = res + Vh*mySpinorSiteSize;
+
+      for (int parity = 0; parity < 2; parity++) {
+        for(int x_cb = 0; x_cb < (Z[0]*Z[1]) / 2; x_cb++) {
+
+           if(parity == 0)
+           {
+              inEven[x_cb*(1*3*2) + 0] = dist(gen);
+              inEven[x_cb*(1*3*2) + 1] = dist(gen);
+           }
+           else
+           {
+              inOdd[x_cb*(1*3*2) + 0] = dist(gen);
+              inOdd[x_cb*(1*3*2) + 1] = dist(gen);
+           }
+
+        }
+      }
+    }//end _2d_u1_emulation
   }
+
+  gseed += 1222;
 }
 
 #define USE_QDP_LINKS
@@ -216,10 +250,11 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   for (int i=0; i<mg_param.n_level; i++) {
     for (int j=0; j<QUDA_MAX_DIM; j++) {
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
-      mg_param.geo_block_size[i][4] = 1;//to be safe with 5th dimension 
+      mg_param.geo_block_size[i][4] = 1;//to be safe with 5th dimension
+      if(_2d_u1_emulation && j >= 2) mg_param.geo_block_size[i][j] = i == 0 ? latt_dim[j] : 1;  
     }
     mg_param.spin_block_size[i] = 1;// 1 or 0 (1 for parity blocking)
-    mg_param.n_vec[i] =  nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.n_vec[i] =  nvec[i] == 0 ? ( !_2d_u1_emulation ? 24 : 4 ) : nvec[i]; // default to 24 vectors if not set
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
 
@@ -304,6 +339,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.verbosity = QUDA_VERBOSE;
   //inv_param.verbosity_precondition = QUDA_SUMMARIZE;
   inv_param.verbosity_precondition = QUDA_VERBOSE;
+
+  //Experimental: for 2d U1 field tests
+  mg_param._2d_u1_emulation = _2d_u1_emulation;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -387,6 +425,7 @@ void mg_test(int argc, char** argv)
   setGaugeParam(gauge_param, 0.8);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
+
   QudaMultigridParam mg_param = newQudaMultigridParam();
   mg_param.invert_param = &mg_inv_param;
 
@@ -536,10 +575,18 @@ void mg_test(int argc, char** argv)
 
 #ifndef EXPERIMENTAL
 //#define GAUGE_TRANSFORM
-    const int gen_type = 1;
+    const int gen_type = 2;
 
-    construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec, 
+    if(!_2d_u1_emulation)
+    {
+      construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec, 
 				 &gauge_param, dslash_type);
+    }
+    else
+    {
+      construct_u1_gauge_field(qdp_fatlink, qdp_longlink, gen_type, gauge_param.cpu_prec,
+                                 &gauge_param, dslash_type);
+    }
 #ifdef GAUGE_TRANSFORM
     void *su3_buffer=malloc(4*V*gaugeSiteSize*gSize);
     void *su3_field[4];
@@ -887,8 +934,6 @@ int main(int argc, char** argv)
       continue;
     }   
 
-
-
     if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){
         usage(argv);
@@ -913,6 +958,16 @@ int main(int argc, char** argv)
     if(test_type != 0 && test_type != 1) errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
 
+  if(_2d_u1_emulation) 
+  {
+    zdim = 2;
+    tdim = 2;
+    latt_dim[0] = xdim;
+    latt_dim[1] = ydim;
+    latt_dim[2] = zdim;
+    latt_dim[3] = tdim;
+    //printfQuda("\nRedefining z- and t- dimensions for 2d U1 emulation, (xdim = %d, ydim = %d zdim = %d, tdim = %d)\n", latt_dim[0], latt_dim[1], latt_dim[2], latt_dim[3]);
+  }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);

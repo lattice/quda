@@ -33,7 +33,7 @@ namespace quda {
       while (geo_bs[d] > 0) {
 	if (d==0 && B[0]->X(0) == geo_bs[0])
 	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
-	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
+	else if ( ((B[0]->X(d)/geo_bs[d]+1)%2 == 0) && (B[0]->X(d) != geo_bs[2]))//temporary hack for 2d U1 emulation
 	  warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0]->X(d)/geo_bs[d]);
 	else if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
 	  warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0]->X(d), geo_bs[d]);

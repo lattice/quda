@@ -424,6 +424,10 @@ namespace quda {
 	Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 4) {
 	Prolongate<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 8) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 12) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,12,order>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 24) {
 	Prolongate<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 32) {

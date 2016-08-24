@@ -521,6 +521,8 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(secs, INVALID_DOUBLE);
 #endif
 
+  P(_2d_u1_emulation, QUDA_BOOLEAN_INVALID);
+
 #ifdef INIT_PARAM
   return ret;
 #endif

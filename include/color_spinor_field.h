@@ -790,6 +790,9 @@ namespace quda {
 
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger);
 
+  //2d code:
+  void generic2DSource(cpuColorSpinorField &a);
+
 } // namespace quda
 
 #endif // _COLOR_SPINOR_FIELD_H

@@ -58,6 +58,9 @@
   void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
 				    QudaPrecision precision, QudaGaugeParam*, 
 				    QudaDslashType dslash_type);
+  void construct_u1_gauge_field(void **fatlink, void** longlink, int type, 
+			       QudaPrecision precision, QudaGaugeParam* param,
+			       QudaDslashType dslash_type);
   void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
   void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision);
   void createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) ;

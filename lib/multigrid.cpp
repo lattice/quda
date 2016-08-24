@@ -127,7 +127,8 @@ namespace quda {
       // create transfer operator
       printfQuda("start creating transfer operator\n");
 
-      Complex alpha = Complex(0.00889, 12.1);//if zero: no smoothing
+      //Complex alpha = Complex(0.00889, 12.1);//if zero: no smoothing
+      Complex alpha = Complex(0.0, 0.0);//if zero: no smoothing
       printfQuda("\nSmoothing params: %le %le\n", alpha.real(), alpha.imag());
       transfer = new Transfer(param.B, &param.matResidual, alpha,  param.Nvec, param.geoBlockSize, param.spinBlockSize,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
@@ -327,7 +328,7 @@ namespace quda {
 
     // temporary fields used for verification
     ColorSpinorParam csParam(*r);
-    csParam.create = QUDA_NULL_FIELD_CREATE;
+    csParam.create = !param.mg_global._2d_u1_emulation ? QUDA_NULL_FIELD_CREATE : QUDA_ZERO_FIELD_CREATE;
 
     if(param.B[0]->Nspin() == 1)  csParam.gammaBasis = param.B[0]->GammaBasis();
 
@@ -758,15 +759,23 @@ namespace quda {
     // Generate sources and launch solver for each source:
     for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec) {
 	cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*nullvec);
-	curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
+        if(!param.mg_global._2d_u1_emulation)
+        {
+	  curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
+        }
+        else
+        {
+          blas::zero(*curr_nullvec);//need this
+          generic2DSource(*curr_nullvec);
+        }
         if(param.B[0]->Nspin() != 1) tmp_cpu_field = curr_nullvec;
         else
         {
-           csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-           csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-           csParam.v      = curr_nullvec->V();//take a pointer
-           tmp_cpu_field  = new cpuColorSpinorField(csParam);
-           csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+          csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+          csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+          csParam.v      = curr_nullvec->V();//take a pointer
+          tmp_cpu_field  = new cpuColorSpinorField(csParam);
+          csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
         }
 
 	csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -940,8 +949,16 @@ namespace quda {
 
     for(int rhs = 0; rhs < solverParam.deflation_grid; rhs++ )
     {
-       //cpu_par_ref.Source(QUDA_RANDOM_SOURCE);
-       v1->Source(QUDA_RANDOM_SOURCE);
+       if(!param.mg_global._2d_u1_emulation)
+       {
+         v1->Source(QUDA_RANDOM_SOURCE);//random initial guess
+       }
+       else
+       {
+         blas::zero(*v1);//need this
+         generic2DSource(*v1);
+       }
+
        csParam.create      = QUDA_COPY_FIELD_CREATE;
        ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpu_even_ref, csParam));
        //
@@ -977,7 +994,15 @@ namespace quda {
 
        for(int rhs = 0; rhs < solverParam.deflation_grid; rhs++ )
        {
-         v1->Source(QUDA_RANDOM_SOURCE);
+         if(!param.mg_global._2d_u1_emulation)
+         {
+           v1->Source(QUDA_RANDOM_SOURCE);//random initial guess
+         }
+         else
+         {
+           blas::zero(*v1);//need this
+           generic2DSource(*v1);
+         }
          csParam.create      = QUDA_COPY_FIELD_CREATE;
          ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpu_odd_ref, csParam));
 
