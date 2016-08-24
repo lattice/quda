@@ -208,41 +208,5 @@ namespace quda {
     return fmax(fabs(b.x), fabs(b.y));
   };
 
-  /*
-    Precision conversion routines for vector types
-  */
-
-  __forceinline__ __host__ __device__ float2 make_FloatN(const double2 &a) {
-    return make_float2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ float4 make_FloatN(const double4 &a) {
-    return make_float4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ double2 make_FloatN(const float2 &a) {
-    return make_double2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ double4 make_FloatN(const float4 &a) {
-    return make_double4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ short4 make_shortN(const float4 &a) {
-    return make_short4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ short2 make_shortN(const float2 &a) {
-    return make_short2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ short4 make_shortN(const double4 &a) {
-    return make_short4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ short2 make_shortN(const double2 &a) {
-    return make_short2(a.x, a.y);
-  }
-
 }
 

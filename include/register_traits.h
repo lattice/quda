@@ -41,33 +41,45 @@ namespace quda {
   template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
 
   // specializations for short-float conversion
-  template<> __host__ __device__ inline void copy(float &a, const short &b) {
-    a = (float)b/MAX_SHORT;
-  }
-  template<> __host__ __device__ inline void copy(short &a, const float &b) {
-    a = (short)(b*MAX_SHORT);
+#define MAX_SHORT_INV 3.051850948e-5
+  static inline __host__ __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
+  static inline __host__ __device__ double s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
+
+  // Fast float to integer round
+  __device__ __host__ inline int f2i(float f) {
+#ifdef __CUDA_ARCH__
+    f += 12582912.0f; return reinterpret_cast<int&>(f);
+#else
+    return static_cast<int>(f);
+#endif
   }
 
-  template<> __host__ __device__ inline void copy(float2 &a, const short2 &b) {
-    a.x = (float)b.x/MAX_SHORT;
-    a.y = (float)b.y/MAX_SHORT;
+  // Fast double to integer round
+  __device__ __host__ inline int d2i(double d) {
+#ifdef __CUDA_ARCH__
+    d += 6755399441055744.0; return reinterpret_cast<int&>(d);
+#else
+    return static_cast<int>(d);
+#endif
   }
+
+  template<> __host__ __device__ inline void copy(float &a, const short &b) { a = s2f(b); }
+  template<> __host__ __device__ inline void copy(short &a, const float &b) { a = f2i(b*MAX_SHORT); }
+
+  template<> __host__ __device__ inline void copy(float2 &a, const short2 &b) {
+    a.x = s2f(b.x); a.y = s2f(b.y);
+  }
+
   template<> __host__ __device__ inline void copy(short2 &a, const float2 &b) {
-    a.x = (short)(b.x*MAX_SHORT);
-    a.y = (short)(b.y*MAX_SHORT);
+    a.x = f2i(b.x*MAX_SHORT); a.y = f2i(b.y*MAX_SHORT);
   }
 
   template<> __host__ __device__ inline void copy(float4 &a, const short4 &b) {
-    a.x = (float)b.x/MAX_SHORT;
-    a.y = (float)b.y/MAX_SHORT;
-    a.z = (float)b.z/MAX_SHORT;
-    a.w = (float)b.w/MAX_SHORT;
+    a.x = s2f(b.x); a.y = s2f(b.y); a.z = s2f(b.z); a.w = s2f(b.w);
   }
+
   template<> __host__ __device__ inline void copy(short4 &a, const float4 &b) {
-    a.x = (short)(b.x*MAX_SHORT);
-    a.y = (short)(b.y*MAX_SHORT);
-    a.z = (short)(b.z*MAX_SHORT);
-    a.w = (short)(b.w*MAX_SHORT);
+    a.x = f2i(b.x*MAX_SHORT); a.y = f2i(b.y*MAX_SHORT); a.z = f2i(b.z*MAX_SHORT); a.w = f2i(b.w*MAX_SHORT);
   }
 
   

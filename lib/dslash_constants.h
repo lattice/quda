@@ -1,3 +1,5 @@
+#include <convert.h>
+
 enum KernelType {
   INTERIOR_KERNEL = 5,
   EXTERIOR_KERNEL_ALL = 6,
