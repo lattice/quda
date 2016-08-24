@@ -460,6 +460,7 @@ POP_RANGE
 
     for(int i=0; i<param.num_src; i++){
       mat(r.Component(i), x.Component(i), y.Component(i));
+      blas::xmyNorm(b.Component(i), r.Component(i));
     }
 
     double r2avg=0;
@@ -630,8 +631,9 @@ POP_RANGE
       }
     }
 
-    // Eigen::LLT<MatrixXcd> lltOfA(r2);  // compute the Cholesky decomposition of A
-    MatrixXcd L = r2.llt().matrixL();  // retrieve factor L  in the decomposition
+
+    Eigen::LLT<MatrixXcd> lltOfA(r2); // compute the Cholesky decomposition of A
+    MatrixXcd L = lltOfA.matrixL(); // retrieve factor L  in the decomposition
     C = L.adjoint();
     MatrixXcd Linv = C.inverse();
 // r2.llt().matrixL() should do as well
@@ -783,12 +785,6 @@ POP_RANGE
           // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
           // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
           // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
-        }
-      }
-
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0;j<param.num_src; j++){
-          blas::caxpy(Linv(j,i),rnew.Component(j),rSloppy.Component(i));
         }
       }
 
