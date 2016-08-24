@@ -3,8 +3,8 @@
 /**
    @file float_vector.h
 
-   @section DESCRIPTION
-   Inline device functions for elementary operations on short vectors, e.g., float4, etc.
+   @section DESCRIPTION 
+   Inline device functions for elementary operations on short vectors, e.g., float4, etc. 
 */
 
 #pragma once
@@ -208,7 +208,7 @@ namespace quda {
 
   __forceinline__ __host__ __device__ float2 make_FloatN(const double2 &a) {
     return make_float2(a.x, a.y);
-  }
+}
 
   __forceinline__ __host__ __device__ float4 make_FloatN(const double4 &a) {
     return make_float4(a.x, a.y, a.z, a.w);
