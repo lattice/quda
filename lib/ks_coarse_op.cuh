@@ -84,7 +84,9 @@ namespace quda {
               if( arg.LL ) (*arg.UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*arg.LL)(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 3, (parity+1)&1, ghost_idx_3d, stag_sp, jc, ic_c);
             } else {
               for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-                for (int s_col=0; s_col<fineSpin; s_col++) {
+                //for (int s_col=0; s_col<fineSpin; s_col++) 
+                {
+                    int s_col = 1 - s;
 	            // on the coarse lattice if forwards then use the forwards links
 		    (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c);
                 } //which chiral block
@@ -106,7 +108,9 @@ namespace quda {
               if( arg.LL ) (*arg.UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*arg.LL)(dim , parity, x_cb, ic, jc) * arg.V((parity+1)&1, y3_cb, stag_sp, jc, ic_c);
 	    } else {
               for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-                 for (int s_col=0; s_col<fineSpin; s_col++) {
+                 //for (int s_col=0; s_col<fineSpin; s_col++) 
+                 {
+                    int s_col = 1 - s;
 	           // on the coarse lattice if forwards then use the forwards links
 		   (*arg.UV)(parity, x_cb, s_col*fineSpin+s, ic, ic_c) += (*arg.FL)(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) * arg.V((parity+1)&1, y_cb, s_col, jc, ic_c);
                  } // which chiral block
@@ -172,7 +176,9 @@ namespace quda {
 
     } else { // fine grid operator is a coarse operator
       for (int s_col=0; s_col<fineSpin; s_col++) { // which chiral block
-	for (int s = 0; s < fineSpin; s++) {
+	//for (int s = 0; s < fineSpin; s++) 
+        {
+          int s = 1 - s_col;
 	  for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
 	    for(int jc_c = 0; jc_c < coarseColor; jc_c++) { //Coarse Color column
 	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color
@@ -204,10 +210,10 @@ namespace quda {
 
 
     bool isDiagonal = (((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
-    bool isDiagonal_long = (arg.UVL == nullptr) ? false : (((coord[dim]+3)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
+    bool isDiagonal_long = (arg.UVL == nullptr || from_coarse) ? false : (((coord[dim]+3)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim]) ? true : false;
     
     auto *M =   isDiagonal ? (dir == QUDA_BACKWARDS ? &arg.X : &arg.Xinv) : &arg.Y;
-    auto *M_L = (arg.UVL == nullptr) ? nullptr : (isDiagonal_long ? (dir == QUDA_BACKWARDS ? &arg.X : &arg.Xinv) : &arg.Y);
+    auto *M_L = (arg.UVL == nullptr || from_coarse) ? nullptr : (isDiagonal_long ? (dir == QUDA_BACKWARDS ? &arg.X : &arg.Xinv) : &arg.Y);
 	      
     const int dim_index      = isDiagonal ? 0 : (dir == QUDA_BACKWARDS ? dim : dim + 4);
     const int dim_index_long = isDiagonal_long ? 0 : (dir == QUDA_BACKWARDS ? dim : dim + 4);
@@ -225,17 +231,29 @@ namespace quda {
     int s_row = parity == 0 ? 0 : 1  ;//coarse spin components
     int s_col = (1 - s_row);
 
-    const int factor = (arg.UVL == nullptr) ? 1 : 2;
-    const int elements = !from_coarse ? factor*coarseColor*coarseColor : coarseSpin*coarseSpin*coarseColor*coarseColor;
+    if(!from_coarse)
+    {
+      const int factor = (arg.UVL == nullptr) ? 1 : 2;
 
-    //complex<Float> *vuv = new complex<Float>[elements]; 
-    complex<Float> vuv[2*coarseColor*coarseColor];//[factor*coarseColor*coarseColor]
-    multiplyKSVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, factor);
+      complex<Float> vuv[2*coarseColor*coarseColor];//[factor*coarseColor*coarseColor]
+      multiplyKSVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, factor);
 
-    for(int c_row = 0; c_row < coarseColor; c_row++) { // Coarse Color row
-       for(int c_col = 0; c_col < coarseColor; c_col++) { // Coarse Color column
-         (*M)(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[c_row*coarseColor+c_col];
-         if(M_L != nullptr) (*M_L)(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[coarseColor*coarseColor+c_row*coarseColor+c_col]; 
+      for(int c_row = 0; c_row < coarseColor; c_row++) { // Coarse Color row
+        for(int c_col = 0; c_col < coarseColor; c_col++) { // Coarse Color column
+          (*M)(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[c_row*coarseColor+c_col];
+          if(M_L != nullptr) (*M_L)(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[coarseColor*coarseColor+c_row*coarseColor+c_col]; 
+        }
+      }
+    } else {
+      const int factor = coarseSpin*coarseSpin;
+ 
+      complex<Float> vuv[coarseSpin*coarseSpin*coarseColor*coarseColor];
+      multiplyKSVUV<from_coarse,Float,dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, factor);
+
+      for(int c_row = 0; c_row < coarseColor; c_row++) { // Coarse Color row
+        for(int c_col = 0; c_col < coarseColor; c_col++) { // Coarse Color column
+          (*M)(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[c_row*coarseColor+c_col];
+        }
       }
     }
 
