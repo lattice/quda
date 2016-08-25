@@ -4599,7 +4599,16 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  cloverDerivative(cudaForce, gaugeEx, traceEx, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
+  // In double precision the clover derivative is faster with no reconstruct
+  cudaGaugeField *u = &gaugeEx;
+  if (gaugeEx.Reconstruct() == QUDA_RECONSTRUCT_12 && gaugeEx.Precision() == QUDA_DOUBLE_PRECISION) {
+    GaugeFieldParam param(gaugeEx);
+    param.reconstruct = QUDA_RECONSTRUCT_NO;
+    u = new cudaGaugeField(param);
+    u -> copy(gaugeEx);
+  }
+
+  cloverDerivative(cudaForce, *u, traceEx, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
 
   /* Now the U dA/dU terms */
   for(int shift = 0; shift < nvector; shift++){
@@ -4616,8 +4625,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  cloverDerivative(cudaForce, gaugeEx, oprodEx, -kappa2*ck, QUDA_ODD_PARITY, 1);
-  cloverDerivative(cudaForce, gaugeEx, oprodEx, ck, QUDA_EVEN_PARITY, 1);
+  cloverDerivative(cudaForce, *u, oprodEx, -kappa2*ck, QUDA_ODD_PARITY, 1);
+  cloverDerivative(cudaForce, *u, oprodEx, ck, QUDA_EVEN_PARITY, 1);
+
+  if (u != &gaugeEx) delete u;
 
   updateMomentum(cudaMom, -1.0, cudaForce);
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
