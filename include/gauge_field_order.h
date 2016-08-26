@@ -730,6 +730,7 @@ namespace quda {
       typedef typename mapper<Float>::type RegType;
       Reconstruct<reconLenParam,Float> reconstruct;
       static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
+      static const int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
       Float *gauge;
       size_t offset;
       Float *ghost[4];
@@ -737,7 +738,6 @@ namespace quda {
       int faceVolumeCB[4];
       const int stride;
       const int geometry;
-      const int hasPhase;
       const size_t phaseOffset;
       void *backup_h; //! host memory for backing up the field when tuning
       size_t bytes;
@@ -746,7 +746,6 @@ namespace quda {
       : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
 	offset(u.Bytes()/(2*sizeof(Float))),
 	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
-	hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0),
 	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
       {
 	for (int i=0; i<4; i++) {
@@ -758,7 +757,7 @@ namespace quda {
     FloatNOrder(const FloatNOrder &order)
       : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
         volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry),
-	hasPhase(order.hasPhase), phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
+	phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
       {
 	for (int i=0; i<4; i++) {
 	  ghost[i] = order.ghost[i];
@@ -848,7 +847,6 @@ namespace quda {
 
 #pragma unroll
           for (int i=0; i<M; i++) {
-	    const int hasPhase = 0;
 	    Vector vecTmp;
 	    // first do copy converting into storage type
 #pragma unroll
