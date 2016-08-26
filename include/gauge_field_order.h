@@ -7,6 +7,12 @@
  *
  */
 
+// trove requires the warp shuffle instructions introduced with Fermi
+#if __COMPUTE_CAPABILITY__ >= 300
+#include <trove/ptr.h>
+#else
+#define DISABLE_TROVE
+#endif
 #include <tune_quda.h>
 #include <assert.h>
 #include <register_traits.h>
@@ -719,10 +725,11 @@ namespace quda {
 
     };
 
-  template <typename Float, int length, int N, int reconLen>
+  template <typename Float, int length, int N, int reconLenParam>
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;
-      Reconstruct<reconLen,Float> reconstruct;
+      Reconstruct<reconLenParam,Float> reconstruct;
+      static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
       Float *gauge;
       size_t offset;
       Float *ghost[4];
@@ -770,8 +777,9 @@ namespace quda {
         for (int i=0; i<M; i++){
 	  // first do vectorized copy from memory
 	  Vector vecTmp = vector_load<Vector>(gauge + parity*offset, x + dir*stride*M + stride*i);
-	  // second do vectorized copy converting into register type
-          copy(reinterpret_cast<RegVector*>(tmp)[i], vecTmp);
+	  // second do copy converting into register type
+#pragma unroll
+          for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
         }
 
         RegType phase = 0.;
@@ -790,8 +798,9 @@ namespace quda {
 #pragma unroll
         for (int i=0; i<M; i++){
 	  Vector vecTmp;
-	  // first do vectorized copy converting into storage type
-	  copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
+	  // first do copy converting into storage type
+#pragma unroll
+	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
 	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
         }
@@ -817,8 +826,9 @@ namespace quda {
 	    // first do vectorized copy from memory into registers
 	    Vector vecTmp = vector_load<Vector>(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase),
 						i*faceVolumeCB[dir]+x);
-	    // second do vectorized copy converting into register type
-	    copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
+	    // second do copy converting into register type
+#pragma unroll
+	    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
           }
           RegType phase=0.;
           if(hasPhase) copy(phase, ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x]);
@@ -840,8 +850,9 @@ namespace quda {
           for (int i=0; i<M; i++) {
 	    const int hasPhase = 0;
 	    Vector vecTmp;
-	    // first do vectorized copy converting into storage type
-	    copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+	    // first do copy converting into storage type
+#pragma unroll
+	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy into memory
 	    reinterpret_cast< Vector*>
 	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
@@ -867,8 +878,9 @@ namespace quda {
 	  // first do vectorized copy from memory
 	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
-	  // second do vectorized copy converting into register type
-	  copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
+	  // second do copy converting into register type
+#pragma unroll
+	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
 	}
 	RegType phase=0.;
 	if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1)
@@ -890,8 +902,9 @@ namespace quda {
 #pragma unroll
 	  for (int i=0; i<M; i++) {
 	    Vector vecTmp;
-	    // first do vectorized copy converting into storage type
-	    copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+	    // first do copy converting into storage type
+#pragma unroll
+	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy to memory
 	    reinterpret_cast< Vector* >
 	      (ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase))
@@ -928,6 +941,14 @@ namespace quda {
       size_t Bytes() const { return reconLen * sizeof(Float); }
     };
 
+
+  /**
+     @brief This is just a dummy structure we use for trove to define the
+     required structure size
+     @param real Real number type
+     @param length Number of elements in the structure
+  */
+  template <typename real, int length> struct S { real v[length]; };
 
   /**
       The LegacyOrder defines the ghost zone storage and ordering for
@@ -1004,15 +1025,30 @@ namespace quda {
       virtual ~QDPOrder() { ; }
 
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
+	structure v_ = gauge_[parity*volumeCB + x];
+	for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
+#else
 	for (int i=0; i<length; i++) {
 	  v[i] = (RegType)gauge[dir][(parity*volumeCB + x)*length + i];
 	}
+#endif
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
+	structure v_;
+	for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
+	gauge_[parity*volumeCB + x] = v_;
+#else
 	for (int i=0; i<length; i++) {
 	  gauge[dir][(parity*volumeCB + x)*length + i] = (Float)v[i];
 	}
+#endif
       }
 
       size_t Bytes() const { return length * sizeof(Float); }
@@ -1071,15 +1107,30 @@ namespace quda {
     virtual ~MILCOrder() { ; }
 
     __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[(parity*volumeCB+x)*geometry + dir];
+      for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
+#else
       for (int i=0; i<length; i++) {
 	v[i] = (RegType)gauge[((parity*volumeCB+x)*geometry + dir)*length + i];
       }
+#endif
     }
 
     __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_;
+      for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
+      gauge_[(parity*volumeCB+x)*geometry + dir] = v_;
+#else
       for (int i=0; i<length; i++) {
 	gauge[((parity*volumeCB+x)*geometry + dir)*length + i] = (Float)v[i];
       }
+#endif
     }
 
     size_t Bytes() const { return length * sizeof(Float); }
@@ -1109,6 +1160,15 @@ namespace quda {
 
     // we need to transpose and scale for CPS ordering
     __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[((parity*volumeCB+x)*geometry + dir)];
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v[(i*Nc+j)*2+z] = (RegType)v_.v[(j*Nc+i)*2+z] / anisotropy;
+#else
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
@@ -1117,9 +1177,20 @@ namespace quda {
 	  }
 	}
       }
+#endif
     }
 
     __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_;
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v_.v[(j*Nc+i)*2+z] = (Float)(anisotropy * v[(i*Nc+j)*2+z]);
+      gauge_[((parity*volumeCB+x)*geometry + dir)] = v_;
+#else
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
@@ -1128,6 +1199,7 @@ namespace quda {
 	  }
 	}
       }
+#endif
     }
 
     size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1159,6 +1231,15 @@ namespace quda {
 
       // we need to transpose for BQCD ordering
       __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[(dir*2+parity)*exVolumeCB + x];
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v[(i*Nc+j)*2+z] = (RegType)v_.v[(j*Nc+i)*2+z];
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1166,9 +1247,20 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+	structure v_;
+	for (int i=0; i<Nc; i++)
+	  for (int j=0; j<Nc; j++)
+	    for (int z=0; z<2; z++)
+	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]);
+	gauge_[(dir*2+parity)*exVolumeCB + x] = v_;
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1176,6 +1268,7 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1205,6 +1298,15 @@ namespace quda {
 
       // we need to transpose for TIFR ordering
       __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[(dir*2+parity)*volumeCB + x];
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v[(i*Nc+j)*2+z] = (RegType)v_.v[(j*Nc+i)*2+z] / scale;
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1212,9 +1314,20 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+	structure v_;
+	for (int i=0; i<Nc; i++)
+	  for (int j=0; j<Nc; j++)
+	    for (int z=0; z<2; z++)
+	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]) * scale;
+	gauge_[(dir*2+parity)*volumeCB + x] = v_;
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1222,6 +1335,7 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1256,7 +1370,6 @@ namespace quda {
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
-
 
   // experiments in reducing template instantation boilerplate
   // can this be replaced with a C++11 variant that uses variadic templates?
