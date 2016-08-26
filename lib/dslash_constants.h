@@ -1,4 +1,5 @@
 #include <fast_intdiv.h>
+#include <convert.h>
 
 enum KernelType {
   INTERIOR_KERNEL = 5,

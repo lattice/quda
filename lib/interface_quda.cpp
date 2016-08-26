@@ -92,23 +92,27 @@ static bool redundant_comms = false;
 
 static bool InitMagma = false;
 
-void openMagma(){
+void openMagma() {
 
-   if(!InitMagma){
-      BlasMagmaArgs::OpenMagma();
-      InitMagma = true;
-   }
-   else printfQuda("\nMAGMA library was already initialized..\n");
+  if (!InitMagma) {
+    BlasMagmaArgs::OpenMagma();
+    InitMagma = true;
+  } else {
+    printfQuda("\nMAGMA library was already initialized..\n");
+  }
 
-   return;
 }
 
 void closeMagma(){
 
-   if(InitMagma) BlasMagmaArgs::CloseMagma();
-   else printfQuda("\nMAGMA library was not initialized..\n");
+  if (InitMagma) {
+    BlasMagmaArgs::CloseMagma();
+    InitMagma = false;
+  } else {
+    printfQuda("\nMAGMA library was not initialized..\n");
+  }
 
-   return;
+  return;
 }
 
 cudaGaugeField *gaugePrecise = NULL;
@@ -2208,7 +2212,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  if(!InitMagma) openMagma();
+  openMagma();
 
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
 
@@ -2832,7 +2836,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 {
   setTuning(param->tune);
 
-  if(!InitMagma) openMagma();
+  openMagma();
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
@@ -3078,7 +3082,9 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   popVerbosity();
 
-  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  closeMagma();
+
+ // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
