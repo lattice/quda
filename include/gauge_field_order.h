@@ -981,27 +981,57 @@ namespace quda {
       virtual ~LegacyOrder() { ; }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
+	structure v_ = ghost_[parity*faceVolumeCB[dir] + x];
+	for (int i=0; i<length; i++) v[i] = v_.v[i];
+#else
 	for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
+#endif
       }
 
       __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
+	structure v_;
+	for (int i=0; i<length; i++) v_.v[i] = v[i];
+	ghost_[parity*faceVolumeCB[dir] + x] = v_;
+#else
 	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
+#endif
       }
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dummy, int dir,
 						  int dim, int g, int parity, const int R[]) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
+	structure v_ = ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g];
+	for (int i=0; i<length; i++) v[i] = v_.v[i];
+#else
 	for (int i=0; i<length; i++) {
 	  v[i] = ghost[dim]
 	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
 	}
+#endif
       }
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
 						  int dir, int dim, int g, int parity, const int R[]) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
+	structure v_;
+	for (int i=0; i<length; i++) v_.v[i] = v[i];
+	ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g] = v_;
+#else
 	for (int i=0; i<length; i++) {
 	  ghost[dim]
 	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
 	}
+#endif
       }
 
     };
