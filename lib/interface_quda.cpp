@@ -2639,6 +2639,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 
   profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
+
   // Check source norms
   double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Source has zero norm");
@@ -4631,6 +4632,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
+  // TODO this first derivative can be combined with the previous one
+  // if we sum project oprodEx and sum to traceEx with the appropriate
+  // weights.  This will also half the amount of communication
   cloverDerivative(cudaForce, *u, oprodEx, -kappa2*ck, QUDA_ODD_PARITY, 1);
   cloverDerivative(cudaForce, *u, oprodEx, ck, QUDA_EVEN_PARITY, 1);
 
@@ -4976,10 +4980,16 @@ void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatQuda(h_out, h_in, inv_param); }
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatDagMatQuda(h_out, h_in, inv_param); }
-void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
-{ invertQuda(hp_x, hp_b, param); }    
-void invert_multishift_quda_(void *hp_x[QUDA_MAX_MULTI_SHIFT], void *hp_b, QudaInvertParam *param)
-{ invertMultiShiftQuda(hp_x, hp_b, param); }
+void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) {
+  // ensure that fifth dimension is set to 1
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
+  invertQuda(hp_x, hp_b, param);
+}
+void invert_multishift_quda_(void *hp_x[QUDA_MAX_MULTI_SHIFT], void *hp_b, QudaInvertParam *param) {
+  // ensure that fifth dimension is set to 1
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
+  invertMultiShiftQuda(hp_x, hp_b, param);
+}
 void new_quda_gauge_param_(QudaGaugeParam *param) {
   *param = newQudaGaugeParam();
 }

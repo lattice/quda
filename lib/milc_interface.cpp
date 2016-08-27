@@ -611,6 +611,7 @@ static void setInvertParams(const int dim[4],
   invertParam->dirac_order = QUDA_DIRAC_ORDER;
 
   invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
+  invertParam->Ls = 1;
   invertParam->tune = QUDA_TUNE_YES;
   invertParam->gflops = 0.0;
 
