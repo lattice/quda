@@ -66,9 +66,9 @@ namespace quda {
 }
 
 TEST(unitarization, verify) {
-    unitarizeLinksCPU(*cpuULink, *cpuFatLink);
-  cudaULink->saveCPUField(*cudaResult, QUDA_CPU_FIELD_LOCATION);
-
+  unitarizeLinksCPU(*cpuULink, *cpuFatLink);
+  cudaULink->saveCPUField(*cudaResult);
+    
   int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(),
 			   4*cudaResult->Volume()*gaugeSiteSize, tol, cpu_prec);
 
@@ -197,7 +197,7 @@ static int unitarize_link_test(int &test_rc)
     computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
 		      QUDA_COMPUTE_FAT_STANDARD);
 
-    cudaFatLink->loadCPUField(*cpuFatLink, QUDA_CPU_FIELD_LOCATION);
+    cudaFatLink->loadCPUField(*cpuFatLink);
   }
 
   setUnitarizeLinksConstants(unitarize_eps,

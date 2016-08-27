@@ -122,8 +122,8 @@ hisq_force_init()
   cudaResult  = new cudaGaugeField(gParam);
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 
-  cudaFatLink->loadCPUField(*cpuFatLink, QUDA_CPU_FIELD_LOCATION);
-  cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cudaFatLink->loadCPUField(*cpuFatLink);
+  cudaOprod->loadCPUField(*cpuOprod);
 
 
   return;
@@ -179,7 +179,7 @@ hisq_force_test()
     fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
   }
 
-  cudaResult->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION);
+  cudaResult->saveCPUField(*cpuReference);
   
   printfQuda("Comparing CPU and GPU results\n");
   for(int dir=0; dir<4; ++dir){
