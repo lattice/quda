@@ -839,6 +839,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 template <typename Float>
 void applyU1FieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 {
+  printfQuda("\nApply sign factor..\n");
   int X1 =param->X[0];
   int X2 =param->X[1];
   int X3 =param->X[2];
@@ -1343,7 +1344,7 @@ static void constructU1GaugeField(Float **res, QudaGaugeParam *param, int type, 
   printfQuda( "\nCheck plaquette : (%1.15f, %1.15f)\n", tmp_plaq.real(), tmp_plaq.imag());
 
 
-  if(type == 2) return;
+//  if(type == 2) return;
  
   if (dslash_type == QUDA_STAGGERED_DSLASH){
     applyU1FieldScaling(res, Vh, param);

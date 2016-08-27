@@ -2,6 +2,8 @@
 #include <qio_field.h>
 #include <string.h>
 
+#include <quda_arpack_interface.h>
+
 namespace quda {  
 
   using namespace blas;
@@ -457,6 +459,55 @@ namespace quda {
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
+
+    printfQuda("\n");
+    printfQuda("Check eigenvector overlap for level %d\n", param.level );
+
+    int nmodes = 128;//tmp1->VolumeCB();
+    int ncv    = 256;//tmp1->VolumeCB();
+    char *which = (char*)malloc(256*sizeof(char));
+    sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
+
+    ColorSpinorParam cpuParam(*param.B[0]);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+    cpuParam.extendDimensionality();//5d field
+
+    std::vector<ColorSpinorField*> evecsBuffer;
+    evecsBuffer.reserve(nmodes);
+
+    for (int i = 0; i < nmodes; i++) evecsBuffer.push_back( new cpuColorSpinorField(cpuParam) );
+    
+    Complex *evalsBuffer = new Complex[nmodes+1];
+    //
+    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
+    ArpackArgs args(param.matResidual, matPrecision, nmodes, ncv, which);    
+    if(param.mg_global._2d_u1_emulation) 
+    {
+      args.Set2D();
+      args.SetReducedColors(1);
+    }
+    //
+    args(evecsBuffer, evalsBuffer);
+
+    for (int i=0; i<param.Nvec; i++) {
+      // as well as copying to the correct location this also changes basis if necessary
+      *tmp1 = *evecsBuffer[i]; 
+
+      transfer->R(*r_coarse, *tmp1);
+      transfer->P(*tmp2, *r_coarse);
+
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+
+      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
+      printfQuda("L2 relative deviation = %e\n", deviation);
+      if (deviation > tol) errorQuda("failed");
+    }
+
+    for (unsigned int i = 0; i < evecsBuffer.size(); i++) delete evecsBuffer[i];
+    delete [] evalsBuffer;
+
+    free(which);
 
     delete tmp1;
     delete tmp2;

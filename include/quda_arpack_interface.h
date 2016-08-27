@@ -19,24 +19,11 @@ namespace quda{
       /**Problem matrix **/
       DiracMatrix &matEigen;
 
-      /** The null space vectors */
-      std::vector<ColorSpinorField*> &B;      
-
-      /** eigenvalues*/
-      void *evals;
-
       /**Matrix vector precision (may not coincide with arpack IRA routines precision) **/
       QudaPrecision mat_precision;
 
       /**precision of IRA routines**/
       bool use_full_prec_arpack;
-
-      //experimental: for tests only!
-      //supported oprtions: 2d fields -> 1 (U(1)), 4d fields -> 2 (SU(2))      
-      int reducedColors;
-
-      //experimental: 2d or 4d fields?
-      bool _2d_field;
 
       /**spectrum info**/
       int nev;//number of eigenvecs to be comupted
@@ -46,20 +33,21 @@ namespace quda{
 
       /**general arpack library parameters**/	
       double tol;
-      int info;
+      int   info;
+
+      //experimental: for tests only!
+      //supported oprtions: 2d fields -> 1 (U(1)), 4d fields -> 2 (SU(2))      
+      int reducedColors;
+
+      //experimental: 2d or 4d fields?
+      bool _2d_field;
 
     public:
 
-      ArpackArgs(DiracMatrix &matEigen, std::vector<ColorSpinorField*> &B, QudaPrecision prec, int nev, int ncv, char *which) : matEigen(matEigen), B(B), evals(nullptr), mat_precision(prec), 
-            use_full_prec_arpack(true), reducedColors(3), _2d_field(false), nev(nev), ncv(ncv), lanczos_which(which), tol(1e-6), info(0)        
-      {
-         evals = malloc((nev+1)*sizeof(std::complex<double>));
-      }
+      ArpackArgs(DiracMatrix &matEigen, QudaPrecision prec, int nev, int ncv, char *which) : matEigen(matEigen), mat_precision(prec), 
+            use_full_prec_arpack(true), nev(nev), ncv(ncv), lanczos_which(which), tol(1e-6), info(0), reducedColors(3), _2d_field(false) { };       
 
-      virtual ~ArpackArgs() 
-      {
-        if(evals) free( evals );
-      }
+      virtual ~ArpackArgs() { };
 
       //Extra setup:
       void Set2D() {_2d_field = true; } 
@@ -68,7 +56,7 @@ namespace quda{
 
       void SetTol(double _tol) {tol = _tol;};
       //Main IRA algorithm driver:
-      void EigenSolver();     
+      void operator()(std::vector<ColorSpinorField*> &B, std::complex<double> *evals);     
 
    };
 
@@ -81,26 +69,29 @@ extern "C" {
 
 
 extern int ARPACK(cnaupd) (int *ido, char *bmat, int *n, char *which, int *nev, float *tol,
-                         _Complex float *resid, int *ncv, _Complex float *v, int *ldv,
-                         int *iparam, int *ipntr, _Complex float *workd, _Complex float *workl,
+                         std::complex<float> *resid, int *ncv, std::complex<float> *v, int *ldv,
+                         int *iparam, int *ipntr, std::complex<float> *workd, std::complex<float> *workl,
                          int *lworkl, float *rwork, int *info);
 
+
 extern int ARPACK(znaupd) (int *ido, char *bmat, int *n, char *which, int *nev, double *tol,
-                         _Complex double *resid, int *ncv, _Complex double *v, int *ldv, 
-                         int *iparam, int *ipntr, _Complex double *workd, _Complex double *workl, 
+                         std::complex<double> *resid, int *ncv, std::complex<double> *v, int *ldv, 
+                         int *iparam, int *ipntr, std::complex<double> *workd, std::complex<double> *workl, 
                          int *lworkl, double *rwork, int *info);
 
-extern int ARPACK(cneupd) (int *comp_evecs, char *howmany, int *select, _Complex float *evals, 
-			 _Complex float *v, int *ldv, _Complex float *sigma, _Complex float *workev, 
-			 char *bmat, int *n, char *which, int *nev, float *tol, _Complex float *resid, 
-                         int *ncv, _Complex float *v1, int *ldv1, int *iparam, int *ipntr, 
-                         _Complex float *workd, _Complex float *workl, int *lworkl, float *rwork, int *info);			
 
-extern int ARPACK(zneupd) (int *comp_evecs, char *howmany, int *select, _Complex double *evals, 
-			 _Complex double *v, int *ldv, _Complex double *sigma, _Complex double *workev, 
-			 char *bmat, int *n, char *which, int *nev, double *tol, _Complex double *resid, 
-                         int *ncv, _Complex double *v1, int *ldv1, int *iparam, int *ipntr, 
-                         _Complex double *workd, _Complex double *workl, int *lworkl, double *rwork, int *info);
+extern int ARPACK(cneupd) (int *comp_evecs, char *howmany, int *select, std::complex<float> *evals, 
+			 std::complex<float> *v, int *ldv, std::complex<float> *sigma, std::complex<float> *workev, 
+			 char *bmat, int *n, char *which, int *nev, float *tol, std::complex<float> *resid, 
+                         int *ncv, std::complex<float> *v1, int *ldv1, int *iparam, int *ipntr, 
+                         std::complex<float> *workd, std::complex<float> *workl, int *lworkl, float *rwork, int *info);			
+
+
+extern int ARPACK(zneupd) (int *comp_evecs, char *howmany, int *select, std::complex<double> *evals, 
+			 std::complex<double> *v, int *ldv, std::complex<double> *sigma, std::complex<double> *workev, 
+			 char *bmat, int *n, char *which, int *nev, double *tol, std::complex<double> *resid, 
+                         int *ncv, std::complex<double> *v1, int *ldv1, int *iparam, int *ipntr, 
+                         std::complex<double> *workd, std::complex<double> *workl, int *lworkl, double *rwork, int *info);
 
 
 #ifdef __cplusplus
