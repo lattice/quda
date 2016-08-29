@@ -1,3 +1,4 @@
+#include <fast_intdiv.h>
 #include <convert.h>
 
 enum KernelType {
@@ -16,6 +17,10 @@ enum KernelType {
     int parity;  // Even-Odd or Odd-Even
     int X[4];
     int Ls;
+
+    int_fastdiv block[4]; // dslash tile block parameter
+    int_fastdiv grid[4]; // dslash tile grid parameter
+
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension

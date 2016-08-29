@@ -1,3 +1,7 @@
+// trove cannot deal with the large matrices that MG uses so we need
+// to disable it
+#define DISABLE_TROVE
+
 #include <gauge_field_order.h>
 #include <extract_gauge_ghost_helper.cuh>
 

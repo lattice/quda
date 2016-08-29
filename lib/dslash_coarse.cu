@@ -567,9 +567,7 @@ namespace quda {
 
     virtual void initTuneParam(TuneParam &param) const
     {
-      param.aux.x = 1;
-      param.aux.y = 1;
-      param.aux.z = 1;
+      param.aux = make_int4(1,1,1,1);
       color_col_stride = param.aux.x;
       dim_threads = param.aux.y;
 
@@ -585,9 +583,7 @@ namespace quda {
     /** sets default values for when tuning is disabled */
     virtual void defaultTuneParam(TuneParam &param) const
     {
-      param.aux.x = 1;
-      param.aux.y = 1;
-      param.aux.z = 1;
+      param.aux = make_int4(1,1,1,1);
       color_col_stride = param.aux.x;
       dim_threads = param.aux.y;
 

@@ -21,19 +21,18 @@ namespace quda {
     bool regularToextended;
     CopyGaugeExArg(const OutOrder &out, const InOrder &in, const int *Xout, const int *Xin,
        const int *faceVolumeCB, int nDim, int geometry)
-      : out(out), in(in),
-  nDim(nDim), geometry(geometry) {
+      : out(out), in(in), nDim(nDim), geometry(geometry) {
       for (int d=0; d<nDim; d++) {
-  this->Xout[d] = Xout[d];
-  this->Xin[d] = Xin[d];
-  this->faceVolumeCB[d] = faceVolumeCB[d];
+	this->Xout[d] = Xout[d];
+	this->Xin[d] = Xin[d];
+	this->faceVolumeCB[d] = faceVolumeCB[d];
       }
-      if(out.volumeCB > in.volumeCB){
+
+      if (out.volumeCB > in.volumeCB) {
         this->volume = 2*in.volumeCB;
         this->volumeEx = 2*out.volumeCB;
         this->regularToextended = true;
-      }
-      else{
+      } else {
         this->volume = 2*out.volumeCB;
         this->volumeEx = 2*in.volumeCB;
         this->regularToextended = false;
@@ -66,8 +65,7 @@ namespace quda {
       // Y is the cb spatial index into the extended gauge field
       xout = ((((x[3]+R[3])*arg.Xout[2] + (x[2]+R[2]))*arg.Xout[1] + (x[1]+R[1]))*arg.Xout[0]+(x[0]+R[0])) >> 1;
       xin = X;
-    }
-    else{
+    } else{
       //extended to regular gauge
       for (int d=0; d<4; d++) R[d] = (arg.Xin[d] - arg.Xout[d]) >> 1;
       int za = X/(arg.Xout[0]/2);
@@ -81,7 +79,7 @@ namespace quda {
       xin = ((((x[3]+R[3])*arg.Xin[2] + (x[2]+R[2]))*arg.Xin[1] + (x[1]+R[1]))*arg.Xin[0]+(x[0]+R[0])) >> 1;
       xout = X;
     }
-    for(int d=0; d<arg.geometry; d++){
+    for (int d=0; d<arg.geometry; d++){
       RegTypeIn in[length];
       RegTypeOut out[length];
       arg.in.load(in, xin, d, parity);
@@ -124,7 +122,7 @@ namespace quda {
   public:
     CopyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, const GaugeField &meta, QudaFieldLocation location)
       : arg(arg), meta(meta), location(location) {
-      writeAuxString("out_stride=%d,in_stride=%d,geometery=%d",arg.out.stride,arg.in.stride,arg.geometry);
+      writeAuxString("out_stride=%d,in_stride=%d,geometry=%d",arg.out.stride,arg.in.stride,arg.geometry);
     }
     virtual ~CopyGaugeEx() { ; }
 
@@ -145,13 +143,6 @@ namespace quda {
 
     TuneKey tuneKey() const {
       return TuneKey(meta.VolString(), typeid(*this).name(), aux);
-    }
-
-    std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
     }
 
     long long flops() const { return 0; }

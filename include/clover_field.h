@@ -35,6 +35,8 @@ namespace quda {
       clover(param.clover), norm(param.norm),
       cloverInv(param.cloverInv), invNorm(param.invNorm),
       twisted(param.twisted), mu2(param.mu2) { }
+
+    CloverFieldParam(const CloverField &field);
   };
 
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param);
@@ -163,6 +165,23 @@ namespace quda {
     virtual ~cpuCloverField();
   };
 
+  /**
+     This is a debugging function, where we cast a clover field into a
+     spinor field so we can compute its L1 norm.
+     @param a The clover field that we want the norm of
+     @return The L1 norm of the gauge field
+  */
+  double norm1(const CloverField &u, bool inverse=false);
+
+  /**
+     This is a debugging function, where we cast a clover field into a
+     spinor field so we can compute its L2 norm.
+     @param a The clover field that we want the norm of
+     @return The L2 norm squared of the gauge field
+  */
+  double norm2(const CloverField &a, bool inverse=false);
+
+
   // lightweight struct used to send pointers to cuda driver code
   struct FullClover {
     void *even;
@@ -207,6 +226,7 @@ namespace quda {
 	}
     }
   };
+
 
   // driver for computing the clover field from the gauge field
   void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);
@@ -262,29 +282,25 @@ namespace quda {
      Compute the outer product from the solver solution fields arising
      from the diagonal term of the fermion bilinear in direction mu,nu.
 
-     @param oprod Computed outer product field (scalar matrix field)
+     @param oprod Computed outer product field (tensor matrix field)
      @param x Solution field (both parities)
      @param p Intermediate vectors (both parities)
      @coeff coeff Multiplicative coefficient (e.g., dt * residiue)
-     @param mu mu direction
-     @param nu nu direction
      @param update If update>1 then read/write to oprod field else just over write
   */
   void computeCloverSigmaOprod(cudaGaugeField& oprod,
 			       cudaColorSpinorField& x,  
 			       cudaColorSpinorField& p,
-			       const double coeff, int mu, int nu, int update);
+			       const double coeff, int update);
   /**
      Compute the matrix field necessary for the force calculation from
-     the clover trace action.
+     the clover trace action.  This computes a tensor field [mu,nu].
 
-     @param output The computed matrix field (scalar)
+     @param output The computed matrix field (tensor matrix field)
      @param clover The input clover field
-     @param mu mu direction
-     @param nu nu direction
      @param location The location of the computation
    */
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, int mu, int nu, QudaFieldLocation location);
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, QudaFieldLocation location);
 
   /**
      Compute the derivative of the clover matrix in the direction
@@ -293,14 +309,12 @@ namespace quda {
 
      @param force The compute force field (read/write update)
      @param gauge The input gauge field
-     @param oprod The input outer-product field
-     @param mu mu direction
-     @param nu nu direction
+     @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
      @param parity The field parity we are working on 
      @param conjugate Whether to set oprod = oprod - conj(oprod) or not
    */
-  void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, double coeff, QudaParity parity, int conjugate);
+  void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity, int conjugate);
 
 } // namespace quda
 

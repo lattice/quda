@@ -96,16 +96,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-    void preTune(){
-    }
-    void postTune(){
-    }
+
     long long flops() const {
       return 0;
     }                                  // Only correct if there is no link reconstruction, no cub reduction accounted also
@@ -409,12 +400,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     void preTune(){ arg.rngstate.backup(); }
     void postTune(){ arg.rngstate.restore(); }
     long long flops() const {

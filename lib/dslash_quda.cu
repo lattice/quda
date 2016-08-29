@@ -210,14 +210,6 @@ namespace quda {
 	}
     }
     
-    std::string paramString(const TuneParam &param) const
-    {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-    
     long long flops() const { return 12ll * in->VolumeCB(); }
     long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
   };
@@ -311,14 +303,6 @@ class CloverCuda : public Tunable {
           delete[] saveOutNorm;
         }
       }
-    }
-
-    std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
-    {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
     }
 
     long long flops() const { return 504ll * in->VolumeCB(); }
@@ -434,13 +418,6 @@ class TwistGamma5Cuda : public Tunable {
         cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
         delete[] saveOutNorm;
       }
-    }
-
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
     }
 
     long long flops() const { return 24ll * in->VolumeCB(); }
@@ -575,12 +552,6 @@ class TwistCloverGamma5Cuda : public Tunable {
       }
     }
 
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
 
     long long flops() const { return 24ll * in->VolumeCB(); }	//TODO FIX THIS NUMBER!!!
     long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }

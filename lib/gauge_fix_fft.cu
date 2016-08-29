@@ -218,12 +218,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     long long flops() const {
       return 0;
     }
@@ -333,13 +328,6 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     }
 
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-
     long long flops() const {
       return (36LL * gauge_dir + 65LL) * 2 * argQ.threads;
     }                                                                         // Only correct if there is no link reconstruction, no cub reduction accounted also
@@ -444,12 +432,6 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
 
     long long flops() const {
       return 21 * arg.threads;
@@ -509,12 +491,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     void preTune(){
       //since delta contents are irrelevant at this point, we can swap gx with delta
       complex<Float> *tmp = arg.gx;
@@ -692,12 +669,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     //need this
     void preTune() {
       arg.data.backup();
@@ -821,12 +793,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     long long flops() const {
       if ( Elems == 6 ) return 208LL * arg.threads;
       else return 166LL * arg.threads;
@@ -944,12 +911,7 @@ namespace quda {
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     //need this
     void preTune() {
       arg.data.backup();

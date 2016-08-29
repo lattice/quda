@@ -805,21 +805,10 @@ extern "C" {
   double momActionQuda(void* momentum, QudaGaugeParam* param);
 
   /**
-   * Take a gauge field on the host, load it onto the device and extend it.
-   * Return a pointer to the extended gauge field object.
-   *
-   * @param gauge The CPU gauge field (optional - if set to 0 then the gauge field zeroed)
-   * @param geometry The geometry of the matrix field to create (1 - scaler, 4 - vector, 6 - tensor)
-   * @param param The parameters of the external field and the field to be created
-   * @return Pointer to the gauge field (cast as a void*)
-   */
-  void* createExtendedGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param);
-
-  /**
    * Allocate a gauge (matrix) field on the device and optionally download a host gauge field.
    *
    * @param gauge The host gauge field (optional - if set to 0 then the gauge field zeroed)
-   * @param geometry The geometry of the matrix field to create (1 - scaler, 4 - vector, 6 - tensor)
+   * @param geometry The geometry of the matrix field to create (1 - scalar, 4 - vector, 6 - tensor)
    * @param param The parameters of the external field and the field to be created
    * @return Pointer to the gauge field (cast as a void*)
    */
@@ -835,16 +824,6 @@ extern "C" {
   void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
   /**
-   * Take a gauge field on the device and copy to the extended gauge
-   * field.  The precisions and reconstruct types can differ between
-   * the input and output field, but they must be compatible (same volume, geometry).
-   *
-   * @param outGauge Pointer to the output extended device gauge field (QUDA extended device field)
-   * @param inGauge Pointer to the input device gauge field (QUDA gauge field)
-   */
-  void  extendGaugeFieldQuda(void* outGauge, void* inGauge);
-
-  /**
    * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
    *
    * @param gauge Gauge field to be freed
@@ -858,38 +837,6 @@ extern "C" {
    */
   void createCloverQuda(QudaInvertParam* param);
 
-  /**
-   * Compute the sigma trace field (part of clover force computation).
-   * All the pointers here are for QUDA native device objects.  The
-   * precisions of all fields must match.  This function requires that
-   * there is a persistent clover field.
-   *
-   * @param out Sigma trace field  (QUDA device field, geometry = 1)
-   * @param dummy (not used)
-   * @param mu mu direction
-   * @param nu nu direction
-   * @param dim array of local field dimensions
-   */
-  void computeCloverTraceQuda(void* out, void* dummy, int mu, int nu, int dim[4]);
-
-  /**
-   * Compute the derivative of the clover term (part of clover force
-   * computation).  All the pointers here are for QUDA native device
-   * objects.  The precisions of all fields must match.
-   *
-   * @param out Clover derivative field (QUDA device field, geometry = 1)
-   * @param gauge Gauge field (extended QUDA device field, gemoetry = 4)
-   * @param oprod Matrix field (outer product) which is multiplied by the derivative
-   * @param mu mu direction
-   * @param nu nu direction
-   * @param coeff Coefficient of the clover derviative (including stepsize and clover coefficient)
-   * @param parity Parity for which we are computing
-   * @param param Gauge field meta data
-   * @param conjugate Whether to make the oprod field anti-hermitian prior to multiplication
-   */
-  void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
-				   double coeff,
-				   QudaParity parity, QudaGaugeParam* param, int conjugate);
   /**
    * Compute the clover force contributions in each dimension mu given
    * the array of solution fields, and compute the resulting momentum

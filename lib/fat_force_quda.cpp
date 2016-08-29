@@ -548,7 +548,7 @@ namespace quda {
 #ifdef GPU_DIRECT
 	cudaMemcpyAsync(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice, streams[0]); 
 #else
-	cudaMemcpy(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice); 
+	qudaMemcpy(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice);
 #endif
       }
     } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
@@ -559,7 +559,7 @@ namespace quda {
 #ifdef GPU_DIRECT
       cudaMemcpyAsync(tmp_even, ((char*)cpuGauge), 4*len, cudaMemcpyHostToDevice, streams[0]);
 #else
-      cudaMemcpy(tmp_even, ((char*)cpuGauge), 4*len, cudaMemcpyHostToDevice);
+      qudaMemcpy(tmp_even, ((char*)cpuGauge), 4*len, cudaMemcpyHostToDevice);
 #endif
     } else {								\
       errorQuda("Unsupported gauge order\n");				\
@@ -575,8 +575,8 @@ namespace quda {
 	cudaMemcpyAsync(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[0]); 
 	cudaMemcpyAsync(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice, streams[0]); 	
 #else
-	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
-	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+	qudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice);
+	qudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice);
 #endif
 	dest += 2*glen[dir];
       }
@@ -602,7 +602,7 @@ namespace quda {
 	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu], 
 			X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice, streams[0]);	
 #else	
-	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu], 
+	qudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,ghost_cpuGauge_diag[nu*4+mu],
 		   X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice);	
 #endif
       
@@ -619,14 +619,14 @@ namespace quda {
 #ifdef GPU_DIRECT 
 	cudaMemcpyAsync(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice, streams[0]);
 #else
-	cudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
+	qudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
       }
     } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
 #ifdef GPU_DIRECT 
       cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[0]);
 #else
-      cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
+      qudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
     } else {								
       errorQuda("Unsupported gauge order\n");				
@@ -642,8 +642,8 @@ namespace quda {
 	cudaMemcpyAsync(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], 
 			cudaMemcpyHostToDevice, streams[0]); 
 #else
-	cudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
-	cudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice); 
+	qudaMemcpy(dest, ((char*)ghost_cpuGauge[dir])+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice);
+	qudaMemcpy(dest + glen[dir], ((char*)ghost_cpuGauge[dir])+8*glen[dir]+glen[dir] +i*2*glen[dir], glen[dir], cudaMemcpyHostToDevice);
 
 #endif
 
@@ -671,7 +671,7 @@ namespace quda {
 	cudaMemcpyAsync(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,((char*)ghost_cpuGauge_diag[nu*4+mu])+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
 			X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice, streams[0]);	
 #else
-	cudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,((char*)ghost_cpuGauge_diag[nu*4+mu])+X[dir1]*X[dir2]/2*gaugeSiteSize*prec, 
+	qudaMemcpy(dest+ mu *Vh_2d_max*gaugeSiteSize*prec,((char*)ghost_cpuGauge_diag[nu*4+mu])+X[dir1]*X[dir2]/2*gaugeSiteSize*prec,
 		   X[dir1]*X[dir2]/2*gaugeSiteSize*prec, cudaMemcpyHostToDevice );		
 #endif
       }
@@ -805,7 +805,7 @@ namespace quda {
 #ifdef GPU_DIRECT 
 	cudaMemcpyAsync(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
 #else
-	cudaMemcpy(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
+	qudaMemcpy(tmp_even + i*len, cpuGauge[i], len, cudaMemcpyHostToDevice);
 #endif
       
       }
@@ -813,7 +813,7 @@ namespace quda {
 #ifdef GPU_DIRECT 
       cudaMemcpyAsync(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
 #else
-      cudaMemcpy(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
+      qudaMemcpy(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
 #endif
     } 
 
@@ -830,14 +830,14 @@ else {
 #ifdef GPU_DIRECT 
 	cudaMemcpyAsync(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #else
-	cudaMemcpy(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
+	qudaMemcpy(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
       }
     } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
 #ifdef GPU_DIRECT 
       cudaMemcpyAsync(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #else
-      cudaMemcpy(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
+      qudaMemcpy(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
     } else {
       errorQuda("Unsupported gauge order");
@@ -877,7 +877,7 @@ else {
 #ifdef GPU_DIRECT 
     cudaMemcpyAsync(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost, streams[0]);
 #else
-    cudaMemcpy(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost);
+    qudaMemcpy(cpuGauge, unpackedDataEven, datalen, cudaMemcpyDeviceToHost);
 #endif
   
     //unpack odd data kernel
@@ -885,7 +885,7 @@ else {
 #ifdef GPU_DIRECT 
     cudaMemcpyAsync(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost, streams[0]);  
 #else
-    cudaMemcpy(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost);  
+    qudaMemcpy(cpuGauge + 4*Vh*gaugeSiteSize, unpackedDataOdd, datalen, cudaMemcpyDeviceToHost);
 #endif
   
     device_free(unpackedDataEven);

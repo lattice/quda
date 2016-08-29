@@ -611,6 +611,7 @@ static void setInvertParams(const int dim[4],
   invertParam->dirac_order = QUDA_DIRAC_ORDER;
 
   invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
+  invertParam->Ls = 1;
   invertParam->tune = QUDA_TUNE_YES;
   invertParam->gflops = 0.0;
 
@@ -1109,28 +1110,6 @@ void qudaEigCGInvert(int external_precision,
 
 static int clover_alloc = 0;
 
-static inline void* createExtendedGaugeField(void* gauge, int geometry, int precision, int resident)
-{
-  qudamilc_called<true>(__func__);
-  QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
-      (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
-  gaugeParam.use_resident_gauge = resident ? 1 : 0;
-  qudamilc_called<false>(__func__);
-  return createExtendedGaugeFieldQuda(gauge, geometry, &gaugeParam);
-}
-
-void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
-{
-  return createExtendedGaugeField(gauge, geometry, precision, 0);
-}
-
-void* qudaResidentExtendedGaugeField(void* gauge, int geometry, int precision)
-{
-  return createExtendedGaugeField(gauge, geometry, precision, 1);
-}
-
-
 void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
 {
   qudamilc_called<true>(__func__);
@@ -1195,31 +1174,6 @@ void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, do
   qudamilc_called<false>(__func__);
   return;
 }
-
-
-void qudaCloverTrace(void* out, void* clover, int mu, int nu)
-{
-  qudamilc_called<true>(__func__);
-  computeCloverTraceQuda(out, clover, mu, nu, const_cast<int*>(localDim));
-  qudamilc_called<false>(__func__);
-  return;
-}
-
-
-
-void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, double coeff, int precision, int parity, int conjugate)
-{
-  qudamilc_called<true>(__func__);
-  QudaParity qudaParity = (parity==2) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
-
-  computeCloverDerivativeQuda(out, gauge, oprod, mu, nu, coeff, qudaParity, &gaugeParam, conjugate);
-  qudamilc_called<false>(__func__);
-  return;
-}
-
 
 
 void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs_t &inv_args,
@@ -1594,7 +1548,9 @@ void qudaCloverMultishiftInvert(int external_precision,
   }
 
   // if doing a pure double-precision multi-shift solve don't use reliable updates
-  double reliable_delta = (inv_args.mixed_precision == 1 || quda_precision == 1) ? 1e-1 : 0.0;
+  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
+                                     ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
+  double reliable_delta = (use_mixed_precision) ? 1e-1 : 0.0;
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
   invertParam.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
@@ -1617,11 +1573,17 @@ void qudaCloverMultishiftInvert(int external_precision,
 
   invertParam.make_resident_solution = inv_args.make_resident_solution;
 
-  invertMultiShiftQuda(solutionArray, source, &invertParam);
+  if (num_offsets==1 && offset[0] == 0) {
+    invertQuda(solutionArray[0], source, &invertParam);
+    *final_residual = invertParam.true_res;
+  } else {
+    invertMultiShiftQuda(solutionArray, source, &invertParam);
+    for (int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];
+  }
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
-  for(int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];
+
   qudamilc_called<false>(__func__, verbosity);
   return;
 } // qudaCloverMultishiftInvert
