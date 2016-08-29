@@ -187,7 +187,7 @@ namespace quda {
     cpuGaugeField *l = nullptr;
 
     //Copy the cuda gauge field to the cpu
-    fat_links->saveCPUField(*f, QUDA_CPU_FIELD_LOCATION);
+    fat_links->saveCPUField(*f);
 
     //Create a field UV which holds U*V.  Has the same structure as V.
     ColorSpinorParam UVparam(T.Vectors());
@@ -214,7 +214,7 @@ namespace quda {
       //
       uv_long = ColorSpinorField::Create(UVparam);
       //Copy the cuda gauge field to the cpu
-      long_links->saveCPUField(*l, QUDA_CPU_FIELD_LOCATION);
+      long_links->saveCPUField(*l);
     }
 
     //If the fine lattice operator is the clover operator, copy the cudaCloverField to cpuCloverField
