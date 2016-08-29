@@ -405,6 +405,7 @@ POP_RANGE
   // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
   #define BCGRQ 1
 //#define MWVERBOSE
+// #define NOTMULTCAXPY 1
   #if BCGRQ
   void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     #ifndef BLOCKSOLVER
@@ -564,6 +565,9 @@ POP_RANGE
     MatrixXcd S = MatrixXcd::Identity(param.num_src,param.num_src);
     MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
     MatrixXcd pAp = MatrixXcd::Identity(param.num_src,param.num_src);
+#ifndef NOTMULTCAXPY
+    quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
+#endif
     //  gamma = gamma * 2.0;
 
 
@@ -641,18 +645,25 @@ POP_RANGE
     std::cout << "r2\n " << r2 << std::endl;
     std::cout << "L\n " << L.adjoint() << std::endl;
 #endif
+#ifdef NOTMULTCAXPY
     for(int i=0; i<param.num_src; i++){
       blas::zero(p.Component(i));
-      // blas::cax(Linv(i,0),p.Component(i));
-
       for(int j=0;j<param.num_src; j++){
-        // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
         blas::caxpy(Linv(j,i),r.Component(j),p.Component(i));
-        // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
-        // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
-        // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
       }
     }
+#else
+// temporary hack
+for(int i=0; i<param.num_src; i++){
+  blas::zero(p.Component(i));
+  for(int j=0;j<param.num_src; j++){
+    AC[i*param.num_src + j] = Linv(i,j);
+  }
+}
+blas::multcaxpy(AC,r,p,param.num_src);
+
+
+#endif
     // L.adjoint() is equal to C.
     // C is <pnew, pold>
     //std::cout << "L\n " << L.inverse() << std::endl;
@@ -716,45 +727,40 @@ POP_RANGE
       #endif
       // update X
 
+#ifdef NOTMULTCAXPY
       for(int i = 0; i < param.num_src; i++){
-        // for(int j = 0; j < param.num_src; j++){
-        //   blas::caxpy(alpha(j,i),  p.Component(j),xSloppy.Component(i));
-        // }
-        // this is just a workaround to reduce LA overhead somewhat
-        const int j3 = param.num_src/3;
-        const int j2 = ((param.num_src%3)/2);
-        const int j1 = ((param.num_src%3)%2);
-        for (int j=0;j<j3;j++){
-          blas::caxpbypczpw(alpha(3*j,i),p.Component(3*j),alpha(3*j+1,i),p.Component(3*j+1),alpha(3*j+2,i),p.Component(3*j+2),xSloppy.Component(i));
-        }
-        for (int j=0;j<j2;j++){
-          blas::caxpbypz(alpha(3*j3+2*j,i),p.Component(3*j3+2*j),alpha(3*j3+2*j+1,i),p.Component(3*j3+2*j+1),xSloppy.Component(i));
-        }
-        for (int j=0; j<j1;j++){
-          blas::caxpy(alpha(3*j3+2*j2+j,i),p.Component(3*j3+2*j2+j),xSloppy.Component(i));
+        for(int j = 0; j < param.num_src; j++){
+          blas::caxpy(alpha(j,i),  p.Component(j),xSloppy.Component(i));
         }
       }
+#else
+// temporary hack
+for(int i=0; i<param.num_src; i++){
+  for(int j=0;j<param.num_src; j++){
+    AC[i*param.num_src + j] = alpha(i,j);
+  }
+}
+blas::multcaxpy(AC,p,xSloppy,param.num_src);
+#endif
 
       beta = pAp.inverse();
       // here we are deploying the alternative beta computation
+#ifdef NOTMULTCAXPY
       for(int i=0; i<param.num_src; i++){
-        // for(int j=0; j < param.num_src; j++){
-        //   blas::caxpy(-beta(j,i), Ap.Component(j), rSloppy.Component(i));
-        // }
-        const int j3 = param.num_src/3;
-        const int j2 = ((param.num_src%3)/2);
-        const int j1 = ((param.num_src%3)%2);
-        for (int j=0;j<j3;j++){
-          blas::caxpbypczpw(-beta(3*j,i),Ap.Component(3*j),-beta(3*j+1,i),Ap.Component(3*j+1),-beta(3*j+2,i),Ap.Component(3*j+2),rSloppy.Component(i));
-        }
-        for (int j=0;j<j2;j++){
-          blas::caxpbypz(-beta(3*j3+2*j,i),Ap.Component(3*j3+2*j),-beta(3*j3+2*j+1,i),Ap.Component(3*j3+2*j+1),rSloppy.Component(i));
-        }
-        for (int j=0; j<j1;j++){
-          blas::caxpy(-beta(3*j3+2*j2+j,i),Ap.Component(3*j3+2*j2+j),rSloppy.Component(i));
+        for(int j=0; j < param.num_src; j++){
+          blas::caxpy(-beta(j,i), Ap.Component(j), rSloppy.Component(i));
         }
       }
-
+      #else
+            // temporary hack
+                      for(int i=0; i<param.num_src; i++){
+              // blas::zero(rSloppy.Component(i));
+              for(int j=0;j<param.num_src; j++){
+                AC[i*param.num_src + j] = -beta(i,j);
+              }
+            }
+            blas::multcaxpy(AC,Ap,rSloppy,param.num_src);
+      #endif
 
       POP_RANGE
       PUSH_RANGE("GramSchmidt",3)
@@ -774,7 +780,7 @@ POP_RANGE
       L = lltOfr2.matrixL(); // retrieve factor L  in the decomposition
       S = L.adjoint();
       MatrixXcd Linv = S.inverse();
-#if NOTMULTCAXPY
+#ifdef NOTMULTCAXPY
       for(int i=0; i<param.num_src; i++){
         blas::zero(rSloppy.Component(i));
         for(int j=0;j<param.num_src; j++){
@@ -783,96 +789,48 @@ POP_RANGE
       }
 #else
       // temporary hack
-      quda::Complex * AA = new quda::Complex[param.num_src*param.num_src];
       for(int i=0; i<param.num_src; i++){
         blas::zero(rSloppy.Component(i));
         for(int j=0;j<param.num_src; j++){
-          AA[i*param.num_src + j] = Linv(i,j);
+          AC[i*param.num_src + j] = Linv(i,j);
         }
       }
-      blas::multcaxpy(AA,rnew,rSloppy,param.num_src);
+      blas::multcaxpy(AC,rnew,rSloppy,param.num_src);
 
-      delete[] AA;
 #endif
-      // for(int i=0; i < param.num_src; i++){
-      //   // scales with nsrc
-      //   n = blas::norm2(rSloppy.Component(i));
-      //   blas::ax(1/sqrt(n),rSloppy.Component(i));
-      //   // (nsrc * (nsrc-1))/2) * nsrc
-      //   for(int j=i+1; j < param.num_src; j++) {
-      //     ri=blas::cDotProduct(rSloppy.Component(i),rSloppy.Component(j));
-      //     blas::caxpy(-ri,rSloppy.Component(i),rSloppy.Component(j));
-      //
-      //   }
-      // }
-      //
-      //
-      // S = MatrixXcd::Zero(param.num_src,param.num_src);
-      // for (int i = 0; i < param.num_src; i++){
-      //   for (int j=i; j < param.num_src; j++){
-      //     S(i,j) = blas::cDotProduct(rSloppy.Component(i), rnew.Component(j));
-      //   }
-      // }
-      POP_RANGE
-      #ifdef MWVERBOSE
+
+POP_RANGE
+
+#ifdef MWVERBOSE
       for(int i=0; i<param.num_src; i++){
         for(int j=0; j<param.num_src; j++){
           pTp(i,j) = blas::cDotProduct(rSloppy.Component(i), rSloppy.Component(j));
         }
       }
       std::cout << " rTr " << std::endl << pTp << std::endl;
-
-      // gamma = qr.householderQ();
-      // gamma = gamma.transpose().eval();
       std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
       #endif
 
       // update p
-      PUSH_RANGE("LinearAlgebra",2)
-      // mw this needs a lot of cleanup
-      // for(int i=0; i < param.num_src; i++){
-      //   // blas::ax(0,rnew.Component(i)); // do we need components here?
-      // }
-      // add r
-      // scales with nsrc
+PUSH_RANGE("LinearAlgebra",2)
+
       for(int i=0; i<param.num_src; i++){
         blas::copy(rnew.Component(i),rSloppy.Component(i));
       }
-#if NOTMULTCAXPY
+#ifdef NOTMULTCAXPY
       for(int i=0; i<param.num_src; i++){
         for(int j=0;j<param.num_src; j++){
-        //   // nsrc * nsrc (write rnew) + nsrc * nsrc (read rnew) + nsrc * nsrc (read p)
           blas::caxpy(std::conj(S(i,j)),p.Component(j),rnew.Component(i));
-        //   // if we can do something like rnew_i(x) += sum_j S(j,i)^h p_j(x) we get away with
-        //   // nsrc * read rnew + nsrc * write rnew + nsrc*nsrc read p_j = (nsrc+nsrc + nsrc^2)
-        //   // maybe we can also use i as blockIdx.y and by that explit caching of the p_j(x) Components
         }
-        // const int j3 = param.num_src/3;
-        // const int j2 = ((param.num_src%3)/2);
-        // const int j1 = ((param.num_src%3)%2);
-        // for (int j=0;j<j3;j++){
-        //   blas::caxpbypczpw(std::conj(S(i,3*j)),p.Component(3*j),std::conj(S(i,3*j+1)),p.Component(3*j+1),std::conj(S(i,3*j+2)),p.Component(3*j+2),rnew.Component(i));
-        // }
-        // for (int j=0;j<j2;j++){
-        //   blas::caxpbypz(std::conj(S(i,3*j3+2*j)),p.Component(3*j3+2*j),std::conj(S(i,3*j3+2*j+1)),p.Component(3*j3+2*j+1),rnew.Component(i));
-        // }
-        // for (int j=0; j<j1;j++){
-        //   blas::caxpy(std::conj(S(i,3*j3+2*j2+j)),p.Component(3*j3+2*j2+j),rnew.Component(i));
-        // }
-
-      }
+            }
 #else
       // temporary hack
-      quda::Complex * AB = new quda::Complex[param.num_src*param.num_src];
       for(int i=0; i<param.num_src; i++){
-        // blas::zero(rSloppy.Component(i));
         for(int j=0;j<param.num_src; j++){
-          AB[i*param.num_src + j] = std::conj(S(j,i));
+          AC[i*param.num_src + j] = std::conj(S(j,i));
         }
       }
-      blas::multcaxpy(AB,p,rnew,param.num_src);
-
-      delete[] AB;
+      blas::multcaxpy(AC,p,rnew,param.num_src);
 #endif
       // copy sclae with nsrc
       for(int i=0; i < param.num_src; i++){
@@ -1203,6 +1161,9 @@ POP_RANGE
 
     delete pp;
 
+#ifndef NOTMULTCAXPY
+    delete[] AC;
+#endif
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
