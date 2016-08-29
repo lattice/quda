@@ -166,6 +166,7 @@ namespace quda {
     QUDA_PROFILE_INIT, /**< The time in seconds taken for initiation */
     QUDA_PROFILE_PREAMBLE, /**< The time in seconds taken for any preamble */
     QUDA_PROFILE_COMPUTE, /**< The time in seconds taken for the actual computation */
+    QUDA_PROFILE_COMMS, /**< synchronous communication */
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
 
@@ -179,7 +180,6 @@ namespace quda {
     QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
     QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
 
-    QUDA_PROFILE_COMMS, /**< synchronous communication */
     QUDA_PROFILE_COMMS_START, /**< initiating communication */
     QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
 

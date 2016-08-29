@@ -85,13 +85,6 @@ namespace quda {
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-    std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-
     long long flops() const { return 0; } 
     long long bytes() const { return 2*arg.volumeCB*(arg.in.Bytes() + arg.out.Bytes()); } 
   };

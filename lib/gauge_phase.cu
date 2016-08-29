@@ -189,13 +189,6 @@ namespace quda {
     void preTune() { arg.order.save(); }
     void postTune() { arg.order.load(); }
 
-    std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-
     long long flops() const { return 0; } 
     long long bytes() const { return 2 * arg.threads * 2 * arg.order.Bytes(); } // parity * e/o volume * i/o * vec size
   };
