@@ -197,7 +197,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 
   // Inline by hand for the moment and assume even dimensions
   const int dims[] = {X1, X2, X3, X4};
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
+  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims, param.block, param.grid);
 
   o1_00_re = 0;  o1_00_im = 0;
   o1_01_re = 0;  o1_01_im = 0;

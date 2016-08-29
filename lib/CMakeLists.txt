@@ -19,7 +19,7 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp fat_force_quda.cpp
-  llfat_quda_itf.cpp llfat_quda.cu gauge_force_quda.cu
+  llfat_quda_itf.cpp llfat_quda.cu gauge_force.cu
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu covDev.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu

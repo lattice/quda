@@ -158,14 +158,6 @@ namespace quda {
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-      std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-
       long long flops() const { return 792*arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3]; } 
       long long bytes() const { return 0; } // Fix this
     };
@@ -375,16 +367,6 @@ class KSLongLinkForce : Tunable {
 
   TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-  std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
-
-
-  void preTune(){}
-  void postTune(){}
   long long flops() const { return 0; } // Fix this
   long long bytes() const { return 0; } // Fix this
 }; 

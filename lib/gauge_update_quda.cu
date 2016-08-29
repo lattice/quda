@@ -207,9 +207,6 @@ namespace quda {
       }
     } // apply
     
-    void preTune(){}
-    void postTune(){}
-    
     long long flops() const { 
       const int Nc = 3;
       return arg.nDim*2*arg.in.volumeCB*N*(Nc*Nc*2 +                 // scalar-matrix multiply

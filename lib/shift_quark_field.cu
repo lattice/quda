@@ -168,9 +168,6 @@ namespace quda {
           }
         } // apply
 
-        void preTune(){}
-        void postTune(){}
-
         virtual void initTuneParam(TuneParam &param) const
         {
           const unsigned int max_threads = deviceProp.maxThreadsDim[0];

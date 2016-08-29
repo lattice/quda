@@ -180,3 +180,11 @@ following license:
      those of the United States Government or Lawrence Livermore
      National Security, LLC, and shall not be used for advertising or
      product endorsement purposes.
+
+
+  Additional Notices
+
+  QUDA utilizes Maxim Milakov's int_fastdiv library for fast run-time
+  integer division.  This is distributed under the Apache License,
+  Version 2.0.  See declaration at top of int_fastdiv.h for license
+  specifics.

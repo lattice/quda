@@ -388,6 +388,21 @@ namespace quda {
     return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d) & Location(a,e) & Location(a,f));
   }
 
+  /**
+     Return whether data is reorderd on the CPU or GPU.  This can set
+     at QUDA initialization using the environment variable
+     QUDA_REORDER_LOCATION.
+     @return Reorder location
+  */
+  QudaFieldLocation reorder_location();
+
+  /**
+     Set whether data is reorderd on the CPU or GPU.  This can set at
+     QUDA initialization using the environment variable
+     QUDA_REORDER_LOCATION.
+     @param reorder_location_ The location to set where data will be reordered
+  */
+  void reorder_location_set(QudaFieldLocation reorder_location_);
 
 } // namespace quda
 

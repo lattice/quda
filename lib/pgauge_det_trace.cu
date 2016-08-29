@@ -106,12 +106,6 @@ class CalcFunc : TunableLocalParity {
     return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     
   }
-  std::string paramString(const TuneParam &param) const {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
 
   long long flops() const { 
     if(NCOLORS==3 && functiontype == 0) return 264LL*2*arg.threads+2LL*tp.block.x;
