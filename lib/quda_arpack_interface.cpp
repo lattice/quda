@@ -12,72 +12,74 @@ using namespace quda ;
     static bool CmpEigenNrms (SortEvals v1, SortEvals v2) { return (v1._val < v2._val);}
   };
 
-  template<typename Float> void arpack_naupd(int &ido, char &bmat, int &n, char *which, int &nev, Float &tol,  void *resid, int &ncv, void *v, int &ldv,
-                    int *iparam, int *ipntr, void *workd, void *workl, int &lworkl, void *rwork, int &info, MPI_Fint *fcomm)
+  template<typename Float> void arpack_naupd(int &ido, char &bmat, int &n, char *which, int &nev, Float &tol,  std::complex<Float> *resid, int &ncv, std::complex<Float> *v, int &ldv,
+                    int *iparam, int *ipntr, std::complex<Float> *workd, std::complex<Float> *workl, int &lworkl, Float *rwork, int &info, int *fcomm)
   {
     if(sizeof(Float) == sizeof(float))
     {
        float _tol  = static_cast<float>(tol);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pcnaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, static_cast<std::complex<float> *>(resid), &ncv, static_cast<std::complex<float> *>(v),
-                       &ldv, iparam, ipntr, static_cast<std::complex<float> *>(workd), static_cast<std::complex<float> *>(workl), &lworkl, static_cast<float*>(rwork), &info);
+       ARPACK(pcnaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v),
+                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl), &lworkl, reinterpret_cast<float*>(rwork), &info);
 #else
-       ARPACK(cnaupd)(&ido, &bmat, &n, which, &nev, &_tol, static_cast<std::complex<float> *>(resid), &ncv, static_cast<std::complex<float> *>(v),
-                       &ldv, iparam, ipntr, static_cast<std::complex<float> *>(workd), static_cast<std::complex<float> *>(workl), &lworkl, static_cast<float*>(rwork), &info);
+       ARPACK(cnaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v),
+                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl), &lworkl, reinterpret_cast<float*>(rwork), &info);
 #endif
     }
     else
     {
        double _tol = static_cast<double>(tol);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pznaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, static_cast<std::complex<double> *>(resid), &ncv, static_cast<std::complex<double> *>(v),
-                       &ldv, iparam, ipntr, static_cast<std::complex<double> *>(workd), static_cast<std::complex<double> *>(workl), &lworkl, static_cast<double*>(rwork), &info);
+       ARPACK(pznaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v),
+                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl), &lworkl, reinterpret_cast<double*>(rwork), &info);
 #else
-       ARPACK(znaupd)(&ido, &bmat, &n, which, &nev, &_tol, static_cast<std::complex<double> *>(resid), &ncv, static_cast<std::complex<double> *>(v),
-                       &ldv, iparam, ipntr, static_cast<std::complex<double> *>(workd), static_cast<std::complex<double> *>(workl), &lworkl, static_cast<double*>(rwork), &info);
+       ARPACK(znaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v),
+                       &ldv, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl), &lworkl, reinterpret_cast<double*>(rwork), &info);
 #endif
     }
 
     return;
   }
 
-  template<typename Float> void arpack_neupd (int &comp_evecs, char howmny, int *select, void* evals, void* v, int &ldv, void* sigma, void* workev, 
-		       char bmat, int &n, char *which, int &nev, Float tol,  void* resid, int &ncv, void* v1, int &ldv1, int *iparam, int *ipntr, 
-                       void* workd, void* workl, int &lworkl, void* rwork, int &info, MPI_Fint *fcomm)
+  template<typename Float> void arpack_neupd (int &comp_evecs, char howmny, int *select, std::complex<Float>* evals, std::complex<Float>* v, int &ldv, std::complex<Float> sigma, std::complex<Float>* workev, 
+		       char bmat, int &n, char *which, int &nev, Float tol,  std::complex<Float>* resid, int &ncv, std::complex<Float>* v1, int &ldv1, int *iparam, int *ipntr, 
+                       std::complex<Float>* workd, std::complex<Float>* workl, int &lworkl, Float* rwork, int &info, int *fcomm)
   {
     if(sizeof(Float) == sizeof(float))
     {   
        float _tol = static_cast<float>(tol);
+       std::complex<float> _sigma = static_cast<std::complex<float> >(sigma);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, static_cast<std::complex<float> *>(evals),
-                     static_cast<std::complex<float> *>(v), &ldv, static_cast<std::complex<float> *>(sigma), static_cast<std::complex<float> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, static_cast<std::complex<float> *>(resid), &ncv, static_cast<std::complex<float> *>(v1),
-                     &ldv1, iparam, ipntr, static_cast<std::complex<float> *>(workd), static_cast<std::complex<float> *>(workl),
-                     &lworkl, static_cast<float *>(rwork), &info);
+       ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
+                     reinterpret_cast<std::complex<float> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<float> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
+                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
+                     &lworkl, reinterpret_cast<float *>(rwork), &info);
 #else
 
-       ARPACK(cneupd)(&comp_evecs, &howmny, select, static_cast<std::complex<float> *>(evals),
-                     static_cast<std::complex<float> *>(v), &ldv, static_cast<std::complex<float> *>(sigma), static_cast<std::complex<float> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, static_cast<std::complex<float> *>(resid), &ncv, static_cast<std::complex<float> *>(v1),
-                     &ldv1, iparam, ipntr, static_cast<std::complex<float> *>(workd), static_cast<std::complex<float> *>(workl),
-                     &lworkl, static_cast<float *>(rwork), &info); 
+       ARPACK(cneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
+                     reinterpret_cast<std::complex<float> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<float> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
+                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
+                     &lworkl, reinterpret_cast<float *>(rwork), &info); 
 #endif
     }
     else
     {
        double _tol = static_cast<double>(tol);
+       std::complex<double> _sigma = static_cast<std::complex<double> >(sigma);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, static_cast<std::complex<double> *>(evals),
-                     static_cast<std::complex<double> *>(v), &ldv, static_cast<std::complex<double> *>(sigma), static_cast<std::complex<double> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, static_cast<std::complex<double> *>(resid), &ncv, static_cast<std::complex<double> *>(v1),
-                     &ldv1, iparam, ipntr, static_cast<std::complex<double> *>(workd), static_cast<std::complex<double> *>(workl),
-                     &lworkl, static_cast<double *>(rwork), &info);
+       ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
+                     reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
+                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
+                     &lworkl, reinterpret_cast<double *>(rwork), &info);
 #else
-       ARPACK(zneupd)(&comp_evecs, &howmny, select, static_cast<std::complex<double> *>(evals),
-                     static_cast<std::complex<double> *>(v), &ldv, static_cast<std::complex<double> *>(sigma), static_cast<std::complex<double> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, static_cast<std::complex<double> *>(resid), &ncv, static_cast<std::complex<double> *>(v1),
-                     &ldv1, iparam, ipntr, static_cast<std::complex<double> *>(workd), static_cast<std::complex<double> *>(workl),
-                     &lworkl, static_cast<double *>(rwork), &info);
+       ARPACK(zneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
+                     reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
+                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
+                     &lworkl, reinterpret_cast<double *>(rwork), &info);
 #endif
     }
 
@@ -209,9 +211,9 @@ using namespace quda ;
 
       std::complex<Float>* tmp_buffer =  &arpack_evecs[sorted_id*cldn];
       cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*vec);
+
       if(do_2d_emulation)
       {
-        static_cast<void*>(tmp_buffer);
         cpu_tmp = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
         convertFrom2DVector<Float, fineSpin, fineColor, reducedColor>(*cpu_tmp, tmp_buffer);
       }
@@ -230,19 +232,18 @@ using namespace quda ;
   template<typename Float, int fineSpin, int fineColor, int reducedColor, bool do_2d_emulation>
   int arpack_solve( char *lanczos_which, std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &mat,  QudaPrecision matPrecision, Float tol, int nev, int ncv)
   {
+    int *fcomm = nullptr;
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
     MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_WORLD);
-    MPI_Fint *fcomm = &mpi_comm_fort;
-#else
-    MPI_Fint *fcomm = NULL;
+    fcomm = static_cast<int*>(&mpi_comm_fort);
 #endif
 
-    int   max_iter = 240000;
+    int   max_iter = 4000;
 
-    size_t clen = B[0]->X(0)*B[0]->X(1)*( do_2d_emulation ? (B[0]->X(2)*B[0]->X(3)) : 1 )*B[0]->Nspin()*B[0]->Ncolor();
+    size_t clen = B[0]->X(0)*B[0]->X(1)*( do_2d_emulation ? reducedColor : (B[0]->X(2)*B[0]->X(3))*fineColor)*fineSpin;
     size_t cldn = clen;
-    const size_t wbytes = cldn*sizeof(std::complex<Float>);
-    void *arpack_evecs = malloc(wbytes*ncv);     /* workspace for evectors (BLAS-matrix), [ld_evec, >=ncv] */
+
+    std::complex<Float> *arpack_evecs = new std::complex<Float>[cldn*ncv];     /* workspace for evectors (BLAS-matrix), [ld_evec, >=ncv] */
 
     /* all FORTRAN communication uses underscored variables */
     int ido_; 
@@ -253,33 +254,22 @@ using namespace quda ;
         nev_    = nev,
         ncv_    = ncv,
         ldv_    = cldn,
-        lworkl_ = (3 * ncv_ * ncv_ + 5 * ncv_) * 2,
+        lworkl_ = (3 * ncv_ * ncv_ + 5 * ncv_),
         rvec_   = 1;
-    void *sigma_ = malloc(sizeof(std::complex<Float>));
+    std::complex<Float> sigma_ = 0.0;
     Float tol_ = tol;
 
-    void *w_d_         = evals;
-    void *w_v_         = arpack_evecs;
+    std::complex<Float> *w_d_  = static_cast<std::complex<Float> *>(evals);
+    std::complex<Float> *w_v_  = arpack_evecs;
 
-    void *resid_      = malloc(wbytes);
-    void *w_workd_    = malloc(wbytes * 3);
-    void *w_workl_    = malloc(sizeof(std::complex<Float>) * lworkl_);
-    void *w_rwork_    = malloc(sizeof(Float) *ncv_);
+    std::complex<Float> *resid_      = new std::complex<Float>[cldn];
+    std::complex<Float> *w_workd_    = new std::complex<Float>[(cldn * 3)];
+    std::complex<Float> *w_workl_    = new std::complex<Float>[lworkl_];
+    Float *w_rwork_                  = new Float[ncv_];
     
     /* __neupd-only workspace */
-    void *w_workev_   = malloc(sizeof(std::complex<Float>) * 2 * ncv_);
-    int *select_      = (int*)malloc(sizeof(int) * ncv_);
-
-    if(resid_ == nullptr||
-           w_workd_ == nullptr||
-           w_workl_ == nullptr||
-           w_rwork_ == nullptr||
-           w_workev_ == nullptr||
-           select_ == nullptr)    errorQuda("Could not allocate memory..");
-
-    memset(sigma_, 0, sizeof(std::complex<Float>));
-    memset(resid_, 0, wbytes);
-    memset(w_workd_, 0, wbytes * 3);
+    std::complex<Float> *w_workev_   = new std::complex<Float>[ 2 * ncv_];
+    int *select_                     = new int[ ncv_];
 
     /* cnaupd cycle */
     ido_        = 0;
@@ -289,7 +279,7 @@ using namespace quda ;
     iparam_[3]  = 1;
     iparam_[6]  = 1;
 
-    char howmny='P';
+    char howmny='A';//'P'
     char bmat = 'I';
 
     int iter_cnt= 0;
@@ -304,10 +294,8 @@ using namespace quda ;
         
       if (ido_ == -1 || ido_ == 1) {
          //apply matrix vector here:
-         std::complex<Float> *in   = &(static_cast<std::complex<Float>*> (w_workd_))[(ipntr_[0]-1)];
-         std::complex<Float> *out  = &(static_cast<std::complex<Float>*> (w_workd_))[(ipntr_[1]-1)];
-         //
-         arpack_matvec<Float, fineSpin, fineColor, reducedColor, do_2d_emulation> (out, in,  mat, matPrecision, *B[0]) ;
+         arpack_matvec<Float, fineSpin, fineColor, reducedColor, do_2d_emulation> (&(w_workd_[(ipntr_[1]-1)]), &(w_workd_[(ipntr_[0]-1)]),  mat, matPrecision, *B[0]) ;
+
          if(iter_cnt % 50 == 0) printfQuda("\nIteration : %d\n", iter_cnt);
       } 
 
@@ -323,22 +311,22 @@ using namespace quda ;
 
     if (info_ != 0) errorQuda("\nError in ARPACK CNEUPD (error code %d) , exit.\n", info_);    
 //copy fields:
-    copy_eigenvectors<Float, fineSpin, fineColor, reducedColor, do_2d_emulation>(B, static_cast<std::complex<Float>* > (arpack_evecs), static_cast<std::complex<Float>* > (w_d_), cldn, nev);
+    copy_eigenvectors<Float, fineSpin, fineColor, reducedColor, do_2d_emulation>(B, arpack_evecs, w_d_, cldn, nev);
 
     printfQuda("\ndone..\n");
 
     /* cleanup */
-    if (w_workl_ != nullptr)   free(w_workl_);
-    if (w_rwork_ != nullptr)   free(w_rwork_);
-    if (w_workev_ != nullptr)  free(w_workev_);
-    if (select_ != nullptr)    free(select_);
+    if (w_workl_ != nullptr)   delete [] w_workl_;
+    if (w_rwork_ != nullptr)   delete [] w_rwork_;
+    if (w_workev_ != nullptr)  delete [] w_workev_;
+    if (select_ != nullptr)    delete [] select_;
 
     //n_iters    = iter_cnt;
     //nconv      = conv_cnt;
-    free(arpack_evecs);
+    delete [] arpack_evecs;
 
-    if (w_workd_ != nullptr)   free(w_workd_);
-    if (resid_   != nullptr)   free(resid_);
+    if (w_workd_ != nullptr)   delete [] w_workd_;
+    if (resid_   != nullptr)   delete [] resid_;
 
     return 0;
   }
