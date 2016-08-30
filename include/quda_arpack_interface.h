@@ -80,7 +80,7 @@ extern int ARPACK(pcnaupd) (int *fcomm, int *ido, char *bmat, int *n, char *whic
                          int *lworkl, float *rwork, int *info);
 
 
-extern int ARPACK(pznaupd) (MPI_Fint *fcomm, int *ido, char *bmat, int *n, char *which, int *nev, double *tol,
+extern int ARPACK(pznaupd) (int *fcomm, int *ido, char *bmat, int *n, char *which, int *nev, double *tol,
                          std::complex<double> *resid, int *ncv, std::complex<double> *v, int *ldv,
                          int *iparam, int *ipntr, std::complex<double> *workd, std::complex<double> *workl,
                          int *lworkl, double *rwork, int *info);
