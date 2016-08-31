@@ -242,9 +242,14 @@ namespace quda {
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
 
-    const void** Ghost() const { 
+    const void** Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return (const void**)ghost; 
+      return (const void**)ghost;
+    }
+
+    void** Ghost() {
+      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
+      return ghost;
     }
 
     /**

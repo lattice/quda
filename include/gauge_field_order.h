@@ -890,9 +890,9 @@ namespace quda {
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
 	structure v_ = ghost_[parity*faceVolumeCB[dir] + x];
-	for (int i=0; i<length; i++) v[i] = v_.v[i];
+	for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
 #else
-	for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
+	for (int i=0; i<length; i++) v[i] = (RegType)ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
 #endif
       }
 
@@ -901,10 +901,10 @@ namespace quda {
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
 	structure v_;
-	for (int i=0; i<length; i++) v_.v[i] = v[i];
+	for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
 	ghost_[parity*faceVolumeCB[dir] + x] = v_;
 #else
-	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
+	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = (Float)v[i];
 #endif
       }
 
@@ -914,11 +914,10 @@ namespace quda {
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
 	structure v_ = ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g];
-	for (int i=0; i<length; i++) v[i] = v_.v[i];
+	for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
 #else
 	for (int i=0; i<length; i++) {
-	  v[i] = ghost[dim]
-	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
+	  v[i] = (RegType)ghost[dim][(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
 	}
 #endif
       }
@@ -929,12 +928,12 @@ namespace quda {
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
 	structure v_;
-	for (int i=0; i<length; i++) v_.v[i] = v[i];
+	for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
 	ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g] = v_;
 #else
 	for (int i=0; i<length; i++) {
 	  ghost[dim]
-	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
+	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = (Float)v[i];
 	}
 #endif
       }
