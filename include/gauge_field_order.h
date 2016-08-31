@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <register_traits.h>
 #include <complex_quda.h>
+#include <quda_matrix.h>
 
 namespace quda {
 
@@ -314,12 +315,7 @@ namespace quda {
 	__device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir, const RegType phase) const {
 	  for (int i=0; i<N; i++) out[i] = in[i];
 	}
-
-
-	__device__ __host__ inline void getPhase(RegType *phase, const RegType in[N]) const {
-	  *phase = 0;
-	}
-
+	__device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
       };
 
     /** No reconstruction but we scale the result. This is used for
@@ -337,8 +333,7 @@ namespace quda {
 					     int idx, int dir, const RegType phase) const {
 	for (int i=0; i<18; i++) out[i] = scale * in[i];
       }
-
-      __device__ __host__ inline void getPhase(RegType* phase, const RegType in[18]) const { *phase=0; return; }
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const { return 0; }
     };
 
       template <typename Float>
@@ -421,8 +416,7 @@ namespace quda {
 	  Out[8] = u0*conj(Out[0]*Out[4] - Out[1]*Out[3]);
 	}
 
-	__device__ __host__ inline void getPhase(RegType* phase, const RegType in[18]) { *phase=0; return; }
-
+	__device__ __host__ inline RegType getPhase(const RegType in[18]) { return 0; }
       };
 
       // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
@@ -461,7 +455,7 @@ namespace quda {
 	  out[17] = in[8];
 	}
 
-	__device__ __host__ inline void getPhase(RegType* phase, const RegType in[18]) { *phase=0; return; }
+	__device__ __host__ inline RegType getPhase(const RegType in[18]) { return 0; }
 
       };
 
@@ -499,12 +493,20 @@ namespace quda {
 	Out[8] *= A;
       }
 
-      __device__ __host__ inline void getPhase(RegType *phase, const RegType in[18]) const {
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
+#if 1 // phase from cross product
 	const Complex *In = reinterpret_cast<const Complex*>(in);
 	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
 	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
 	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-	*phase = arg(expI3Phase)/static_cast<RegType>(3.0);
+	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
+#else // phase from determinant
+	Matrix<Complex,3> a;
+	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
+	const Complex det = getDeterminant( a );
+	RegType phase = arg(det)/3;
+#endif
+	return phase;
       }
 
     };
@@ -579,7 +581,7 @@ namespace quda {
       Out[8] = -(conj(Out[3])*conj(Out[1]) + u0*A*Out[2])*r_inv2; // U12
     }
 
-    __device__ __host__ inline void getPhase(RegType* phase, const RegType in[18]){ *phase=0; return; }
+    __device__ __host__ inline RegType getPhase(const RegType in[18]){ return 0; }
   };
 
 
@@ -592,18 +594,25 @@ namespace quda {
 
     Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()) {}
 
-      __device__ __host__ inline void getPhase(RegType *phase, const RegType in[18]) const {
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
+#if 1 // phase from cross product
 	const Complex *In = reinterpret_cast<const Complex*>(in);
 	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
 	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
 	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
-	*phase = arg(expI3Phase)/static_cast<RegType>(3.0);
+	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
+#else // phase from determinant
+	Matrix<Complex,3> a;
+	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
+	const Complex det = getDeterminant( a );
+	RegType phase = arg(det)/3;
+#endif
+	return phase;
       }
 
 	// Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
       __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
-	RegType phase;
-	getPhase(&phase,in);
+	RegType phase = getPhase(in);
 	RegType cos_sin[2];
 	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
@@ -680,11 +689,13 @@ namespace quda {
 
         RegType phase = 0.;
         if(hasPhase) copy(phase, (gauge+parity*offset)[phaseOffset/sizeof(Float) + stride*dir + x]);
+
         // The phases come after the ghost matrices
         reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+
         const int M = reconLen / N;
         RegType tmp[reconLen];
         reconstruct.Pack(tmp, v, x);
@@ -701,8 +712,7 @@ namespace quda {
 	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
         }
         if(hasPhase){
-          RegType phase;
-          reconstruct.getPhase(&phase,v);
+          RegType phase = reconstruct.getPhase(v);
           copy((gauge+parity*offset)[phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI)));
         }
       }
@@ -753,9 +763,8 @@ namespace quda {
 	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
           }
 
-	  if(hasPhase){
-	    RegType phase=0.;
-	    reconstruct.getPhase(&phase, v);
+	  if (hasPhase) {
+	    RegType phase = reconstruct.getPhase(v);
 	    copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], static_cast<RegType>(phase/(2.*M_PI)));
 	  }
 	}
@@ -805,9 +814,8 @@ namespace quda {
 	      (ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase))
 	      [i*R[dim]*faceVolumeCB[dim]+buff_idx] = vecTmp;
 	  }
-	  if(hasPhase){
-	    RegType phase=0.;
-	    reconstruct.getPhase(&phase, v);
+	  if (hasPhase) {
+	    RegType phase = reconstruct.getPhase(v);
 	    copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + R[dim]*faceVolumeCB[dim]*M*N + buff_idx],
 		 static_cast<RegType>(phase/(2.*M_PI)));
 	  }
