@@ -1,5 +1,5 @@
 
-/* Originally from Galen Arnold, NCSA arnoldg@ncsa.illinois.edu 
+/* Originally from Galen Arnold, NCSA arnoldg@ncsa.illinois.edu
  * modified by Guochun Shi
  *
  */
@@ -12,11 +12,11 @@
 #include <string.h>
 #include <numa_affinity.h>
 #include <quda_internal.h>
-#if ((CUDA_VERSION >= 6000) && defined NVML)
+#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
 #include <nvml.h>
 #endif
 
-static int 
+static int
 process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
 {
   /* assume the input format is one of the following two
@@ -43,7 +43,7 @@ process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
       warningQuda("Not enough space in sub_list");
       return -1;
     }
-    
+
     for(i = 0; i < high_core-low_core +1; i++){
       sub_list[i] = i + low_core;
     }
@@ -65,8 +65,8 @@ process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
 static int
 process_core_string_list(const char* _str, int* list, int* ncores)
 {
-  /* The input string @str should be separated by comma, and each item can be 
-   * either a number or a range (see the comments in process_core_string_item 
+  /* The input string @str should be separated by comma, and each item can be
+   * either a number or a range (see the comments in process_core_string_item
    * function)
    *
    */
@@ -88,11 +88,11 @@ process_core_string_list(const char* _str, int* list, int* ncores)
     warningQuda("Invalid string format (%s)", str);
     return -1;
   }
-  
+
   do {
     int sub_ncores = left_space;
     int* sub_list = list + tot_cores;
-    
+
     int rc = process_core_string_item(item, sub_list, &sub_ncores);
     if(rc <0){
       warningQuda("Processing item (%s) failed", item);
@@ -110,7 +110,7 @@ process_core_string_list(const char* _str, int* list, int* ncores)
 }
 
 
-static int 
+static int
 getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
 {
   FILE *nvidia_info, *pci_bus_info;
@@ -118,16 +118,16 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
   char *my_line;
   char nvidia_info_path[255], pci_bus_info_path[255];
   char bus_info[255];
-  
+
   // the nvidia driver populates this path for each gpu
   sprintf(nvidia_info_path,"/proc/driver/nvidia/gpus/%d/information", my_gpu);
   nvidia_info= fopen(nvidia_info_path,"r");
   if (nvidia_info == NULL){
     return -1;
   }
-  
+
   my_line= (char *) safe_malloc(nbytes +1);
-  
+
   while (!feof(nvidia_info)){
     if ( -1 == getline(&my_line, &nbytes, nvidia_info)){
       break;
@@ -149,7 +149,7 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
     fclose(nvidia_info);
     return -1;
   }
-  
+
   while (!feof(pci_bus_info)){
     if ( -1 == getline(&my_line, &nbytes, pci_bus_info)){
       break;
@@ -163,7 +163,7 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
       }
     }
   }
-  
+
   host_free(my_line);
   return 0;
 }
@@ -211,7 +211,7 @@ int setNumaAffinity(int devid)
 
 int setNumaAffinityNVML(int devid)
 {
-#if ((CUDA_VERSION >= 6000) && defined NVML)
+#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
   nvmlReturn_t result;
 
   result = nvmlInit();

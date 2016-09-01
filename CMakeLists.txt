@@ -10,6 +10,9 @@ set(CMAKE_CXX_STANDARD 11)
 # otherwise overwrite the existing makefiles
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
+# add a directory for cmake modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 
 
 find_package(Git)
@@ -101,6 +104,7 @@ set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
+set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 
 # NVTX options
@@ -121,6 +125,7 @@ set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_AFFINITY)
+mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 
 mark_as_advanced(QUDA_MPI_NVTX)
@@ -340,6 +345,14 @@ if(NOT ${APPLE})
     set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
   endif(QUDA_NUMA_AFFINITY)
 endif(NOT ${APPLE})
+
+if(QUDA_NUMA_NVML)
+  add_definitions(-DNUMA_NVML -DNUMA_AFFINITY)
+  set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
+  find_package(NVML REQUIRED)
+  include_directories(NVML_INCLUDE_DIR)
+endif(QUDA_NUMA_NVML)
+
 
 if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)

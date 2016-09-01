@@ -423,9 +423,9 @@ void initQudaDevice(int dev) {
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
-#ifdef NUMA_AFFINITY
+#if defined NUMA_AFFINITY || defined NUMA_NVML
   if(numa_affinity_enabled){
-#if ((CUDA_VERSION >= 6000) && defined NVML)
+#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
     setNumaAffinityNVML(dev);
 #else
     setNumaAffinity(dev);
@@ -750,7 +750,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE || 
+      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
       inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()

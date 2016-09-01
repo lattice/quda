@@ -4,10 +4,10 @@
 #ifdef __cplusplus
 	extern "C" {
 #endif
-	  
+
 	  int setNumaAffinity(int);
     int setNumaAffinityNVML(int);
-#ifdef __cplusplus 
+#ifdef __cplusplus
 }
 #endif
 
