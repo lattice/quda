@@ -72,7 +72,7 @@ extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 
-extern double mass;
+extern int niter; // max solver iterations
 
 static void end();
 
@@ -96,7 +96,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
     int X1, int  X2, int X3, int X4,
     QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
     QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
-    double mass, double tol, int maxiter, double reliable_delta,
+    double mass, double tol, double reliable_delta,
     double tadpole_coeff
     )
 {
@@ -130,7 +130,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->inv_type = inv_type;
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
-  inv_param->maxiter = 500000;
+  inv_param->maxiter = niter;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
@@ -159,7 +159,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
-  inv_param->cuda_prec_precondition = QUDA_HALF_PRECISION;
+  inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
 
   inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -194,8 +194,7 @@ invert_test(void)
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
       cpu_prec, prec, prec_sloppy,
-      link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
-      0.8);
+      link_recon, link_recon_sloppy, mass, tol, 1e-3, 0.8);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -292,7 +291,8 @@ invert_test(void)
   } else {
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
-  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
+  gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
+  gaugeParam.reconstruct_precondition = gaugeParam.reconstruct_sloppy;
   loadGaugeQuda(fatlink, &gaugeParam);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -300,6 +300,8 @@ invert_test(void)
     gaugeParam.ga_pad = link_pad;
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
+    gaugeParam.reconstruct_precondition = gaugeParam.reconstruct_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);
   }
 
