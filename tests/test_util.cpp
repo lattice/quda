@@ -774,8 +774,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int j=0;j < 6; j++){
-	gauge[d][i*gaugeSiteSize + 12+ j] *= sign;
+      for (int j=0; j < 18; j++) {
+	gauge[d][i*gaugeSiteSize + j] *= sign;
       }
     }
     //odd
@@ -804,8 +804,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int j=0;j < 6; j++){
-	gauge[d][(Vh+i)*gaugeSiteSize + 12 + j] *= sign;
+      for (int j=0; j<18; j++){
+	gauge[d][(Vh+i)*gaugeSiteSize + j] *= sign;
       }
     }
 
@@ -825,9 +825,9 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int i = 0; i < 6; i++) {
-	gauge[3][j*gaugeSiteSize+ 12+ i ] *= sign;
-	gauge[3][(Vh+j)*gaugeSiteSize+12 +i] *= sign;
+      for (int i=0; i<18; i++) {
+	gauge[3][j*gaugeSiteSize + i] *= sign;
+	gauge[3][(Vh+j)*gaugeSiteSize + i] *= sign;
       }
     }
   }
@@ -1060,7 +1060,7 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
   if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
     // incorporate non-trivial phase into long links
 
-    const double phase = M_PI/3;
+    const double phase = (M_PI * rand())/RAND_MAX;
     const complex<double> z = polar(1.0, phase);
     for (int dir=0; dir<4; ++dir) {
       for (int i=0; i<V; ++i) {
