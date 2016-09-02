@@ -164,6 +164,7 @@ namespace quda {
     gf_param.gauge = NULL;
     gf_param.create = QUDA_NULL_FIELD_CREATE;
     gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gf_param.nFace = 1;
 
     cpuGaugeField g(gf_param);
 
