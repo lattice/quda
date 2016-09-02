@@ -30,7 +30,7 @@
 
 #include <multigrid.h>
 
-#ifdef NUMA_AFFINITY
+#ifdef NUMA_NVML
 #include <numa_affinity.h>
 #endif
 
@@ -76,7 +76,7 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #include <momentum.h>
 
-int numa_affinity_enabled = 1;
+const int numa_affinity_enabled = 1;
 
 using namespace quda;
 
@@ -423,11 +423,12 @@ void initQudaDevice(int dev) {
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
-#ifdef NUMA_AFFINITY
-  if(numa_affinity_enabled){
-    setNumaAffinity(dev);
-  }
-#endif
+if(numa_affinity_enabled){
+  #if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
+  setNumaAffinityNVML(dev);
+  #endif
+}
+
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
@@ -746,7 +747,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE || 
+      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
       inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()
