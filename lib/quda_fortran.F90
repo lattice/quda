@@ -161,7 +161,12 @@ module quda_fortran
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
      real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately)
 
-     QudaVerbosity :: verbosity
+     integer(4) :: compute_clover;                    ! Whether to compute the clover field
+     integer(4) :: compute_clover_inverse;            ! Whether to compute the clover inverse field
+     integer(4) :: return_clover;                     ! Whether to copy back the clover matrix field
+     integer(4) :: return_clover_inverse;             ! Whether to copy back the inverted clover matrix field
+
+     QudaVerbosity :: verbosity;                      ! The verbosity setting to use in the solver
 
      integer(4) :: sp_pad
      integer(4) :: cl_pad
@@ -187,6 +192,7 @@ module quda_fortran
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
 
+     integer(8) :: preconditioner ! pointer to preconditioner instance
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition

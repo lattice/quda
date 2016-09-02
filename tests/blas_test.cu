@@ -31,7 +31,7 @@ extern bool verify_results;
 
 extern void usage(char** );
 
-const int Nkernels = 32;
+const int Nkernels = 34;
 
 using namespace quda;
 
@@ -353,6 +353,14 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::HeavyQuarkResidualNorm(*xD, *yD);
       break;
 
+    case 32:
+      for (int i=0; i < niter; ++i) blas::tripleCGReduction(*xD, *yD, *zD);
+      break;
+
+    case 33:
+      for (int i=0; i < niter; ++i) blas::tripleCGUpdate(a, b, *xD, *yD, *zD, *wD);
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -649,6 +657,26 @@ double test(int kernel) {
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
+  case 32:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    { double3 d = blas::tripleCGReduction(*xD, *yD, *zD);
+      double3 h = make_double3(blas::norm2(*xH), blas::norm2(*yH), blas::reDotProduct(*yH, *zH));
+      error = fabs(d.x - h.x) / fabs(h.x) + 
+	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+
+  case 33:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *wD = *wH;
+    { blas::tripleCGUpdate(a, b, *xD, *yD, *zD, *wD);
+      blas::tripleCGUpdate(a, b, *xH, *yH, *zH, *wH);
+      error = ERROR(y) + ERROR(z) + ERROR(w); }
+    break;
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
@@ -690,7 +718,9 @@ const char *names[] = {
   "cDotProductNormA",
   "cDotProductNormB",
   "caxpbypzYmbwcDotProductWYNormY",
-  "HeavyQuarkResidualNorm"
+  "HeavyQuarkResidualNorm",
+  "tripleCGReduction",
+  "tripleCGUpdate"
 };
 
 int main(int argc, char** argv)
@@ -789,7 +819,7 @@ TEST_P(BlasTest, verify) {
   // failed without running
   double deviation =  skip_kernel(prec,kernel) ? 1.0 : test(kernel);
   printfQuda("%-35s error = %e\n", names[kernel], deviation);
-  double tol = (prec == 2 ? 1e-12 : (prec == 1 ? 1e-5 : 1e-3));
+  double tol = (prec == 2 ? 1e-11 : (prec == 1 ? 1e-5 : 1e-3));
   tol = (kernel < 2) ? 1e-4 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
@@ -827,6 +857,8 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormA_half, BlasTest, ::testing::Values( make
 INSTANTIATE_TEST_CASE_P(cDotProductNormB_half, BlasTest, ::testing::Values( make_int2(0,29) ));
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_half, BlasTest, ::testing::Values( make_int2(0,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,31) ));
+INSTANTIATE_TEST_CASE_P(TripleCGReduction_half, BlasTest, ::testing::Values( make_int2(0,32) ));
+INSTANTIATE_TEST_CASE_P(TripleCGUpdate_half, BlasTest, ::testing::Values( make_int2(0,33) ));
 
 // single precision
 INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
@@ -861,6 +893,8 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormA_single, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(cDotProductNormB_single, BlasTest, ::testing::Values( make_int2(1,29) ));
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_single, BlasTest, ::testing::Values( make_int2(1,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,31) ));
+INSTANTIATE_TEST_CASE_P(TripleCGReduction_single, BlasTest, ::testing::Values( make_int2(1,32) ));
+INSTANTIATE_TEST_CASE_P(TripleCGUpdate_single, BlasTest, ::testing::Values( make_int2(1,33) ));
 
 // double precision
 INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
@@ -895,4 +929,6 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormA_double, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(cDotProductNormB_double, BlasTest, ::testing::Values( make_int2(2,29) ));
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_double, BlasTest, ::testing::Values( make_int2(2,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,31) ));
+INSTANTIATE_TEST_CASE_P(TripleCGReduction_double, BlasTest, ::testing::Values( make_int2(2,32) ));
+INSTANTIATE_TEST_CASE_P(TripleCGUpdate_double, BlasTest, ::testing::Values( make_int2(2,33) ));
 
