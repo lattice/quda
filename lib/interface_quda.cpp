@@ -30,7 +30,7 @@
 
 #include <multigrid.h>
 
-#ifdef NUMA_AFFINITY
+#ifdef NUMA_NVML
 #include <numa_affinity.h>
 #endif
 
@@ -76,7 +76,7 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #include <momentum.h>
 
-int numa_affinity_enabled = 1;
+const int numa_affinity_enabled = 1;
 
 using namespace quda;
 
@@ -423,15 +423,12 @@ void initQudaDevice(int dev) {
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
-#if defined NUMA_AFFINITY || defined NUMA_NVML
-  if(numa_affinity_enabled){
-#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
-    setNumaAffinityNVML(dev);
-#else
-    setNumaAffinity(dev);
-#endif
-  }
-#endif
+if(numa_affinity_enabled){
+  #if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
+  setNumaAffinityNVML(dev);
+  #endif
+}
+
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);

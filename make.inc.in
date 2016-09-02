@@ -84,8 +84,6 @@ QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
 
 
-NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
-
 ######
 
 INC = -I$(CUDA_INSTALL_PATH)/include
@@ -175,7 +173,7 @@ ifeq ($(strip $(BUILD_MAGMA)), yes)
      MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
      LIB += $(shell pkg-config --libs magma)
   endif
- 
+
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
 else
@@ -351,16 +349,6 @@ endif
 ifeq ($(strip $(DEVICE_PACK)), yes)
   NVCCOPT += -DDEVICE_PACK
   COPT += -DDEVICE_PACK
-endif
-
-ifeq ($(strip $(OS)), osx)
-  NUMA_AFFINITY = no
-endif
-
-ifeq ($(strip $(NUMA_AFFINITY)), yes)
-  NVCCOPT += -DNUMA_AFFINITY
-  COPT += -DNUMA_AFFINITY
-  NUMA_AFFINITY_OBJS=numa_affinity.o
 endif
 
 ifeq ($(strip $(BUILD_CONTRACT)), yes)
