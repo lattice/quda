@@ -484,7 +484,7 @@ void initQudaMemory()
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
   cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
-  loadTuneCache(getVerbosity());
+  loadTuneCache();
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 
@@ -1197,8 +1197,8 @@ void endQuda(void)
   destroyStaggeredOprodEvents();
 #endif
 
-  saveTuneCache(getVerbosity());
-  saveProfile(getVerbosity());
+  saveTuneCache();
+  saveProfile();
 
   initialized = false;
 
@@ -2138,7 +2138,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 
   popVerbosity();
 
-  saveTuneCache(getVerbosity());
+  saveTuneCache();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -2219,6 +2219,9 @@ void* newMultigridQuda(QudaMultigridParam *mg_param) {
 
   closeMagma();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  saveProfile(__func__);
+  flushProfile();
   return static_cast<void*>(mg);
 }
 
@@ -2482,8 +2485,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   popVerbosity();
 
-  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -2827,8 +2830,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   popVerbosity();
 
-  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
 
   profileMulti.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -3086,8 +3089,8 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   closeMagma();
 
- // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
