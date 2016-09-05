@@ -81,6 +81,9 @@ namespace quda {
     Y_h = new cpuGaugeField(gParam);
     Yhat_h = new cpuGaugeField(gParam);
 
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gParam.nFace = 0;
+
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X_h = new cpuGaugeField(gParam);
     Xinv_h = new cpuGaugeField(gParam);
@@ -88,6 +91,8 @@ namespace quda {
     dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer);
 
     if (enable_gpu) {
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      gParam.nFace = 1;
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
       gParam.geometry = QUDA_COARSE_GEOMETRY;
       int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
@@ -96,6 +101,10 @@ namespace quda {
       Yhat_d = new cudaGaugeField(gParam);
       Y_d->copy(*Y_h);
       Yhat_d->copy(*Yhat_h);
+
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gParam.nFace = 0;
+      gParam.pad = 0;
 
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;

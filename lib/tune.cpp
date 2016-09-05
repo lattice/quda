@@ -210,7 +210,7 @@ namespace quda {
   /*
    * Read tunecache from disk.
    */
-  void loadTuneCache(QudaVerbosity verbosity)
+  void loadTuneCache()
   {
     char *path;
     struct stat pstat;
@@ -269,7 +269,7 @@ namespace quda {
 	cache_file.close();
 	initial_cache_size = tunecache.size();
 
-	if (verbosity >= QUDA_SUMMARIZE) {
+	if (getVerbosity() >= QUDA_SUMMARIZE) {
 	  printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size), cache_path.c_str());
 	}
 
@@ -290,7 +290,7 @@ namespace quda {
   /**
    * Write tunecache to disk.
    */
-  void saveTuneCache(QudaVerbosity verbosity)
+  void saveTuneCache()
   {
     time_t now;
     int lock_handle;
@@ -327,7 +327,7 @@ namespace quda {
       cache_path = resource_path + "/tunecache.tsv";
       cache_file.open(cache_path.c_str());
 
-      if (verbosity >= QUDA_SUMMARIZE) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
 	printfQuda("Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), cache_path.c_str());
       }
 
@@ -354,11 +354,20 @@ namespace quda {
 #endif
   }
 
+  // flush profile, setting counts to zero
+  void flushProfile()
+  {
 
-  /**
-   * Write profile to disk.
-   */
-  void saveProfile(QudaVerbosity verbosity)
+    for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
+      // set all n_calls = 0
+      TuneParam &param = entry->second;
+      param.n_calls = 0;
+    }
+
+  }
+
+  // save profile
+  void saveProfile(const std::string label)
   {
     time_t now;
     int lock_handle;
@@ -386,20 +395,26 @@ namespace quda {
       int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
+      // profile counter for writing out unique profiles
+      static int count = 0;
+
       char *profile_fname = getenv("QUDA_PROFILE_OUTPUT_BASE");
 
       if (!profile_fname) {
 	warningQuda("Environment variable QUDA_PROFILE_OUTPUT_BASE is not set; writing to profile.tsv and profile_async.tsv");
-	profile_path = resource_path + "/profile.tsv";
-	async_profile_path = resource_path + "/profile_async.tsv";
+	profile_path = resource_path + "/profile_" + std::to_string(count) + ".tsv";
+	async_profile_path = resource_path + "/profile_async_" + std::to_string(count) + ".tsv";
       } else {
-	profile_path = resource_path + "/" + profile_fname + ".tsv";
-	async_profile_path = resource_path + "/" + profile_fname + "_async.tsv";
+	profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + ".tsv";
+	async_profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + "_async.tsv";
       }
+
+      count++;
+
       profile_file.open(profile_path.c_str());
       async_profile_file.open(async_profile_path.c_str());
 
-      if (verbosity >= QUDA_SUMMARIZE) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
 	// compute number of non-zero entries that will be output in the profile
 	int n_entry = 0;
 	int n_policy = 0;
@@ -419,7 +434,9 @@ namespace quda {
 
       time(&now);
 
-      profile_file << "profile\t" << quda_version;
+      std::string Label = label.empty() ? "profile" : label;
+
+      profile_file << Label << "\t" << quda_version;
 #ifdef GITVERSION
       profile_file << "\t" << gitversion;
 #else
@@ -428,7 +445,7 @@ namespace quda {
       profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       profile_file << std::setw(12) << "total time" << "\t" << std::setw(12) << "percentage" << "\t" << std::setw(12) << "calls" << "\t" << std::setw(12) << "time / call" << "\t" << std::setw(16) << "volume" << "\tname\taux\tcomment" << std::endl;
 
-      async_profile_file << "profile\t" << quda_version;
+      async_profile_file << Label << "\t" << quda_version;
 #ifdef GITVERSION
       async_profile_file << "\t" << gitversion;
 #else
