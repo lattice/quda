@@ -1,5 +1,6 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
+#include <tune_quda.h>
 #include <typeinfo>
 #include <vector>
 #include <assert.h>
@@ -25,12 +26,51 @@ namespace quda {
   }
 
   template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
+  void fillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
     FieldOrderCB<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
     for (int v=0; v<nVec; v++) {
       FieldOrderCB<Float,nSpin,nColor,1,order> bOrder(const_cast<ColorSpinorField&>(*B[v]));
       fill<nSpin,nColor,nVec>(vOrder, bOrder, v);
     }
+  }
+
+  template <typename real, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+  class FillVLaunch : public Tunable {
+
+    ColorSpinorField &V;
+    const std::vector<ColorSpinorField*> &B;
+
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+  public:
+    FillVLaunch(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) : V(V), B(B) {
+      (V.Location() == QUDA_CPU_FIELD_LOCATION) ? strcpy(aux, "CPU") : strcpy(aux,"GPU");
+    }
+    virtual ~FillVLaunch() { }
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
+	fillV<real,nSpin,nColor,nVec,order>(V,B);
+      } else {
+	errorQuda("Not implemented for GPU");
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const { return false; }
+
+    TuneKey tuneKey() const { return TuneKey(V.VolString(), typeid(*this).name(), aux); }
+
+    long long flops() const { return 0; }
+    long long bytes() const { return 2*V.Bytes(); }
+  };
+
+
+  template <typename real, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
+    FillVLaunch<real,nSpin,nColor,nVec,order> f(V,B);
+    f.apply(0);
   }
 
 //for staggered: this does not include factor 2 due to parity decomposition!
@@ -309,7 +349,6 @@ namespace quda {
 	for (int i=0; i<blockSize; i++) v[(b*N+jc)*blockSize+i] *= scale;
       }
 
-
       /*      
       for (int jc=0; jc<N; jc++) {
         complex<sumFloat> nrm2 = 0.0;
@@ -323,11 +362,88 @@ namespace quda {
 
   }
 
+  template <typename sumType, typename real, int N>
+  class BlockGramSchmidt : public Tunable {
+
+    complex<real> *v;
+    int nBlock;
+    int blockSize;
+    const ColorSpinorField &meta;
+
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+  public:
+    BlockGramSchmidt(complex<real> *v, int nBlock, int blockSize, const ColorSpinorField &meta)
+      : v(v), nBlock(nBlock), blockSize(blockSize), meta(meta) {
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) sprintf(aux, "nBlock=%d,blockSize=%d,CPU", nBlock, blockSize);
+      else sprintf(aux, "nBlock=%d,blockSize=%d,GPU", nBlock, blockSize);
+    }
+
+    virtual ~BlockGramSchmidt() { }
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+	blockGramSchmidt<sumType, real, N>(v, nBlock, blockSize);
+      } else {
+	errorQuda("Not implemented for GPU");
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const { return false; }
+
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+
+    long long flops() const { return nBlock * N * ((N-1) * (8l + 8l) + 2l) * blockSize; }
+    long long bytes() const { return 2*meta.Bytes(); }
+  };
+
+  template <bool toBlock, int N, typename real, typename Order>
+  class BlockOrderV : public Tunable {
+
+    complex<real> *vBlock;
+    Order &vOrder;
+    const int *geo_map;
+    const int *geo_bs;
+    int spin_bs;
+    const ColorSpinorField &V;
+
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+  public:
+    BlockOrderV(complex<real> *vBlock, Order &vOrder, const int *geo_map, const int *geo_bs, int spin_bs, const ColorSpinorField &V)
+      : vBlock(vBlock), vOrder(vOrder), geo_map(geo_map), geo_bs(geo_bs), spin_bs(spin_bs), V(V) {
+      (V.Location() == QUDA_CPU_FIELD_LOCATION) ? strcpy(aux, "CPU") : strcpy(aux,"GPU");
+    }
+
+    virtual ~BlockOrderV() { }
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
+	blockOrderV<toBlock,N,complex<real>,Order>(vBlock,vOrder,geo_map,geo_bs,spin_bs,V);
+      } else {
+	errorQuda("Not implemented for GPU");
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const { return false; }
+
+    TuneKey tuneKey() const { return TuneKey(V.VolString(), typeid(*this).name(), aux); }
+
+    long long flops() const { return 0; }
+    long long bytes() const { return 2*V.Bytes(); }
+  };
+
+
   template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
   void BlockOrthogonalize(ColorSpinorField &V, const int *geo_bs, const int *geo_map, int spin_bs) {
     complex<Float> *Vblock = new complex<Float>[V.Volume()*V.Nspin()*V.Ncolor()];
 
-    FieldOrderCB<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
+    typedef FieldOrderCB<Float,nSpin,nColor,nVec,order> VectorField;
+    VectorField vOrder(const_cast<ColorSpinorField&>(V));
 
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
@@ -335,24 +451,19 @@ namespace quda {
     int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
     int chiralBlocks = (V.Nspin() == 1) ? 2 : vOrder.Nspin() / spin_bs; //always 2 for staggered. 
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
+    if (V.Nspin() == 1) blocksize /= chiralBlocks; //for staggered chiral block size is a parity block size
     
-    if(V.Nspin() != 1){//FIXME : this is not good, think about a separate parameter to distinguish staggered stuff!
-      printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
-    
-      blockOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
-      blockGramSchmidt<double,Float,nVec>(Vblock, numblocks, blocksize);  
-      blockOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
-    }
-    else{
-      blocksize /= chiralBlocks; //for staggered chiral block size is a parity block size   
+    printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
-      printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
+    BlockOrderV<true,nVec,Float,VectorField> reorder(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
+    reorder.apply(0);
 
-      blockCBOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
-      blockGramSchmidt<double,Float,nVec>(Vblock, numblocks, blocksize);  
-      blockCBOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
-   
-    }
+    BlockGramSchmidt<double,Float,nVec> ortho(Vblock, numblocks, blocksize, V);
+    ortho.apply(0);
+
+    BlockOrderV<false,nVec,Float,VectorField> reset(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
+    reset.apply(0);
+
     delete []Vblock;
   }
 
