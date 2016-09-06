@@ -385,12 +385,12 @@ using namespace quda ;
     if(B[0]->Ncolor() == 3)
     {
       const int fineColor  = 3;
-      arpack_solve<Float, fineSpin,fineColor,reducedColor, do_2d_emulation>( lanczos_which, B, evals, matEigen, mat_precision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin,fineColor,reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else if(B[0]->Ncolor() == 4)
     {
       const int fineColor  = 4;
-      arpack_solve<Float, fineSpin,fineColor,reducedColor, do_2d_emulation>( lanczos_which, B, evals, matEigen, mat_precision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin,fineColor,reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else 
     {
@@ -404,17 +404,17 @@ using namespace quda ;
     if(B[0]->Nspin() == 1)
     {
       const int fineSpin  = 1;
-      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, matEigen, mat_precision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else if(B[0]->Nspin() == 2)
     {
       const int fineSpin  = 2;
-      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, matEigen, mat_precision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else if(B[0]->Nspin() == 4)
     {
       const int fineSpin  = 4;
-      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, matEigen, mat_precision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else 
     {
