@@ -403,6 +403,54 @@ namespace quda {
       delete v2;
     }
 #endif
+#if 1
+    printfQuda("\n");
+    printfQuda("Check eigenvector overlap for level %d\n", param.level );
+
+    int nmodes = 128;
+    int ncv    = 256;
+    char *which = (char*)malloc(256*sizeof(char));
+    sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
+
+    ColorSpinorParam cpuParam(*param.B[0]);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    std::vector<ColorSpinorField*> evecsBuffer;
+    evecsBuffer.reserve(nmodes);
+
+    for (int i = 0; i < nmodes; i++) evecsBuffer.push_back( new cpuColorSpinorField(cpuParam) );
+    
+    Complex *evalsBuffer = new Complex[nmodes+1];
+    //
+    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
+    ArpackArgs args(param.matResidual, matPrecision, nmodes, ncv, which);    
+
+    args.SetTol(1e-7);
+    //
+    args(evecsBuffer, evalsBuffer);
+
+    for (int i=0; i<nmodes; i++) {
+      // as well as copying to the correct location this also changes basis if necessary
+      *tmp1 = *evecsBuffer[i]; 
+
+      transfer->R(*r_coarse, *tmp1);
+      transfer->P(*tmp2, *r_coarse);
+
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+
+      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
+      printfQuda("L2 relative deviation = %e\n", deviation);
+    }
+
+    for (unsigned int i = 0; i < evecsBuffer.size(); i++) delete evecsBuffer[i];
+    delete [] evalsBuffer;
+
+    free(which);
+#endif
 
     printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
