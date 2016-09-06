@@ -11,25 +11,10 @@
 #define MAX(a, b) (a > b) ? a : b;
 #endif
 
-#define MAGMA_17 //default version version of the MAGMA library
+//#define MAGMA_17 //default version version of the MAGMA library
 
 #ifdef MAGMA_LIB
 #include <magma.h>
-
-#ifdef MAGMA_14
-
-#define _cV 'V'
-#define _cU 'U'
-
-#define _cR 'R'
-#define _cL 'L'
-
-#define _cC 'C'
-#define _cN 'N'
-
-#define _cNV 'N'
-
-#else
 
 #define _cV MagmaVec
 #define _cU MagmaUpper
@@ -41,8 +26,6 @@
 #define _cN MagmaNoTrans
 
 #define _cNV MagmaNoVec
-
-#endif
 
 #endif
 
@@ -247,10 +230,15 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, cons
 
     const int complex_prec = 2*prec;
 
-    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(ldm) : magma_get_zhetrd_nb(ldm);//ldm<-m
-    magma_int_t nbqrf = prec == 4 ? magma_get_cgeqrf_nb(ldm) : magma_get_zgeqrf_nb(ldm);//ldm
-
     htsize   = max_nev;//MIN(l,k)-number of Householder vectors, but we always have k <= MIN(m,n)
+
+    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(ldm) : magma_get_zhetrd_nb(ldm);//ldm<-m
+#ifdef MAGMA_17
+    magma_int_t nbqrf = prec == 4 ? magma_get_cgeqrf_nb(ldm) : magma_get_zgeqrf_nb(ldm);//ldm
+#else
+    magma_int_t nbqrf = prec == 4 ? magma_get_cgeqrf_nb( ldm, htsize ) : magma_get_zgeqrf_nb( ldm, htsize );//ldm
+#endif
+    
     dtsize   = ( 2*htsize + ((htsize + 31)/32)*32 )*nbqrf;//in general: MIN(m,k) for side = 'L' and MIN(n,k) for side = 'R'
 
     magma_malloc_pinned((void**)&hTau, htsize*complex_prec);
@@ -360,7 +348,12 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 #ifdef MAGMA_LIB
      if(prec == 4)
      {
+#ifdef MAGMA_17
         magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
+#else
+        magma_int_t nb = magma_get_cgeqrf_nb(m, l);//ldm
+#endif
+
 
         magma_cgeqrf_gpu(m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTau, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cgeqrf_gpu), exit ...\n");
@@ -370,13 +363,20 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
         magma_cunmqr_gpu(_cR, _cN, m, m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n");
 
+#ifndef MAGMA_17
+//        nb = magma_get_cgeqrf_nb(m, l);//ldm
+#endif
         //get QHT product:
         magma_cunmqr_gpu(_cL, _cC, m, l, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n");
      }
      else
      {
+#ifdef MAGMA_17
         magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
+#else
+        magma_int_t nb = magma_get_zgeqrf_nb(m, l);//ldm
+#endif
 
         magma_zgeqrf_gpu(m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTau, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zgeqrf_gpu), exit ...\n");
@@ -386,6 +386,9 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
         magma_zunmqr_gpu(_cR, _cN, m, m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
 
+#ifndef MAGMA_17
+//        nb = magma_get_zgeqrf_nb(m, l);//ldm
+#endif
         //get QHT product:
         magma_zunmqr_gpu(_cL, _cC, m, l, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
@@ -419,14 +422,22 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 
        if(prec == 4)
        {
+#ifdef MAGMA_17
          magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
+#else
+         magma_int_t nb = magma_get_cgeqrf_nb(m, l);//ldm
+#endif
          magma_cunmqr_gpu(_cL, _cN, m, l, l, (magmaFloatComplex*)dTevecm, ldm, (magmaFloatComplex*)hTau, (magmaFloatComplex*)dTm, ldm, (magmaFloatComplex*)W, sideLR, (magmaFloatComplex*)dTau, nb, &info);
 
          if(info != 0) errorQuda("\nError in RestartV (magma_cunmqr_gpu), exit ...\n");
        }
        else
        {
+#ifdef MAGMA_17
          magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
+#else
+         magma_int_t nb = magma_get_zgeqrf_nb(m, l);//ldm
+#endif
          magma_zunmqr_gpu(_cL, _cN, m, l, l, (magmaDoubleComplex*)dTevecm, ldm, (magmaDoubleComplex*)hTau, (magmaDoubleComplex*)dTm, ldm, (magmaDoubleComplex*)W, sideLR, (magmaDoubleComplex*)dTau, nb, &info);
 
          if(info != 0) errorQuda("\nError in RestartV (magma_zunmqr_gpu), exit ...\n");
@@ -560,7 +571,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
 
      if(prec == 4)
      {
-
+        errorQuda("\nPrecision is not supported.\n");
      }
      else
      {
@@ -582,7 +593,13 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
 
         qudaMemcpy(dQR, QR, ldqr*k*sizeof(magmaDoubleComplex), cudaMemcpyDefault);
 
+
+#ifdef MAGMA_17
         magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
+#else
+        magma_int_t nb = magma_get_zgeqrf_nb(m, k);//ldm
+#endif
+
         //
         magma_zgeqrf_gpu(n, k, (magmaDoubleComplex *)dQR, ldqr, (magmaDoubleComplex *)htau, (magmaDoubleComplex *)dtau, &info);//identical to zgeqrf?
 
@@ -1027,7 +1044,11 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
 
   magma_int_t **dipiv_array = static_cast<magma_int_t**>(device_malloc(batch*sizeof(magma_int_t*)));
   magma_int_t *dipiv_tmp = static_cast<magma_int_t*>(device_malloc(batch*n*sizeof(magma_int_t)));
+#ifdef MAGMA_17
   set_ipointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
+#else
+  magma_iset_pointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
+#endif
 
   magma_int_t *dinfo_array = static_cast<magma_int_t*>(device_malloc(batch*sizeof(magma_int_t)));
   magma_int_t *info_array = static_cast<magma_int_t*>(safe_malloc(batch*sizeof(magma_int_t)));
@@ -1038,8 +1059,13 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
     magmaFloatComplex **A_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
     magmaFloatComplex **Ainv_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
 
+#ifdef MAGMA_17
     cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
     cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
+#else
+    magma_cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
+    magma_cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
+#endif
 
     double magma_time = magma_sync_wtime(queue);
     err = magma_cgetrf_batched(n, n, A_array, n, dipiv_array, dinfo_array, batch, queue);
@@ -1081,10 +1107,14 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
     device_free(A_array);
   } else if (prec == 8) {
     magmaDoubleComplex **A_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
+    magmaDoubleComplex **Ainv_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*))); 
+#ifdef MAGMA_17
     zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
-
-    magmaDoubleComplex **Ainv_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
     zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
+#else
+    magma_zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
+    magma_zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
+#endif
 
     double magma_time = magma_sync_wtime(queue);
     err = magma_zgetrf_batched(n, n, A_array, n, dipiv_array, dinfo_array, batch, queue);
