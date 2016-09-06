@@ -427,6 +427,7 @@ using namespace quda ;
 
  void ArpackArgs::operator()( std::vector<ColorSpinorField*> &B, std::complex<double> *evals )
  {
+#ifdef ARPACK_LIB
    if(_2d_field)
    {
      warningQuda("\nSolving 2d eigen-problem\n");
@@ -443,7 +444,7 @@ using namespace quda ;
      if(use_full_prec_arpack)   arpack_solve<double, 3, false>( lanczos_which, B, (void*)evals, matEigen, mat_precision, tol, nev , ncv );
      else                       arpack_solve<float, 3, false>( lanczos_which, B, (void*)evals, matEigen, mat_precision, (float)tol, nev , ncv  );
    }
- 
+ #endif
    return;
  }
 
