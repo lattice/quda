@@ -210,7 +210,7 @@ namespace quda {
    */
 //#define CHECK_STAGGERED
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_stride, int thread_dir, int thread_dim>
-  __device__ __host__ inline void applyStaggeredDslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block, int color_offset) {
+  __device__ __host__ inline void applyStaggeredDslash(complex<Float> out[], DslashCoarseArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block, int color_offset) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
     int coord[5];
@@ -347,7 +347,7 @@ namespace quda {
 
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, int color_stride,
-	    int dim_thread_split, bool dslash, bool clover, int dir, int dim>
+	    int dim_thread_split, bool dslash, bool clover, bool staggered, int dir, int dim>
   __device__ __host__ inline void coarseDslash(DslashCoarseArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block, int color_offset)
   {
     complex <Float> out[Mc];
@@ -376,7 +376,7 @@ namespace quda {
   }
 
   // CPU kernel for applying the coarse Dslash to a vector
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover>
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool staggered>
   void coarseDslash(DslashCoarseArg<Float,F,G> arg)
   {
     // the fine-grain parameters mean nothing for CPU variant
@@ -403,7 +403,7 @@ namespace quda {
   }
 
   // GPU Kernel for applying the coarse Dslash to a vector
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_thread_split, bool dslash, bool clover>
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_thread_split, bool dslash, bool clover, bool staggered>
   __global__ void coarseDslashKernel(DslashCoarseArg<Float,F,G> arg)
   {
     constexpr int warp_size = 32;
@@ -443,7 +443,7 @@ namespace quda {
   }
 
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool staggered>
-  class CoarseDslash : public Tunable {
+  class DslashCoarse : public Tunable {
 
   protected:
     DslashCoarseArg<Float,F,G> &arg;
@@ -694,35 +694,24 @@ namespace quda {
     const int colors_per_thread = 1;
     if (dslash && !staggered) {
       if (clover) {
-<<<<<<< HEAD
-	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true,false> dslash(arg, inA);
+	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true,false> dslash(arg, inA);
 	dslash.apply(0);
       } else {
-	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,false,false> dslash(arg, inA);
+	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,false,false> dslash(arg, inA);
 	dslash.apply(0);
       }
     }else if (dslash && staggered) {
 
       if (clover) {
-	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true,true> dslash(arg, inA);
+	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true,true> dslash(arg, inA);
 	dslash.apply(0);
       } else {
-	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,false,true> dslash(arg, inA);
-=======
-	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true> dslash(arg, inA);
-	dslash.apply(0);
-      } else {
-	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,false> dslash(arg, inA);
->>>>>>> develop
+	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,false,true> dslash(arg, inA);
 	dslash.apply(0);
       }
     } else {
       if (clover) {
-<<<<<<< HEAD
-	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,false,true,false> dslash(arg, inA);
-=======
-	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,false,true> dslash(arg, inA);
->>>>>>> develop
+	DslashCoarse<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,false,true,false> dslash(arg, inA);
 	dslash.apply(0);
       } else {
 	errorQuda("Unsupported dslash=false clover=false");
