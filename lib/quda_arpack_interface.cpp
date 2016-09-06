@@ -50,11 +50,11 @@ using namespace quda ;
        float _tol = static_cast<float>(tol);
        std::complex<float> _sigma = static_cast<std::complex<float> >(sigma);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, static_cast<std::complex<float> *>(evals),
-                     static_cast<std::complex<float> *>(v), &ldv, static_cast<std::complex<float> *>(sigma), static_cast<std::complex<float> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, static_cast<std::complex<float> *>(resid), &ncv, static_cast<std::complex<float> *>(v1),
-                     &ldv1, iparam, ipntr, static_cast<std::complex<float> *>(workd), static_cast<std::complex<float> *>(workl),
-                     &lworkl, static_cast<float *>(rwork), &info);
+       ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
+                     reinterpret_cast<std::complex<float> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<float> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
+                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
+                     &lworkl, reinterpret_cast<float *>(rwork), &info);
 #else
 
        ARPACK(cneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
@@ -69,11 +69,11 @@ using namespace quda ;
        double _tol = static_cast<double>(tol);
        std::complex<double> _sigma = static_cast<std::complex<double> >(sigma);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, static_cast<std::complex<double> *>(evals),
-                     static_cast<std::complex<double> *>(v), &ldv, static_cast<std::complex<double> *>(sigma), static_cast<std::complex<double> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, static_cast<std::complex<double> *>(resid), &ncv, static_cast<std::complex<double> *>(v1),
-                     &ldv1, iparam, ipntr, static_cast<std::complex<double> *>(workd), static_cast<std::complex<double> *>(workl),
-                     &lworkl, static_cast<double *>(rwork), &info);
+       ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
+                     reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
+                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
+                     &lworkl, reinterpret_cast<double *>(rwork), &info);
 #else
        ARPACK(zneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
                      reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
