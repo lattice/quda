@@ -55,6 +55,8 @@ namespace quda {
 
     if (coarseColor == 2) { 
       calculateKSYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
+    } else if (coarseColor == 4) {
+      calculateKSYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,4,coarseSpin>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
     } else if (coarseColor == 8) {
       calculateKSYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,8,coarseSpin>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
     } else if (coarseColor == 16) {
@@ -64,7 +66,7 @@ namespace quda {
     } else if (coarseColor == 32) {
       calculateKSYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,32,coarseSpin>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
     } else {
-      errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
+      errorQuda("Unsupported number of coarse dof %d (%d)\n", Y.Ncolor(), coarseColor);
     }
   }
 
@@ -87,6 +89,8 @@ namespace quda {
 			const GaugeField &cloverInv, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
     if (g.Ncolor()/T.Vectors().Nspin() == 2) {
       calculateKSYcoarse<Float,csOrder,gOrder,2>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
+    } else if (g.Ncolor()/T.Vectors().Nspin() == 4) {
+      calculateKSYcoarse<Float,csOrder,gOrder,4>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 8) {
       calculateKSYcoarse<Float,csOrder,gOrder,8>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 16) {
@@ -96,7 +100,7 @@ namespace quda {
     } else if (g.Ncolor()/T.Vectors().Nspin() == 32) {
       calculateKSYcoarse<Float,csOrder,gOrder,32>(Y, X, Xinv, Yhat, uv, T, g, clover, cloverInv, mass, dirac, matpc);
     } else {
-      errorQuda("Unsupported number of colors %d\n", g.Ncolor());
+      errorQuda("Unsupported number of colors %d (%d)\n", g.Ncolor(), T.Vectors().Nspin());
     }
   }
 

@@ -210,8 +210,8 @@ namespace quda {
 	  for (int s=0; s<in.Nspin(); s++) {
 	    for (int c=0; c<in.Ncolor(); c++) {
 	      
-	      int chirality =  in.Nspin() != 1 ?  s / spin_bs : 1; // chirality is the coarse spin
-	      int blockSpin =  in.Nspin() != 1 ?  s % spin_bs : 1; // the remaining spin dof left in each block
+	      int chirality =  s / spin_bs; // chirality is the coarse spin
+	      int blockSpin =  s % spin_bs; // the remaining spin dof left in each block
 	      
 	      int index = offset +                                              // geo block
 		chirality * nVec * geoBlockSize * spin_bs * in.Ncolor() + // chiral block
@@ -252,7 +252,7 @@ namespace quda {
   // N.B.: same as above but parity are separated (chirality).
   template <bool toBlock, int nVec, class Complex, class FieldOrder>
   void blockKSOrderV(Complex *out, FieldOrder &in,
-		   const int *geo_map, const int *geo_bs, int spin_bs,
+		   const int *geo_map, const int *geo_bs, 
 		   const cpuColorSpinorField &V) {
     //Compute the size of each block
     int geoBlockSize = 1;
@@ -283,31 +283,20 @@ namespace quda {
 	  blockOffset += y[d];
 	}
         //
-	if(spin_bs != 0) blockOffset /= 2;
+	blockOffset /= 2;
 
 	//Take the block-ordered offset from the coarse grid offset (geo_map) 
 	//A.S.: geo_map introduced for the full site ordering, so ok to use it for the offset
 	int offset = geo_map[i]*nVec*geoBlockSize*in.Ncolor();
-        int index = 0;
 
 	for (int v=0; v<in.Nvec(); v++) {
 	  for (int c=0; c<in.Ncolor(); c++) {
-//
-            if(spin_bs == 0)//we don't block parity components
-            {
-               index = offset +                                // geo block
-                             v * geoBlockSize * in.Ncolor() + // vector
-                                  blockOffset * in.Ncolor() + // local (parity) geometry
-                                                               c;   // color
-            }
-            else
-            {
-	       index = offset +                                // geo block
-	       parity * nVec * geoBlockSizeCB * in.Ncolor() + // chiral block
-	                     v * geoBlockSizeCB * in.Ncolor() + // vector
-	                          blockOffset * in.Ncolor() + // local (parity) geometry
-	                                                       c;   // color
-            } 
+
+	    int index = offset +                                // geo block
+	                parity * nVec * geoBlockSizeCB * in.Ncolor() + // chiral block
+	                v * geoBlockSizeCB * in.Ncolor() + // vector
+	                blockOffset * in.Ncolor() + // local (parity) geometry
+	                c;   // color
 
 	    if (toBlock) out[index] = in(parity, x_cb, 0, c, v); // going to block order
 	    else in(parity, x_cb, 0, c, v) = out[index]; // coming from block order
@@ -430,7 +419,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if(!parity_blocks) blockOrderV<toBlock,N,complex<real>,Order>(vBlock,vOrder,geo_map,geo_bs,spin_bs,V);
-        else               blockKSOrderV<toBlock,N,complex<real>,Order>(vBlock,vOrder,geo_map,geo_bs,spin_bs,V);
+        else               blockKSOrderV<toBlock,N,complex<real>,Order>(vBlock,vOrder,geo_map,geo_bs,V);
       } else {
 	errorQuda("Not implemented for GPU");
       }

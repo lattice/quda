@@ -187,6 +187,9 @@ namespace quda {
     cpuGaugeField *l = nullptr;
 
     //Copy the cuda gauge field to the cpu
+/* WARNING!
+set QUDA_REORDER_LOCATION to CPU to perform re-ordering on CPU (GPU reordering does not work, bug??)
+*/
     fat_links->saveCPUField(*f);
 
     //Create a field UV which holds U*V.  Has the same structure as V.

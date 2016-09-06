@@ -6,12 +6,12 @@
 #include <multigrid_helper.cuh>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
-#define SWIZZLE
+//#define SWIZZLE
 
 namespace quda {
 
 #ifdef GPU_MULTIGRID
-#define STAGG_CPU_DEBUG
+//#define STAGG_CPU_DEBUG
 
   using namespace quda::colorspinor;
 
@@ -45,6 +45,7 @@ namespace quda {
   };
 
 #ifndef STAGG_CPU_DEBUG
+//#if 0
   /**
      Rotates from the fine-color basis into the coarse-color basis.
      A.S.: also works for staggered (fineSpin = 1)
@@ -101,8 +102,12 @@ namespace quda {
     const int spinor_parity = (nParity == 2) ? parity : 0;
     const int v_parity = (V.Nparity() == 2) ? parity : 0;
     *out = 0.0;
+#pragma unroll
     for (int j = 0; j < fineColor; j++) {
-	*out += conj(V(v_parity, x_cb, 0/*s=0*/, j, c_coarse)) * in(spinor_parity, x_cb, 0/*s=0*/, j);
+#pragma unroll
+      for (int s = 0; s < fineSpin; s++) {
+	*out += conj(V(v_parity, x_cb, s, j, c_coarse)) * in(spinor_parity, x_cb, s, j);
+      }
     }
   }
 
@@ -519,7 +524,8 @@ namespace quda {
     fineSpinor   In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
-#ifndef STAGG_CPU_DEBUG
+//#ifndef STAGG_CPU_DEBUG
+#if 0
     // for fine grids (Nc=3) have more parallelism so can use more coarse strategy
     constexpr int coarse_colors_per_thread = fineColor == 3 ? 8 : 2;
 #else
@@ -579,6 +585,37 @@ namespace quda {
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
       }
+    } else if (in.Ncolor() == 4) {
+      const int fineColor = 4;
+      if (nVec == 4) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 8) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+#if 0
+      } else if (nVec == 12) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,12,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 24) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+#endif
+      } else {
+        errorQuda("Unsupported nVec %d", nVec);
+      }
+    } else if (in.Ncolor() == 8) {
+      const int fineColor = 8;
+      if (nVec == 4) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 8) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+#if 0
+      } else if (nVec == 12) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,12,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 24) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+#endif
+      } else {
+        errorQuda("Unsupported nVec %d", nVec);
+      }
+#if 0
     } else if (in.Ncolor() == 24) { // to keep compilation under control coarse grids have same or more colors
       const int fineColor = 24;
       if (nVec == 24) {
@@ -595,6 +632,7 @@ namespace quda {
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
       }
+#endif
     } else {
       errorQuda("Unsupported nColor %d", in.Ncolor());
     }

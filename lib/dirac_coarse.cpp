@@ -3,6 +3,7 @@
 #include <algorithm>
 
 const bool staggered_dslash_emulation =  false;
+const bool coarsecoarse_dslash_emulation = true;
 
 namespace quda {
 
@@ -187,7 +188,7 @@ namespace quda {
     bool is_staggered = false;
     if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
 
-    if(is_staggered && staggered_dslash_emulation)
+    if((is_staggered && staggered_dslash_emulation) || coarsecoarse_dslash_emulation)
     {
         bool single_parity_application = false;
         bool cg_mdagm_operator         = false;
@@ -213,7 +214,7 @@ namespace quda {
         ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
         ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
 
-        csParam.extendDimensionality();
+        if(is_staggered) csParam.extendDimensionality();
 
         ColorSpinorField *tmp5 = ColorSpinorField::Create(csParam);
         ColorSpinorField *tmp6 = ColorSpinorField::Create(csParam);

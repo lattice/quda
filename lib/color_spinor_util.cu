@@ -151,10 +151,10 @@ namespace quda {
 
   }
 
-  template<typename Float>
+  template<typename Float, int fineSpin>
   void generate2DU1Vector(cpuColorSpinorField &a, std::ranlux24 &gen) {
      if(a.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) errorQuda("\nIncorrect feild order (%d) or null vector index (%d).\n", a.FieldOrder());
-     quda::colorspinor::FieldOrderCB<Float,1,3,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> aOrder(static_cast<ColorSpinorField&>(a));
+     quda::colorspinor::FieldOrderCB<Float,fineSpin,3,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> aOrder(static_cast<ColorSpinorField&>(a));
 
      //blas::zero(a);
      warningQuda("\nProcessing 2d null vector.");
@@ -181,12 +181,16 @@ namespace quda {
 
   void generic2DSource(cpuColorSpinorField &a) {
 
-    if(a.Nspin() != 1) errorQuda("\nUnsupported spin\n");
+    if(a.Nspin() == 4) errorQuda("\nUnsupported spin\n");
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      generate2DU1Vector<double>(a, rn_gen);
+      if     ( a.Nspin() == 1 ) generate2DU1Vector<double, 1>(a, rn_gen);
+      else if( a.Nspin() == 2 ) generate2DU1Vector<double, 2>(a, rn_gen);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      generate2DU1Vector<float>(a, rn_gen);      
+  
+      if     ( a.Nspin() == 1 ) generate2DU1Vector<float, 1>(a, rn_gen);
+      else if( a.Nspin() == 2 ) generate2DU1Vector<float, 2>(a, rn_gen);
+      
     } else {
       errorQuda("Precision not supported");
     }

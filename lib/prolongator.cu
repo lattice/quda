@@ -8,7 +8,7 @@
 namespace quda {
 
 #ifdef GPU_MULTIGRID
-#define STAGG_CPU_DEBUG
+//#define STAGG_CPU_DEBUG
   using namespace quda::colorspinor;
   
   /** 
@@ -447,6 +447,24 @@ namespace quda {
 	Prolongate<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, parity);
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
+      }
+    } else if (out.Ncolor() == 4) {
+      const int fineColor = 4;
+      if (nVec == 4) { // these are probably only for debugging only
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 8) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, parity);
+      } else {
+        errorQuda("Unsupported nVec %d", nVec);
+      }
+    } else if (out.Ncolor() == 8) {
+      const int fineColor = 8;
+      if (nVec == 4) { // these are probably only for debugging only
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 8) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, parity);
+      } else {
+        errorQuda("Unsupported nVec %d", nVec);
       }
     } else if (out.Ncolor() == 24) {
       const int fineColor = 24;
