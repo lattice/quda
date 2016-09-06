@@ -29,7 +29,7 @@
 
 extern void usage(char** argv);
 void *qdp_fatlink[4];
-void *qdp_longlink[4];
+void *qdp_longlink[4];  
 
 void *fatlink;
 void *longlink;
@@ -73,7 +73,6 @@ extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 
-extern double mass;
 
 static void end();
 
@@ -97,7 +96,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
     int X1, int  X2, int X3, int X4,
     QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
     QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
-    double mass, double tol, int maxiter, double reliable_delta,
+    double mass, double tol, double reliable_delta,
     double tadpole_coeff
     )
 {
@@ -106,9 +105,9 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->X[2] = X3;
   gaugeParam->X[3] = X4;
 
-  gaugeParam->cpu_prec = cpu_prec;
+  gaugeParam->cpu_prec = cpu_prec;    
   gaugeParam->cuda_prec = prec;
-  gaugeParam->reconstruct = link_recon;
+  gaugeParam->reconstruct = link_recon;  
   gaugeParam->cuda_prec_sloppy = prec_sloppy;
   gaugeParam->reconstruct_sloppy = link_recon_sloppy;
   gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
@@ -130,14 +129,14 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // outer solver parameters
   inv_param->inv_type = inv_type;
   inv_param->tol = tol;
-  inv_param->tol_restart = 1e-3; //now theoretical background for this parameter...
+  inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
   inv_param->maxiter = niter;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
 
   inv_param->Ls = Nsrc;
-
+  
   if(tol_hq == 0 && tol == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
@@ -148,8 +147,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param->residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param->residual_type;
 
   inv_param->tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
-
-  inv_param->Nsteps = 2;
+ 
+  inv_param->Nsteps = 2; 
 
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
@@ -160,7 +159,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
-  inv_param->cuda_prec_precondition = QUDA_HALF_PRECISION;
+  inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
 
   inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -169,7 +168,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
   inv_param->cpu_prec = cpu_prec;
-  inv_param->cuda_prec = prec;
+  inv_param->cuda_prec = prec; 
   inv_param->cuda_prec_sloppy = prec_sloppy;
   inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
@@ -195,8 +194,7 @@ invert_test(void)
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
       cpu_prec, prec, prec_sloppy,
-      link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
-      0.8);
+      link_recon, link_recon_sloppy, mass, tol, 1e-3, 0.8);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -213,7 +211,7 @@ invert_test(void)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
+  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, 
 				 &gaugeParam, dslash_type);
 
   for(int dir=0; dir<4; ++dir){
@@ -245,14 +243,14 @@ invert_test(void)
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  in = new cpuColorSpinorField(csParam);
-  out = new cpuColorSpinorField(csParam);
-  ref = new cpuColorSpinorField(csParam);
-  tmp = new cpuColorSpinorField(csParam);
+  csParam.create = QUDA_ZERO_FIELD_CREATE;  
+  in = new cpuColorSpinorField(csParam);  
+  out = new cpuColorSpinorField(csParam);  
+  ref = new cpuColorSpinorField(csParam);  
+  tmp = new cpuColorSpinorField(csParam);  
 
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    constructSpinorField((float*)in->V());
+    constructSpinorField((float*)in->V());    
   }else{
     constructSpinorField((double*)in->V());
   }
@@ -266,7 +264,7 @@ invert_test(void)
   int link_pad =  3*tmp_value;
 
   // FIXME: currently assume staggered is SU(3)
-  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ?
+  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
@@ -283,8 +281,8 @@ invert_test(void)
   int fat_pad = 0;
   int link_pad = 0;
 #endif
-
-  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ?
+  
+  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
@@ -293,7 +291,8 @@ invert_test(void)
   } else {
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
-  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
+  gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
+  gaugeParam.reconstruct_precondition = gaugeParam.reconstruct_sloppy;
   loadGaugeQuda(fatlink, &gaugeParam);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -301,6 +300,8 @@ invert_test(void)
     gaugeParam.ga_pad = link_pad;
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
+    gaugeParam.reconstruct_precondition = gaugeParam.reconstruct_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);
   }
 
@@ -324,11 +325,11 @@ invert_test(void)
 
       invertQuda(out->V(), in->V(), &inv_param);
 
-      time0 += clock();
+      time0 += clock(); 
       time0 /= CLOCKS_PER_SEC;
 
-#ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+#ifdef MULTI_GPU    
+      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
           out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
@@ -349,15 +350,15 @@ invert_test(void)
       }
 
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
-      invertQuda(out->V(), in->V(), &inv_param);
+      invertQuda(out->V(), in->V(), &inv_param);	
       time0 += clock(); // stop the timer
       time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
           out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
 #else
-      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);
+      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);	
 #endif
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
@@ -375,7 +376,7 @@ invert_test(void)
 
 #define NUM_OFFSETS 12
 
-      {
+      {    
         double masses[NUM_OFFSETS] ={0.06, 0.061, 0.064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
         inv_param.num_offset = NUM_OFFSETS;
         // these can be set independently
@@ -386,9 +387,9 @@ invert_test(void)
         void* outArray[NUM_OFFSETS];
 
         cpuColorSpinorField* spinorOutArray[NUM_OFFSETS];
-        spinorOutArray[0] = out;
+        spinorOutArray[0] = out;    
         for(int i=1;i < inv_param.num_offset; i++){
-          spinorOutArray[i] = new cpuColorSpinorField(csParam);
+          spinorOutArray[i] = new cpuColorSpinorField(csParam);       
         }
 
         for(int i=0;i < inv_param.num_offset; i++){
@@ -397,18 +398,18 @@ invert_test(void)
         }
 
         if (test_type == 3) {
-          inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+          inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
         } else {
-          inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
+          inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
         }
 
-        invertMultiShiftQuda(outArray, in->V(), &inv_param);
+        invertMultiShiftQuda(outArray, in->V(), &inv_param);	
 
         cudaDeviceSynchronize();
         time0 += clock(); // stop the timer
         time0 /= CLOCKS_PER_SEC;
 
-        printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n",
+        printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n", 
             time0, inv_param.secs, inv_param.iter, inv_param.secs,
             inv_param.gflops/inv_param.secs);
 
@@ -429,8 +430,8 @@ invert_test(void)
         for(int i=0;i < inv_param.num_offset;i++){
           printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU
-          matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-              spinorOutArray[i], masses[i], 0, inv_param.cpu_prec,
+          matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+              spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, 
               gaugeParam.cpu_prec, tmp, parity);
 #else
           matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
@@ -441,9 +442,9 @@ invert_test(void)
 	  double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
 	  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
 	  double l2r = sqrt(nrm2/src2);
-
+	
 	  printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r,
+		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
 		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
 
 	  //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
@@ -469,7 +470,7 @@ invert_test(void)
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
         inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
-    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n",
+    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
         time0, inv_param.secs, inv_param.iter, inv_param.secs,
         inv_param.gflops/inv_param.secs);
   }
@@ -481,7 +482,7 @@ invert_test(void)
 
 
   static void
-end(void)
+end(void) 
 {
   for(int i=0;i < 4;i++){
     free(qdp_fatlink[i]);
@@ -511,15 +512,15 @@ display_test_info()
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
   printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n",
       get_prec_str(prec),get_prec_str(prec_sloppy),
-      get_recon_str(link_recon),
-      get_recon_str(link_recon_sloppy), get_test_type(test_type), xdim, ydim, zdim, tdim);
+      get_recon_str(link_recon), 
+      get_recon_str(link_recon_sloppy), get_test_type(test_type), xdim, ydim, zdim, tdim);     
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n",
+  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("                         %d  %d  %d  %d\n", 
       dimPartitioned(0),
       dimPartitioned(1),
       dimPartitioned(2),
-      dimPartitioned(3));
+      dimPartitioned(3)); 
 
   return ;
 
@@ -544,7 +545,7 @@ int main(int argc, char** argv)
 
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
-    }
+    }   
 
 
 
@@ -577,7 +578,7 @@ int main(int argc, char** argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
-
+  
   printfQuda("dslash_type = %d\n", dslash_type);
 
   int ret = invert_test();

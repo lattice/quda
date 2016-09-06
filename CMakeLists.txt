@@ -103,7 +103,7 @@ set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 #######################################################################
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
-set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
+set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 
 # NVTX options
@@ -124,7 +124,7 @@ set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
-mark_as_advanced(QUDA_NUMA_AFFINITY)
+mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 
 mark_as_advanced(QUDA_MPI_NVTX)
@@ -346,12 +346,15 @@ if(DEVICE_PACK)
   add_definitions(-DDEVICE_PACK)
 endif(DEVICE_PACK)
 
-if(NOT ${APPLE})
-  if(QUDA_NUMA_AFFINITY)
-    add_definitions(-DNUMA_AFFINITY)
-    set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
-  endif(QUDA_NUMA_AFFINITY)
-endif(NOT ${APPLE})
+
+
+if(QUDA_NUMA_NVML)
+  add_definitions(-DNUMA_NVML)
+  set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
+  find_package(NVML REQUIRED)
+  include_directories(NVML_INCLUDE_DIR)
+endif(QUDA_NUMA_NVML)
+
 
 if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)

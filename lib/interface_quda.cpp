@@ -30,7 +30,7 @@
 
 #include <multigrid.h>
 
-#ifdef NUMA_AFFINITY
+#ifdef NUMA_NVML
 #include <numa_affinity.h>
 #endif
 
@@ -76,7 +76,7 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #include <momentum.h>
 
-int numa_affinity_enabled = 1;
+const int numa_affinity_enabled = 1;
 
 using namespace quda;
 
@@ -423,11 +423,12 @@ void initQudaDevice(int dev) {
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
-#ifdef NUMA_AFFINITY
-  if(numa_affinity_enabled){
-    setNumaAffinity(dev);
-  }
-#endif
+if(numa_affinity_enabled){
+  #if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
+  setNumaAffinityNVML(dev);
+  #endif
+}
+
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
@@ -483,7 +484,7 @@ void initQudaMemory()
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
   cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
-  loadTuneCache(getVerbosity());
+  loadTuneCache();
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 
@@ -746,7 +747,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // determines whether operator is preconditioned when calling invertQuda()
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE || 
+      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
       inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
 
   // determines whether operator is preconditioned when calling MatQuda() or MatDagMatQuda()
@@ -1196,8 +1197,8 @@ void endQuda(void)
   destroyStaggeredOprodEvents();
 #endif
 
-  saveTuneCache(getVerbosity());
-  saveProfile(getVerbosity());
+  saveTuneCache();
+  saveProfile();
 
   initialized = false;
 
@@ -2137,7 +2138,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 
   popVerbosity();
 
-  saveTuneCache(getVerbosity());
+  saveTuneCache();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -2218,6 +2219,9 @@ void* newMultigridQuda(QudaMultigridParam *mg_param) {
 
   closeMagma();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  saveProfile(__func__);
+  flushProfile();
   return static_cast<void*>(mg);
 }
 
@@ -2481,8 +2485,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   popVerbosity();
 
-  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -2848,7 +2852,7 @@ for(int i=0; i < param->num_src; i++) {
   popVerbosity();
 
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
+  saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -3193,8 +3197,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   popVerbosity();
 
-  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
 
   profileMulti.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -3452,8 +3456,8 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   closeMagma();
 
- // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache(getVerbosity());
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }

@@ -370,9 +370,18 @@ namespace quda {
 
   };
 
-  void loadTuneCache(QudaVerbosity verbosity);
-  void saveTuneCache(QudaVerbosity verbosity);
-  void saveProfile(QudaVerbosity verbosity);
+  void loadTuneCache();
+  void saveTuneCache();
+
+  /**
+   * @brief Save profile to disk.
+   */
+  void saveProfile(const std::string label = "");
+
+  /**
+   * @brief Flush profile contents, setting all counts to zero.
+   */
+  void flushProfile();
 
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 

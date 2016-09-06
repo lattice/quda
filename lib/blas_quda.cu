@@ -595,7 +595,6 @@ namespace quda {
       Float2 a, b;
       tripleCGUpdate_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
-      //{ y -= a.x*x; z += a.x*w; w = y + b.x*w; }
       { y += a.x*w; z -= a.x*x; w = z + b.x*w; }
       static int streams() { return 7; } //! total number of input and output streams
       static int flops() { return 6; } //! flops per element

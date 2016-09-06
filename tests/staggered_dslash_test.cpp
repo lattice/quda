@@ -51,7 +51,7 @@ void *hostGauge[4];
 void *fatlink[4], *longlink[4];
 
 #ifdef MULTI_GPU
-const void **ghost_fatlink, **ghost_longlink;
+void **ghost_fatlink, **ghost_longlink;
 #endif
 
 QudaParity parity = QUDA_EVEN_PARITY;
@@ -372,7 +372,7 @@ void staggeredDslashRef()
   switch (test_type) {
     case 0:
 #ifdef MULTI_GPU
-      staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
+      staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink,
 			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
       staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
@@ -380,7 +380,7 @@ void staggeredDslashRef()
       break;
     case 1:
 #ifdef MULTI_GPU
-      matdagmat_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink,
+      matdagmat_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink,
 		       spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu, parity);
 #else
       matdagmat(spinorRef->V(), fatlink, longlink, spinor->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu->V(), parity);

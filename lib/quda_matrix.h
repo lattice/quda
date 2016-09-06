@@ -69,6 +69,7 @@ namespace quda {
     };
 
 
+
   template<class T>
     struct Zero
     {
@@ -126,6 +127,8 @@ namespace quda {
         T data[N*N];
 
 	__device__ __host__ Matrix() { for (int i=0; i<N*N; i++) zero(data[i]); }
+
+	__device__ __host__ Matrix(const T data_[]) { for (int i=0; i<N*N; i++) data[i] = data_[i]; }
 
         __device__ __host__ inline T const & operator()(int i, int j) const{
           return data[index<N>(i,j)];

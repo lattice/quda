@@ -249,21 +249,19 @@ PUSH_RANGE("LinearAlgebra",2)
       if ( !(updateR || updateX )) {
         beta = sigma / r2_old;  // use the alternative beta computation
 
-        if (param.pipeline && !breakdown)
-          blas::tripleCGUpdate(alpha, beta, Ap, rSloppy, xSloppy, p);
-        else
-          blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
 
+        if (param.pipeline && !breakdown) blas::tripleCGUpdate(alpha, beta, Ap, xSloppy, rSloppy, p);
+	else blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
 
-        if (use_heavy_quark_res && (k % heavy_quark_check) == 0) {
-          if (&x != &xSloppy) {
-            blas::copy(tmp, y);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
-          } else {
-            blas::copy(r, rSloppy);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
-          }
-        }
+	if (use_heavy_quark_res && k%heavy_quark_check==0) {
+	  if (&x != &xSloppy) {
+	    blas::copy(tmp,y);
+	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+	  } else {
+	    blas::copy(r, rSloppy);
+	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+	  }
+	}
 
         steps_since_reliable++;
       } else {
