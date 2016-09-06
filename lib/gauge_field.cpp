@@ -271,29 +271,14 @@ namespace quda {
      errorQuda("Not implemented for this order %d", a.FieldOrder());
 
     if (a.LinkType() == QUDA_COARSE_LINKS) errorQuda("Not implemented for coarse-link type");
-
-    int spin = 0;
-    switch (a.Geometry()) {
-    case QUDA_SCALAR_GEOMETRY:
-    case QUDA_TENSOR_GEOMETRY:
-      spin = 1;
-      break;
-    case QUDA_VECTOR_GEOMETRY:
-      spin = a.Ndim();
-      break;
-    default:
-      errorQuda("Unsupported field geometry %d", a.Geometry());
-    }
+    if (a.Ncolor() != 3) errorQuda("Not implemented for Ncolor = %d", a.Ncolor());
 
     if (a.Precision() == QUDA_HALF_PRECISION)
       errorQuda("Casting a GaugeField into ColorSpinorField not possible in half precision");
 
-    if (a.Reconstruct() == QUDA_RECONSTRUCT_13 || a.Reconstruct() == QUDA_RECONSTRUCT_9)
-      errorQuda("Unsupported field reconstruct %d", a.Reconstruct());
-
     ColorSpinorParam spinor_param;
-    spinor_param.nColor = a.Reconstruct()/2 * (a.Geometry() == QUDA_TENSOR_GEOMETRY ? 6 : 1);
-    spinor_param.nSpin = spin;
+    spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;
+    spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
     spinor_param.precision = a.Precision();

@@ -8,7 +8,7 @@
 namespace quda {
 
   cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
-    GaugeField(param)
+    GaugeField(param), backed_up(false)
   {
     if (precision == QUDA_HALF_PRECISION) {
       errorQuda("CPU fields do not support half precision");
@@ -259,6 +259,42 @@ namespace quda {
 		"QUDA_REFERENCE_FIELD_CREATE type\n");
     }
     gauge = gauge_;
+  }
+
+  void cpuGaugeField::backup() const {
+    if (backed_up) errorQuda("Gauge field already backed up");
+
+    if (order == QUDA_QDP_GAUGE_ORDER) {
+      char **buffer = new char*[geometry];
+      for (int d=0; d<geometry; d++) {
+	buffer[d] = new char[bytes/geometry];
+	memcpy(buffer[d], gauge[d], bytes/geometry);
+      }
+      backup_h = reinterpret_cast<char*>(buffer);
+    } else {
+      backup_h = new char[bytes];
+      memcpy(backup_h, gauge, bytes);
+    }
+
+    backed_up = true;
+  }
+
+  void cpuGaugeField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+
+    if (order == QUDA_QDP_GAUGE_ORDER) {
+      char **buffer = reinterpret_cast<char**>(backup_h);
+      for (int d=0; d<geometry; d++) {
+	memcpy(gauge[d], buffer[d], bytes/geometry);
+	delete []buffer[d];
+      }
+      delete []buffer;
+    } else {
+      memcpy(gauge, backup_h, bytes);
+      delete []backup_h;
+    }
+
+    backed_up = false;
   }
 
   void cpuGaugeField::zero() {

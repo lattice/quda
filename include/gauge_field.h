@@ -242,9 +242,14 @@ namespace quda {
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
 
-    const void** Ghost() const { 
+    const void** Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return (const void**)ghost; 
+      return (const void**)ghost;
+    }
+
+    void** Ghost() {
+      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
+      return ghost;
     }
 
     /**
@@ -257,6 +262,16 @@ namespace quda {
      * @param[in] src Source from which we are copying
      */
     virtual void copy(const GaugeField &src) = 0;
+
+    /**
+       @brief Backs up the cpuGaugeField
+    */
+    virtual void backup() const = 0;
+
+    /**
+       @brief Restores the cpuGaugeField
+    */
+    virtual void restore() = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -327,9 +342,15 @@ namespace quda {
 
     mutable char *backup_h;
     mutable bool backed_up;
-    // backs up the cudaGaugeField to CPU memory
+
+    /**
+       @brief Backs up the cudaGaugeField to CPU memory
+    */
     void backup() const;
-    // restores the cudaGaugeField to CUDA memory
+
+    /**
+       @brief Restores the cudaGaugeField to CUDA memory
+    */
     void restore();
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
@@ -382,6 +403,20 @@ namespace quda {
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
+
+    mutable char *backup_h;
+    mutable bool backed_up;
+
+    /**
+     @brief Backs up the cpuGaugeField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cpuGaugeField
+    */
+    void restore();
+
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**

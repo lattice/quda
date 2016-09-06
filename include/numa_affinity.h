@@ -1,14 +1,10 @@
-#ifndef __NUMA_AFFINITY_H__
-#define __NUMA_AFFINITY_H__
+#pragma once
 
-#ifdef __cplusplus
-	extern "C" {
-#endif
-	  
-	  int setNumaAffinity(int);
-	  
-#ifdef __cplusplus 
-}
-#endif
 
-#endif
+/**
+ * sets the cpu affinity of the calling process to the affinity mask reported by nvidia-smi topo
+ * Note that older driver versions might pin all mpi ranks to the same single conre instead of a range
+ * @param  deviceid gpu to determine affinity for
+ * @return          0 if numa affinity was set
+ */
+int setNumaAffinityNVML(int deviceid);

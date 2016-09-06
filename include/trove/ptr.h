@@ -69,10 +69,6 @@ struct coalesced_ptr {
     __device__ trove::detail::coalesced_ref<T> operator[](const I& idx) {
         return trove::detail::coalesced_ref<T>(m_ptr + idx);
     }
-    template<typename I>
-    __device__ trove::detail::coalesced_ref<T> operator[](const I& idx) const {
-        return trove::detail::coalesced_ref<T>(m_ptr + idx);
-    }
     __device__ operator T*() {
         return m_ptr;
     }

@@ -1,5 +1,8 @@
 namespace quda {
 
+  // For coarsening un-preconditioned operators we use uni-directional
+  // coarsening to reduce the set up code.  For debugging we can force
+  // bi-directional coarsening.
   static bool bidirectional_debug = false;
 
   template <typename Float, typename coarseGauge, typename fineGauge, typename fineSpinor,
@@ -901,6 +904,9 @@ namespace quda {
   protected:
     Arg &arg;
     const ColorSpinorField &meta;
+    GaugeField &Y;
+    GaugeField &X;
+    GaugeField &Xinv;
 
     int dim;
     QudaDirection dir;
@@ -913,24 +919,24 @@ namespace quda {
       switch (type) {
       case COMPUTE_UV:
 	// when fine operator is coarse take into account that the link matrix has spin dependence
-	flops_ = 2*arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * !from_coarse ? 1 : fineSpin;
+	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * !from_coarse ? 1 : fineSpin;
 	break;
       case COMPUTE_AV:
       case COMPUTE_TMAV:
 	// # chiral blocks * size of chiral block * number of null space vectors
-	flops_ = 2*arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
+	flops_ = 2l * arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
       case COMPUTE_TMCAV:
 	// # Twice chiral blocks * size of chiral block * number of null space vectors
-	flops_ = 4*arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
+	flops_ = 4l * arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
       case COMPUTE_VUV:
 	// when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
-	flops_ = 2*arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
+	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
       case COMPUTE_COARSE_CLOVER:
 	// when the fine operator is truly fine the clover multiplication is block sparse which halves the number of operations
-	flops_ = 2*arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / (!from_coarse ? coarseSpin : 1);
+	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
       case COMPUTE_REVERSE_Y:
 	// no floating point operations
@@ -938,12 +944,12 @@ namespace quda {
 	break;
       case COMPUTE_COARSE_LOCAL:
 	// complex addition over all components
-	flops_ = 2*arg.coarseVolumeCB*coarseSpin*coarseSpin*coarseColor*coarseColor*2;
+	flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseSpin*coarseColor*coarseColor*2;
 	break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
 	// read addition on the diagonal
-	flops_ = 2*arg.coarseVolumeCB*coarseSpin*coarseColor;
+	flops_ = 2l * arg.coarseVolumeCB*coarseSpin*coarseColor;
 	break;
       default:
 	errorQuda("Undefined compute type %d", type);
@@ -1010,10 +1016,10 @@ namespace quda {
     }
 
   public:
-    CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta)
+    CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Xinv)
       : TunableVectorY(2), arg(arg), type(COMPUTE_INVALID),
 	bidirectional(dirac==QUDA_CLOVERPC_DIRAC || dirac==QUDA_COARSEPC_DIRAC || dirac==QUDA_TWISTED_MASSPC_DIRAC || dirac==QUDA_TWISTED_CLOVERPC_DIRAC ||  bidirectional_debug),
-	meta(meta), dim(0), dir(QUDA_BACKWARDS)
+	meta(meta), Y(Y), X(X), Xinv(Xinv), dim(0), dir(QUDA_BACKWARDS)
     {
       strcpy(aux, meta.AuxString());
 #ifdef MULTI_GPU
@@ -1030,6 +1036,8 @@ namespace quda {
     virtual ~CalculateY() { }
 
     void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 
 	if (type == COMPUTE_UV) {
@@ -1123,6 +1131,11 @@ namespace quda {
      */
     void setComputeType(ComputeType type_) { type = type_; }
 
+    bool advanceTuneParam(TuneParam &param) const {
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) return Tunable::advanceTuneParam(param);
+      else return false;
+    }
+
     TuneKey tuneKey() const {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
@@ -1149,9 +1162,53 @@ namespace quda {
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
       }
 
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) strcat(Aux,",GPU");
+      else strcat(Aux,",CPU");
+
       return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
     }
 
+    void preTune() {
+      switch (type) {
+      case COMPUTE_VUV:
+	Y.backup();
+	Xinv.backup();
+      case COMPUTE_COARSE_LOCAL:
+      case COMPUTE_DIAGONAL:
+      case COMPUTE_TMDIAGONAL:
+	X.backup();
+      case COMPUTE_UV:
+      case COMPUTE_AV:
+      case COMPUTE_TMAV:
+      case COMPUTE_TMCAV:
+      case COMPUTE_COARSE_CLOVER:
+      case COMPUTE_REVERSE_Y:
+	break;
+      default:
+	errorQuda("Undefined compute type %d", type);
+      }
+    }
+
+    void postTune() {
+      switch (type) {
+      case COMPUTE_VUV:
+	Y.restore();
+	Xinv.restore();
+      case COMPUTE_COARSE_LOCAL:
+      case COMPUTE_DIAGONAL:
+      case COMPUTE_TMDIAGONAL:
+	X.restore();
+      case COMPUTE_UV:
+      case COMPUTE_AV:
+      case COMPUTE_TMAV:
+      case COMPUTE_TMCAV:
+      case COMPUTE_COARSE_CLOVER:
+      case COMPUTE_REVERSE_Y:
+	break;
+      default:
+	errorQuda("Undefined compute type %d", type);
+      }
+    }
   };
 
 
@@ -1284,7 +1341,7 @@ namespace quda {
 
     typedef CalculateYArg<Float,coarseGauge,fineGauge,F,Ftmp,fineClover> Arg;
     Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, x_size, xc_size, geo_bs, spin_bs);
-    CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v);
+    CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v, Y_, X_, Xinv_);
 
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
@@ -1424,7 +1481,7 @@ namespace quda {
 
     {
       // use spin-ignorant accessor to make multiplication simpler
-      // alse with new accessor we ensure we're accessing the same ghost buffer in Y_ as was just exchanged
+      // also with new accessor we ensure we're accessing the same ghost buffer in Y_ as was just exchanged
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,1,gOrder> gCoarse;
       gCoarse yAccessor(const_cast<GaugeField&>(Y_));
       gCoarse yHatAccessor(const_cast<GaugeField&>(Yhat_));

@@ -477,30 +477,7 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu)
-  {
-    QudaFieldLocation pack_location = reorder_location();
-
-    if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
-
-      void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
-      if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
-	for (int d=0; d<geometry; d++) qudaMemcpy(((void**)buffer)[d], ((void**)cpu.gauge)[d], cpu.Bytes()/geometry, cudaMemcpyHostToDevice);
-      } else {
-	qudaMemcpy(buffer, cpu.gauge, cpu.Bytes(), cudaMemcpyHostToDevice);
-      }
-      copyGenericGauge(*this, cpu, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
-      free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
-
-    } else if (pack_location == QUDA_CPU_FIELD_LOCATION) {
-
-      copy(cpu);
-
-    } else {
-      errorQuda("Invalid pack location %d", pack_location);
-    }
-
-  }
+  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) { copy(cpu); }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const
   {
@@ -509,13 +486,28 @@ namespace quda {
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
 
       void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
-      copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge);
+
+      // Allocate space for ghost zone if required
+      size_t ghost_bytes[4];
+      int cpuNinternal = cpu.Reconstruct() != QUDA_RECONSTRUCT_NO ? cpu.Reconstruct() : 2*nColor*nColor;
+      for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * cpuNinternal * cpu.Precision();
+      void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, cpu.Order()) : nullptr;
+
+      copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge, ghost_buffer, 0);
+
       if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
 	for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDeviceToHost);
       } else {
 	qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDeviceToHost);
       }
+
+      if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
+	  cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+	for (int d=0; d<4; d++)
+	  qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
+
       free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
+      if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order());
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
 

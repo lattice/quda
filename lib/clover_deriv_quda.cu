@@ -9,53 +9,67 @@
 #include <index_helper.cuh>
 #include <cassert>
 
-namespace quda {
-  
-#ifdef GPU_CLOVER_DIRAC
-  
-  template<class Float, typename Force, typename Gauge, typename Oprod>
-  struct CloverDerivArg
-  {
-    int X[4];
-    int E[4];
-    int border[4];
-    Float coeff;
-    int parity;
-    int volumeCB;
+/**
+   @file clover_deriv_quda.cu
 
-    Force force;
-    Gauge gauge;
-    Oprod oprod;
+   @brief This kernel has been a bit of a pain to optimize since it is
+   excessively register bound.  To reduce register pressure we use
+   shared memory to help offload some of this pressure.  Annoyingly,
+   the optimal approach for CUDA 8.0 is not the same as CUDA 7.5, so
+   implementation is compiler version dependent.  The CUDA 8.0 optimal
+   code runs 10x slower on 7.5, though the 7.5 code runs fine on 8.0.
 
-    bool conjugate;      
+   CUDA >= 8.0
+   - Used shared memory for force accumulator matrix
+   - Template mu / nu to prevent register spilling of indexing arrays
+   - Force the computation routine to inline
 
-    CloverDerivArg(const Force& force, const Gauge& gauge, const Oprod& oprod,
-		   const int *X_, const int *E_,
-		   double coeff, int parity, bool conjugate) :
-      coeff(coeff), parity(parity), volumeCB(force.volumeCB),
-      force(force), gauge(gauge), oprod(oprod), conjugate(conjugate)
-    {
-      for(int dir=0; dir<4; ++dir) {
-	this->X[dir] = X_[dir];
-	this->E[dir] = E_[dir];
-	this->border[dir] = (E_[dir] - X_[dir])/2;
-      }
-    }
-  };
+   CUDA <= 7.5
+   - Used shared memory for force accumulator matrix
+   - Keep mu/nu dynamic and use shared memory to store indexing arrays
+   - Do not inline computation routine
+
+   For the shared-memory dynamic indexing arrays, we use chars, since
+   the array is 4-d, a 4-d coordinate can be stored in a single word
+   which means that we will not have to worry about bank conflicts,
+   and the shared array can be passed to the usual indexing routines
+   (getCoordsExtended and linkIndexShift) with no code changes.  This
+   strategy works as long as each local lattice coordinate is less
+   than 256.
+ */
 
 
+#if (CUDA_VERSION < 8000)
+#define DYNAMIC_MU_NU
+#endif
+
+// Use shared memory for the force accumulator matrix
 #define SHARED_ACCUMULATOR
+
+
+#ifdef DYNAMIC_MU_NU
+
+// When using dynamic mu/nu indexing, to avoid local spills use shared
+// memory for the per thread indexing arrays.
+#define SHARED_ARRAY
+
+#endif // DYNAMIC_MU_NU
+
+
+namespace quda {
 
 #ifdef SHARED_ACCUMULATOR
 
-#define DECLARE_FORCE							\
+#define DECLARE_LINK(U)							\
   extern __shared__ int s[];						\
-  real *force = (real*)s;						\
+  real *U = (real*)s;							\
   {									\
     const int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x; \
     const int block = blockDim.x * blockDim.y * blockDim.z;		\
     for (int i=0; i<18; i++) force[i*block + tid] = 0.0;		\
   }
+
+#define LINK real*
 
   template <typename real, typename Link>
   __device__ inline void axpy(real a, const real *x, Link &y) {
@@ -91,6 +105,10 @@ namespace quda {
 
 #else
 
+#define DECLARE_LINK(U) Link U;
+
+#define LINK Link &
+
   template <typename real, typename Link>
   __device__ inline void axpy(real a, const Link &x, Link &y) { y += a*x;  }
 
@@ -102,26 +120,79 @@ namespace quda {
 
 #endif
 
-#ifdef SHARED_ACCUMULATOR
-  template <typename real, bool isConjugate, typename Arg, int mu, int nu, typename Link>
-  __device__ __forceinline__ void computeForce(real *force, Arg &arg, int xIndex, int yIndex) {
+#if defined(SHARED_ARRAY) && defined(SHARED_ACCUMULATOR)
+
+#define DECLARE_ARRAY(d, idx)						\
+  unsigned char *d;							\
+  {									\
+    extern __shared__ int s[];						\
+    int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x; \
+    int block = blockDim.x*blockDim.y*blockDim.z;			\
+    int offset = 18*block*sizeof(real)/sizeof(int) + idx*block + tid;	\
+    s[offset] = 0;							\
+    d = (unsigned char*)&s[offset];					\
+  }
+#elif defined(SHARED_ARRAY)
+#error Cannot use SHARED_ARRAY with SHARED_ACCUMULATOR
+#else
+#define DECLARE_ARRAY(d, idx)						\
+  int d[4] = {0, 0, 0, 0};
+#endif
+
+
+#ifdef GPU_CLOVER_DIRAC
+
+  template<class Float, typename Force, typename Gauge, typename Oprod>
+  struct CloverDerivArg
+  {
+    int X[4];
+    int E[4];
+    int border[4];
+    Float coeff;
+    int parity;
+    int volumeCB;
+
+    Force force;
+    Gauge gauge;
+    Oprod oprod;
+
+    bool conjugate;
+
+    CloverDerivArg(const Force& force, const Gauge& gauge, const Oprod& oprod,
+		   const int *X_, const int *E_,
+		   double coeff, int parity, bool conjugate) :
+      coeff(coeff), parity(parity), volumeCB(force.volumeCB),
+      force(force), gauge(gauge), oprod(oprod), conjugate(conjugate)
+    {
+      for(int dir=0; dir<4; ++dir) {
+	this->X[dir] = X_[dir];
+	this->E[dir] = E_[dir];
+	this->border[dir] = (E_[dir] - X_[dir])/2;
+      }
+    }
+  };
+
+
+#ifdef DYNAMIC_MU_NU
+  template <typename real, bool isConjugate, typename Arg, typename Link>
+  __device__ void computeForce(LINK force, Arg &arg, int xIndex, int yIndex, int mu, int nu) {
 #else
   template <typename real, bool isConjugate, typename Arg, int mu, int nu, typename Link>
-  __device__ __forceinline__ void computeForce(Link &force, Arg &arg, int xIndex, int yIndex) {
+  __device__ __forceinline__ void computeForce(LINK force, Arg &arg, int xIndex, int yIndex) {
 #endif
 
     int otherparity = (1-arg.parity);
 
-    constexpr int tidx = mu > nu ? (mu-1)*mu/2 + nu : (nu-1)*nu/2 + mu;
+    const int tidx = mu > nu ? (mu-1)*mu/2 + nu : (nu-1)*nu/2 + mu;
 
     if (yIndex == 0) { // do "this" force
 
-      int x[4] = {0, 0, 0, 0};
+      DECLARE_ARRAY(x, 1);
       getCoordsExtended(x, xIndex, arg.X, arg.parity, arg.border);
 
       // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
       {
-	int d[4] = {0, 0, 0, 0};
+	DECLARE_ARRAY(d,0);
 	Link U1, U2, U3, U4, Oprod1, Oprod2;
 
 	// load U(x)_(+mu)
@@ -159,7 +230,7 @@ namespace quda {
       }
  
       {
-	int d[4] = {0, 0, 0, 0};
+	DECLARE_ARRAY(d,0);
 	Link U1, U2, U3, U4, Oprod1, Oprod4;
 
 	// load U(x-nu)(+nu)
@@ -199,11 +270,11 @@ namespace quda {
 
     } else { // else do other force
 
-      int y[4] = {0, 0, 0, 0};
+      DECLARE_ARRAY(y, 1);
       getCoordsExtended(y, xIndex, arg.X, otherparity, arg.border);
 
       {
-	int d[4] = {0, 0, 0, 0};
+	DECLARE_ARRAY(d,0);
 	Link U1, U2, U3, U4, Oprod3, Oprod4;
 
 	// load U(x)_(+mu)
@@ -246,7 +317,7 @@ namespace quda {
       // Lower leaf
       // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
       {
-	int d[4] = {0, 0, 0, 0};
+	DECLARE_ARRAY(d,0);
 	Link U1, U2, U3, U4, Oprod1, Oprod2;
 
 	// load U(x-nu)(+nu)
@@ -291,7 +362,6 @@ namespace quda {
 
   }
 
-
   template<typename real, bool isConjugate, typename Arg>
   __global__ void cloverDerivativeKernel(Arg arg)
   {
@@ -304,12 +374,19 @@ namespace quda {
 
     // mu index is mapped from z thread index
     int mu = threadIdx.z + blockIdx.z*blockDim.z;
+    if (mu >= 4) return;
 
     typedef complex<real> Complex;
     typedef Matrix<Complex,3> Link;
 
-    DECLARE_FORCE;
+    DECLARE_LINK(force);
 
+#ifdef DYNAMIC_MU_NU
+    for (int nu=0; nu<4; nu++) {
+      if (mu==nu) continue;
+      computeForce<real,isConjugate,Arg,Link>(force, arg, index, yIndex, mu, nu);
+    }
+#else
     switch(mu) {
     case 0:
       computeForce<real,isConjugate,Arg,0,1,Link>(force, arg, index, yIndex);
@@ -332,6 +409,7 @@ namespace quda {
       computeForce<real,isConjugate,Arg,3,0,Link>(force, arg, index, yIndex);
       break;
     }
+#endif
 
     // Write to array
     Link F;
@@ -350,7 +428,13 @@ namespace quda {
     Arg arg;
     const GaugeField &meta;
 
+#if defined(SHARED_ACCUMULATOR) && defined(SHARED_ARRAY)
+    unsigned int sharedBytesPerThread() const { return 18*sizeof(Float) + 8; }
+#elif defined(SHARED_ACCUMULATOR)
     unsigned int sharedBytesPerThread() const { return 18*sizeof(Float); }
+#else
+    unsigned int sharedBytesPerThread() const { return 0; }
+#endif
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     unsigned int minThreads() const { return arg.volumeCB; }

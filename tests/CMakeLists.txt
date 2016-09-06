@@ -23,6 +23,10 @@ if(QUDA_MAGMA)
   LIST(APPEND TEST_LIBS ${MAGMA})
 endif()
 
+if(QUDA_NUMA_NVML)
+  LIST(APPEND TEST_LIBS ${NVML_LIBRARY})
+endif()
+
 
 #define tests
 

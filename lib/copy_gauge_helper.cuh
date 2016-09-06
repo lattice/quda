@@ -201,6 +201,10 @@ namespace quda {
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
       }
       size = isGhost ? faceMax : arg.volume/2;
+      if (size == 0 && isGhost) {
+	errorQuda("Cannot copy zero-sized ghost zone.  Check nFace parameter is non-zero for both input and output gauge fields");
+      }
+
 #ifndef FINE_GRAINED_ACCESS
       writeAuxString("out_stride=%d,in_stride=%d,geometry=%d", arg.out.stride, arg.in.stride, arg.in.geometry);
 #endif
@@ -210,7 +214,6 @@ namespace quda {
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#if (__COMPUTE_CAPABILITY__ >= 200)
       if (!isGhost) {
 	copyGaugeKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -218,9 +221,6 @@ namespace quda {
 	copyGhostKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
-#else
-      errorQuda("Gauge copy not supported on pre-Fermi architecture");
-#endif
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -232,7 +232,7 @@ namespace quda {
 	sites = 0;
 	for (int d=0; d<4; d++) sites += arg.faceVolumeCB[d];
       }
-#if __COMPUTE_CAPABILITY__ >= 200 && !defined(FINE_GRAINED_ACCESS)
+#ifndef FINE_GRAINED_ACCESS
       return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
 			    + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
 #else      

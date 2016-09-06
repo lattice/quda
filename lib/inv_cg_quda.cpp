@@ -212,9 +212,8 @@ namespace quda {
 	//beta = r2 / r2_old;
 	beta = sigma / r2_old; // use the alternative beta computation
 
-        if (param.pipeline && !breakdown) blas::tripleCGUpdate(alpha, beta, Ap, rSloppy, xSloppy, p);
+        if (param.pipeline && !breakdown) blas::tripleCGUpdate(alpha, beta, Ap, xSloppy, rSloppy, p);
 	else blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
-
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	  if (&x != &xSloppy) {
