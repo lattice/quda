@@ -9,7 +9,7 @@ using namespace quda ;
 
     SortEvals(double val, int idx) : _val(val), _idx(idx) {};
 
-    static bool CmpEigenNrms (SortEvals v1, SortEvals v2) { return (v1._val < v2._val);}
+    static bool Cmp (SortEvals v1, SortEvals v2) { return (v1._val < v2._val);}
   };
 
   template<typename Float> void arpack_naupd(int &ido, char &bmat, int &n, char *which, int &nev, Float &tol,  std::complex<Float> *resid, int &ncv, std::complex<Float> *v, int &ldv,
@@ -50,11 +50,11 @@ using namespace quda ;
        float _tol = static_cast<float>(tol);
        std::complex<float> _sigma = static_cast<std::complex<float> >(sigma);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
-                     reinterpret_cast<std::complex<float> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<float> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
-                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
-                     &lworkl, reinterpret_cast<float *>(rwork), &info);
+       ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, static_cast<std::complex<float> *>(evals),
+                     static_cast<std::complex<float> *>(v), &ldv, static_cast<std::complex<float> *>(sigma), static_cast<std::complex<float> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, static_cast<std::complex<float> *>(resid), &ncv, static_cast<std::complex<float> *>(v1),
+                     &ldv1, iparam, ipntr, static_cast<std::complex<float> *>(workd), static_cast<std::complex<float> *>(workl),
+                     &lworkl, static_cast<float *>(rwork), &info);
 #else
 
        ARPACK(cneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
@@ -69,11 +69,11 @@ using namespace quda ;
        double _tol = static_cast<double>(tol);
        std::complex<double> _sigma = static_cast<std::complex<double> >(sigma);
 #if (defined(MPI_COMMS) || defined(QMP_COMMS))
-       ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
-                     reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
-                     &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
-                     &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
-                     &lworkl, reinterpret_cast<double *>(rwork), &info);
+       ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, static_cast<std::complex<double> *>(evals),
+                     static_cast<std::complex<double> *>(v), &ldv, static_cast<std::complex<double> *>(sigma), static_cast<std::complex<double> *>(workev), &bmat, &n, which,
+                     &nev, &_tol, static_cast<std::complex<double> *>(resid), &ncv, static_cast<std::complex<double> *>(v1),
+                     &ldv1, iparam, ipntr, static_cast<std::complex<double> *>(workd), static_cast<std::complex<double> *>(workl),
+                     &lworkl, static_cast<double *>(rwork), &info);
 #else
        ARPACK(zneupd)(&comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
                      reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
@@ -131,6 +131,30 @@ using namespace quda ;
      return;
   }
 
+  template<typename cpuFloat, typename Float, int fineSpin, int fineColor, int reducedColor>
+  void convertFrom2DVector_v2(cpuColorSpinorField &out, std::complex<Float> *in) {
+     if(out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER ) errorQuda("\nIncorrect feild order (%d).\n", out.FieldOrder() );
+     quda::colorspinor::FieldOrderCB<cpuFloat,fineSpin,fineColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> outOrder(static_cast<ColorSpinorField&>(out));//fineColor =3 here!
+
+     blas::zero(out);
+
+     for (int parity = 0; parity < 2; parity++) {
+       for(int x_cb = 0; x_cb < out.VolumeCB(); x_cb++) {
+
+         int i = parity*out.VolumeCB() + x_cb;
+         int xx[4] = {0};
+         out.LatticeIndex(xx, i);
+
+         int _2d_idx = (xx[0] + xx[1]*out.X(0))*fineSpin*reducedColor;
+
+         if( xx[2] == 0 && xx[3] == 0 ) for(int s = 0; s < fineSpin; s++) for(int c = 0; c < reducedColor; c++) outOrder(parity, x_cb, s, c) = std::complex<cpuFloat>( in[_2d_idx+s*reducedColor+c].real(), in[_2d_idx+s*reducedColor+c].imag() );
+       }
+     }
+
+     return;
+  }
+
+
   template<typename Float, int fineSpin, int fineColor, int reducedColor, bool do_2d_emulation>
   void arpack_matvec(std::complex<Float> *out, std::complex<Float> *in,  DiracMatrix &matEigen, QudaPrecision matPrecision, ColorSpinorField &meta)
   {
@@ -187,8 +211,10 @@ using namespace quda ;
 
 //copy fields:
   template<typename Float, int fineSpin, int fineColor, int reducedColor, bool do_2d_emulation> 
-  void copy_eigenvectors(std::vector<ColorSpinorField*> &B, std::complex<Float> *arpack_evecs, std::complex<Float> *arpack_evals, const int cldn, const int nev)
+  void copy_eigenvectors(std::vector<ColorSpinorField*> &B, std::complex<Float> *arpack_evecs, std::complex<Float> *arpack_evals, const int cldn, const int nev, char *which)
   {
+    printfQuda("\nLoad eigenvectors..\n");
+
     std::vector<SortEvals> sorted_evals_cntr;
     sorted_evals_cntr.reserve(nev);
 
@@ -197,11 +223,21 @@ using namespace quda ;
     csParam.create = do_2d_emulation ? QUDA_ZERO_FIELD_CREATE : QUDA_REFERENCE_FIELD_CREATE;  
     //cpuParam.extendDimensionality();5-dim field
     csParam.location = QUDA_CPU_FIELD_LOCATION;
-    csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+    if(!do_2d_emulation) csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
-    for(int e = 0; e < nev; e++) sorted_evals_cntr.push_back( SortEvals(arpack_evals[e].imag(), e ));
-    std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), SortEvals::CmpEigenNrms);
+    std::string arpack_which(which);
+
+    for(int e = 0; e < nev; e++) 
+    {
+      if     (arpack_which.compare(std::string("SM")))    sorted_evals_cntr.push_back( SortEvals(std::norm(arpack_evals[e]), e ));
+      else if(arpack_which.compare(std::string("SI")))    sorted_evals_cntr.push_back( SortEvals(arpack_evals[e].imag(), e ));
+      else if(arpack_which.compare(std::string("SR")))    sorted_evals_cntr.push_back( SortEvals(arpack_evals[e].real(), e ));
+      else
+          errorQuda("\nSorting option is not supported.\n");
+    }
+
+    std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), SortEvals::Cmp);
 
     cpuColorSpinorField *cpu_tmp = nullptr;
     int ev_id = 0;
@@ -209,13 +245,21 @@ using namespace quda ;
     for(std::vector<ColorSpinorField*>::iterator vec = B.begin() ; vec != B.end(); ++vec) {
       int sorted_id =  sorted_evals_cntr[ev_id++]._idx;
 
+      printfQuda("%d ,Re= %le, Im= %le\n", sorted_id, arpack_evals[sorted_id].real(), arpack_evals[sorted_id].imag());
+
       std::complex<Float>* tmp_buffer =  &arpack_evecs[sorted_id*cldn];
       cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*vec);
 
       if(do_2d_emulation)
       {
         cpu_tmp = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
-        convertFrom2DVector<Float, fineSpin, fineColor, reducedColor>(*cpu_tmp, tmp_buffer);
+
+        if      (csParam.precision == QUDA_DOUBLE_PRECISION)
+          convertFrom2DVector_v2<double, Float, fineSpin, fineColor, reducedColor>(*cpu_tmp, tmp_buffer);
+        else if (csParam.precision == QUDA_SINGLE_PRECISION)
+          convertFrom2DVector_v2<float, Float, fineSpin, fineColor, reducedColor>(*cpu_tmp, tmp_buffer);
+        else
+          errorQuda("\nUnsupported precision.\n"); 
       }
       else
       {
@@ -223,10 +267,14 @@ using namespace quda ;
         cpu_tmp = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
       }
 
-      *curr_nullvec = *cpu_tmp;
+      *curr_nullvec = *cpu_tmp;//this does not work for different precision (usual memcpy)?
 
       delete cpu_tmp;
     }
+
+    printfQuda("\n..done.\n");
+
+    return;
   }
 
   template<typename Float, int fineSpin, int fineColor, int reducedColor, bool do_2d_emulation>
@@ -311,7 +359,7 @@ using namespace quda ;
 
     if (info_ != 0) errorQuda("\nError in ARPACK CNEUPD (error code %d) , exit.\n", info_);    
 //copy fields:
-    copy_eigenvectors<Float, fineSpin, fineColor, reducedColor, do_2d_emulation>(B, arpack_evecs, w_d_, cldn, nev);
+    copy_eigenvectors<Float, fineSpin, fineColor, reducedColor, do_2d_emulation>(B, arpack_evecs, w_d_, cldn, nev, lanczos_which);
 
     printfQuda("\ndone..\n");
 

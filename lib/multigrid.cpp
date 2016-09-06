@@ -69,7 +69,7 @@ namespace quda {
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
-    param_presmooth->Nkrylov = 4;
+    param_presmooth->Nkrylov = 6;
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
     if (param.level == 0) {
@@ -78,8 +78,8 @@ namespace quda {
     }
 
     if (param.level==param.Nlevel-1) {
-      param_presmooth->Nkrylov = 32;
-      param_presmooth->maxiter = 600;
+      param_presmooth->Nkrylov = 64;
+      param_presmooth->maxiter = 1000;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
@@ -130,6 +130,7 @@ namespace quda {
       printfQuda("start creating transfer operator\n");
 
       //Complex alpha = Complex(0.00889, 12.1);//if zero: no smoothing
+//WARNING:
       Complex alpha = Complex(0.0, 0.0);//if zero: no smoothing
       printfQuda("\nSmoothing params: %le %le\n", alpha.real(), alpha.imag());
       transfer = new Transfer(param.B, &param.matResidual, alpha,  param.Nvec, param.geoBlockSize, param.spinBlockSize,
@@ -354,6 +355,7 @@ namespace quda {
 
     double deviation;
     double tol = std::pow(10.0, 4-2*csParam.precision);
+    //double tol = 1e-3;
 #if 1
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -455,22 +457,26 @@ namespace quda {
     }
 #endif
 
+
     printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
-
+#if 1
     printfQuda("\n");
     printfQuda("Check eigenvector overlap for level %d\n", param.level );
 
-    int nmodes = 128;//tmp1->VolumeCB();
-    int ncv    = 256;//tmp1->VolumeCB();
+    int nmodes = 128;
+    int ncv    = 256;
     char *which = (char*)malloc(256*sizeof(char));
     sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
 
     ColorSpinorParam cpuParam(*param.B[0]);
     cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-    cpuParam.extendDimensionality();//5d field
+    cpuParam.extendDimensionality();//make 5d field
+
+    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     std::vector<ColorSpinorField*> evecsBuffer;
     evecsBuffer.reserve(nmodes);
@@ -485,13 +491,16 @@ namespace quda {
     {
       args.Set2D();
       args.SetReducedColors(1);
+      args.SetTol(1e-7);
     }
     //
     args(evecsBuffer, evalsBuffer);
 
-    for (int i=0; i<param.Nvec; i++) {
+    for (int i=0; i<nmodes; i++) {
       // as well as copying to the correct location this also changes basis if necessary
-      *tmp1 = *evecsBuffer[i]; 
+      printfQuda("\nNorm : %le\n", blas::norm2(*evecsBuffer[i]));
+      *tmp5 = *evecsBuffer[i]; 
+      *tmp1 = *tmp5;
 
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
@@ -501,13 +510,13 @@ namespace quda {
 
       deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
       printfQuda("L2 relative deviation = %e\n", deviation);
-      if (deviation > tol) errorQuda("failed");
     }
 
     for (unsigned int i = 0; i < evecsBuffer.size(); i++) delete evecsBuffer[i];
     delete [] evalsBuffer;
 
     free(which);
+#endif
 
     delete tmp1;
     delete tmp2;
@@ -773,8 +782,8 @@ namespace quda {
     SolverParam solverParam(param);
 
     // set null-space generation options - need to expose these
-    solverParam.maxiter = 1000;
-    solverParam.tol = 5e-5;
+    solverParam.maxiter = 500;
+    solverParam.tol = param.level == 0 ? 5e-5 : 1e-7;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7;
     solverParam.inv_type = (param.level == 0 && param.matSmooth.isStaggered() && param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
@@ -849,7 +858,13 @@ namespace quda {
           dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
           (*solve)(*out, *in);
           dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
-
+/*
+          if(param.mg_global._2d_u1_emulation)
+          {
+            *b = *tmp_cpu_field;
+            xpy(*b, *x);
+          }
+*/
           dirac_tmp.setMass(init_mass);
         }
         else
