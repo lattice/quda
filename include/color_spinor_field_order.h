@@ -540,7 +540,7 @@ namespace quda {
 	  }
 	}
 
-	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x, int parity=0) {
+	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x, int parity=1) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
