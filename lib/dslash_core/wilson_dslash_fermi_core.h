@@ -400,9 +400,8 @@ int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
-  // Inline by hand for the moment and assume even dimensions
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
+  // Assume even dimensions
+  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, param.X);
 
   // only need to check Y and Z dims currently since X and T set to match exactly
   if (x2 >= X2) return;
