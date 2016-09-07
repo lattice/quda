@@ -335,7 +335,8 @@ spinorFloat o02_im;
 #define NFACE 1
 #endif
 
-  const int *X = param.X;
+  const auto *X = param.X;
+  const auto *Xh = param.Xh;
   const int& fat_stride = param.gauge_stride;
 #if (DD_IMPROVED == 1)
   const int& long_stride = param.long_gauge_stride;
@@ -372,13 +373,13 @@ int full_idx=0;
   int dim = dimFromFaceIndex (idx, param);
     
   if(dim == 0){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_X, X);
+    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_X, X, Xh);
   }else if(dim == 1){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_Y, X);
+    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_Y, X, Xh);
   }else if(dim == 2){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_Z, X);
+    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_Z, X, Xh);
   }else if(dim == 3){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_T, X);
+    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_T, X, Xh);
   }
 
   const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);

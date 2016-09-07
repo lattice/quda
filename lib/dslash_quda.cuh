@@ -368,12 +368,14 @@ public:
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-    for (int i=0; i<4; i++) dslashParam.X[i] = in->X(i);
+    // this is a c/b field so double the x dimension
+    dslashParam.X[0] = in->X(0)*2;
+    for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
 #ifdef GPU_DOMAIN_WALL_DIRAC
     dslashParam.Ls = in->X(4); // needed by tuneLaunch()
 #endif
-    // this is a c/b field so double the x dimension
-    dslashParam.X[0] *= 2;
+    dslashParam.Xh[0] = in->X(0);
+    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
   }
 
   virtual ~DslashCuda() { }

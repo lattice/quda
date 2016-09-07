@@ -334,7 +334,8 @@ spinorFloat o02_im;
 #define NFACE 1
 #endif
 
-  const int *X = param.X;
+  const auto *X = param.X;
+  const auto *Xh = param.Xh;
   const int& fat_stride = param.gauge_stride;
 #if (DD_IMPROVED == 1)
   const int& long_stride = param.long_gauge_stride;
@@ -374,8 +375,8 @@ spinorFloat o02_im;
 
   if(kernel_type == INTERIOR_KERNEL){
     //data order: X4 X3 X2 X1h
-    za = sid/(X[0]>>1);
-    x0h = sid - za*(X[0]>>1);
+    za = sid/Xh[0];
+    x0h = sid - za*Xh[0];
     zb = za / X[1];
     y[1] = za - zb*X[1];
     y[3] = zb / X[2];
@@ -384,7 +385,7 @@ spinorFloat o02_im;
     y[0] = 2*x0h + x0odd;
     full_idx = 2*sid + x0odd;
   }else{
-    coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, kernel_type, X);
+    coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, kernel_type, X, Xh);
     full_idx = ((y[3]*X[2] +y[2])*X[1] +y[1])*X[0]+y[0];
     sid = full_idx>>1;
   }

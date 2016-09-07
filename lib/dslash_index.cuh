@@ -169,45 +169,22 @@ static inline __device__ int indexFromFaceIndexExtended(int face_idx, const int 
 // (used by the face packing routines).  The spinor order in ghost
 // region is different between wilson and staggered, thus different
 // index computing routine.
-template <int dim, int nLayers, int face_num>
-static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const int &face_volume, const int &parity, const int X[])
+template <int dim, int nLayers, int face_num, typename Param>
+static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const int &face_volume, const Param &param)
 {
-  // dimensions of the face
-  int dims[3];
-  int V = X[0]*X[1]*X[2]*X[3];
-  int face_X = X[0], face_Y = X[1], face_Z = X[2]; // face_T = X[3];
-
-  switch (dim) {
-    case 0:
-      face_X = nLayers;
-      dims[0]=X[1]; dims[1]=X[2]; dims[2]=X[3];
-      break;
-    case 1:
-      face_Y = nLayers;
-      dims[0]=X[0];dims[1]=X[2]; dims[2]=X[3];
-      break;
-    case 2:
-      face_Z = nLayers;
-      dims[0]=X[0]; dims[1]=X[1]; dims[2]=X[3];
-      break;
-    case 3:
-      // face_T = nLayers;
-      dims[0]=X[0]; dims[1]=X[1]; dims[2]=X[2];
-      break;
-  }
-
-  int face_XYZ = face_X * face_Y * face_Z;
-  int face_XY = face_X * face_Y;
+  const auto *X = param.X;              // grid dimension
+  const auto *dims = param.dims[dim];   // dimensions of the face
+  const auto &V4 = param.volume_4d;     // 4-d volume
 
   // intrinsic parity of the face depends on offset of first element
-  int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
+  int face_parity = (param.parity + face_num *(X[dim] - nLayers)) & 1;
 
   // reconstruct full face index from index into the checkerboard
   face_idx_in *= 2;
 
   // first compute src index, then find 4-d index from remainder
-  int s = face_idx_in / (dims[0]*dims[1]*dims[2]*nLayers);
-  int face_idx = face_idx_in - s*(dims[0]*dims[1]*dims[2]*nLayers);
+  int s = face_idx_in / param.face_XYZT[dim];
+  int face_idx = face_idx_in - s*param.face_XYZT[dim];
 
   /*y,z,t here are face indexes in new order*/
   int aux1 = face_idx / dims[0];
@@ -217,34 +194,32 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const 
   int z = aux2 - t * dims[2];
   face_idx += (face_parity + t + z + y) & 1;
 
+  int gap = X[dim] - nLayers;
   int idx = face_idx;
   int aux;
-
-  int gap = X[dim] - nLayers;
   switch (dim) {
     case 0:
       aux = face_idx;
       idx += face_num*gap + aux*(X[0]-1);
-      idx += (idx/V)*(1-V);    
+      idx += (idx/V4)*(1-V4);
       break;
     case 1:
-      aux = face_idx / face_X;
-      idx += face_num * gap * face_X + aux*(X[1]-1)*face_X;
-      idx += idx/V*(X[0]-V);
+      aux = face_idx / param.face_X[dim];
+      idx += face_num * gap * param.face_X[dim] + aux*(X[1]-1)*param.face_X[dim];
+      idx += (idx/V4)*(X[0]-V4);
       break;
     case 2:
-      aux = face_idx / face_XY;    
-      idx += face_num * gap * face_XY +aux*(X[2]-1)*face_XY;
-      idx += idx/V*((X[1]*X[0])-V);
+      aux = face_idx / param.face_XY[dim];
+      idx += face_num * gap * param.face_XY[dim] +aux*(X[2]-1)*param.face_XY[dim];
+      idx += (idx/V4)*((X[1]*X[0])-V4);
       break;
     case 3:
-      idx += face_num * gap * face_XYZ;
+      idx += face_num * gap * param.face_XYZ[dim];
       break;
   }
 
-
   // return index into the checkerboard
-  return (idx + s*V) >> 1;
+  return (idx + s*V4) >> 1;
 }
 
   template <int dim, int nLayers, int face_num>
@@ -323,14 +298,14 @@ static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, c
 }
 
 
-template<int nLayers, int Dir> 
-static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const int parity, const enum KernelType dim, const int X[])
+template<int nLayers, int Dir, typename T>
+static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const int parity, const enum KernelType dim, const T X[], const T Xh[])
 {
   int za, x1h, x0h, zb;
   switch(dim) {
     case EXTERIOR_KERNEL_X:
-      za = idx/(X[1]>>1); 
-      x1h = idx - za*(X[1]>>1);
+      za = idx/Xh[1];
+      x1h = idx - za*Xh[1];
       zb = za / X[2];
       x[2] = za - zb*X[2];
       x[0] = zb/X[3];
@@ -343,8 +318,8 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       x[1] = 2*x1h + ((x[0] + x[2] + x[3] + parity) & 1);
       break;
     case EXTERIOR_KERNEL_Y:
-      za = idx/(X[0]>>1);
-      x0h = idx - za*(X[0]>>1);
+      za = idx/Xh[0];
+      x0h = idx - za*Xh[0];
       zb = za / X[2];
       x[2] = za - zb*X[2];
       x[1] = zb/X[3];
@@ -357,8 +332,8 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1); 
       break;
     case EXTERIOR_KERNEL_Z:
-      za = idx/(X[0]>>1);
-      x0h = idx - za*(X[0]>>1);
+      za = idx/Xh[0];
+      x0h = idx - za*Xh[0];
       zb = za / X[1];
       x[1] = za - zb*X[1];
       x[2] = zb / X[3];
@@ -371,8 +346,8 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
       break;
     case EXTERIOR_KERNEL_T:
-      za = idx/(X[0]>>1);
-      x0h = idx - za*(X[0]>>1);
+      za = idx/Xh[0];
+      x0h = idx - za*Xh[0];
       zb = za / X[1];
       x[1] = za - zb*X[1];
       x[3] = zb / X[2];
@@ -397,22 +372,17 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int &x,
   // dimensions of the face (FIXME: optimize using constant cache)
 
   int face_X = X[0], face_Y = X[1], face_Z = X[2];
-  int face_parity;
   switch (dim) {
     case 0:
       face_X = nLayers;
-      face_parity = (parity + face_num * (X[0] - nLayers)) & 1;
       break;
     case 1:
       face_Y = nLayers;
-      face_parity = (parity + face_num * (X[1] - nLayers)) & 1;
       break;
     case 2:
       face_Z = nLayers;
-      face_parity = (parity + face_num * (X[2] - nLayers)) & 1;
       break;
     case 3:
-      face_parity = (parity + face_num * (X[3] - nLayers)) & 1;
       break;
   }
   int face_XYZ = face_X * face_Y * face_Z;
@@ -422,6 +392,7 @@ static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int &x,
 
   face_idx *= 2;
 
+  int face_parity = (parity + face_num * (X[dim] - nLayers)) & 1;
   if (!(face_X & 1)) { // face_X even
     //   t = face_idx / face_XYZ;
     //   z = (face_idx / face_XY) % face_Z;
@@ -496,12 +467,12 @@ enum IndexType {
 // compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
 template <IndexType idxType, typename I>
 static __device__ __forceinline__ void coordsFromIndex(int &idx, int &x, int &y, int &z, int &t,
-						       int &cb_idx, const int &parity, const int X[],
+						       int &cb_idx, const int &parity, const I X[],
 						       const I block[4], const I grid[4])
 {
-  const int LX = X[0];
-  const int LY = X[1];
-  const int LZ = X[2];
+  const auto LX = X[0];
+  const auto LY = X[1];
+  const auto LZ = X[2];
   int &XYZ = X3X2X1; // X[2]*X[1]*X[0]
   int &XY = X2X1; // X[1]*X[0]
 
@@ -1162,13 +1133,13 @@ static inline __device__ int indexFromNdegTMFaceIndex(int face_idx, const int &f
 
 
 
-template <int dim>
-static inline __device__ bool inBoundary(const int width, const int coord[], const int X[]){
+template <int dim, typename T>
+static inline __device__ bool inBoundary(const int width, const int coord[], const T X[]){
   return ((coord[dim] >= X[dim] - width) || (coord[dim] < width));
 }
 
-
-static inline __device__ bool isActive(const int threadDim, int offsetDim, int offset, const int y[],  const int partitioned[], const int X[])
+template <typename T>
+static inline __device__ bool isActive(const int threadDim, int offsetDim, int offset, const int y[],  const int partitioned[], const T X[])
 {
 
   // Threads with threadDim = t can handle t,z,y,x offsets
@@ -1208,8 +1179,9 @@ static inline __device__ bool isActive(const int threadDim, int offsetDim, int o
   return true;
 }
 
+template <typename T>
 static inline __device__ bool isActive(const int threadDim, int offsetDim, int offset, int x1, int x2, int x3, int x4,
-                                       const int partitioned[], const int X[])
+                                       const int partitioned[], const T X[])
 {
   int y[4] = {x1, x2, x3, x4};
   return isActive(threadDim, offsetDim, offset, y, partitioned, X);
