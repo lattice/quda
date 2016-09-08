@@ -346,6 +346,10 @@ namespace quda {
       FieldOrderCB<Float,2,2,1,order> A(a);
       print_vector(A, x);
     }
+    else if (a.Ncolor() == 4 && a.Nspin() == 2) {
+      FieldOrderCB<Float,2,4,1,order> A(a);
+      print_vector(A, x);
+    }
     else if (a.Ncolor() == 24 && a.Nspin() == 2) {
       FieldOrderCB<Float,2,24,1,order> A(a);
       print_vector(A, x);

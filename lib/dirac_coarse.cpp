@@ -188,7 +188,7 @@ namespace quda {
     bool is_staggered = false;
     if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
 
-    if((is_staggered && staggered_dslash_emulation) || coarsecoarse_dslash_emulation)
+    if((is_staggered && staggered_dslash_emulation) || (!is_staggered && coarsecoarse_dslash_emulation))
     {
         bool single_parity_application = false;
         bool cg_mdagm_operator         = false;
