@@ -25,6 +25,10 @@ enum KernelType {
     int_fastdiv face_XYZT[4];
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XY[4];
+    int_fastdiv face_X[4];
+    int_fastdiv face_Y[4];
+    int_fastdiv face_Z[4];
+    int_fastdiv face_T[4];
 
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not

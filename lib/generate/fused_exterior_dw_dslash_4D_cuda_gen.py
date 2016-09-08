@@ -366,8 +366,6 @@ if (sid >= param.threads*param.Ls) return;
 
 int dim;
 int face_idx;
-int Y[4] = {X1,X2,X3,X4};
-
 
 
 """)
@@ -407,9 +405,20 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-
-const int dims[] = {X1, X2, X3, X4};
-coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
+switch(dim) {
+case 0:
+  coordsFromDW4DFaceIndex<0,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
+case 1:
+  coordsFromDW4DFaceIndex<1,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
+case 2:
+  coordsFromDW4DFaceIndex<2,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
+case 3:
+  coordsFromDW4DFaceIndex<3,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
+}
 
 {
   bool active = false;
@@ -529,7 +538,7 @@ def gen(dir, pack_only=False):
         str += "//"+l+"\n"
     str += "\n"
 
-    str += "faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs," + `dir/2` + ",Y);\n"
+    str += "faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs," + `dir/2` + ",param.X);\n"
     str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#if (DD_PREC==2) // half precision\n"
     str += "  sp_norm_idx = face_idx + "

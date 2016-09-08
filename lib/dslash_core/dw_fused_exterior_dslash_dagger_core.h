@@ -178,14 +178,9 @@ int sp_norm_idx;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
 
-
-int dim; 
+int dim;
 int face_idx;
-int Y[4] = {X1,X2,X3,X4};
-
-
 int x1, x2, x3, x4, xs;
-
 int s_parity;
 
 
@@ -202,16 +197,26 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-const int dims[] = {X1, X2, X3, X4};
-coordsFromDWFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
-
-{
-  bool active = false;
-  for(int dir=0; dir<4; ++dir){
-    active = active || isActive(dim,dir,+1,x1,x2,x3,x4,param.commDim,param.X);
-  }
-  if(!active) return;
+switch(dim) {
+case 0:
+  coordsFromDWFaceIndex<0,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
+case 1:
+  coordsFromDWFaceIndex<1,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
+case 2:
+  coordsFromDWFaceIndex<2,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
+case 3:
+  coordsFromDWFaceIndex<3,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  break;
 }
+
+bool active = false;
+for(int dir=0; dir<4; ++dir){
+  active = active || isActive(dim,dir,+1,x1,x2,x3,x4,param.commDim,param.X);
+}
+if(!active) return;
 
 
 s_parity = ( sid/(X4*X3*X2*X1h) ) % 2;
@@ -273,7 +278,7 @@ if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
  //  0 -i  1  0
  // -i  0  0  1
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,0,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,0,param.X);
  const int sp_idx = face_idx + param.ghostOffset[0][1];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[0][1];
@@ -438,7 +443,7 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
  //  0  i  1  0
  //  i  0  0  1
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,0,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,0,param.X);
  const int sp_idx = face_idx + param.ghostOffset[0][0];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[0][0];
@@ -603,7 +608,7 @@ if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
  //  0 -1  1  0
  //  1  0  0  1
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,1,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,1,param.X);
  const int sp_idx = face_idx + param.ghostOffset[1][1];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[1][1];
@@ -768,7 +773,7 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
  //  0  1  1  0
  // -1  0  0  1
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,1,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,1,param.X);
  const int sp_idx = face_idx + param.ghostOffset[1][0];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[1][0];
@@ -933,7 +938,7 @@ if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
  // -i  0  1  0
  //  0  i  0  1
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,2,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,2,param.X);
  const int sp_idx = face_idx + param.ghostOffset[2][1];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[2][1];
@@ -1098,7 +1103,7 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
  //  i  0  1  0
  //  0 -i  0  1
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,2,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,2,param.X);
  const int sp_idx = face_idx + param.ghostOffset[2][0];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[2][0];
@@ -1263,7 +1268,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
  //  0  0  0  0
  //  0  0  0  0
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,3,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,3,param.X);
  const int sp_idx = face_idx + param.ghostOffset[3][1];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[3][1];
@@ -1467,7 +1472,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
  //  0  0  2  0
  //  0  0  0  2
 
- faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,3,Y);
+ faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,3,param.X);
  const int sp_idx = face_idx + param.ghostOffset[3][0];
 #if (DD_PREC==2) // half precision
    sp_norm_idx = face_idx + param.ghostNormOffset[3][0];

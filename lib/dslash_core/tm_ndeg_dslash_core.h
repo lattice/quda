@@ -195,9 +195,8 @@ if (kernel_type == INTERIOR_KERNEL) {
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
 
-  // Inline by hand for the moment and assume even dimensions
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims, param.block, param.grid);
+  // Assume even dimensions
+  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, param.X, param.block, param.grid);
 
   o1_00_re = 0;  o1_00_im = 0;
   o1_01_re = 0;  o1_01_im = 0;
@@ -231,7 +230,6 @@ if (kernel_type == INTERIOR_KERNEL) {
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
 
-  const int dim = static_cast<int>(kernel_type);
   const int face_volume = (param.threads >> 1);           // volume of one face (per flavor)
   const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
   face_idx = sid - face_num*face_volume;        // index into the respective face
@@ -240,8 +238,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
   //sp_idx = face_idx + param.ghostOffset[dim];
 
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
+  coordsFromFaceIndex<kernel_type,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
 
 
   {

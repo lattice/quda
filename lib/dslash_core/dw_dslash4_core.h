@@ -221,7 +221,6 @@ xs = X/(X1*X2*X3*X4);
 
 } else { // exterior kernel
 
-const int dim = static_cast<int>(kernel_type);
 const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
@@ -230,8 +229,7 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-const int dims[] = {X1, X2, X3, X4};
-coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
+coordsFromDW4DFaceIndex<kernel_type,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
