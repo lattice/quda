@@ -77,12 +77,9 @@ namespace quda {
 
 #include <blas_core.h>
 #include <blas_mixed_core.h>
-#ifdef BLOCKSOLVER
-// #include <Eigen/Dense>
-// using Eigen::MatrixXcd;
 #include <multi_blas_core.cuh>
 #include <multi_blas_core.h>
-#endif
+
 
     template <typename Float2, typename FloatN>
     struct BlasFunctor {
@@ -254,7 +251,7 @@ namespace quda {
 			       make_double2(0.0, 0.0), x, y, x, x);
     }
 
-#ifdef BLOCKSOLVER
+
     template<int NXZ, int NYW, typename Float2, typename FloatN>
     struct multcaxpy_ : public MultBlasFunctor<NXZ, NYW, Float2, FloatN> {
       Float2 a[NXZ*NYW];
@@ -295,7 +292,6 @@ namespace quda {
       }
     }
 
-#endif
 
     /**
        Functor to perform the operation y = a*x + b*y  (complex-valued)
