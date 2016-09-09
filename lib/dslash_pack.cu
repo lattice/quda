@@ -55,7 +55,7 @@ namespace quda {
     FloatN *in;
     float *inNorm;
     
-    int threads; // total number of threads
+    int_fastdiv threads; // total number of threads
     
     // offsets which determine thread mapping to dimension
     int threadDimMapLower[4]; // lowest thread which maps to dim
