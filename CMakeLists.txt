@@ -81,6 +81,8 @@ set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dsl
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
 
+#ARPACK
+set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
 
 # Interface options
 set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
@@ -195,6 +197,18 @@ if(QUDA_MAGMA)
   message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
 endif(QUDA_MAGMA)
+
+if(QUDA_ARPACK)
+  add_definitions(-DARPACK_LIB)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(ARPACK  arpack)
+
+if(${QUDA_MPI} OR ${QUDA_QMP})
+  add_definitions(-DMULTI_GPU)
+  find_package(MPI)
+endif()
+
+endif(QUDA_ARPACK)
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
