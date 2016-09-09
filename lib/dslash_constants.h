@@ -22,6 +22,7 @@ enum KernelType {
 
     int_fastdiv block[4]; // dslash tile block parameter
     int_fastdiv grid[4]; // dslash tile grid parameter
+    int_fastdiv swizzle; // block index swizzle factor
 
     int_fastdiv face_XYZT[4];
     int_fastdiv face_XYZ[4];

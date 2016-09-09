@@ -823,7 +823,7 @@ __device__ inline int dimFromFaceIndex(int &face_idx, const Param &param){
     face_idx -= param.threadDimMapLower[2];
     face_idx += s*(param.threadDimMapUpper[2] - param.threadDimMapLower[2]);
     return 2;
-  } else  { 
+  } else {
     face_idx -= param.threadDimMapLower[3];
     face_idx += s*(param.threadDimMapUpper[3] - param.threadDimMapLower[3]);
     return 3;
@@ -854,6 +854,50 @@ static inline __device__ void faceIndexFromCoords(int &face_idx, I * const x, in
 
   return;
 }
+
+
+/**
+   @brief Swizzler for reordering the (x) thread block indices - use on
+   conjunction with swizzle-factor autotuning to find the optimum
+   swizzle factor.  Specfically, the thread block id is remapped by
+   transposing its coordinates: if the original order can be
+   parametrized by
+
+   blockIdx.x = j * swizzle + i,
+
+   then the new order is
+
+   block_idx = i * (gridDim.x / swizzle) + j
+
+   We need to factor out any remainder and leave this in original
+   ordering.
+
+   @param[in] swizzle Swizzle factor to be applied
+   @return Swizzled block index
+*/
+//#define SWIZZLE
+
+  template <typename T>
+  __device__ inline int block_idx(const T &swizzle) {
+#ifdef SWIZZLE
+    // the portion of the grid that is exactly divisible by the number of SMs
+    const int gridp = gridDim.x - gridDim.x % swizzle;
+
+    int block_idx = blockIdx.x;
+    if (blockIdx.x < gridp) {
+      // this is the portion of the block that we are going to transpose
+      const int i = blockIdx.x % swizzle;
+      const int j = blockIdx.x / swizzle;
+
+      // transpose the coordinates
+      block_idx = i * (gridp / swizzle) + j;
+    }
+    return block_idx;
+#else
+    return blockIdx.x;
+#endif
+  }
+
 
 
 /*

@@ -96,6 +96,7 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      dslashParam.swizzle = tp.aux.x;
       STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 		       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 		       (sFloat*)in->V(), (float*)in->Norm(), 
@@ -122,11 +123,27 @@ namespace quda {
       }
     }
 
+    bool advanceAux(TuneParam &param) const
+    {
+#ifdef SWIZZLE
+      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+        param.aux.x++;
+	return true;
+      } else {
+        param.aux.x = 1;
+	return false;
+      }
+#else
+      return false;
+#endif
+    }
+
     void initTuneParam(TuneParam &param) const
     {
       DslashCuda::initTuneParam(param);
       param.block.y = 1;
       param.grid.y = nSrc;
+      param.aux.x = 1;
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }

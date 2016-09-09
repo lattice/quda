@@ -48,28 +48,6 @@ namespace quda {
 
 #ifdef MULTI_GPU
 
-  template <typename T>
-  __device__ inline int block_idx(const T &swizzle) {
-#ifdef SWIZZLE
-    // the portion of the grid that is exactly divisible by the number of SMs
-    const int gridp = gridDim.x - gridDim.x % swizzle;
-
-    int block_idx = blockIdx.x;
-    if (blockIdx.x < gridp) {
-      // this is the portion of the block that we are going to transpose
-      const int i = blockIdx.x % swizzle;
-      const int j = blockIdx.x / swizzle;
-
-      // transpose the coordinates
-      block_idx = i * (gridp / swizzle) + j;
-    }
-    return block_idx;
-#else
-    return blockIdx.x;
-#endif
-  }
-
-
   template <typename FloatN>
   struct PackParam {
 

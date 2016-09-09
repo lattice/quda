@@ -352,7 +352,7 @@ spinorFloat o02_im;
 #endif
 #endif
 
-  int idx = blockIdx.x*blockDim.x + threadIdx.x;
+  int idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
   if(idx >= param.threads) return;
  
   int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
