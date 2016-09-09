@@ -830,7 +830,7 @@ namespace quda {
       unbindSpinorTex<FloatN>(in);
     }
 
-    virtual int tuningIter() const { return 100; }
+    virtual int tuningIter() const { return 3; }
 
     virtual TuneKey tuneKey() const {
       return TuneKey(in->VolString(), typeid(*this).name(), aux);
