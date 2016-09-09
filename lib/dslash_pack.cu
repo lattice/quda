@@ -12,6 +12,8 @@
 #endif // GPU_WILSON_DIRAC
 
 
+//#define SWIZZLE
+
 #include <quda_internal.h>
 #include <dslash_quda.h>
 #include <sys/time.h>
@@ -45,6 +47,28 @@ namespace quda {
 
 
 #ifdef MULTI_GPU
+
+  template <typename T>
+  __device__ inline int block_idx(const T &swizzle) {
+#ifdef SWIZZLE
+    // the portion of the grid that is exactly divisible by the number of SMs
+    const int gridp = gridDim.x - gridDim.x % swizzle;
+
+    int block_idx = blockIdx.x;
+    if (blockIdx.x < gridp) {
+      // this is the portion of the block that we are going to transpose
+      const int i = blockIdx.x % swizzle;
+      const int j = blockIdx.x / swizzle;
+
+      // transpose the coordinates
+      block_idx = i * (gridp / swizzle) + j;
+    }
+    return block_idx;
+#else
+    return blockIdx.x;
+#endif
+  }
+
 
   template <typename FloatN>
   struct PackParam {
@@ -84,6 +108,8 @@ namespace quda {
     int_fastdiv face_XYZT[4];
 
     int sp_stride;
+
+    int_fastdiv swizzle;
   };
 
   template<typename FloatN>
@@ -269,7 +295,7 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle) * blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -338,7 +364,7 @@ namespace quda {
   template <int dagger, typename FloatN, int nFace>
     __global__ void packFaceExtendedWilsonKernel(PackParam<FloatN> param)
   {
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -407,7 +433,7 @@ namespace quda {
   template <int dagger, typename FloatN, int nFace>
     __global__ void unpackFaceExtendedWilsonKernel(PackParam<FloatN> param)
   {
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -607,7 +633,7 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
 
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -705,7 +731,7 @@ namespace quda {
     virtual int outputPerSite() const = 0;
 
     // prepare the param struct with kernel arguments
-    PackParam<FloatN> prepareParam(int dim=-1, int face_num=2) {
+    PackParam<FloatN> prepareParam(TuneParam &tp, int dim=-1, int face_num=2) {
       PackParam<FloatN> param;
       param.in = (FloatN*)in->V();
       param.inNorm = (float*)in->Norm();
@@ -785,6 +811,8 @@ namespace quda {
 	param.face_XYZT[dim] = param.face_XYZ[dim] * face[3];
       }
 
+      param.swizzle = tp.aux.x;
+
       return param;
     }
 
@@ -830,11 +858,36 @@ namespace quda {
       unbindSpinorTex<FloatN>(in);
     }
 
+    bool advanceAux(TuneParam &param) const
+    {
+#ifdef SWIZZLE
+      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+        param.aux.x++;
+	return true;
+      } else {
+        param.aux.x = 1;
+	return false;
+      }
+#else
+      return false;
+#endif
+    }
+
+    void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      param.aux.x = 1; // swizzle factor
+    }
+
+    void defaultTuneParam(TuneParam &param) const {
+      Tunable::defaultTuneParam(param);
+      param.aux.x = 1; // swizzle factor
+    }
+
+    long long flops() const { return outputPerSite()*this->threads(); }
+
     virtual int tuningIter() const { return 3; }
 
-    virtual TuneKey tuneKey() const {
-      return TuneKey(in->VolString(), typeid(*this).name(), aux);
-    }  
+    virtual TuneKey tuneKey() const { return TuneKey(in->VolString(), typeid(*this).name(), aux); }
 
     virtual void apply(const cudaStream_t &stream) = 0;
 
@@ -864,7 +917,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_WILSON_DIRAC
-      PackParam<FloatN> param = this->prepareParam();
+      PackParam<FloatN> param = this->prepareParam(tp);
       if (this->dagger) {
         packFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -875,7 +928,6 @@ namespace quda {
 #endif  
     }
 
-    long long flops() const { return outputPerSite()*this->threads(); }
   };
 
   void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 
@@ -925,7 +977,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_TWISTED_MASS_DIRAC
-      PackParam<FloatN> param = this->prepareParam();
+      PackParam<FloatN> param = this->prepareParam(tp);
       if (this->dagger) {
         packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
       } else {
@@ -1058,7 +1110,7 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
   {
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     const int Ls = param.X[4];
@@ -1126,7 +1178,7 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void packFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
   {
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -1194,7 +1246,7 @@ namespace quda {
   template <typename FloatN, int nFace>
     __global__ void unpackFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
   {
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -1289,7 +1341,7 @@ namespace quda {
 
 #ifdef GPU_STAGGERED_DIRAC
 
-      PackParam<FloatN> param = this->prepareParam(this->dim, this->face_num);
+      PackParam<FloatN> param = this->prepareParam(tp,this->dim, this->face_num);
       if(!R){
         if (PackFace<FloatN,Float>::nFace==1) {
           packFaceStaggeredKernel<FloatN, 1> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
@@ -1414,7 +1466,7 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for dwf
 
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -1484,7 +1536,7 @@ namespace quda {
   {
     const int nFace = 1; // 1 face for Wilson
   
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     const int Ls = param.X[4];
@@ -1568,7 +1620,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      PackParam<FloatN> param = this->prepareParam();
+      PackParam<FloatN> param = this->prepareParam(tp);
       if (this->dagger) {
         packFaceDWKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -1600,7 +1652,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      PackParam<FloatN> param = this->prepareParam();
+      PackParam<FloatN> param = this->prepareParam(tp);
       if (this->dagger) {
 	packFaceDW4DKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -1677,7 +1729,7 @@ namespace quda {
     const int nFace = 1; // 1 face for Wilson
     const int Nf = 2;
 
-    int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
     if (face_idx >= param.threads) return;
 
     // determine which dimension we are packing
@@ -1759,7 +1811,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-      PackParam<FloatN> param = this->prepareParam();
+      PackParam<FloatN> param = this->prepareParam(tp);
       if (this->dagger) {
         packFaceNdegTMKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
