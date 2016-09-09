@@ -386,6 +386,8 @@ spinorFloat o02_im;
     full_idx = 2*sid + x0odd;
   } else {
     coordsFromFaceIndexStaggered<kernel_type,NFACE,2>(y, sid, param);
+    full_idx = ((y[3]*X[2] +y[2])*X[1] +y[1])*X[0]+y[0];
+    sid = full_idx>>1;
   }
 
 
