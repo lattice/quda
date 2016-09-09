@@ -17,6 +17,7 @@ enum KernelType {
     int parity;  // Even-Odd or Odd-Even
     int_fastdiv X[4];
     int_fastdiv Xh[4];
+    int_fastdiv volume4CB;
     int Ls;
 
     int_fastdiv block[4]; // dslash tile block parameter

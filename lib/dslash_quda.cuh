@@ -376,6 +376,7 @@ public:
 #endif
     dslashParam.Xh[0] = in->X(0);
     for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
+    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
 
     int face[4];
     for (int dim=0; dim<4; dim++) {

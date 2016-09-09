@@ -349,30 +349,21 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
 
-int X, x1, x2, x3, x4, xs;
+int X, coord[5];
 
-int s_parity, boundaryCrossing;
+int s_parity;
 
 #ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
-// Inline by hand for the moment and assume even dimensions
-//coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
 """)
         if domain_wall:
           prolog_str+=(
 """
-s_parity = ( sid/(X4*X3*X2*X1h) ) % 2;
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h) + sid/(X4*X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-x1 = X % X1;
-x2 = (X/X1) % X2;
-x3 = (X/(X1*X2)) % X3;
-x4 = (X/(X1*X2*X3)) % X4;
-xs = X/(X1*X2*X3*X4);
+coordsFromIndex<5,QUDA_5D_PC,EVEN_X>(X, coord, sid, param);
+s_parity = ( sid/param.volume4CB ) % 2;
 
 """)
         else:
@@ -410,12 +401,8 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-coordsFromDWFaceIndex<kernel_type,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
-
-s_parity = ( sid/(X4*X3*X2*X1h) ) % 2;
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h) + sid/(X4*X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
+coordsFromFaceIndex<5,QUDA_5D_PC,kernel_type,1>(X, sid, coord, face_idx, face_num, param);
+s_parity = ( sid/param.volume4CB ) % 2;
 
 READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 
@@ -511,10 +498,8 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-# boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-# interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
-    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
+    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
+    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
@@ -742,12 +727,12 @@ def gen_dw():
     str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n{\n"
     str += "// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
-    str += "     int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
+    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
     str += "\n"
-    str += "     if ( xs != %s )\n" % ledge
+    str += "     if ( coord[4] != %s )\n" % ledge
     str += "     {\n"
     
     def proj(i,j):
@@ -781,16 +766,16 @@ def gen_dw():
     # xs == 0:
     str += out_L.replace(" += "," += -mferm*(").replace(";",");")
 
-    str += "    } // end if ( xs != %s )\n" % ledge
+    str += "    } // end if ( coord[4]!= %s )\n" % ledge
     str += "  } // end P_L\n\n"
     str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
     str += "  {\n"
-    str += "    int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
+    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
     str += "\n"
-    str += "    if ( xs != %s )\n" % redge
+    str += "    if ( coord[4] != %s )\n" % redge
     str += "    {\n"
     
     # xs != Ls-1
@@ -803,7 +788,7 @@ def gen_dw():
     # xs == Ls-1
     str += out_L.replace("-","+").replace(" += "," += -mferm*(").replace(";",");")
 
-    str += "    } // end if ( xs != %s )\n" % redge
+    str += "    } // end if ( coord[4] != %s )\n" % redge
     str += "  } // end P_R\n"
     str += "} // end 5th dimension\n\n\n"
 
@@ -1078,13 +1063,13 @@ int incomplete = 0; // Have all 8 contributions been computed for this site?
 
 switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
-incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
+  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==X4m1));
 case EXTERIOR_KERNEL_T:
-incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
+  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==X3m1));
 case EXTERIOR_KERNEL_Z:
-incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
+  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==X2m1));
 case EXTERIOR_KERNEL_Y:
-incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
+  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
 }
 
 """)

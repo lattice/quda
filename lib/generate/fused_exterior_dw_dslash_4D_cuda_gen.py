@@ -373,17 +373,19 @@ int face_idx;
           if dslash4 == True:
             prolog_str+=(
 """
-int x1, x2, x3, x4, xs;
+int coord[5];
+int X;
 """)
           else:
             prolog_str+=(
 """
-int xs;
+int coord[5];
 """)
         else:
           prolog_str+=(
 """
-int x1, x2, x3, x4, xs;
+int coord[5];
+int X;
 """)
 
 
@@ -393,7 +395,7 @@ int x1, x2, x3, x4, xs;
 """
 { // exterior kernel
 
-dim = dimFromDWFaceIndex(sid, param); // sid is also modified
+dim = dimFromFaceIndex<5>(sid, param); // sid is also modified
 
 //const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
 const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim])*param.Ls >> 1);
@@ -407,23 +409,23 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 
 switch(dim) {
 case 0:
-  coordsFromDW4DFaceIndex<0,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  coordsFromFaceIndex<5,QUDA_4D_PC,0,1>(X, sid, coord, face_idx, face_num, param);
   break;
 case 1:
-  coordsFromDW4DFaceIndex<1,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  coordsFromFaceIndex<5,QUDA_4D_PC,1,1>(X, sid, coord, face_idx, face_num, param);
   break;
 case 2:
-  coordsFromDW4DFaceIndex<2,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  coordsFromFaceIndex<5,QUDA_4D_PC,2,1>(X, sid, coord, face_idx, face_num, param);
   break;
 case 3:
-  coordsFromDW4DFaceIndex<3,1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, face_num, param);
+  coordsFromFaceIndex<5,QUDA_4D_PC,3,1>(X, sid, coord, face_idx, face_num, param);
   break;
 }
 
 {
   bool active = false;
   for(int dir=0; dir<4; ++dir){
-    active = active || isActive(dim,dir,+1,x1,x2,x3,x4,param.commDim,param.X);
+    active = active || isActive(dim,dir,+1,coord,param.commDim,param.X);
   }
   if(!active) return;
 }
@@ -510,10 +512,8 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-# boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-# interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
-    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
+    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
+    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
 
     offset = ["+1", "-1", "+1", "-1", "+1", "-1", "+1", "-1"]
 
@@ -527,7 +527,7 @@ def gen(dir, pack_only=False):
                    "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
 
     cond = ""
-    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " + boundary[dir] + " )\n"
+    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.X) && " + boundary[dir] + " )\n"
 
 
     str = ""
@@ -538,7 +538,7 @@ def gen(dir, pack_only=False):
         str += "//"+l+"\n"
     str += "\n"
 
-    str += "faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs," + `dir/2` + ",param.X);\n"
+    str += "faceIndexFromCoords<5,1>(face_idx,coord," + `dir/2` + ",param);\n"
     str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#if (DD_PREC==2) // half precision\n"
     str += "  sp_norm_idx = face_idx + "
@@ -717,7 +717,7 @@ def gen_dw_inv():
     str = "\n"
     str += "VOLATILE spinorFloat kappa;\n\n"
     str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
-    str += "  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));\n"
+    str += "  kappa = (spinorFloat)(-(mdwf_c5[coord[4]]*(4.0 + m5) - 1.0)/(mdwf_b5[coord[4]]*(4.0 + m5) + 1.0));\n"
     str += "#else\n" 
     str += "  kappa = 2.0*a;\n"
     str += "#endif  // select MDWF mode\n\n"
@@ -740,9 +740,9 @@ def gen_dw_inv():
     str += "\n"
     str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorR = ( coord[4] > s ? -inv_d_n*pow(kappa,param.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    factorR = ( coord[4] < s ? -inv_d_n*pow(kappa,param.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
     str += "    sp_idx = base_idx + s*Vh;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
@@ -772,9 +772,9 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    factorL = ( coord[4] < s ? -inv_d_n*pow(kappa,param.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
     else : 
-        str += "    factorL = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorL = ( coord[4] > s ? -inv_d_n*pow(kappa,param.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"
@@ -1005,14 +1005,14 @@ def xpay():
     if dslash4:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "coeff = (spinorFloat)(0.5*a/(mdwf_b5[coord[4]]*(m5+4.0) + 1.0));\n"
       str += "#else\n"
       str += "coeff = a;\n"
       str += "#endif\n\n"
     elif dslash5:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
-      str += "coeff = (spinorFloat)(0.5/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "coeff = (spinorFloat)(0.5/(mdwf_b5[coord[4]]*(m5+4.0) + 1.0));\n"
       str += "coeff *= -coeff;\n"
       str += "#else\n"
       str += "coeff = a;\n"

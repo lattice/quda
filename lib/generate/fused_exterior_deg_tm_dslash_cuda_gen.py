@@ -296,7 +296,7 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD
 #include "read_gauge.h"
 #include "io_spinor.h"
 
-int x1, x2, x3, x4;
+int coord[5];
 int X;
 
 #if (DD_PREC==2) // half precision
@@ -321,23 +321,23 @@ int sid;
 
   switch(dim) {
   case 0:
-    coordsFromFaceIndex<0,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,0,1>(X, sid, coord, face_idx, face_num, param);
     break;
   case 1:
-    coordsFromFaceIndex<1,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,1,1>(X, sid, coord, face_idx, face_num, param);
     break;
   case 2:
-    coordsFromFaceIndex<2,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,2,1>(X, sid, coord, face_idx, face_num, param);
     break;
   case 3:
-    coordsFromFaceIndex<3,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,3,1>(X, sid, coord, face_idx, face_num, param);
     break;
   }
 
 
   bool active = false;
   for(int dir=0; dir<4; ++dir){
-    active = active || isActive(dim,dir,+1,x1,x2,x3,x4,param.commDim,param.X);
+    active = active || isActive(dim,dir,+1,coord,param.commDim,param.X);
   }
   if(!active) return;
 
@@ -373,8 +373,8 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
+    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
+    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
     offset = ["+1","-1","+1","-1","+1","-1","+1","-1"];
     dim = ["X", "Y", "Z", "T"]
 
@@ -387,7 +387,7 @@ def gen(dir, pack_only=False):
 
     cond = ""
 #    cond += "#ifdef MULTI_GPU\n"
-    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " +boundary[dir]+" )\n"
+    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.X) && " +boundary[dir]+" )\n"
 #    cond += "#endif\n"
 
     str = ""
@@ -398,7 +398,7 @@ def gen(dir, pack_only=False):
         str += "// "+l+"\n"
     str += "\n"
 
-    str += "faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",param.X);\n"
+    str += "faceIndexFromCoords<4,1>(face_idx,coord," + `dir/2` + ",param);\n"
     str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "][" + `1-dir%2` +"];\n"
 
 

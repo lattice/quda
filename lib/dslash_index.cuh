@@ -1,42 +1,74 @@
-// The following indexing routines work for arbitrary (including odd) lattice dimensions.
-// compute an index into the local volume from an index into the face (used by the face packing routines)
+/**
+  @brief Compute global checkerboard index from face index.  The
+  following indexing routines work for arbitrary (including odd)
+  lattice dimensions.  Specifically, we compute an index into the
+  local volume from an index into the face.  This is used by the
+  Wilson-like face packing routines.  This routine can handle 4-d or
+  5-d fields, and well as 4-d or 5-d preconditioning
 
-template <int dim, int nLayers, int face_num, typename Param>
-static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_volume, const Param &param)
+  @param[in] face_idx Checkerboarded face index
+  @param[in] param Parameter struct with required meta data
+  @return Global checkerboard coordinate
+*/
+template <int nDim, QudaDWFPCType type, int dim, int nLayers, int face_num, typename Param>
+static inline __device__ int indexFromFaceIndex(int face_idx, const Param &param)
 {
-  const auto *X = param.X;
-
   // intrinsic parity of the face depends on offset of first element
-  int face_parity = (param.parity + face_num *(X[dim] - nLayers)) & 1;
+  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
 
   // reconstruct full face index from index into the checkerboard
   face_idx *= 2;
 
   if (!(param.face_X[dim] & 1)) { // face_X even
-    //   int t = face_idx / face_XYZ;
+
+    //   int s = face_idx / face_XYZT;
+    //   int t = (face_idx / face_XYZ) % face_T;
     //   int z = (face_idx / face_XY) % face_Z;
     //   int y = (face_idx / face_X) % face_Y;
-    //   face_idx += (face_parity + t + z + y) & 1;
+    //   face_idx += (face_parity + s + t + z + y) & 1;
     // equivalent to the above, but with fewer divisions/mods:
     int aux1 = face_idx / param.face_X[dim];
     int aux2 = aux1 / param.face_Y[dim];
+    int aux3 = aux2 / param.face_Z[dim];
+    int aux4 = (nDim == 5 ? aux3 / param.face_T[dim] : 0);
+
     int y = aux1 - aux2 * param.face_Y[dim];
-    int t = aux2 / param.face_Z[dim];
-    int z = aux2 - t * param.face_Z[dim];
-    face_idx += (face_parity + t + z + y) & 1;
+    int z = aux2 - aux3 * param.face_Z[dim];
+    int t = aux3 - aux4 * param.face_T[dim];
+    int s = aux4;
+
+    if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t + z + y) & 1;
+    else if (type == QUDA_4D_PC) face_idx += (face_parity + t + z + y) & 1;
+
   } else if (!(param.face_Y[dim] & 1)) { // face_Y even
-    int t = face_idx / param.face_XYZ[dim];
+
+    int s = face_idx / param.face_XYZT[dim];
+    int t = (nDim == 5 ? (face_idx / param.face_XYZ[dim]) % param.face_T[dim] : (face_idx / param.face_XYZ[dim]) );
     int z = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
-    face_idx += (face_parity + t + z) & 1;
+    if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t + z) & 1;
+    else if (type == QUDA_4D_PC) face_idx += (face_parity + t + z) & 1;
+
   } else if (!(param.face_Z[dim] & 1)) { // face_Z even
-    int t = face_idx / param.face_XYZ[dim];
-    face_idx += (face_parity + t) & 1;
+
+    int s = face_idx / param.face_XYZT[dim];
+    int t = (nDim == 5 ? (face_idx / param.face_XYZ[dim]) % param.face_T[dim] : (face_idx / param.face_XYZ[dim]) );
+    if (type == QUDA_5D_PC)      face_idx += (face_parity + s + t) & 1;
+    else if (type == QUDA_4D_PC) face_idx += (face_parity + t) & 1;
+
+  } else if (!(param.face_T[dim]) && nDim == 5) {
+
+    int s = face_idx / param.face_XYZT[dim];
+    if (type == QUDA_5D_PC)      face_idx += (face_parity + s) & 1;
+    else if (type == QUDA_4D_PC) face_idx += face_parity;
+
   } else {
+
     face_idx += face_parity;
+
   }
 
   // compute index into the full local volume
-  const int gap = X[dim] - nLayers;
+  int gap = param.X[dim] - nLayers;
   int idx = face_idx;
   int aux;
   switch (dim) {
@@ -53,7 +85,8 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
       idx += (aux + face_num) * gap * param.face_XY[dim];
       break;
     case 3:
-      idx += face_num * gap * param.face_XYZ[dim];
+      aux = (nDim == 5 ? face_idx / param.face_XYZT[dim] : 0);
+      idx += (aux + face_num) * gap * param.face_XYZ[dim];
       break;
   }
 
@@ -62,8 +95,19 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 }
 
 
+/**
+  @brief Compute global extended checkerboard index from face index.  The
+  following indexing routines work for arbitrary (including odd)
+  lattice dimensions.  Specifically, we compute an index into the
+  local volume from an index into the face.  This is used by the
+  Wilson-like face packing routines.
+
+  @param[in] face_idx Checkerboarded face index
+  @param[in] param Parameter struct with required meta data
+  @return Global extended checkerboard coordinate
+*/
 template <int dim, int nLayers, int face_num, typename Param>
-static inline __device__ int indexFromFaceIndexExtended(int face_idx, const int &face_volume, const Param &param)
+static inline __device__ int indexFromFaceIndexExtended(int face_idx, const Param &param)
 {
   const auto *X = param.X;
   const auto *R = param.R;
@@ -145,12 +189,22 @@ static inline __device__ int indexFromFaceIndexExtended(int face_idx, const int 
   return idx >> 1;
 }
 
-// compute an index into the local volume from an index into the face
-// (used by the face packing routines).  The spinor order in ghost
-// region is different between wilson and staggered, thus different
-// index computing routine.
+/**
+  @brief Compute global checkerboard index from face index.
+  The following indexing routines work for arbitrary lattice
+  dimensions (though perhaps not odd like thw Wilson variant?)
+  Specifically, we compute an index into the local volume from an
+  index into the face.  This is used by the staggered-like face
+  packing routines, and is different from the Wilson variant since
+  here the halo depth is tranversed in a different order - here the
+  halo depth is the faster running dimension.
+
+  @param[in] face_idx_in Checkerboarded face index
+  @param[in] param Parameter struct with required meta data
+  @return Global checkerboard coordinate
+*/
 template <int dim, int nLayers, int face_num, typename Param>
-static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const int &face_volume, const Param &param)
+static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const Param &param)
 {
   const auto *X = param.X;              // grid dimension
   const auto *dims = param.dims[dim];   // dimensions of the face
@@ -203,8 +257,23 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, const 
   return (idx + s*V4) >> 1;
 }
 
+
+/**
+  @brief Compute global extended checkerboard index from face index.
+  The following indexing routines work for arbitrary lattice
+  dimensions (though perhaps not odd like thw Wilson variant?)
+  Specifically, we compute an index into the local volume from an
+  index into the face.  This is used by the staggered-like face
+  packing routines, and is different from the Wilson variant since
+  here the halo depth is tranversed in a different order - here the
+  halo depth is the faster running dimension.
+
+  @param[in] face_idx_in Checkerboarded face index
+  @param[in] param Parameter struct with required meta data
+  @return Global extended checkerboard coordinate
+*/
 template <int dim, int nLayers, int face_num, typename Param>
-static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, const int &face_volume, const Param &param)
+static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, const Param &param)
 {
   const auto *X = param.X;
   const auto *R = param.R;
@@ -281,9 +350,20 @@ static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, c
 }
 
 
-template<int nLayers, int Dir, typename T>
-static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const int parity, const enum KernelType dim, const T X[], const T Xh[])
+/**
+   @brief Compute the full-lattice coordinates from the input face
+   index.  This is used by the staggered halo update kernels.
+
+   @param x[out] Coordinates we are computing
+   @param idx[in] Input checkerboard face index
+   @param[in] param Parameter struct with required meta data
+ */
+template<KernelType dim, int nLayers, int Dir, typename Param>
+static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const Param &param)
 {
+  const auto *X = param.X;
+  const auto *Xh = param.Xh;
+
   int za, x1h, x0h, zb;
   switch(dim) {
     case EXTERIOR_KERNEL_X:
@@ -298,7 +378,7 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       }else if(Dir == 1){
        x[0] += (X[0] - nLayers);
       }
-      x[1] = 2*x1h + ((x[0] + x[2] + x[3] + parity) & 1);
+      x[1] = 2*x1h + ((x[0] + x[2] + x[3] + param.parity) & 1);
       break;
     case EXTERIOR_KERNEL_Y:
       za = idx/Xh[0];
@@ -312,7 +392,7 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       }else if(Dir == 1){
         x[1] += (X[1] - nLayers);
       }
-      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1); 
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + param.parity) & 1);
       break;
     case EXTERIOR_KERNEL_Z:
       za = idx/Xh[0];
@@ -326,7 +406,7 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       }else if(Dir == 1){
         x[2] += (X[2] - nLayers);
       }
-      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + param.parity) & 1);
       break;
     case EXTERIOR_KERNEL_T:
       za = idx/Xh[0];
@@ -340,83 +420,112 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       }else if(Dir == 1){
         x[3] += (X[3] - nLayers);
       }
-      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + param.parity) & 1);
       break; 
   }
   return;
 }
 
 
-// compute full coordinates from an index into the face (used by the exterior Dslash kernels)
-template <int dim_, int nLayers, typename Int, typename Param>
-static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int &x, Int &y, Int &z, Int &t, int face_idx,
-						  const int &face_volume, const int &face_num, const Param &param)
+/**
+   @brief Compute the full-lattice coordinates from the input face
+   index.  This is used by the Wilson-like halo update kernels, and
+   can deal with 4-d or 5-d field and 4-d or 5-d preconditioning.
+
+   @param idx[out] The full lattice coordinate
+   @param cb_idx[out] The checkboarded lattice coordinate
+   @param x[out] Coordinates we are computing
+   @param face_idx[in] Input checkerboarded face index
+   @param[in] param Parameter struct with required meta data
+ */
+template <int nDim, QudaDWFPCType type, int dim_, int nLayers, typename Int, typename Param>
+static inline __device__ void coordsFromFaceIndex(int &idx, int &cb_idx, Int * const x, int face_idx,
+						  const int &face_num, const Param &param)
 {
-  const auto *X = param.X;
   constexpr int dim = (dim_ == INTERIOR_KERNEL) ? 0 : dim_; // silence compiler warning
+
+  const auto *X = param.X;
+  const auto &face_X = param.face_X[dim];
+  const auto &face_Y = param.face_Y[dim];
+  const auto &face_Z = param.face_Z[dim];
+  const auto &face_T = param.face_T[dim];
+  const auto &face_XYZT = param.face_XYZT[dim];
+  const auto &face_XYZ = param.face_XYZ[dim];
+  const auto &face_XY = param.face_XY[dim];
+
+  // intrinsic parity of the face depends on offset of first element
+  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
 
   // compute coordinates from (checkerboard) face index
   face_idx *= 2;
 
-  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
-
-  if (!(param.face_X[dim] & 1)) { // face_X even
-    //   t = face_idx / face_XYZ;
+  if (!(face_X & 1)) { // face_X even
+    //   s = face_idx / face_XYZT;
+    //   t = (face_idx / face_XYZ) % face_T;
     //   z = (face_idx / face_XY) % face_Z;
     //   y = (face_idx / face_X) % face_Y;
-    //   face_idx += (face_parity + t + z + y) & 1;
+    //   face_idx += (face_parity + s + t + z + y) & 1;
     //   x = face_idx % face_X;
     // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = face_idx / param.face_X[dim];
-    x = face_idx - aux1 * param.face_X[dim];
-    int aux2 = aux1 / param.face_Y[dim];
-    y = aux1 - aux2 * param.face_Y[dim];
-    t = aux2 / param.face_Z[dim];
-    z = aux2 - t * param.face_Z[dim];
-    x += (face_parity + t + z + y) & 1;
-    // face_idx += (face_parity + t + z + y) & 1;
-  } else if (!(param.face_Y[dim] & 1)) { // face_Y even
-    t = face_idx / param.face_XYZ[dim];
-    z = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
-    face_idx += (face_parity + t + z) & 1;
-    y = (face_idx / param.face_X[dim]) % param.face_Y[dim];
-    x = face_idx % param.face_X[dim];
-  } else if (!(param.face_Z[dim] & 1)) { // face_Z even
-    t = face_idx / param.face_XYZ[dim];
-    face_idx += (face_parity + t) & 1;
-    z = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
-    y = (face_idx / param.face_X[dim]) % param.face_Y[dim];
-    x = face_idx % param.face_X[dim];
+    int aux1 = face_idx / face_X;
+    int aux2 = aux1 / face_Y;
+    int aux3 = aux2 / face_Z;
+    int aux4 = (nDim == 5 ? aux3 / face_T : 0);
+
+    x[0] = face_idx - aux1 * face_X;
+    x[1] = aux1 - aux2 * face_Y;
+    x[2] = aux2 - aux3 * face_Z;
+    x[3] = aux3 - aux4 * face_T;
+    x[4] = aux4;
+
+    if (type == QUDA_5D_PC) x[0] += (face_parity + x[4] + x[3] + x[2] + x[1]) & 1;
+    else x[0] += (face_parity + x[3] + x[2] + x[1]) & 1;
+
+  } else if (!(face_Y & 1)) { // face_Y even
+
+    x[4] = (nDim == 5 ? face_idx / face_XYZT : 0);
+    x[3] = (nDim == 5 ? (face_idx / face_XYZ) % face_T : (face_idx/face_XYZ) );
+    x[2] = (face_idx / face_XY) % face_Z;
+
+    if (type == QUDA_5D_PC) face_idx += (face_parity + x[4] + x[3] + x[2]) & 1;
+    else face_idx += (face_parity + x[3] + x[2]) & 1;
+
+    x[1] = (face_idx / face_X) % face_Y;
+    x[0] = face_idx % face_X;
+
+  } else if (!(face_Z & 1)) { // face_Z even
+
+    x[4] = (nDim == 5 ? face_idx / face_XYZT : 0);
+    x[3] = (nDim == 5 ? (face_idx / face_XYZ) % face_T : (face_idx / face_XYZ) );
+
+    if (type == QUDA_5D_PC)      face_idx += (face_parity + x[4] + x[3]) & 1;
+    else if (type == QUDA_4D_PC) face_idx += (face_parity + x[3]) & 1;
+
+    x[2] = (face_idx / face_XY) % face_Z;
+    x[1] = (face_idx / face_X) % face_Y;
+    x[0] = face_idx % face_X;
+
   } else {
+
+    x[4] = (nDim == 5 ? face_idx / face_XYZT : 0);
     face_idx += face_parity;
-    t = face_idx / param.face_XYZ[dim]; 
-    z = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
-    y = (face_idx / param.face_X[dim]) % param.face_Y[dim];
-    x = face_idx % param.face_X[dim];
+    x[3] = (nDim == 5 ? (face_idx / face_XYZ) % face_T : (face_idx / face_XYZ) );
+    x[2] = (face_idx / face_XY) % face_Z;
+    x[1] = (face_idx / face_X) % face_Y;
+    x[0] = face_idx % face_X;
+
   }
 
   // need to convert to global coords, not face coords
-  switch(dim) {
-    case 0:
-      x += face_num * (X[0]-nLayers);
-      break;
-    case 1:
-      y += face_num * (X[1]-nLayers);
-      break;
-    case 2:
-      z += face_num * (X[2]-nLayers);
-      break;
-    case 3:
-      t += face_num * (X[3]-nLayers);
-      break;
-  }
+  x[dim] += face_num * (X[dim]-nLayers);
 
   // compute index into the full local volume
-  idx = X[0]*(X[1]*(X[2]*t + z) + y) + x; 
+  idx = X[0]*(X[1]*(X[2]*(X[3]*x[4] + x[3]) + x[2]) + x[1]) + x[0];
 
   // compute index into the checkerboard
   cb_idx = idx >> 1;
 }
+
 
 enum IndexType {
   EVEN_X = 0,
@@ -425,19 +534,21 @@ enum IndexType {
   EVEN_T = 3
 };
 
-// compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
-template <IndexType idxType, typename I>
-static __device__ __forceinline__ void coordsFromIndex(int &idx, int &x, int &y, int &z, int &t,
-						       int &cb_idx, const int &parity, const I X[],
-						       const I block[4], const I grid[4])
-{
-  const auto LX = X[0];
-  const auto LY = X[1];
-  const auto LZ = X[2];
-  int &XYZ = X3X2X1; // X[2]*X[1]*X[0]
-  int &XY = X2X1; // X[1]*X[0]
+/**
+   @brief Compute coordinates from index into the checkerboard (used
+   by the interior Dslash kernels).  This is used by the Wilson-like
+   interior update kernels, and can deal with 4-d or 5-d field and 4-d or
+   5-d preconditioning.
 
-  idx = 2*cb_idx;
+   @param idx[out] The full lattice coordinate
+   @param cb_idx[out] The checkboarded lattice coordinate
+   @param x[out] Coordinates we are computing
+   @param idx[in] Input checkerboarded face index
+   @param[in] param Parameter struct with required meta data
+ */
+template <int nDim, QudaDWFPCType pc_type, IndexType idxType, typename T, typename Param>
+static __device__ __forceinline__ void coordsFromIndex(int &idx, T *x, int &cb_idx, const Param &param)
+{
 
   // The full field index is 
   // idx = x + y*X + z*X*Y + t*X*Y*Z
@@ -498,7 +609,14 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, int &x, int &y,
   // as well as the cases where X, Y are odd and Z is even,
   // and X,Y,Z are all odd
 
-  if (idxType == EVEN_X /*!(LX & 1)*/) { // X even
+  const auto *X = param.X;
+
+  int XYZT = Vh << 1; // X[3]*X[2]*X[1]*X[0]
+  int XYZ = X3X2X1; // X[2]*X[1]*X[0]
+  int XY = X2X1; // X[1]*X[0]
+
+  idx = 2*cb_idx;
+  if (idxType == EVEN_X /*!(X[0] & 1)*/) { // X even
     //   t = idx / XYZ;
     //   z = (idx / XY) % Z;
     //   y = (idx / X) % Y;
@@ -506,84 +624,88 @@ static __device__ __forceinline__ void coordsFromIndex(int &idx, int &x, int &y,
     //   x = idx % X;
     // equivalent to the above, but with fewer divisions/mods:
 #if DSLASH_TUNE_TILE // tiled indexing - experimental and disabled for now
-    int aux1 =  idx / block[0];
-    int aux2 = aux1 / block[1];
-    int aux3 = aux2 / block[2];
-    int aux4 = aux3 / block[3];
-    int aux5 = aux4 / grid[0];
-    int aux6 = aux5 / grid[1];
-    int aux7 = aux6 / grid[2];
-    int aux8 = aux7 / grid[3];
+    const auto *block = param.block;
+    const auto *grid = param.grid;
 
-    x =       idx - aux1 * block[0];
-    y =      aux1 - aux2 * block[1];
-    z =      aux2 - aux3 * block[2];
-    t =      aux3 - aux4 * block[3];
+    int aux[9];
+    aux[0] = idx;
+    for (int i=0; i<4; i++) aux[i+1] = aux[i] / block[i];
+    for (int i=4; i<8; i++) aux[i+1] = aux[i] / grid[i];
 
-    x += block[0]*(aux4 - aux5 * grid[0]);
-    y += block[1]*(aux5 - aux6 * grid[1]);
-    z += block[2]*(aux6 - aux7 * grid[2]);
-    t += block[3]*(aux7 - aux8 * grid[3]);
+    for (int i=0; i<4; i++) x[i] = aux[i] - aux[i+1] * block[i];
+    for (int i=0; i<4; i++) x[i] += block[i]*(aux[i+4] - aux[i+5] * grid[i]);
+    x[4] = (nDim == 5) ? aux[8] : 0;
 
-    aux1 = (parity + t + z + y) & 1;
-    x += aux1;
+    int oddbit = (pc_type == QUDA_4D_PC ? (param.parity + t + z + y) : (param.parity + s + t + z + y)) & 1;
+    x += oddbit;
 
     // update cb_idx for the swizzled coordinate
-    cb_idx = (((t*LZ+z)*LY+y)*LX+x) >> 1;
-    idx = 2*cb_idx + aux1;
+    cb_idx = (nDim == 5 ? (((x[4]*X[3]+x[3])*X[2]+x[2])*X[1]+x[1])*X[0]+x[0] : ((x[3]*X[2]+x[2])*X[1]+x[1])*X[0]+x[0]) >> 1;
+    idx = 2*cb_idx + oddbit;
 #else
-    int aux1 =  idx / LX;
-    int aux2 = aux1 / LY;
-    int aux3 = aux2 / LZ;
+    int aux[5];
+    aux[0] = idx;
+    for (int i=0; i<4; i++) aux[i+1] = aux[i] / X[i];
 
-    x =  idx - aux1 * LX;
-    y = aux1 - aux2 * LY;
-    z = aux2 - aux3 * LZ;
-    t = aux3;
-    aux1 = (parity + t + z + y) & 1;
-    x += aux1;
-    idx += aux1;
+    x[0] = aux[0] - aux[1] * X[0];
+    x[1] = aux[1] - aux[2] * X[1];
+    x[2] = aux[2] - aux[3] * X[2];
+    x[3] = aux[3] - (nDim == 5 ? aux[4] * X[3] : 0);
+    x[4] = (nDim == 5) ? aux[4] : 0;
+
+    int oddbit = (pc_type == QUDA_4D_PC ? (param.parity + x[3] + x[2] + x[1]) : (param.parity + x[4] + x[3] + x[2] + x[1])) & 1;
+
+    x[0] += oddbit;
+    idx += oddbit;
 #endif
-  } else if (idxType == EVEN_Y /*!(LY & 1)*/) { // Y even
-    t = idx / XYZ;
-    z = (idx / XY) % LZ;
-    idx += (parity + t + z) & 1;
-    y = (idx / LX) % LY;
-    x = idx % LX;
-  } else if (idxType == EVEN_Z /*!(LZ & 1)*/) { // Z even
-    t = idx / XYZ;
-    idx += (parity + t) & 1;
-    z = (idx / XY) % LZ;
-    y = (idx / LX) % LY;
-    x = idx % LX;
+  } else if (idxType == EVEN_Y /*!(X[1] & 1)*/) { // Y even
+    x[4] = idx / XYZT;
+    x[3] = (idx / XYZ) % X[3];
+    x[2] = (idx / XY) % X[2];
+    idx += (param.parity + x[3] + x[2]) & 1;
+    x[1] = (idx / X[0]) % X[1];
+    x[0] = idx % X[0];
+  } else if (idxType == EVEN_Z /*!(X[2] & 1)*/) { // Z even
+    x[4] = idx / XYZT;
+    x[3] = (idx / XYZ) % X[3];
+    idx += (param.parity + x[3]) & 1;
+    x[2] = (idx / XY) % X[2];
+    x[1] = (idx / X[0]) % X[1];
+    x[0] = idx % X[0];
   } else {
-    idx += parity;
-    t = idx / XYZ;
-    z = (idx / XY) % LZ;
-    y = (idx / LX) % LY;
-    x = idx % LX;
-  }
+    x[4] = idx / XYZT;
+    idx += (param.parity + x[4]) & 1;
+    x[3] = idx / XYZ;
+    x[2] = (idx / XY) % X[2];
+    x[1] = (idx / X[0]) % X[1];
+    x[0] = idx % X[0];
+  } // else we do not support all odd local dimensions except fifth dimension
 }
 
 
+/**
+  @brief Compute coordinates from index into the checkerboard (used
+  by the interior Dslash kernels).  This is the variant used by the
+  shared memory wilson dslash.
 
+  @param[out] idx Linear index
+  @param[out] x Compute coordinates
+  @param[out] ch_idx Linear checkboard index
+  @param[in] param Parameter struct with required meta data
+*/
+template <IndexType idxType, typename Int, typename Param>
+static __device__ __forceinline__ void coordsFromIndex3D(int &idx, Int * const x, int &cb_idx, const Param &param) {
+  const auto *X = param.x;
 
-
-// compute coordinates from index into the checkerboard (used by the interior Dslash kernels)
-// This is the variant used byt the shared memory wilson dslash
-template <IndexType idxType, typename Int, typename T>
-static __device__ __forceinline__ void coordsFromIndex3D(int &idx, Int &x, Int &y, Int &z, Int &t, 
-							 int &cb_idx, const int &parity, const T X[])
-{
   if (idxType == EVEN_X) { // X even
     int xt = blockIdx.x*blockDim.x + threadIdx.x;
     int aux = xt+xt;
-    t = aux / X[0];
-    x = aux - t*X[0];
-    y = blockIdx.y*blockDim.y + threadIdx.y;
-    z = blockIdx.z*blockDim.z + threadIdx.z;
-    x += (parity + t + z + y) &1;
-    idx = ((t*X[2] + z)*X[1] + y)*X[0] + x;
+    x[3] = aux / X[0];
+    x[0] = aux - x[3]*X[0];
+    x[1] = blockIdx.y*blockDim.y + threadIdx.y;
+    x[2] = blockIdx.z*blockDim.z + threadIdx.z;
+    x[0] += (param.parity + x[3] + x[2] + x[1]) &1;
+    idx = ((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0];
     cb_idx = idx >> 1; 
   } else {
     // Non-even X is not (yet) supported.
@@ -591,383 +713,42 @@ static __device__ __forceinline__ void coordsFromIndex3D(int &idx, Int &x, Int &
   }
 }
 
-//Used in DW kernels only:
 
-template <int dim, int nLayers, int face_num, typename Param>
-static inline __device__ int indexFromDWFaceIndex(int face_idx, const int &face_volume, const Param &param)
-{
-  // intrinsic parity of the face depends on offset of first element
-  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
+/**
+  @brief Compute whether the provided coordinate is within the halo
+  region boundary of a given dimension.
 
-  // reconstruct full face index from index into the checkerboard
-  face_idx *= 2;
-
-  if (!(param.face_X[dim] & 1)) { // face_X even
-    //   int s = face_idx / face_XYZT;    
-    //   int t = (face_idx / face_XYZ) % face_T;
-    //   int z = (face_idx / face_XY) % face_Z;
-    //   int y = (face_idx / face_X) % face_Y;
-    //   face_idx += (face_parity + s + t + z + y) & 1;
-    // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = face_idx / param.face_X[dim];
-    int aux2 = aux1 / param.face_Y[dim];
-    int aux3 = aux2 / param.face_Z[dim];
-    int y = aux1 - aux2 * param.face_Y[dim];
-    int z = aux2 - aux3 * param.face_Z[dim];    
-    int s = aux3 / param.face_T[dim];
-    int t = aux3 - s * param.face_T[dim];
-    face_idx += (face_parity + s + t + z + y) & 1;
-  } else if (!(param.face_Y[dim] & 1)) { // face_Y even
-    int s = face_idx / param.face_XYZT[dim];    
-    int t = (face_idx / param.face_XYZ[dim]) % param.face_T[dim];
-    int z = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
-    face_idx += (face_parity + s + t + z) & 1;
-  } else if (!(param.face_Z[dim] & 1)) { // face_Z even
-    int s = face_idx / param.face_XYZT[dim];        
-    int t = (face_idx / param.face_XYZ[dim]) % param.face_T[dim];
-    face_idx += (face_parity + s + t) & 1;
-  } else if(!(param.face_T[dim])){
-    int s = face_idx / param.face_XYZT[dim];        
-    face_idx += (face_parity + s) & 1;
-  }else{    
-    face_idx += face_parity;
-  }
-
-  // compute index into the full local volume
-  int gap = param.X[dim] - nLayers;
-  int idx = face_idx;
-  int aux;
-  switch (dim) {
-    case 0:
-      aux = face_idx / param.face_X[dim];
-      idx += (aux + face_num) * gap;
-      break;
-    case 1:
-      aux = face_idx / param.face_XY[dim];
-      idx += (aux + face_num) * gap * param.face_X[dim];
-      break;
-    case 2:
-      aux = face_idx / param.face_XYZ[dim];
-      idx += (aux + face_num) * gap * param.face_XY[dim];
-      break;
-    case 3:
-      aux = face_idx / param.face_XYZT[dim];
-      idx += (aux + face_num) * gap * param.face_XYZ[dim];
-      break;
-  }
-
-  // return index into the checkerboard
-  return idx >> 1;
-}
-
-
-// compute full coordinates from an index into the face (used by the exterior Dslash kernels)
-template <int dim_, int nLayers, typename Int, typename Param>
-static inline __device__ void coordsFromDWFaceIndex(int &cb_idx, Int &x, Int &y, Int &z, Int &t, Int &s, int face_idx,
-						    const int &face_volume, const int &face_num, const Param &param)
-{
-  constexpr int dim = (dim_ == INTERIOR_KERNEL) ? 0 : dim_; // silence compiler warning
-
-  const auto &face_X = param.face_X[dim];
-  const auto &face_Y = param.face_Y[dim];
-  const auto &face_Z = param.face_Z[dim];
-  const auto &face_T = param.face_T[dim];
-  const auto &face_XYZT = param.face_XYZT[dim];
-  const auto &face_XYZ = param.face_XYZ[dim];
-  const auto &face_XY = param.face_XY[dim];
-  const auto *X = param.X;
-
-  // intrinsic parity of the face depends on offset of first element
-  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
-
-  // compute coordinates from (checkerboard) face index
-  face_idx *= 2;
-
-  if (!(face_X & 1)) { // face_X even
-    //   s = face_idx / face_XYZT;        
-    //   t = (face_idx / face_XYZ) % face_T;
-    //   z = (face_idx / face_XY) % face_Z;
-    //   y = (face_idx / face_X) % face_Y;
-    //   face_idx += (face_parity + s + t + z + y) & 1;
-    //   x = face_idx % face_X;
-    // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = face_idx / face_X;
-    x = face_idx - aux1 * face_X;
-    int aux2 = aux1 / face_Y;
-    y = aux1 - aux2 * face_Y;
-    int aux3 = aux2 / face_Z;
-    z = aux2 - aux3 * face_Z;
-    s = aux3 / face_T;
-    t = aux3 - s * face_T;
-    x += (face_parity + s + t + z + y) & 1;
-    // face_idx += (face_parity + t + z + y) & 1;
-  } else if (!(face_Y & 1)) { // face_Y even
-    s = face_idx / face_XYZT;    
-    t = (face_idx / face_XYZ) % face_T;
-    z = (face_idx / face_XY) % face_Z;
-    face_idx += (face_parity + s + t + z) & 1;
-    y = (face_idx / face_X) % face_Y;
-    x = face_idx % face_X;
-  } else if (!(face_Z & 1)) { // face_Z even
-    s = face_idx / face_XYZT;    
-    t = (face_idx / face_XYZ) % face_T;
-    face_idx += (face_parity + s + t) & 1;
-    z = (face_idx / face_XY) % face_Z;
-    y = (face_idx / face_X) % face_Y;
-    x = face_idx % face_X;
-  } else {
-    s = face_idx / face_XYZT;        
-    face_idx += face_parity;
-    t = (face_idx / face_XYZ) % face_T;
-    z = (face_idx / face_XY) % face_Z;
-    y = (face_idx / face_X) % face_Y;
-    x = face_idx % face_X;
-  }
-
-  // need to convert to global coords, not face coords
-  switch(dim) {
-    case 0:
-      x += face_num * (X[0]-nLayers);
-      break;
-    case 1:
-      y += face_num * (X[1]-nLayers);
-      break;
-    case 2:
-      z += face_num * (X[2]-nLayers);
-      break;
-    case 3:
-      t += face_num * (X[3]-nLayers);
-      break;
-  }
-
-  // compute index into the checkerboard
-  cb_idx = (X[0]*(X[1]*(X[2]*(X[3]*s + t) + z) + y) + x) >> 1;
-}
-
-template <int dim, int nLayers, int face_num, typename Param>
-static inline __device__ int indexFromDW4DFaceIndex(int face_idx, const int &face_volume, const Param &param)
-{
-  // intrinsic parity of the face depends on offset of first element, used for MPI DW as well
-  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
-
-  // reconstruct full face index from index into the checkerboard
-  face_idx *= 2;
-
-  if (!(param.face_X[dim] & 1)) { // face_X even
-    //   int s = face_idx / face_XYZT;    
-    //   int t = (face_idx / face_XYZ) % face_T;
-    //   int z = (face_idx / face_XY) % face_Z;
-    //   int y = (face_idx / face_X) % face_Y;
-    //   face_idx += (face_parity + s + t + z + y) & 1;
-    // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = face_idx / param.face_X[dim];
-    int aux2 = aux1 / param.face_Y[dim];
-    int aux3 = aux2 / param.face_Z[dim];
-    int y = aux1 - aux2 * param.face_Y[dim];
-    int z = aux2 - aux3 * param.face_Z[dim];    
-    int s = aux3 / param.face_T[dim];
-    int t = aux3 - s * param.face_T[dim];
-    face_idx += (face_parity + t + z + y) & 1;
-  } else if (!(param.face_Y[dim] & 1)) { // face_Y even
-  //  int s = face_idx / face_XYZT;    
-    int t = (face_idx / param.face_XYZ[dim]) % param.face_T[dim];
-    int z = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
-    face_idx += (face_parity + t + z) & 1;
-  } else if (!(param.face_Z[dim] & 1)) { // face_Z even
-  //  int s = face_idx / face_XYZT;        
-    int t = (face_idx / param.face_XYZ[dim]) % param.face_T[dim];
-    face_idx += (face_parity + t) & 1;
-  } else if(!(param.face_T)){
-  //  int s = face_idx / face_XYZT;        
-    face_idx += face_parity;
-  }else{    
-    face_idx += face_parity;
-  }
-
-  // compute index into the full local volume
-  int gap = param.X[dim] - nLayers;
-  int idx = face_idx;
-  int aux;
-  switch (dim) {
-  case 0:
-    aux = face_idx / param.face_X[dim];
-    idx += (aux + face_num) * gap;
-    break;
-  case 1:
-    aux = face_idx / param.face_XY[dim];
-    idx += (aux + face_num) * gap * param.face_X[dim];
-    break;
-  case 2:
-    aux = face_idx / param.face_XYZ[dim];
-    idx += (aux + face_num) * gap * param.face_XY[dim];
-    break;
-  case 3:
-    aux = face_idx / param.face_XYZT[dim];
-    idx += (aux + face_num) * gap * param.face_XYZ[dim];
-    break;
-  }
-
-  // return index into the checkerboard
-  return idx >> 1;
-}
-
-// compute full coordinates from an index into the face (used by the exterior Dslash kernels)
-template <int dim_, int nLayers, typename Int, typename Param>
-static inline __device__ void coordsFromDW4DFaceIndex(int &cb_idx, Int &x, Int &y, Int &z, Int &t, Int &s, int face_idx,
-						      const int &face_volume, const int &face_num, const Param &param)
-{
-  constexpr int dim = (dim_ == INTERIOR_KERNEL) ? 0 : dim_; // silence compiler warning
-
-  const auto &face_X = param.face_X[dim];
-  const auto &face_Y = param.face_Y[dim];
-  const auto &face_Z = param.face_Z[dim];
-  const auto &face_T = param.face_T[dim];
-  const auto &face_XYZT = param.face_XYZT[dim];
-  const auto &face_XYZ  = param.face_XYZ[dim];
-  const auto &face_XY = param.face_XY[dim];
-  const auto *X = param.X;
-
-  int face_parity = (param.parity + face_num * (X[dim] - nLayers)) & 1;
-
-  // compute coordinates from (checkerboard) face index
-  face_idx *= 2;
-
-  if (!(face_X & 1)) { // face_X even
-    //   s = face_idx / face_XYZT;        
-    //   t = (face_idx / face_XYZ) % face_T;
-    //   z = (face_idx / face_XY) % face_Z;
-    //   y = (face_idx / face_X) % face_Y;
-    //   face_idx += (face_parity + s + t + z + y) & 1;
-    //   x = face_idx % face_X;
-    // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = face_idx / face_X;
-    x = face_idx - aux1 * face_X;
-    int aux2 = aux1 / face_Y;
-    y = aux1 - aux2 * face_Y;
-    int aux3 = aux2 / face_Z;
-    z = aux2 - aux3 * face_Z;
-    s = aux3 / face_T;
-    t = aux3 - s * face_T;
-    x += (face_parity + t + z + y) & 1;
-  } else if (!(face_Y & 1)) { // face_Y even
-    s = face_idx / face_XYZT;    
-    t = (face_idx / face_XYZ) % face_T;
-    z = (face_idx / face_XY) % face_Z;
-    face_idx += (face_parity + t + z) & 1;
-    y = (face_idx / face_X) % face_Y;
-    x = face_idx % face_X;
-  } else if (!(face_Z & 1)) { // face_Z even
-    s = face_idx / face_XYZT;    
-    t = (face_idx / face_XYZ) % face_T;
-    face_idx += (face_parity + t) & 1;
-    z = (face_idx / face_XY) % face_Z;
-    y = (face_idx / face_X) % face_Y;
-    x = face_idx % face_X;
-  } else {
-    s = face_idx / face_XYZT;        
-    face_idx += face_parity;
-    t = (face_idx / face_XYZ) % face_T;
-    z = (face_idx / face_XY) % face_Z;
-    y = (face_idx / face_X) % face_Y;
-    x = face_idx % face_X;
-  }
-
-  //printf("Local sid %d (%d, %d, %d, %d, %d)\n", cb_idx, x, y, z, t, s);
-
-  // need to convert to global coords, not face coords
-  switch(dim) {
-  case 0:
-    x += face_num * (X[0]-nLayers);
-    break;
-  case 1:
-    y += face_num * (X[1]-nLayers);
-    break;
-  case 2:
-    z += face_num * (X[2]-nLayers);
-    break;
-  case 3:
-    t += face_num * (X[3]-nLayers);
-    break;
-  }
-
-  // compute index into the checkerboard
-
-  cb_idx = (X[0]*(X[1]*(X[2]*(X[3]*s + t) + z) + y) + x) >> 1;
-
-  //printf("Global sid %d (%d, %d, %d, %d, %d)\n", cb_idx, x, y, z, t, s);
-}
-
-//!ndeg tm:
-template <int dim, int nLayers, int face_num, typename Param>
-static inline __device__ int indexFromNdegTMFaceIndex(int face_idx, const int &face_volume, const Param &param)
-{
-  // intrinsic parity of the face depends on offset of first element
-  int face_parity = (param.parity + face_num * (param.X[dim] - nLayers)) & 1;
-
-  // reconstruct full face index from index into the checkerboard
-  face_idx *= 2;
-
-  if (!(param.face_X[dim] & 1)) { // face_X even
-    //   int t = (face_idx / face_XYZ) % face_T;
-    //   int z = (face_idx / face_XY) % face_Z;
-    //   int y = (face_idx / face_X) % face_Y;
-    //   face_idx += (face_parity + t + z + y) & 1;//the same parity for both flavors 
-    // equivalent to the above, but with fewer divisions/mods:
-    int aux1 = face_idx / param.face_X[dim];
-    int aux2 = aux1 / param.face_Y[dim];
-    int aux3 = aux2 / param.face_Z[dim];
-    int y = aux1 - aux2 * param.face_Y[dim];
-    int z = aux2 - aux3 * param.face_Z[dim];    
-    int Nf = aux3 / param.face_T[dim];
-    int t  = aux3 - Nf * param.face_T[dim];
-    face_idx += (face_parity + t + z + y) & 1;
-  } else if (!(param.face_Y[dim] & 1)) { // face_Y even
-    int t  = (face_idx / param.face_XYZ[dim]) % param.face_T[dim];
-    int z  = (face_idx / param.face_XY[dim]) % param.face_Z[dim];
-    face_idx += (face_parity + t + z) & 1;
-  } else if (!(param.face_Z[dim] & 1)) { // face_Z even
-    int t = (face_idx / param.face_XYZ[dim]) % param.face_T[dim];
-    face_idx += (face_parity + t) & 1;
-  } else if(!(param.face_T[dim])){
-    face_idx += face_parity & 1;
-  }else{    
-    face_idx += face_parity;
-  }
-
-  // compute index into the full local volume
-  int gap = param.X[dim] - nLayers;
-  int idx = face_idx;
-  int aux;
-  switch (dim) {
-    case 0:
-      aux = face_idx / param.face_X[dim];
-      idx += (aux + face_num) * gap;
-      break;
-    case 1:
-      aux = face_idx / param.face_XY[dim];
-      idx += (aux + face_num) * gap * param.face_X[dim];
-      break;
-    case 2:
-      aux = face_idx / param.face_XYZ[dim];
-      idx += (aux + face_num) * gap * param.face_XY[dim];
-      break;
-    case 3:
-      aux = face_idx / param.face_XYZT[dim];
-      idx += (aux + face_num) * gap * param.face_XYZ[dim];
-      break;
-  }
-
-  // return index into the checkerboard
-  return idx >> 1;
-}
-
-
-
+  @param[in] depth Depth of halo
+  @param[in] coord Coordinates
+  @param[in] X Lattice dimensions
+  @return True if in boundary, else false
+*/
 template <int dim, typename T>
-static inline __device__ bool inBoundary(const int width, const int coord[], const T X[]){
-  return ((coord[dim] >= X[dim] - width) || (coord[dim] < width));
+static inline __device__ bool inBoundary(const int depth, const int coord[], const T X[]){
+  return ((coord[dim] >= X[dim] - depth) || (coord[dim] < depth));
 }
 
+
+/**
+  @brief Compute whether this thread should be active for updating the
+  a given offsetDim halo.  This is used by the fused halo region
+  update kernels: here every thread has a prescribed dimension it is
+  tasked with updating, but for the edges and vertices, the thread
+  responsible for the entire update is the "greatest" one.  Hence some
+  threads may be labelled as a given dimension, but they have to
+  update other dimensions too.  Conversely, a given thread may be
+  labeled for a given dimension, but if that thread lies at en edge or
+  vertex, and we have partitioned a higher dimension, then that thread
+  will cede to the higher thread.
+
+  @param[in] threadDim Prescribed dimension of this thread
+  @param[in] offsetDim The dimension we are querying whether this thread should be responsible
+  @param[in] offset The size of the hop
+  @param[in] y Site coordinate
+  @param[in] partitioned Array of which dimensions have been partitioned
+  @param[in] X Lattice dimensions
+  @return True if this thread is active
+*/
 template <typename T>
 static inline __device__ bool isActive(const int threadDim, int offsetDim, int offset, const int y[],  const int partitioned[], const T X[])
 {
@@ -1009,39 +790,25 @@ static inline __device__ bool isActive(const int threadDim, int offsetDim, int o
   return true;
 }
 
-template <typename T>
-static inline __device__ bool isActive(const int threadDim, int offsetDim, int offset, int x1, int x2, int x3, int x4,
-                                       const int partitioned[], const T X[])
-{
-  int y[4] = {x1, x2, x3, x4};
-  return isActive(threadDim, offsetDim, offset, y, partitioned, X);
-}
 
 /**
- *  * Determines which face a given thread is computing.  Also rescale
- *   * face_idx so that is relative to a given dimension.
- *    */
-template <typename Param>
-__device__ inline int dimFromFaceIndex (int &face_idx, const Param &param) {
-  if (face_idx < param.threadDimMapUpper[0]) {
-    return 0;
-  } else if (face_idx < param.threadDimMapUpper[1]) {
-    face_idx -= param.threadDimMapLower[1];
-    return 1;
-  } else if (face_idx < param.threadDimMapUpper[2]) {
-    face_idx -= param.threadDimMapLower[2];
-    return 2;
-  } else { // this is only called if we use T kernel packing 
-    face_idx -= param.threadDimMapLower[3];
-    return 3;
-  }
-}
+  @brief Determines which face a given thread is computing.  Also
+  rescale face_idx so that is relative to a given dimension.  If 5-d
+  variant if called, then it is assumed that param.threads contains
+  only the 3-d surface of threads but face_idx is a 4-d index
+  (surface * fifth dimension).  At present multi-src staggered uses
+  the 4-d variant since the face_idx that is passed in is the 3-d
+  surface not the 4-d one.
 
-template <typename Param> 
-__device__ inline int dimFromDWFaceIndex(int &face_idx, const Param &param){
+  @param[in] face_idx Face index
+  @param[in] param Input parameters
+  @return dimension this face_idx corresponds to
+*/
+template <int nDim=4, typename Param>
+__device__ inline int dimFromFaceIndex(int &face_idx, const Param &param){
 
   // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
-  const int s = face_idx/param.threads;
+  const int s = (nDim == 5 ? face_idx/param.threads : 0);
 
   face_idx = face_idx - s*param.threads; // face_idx = face_idx % param.threads
 
@@ -1063,60 +830,37 @@ __device__ inline int dimFromDWFaceIndex(int &face_idx, const Param &param){
   }
 }
 
-template<int nLayers, typename T>
-static inline __device__ void faceIndexFromCoords(int &face_idx, int x, int y, int z, int t, int face_dim, const T X[4])
-{
-  int D[4] = {X[0], X[1], X[2], X[3]};
 
-  switch(face_dim){
-    case 0:
-      x = (x < nLayers) ? x : x - (X[0] - nLayers);
-      break;
-    case 1:
-      y = (y < nLayers) ? y : y - (X[1] - nLayers);
-      break;
-    case 2:
-      z = (z < nLayers) ? z : z - (X[2] - nLayers);
-      break;
-    case 3:
-      t = (t < nLayers) ? t : t - (X[3] - nLayers);
-      break;
-  }
+/**
+  @brief Compute the face index from the lattice coordinates.
+
+  @param[in] face_idx Face index
+  @param[in] x Lattice coordinates
+  @param[in] face_dim Which dimension
+  @param[in] param Input parameters
+  @return dimension this face_idx corresponds to
+*/
+template<int nDim, int nLayers, typename I, typename Param>
+static inline __device__ void faceIndexFromCoords(int &face_idx, I * const x, int face_dim, const Param &param)
+{
+  int D[4] = {param.X[0], param.X[1], param.X[2], param.X[3]};
+  int y[5] = {x[0], x[1], x[2], x[3], (nDim==5 ? x[4] : 0)};
+
+  y[face_dim] = (y[face_dim] < nLayers) ? y[face_dim] : y[face_dim] - (D[face_dim] - nLayers);
   D[face_dim] = nLayers;
 
-  face_idx = ((((D[2]*t + z)*D[1] + y)*D[0] + x) >> 1);
+  if (nDim == 5)      face_idx = (((((D[3]*y[4] + y[3])*D[2] + y[2])*D[1] + y[1])*D[0] + y[0]) >> 1);
+  else if (nDim == 4) face_idx =  ((((D[2]*y[3] + y[2])*D[1] + y[1])*D[0] + y[0]) >> 1);
 
   return;
 }
 
-template<int nLayers, typename T> 
-static inline __device__ void faceIndexFromDWCoords(int &face_idx, int x, int y, int z, int t, int s, int face_dim, const T X[4])
-{
-  int D[4] = {X[0], X[1], X[2], X[3]};
-  
-  switch(face_dim){
-    case 0:
-      x = (x < nLayers) ? x : x - (X[0] - nLayers);
-      break;
-    case 1:
-      y = (y < nLayers) ? y : y - (X[1] - nLayers);
-      break;
-    case 2:
-      z = (z < nLayers) ? z : z - (X[2] - nLayers);
-      break;
-    case 3:
-      t = (t < nLayers) ? t : t - (X[3] - nLayers);
-      break;
-  }
-  D[face_dim] = nLayers;
-
-  face_idx = (((((D[3]*s + t)*D[2] + z)*D[1] + y)*D[0] + x) >> 1);
-
-  return;
-}
 
 /*
-  Fast power function that works for negative "a" argument
+  @brief Fast power function that works for negative "a" argument
+  @param a argument we want to raise to some power
+  @param b power that we want to raise a to
+  @return pow(a,b)
 */
 __device__ inline float __fast_pow(float a, int b) {
   float sign = signbit(a) ? -1.0f : 1.0f;

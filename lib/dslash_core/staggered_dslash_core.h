@@ -373,7 +373,7 @@ spinorFloat o02_im;
   int x0odd;
   int full_idx;
 
-  if(kernel_type == INTERIOR_KERNEL){
+  if (kernel_type == INTERIOR_KERNEL) {
     //data order: X4 X3 X2 X1h
     za = sid/Xh[0];
     x0h = sid - za*Xh[0];
@@ -384,10 +384,8 @@ spinorFloat o02_im;
     x0odd = (y[1] + y[2] + y[3] + param.parity) & 1;
     y[0] = 2*x0h + x0odd;
     full_idx = 2*sid + x0odd;
-  }else{
-    coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, kernel_type, X, Xh);
-    full_idx = ((y[3]*X[2] +y[2])*X[1] +y[1])*X[0]+y[0];
-    sid = full_idx>>1;
+  } else {
+    coordsFromFaceIndexStaggered<kernel_type,NFACE,2>(y, sid, param);
   }
 
 

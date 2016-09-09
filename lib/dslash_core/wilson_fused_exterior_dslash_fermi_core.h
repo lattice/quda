@@ -392,7 +392,7 @@ VOLATILE spinorFloat o32_im;
 #include "read_clover.h"
 #include "io_spinor.h"
 
-int x1, x2, x3, x4;
+int coord[5];
 int X;
 
 #if (DD_PREC==2) // half precision
@@ -418,23 +418,23 @@ int sid;
 
   switch(dim) {
   case 0:
-    coordsFromFaceIndex<0,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,0,1>(X, sid, coord, face_idx, face_num, param);
     break;
   case 1:
-    coordsFromFaceIndex<1,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,1,1>(X, sid, coord, face_idx, face_num, param);
     break;
   case 2:
-    coordsFromFaceIndex<2,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,2,1>(X, sid, coord, face_idx, face_num, param);
     break;
   case 3:
-    coordsFromFaceIndex<3,1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, face_num, param);
+    coordsFromFaceIndex<4,QUDA_4D_PC,3,1>(X, sid, coord, face_idx, face_num, param);
     break;
   }
 
 
   bool active = false;
   for(int dir=0; dir<4; ++dir){
-   active = active  || isActive(dim,dir,+1,x1,x2,x3,x4,param.commDim,param.X);
+   active = active  || isActive(dim,dir,+1,coord,param.commDim,param.X);
   }
   if(!active) return;
 
@@ -454,7 +454,7 @@ int sid;
   o32_re = i32_re;  o32_im = i32_im;
 
 
-if ( isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
+if ( isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1 )
 {
   // Projector P0-
   // 1 0 0 -i 
@@ -462,7 +462,7 @@ if ( isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
   // 0 i 1 0 
   // i 0 0 1 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,0,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,0,param);
   const int sp_idx = face_idx + param.ghostOffset[0][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[0][1];
@@ -616,7 +616,7 @@ if ( isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
   
 }
 
-if ( isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
+if ( isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
 {
   // Projector P0+
   // 1 0 0 i 
@@ -624,7 +624,7 @@ if ( isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
   // 0 -i 1 0 
   // -i 0 0 1 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,0,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,0,param);
   const int sp_idx = face_idx + param.ghostOffset[0][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[0][0];
@@ -778,7 +778,7 @@ if ( isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
   
 }
 
-if ( isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
+if ( isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1 )
 {
   // Projector P1-
   // 1 0 0 -1 
@@ -786,7 +786,7 @@ if ( isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
   // 0 1 1 0 
   // -1 0 0 1 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,1,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,1,param);
   const int sp_idx = face_idx + param.ghostOffset[1][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[1][1];
@@ -940,7 +940,7 @@ if ( isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
   
 }
 
-if ( isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
+if ( isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
 {
   // Projector P1+
   // 1 0 0 1 
@@ -948,7 +948,7 @@ if ( isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
   // 0 -1 1 0 
   // 1 0 0 1 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,1,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,1,param);
   const int sp_idx = face_idx + param.ghostOffset[1][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[1][0];
@@ -1102,7 +1102,7 @@ if ( isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
   
 }
 
-if ( isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
+if ( isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1 )
 {
   // Projector P2-
   // 1 0 -i 0 
@@ -1110,7 +1110,7 @@ if ( isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
   // i 0 1 0 
   // 0 -i 0 1 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,2,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,2,param);
   const int sp_idx = face_idx + param.ghostOffset[2][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[2][1];
@@ -1264,7 +1264,7 @@ if ( isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
   
 }
 
-if ( isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
+if ( isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
 {
   // Projector P2+
   // 1 0 i 0 
@@ -1272,7 +1272,7 @@ if ( isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
   // -i 0 1 0 
   // 0 i 0 1 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,2,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,2,param);
   const int sp_idx = face_idx + param.ghostOffset[2][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[2][0];
@@ -1426,7 +1426,7 @@ if ( isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
   
 }
 
-if ( isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
+if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
 {
   // Projector P3-
   // 0 0 0 0 
@@ -1434,7 +1434,7 @@ if ( isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
   // 0 0 2 0 
   // 0 0 0 2 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,3,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,3,param);
   const int sp_idx = face_idx + param.ghostOffset[3][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[3][1];
@@ -1626,7 +1626,7 @@ if ( isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
   }
 }
 
-if ( isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
+if ( isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
 {
   // Projector P3+
   // 2 0 0 0 
@@ -1634,7 +1634,7 @@ if ( isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
   // 0 0 0 0 
   // 0 0 0 0 
   
-  faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,3,param.X);
+  faceIndexFromCoords<4,1>(face_idx,coord,3,param);
   const int sp_idx = face_idx + param.ghostOffset[3][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[3][0];
