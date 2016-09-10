@@ -120,8 +120,6 @@ namespace quda {
 	param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
 	return true;
       } else {
-	param.block.y = 1;
-	param.grid.y = nSrc;
 	bool rtn = DslashCuda::advanceBlockDim(param);
 	param.block.y = 1;
 	param.grid.y = nSrc;
