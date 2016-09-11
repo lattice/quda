@@ -77,7 +77,8 @@ namespace quda {
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
 		int col = s_col*Nc + c_col + color_offset;
-		out[color_local] += arg.Y(d+4, parity, x_cb, row, col) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col+color_offset);
+		out[color_local] += arg.Y(d+4, parity, x_cb, row, col)
+		  * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	    }
 	  }
@@ -91,7 +92,8 @@ namespace quda {
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
 		int col = s_col*Nc + c_col + color_offset;
-		out[color_local] += arg.Y(d+4, parity, x_cb, row, col) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col+color_offset);
+		out[color_local] += arg.Y(d+4, parity, x_cb, row, col)
+		  * arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	    }
 	  }
@@ -129,7 +131,8 @@ namespace quda {
 #pragma unroll
 	      for (int c_col=0; c_col<Nc; c_col+=color_stride) {
 		int col = s_col*Nc + c_col + color_offset;
-		out[color_local] += conj(arg.Y.Ghost(d, (parity+1)&1, ghost_idx, col, row)) * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col+color_offset);
+		out[color_local] += conj(arg.Y.Ghost(d, (parity+1)&1, ghost_idx, col, row))
+		  * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	  }
 	} else {
@@ -142,7 +145,8 @@ namespace quda {
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) {
 		int col = s_col*Nc + c_col + color_offset;
-		out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col+color_offset);
+		out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row))
+		  * arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	  }
 	}
@@ -403,9 +407,15 @@ namespace quda {
     // Experimental autotuning of the color column stride
     bool advanceAux(TuneParam &param) const
     {
+
 #if __COMPUTE_CAPABILITY__ >= 300
       // we can only split the dot product on Kepler and later since we need the __shfl instruction
-      if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0) {
+      if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0 &&
+	  param.block.x % deviceProp.warpSize == 0) {
+	// An x-dimension block size that is not a multiple of the
+	// warp size is incompatible with splitting the dot product
+	// across the warp so we must skip this
+
 	param.aux.x *= 2; // safe to advance
 	color_col_stride = param.aux.x;
 
