@@ -187,10 +187,10 @@ fermion_force_test(void)
   act_path_coeff[5] = -0.123113;        
     
   // download the momentum field to the GPU
-  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  cudaMom->loadCPUField(*cpuMom);
 
   // download the gauge field to the GPU
-  cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaGauge->loadCPUField(*cpuGauge);
 
   *cudaHw = *cpuHw;
     
@@ -216,7 +216,7 @@ fermion_force_test(void)
   double secs = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
     
   // copy the new momentum back on the CPU
-  cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  cudaMom->saveCPUField(*cpuMom);
 
   int res;
   res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize, 1e-5, gaugeParam.cpu_prec);

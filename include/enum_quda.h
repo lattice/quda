@@ -216,9 +216,9 @@ extern "C" {
   } QudaDiracFieldOrder;  
 
   typedef enum QudaCloverFieldOrder_s {
-    QUDA_FLOAT_CLOVER_ORDER=1,   // even-odd float ordering 
-    QUDA_FLOAT2_CLOVER_ORDER=2,   // even-odd float2 ordering
-    QUDA_FLOAT4_CLOVER_ORDER=4,   // even-odd float4 ordering
+    QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
+    QUDA_FLOAT2_CLOVER_ORDER = 2, // even-odd float2 ordering
+    QUDA_FLOAT4_CLOVER_ORDER = 4, // even-odd float4 ordering
     QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
     QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
     QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
@@ -410,13 +410,13 @@ extern "C" {
   typedef enum QudaComputeFatMethod_s {
     QUDA_COMPUTE_FAT_STANDARD,
     QUDA_COMPUTE_FAT_EXTENDED_VOLUME,
-    QUDA_COMPUTE_FAT_INVALID=  QUDA_INVALID_ENUM
+    QUDA_COMPUTE_FAT_INVALID = QUDA_INVALID_ENUM
   } QudaComputeFatMethod;
 
   typedef enum QudaFatLinkFlag_s {
-    QUDA_FAT_PRESERVE_CPU_GAUGE=1,
-    QUDA_FAT_PRESERVE_GPU_GAUGE=2,
-    QUDA_FAT_PRESERVE_COMM_MEM=4
+    QUDA_FAT_PRESERVE_CPU_GAUGE = 1,
+    QUDA_FAT_PRESERVE_GPU_GAUGE = 2,
+    QUDA_FAT_PRESERVE_COMM_MEM = 4
   } QudaFatLinkFlag;
 
   typedef enum QudaFieldGeometry_s {

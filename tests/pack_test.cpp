@@ -41,10 +41,6 @@ extern bool tune;
 
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
-// where is the packing / unpacking taking place
-//most orders are CPU only currently
-const QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION;
-
 void init() {
 
   param.cpu_prec = prec_cpu;
@@ -138,12 +134,12 @@ void packTest() {
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     stopwatchStart();
-    cudaCpsGauge.loadCPUField(cpsCpuGauge, location);    
+    cudaCpsGauge.loadCPUField(cpsCpuGauge);
     double cpsGtime = stopwatchReadSeconds();
     printf("CPS Gauge send time = %e seconds\n", cpsGtime);
 
     stopwatchStart();
-    cudaCpsGauge.saveCPUField(cpsCpuGauge, location);
+    cudaCpsGauge.saveCPUField(cpsCpuGauge);
     double cpsGRtime = stopwatchReadSeconds();
     printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
   }
@@ -165,12 +161,12 @@ void packTest() {
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     stopwatchStart();
-    cudaQdpGauge.loadCPUField(qdpCpuGauge, location);    
+    cudaQdpGauge.loadCPUField(qdpCpuGauge);
     double qdpGtime = stopwatchReadSeconds();
     printf("QDP Gauge send time = %e seconds\n", qdpGtime);
 
     stopwatchStart();
-    cudaQdpGauge.saveCPUField(qdpCpuGauge, location);
+    cudaQdpGauge.saveCPUField(qdpCpuGauge);
     double qdpGRtime = stopwatchReadSeconds();
     printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
   }

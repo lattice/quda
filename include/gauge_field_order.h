@@ -7,10 +7,17 @@
  *
  */
 
+// trove requires the warp shuffle instructions introduced with Fermi
+#if __COMPUTE_CAPABILITY__ >= 300
+#include <trove/ptr.h>
+#else
+#define DISABLE_TROVE
+#endif
 #include <tune_quda.h>
 #include <assert.h>
 #include <register_traits.h>
 #include <complex_quda.h>
+#include <quda_matrix.h>
 
 namespace quda {
 
@@ -296,50 +303,6 @@ namespace quda {
       };
 
 
-    // a += b*c
-    template <typename Float>
-      __device__ __host__ inline void accumulateComplexProduct(Float *a, const Float *b, const Float *c, Float sign) {
-      a[0] += sign*(b[0]*c[0] - b[1]*c[1]);
-      a[1] += sign*(b[0]*c[1] + b[1]*c[0]);
-    }
-
-    // a = b*c
-    template <typename Float>
-      __device__ __host__ inline void complexProduct(Float *a, const Float *b, const Float *c) {
-      a[0] = b[0]*c[0] - b[1]*c[1];
-      a[1] = b[0]*c[1] + b[1]*c[0];
-    }
-
-    // a = conj(b)*c
-    template <typename Float>
-      __device__ __host__ inline void complexDotProduct(Float *a, const Float *b, const Float *c) {
-      a[0] = b[0]*c[0] + b[1]*c[1];
-      a[1] = b[0]*c[1] - b[1]*c[0];
-    }
-
-    // a = b/c
-    template <typename Float>
-      __device__ __host__ inline void complexQuotient(Float *a, const Float *b, const Float *c){
-      complexDotProduct(a, c, b);
-      Float denom = c[0]*c[0] + c[1]*c[1];
-      a[0] /= denom;
-      a[1] /= denom;
-    }
-
-    // a += conj(b) * conj(c)
-    template <typename Float>
-      __device__ __host__ inline void accumulateConjugateProduct(Float *a, const Float *b, const Float *c, int sign) {
-      a[0] += sign * (b[0]*c[0] - b[1]*c[1]);
-      a[1] -= sign * (b[0]*c[1] + b[1]*c[0]);
-    }
-
-    // a = conj(b)*conj(c)
-    template <typename Float>
-      __device__ __host__ inline void complexConjugateProduct(Float *a, const Float *b, const Float *c) {
-      a[0] = b[0]*c[0] - b[1]*c[1];
-      a[1] = -b[0]*c[1] - b[1]*c[0];
-    }
-
     /** Generic reconstruction is no reconstruction */
     template <int N, typename Float>
       struct Reconstruct {
@@ -352,12 +315,7 @@ namespace quda {
 	__device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir, const RegType phase) const {
 	  for (int i=0; i<N; i++) out[i] = in[i];
 	}
-
-
-	__device__ __host__ inline void getPhase(RegType *phase, const RegType in[N]) const {
-	  *phase = 0;
-	}
-
+	__device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
       };
 
     /** No reconstruction but we scale the result. This is used for
@@ -375,8 +333,7 @@ namespace quda {
 					     int idx, int dir, const RegType phase) const {
 	for (int i=0; i<18; i++) out[i] = scale * in[i];
       }
-
-      __device__ __host__ inline void getPhase(RegType* phase, const RegType in[18]) const { *phase=0; return; }
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const { return 0; }
     };
 
       template <typename Float>
@@ -422,6 +379,7 @@ namespace quda {
       template <typename Float>
       struct Reconstruct<12,Float> {
 	typedef typename mapper<Float>::type RegType;
+	typedef complex<RegType> Complex;
 	int X[QUDA_MAX_DIM];
 	int R[QUDA_MAX_DIM];
 	const RegType anisotropy;
@@ -444,25 +402,21 @@ namespace quda {
 	  for (int i=0; i<12; i++) out[i] = in[i];
 	}
 
-	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[12],
-					       int idx, int dir, const RegType phase) const {
-	  for (int i=0; i<12; i++) out[i] = in[i];
-	  for (int i=12; i<18; i++) out[i] = 0.0;
-	  accumulateConjugateProduct(&out[12], &out[2], &out[10], +1);
-	  accumulateConjugateProduct(&out[12], &out[4], &out[8], -1);
-	  accumulateConjugateProduct(&out[14], &out[4], &out[6], +1);
-	  accumulateConjugateProduct(&out[14], &out[0], &out[10], -1);
-	  accumulateConjugateProduct(&out[16], &out[0], &out[8], +1);
-	  accumulateConjugateProduct(&out[16], &out[2], &out[6], -1);
+	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir, const RegType phase) const {
+	  const Complex *In = reinterpret_cast<const Complex*>(in);
+	  Complex *Out = reinterpret_cast<Complex*>(out);
 
-	  RegType u0 = dir < 3 ? anisotropy :
+	  const RegType u0 = dir < 3 ? anisotropy :
 	    timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
-	  for (int i=12; i<18; i++) out[i]*=u0;
+	  for(int i=0; i<6; ++i) Out[i] = In[i];
+
+	  Out[6] = u0*conj(Out[1]*Out[5] - Out[2]*Out[4]);
+	  Out[7] = u0*conj(Out[2]*Out[3] - Out[0]*Out[5]);
+	  Out[8] = u0*conj(Out[0]*Out[4] - Out[1]*Out[3]);
 	}
 
-	__device__ __host__ inline void getPhase(RegType* phase, const RegType in[18]){ *phase=0; return; }
-
+	__device__ __host__ inline RegType getPhase(const RegType in[18]) { return 0; }
       };
 
       // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
@@ -501,14 +455,14 @@ namespace quda {
 	  out[17] = in[8];
 	}
 
-	__device__ __host__ inline void getPhase(RegType* phase, const RegType in[18])
-	{ *phase=0; return; }
+	__device__ __host__ inline RegType getPhase(const RegType in[18]) { return 0; }
 
       };
 
       template <typename Float>
       struct Reconstruct<13,Float> {
       typedef typename mapper<Float>::type RegType;
+      typedef complex<RegType> Complex;
       const Reconstruct<12,Float> reconstruct_12;
       const RegType scale;
 
@@ -519,42 +473,40 @@ namespace quda {
       }
 
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir, const RegType phase) const {
-	for(int i=0; i<12; ++i) out[i] = in[i];
-	for(int i=12; i<18; ++i) out[i] = 0.0;
+	const Complex *In = reinterpret_cast<const Complex*>(in);
+	Complex *Out = reinterpret_cast<Complex*>(out);
+	const RegType coeff = static_cast<RegType>(1.0)/scale;
 
-	const RegType coeff = 1./scale;
+	for(int i=0; i<6; ++i) Out[i] = In[i];
 
-	accumulateConjugateProduct(&out[12], &out[2], &out[10], +coeff);
-	accumulateConjugateProduct(&out[12], &out[4], &out[8], -coeff);
-	accumulateConjugateProduct(&out[14], &out[4], &out[6], +coeff);
-	accumulateConjugateProduct(&out[14], &out[0], &out[10], -coeff);
-	accumulateConjugateProduct(&out[16], &out[0], &out[8], +coeff);
-	accumulateConjugateProduct(&out[16], &out[2], &out[6], -coeff);
+	Out[6] = coeff*conj(Out[1]*Out[5] - Out[2]*Out[4]);
+	Out[7] = coeff*conj(Out[2]*Out[3] - Out[0]*Out[5]);
+	Out[8] = coeff*conj(Out[0]*Out[4] - Out[1]*Out[3]);
 
-	// Multiply the third row by exp(I*3*phase)
+	// Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
 	RegType cos_sin[2];
 	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
-	RegType tmp[2];
-	complexProduct(tmp, cos_sin, &out[12]); out[12] = tmp[0]; out[13] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[14]); out[14] = tmp[0]; out[15] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[16]); out[16] = tmp[0]; out[17] = tmp[1];
+	Complex A(cos_sin[0], cos_sin[1]);
+
+	Out[6] *= A;
+	Out[7] *= A;
+	Out[8] *= A;
       }
 
-      __device__ __host__ inline void getPhase(RegType *phase, const RegType in[18]) const {
-	RegType denom[2];
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
+#if 1 // phase from cross product
+	const Complex *In = reinterpret_cast<const Complex*>(in);
 	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-	complexProduct(denom, in, in+8);
-	accumulateComplexProduct(denom, in+2, in+6, static_cast<RegType>(-1.0));
-
-	denom[0] /= scale;
-	denom[1] /= (-scale); // complex conjugate
-
-	RegType expI3Phase[2];
-	// numerator = U[2][2]
-	complexQuotient(expI3Phase, in+16, denom);
-
-	*phase = Trig<isHalf<RegType>::value,RegType>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
-	return;
+	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
+	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
+	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
+#else // phase from determinant
+	Matrix<Complex,3> a;
+	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
+	const Complex det = getDeterminant( a );
+	RegType phase = arg(det)/3;
+#endif
+	return phase;
       }
 
     };
@@ -563,6 +515,7 @@ namespace quda {
  template <typename Float>
     struct Reconstruct<8,Float> {
     typedef typename mapper<Float>::type RegType;
+    typedef complex<RegType> Complex;
     int X[QUDA_MAX_DIM];
     int R[QUDA_MAX_DIM];
     const RegType anisotropy;
@@ -588,141 +541,102 @@ namespace quda {
     }
 
     __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8],
-					   int idx, int dir, const RegType phase) const {
+					   int idx, int dir, const RegType phase, const RegType scale=1.0) const {
+      const Complex *In = reinterpret_cast<const Complex*>(in);
+      Complex *Out = reinterpret_cast<Complex*>(out);
+
       // First reconstruct first row
-      RegType row_sum = 0.0;
-      for (int i=2; i<6; i++) {
-	out[i] = in[i];
-	row_sum += in[i]*in[i];
-      }
+      Out[1] = In[1];
+      Out[2] = In[2];
+      RegType row_sum = norm(Out[1]) + norm(Out[2]);
 
       RegType u0 = dir < 3 ? anisotropy :
 	timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
+      u0 *= scale;
 
       RegType diff = static_cast<RegType>(1.0)/(u0*u0) - row_sum;
       RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      out[0] = U00_mag * Trig<isHalf<Float>::value,RegType>::Cos(in[0]);
-      out[1] = U00_mag * Trig<isHalf<Float>::value,RegType>::Sin(in[0]);
+      Out[0] = U00_mag * Complex(Trig<isHalf<Float>::value,RegType>::Cos(in[0]), Trig<isHalf<Float>::value,RegType>::Sin(in[0]));
 
       // Now reconstruct first column
-      RegType column_sum = 0.0;
-      for (int i=0; i<2; i++) column_sum += out[i]*out[i];
-      for (int i=6; i<8; i++) {
-	out[i] = in[i];
-	column_sum += in[i]*in[i];
-      }
-      diff = 1.f/(u0*u0) - column_sum;
+      Out[3] = In[3];
+      RegType column_sum = norm(Out[0]) + norm(Out[3]);
+
+      diff = static_cast<RegType>(1.0)/(u0*u0) - column_sum;
       RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      out[12] = U20_mag * Trig<isHalf<Float>::value,RegType>::Cos(in[1]);
-      out[13] = U20_mag * Trig<isHalf<Float>::value,RegType>::Sin(in[1]);
+      Out[6] = U20_mag * Complex( Trig<isHalf<Float>::value,RegType>::Cos(in[1]), Trig<isHalf<Float>::value,RegType>::Sin(in[1]));
       // First column now restored
 
       // finally reconstruct last elements from SU(2) rotation
       RegType r_inv2 = static_cast<RegType>(1.0)/(u0*row_sum);
 
-      // U11
-      RegType A[2];
-      complexDotProduct(A, out+0, out+6);
-      complexConjugateProduct(out+8, out+12, out+4);
-      accumulateComplexProduct(out+8, A, out+2, u0);
-      out[8] *= -r_inv2;
-      out[9] *= -r_inv2;
+      Complex A = conj(Out[0])*Out[3];
+      Out[4] = -(conj(Out[6])*conj(Out[2]) + u0*A*Out[1])*r_inv2; // U11
+      Out[5] = (conj(Out[6])*conj(Out[1]) - u0*A*Out[2])*r_inv2;  // U12
 
-      // U12
-      complexConjugateProduct(out+10, out+12, out+2);
-      accumulateComplexProduct(out+10, A, out+4, -u0);
-      out[10] *= r_inv2;
-      out[11] *= r_inv2;
-
-      // U21
-      complexDotProduct(A, out+0, out+12);
-      complexConjugateProduct(out+14, out+6, out+4);
-      accumulateComplexProduct(out+14, A, out+2, -u0);
-      out[14] *= r_inv2;
-      out[15] *= r_inv2;
-
-      // U12
-      complexConjugateProduct(out+16, out+6, out+2);
-      accumulateComplexProduct(out+16, A, out+4, u0);
-      out[16] *= -r_inv2;
-      out[17] *= -r_inv2;
+      A = conj(Out[0])*Out[6];
+      Out[7] = (conj(Out[3])*conj(Out[2]) - u0*A*Out[1])*r_inv2;  // U21
+      Out[8] = -(conj(Out[3])*conj(Out[1]) + u0*A*Out[2])*r_inv2; // U12
     }
 
-    __device__ __host__ inline void getPhase(RegType* phase, const RegType in[18]){ *phase=0; return; }
+    __device__ __host__ inline RegType getPhase(const RegType in[18]){ return 0; }
   };
 
 
     template <typename Float>
       struct Reconstruct<9,Float> {
       typedef typename mapper<Float>::type RegType;
+      typedef complex<RegType> Complex;
       const Reconstruct<8,Float> reconstruct_8;
       const RegType scale;
 
     Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()) {}
 
-      __device__ __host__ inline void getPhase(RegType *phase, const RegType in[18]) const {
-
-	RegType denom[2];
+      __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
+#if 1 // phase from cross product
+	const Complex *In = reinterpret_cast<const Complex*>(in);
 	// denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
-	complexProduct(denom, in, in+8);
-	accumulateComplexProduct(denom, in+2, in+6, static_cast<RegType>(-1.0));
-
-	denom[0] /= scale;
-	denom[1] /= (-scale); // complex conjugate
-
-	RegType expI3Phase[2];
-	// numerator = U[2][2]
-	complexQuotient(expI3Phase, in+16, denom);
-
-	*phase = Trig<isHalf<RegType>::value,RegType>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
+	Complex denom = conj(In[0]*In[4] - In[1]*In[3]) / scale;
+	Complex expI3Phase = In[8] / denom; // numerator = U[2][2]
+	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
+#else // phase from determinant
+	Matrix<Complex,3> a;
+	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
+	const Complex det = getDeterminant( a );
+	RegType phase = arg(det)/3;
+#endif
+	return phase;
       }
 
-      __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
-
-	RegType phase;
-	getPhase(&phase,in);
-	RegType cos_sin[2];
-	sincos(-phase, &cos_sin[1], &cos_sin[0]);
 	// Rescale the U3 input matrix by exp(-I*phase) to obtain an SU3 matrix multiplied by a real scale factor,
-	// which the macros in read_gauge.h can handle.
-	// NB: Only 5 complex matrix elements are used in the reconstruct 8 packing routine,
-	// so only need to rescale those elements.
-	RegType su3[18];
-	for(int i=0; i<4; ++i){
-	  complexProduct(su3 + 2*i, cos_sin, in + 2*i);
-	}
-	complexProduct(&su3[12], cos_sin, &in[12]);
-	reconstruct_8.Pack(out, su3, idx);
+      __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
+	RegType phase = getPhase(in);
+	RegType cos_sin[2];
+	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
+	Complex z(cos_sin[0], cos_sin[1]);
+	Complex su3[9];
+	for (int i=0; i<9; i++) su3[i] = z * reinterpret_cast<const Complex*>(in)[i];
+	reconstruct_8.Pack(out, reinterpret_cast<RegType*>(su3), idx);
       }
 
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase) const {
-	reconstruct_8.Unpack(out, in, idx, dir, phase);
+	reconstruct_8.Unpack(out, in, idx, dir, phase, scale);
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(phase, &cos_sin[1], &cos_sin[0]);
-	RegType tmp[2];
-	cos_sin[0] *= scale;
-	cos_sin[1] *= scale;
-
-	// rescale the matrix by exp(I*phase)*scale
-	complexProduct(tmp, cos_sin, &out[0]);  out[0] = tmp[0]; out[1] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[2]);  out[2] = tmp[0]; out[3] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[4]);  out[4] = tmp[0]; out[5] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[6]);  out[6] = tmp[0]; out[7] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[8]);  out[8] = tmp[0]; out[9] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[10]); out[10] = tmp[0]; out[11] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[12]); out[12] = tmp[0]; out[13] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[14]); out[14] = tmp[0]; out[15] = tmp[1];
-	complexProduct(tmp, cos_sin, &out[16]); out[16] = tmp[0]; out[17] = tmp[1];
+	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
+	Complex z(cos_sin[0], cos_sin[1]);
+	for (int i=0; i<9; i++) reinterpret_cast<Complex*>(out)[i] *= z;
       }
 
     };
 
-  template <typename Float, int length, int N, int reconLen>
+  template <typename Float, int length, int N, int reconLenParam>
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;
-      Reconstruct<reconLen,Float> reconstruct;
+      Reconstruct<reconLenParam,Float> reconstruct;
+      static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
+      static const int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
       Float *gauge;
       size_t offset;
       Float *ghost[4];
@@ -730,7 +644,6 @@ namespace quda {
       int faceVolumeCB[4];
       const int stride;
       const int geometry;
-      const int hasPhase;
       const size_t phaseOffset;
       void *backup_h; //! host memory for backing up the field when tuning
       size_t bytes;
@@ -739,7 +652,6 @@ namespace quda {
       : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
 	offset(u.Bytes()/(2*sizeof(Float))),
 	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
-	hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0),
 	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
       {
 	for (int i=0; i<4; i++) {
@@ -751,7 +663,7 @@ namespace quda {
     FloatNOrder(const FloatNOrder &order)
       : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
         volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry),
-	hasPhase(order.hasPhase), phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
+	phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
       {
 	for (int i=0; i<4; i++) {
 	  ghost[i] = order.ghost[i];
@@ -770,17 +682,20 @@ namespace quda {
         for (int i=0; i<M; i++){
 	  // first do vectorized copy from memory
 	  Vector vecTmp = vector_load<Vector>(gauge + parity*offset, x + dir*stride*M + stride*i);
-	  // second do vectorized copy converting into register type
-          copy(reinterpret_cast<RegVector*>(tmp)[i], vecTmp);
+	  // second do copy converting into register type
+#pragma unroll
+          for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
         }
 
         RegType phase = 0.;
         if(hasPhase) copy(phase, (gauge+parity*offset)[phaseOffset/sizeof(Float) + stride*dir + x]);
+
         // The phases come after the ghost matrices
         reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+
         const int M = reconLen / N;
         RegType tmp[reconLen];
         reconstruct.Pack(tmp, v, x);
@@ -790,14 +705,14 @@ namespace quda {
 #pragma unroll
         for (int i=0; i<M; i++){
 	  Vector vecTmp;
-	  // first do vectorized copy converting into storage type
-	  copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
+	  // first do copy converting into storage type
+#pragma unroll
+	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
 	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
         }
         if(hasPhase){
-          RegType phase;
-          reconstruct.getPhase(&phase,v);
+          RegType phase = reconstruct.getPhase(v);
           copy((gauge+parity*offset)[phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI)));
         }
       }
@@ -817,8 +732,9 @@ namespace quda {
 	    // first do vectorized copy from memory into registers
 	    Vector vecTmp = vector_load<Vector>(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase),
 						i*faceVolumeCB[dir]+x);
-	    // second do vectorized copy converting into register type
-	    copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
+	    // second do copy converting into register type
+#pragma unroll
+	    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
           }
           RegType phase=0.;
           if(hasPhase) copy(phase, ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x]);
@@ -838,18 +754,17 @@ namespace quda {
 
 #pragma unroll
           for (int i=0; i<M; i++) {
-	    const int hasPhase = 0;
 	    Vector vecTmp;
-	    // first do vectorized copy converting into storage type
-	    copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+	    // first do copy converting into storage type
+#pragma unroll
+	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy into memory
 	    reinterpret_cast< Vector*>
 	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
           }
 
-	  if(hasPhase){
-	    RegType phase=0.;
-	    reconstruct.getPhase(&phase, v);
+	  if (hasPhase) {
+	    RegType phase = reconstruct.getPhase(v);
 	    copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], static_cast<RegType>(phase/(2.*M_PI)));
 	  }
 	}
@@ -867,8 +782,9 @@ namespace quda {
 	  // first do vectorized copy from memory
 	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
-	  // second do vectorized copy converting into register type
-	  copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
+	  // second do copy converting into register type
+#pragma unroll
+	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
 	}
 	RegType phase=0.;
 	if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1)
@@ -890,16 +806,16 @@ namespace quda {
 #pragma unroll
 	  for (int i=0; i<M; i++) {
 	    Vector vecTmp;
-	    // first do vectorized copy converting into storage type
-	    copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+	    // first do copy converting into storage type
+#pragma unroll
+	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy to memory
 	    reinterpret_cast< Vector* >
 	      (ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase))
 	      [i*R[dim]*faceVolumeCB[dim]+buff_idx] = vecTmp;
 	  }
-	  if(hasPhase){
-	    RegType phase=0.;
-	    reconstruct.getPhase(&phase, v);
+	  if (hasPhase) {
+	    RegType phase = reconstruct.getPhase(v);
 	    copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + R[dim]*faceVolumeCB[dim]*M*N + buff_idx],
 		 static_cast<RegType>(phase/(2.*M_PI)));
 	  }
@@ -928,6 +844,14 @@ namespace quda {
       size_t Bytes() const { return reconLen * sizeof(Float); }
     };
 
+
+  /**
+     @brief This is just a dummy structure we use for trove to define the
+     required structure size
+     @param real Real number type
+     @param length Number of elements in the structure
+  */
+  template <typename real, int length> struct S { real v[length]; };
 
   /**
       The LegacyOrder defines the ghost zone storage and ordering for
@@ -962,27 +886,56 @@ namespace quda {
       virtual ~LegacyOrder() { ; }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
-	for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
+	structure v_ = ghost_[parity*faceVolumeCB[dir] + x];
+	for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
+#else
+	for (int i=0; i<length; i++) v[i] = (RegType)ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
+#endif
       }
 
       __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
-	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
+	structure v_;
+	for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
+	ghost_[parity*faceVolumeCB[dir] + x] = v_;
+#else
+	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = (Float)v[i];
+#endif
       }
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dummy, int dir,
 						  int dim, int g, int parity, const int R[]) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
+	structure v_ = ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g];
+	for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
+#else
 	for (int i=0; i<length; i++) {
-	  v[i] = ghost[dim]
-	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
+	  v[i] = (RegType)ghost[dim][(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
 	}
+#endif
       }
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
 						  int dir, int dim, int g, int parity, const int R[]) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
+	structure v_;
+	for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
+	ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g] = v_;
+#else
 	for (int i=0; i<length; i++) {
 	  ghost[dim]
-	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
+	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = (Float)v[i];
 	}
+#endif
       }
 
     };
@@ -1004,15 +957,30 @@ namespace quda {
       virtual ~QDPOrder() { ; }
 
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
+	structure v_ = gauge_[parity*volumeCB + x];
+	for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
+#else
 	for (int i=0; i<length; i++) {
 	  v[i] = (RegType)gauge[dir][(parity*volumeCB + x)*length + i];
 	}
+#endif
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
+	structure v_;
+	for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
+	gauge_[parity*volumeCB + x] = v_;
+#else
 	for (int i=0; i<length; i++) {
 	  gauge[dir][(parity*volumeCB + x)*length + i] = (Float)v[i];
 	}
+#endif
       }
 
       size_t Bytes() const { return length * sizeof(Float); }
@@ -1071,15 +1039,30 @@ namespace quda {
     virtual ~MILCOrder() { ; }
 
     __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[(parity*volumeCB+x)*geometry + dir];
+      for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
+#else
       for (int i=0; i<length; i++) {
 	v[i] = (RegType)gauge[((parity*volumeCB+x)*geometry + dir)*length + i];
       }
+#endif
     }
 
     __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_;
+      for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
+      gauge_[(parity*volumeCB+x)*geometry + dir] = v_;
+#else
       for (int i=0; i<length; i++) {
 	gauge[((parity*volumeCB+x)*geometry + dir)*length + i] = (Float)v[i];
       }
+#endif
     }
 
     size_t Bytes() const { return length * sizeof(Float); }
@@ -1109,6 +1092,15 @@ namespace quda {
 
     // we need to transpose and scale for CPS ordering
     __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[((parity*volumeCB+x)*geometry + dir)];
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v[(i*Nc+j)*2+z] = (RegType)v_.v[(j*Nc+i)*2+z] / anisotropy;
+#else
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
@@ -1117,9 +1109,20 @@ namespace quda {
 	  }
 	}
       }
+#endif
     }
 
     __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_;
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v_.v[(j*Nc+i)*2+z] = (Float)(anisotropy * v[(i*Nc+j)*2+z]);
+      gauge_[((parity*volumeCB+x)*geometry + dir)] = v_;
+#else
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
@@ -1128,6 +1131,7 @@ namespace quda {
 	  }
 	}
       }
+#endif
     }
 
     size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1159,6 +1163,15 @@ namespace quda {
 
       // we need to transpose for BQCD ordering
       __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[(dir*2+parity)*exVolumeCB + x];
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v[(i*Nc+j)*2+z] = (RegType)v_.v[(j*Nc+i)*2+z];
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1166,9 +1179,20 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+	structure v_;
+	for (int i=0; i<Nc; i++)
+	  for (int j=0; j<Nc; j++)
+	    for (int z=0; z<2; z++)
+	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]);
+	gauge_[(dir*2+parity)*exVolumeCB + x] = v_;
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1176,6 +1200,7 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1205,6 +1230,15 @@ namespace quda {
 
       // we need to transpose for TIFR ordering
       __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+      structure v_ = gauge_[(dir*2+parity)*volumeCB + x];
+      for (int i=0; i<Nc; i++)
+	for (int j=0; j<Nc; j++)
+	  for (int z=0; z<2; z++)
+	    v[(i*Nc+j)*2+z] = (RegType)v_.v[(j*Nc+i)*2+z] / scale;
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1212,9 +1246,20 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+	structure v_;
+	for (int i=0; i<Nc; i++)
+	  for (int j=0; j<Nc; j++)
+	    for (int z=0; z<2; z++)
+	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]) * scale;
+	gauge_[(dir*2+parity)*volumeCB + x] = v_;
+#else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
@@ -1222,6 +1267,7 @@ namespace quda {
 	    }
 	  }
 	}
+#endif
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1256,7 +1302,6 @@ namespace quda {
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
-
 
   // experiments in reducing template instantation boilerplate
   // can this be replaced with a C++11 variant that uses variadic templates?

@@ -25,7 +25,6 @@ namespace quda {
     QudaFieldCreate create; // used to determine the type of field created
 
     QudaFieldGeometry geometry; // whether the field is a scale, vector or tensor
-    int pinned; //used in cpu field only, where the host memory is pinned
 
     // whether we need to compute the fat link maxima
     // FIXME temporary flag until we have a kernel that can do this, then we just do this in copy()
@@ -62,7 +61,6 @@ namespace quda {
       gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), 
       geometry(QUDA_VECTOR_GEOMETRY),
-      pinned(0),
       compute_fat_link_max(false),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
 
@@ -85,11 +83,11 @@ namespace quda {
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry, 
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
-    : LatticeFieldParam(), nColor(3), nFace(0), reconstruct(reconstruct), 
-      order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
-      link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
-      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
-      pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
+    : LatticeFieldParam(), nColor(3), nFace(0), reconstruct(reconstruct),
+      order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO),
+      link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
+      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
+      compute_fat_link_max(false), ghostExchange(ghostExchange),
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), i_mu(0.0)
       {
 	// variables declared in LatticeFieldParam
@@ -106,7 +104,7 @@ namespace quda {
       nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order), 
       fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
       anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
-      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
+      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
       staggeredPhaseType(param.staggered_phase_type), 
       staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu)
@@ -244,9 +242,14 @@ namespace quda {
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
 
-    const void** Ghost() const { 
+    const void** Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return (const void**)ghost; 
+      return (const void**)ghost;
+    }
+
+    void** Ghost() {
+      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
+      return ghost;
     }
 
     /**
@@ -259,6 +262,16 @@ namespace quda {
      * @param[in] src Source from which we are copying
      */
     virtual void copy(const GaugeField &src) = 0;
+
+    /**
+       @brief Backs up the cpuGaugeField
+    */
+    virtual void backup() const = 0;
+
+    /**
+       @brief Restores the cpuGaugeField
+    */
+    virtual void restore() = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -308,8 +321,8 @@ namespace quda {
      */
     void copy(const GaugeField &src);
 
-    void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
-    void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
+    void loadCPUField(const cpuGaugeField &);
+    void saveCPUField(cpuGaugeField &) const;
 
     // (ab)use with care
     void* Gauge_p() { return gauge; }
@@ -329,9 +342,15 @@ namespace quda {
 
     mutable char *backup_h;
     mutable bool backed_up;
-    // backs up the cudaGaugeField to CPU memory
+
+    /**
+       @brief Backs up the cudaGaugeField to CPU memory
+    */
     void backup() const;
-    // restores the cudaGaugeField to CUDA memory
+
+    /**
+       @brief Restores the cudaGaugeField to CUDA memory
+    */
     void restore();
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
@@ -345,12 +364,11 @@ namespace quda {
   class cpuGaugeField : public GaugeField {
 
     friend void cudaGaugeField::copy(const GaugeField &cpu);
-    friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &);
-    friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &) const;
+    friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu);
+    friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const;
 
   private:
     void **gauge; // the actual gauge field
-    int pinned;
 
   public:
     cpuGaugeField(const GaugeFieldParam &);
@@ -385,6 +403,20 @@ namespace quda {
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
+
+    mutable char *backup_h;
+    mutable bool backed_up;
+
+    /**
+     @brief Backs up the cpuGaugeField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cpuGaugeField
+    */
+    void restore();
+
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -399,7 +431,7 @@ namespace quda {
      @param u The gauge field that we want the norm of
      @return The L1 norm of the gauge field
   */
-  double norm1(const cudaGaugeField &u);
+  double norm1(const GaugeField &u);
 
   /**
      This is a debugging function, where we cast a gauge field into a
@@ -407,7 +439,7 @@ namespace quda {
      @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const cudaGaugeField &u);
+  double norm2(const GaugeField &u);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

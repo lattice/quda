@@ -704,12 +704,7 @@ namespace quda {
       sprintf(aux_string,"threads=%d,prec=%lu",arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     void preTune() {
       arg.data.backup();
       if(HeatbathOrRelax) arg.rngstate.backup();

@@ -34,12 +34,11 @@ namespace quda {
     
   }
 
-  std::string TimeProfile::pname[] = { "download",  "upload", "init", "preamble", "compute", 
-				       "epilogue", "free", "dummy", "pack kernel", "dslash kernel", 
-				       "gather", "scatter", "event record", 
-				       "event query", "stream wait event", 
-				       "comms", "comms start", "comms query", "constant", "file i/o",
-				       "total" };
+  std::string TimeProfile::pname[] = { "download",  "upload", "init", "preamble", "compute",
+				       "comms", "epilogue", "free", "dummy", "pack kernel",
+				       "dslash kernel", "gather", "scatter", "event record",
+				       "event query", "stream wait event", "comms start",
+				       "comms query", "constant", "file i/o", "total" };
 
 #ifdef INTERFACE_NVTX
   const uint32_t TimeProfile::nvtx_colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };

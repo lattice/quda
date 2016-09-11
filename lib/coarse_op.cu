@@ -164,11 +164,12 @@ namespace quda {
     gf_param.gauge = NULL;
     gf_param.create = QUDA_NULL_FIELD_CREATE;
     gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gf_param.nFace = 1;
 
     cpuGaugeField g(gf_param);
 
     //Copy the cuda gauge field to the cpu
-    gauge.saveCPUField(g, QUDA_CPU_FIELD_LOCATION);
+    gauge.saveCPUField(g);
 
     //Create a field UV which holds U*V.  Has the same structure as V.
     ColorSpinorParam UVparam(T.Vectors());

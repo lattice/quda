@@ -186,8 +186,10 @@ namespace quda {
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      switch(dslashType){
+      dslashParam.block[0] = tp.aux.x; dslashParam.block[1] = tp.aux.y; dslashParam.block[2] = tp.aux.z; dslashParam.block[3] = tp.aux.w;
+      for (int i=0; i<4; i++) dslashParam.grid[i] = ( (i==0 ? 2 : 1) * in->X(i)) / dslashParam.block[i];
 
+      switch(dslashType){
       case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
 	DSLASH(twistedCloverInvDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cNorm, cloverInv, cNrm2,

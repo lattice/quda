@@ -20,13 +20,15 @@ namespace quda {
     dim3 block;
     dim3 grid;
     int shared_bytes;
-    dim3 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
     float time;
     long long n_calls;
 
-  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(1, 1, 1), time(FLT_MAX), n_calls(0) { }
+  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
+      aux = make_int4(1,1,1,1);
+    }
 
     TuneParam(const TuneParam &param)
       : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
@@ -175,9 +177,12 @@ namespace quda {
       {
 	std::stringstream ps;
 	ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-	ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+	if (tuneGridDim()) ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
 	ps << "shared=" << param.shared_bytes << ", ";
-	ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << ")";
+
+	// determine if we are tuning the auxiliary dimension
+	TuneParam dummy; initTuneParam(dummy);
+	if (advanceAux(dummy)) ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
 	return ps.str();
       }
 
@@ -293,6 +298,11 @@ namespace quda {
       param.block.y = 2;
     }
 
+    void defaultTuneParam(TuneParam &param) const {
+      Tunable::defaultTuneParam(param);
+      param.block.y = 2;
+    }
+
   };
   
   /**
@@ -304,8 +314,8 @@ namespace quda {
   class TunableVectorY : public Tunable {
 
   protected:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    virtual unsigned int sharedBytesPerThread() const { return 0; }
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     // don't tune the grid dimension
     bool tuneGridDim() const { return false; }
@@ -331,7 +341,7 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y <= vector_length) {
+	if (param.block.y < vector_length) {
 	  param.block.y++;
 	  param.grid.y = (vector_length + param.block.y - 1) / param.block.y;
 	  return true;
@@ -360,9 +370,18 @@ namespace quda {
 
   };
 
-  void loadTuneCache(QudaVerbosity verbosity);
-  void saveTuneCache(QudaVerbosity verbosity);
-  void saveProfile(QudaVerbosity verbosity);
+  void loadTuneCache();
+  void saveTuneCache();
+
+  /**
+   * @brief Save profile to disk.
+   */
+  void saveProfile(const std::string label = "");
+
+  /**
+   * @brief Flush profile contents, setting all counts to zero.
+   */
+  void flushProfile();
 
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
