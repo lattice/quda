@@ -1602,6 +1602,7 @@ int mg_levels = 2;
 
 int nu_pre = 2;
 int nu_post = 2;
+QudaInverterType smoother_type = QUDA_MR_INVERTER;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 
@@ -1672,6 +1673,7 @@ void usage(char** argv )
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
@@ -2266,7 +2268,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc= atoi(argv[i+1]);
-    if (Nsrc < 1 || Nsrc > 64){
+    if (Nsrc < 1 || Nsrc > 128){
       printf("ERROR: invalid number of sources (%d)\n", Nsrc);
       usage(argv);
     }
@@ -2343,6 +2345,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-smoother") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    smoother_type = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
