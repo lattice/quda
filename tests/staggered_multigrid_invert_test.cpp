@@ -181,6 +181,8 @@ void setGaugeParam(QudaGaugeParam &gaugeParam, double tadpole_coeff) {
   gaugeParam.anisotropy = 1.0;
   gaugeParam.tadpole_coeff = tadpole_coeff;
 
+  gaugeParam._2d_u1_emulation = _2d_u1_emulation;
+
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
 
@@ -742,7 +744,7 @@ void mg_test(int argc, char** argv)
   out = new cpuColorSpinorField(csParam);  
   ref = new cpuColorSpinorField(csParam);  
   tmp = new cpuColorSpinorField(csParam);  
-
+/*
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
     if(  inv_param.use_init_guess == QUDA_USE_INIT_GUESS_YES && inv_param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
       constructSpinorField((float*)out->V(), out->Volume());
@@ -754,7 +756,9 @@ void mg_test(int argc, char** argv)
     else
       constructSpinorField((double*)in->V(), in->Volume());
   }
-
+*/
+  if(!_2d_u1_emulation) in->Source(QUDA_RANDOM_SOURCE);
+  else generic2DSource(*in);
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
   tmp_value = MAX(tmp_value, xdim*ydim*tdim/2);

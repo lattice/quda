@@ -152,6 +152,8 @@ namespace quda {
     dslashParam.parity = parity;
     dslashParam.gauge_stride = gauge.Stride();
     dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
+    //experimental for U1 emulation:
+    dslashParam.staggered_u1_emulation = gauge.StaggeredU1Emulation() ? 1 : 0;
     // in the solver for the improved staggered action
 
     for(int i=0;i<4;i++){

@@ -43,6 +43,9 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
+    /*** Experimental only! ***/
+    bool staggered_u1_emulation;
+
     /** Imaginary chemical potential */
     double i_mu;
 
@@ -66,6 +69,7 @@ namespace quda {
 
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
       staggeredPhaseApplied(false),
+      staggered_u1_emulation(false),
       i_mu(0.0)
 	{
 	  // variables declared in LatticeFieldParam
@@ -88,7 +92,7 @@ namespace quda {
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
       compute_fat_link_max(false), ghostExchange(ghostExchange),
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), i_mu(0.0)
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), staggered_u1_emulation(false), i_mu(0.0)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -107,7 +111,7 @@ namespace quda {
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
       staggeredPhaseType(param.staggered_phase_type), 
-      staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu)
+      staggeredPhaseApplied(param.staggered_phase_applied), staggered_u1_emulation(param._2d_u1_emulation), i_mu(param.i_mu)
 	{
 	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
@@ -169,6 +173,9 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
+    /*** Experimental only! ***/
+    bool staggered_u1_emulation;
+
     /**
        @brief Exchange the buffers across all dimensions in a given direction
        @param recv[out] Reicve buffer
@@ -203,6 +210,8 @@ namespace quda {
     QudaGhostExchange GhostExchange() const { return ghostExchange; }
     QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
     bool StaggeredPhaseApplied() const { return staggeredPhaseApplied; }
+    /**Experimental! */
+    bool StaggeredU1Emulation() const { return staggered_u1_emulation; }
 
     /**
        Apply the staggered phase factors to the gauge field.
@@ -272,6 +281,7 @@ namespace quda {
        @brief Restores the cpuGaugeField
     */
     virtual void restore() = 0;
+    
   };
 
   class cudaGaugeField : public GaugeField {

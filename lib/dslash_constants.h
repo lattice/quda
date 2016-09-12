@@ -37,6 +37,8 @@ enum KernelType {
     int gauge_stride;
     int long_gauge_stride;
     float fat_link_max;
+//Experimental only!
+    int staggered_u1_emulation;
 #endif 
 #ifdef MULTI_GPU
     int threadDimMapLower[4];

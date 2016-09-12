@@ -764,6 +764,47 @@ if (!(threadIdx.z & 1))
 
 }
 
+///MODIFIED:
+
+if(param.staggered_u1_emulation) {
+#if (DD_DAG == 1)
+{
+  o00_re = - o00_re;
+  o00_im = - o00_im;
+  o01_re = 0.0;
+  o01_im = 0.0;
+  o02_re = 0.0;
+  o02_im = 0.0;
+}
+#endif
+
+#ifdef DSLASH_AXPY
+#ifdef MULTI_GPU
+  o00_re = -o00_re;
+  o00_im = -o00_im;
+  o01_re = 0.0;
+  o01_im = 0.0;
+  o02_re = 0.0;
+  o02_im = 0.0;
+#else
+READ_ACCUM(ACCUMTEX, half_idx+src_idx*Vh);
+o00_re = -o00_re + a*accum0.x;
+o00_im = -o00_im + a*accum0.y;
+o01_re = 0.0;
+o01_im = 0.0;
+o02_re = 0.0;
+o02_im = 0.0;
+#endif 
+#endif 
+
+#ifdef MULTI_GPU
+if (active){
+  READ_AND_SUM_SPINOR(INTERTEX, half_idx+src_idx*Vh);
+  WRITE_SPINOR(out, half_idx+src_idx*Vh, param.sp_stride);
+}
+#endif
+return;
+}
 
 #ifdef PARALLEL_DIR
 if (threadId.z & 1)

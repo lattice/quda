@@ -18,6 +18,8 @@ extern void *memset(void *s, int c, size_t n);
 
 #include <dslash_util.h>
 
+#define _2D_EMULATION
+
 //
 // dslashReference()
 //
@@ -47,6 +49,9 @@ template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *spinorField, 
 		     int oddBit, int daggerBit) 
 {
+#ifdef _2D_EMULATION
+  warningQuda("\nUsing 2D emulation.\n");
+#endif
   const int nSrc = Ls; // Ls should already be set
 
   for (int i=0; i<Vh*mySpinorSiteSize*nSrc; i++) res[i] = 0.0;
@@ -66,8 +71,11 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *s
     for (int i = 0; i < Vh; i++) {
       int sid = i + xs*Vh;
       int offset = mySpinorSiteSize*sid;
-
+#ifdef _2D_EMULATION
+      for (int dir = 0; dir < 4; dir++) {
+#else
       for (int dir = 0; dir < 8; dir++) {
+#endif
 	gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
 	gFloat* longlnk = gaugeLink(i, dir, oddBit, longlinkEven, longlinkOdd, 3);
 

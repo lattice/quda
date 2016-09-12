@@ -63,6 +63,7 @@ extern "C" {
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
+    bool _2d_u1_emulation;  /**< Experimental : whether we want 2d u1 field*/
 
     double i_mu; /**< Imaginary chemical potential */
 

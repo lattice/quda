@@ -826,6 +826,83 @@ if (!(threadIdx.z & 1))
 #endif
 }
 
+
+///MODIFIED (the actual 2d path):
+
+if(param.staggered_u1_emulation) {
+#ifdef PARALLEL_DIR
+__syncthreads();
+
+// add the forward gathers to the backward gathers and save
+if (threadIdx.z & 1) {
+  o00_re += s[0*SHARED_STRIDE];
+  o00_im += s[1*SHARED_STRIDE];
+  o01_re += 0.0;
+  o01_im += 0.0;
+  o02_re += 0.0;
+  o02_im += 0.0;
+#else
+  {
+#endif // PARALLEL_DIR
+
+
+#if (DD_DAG == 1)
+{
+  o00_re = - o00_re;
+  o00_im = - o00_im;
+  o01_re = 0.0;
+  o01_im = 0.0;
+  o02_re = 0.0;
+  o02_im = 0.0;
+}
+
+#endif
+
+#ifdef DSLASH_AXPY
+#ifdef MULTI_GPU
+if (kernel_type == INTERIOR_KERNEL){
+  READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
+  o00_re = -o00_re + a*accum0.x;
+  o00_im = -o00_im + a*accum0.y;
+  o01_re = 0.0;
+  o01_im = 0.0;
+  o02_re = 0.0;
+  o02_im = 0.0;
+}else{
+  o00_re = -o00_re;
+  o00_im = -o00_im;
+  o01_re = 0.0;
+  o01_im = 0.0;
+  o02_re = 0.0;
+  o02_im = 0.0;
+}
+#else
+READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
+o00_re = -o00_re + a*accum0.x;
+o00_im = -o00_im + a*accum0.y;
+o01_re = 0.0;
+o01_im = 0.0;
+o02_re = 0.0;
+o02_im = 0.0;
+#endif //MULTI_GPU
+#endif // DSLASH_AXPY
+
+#ifdef MULTI_GPU
+//if (kernel_type == EXTERIOR_KERNEL_T){
+if (kernel_type != INTERIOR_KERNEL){
+  READ_AND_SUM_SPINOR(INTERTEX, sid + src_idx*Vh);
+}
+#endif
+
+
+// write spinor field back to device memory
+WRITE_SPINOR(out, sid + src_idx*Vh, param.sp_stride);
+  }
+return;
+}
+
+
+
 #ifdef PARALLEL_DIR
 if (threadIdx.z&1)
 #endif // PARALLEL_DIR
