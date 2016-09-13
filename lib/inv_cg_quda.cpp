@@ -630,7 +630,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       AC[i*param.num_src + j] = Linv(i,j);
     }
   }
-  blas::multcaxpy(AC,r,p,param.num_src);
+  blas::multicaxpy(AC,r,p,param.num_src);
 
 
   #endif
@@ -686,7 +686,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*param.num_src + j] = alpha(i,j);
       }
     }
-    blas::multcaxpy(AC,p,xSloppy,param.num_src);
+    blas::multicaxpy(AC,p,xSloppy,param.num_src);
     #endif
 
     beta = pAp.inverse();
@@ -705,7 +705,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*param.num_src + j] = -beta(i,j);
       }
     }
-    blas::multcaxpy(AC,Ap,rSloppy,param.num_src);
+    blas::multicaxpy(AC,Ap,rSloppy,param.num_src);
     #endif
 
     POP_RANGE
@@ -741,7 +741,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*param.num_src + j] = Linv(i,j);
       }
     }
-    blas::multcaxpy(AC,rnew,rSloppy,param.num_src);
+    blas::multicaxpy(AC,rnew,rSloppy,param.num_src);
 
     #endif
 
@@ -776,7 +776,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*param.num_src + j] = std::conj(S(j,i));
       }
     }
-    blas::multcaxpy(AC,p,rnew,param.num_src);
+    blas::multicaxpy(AC,p,rnew,param.num_src);
     #endif
     // copy sclae with nsrc
     for(int i=0; i < param.num_src; i++){
