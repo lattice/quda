@@ -4,6 +4,10 @@
 using namespace quda;
 #include <cub/cub.cuh>
 
+#if __COMPUTE_CAPABILITY__ >= 300
+#include <generics/shfl.h>
+#endif
+
 /**
    @file cub_helper.cuh
 
@@ -117,12 +121,11 @@ namespace quda {
 
   __shared__ volatile bool isLastWarpDone[16];
 
-  // the warp shuffle instruction was introduced with Kepler
 #if __COMPUTE_CAPABILITY__ >= 300
-#include <generics/shfl.h>
 
   /**
-     @brief Do a warp reduction, followed by a global reduction to the idx bin
+     @brief Do a warp reduction, followed by a global reduction to the
+     idx bin.  This function is only enabled on Kepler and above.
      @param arg Meta data needed for reduction
      @param in Input data in registers for reduction
      @param idx Bin in which the global (inter-CTA) reduction is done
