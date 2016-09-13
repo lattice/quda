@@ -1,14 +1,20 @@
 /**
-  Parameter struct for generic blas kernel
-*/
-// NXZ is dimension of input vectors: X,Z
-// NYW is dimension of in-output vectors: Y,W
-// need to check all loops. Not everything here needs to be templated
-// some NXZ, NYW should be be runtime args
+   @brief Parameter struct for generic multi-blas kernel.
 
+   Need to check all loops. Not everything here needs to be templated
+   some NXZ, NYW should be be runtime args
+
+   @tparam NXZ is dimension of input vectors: X,Z
+   @tparam NYW is dimension of in-output vectors: Y,W
+   @tparam SpinorX Type of input spinor for x argument
+   @tparam SpinorY Type of input spinor for y argument
+   @tparam SpinorZ Type of input spinor for z argument
+   @tparam SpinorW Type of input spinor for w argument
+   @tparam Functor Functor used to operate on data
+*/
 template <int NXZ, int NYW, typename SpinorX, typename SpinorY, typename SpinorZ,
-  typename SpinorW, typename Functor>
-struct MultBlasArg {
+	  typename SpinorW, typename Functor>
+struct MultiBlasArg {
   SpinorX X[NXZ];
   SpinorY Y[NYW];
   SpinorZ Z[NXZ];
@@ -17,62 +23,77 @@ struct MultBlasArg {
   const int length;
   const int out_dim;
   const int in_dim;
-  MultBlasArg(SpinorX X[NXZ], SpinorY Y[NYW], SpinorZ Z[NXZ], SpinorW W[NYW], Functor f, int length)
+  MultiBlasArg(SpinorX X[NXZ], SpinorY Y[NYW], SpinorZ Z[NXZ], SpinorW W[NYW], Functor f, int length)
   :  f(f), length(length), in_dim(NXZ), out_dim(NYW){
 
-  for(int i=0; i<in_dim; ++i){
-    this->X[i] = X[i];
-    this->Z[i] = Z[i];
+    for(int i=0; i<in_dim; ++i){
+      this->X[i] = X[i];
+      this->Z[i] = Z[i];
+    }
+    for(int i=0; i<out_dim; ++i){
+      this->Y[i] = Y[i];
+      this->W[i] = W[i];
+    }
   }
-  for(int i=0; i<out_dim; ++i){
-    this->Y[i] = Y[i];
-    this->W[i] = W[i];
-  }
-}
 };
 
+template<int k_, int NXZ, int NYW, typename FloatN, int M, typename Arg>
+__device__ inline void compute(Arg &arg, int idx) {
+
+  constexpr int k = k_ < NYW ? k_ : 0; // silence out-of-bounds compiler warning
+
+  while (idx < arg.length) {
+
+    FloatN x[M], y[M], z[M], w[M];
+    arg.Y[k].load(y, idx);
+    arg.W[k].load(w, idx);
+
+#pragma unroll
+    for (int l=0; l < NXZ; l++) {
+      arg.X[l].load(x, idx);
+      arg.Z[l].load(z, idx);
+
+#pragma unroll
+      for (int j=0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
+    }
+    arg.Y[k].save(y, idx);
+    arg.W[k].save(w, idx);
+
+    idx += gridDim.x*blockDim.x;
+  }
+}
+
 /**
-Generic blas kernel with four loads and up to four stores.
+   @brief Generic multi-blas kernel with four loads and up to four stores.
+
+   @param[in,out] arg Argument struct with required meta data
+   (input/output fields, functor, etc.)
 */
 template <typename FloatN, int M, int NXZ, int NYW, typename SpinorX, typename SpinorY,
 typename SpinorZ, typename SpinorW, typename Functor>
-__global__ void multblasKernel(MultBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
+__global__ void multiblasKernel(MultiBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
 
   // use i to loop over elements in kernel
-
-
-  const unsigned int gridSizex = gridDim.x * blockDim.x;
-  const unsigned int gridSizey = gridDim.y * blockDim.y;
-
-
-
+  unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
 
   arg.f.init();
-  unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
-  while (k < NYW){
-    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-    while (i < arg.length) {
+  if (k >= NYW) return;
 
-
-      FloatN x[M], y[M], z[M], w[M];
-      arg.Y[k].load(y, i);
-      arg.W[k].load(w, i);
-
-      #pragma unroll
-      for (int l=0; l < NXZ; l++ ){
-        arg.X[l].load(x, i);
-        arg.Z[l].load(z, i);
-
-        #pragma unroll
-        for (int j=0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
-      }
-      arg.Y[k].save(y, i);
-      arg.W[k].save(w, i);
-
-
-      i += gridSizex;
-    }
-    k += gridSizey;
+  switch(k) {
+    case 0: compute<0,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 1: compute<1,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 2: compute<2,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 3: compute<3,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 4: compute<4,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 5: compute<5,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 6: compute<6,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 7: compute<7,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 8: compute<8,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 9: compute<9,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 10: compute<10,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 11: compute<11,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 12: compute<12,NXZ,NYW,FloatN,M>(arg,i); break;
   }
 
 }
@@ -98,10 +119,10 @@ struct num_to_string : detail::explode<num / 10, num % 10> {};
 
 template <int NXZ, int NYW, typename FloatN, int M, typename SpinorX, typename SpinorY,
   typename SpinorZ, typename SpinorW, typename Functor>
-class MultBlasCuda : public Tunable {
+class MultiBlasCuda : public TunableVectorY {
 
 private:
-  mutable MultBlasArg<NXZ, NYW,SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg;
+  mutable MultiBlasArg<NXZ, NYW,SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg;
 
   // host pointers used for backing up fields when tuning
   // these can't be curried into the Spinors because of Tesla argument length restriction
@@ -111,19 +132,16 @@ private:
   const size_t **bytes_;
   const size_t **norm_bytes_;
 
-  unsigned int sharedBytesPerThread() const { return 0; }
-  unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool tuneSharedBytes() const { return false; }
-  const unsigned int vector_length;
-
 
 public:
-  MultBlasCuda(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f,
-	   int length,  size_t **bytes,  size_t **norm_bytes) :
-  arg(X, Y, Z, W, f, length), X_h(), Y_h(), Z_h(), W_h(), vector_length(NYW),
-    Xnorm_h(), Ynorm_h(), Znorm_h(), Wnorm_h(), bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
+  MultiBlasCuda(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f,
+		int length,  size_t **bytes,  size_t **norm_bytes)
+    : TunableVectorY(NYW), arg(X, Y, Z, W, f, length), X_h(), Y_h(), Z_h(), W_h(),
+      Xnorm_h(), Ynorm_h(), Znorm_h(), Wnorm_h(),
+      bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
 
-  virtual ~MultBlasCuda() { }
+  virtual ~MultiBlasCuda() { }
 
   inline TuneKey tuneKey() const {
     char name[TuneKey::name_n];
@@ -135,56 +153,7 @@ public:
 
   inline void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-    multblasKernel<FloatN,M,NXZ,NYW> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-  }
-
-  bool advanceBlockDim(TuneParam &param) const
-  {
-    dim3 block = param.block;
-    dim3 grid = param.grid;
-    bool ret = Tunable::advanceBlockDim(param);
-    param.block.y = block.y;
-    param.grid.y = grid.y;
-    const unsigned int max_threads = maxBlockSize();
-
-    if (ret) { // we advanced the block.x so we're done
-    return true;
-  }
-  else { // block.x (spacetime) was reset
-    if ((param.block.y  < vector_length) && (param.block.y +1) * param.grid.y <= vector_length){
-      param.block.y++;
-      return true;
-    }
-    else{
-    if (param.grid.y  < vector_length){
-      param.grid.y++;
-      param.block.y=1;
-      return true;
-    }
-  }
-    // we have run off the end so let's reset
-  param.block.y = 1;
-  param.grid.y = 1;
-  return false;
-}
-}
-
-
-
-  void initTuneParam(TuneParam &param) const
-  {
-    Tunable::initTuneParam(param);
-    param.block.y = 1;
-    param.grid.y = 1;
-  }
-
-  /** sets default values for when tuning is disabled */
-  void defaultTuneParam(TuneParam &param) const
-  {
-    Tunable::defaultTuneParam(param);
-    param.block.y = 1;
-    param.grid.y = vector_length;
+    multiblasKernel<FloatN,M,NXZ,NYW> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
   }
 
   void preTune() {
@@ -210,6 +179,7 @@ public:
   }
 
   long long flops() const { return arg.f.flops()*vec_length<FloatN>::value*arg.length*M; }
+
   long long bytes() const
   {
     // bytes for low-precision vector
@@ -223,16 +193,17 @@ public:
     // the factor two here assumes we are reading and writing to the high precision vector
     return ((arg.f.streams()-2)*base_bytes + 2*extra_bytes)*arg.length;
   }
+
   int tuningIter() const { return 3; }
 };
 
 template <int NXZ, int NYW, typename RegType, typename StoreType, typename yType, int M,
 	  template <int,int,typename,typename> class Functor,
 	  int writeX, int writeY, int writeZ, int writeW>
-void multblasCuda(const Complex *a, const double2 &b, const double2 &c,
-CompositeColorSpinorField& x, CompositeColorSpinorField& y,
-  CompositeColorSpinorField& z, CompositeColorSpinorField& w,
-         int length) {
+void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
+		   CompositeColorSpinorField& x, CompositeColorSpinorField& y,
+		   CompositeColorSpinorField& z, CompositeColorSpinorField& w,
+		   int length) {
 
   // FIXME implement this as a single kernel
   if (x[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET) {
@@ -250,7 +221,7 @@ CompositeColorSpinorField& x, CompositeColorSpinorField& y,
       ypp.push_back(&yp[i]); ; wpp.push_back(&wp[i]);
     }
 
-    multblasCuda<NXZ, NYW, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
+    multiblasCuda<NXZ, NYW, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
       (a, b, c, xpp, ypp, zpp, wpp, length);
 
     for (int i=0; i<NXZ; ++i) {
@@ -262,7 +233,7 @@ CompositeColorSpinorField& x, CompositeColorSpinorField& y,
       ypp.push_back(&yp[i]); wpp.push_back(&wp[i]);
     }
 
-    multblasCuda<NXZ, NYW, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
+    multiblasCuda<NXZ, NYW, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
        (a, b, c, xpp, ypp, zpp, wpp, length);
 
     return;
@@ -270,10 +241,6 @@ CompositeColorSpinorField& x, CompositeColorSpinorField& y,
 
   // for (int i=0; i<N; i++) {
   //   checkSpinor(*x[i],*y[i]); checkSpinor(*x[i],*z[i]); checkSpinor(*x[i],*w[i]);
-  //   if (!x[i]->isNative()) {
-  //     warningQuda("Reductions on non-native fields are not supported\n");
-  //     return;
-  //   }
   // }
 
   blasStrings.vol_str = x[0]->VolString();
@@ -310,7 +277,7 @@ CompositeColorSpinorField& x, CompositeColorSpinorField& y,
   for (int i=0; i<NYW; i++) { Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i])); W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));}
   Functor<NXZ,NYW,Float2, RegType> f( a, (Float2)vec2(b), (Float2)vec2(c));
 
-  MultBlasCuda<NXZ,NYW,RegType,M,
+  MultiBlasCuda<NXZ,NYW,RegType,M,
     Spinor<RegType,StoreType,M,writeX,0>,
     Spinor<RegType,    yType,M,writeY,1>,
     Spinor<RegType,StoreType,M,writeZ,2>,
@@ -336,7 +303,7 @@ CompositeColorSpinorField& x, CompositeColorSpinorField& y,
 template <typename Float2, int writeX, int writeY, int writeZ, int writeW,
   typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
   typename Functor>
-void genericMultBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
+void genericMultiBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
 
   for (int parity=0; parity<X.Nparity(); parity++) {
     for (int x=0; x<X.VolumeCB(); x++) {
@@ -348,10 +315,10 @@ void genericMultBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) 
 	  Float2 W2 = make_Float2<Float2>( W(parity, x, s, c) );
     f(X2, Y2, Z2, W2, 1 , 1);
     // if (writeX) X(parity, x, s, c) = make_Complex(X2);
-    if (writeX) errorQuda("writeX not supported in multblas.");
+    if (writeX) errorQuda("writeX not supported in multiblas.");
     if (writeY) Y(parity, x, s, c) = make_Complex(Y2);
 	  // if (writeZ) Z(parity, x, s, c) = make_Complex(Z2);
-    if (writeX) errorQuda("writeZ not supported in multblas.");
+    if (writeX) errorQuda("writeZ not supported in multiblas.");
 	  if (writeW) W(parity, x, s, c) = make_Complex(W2);
 	}
       }
@@ -361,49 +328,49 @@ void genericMultBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) 
 
 template <typename Float, typename yFloat, int nSpin, int nColor, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, typename Functor>
-  void genericMultBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+  void genericMultiBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
 		   ColorSpinorField &w, Functor f) {
   colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Z(z), W(w);
   colorspinor::FieldOrderCB<yFloat,nSpin,nColor,1,order> Y(y);
   typedef typename vector<yFloat,2>::type Float2;
-  genericMultBlas<Float2,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
+  genericMultiBlas<Float2,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
 }
 
 template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
 	  int writeX, int writeY, int writeZ, int writeW, typename Functor>
-  void genericMultBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+  void genericMultiBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
   if (x.Ncolor() == 2) {
-    genericMultBlas<Float,yFloat,nSpin,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 3) {
-    genericMultBlas<Float,yFloat,nSpin,3,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,3,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 4) {
-    genericMultBlas<Float,yFloat,nSpin,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 8) {
-    genericMultBlas<Float,yFloat,nSpin,8,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,8,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 12) {
-    genericMultBlas<Float,yFloat,nSpin,12,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,12,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 16) {
-    genericMultBlas<Float,yFloat,nSpin,16,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,16,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 20) {
-    genericMultBlas<Float,yFloat,nSpin,20,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,20,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 24) {
-    genericMultBlas<Float,yFloat,nSpin,24,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,24,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 32) {
-    genericMultBlas<Float,yFloat,nSpin,32,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,nSpin,32,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
   }
 }
 
 template <typename Float, typename yFloat, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
-  void genericMultBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+  void genericMultiBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
   if (x.Nspin() == 4) {
-    genericMultBlas<Float,yFloat,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Nspin() == 2) {
-    genericMultBlas<Float,yFloat,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
 #ifdef GPU_STAGGERED_DIRAC
   } else if (x.Nspin() == 1) {
-    genericMultBlas<Float,yFloat,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+    genericMultiBlas<Float,yFloat,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
 #endif
   } else {
     errorQuda("nSpin = %d not implemeneted",x.Nspin());
@@ -411,9 +378,9 @@ template <typename Float, typename yFloat, QudaFieldOrder order, int writeX, int
 }
 
 template <typename Float, typename yFloat, int writeX, int writeY, int writeZ, int writeW, typename Functor>
-  void genericMultBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+  void genericMultiBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
   if (x.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-    genericMultBlas<Float,yFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,Functor>
+    genericMultiBlas<Float,yFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,Functor>
       (x, y, z, w, f);
   } else {
     errorQuda("Not implemeneted");

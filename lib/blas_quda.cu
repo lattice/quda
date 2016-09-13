@@ -92,7 +92,7 @@ namespace quda {
     };
 
     template <int NXZ, int NYW, typename Float2, typename FloatN>
-    struct MultBlasFunctor {
+    struct MultiBlasFunctor {
 
       //! pre-computation routine before the main loop
       virtual __device__ __host__ void init() { ; }
@@ -253,42 +253,40 @@ namespace quda {
 
 
     template<int NXZ, int NYW, typename Float2, typename FloatN>
-    struct multcaxpy_ : public MultBlasFunctor<NXZ, NYW, Float2, FloatN> {
+    struct multicaxpy_ : public MultiBlasFunctor<NXZ, NYW, Float2, FloatN> {
       Float2 a[NXZ*NYW];
-      multcaxpy_(const Complex *a, const Float2 &b, const Float2 &c)  {
+      multicaxpy_(const Complex *a, const Float2 &b, const Float2 &c)  {
         for (int i=0; i< NXZ*NYW; i++){
           this->a[i] = make_Float2<Float2>(a[i]);
         }
       }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       { _caxpy(a[NXZ*j+i], x, y); }
-      // { _caxpy(make_Float2<Float2>(std::complex<double>(1,0)), x, y); }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 4; } //! flops per element
+      static int streams() { return 2*NYW + NXZ*NYW; } //! total number of input and output streams
+      static int flops() { return 4*NXZ*NYW; } //! flops per element
     };
 
     // const quda::Complex *, double2, double2, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField
-    void multcaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, int N) {
+    void multicaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, int N) {
       switch (N){
-        case 1:
-          multblasCuda<1,1,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+      case 1:
+	multiblasCuda<1,1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
         break;
-        case 2:
-          multblasCuda<2,2,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+      case 2:
+	multiblasCuda<2,2,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
         break;
-        case 4:
-          multblasCuda<4,4,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+      case 4:
+	multiblasCuda<4,4,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
         break;
-        case 8:
-          multblasCuda<8,8,multcaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-          make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+      case 8:
+	multiblasCuda<8,8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
         break;
-        default:
-        errorQuda("multcaxpy not implemented for N");
-
+      default:
+	errorQuda("multi-caxpy not implemented for N");
       }
     }
 

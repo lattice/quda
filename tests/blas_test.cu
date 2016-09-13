@@ -408,8 +408,7 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 33:
-      for (int i=0; i < niter; ++i) blas::multcaxpy(A, *xmD,* ymD, Nsrc);
-      // for (int i=0; i < niter; ++i)   blas::caxpy(a2, xmD->Component(1), ymD->Component(1));
+      for (int i=0; i < niter; ++i) blas::multicaxpy(A, *xmD,* ymD, Nsrc);
       break;
 
     case 34:
@@ -734,24 +733,23 @@ double test(int kernel) {
     break;
 
   case 33:
-  for (int i=0; i < Nsrc; i++){
-    xmD->Component(i) = *(xmH[i]);
-    ymD->Component(i) = *(ymH[i]);
-  }
-
-  blas::multcaxpy(A, *xmD, *ymD, Nsrc);
-  for (int i=0; i < Nsrc; i++){
-    for(int j=0; j < Nsrc; j++){
-      blas::caxpy(A[Nsrc*i+j], *(xmH[i]), *(ymH[j]));
+    for (int i=0; i < Nsrc; i++){
+      xmD->Component(i) = *(xmH[i]);
+      ymD->Component(i) = *(ymH[i]);
     }
-  }
-  error = 0;
-  for (int i=0; i < Nsrc; i++){
-    error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
-  }
-  error/= Nsrc;
-  break;
 
+    blas::multicaxpy(A, *xmD, *ymD, Nsrc);
+    for (int i=0; i < Nsrc; i++){
+      for(int j=0; j < Nsrc; j++){
+	blas::caxpy(A[Nsrc*i+j], *(xmH[i]), *(ymH[j]));
+      }
+    }
+    error = 0;
+    for (int i=0; i < Nsrc; i++){
+      error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
+    }
+    error/= Nsrc;
+    break;
 
   case 34:
     *xD = *xH;
@@ -816,7 +814,7 @@ const char *names[] = {
   "caxpbypzYmbwcDotProductUYNormY",
   "HeavyQuarkResidualNorm",
   "xpyHeavyQuarkResidualNorm",
-  "multcaxpy",
+  "multicaxpy",
   "tripleCGReduction",
   "tripleCGUpdate"
 };
@@ -956,7 +954,7 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_half, BlasTest, ::testing::Values( make
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_half, BlasTest, ::testing::Values( make_int2(0,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,32) ));
-INSTANTIATE_TEST_CASE_P(multcaxpy_half, BlasTest, ::testing::Values( make_int2(0,33) ));
+INSTANTIATE_TEST_CASE_P(multicaxpy_half, BlasTest, ::testing::Values( make_int2(0,33) ));
 INSTANTIATE_TEST_CASE_P(TripleCGReduction_half, BlasTest, ::testing::Values( make_int2(0,34) ));
 INSTANTIATE_TEST_CASE_P(TripleCGUpdate_half, BlasTest, ::testing::Values( make_int2(0,35) ));
 
@@ -994,7 +992,7 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_single, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_single, BlasTest, ::testing::Values( make_int2(1,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,32) ));
-INSTANTIATE_TEST_CASE_P(multcaxpy_single, BlasTest, ::testing::Values( make_int2(1,33) ));
+INSTANTIATE_TEST_CASE_P(multicaxpy_single, BlasTest, ::testing::Values( make_int2(1,33) ));
 INSTANTIATE_TEST_CASE_P(TripleCGReduction_single, BlasTest, ::testing::Values( make_int2(1,34) ));
 INSTANTIATE_TEST_CASE_P(TripleCGUpdate_single, BlasTest, ::testing::Values( make_int2(1,34) ));
 
@@ -1032,6 +1030,6 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_double, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_double, BlasTest, ::testing::Values( make_int2(2,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,32) ));
-INSTANTIATE_TEST_CASE_P(multcaxpy_double, BlasTest, ::testing::Values( make_int2(2,33) ));
+INSTANTIATE_TEST_CASE_P(multicaxpy_double, BlasTest, ::testing::Values( make_int2(2,33) ));
 INSTANTIATE_TEST_CASE_P(TripleCGReduction_double, BlasTest, ::testing::Values( make_int2(2,34) ));
 INSTANTIATE_TEST_CASE_P(TripleCGUpdate_double, BlasTest, ::testing::Values( make_int2(2,35) ));
