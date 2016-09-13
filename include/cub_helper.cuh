@@ -1,6 +1,5 @@
 #pragma once
 #include <float_vector.h>
-#include <generics/shfl.h>
 
 using namespace quda;
 #include <cub/cub.cuh>
@@ -118,6 +117,10 @@ namespace quda {
 
   __shared__ volatile bool isLastWarpDone[16];
 
+  // the warp shuffle instruction was introduced with Kepler
+#if __COMPUTE_CAPABILITY__ >= 300
+#include <generics/shfl.h>
+
   /**
      @brief Do a warp reduction, followed by a global reduction to the idx bin
      @param arg Meta data needed for reduction
@@ -165,6 +168,7 @@ namespace quda {
       }
     }
   }
+#endif // __COMPUTE_CAPABILITY__ >= 300
 
   /**
      struct which acts as a wrapper to a vector of data.

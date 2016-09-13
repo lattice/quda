@@ -382,7 +382,7 @@ template <typename RegType, typename StoreType, int N, int write, int tex_id=-1>
       ghostTex = Texture<InterType, StoreType>(&x,true);
 #else
       tex = Texture<InterType, StoreType, tex_id>(&x);
-      ghostTex = Texture<InterType, StoreType, tex_id>(&x,true);
+      ghostTex = Texture<InterType, StoreType, -1>(&x,true);
 #endif      
       norm = (float*)x.Norm();
       stride = x.Length()/(N*vec_length<RegType>::value);
