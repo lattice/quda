@@ -442,7 +442,6 @@ double test(int kernel) {
 
   double a = M_PI, b = M_PI*exp(1.0), c = sqrt(M_PI);
   quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
-  quda::Complex c1(1.,0.);
   double error = 0;
   quda::Complex * A = new quda::Complex[Nsrc*Nsrc];
   for(int i=0; i < Nsrc*Nsrc; i++){
@@ -817,9 +816,7 @@ const char *names[] = {
   "caxpbypzYmbwcDotProductUYNormY",
   "HeavyQuarkResidualNorm",
   "xpyHeavyQuarkResidualNorm",
-  "multcaxpy"
-  "caxpbypzYmbwcDotProductWYNormY",
-  "HeavyQuarkResidualNorm",
+  "multcaxpy",
   "tripleCGReduction",
   "tripleCGUpdate"
 };
