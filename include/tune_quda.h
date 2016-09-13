@@ -131,11 +131,11 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
 	const int max_shared = deviceProp.sharedMemPerBlock;
-	const int max_blocks_per_sm = 8; // FIXME: derive from deviceProp
+	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), 8u);
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
-	if (blocks_per_sm == 0) return false;
-	param.shared_bytes = max_shared / blocks_per_sm + 1;
+	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
+
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim

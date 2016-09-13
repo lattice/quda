@@ -335,7 +335,7 @@ spinorFloat o02_im;
 #define NFACE 1
 #endif
 
-  const int *X = param.X;
+  const auto *X = param.X;
   const int& fat_stride = param.gauge_stride;
 #if (DD_IMPROVED == 1)
   const int& long_stride = param.long_gauge_stride;
@@ -352,7 +352,7 @@ spinorFloat o02_im;
 #endif
 #endif
 
-  int idx = blockIdx.x*blockDim.x + threadIdx.x;
+  int idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
   if(idx >= param.threads) return;
  
   int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
@@ -372,13 +372,13 @@ int full_idx=0;
   int dim = dimFromFaceIndex (idx, param);
     
   if(dim == 0){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_X, X);
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_X,NFACE,2>(y, idx, param);
   }else if(dim == 1){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_Y, X);
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_Y,NFACE,2>(y, idx, param);
   }else if(dim == 2){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_Z, X);
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_Z,NFACE,2>(y, idx, param);
   }else if(dim == 3){
-    coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_T, X);
+    coordsFromFaceIndexStaggered<EXTERIOR_KERNEL_T,NFACE,2>(y, idx, param);
   }
 
   const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
