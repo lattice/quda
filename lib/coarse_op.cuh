@@ -1015,6 +1015,8 @@ namespace quda {
       return threads;
     }
 
+    bool tuneGridDim() const { return false; } // don't tune the grid dimension
+
   public:
     CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Xinv)
       : TunableVectorY(2), arg(arg), type(COMPUTE_INVALID),

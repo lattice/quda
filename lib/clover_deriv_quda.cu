@@ -438,7 +438,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     unsigned int minThreads() const { return arg.volumeCB; }
-    bool tuneGridDim() const { return false; }
+    bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
     CloverDerivative(const Arg &arg, const GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) {
