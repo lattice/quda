@@ -59,7 +59,7 @@ extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
-extern QudaInverterType precon_type;
+extern QudaInverterType smoother_type;
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -219,7 +219,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
-    mg_param.smoother[i] = precon_type;
+    mg_param.smoother[i] = smoother_type;
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
     mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now

@@ -76,7 +76,6 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #include <momentum.h>
 
-const int numa_affinity_enabled = 1;
 
 using namespace quda;
 
@@ -423,11 +422,17 @@ void initQudaDevice(int dev) {
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
-if(numa_affinity_enabled){
-  #if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
-  setNumaAffinityNVML(dev);
-  #endif
-}
+
+#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
+  char *enable_numa_env = getenv("QUDA_ENABLE_NUMA");
+  if (enable_numa_env && strcmp(enable_numa_env, "0") == 0) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling numa_affinity\n");
+  }
+  else{
+    setNumaAffinityNVML(dev);
+  }
+#endif
+
 
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
