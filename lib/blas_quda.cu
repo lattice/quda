@@ -322,7 +322,15 @@ namespace quda {
 	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       default:
-	errorQuda("caxpy not implemented for x set size %lu", x.size());
+	// split the problem in half and recurse
+	const Complex *a0 = &a[0];
+	const Complex *a1 = &a[x.size()*y.size()/2];
+
+	std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+	std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+
+	caxpy(a0, x0, y);
+	caxpy(a1, x1, y);
       }
     }
 
