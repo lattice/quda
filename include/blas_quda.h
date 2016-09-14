@@ -58,8 +58,6 @@ namespace quda {
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
     void cxpaypbz(ColorSpinorField &, const Complex &b, ColorSpinorField &y, const Complex &c, ColorSpinorField &z);
     void caxpbypzYmbw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, ColorSpinorField &, ColorSpinorField &);
-    void multicaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, int N);
-
 
     Complex cDotProduct(ColorSpinorField &, ColorSpinorField &);
     Complex xpaycDotzy(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z);
@@ -92,6 +90,10 @@ namespace quda {
     void tripleCGUpdate(const double &alpha, const double &beta, ColorSpinorField &q,
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    // multi blas
+    void caxpy(const Complex *a, CompositeColorSpinorField &x, CompositeColorSpinorField &y);
+    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
 
     void reDotProduct(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
     void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);

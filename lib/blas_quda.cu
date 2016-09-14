@@ -267,38 +267,62 @@ namespace quda {
       int flops() { return 4*NXZ*NYW; } //! flops per element
     };
 
-    // const quda::Complex *, double2, double2, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField
-    void multicaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, int N) {
-      switch (N){
+    void caxpy(const Complex *a, CompositeColorSpinorField &x, CompositeColorSpinorField &y) {
+      switch (x.size()){
       case 1:
-	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
+	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
         break;
       case 2:
-	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
+	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 3:
+	multiblasCuda<3,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
         break;
       case 4:
-	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
+	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 5:
+	multiblasCuda<5,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 6:
+	multiblasCuda<6,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 7:
+	multiblasCuda<7,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
         break;
       case 8:
-	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
+	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 9:
+	multiblasCuda<9,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 10:
+	multiblasCuda<10,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 11:
+	multiblasCuda<11,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
         break;
       case 12:
-	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					      make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
+	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 13:
+	multiblasCuda<13,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 14:
+	multiblasCuda<14,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        break;
+      case 15:
+	multiblasCuda<15,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
         break;
       case 16:
-	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					      make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
+	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
         break;
       default:
-	errorQuda("multi-caxpy not implemented for N");
+	errorQuda("caxpy not implemented for x set size %lu", x.size());
       }
     }
 
+    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy(a, x.Components(), y.Components()); }
 
     /**
        Functor to perform the operation y = a*x + b*y  (complex-valued)

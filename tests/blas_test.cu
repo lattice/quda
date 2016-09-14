@@ -408,7 +408,7 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 33:
-      for (int i=0; i < niter; ++i) blas::multicaxpy(A, *xmD,* ymD, Nsrc);
+      for (int i=0; i < niter; ++i) blas::caxpy(A, *xmD,* ymD);
       break;
 
     case 34:
@@ -738,7 +738,7 @@ double test(int kernel) {
       ymD->Component(i) = *(ymH[i]);
     }
 
-    blas::multicaxpy(A, *xmD, *ymD, Nsrc);
+    blas::caxpy(A, *xmD, *ymD);
     for (int i=0; i < Nsrc; i++){
       for(int j=0; j < Nsrc; j++){
 	blas::caxpy(A[Nsrc*i+j], *(xmH[i]), *(ymH[j]));
@@ -814,7 +814,7 @@ const char *names[] = {
   "caxpbypzYmbwcDotProductUYNormY",
   "HeavyQuarkResidualNorm",
   "xpyHeavyQuarkResidualNorm",
-  "multicaxpy",
+  "caxpy",
   "tripleCGReduction",
   "tripleCGUpdate"
 };

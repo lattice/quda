@@ -203,11 +203,13 @@ template <int NXZ, typename RegType, typename StoreType, typename yType, int M,
 void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
 		   CompositeColorSpinorField& x, CompositeColorSpinorField& y,
 		   CompositeColorSpinorField& z, CompositeColorSpinorField& w,
-		   int NYW, int length) {
+		   int length) {
 
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
   typedef vector<Float,2> vec2;
+
+  const int NYW = y.size();
 
   if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
     errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
@@ -232,7 +234,7 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
     }
 
     multiblasCuda<NXZ, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
-      (a, b, c, xpp, ypp, zpp, wpp, length, NYW);
+      (a, b, c, xpp, ypp, zpp, wpp, length);
 
     for (int i=0; i<NXZ; ++i) {
       xp.push_back(x[i]->Odd()); zp.push_back(z[i]->Odd());
@@ -244,13 +246,13 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
     }
 
     multiblasCuda<NXZ, RegType, StoreType, yType, M, Functor, writeX, writeY, writeZ, writeW>
-      (a, b, c, xpp, ypp, zpp, wpp, NYW, length);
+      (a, b, c, xpp, ypp, zpp, wpp, length);
 
     return;
   }
 
   // for (int i=0; i<N; i++) {
-  //   checkSpinor(*x[i],*y[i]); checkSpinor(*x[i],*z[i]); checkSpinor(*x[i],*w[i]);
+  //   checkLength(*x[i],*y[i]); checkLength(*x[i],*z[i]); checkLength(*x[i],*w[i]);
   // }
 
   blasStrings.vol_str = x[0]->VolString();
@@ -261,6 +263,8 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
   }
 
   const int N = NXZ > NYW ? NXZ : NYW;
+  if (N > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N, MAX_MULTI_BLAS_N);
+
   size_t **bytes = new size_t*[N], **norm_bytes = new size_t*[N];
   for (int i=0; i<N; i++) {
     bytes[i] = new size_t[4]; norm_bytes[i] = new size_t[4];
