@@ -259,63 +259,67 @@ namespace quda {
       multicaxpy_(const Complex *a, const Float2 &b, const Float2 &c, int NYW) : NYW(NYW) { }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       {
-	// FIXME: this won't work on CPU code
-	Float2 *a = reinterpret_cast<Float2*>(Amatrix); // fetch coefficient matrix from constant memory
-	_caxpy(a[NXZ*j+i], x, y);
+#ifdef __CUDA_ARCH__
+	Float2 *a = reinterpret_cast<Float2*>(Amatrix_d); // fetch coefficient matrix from constant memory
+	_caxpy(a[MAX_MULTI_BLAS_N*j+i], x, y);
+#else
+	Float2 *a = reinterpret_cast<Float2*>(Amatrix_h);
+	_caxpy(a[NYW*j+i], x, y);
+#endif
       }
       int streams() { return 2*NYW + NXZ*NYW; } //! total number of input and output streams
-      int flops() { return 4*NXZ*NYW; } //! flops per element
+      int flops() { return 4*NXZ*NYW; } //! flops per real element
     };
 
     void caxpy(const Complex *a, CompositeColorSpinorField &x, CompositeColorSpinorField &y) {
       switch (x.size()){
       case 1:
-	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 2:
-	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 3:
-	multiblasCuda<3,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<3,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 4:
-	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 5:
-	multiblasCuda<5,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<5,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 6:
-	multiblasCuda<6,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<6,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 7:
-	multiblasCuda<7,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<7,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 8:
-	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 9:
-	multiblasCuda<9,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<9,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 10:
-	multiblasCuda<10,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<10,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 11:
-	multiblasCuda<11,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<11,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 12:
-	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 13:
-	multiblasCuda<13,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<13,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 14:
-	multiblasCuda<14,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<14,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 15:
-	multiblasCuda<15,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<15,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 16:
-	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       default:
 	errorQuda("caxpy not implemented for x set size %lu", x.size());

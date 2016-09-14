@@ -39,12 +39,11 @@ struct MultiBlasArg {
 
 // storage for matrix coefficients
 #define MAX_MATRIX_SIZE 4096
-__constant__ signed char Amatrix[MAX_MATRIX_SIZE];
+static __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
+static signed char *Amatrix_h;
 
 template<int k, int NXZ, typename FloatN, int M, typename Arg>
 __device__ inline void compute(Arg &arg, int idx) {
-
-  //constexpr int k = k_ < arg.NYW ? k_ : 0; // silence out-of-bounds compiler warning
 
   while (idx < arg.length) {
 
@@ -133,10 +132,8 @@ private:
   mutable MultiBlasArg<NXZ,SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg;
 
   // host pointers used for backing up fields when tuning
-  // these can't be curried into the Spinors because of Tesla argument length restriction
-  // host pointer used for backing up fields when tuning
-  char *X_h[NXZ], *Y_h[MAX_MULTI_BLAS_N], *Z_h[NXZ], *W_h[MAX_MULTI_BLAS_N];
-  char *Xnorm_h[NXZ], *Ynorm_h[MAX_MULTI_BLAS_N], *Znorm_h[NXZ], *Wnorm_h[MAX_MULTI_BLAS_N];
+  // don't curry into the Spinors to minimize parameter size
+  char *Y_h[MAX_MULTI_BLAS_N], *W_h[MAX_MULTI_BLAS_N], *Ynorm_h[MAX_MULTI_BLAS_N], *Wnorm_h[MAX_MULTI_BLAS_N];
   const size_t **bytes_;
   const size_t **norm_bytes_;
 
@@ -145,8 +142,8 @@ private:
 public:
   MultiBlasCuda(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f,
 		int NYW, int length, size_t **bytes,  size_t **norm_bytes)
-    : TunableVectorY(NYW), NYW(NYW), arg(X, Y, Z, W, f, NYW, length), X_h(), Y_h(), Z_h(), W_h(),
-      Xnorm_h(), Ynorm_h(), Znorm_h(), Wnorm_h(),
+    : TunableVectorY(NYW), NYW(NYW), arg(X, Y, Z, W, f, NYW, length),
+      Y_h(), W_h(), Ynorm_h(), Wnorm_h(),
       bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
 
   virtual ~MultiBlasCuda() { }
@@ -166,15 +163,15 @@ public:
 
   void preTune() {
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
+      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
+      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
     }
   }
 
   void postTune() {
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
+      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
+      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
     }
   }
 
@@ -214,8 +211,14 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
   if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
     errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
   Float2 A[MAX_MATRIX_SIZE/sizeof(Float2)];
-  for (int i=0; i<NXZ*NYW; i++) A[i] = make_Float2<Float2>(a[i]);
-  cudaMemcpyToSymbolAsync(Amatrix, A, NXZ*NYW*sizeof(Complex), 0, cudaMemcpyHostToDevice, *blasStream);
+
+  // since the kernel doesn't know the width of them matrix at compile
+  // time we stride it and copy the padded matrix to GPU
+  for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
+    A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(a[NYW * i + j]);
+
+  cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
+  Amatrix_h = reinterpret_cast<signed char*>(const_cast<Complex*>(a));
 
   // FIXME implement this as a single kernel
   if (x[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET) {
@@ -265,17 +268,15 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
   const int N = NXZ > NYW ? NXZ : NYW;
   if (N > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N, MAX_MULTI_BLAS_N);
 
-  size_t **bytes = new size_t*[N], **norm_bytes = new size_t*[N];
-  for (int i=0; i<N; i++) {
-    bytes[i] = new size_t[4]; norm_bytes[i] = new size_t[4];
-  }
-  for (int i=0; i<NXZ; i++) {
-    bytes[i][0] = x[i]->Bytes();  bytes[i][2] = z[i]->Bytes();
-    norm_bytes[i][0] = x[i]->NormBytes(); norm_bytes[i][2] = z[i]->NormBytes();
-  }
+  size_t **bytes = new size_t*[NYW], **norm_bytes = new size_t*[NYW];
   for (int i=0; i<NYW; i++) {
-    bytes[i][1] = y[i]->Bytes(); bytes[i][3] = w[i]->Bytes();
-    norm_bytes[i][1] = y[i]->NormBytes(); norm_bytes[i][3] = w[i]->NormBytes();
+    bytes[i] = new size_t[2];
+    bytes[i][0] = y[i]->Bytes();
+    bytes[i][1] = w[i]->Bytes();
+
+    norm_bytes[i] = new size_t[2];
+    norm_bytes[i][0] = y[i]->NormBytes();
+    norm_bytes[i][1] = w[i]->NormBytes();
   }
 
   SpinorTexture<RegType,StoreType,M,0> X[NXZ];
@@ -286,6 +287,7 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
   //MWFIXME
   for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
   for (int i=0; i<NYW; i++) { Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i])); W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));}
+
   Functor<NXZ,Float2, RegType> f( a, (Float2)vec2(b), (Float2)vec2(c), NYW);
 
   MultiBlasCuda<NXZ,RegType,M,
@@ -299,6 +301,13 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
 
   blas::bytes += blas.bytes();
   blas::flops += blas.flops();
+
+  for (int i=0; i<NYW; i++) {
+    delete []bytes[i];
+    delete []norm_bytes[i];
+  }
+  delete []bytes;
+  delete []norm_bytes;
 
   checkCudaError();
 }
