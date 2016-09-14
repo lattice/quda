@@ -29,6 +29,7 @@ extern int niter;
 extern bool tune;
 extern bool verify_results;
 extern int Nsrc;
+extern int Msrc;
 
 extern void usage(char** );
 
@@ -130,13 +131,9 @@ void initFields(int prec)
 
 
   xmH.reserve(Nsrc);
-  ymH.reserve(Nsrc);
-  for(int cid = 0; cid < Nsrc; cid++)
-  {
-  xmH.push_back(new cpuColorSpinorField(param));
-  ymH.push_back(new cpuColorSpinorField(param));
- }
-
+  for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new cpuColorSpinorField(param));
+  ymH.reserve(Msrc);
+  for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new cpuColorSpinorField(param));
 
 
 
@@ -149,8 +146,10 @@ void initFields(int prec)
   static_cast<cpuColorSpinorField*>(lH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
   for(int i=0; i<Nsrc; i++){
     static_cast<cpuColorSpinorField*>(xmH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  }
+  for(int i=0; i<Msrc; i++){
     static_cast<cpuColorSpinorField*>(ymH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-}
+  }
   // Now set the parameters for the cuda fields
   //param.pad = xdim*ydim*zdim/2;
 
@@ -187,10 +186,12 @@ void initFields(int prec)
 
   param.is_composite = true;
   param.is_component = false;
-  param.composite_dim = Nsrc;
-// create composite fields
 
+// create composite fields
+  param.composite_dim = Nsrc;
   xmD = new cudaColorSpinorField(param);
+
+  param.composite_dim = Msrc;
   ymD = new cudaColorSpinorField(param);
 
   param.is_composite = false;
@@ -249,10 +250,8 @@ void freeFields()
   delete zH;
   delete hH;
   delete lH;
-  for (int i=0; i < Nsrc; i++){
-    delete xmH[i];
-    delete ymH[i];
-}
+  for (int i=0; i < Nsrc; i++) delete xmH[i];
+  for (int i=0; i < Msrc; i++) delete ymH[i];
   xmH.clear();
   ymH.clear();
 }
@@ -262,7 +261,7 @@ double benchmark(int kernel, const int niter) {
 
   double a, b, c;
   quda::Complex a2, b2, c2;
-  quda::Complex * A = new quda::Complex[Nsrc*Nsrc];
+  quda::Complex * A = new quda::Complex[Nsrc*Msrc];
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -442,9 +441,9 @@ double test(int kernel) {
   double a = M_PI, b = M_PI*exp(1.0), c = sqrt(M_PI);
   quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
-  quda::Complex * A = new quda::Complex[Nsrc*Nsrc];
-  for(int i=0; i < Nsrc*Nsrc; i++){
-    A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
+  quda::Complex * A = new quda::Complex[Nsrc*Msrc];
+  for(int i=0; i < Nsrc*Msrc; i++){
+    A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
   }
   // A[0] = a2;
   // A[1] = 0.;
@@ -733,22 +732,20 @@ double test(int kernel) {
     break;
 
   case 33:
-    for (int i=0; i < Nsrc; i++){
-      xmD->Component(i) = *(xmH[i]);
-      ymD->Component(i) = *(ymH[i]);
-    }
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
     blas::caxpy(A, *xmD, *ymD);
     for (int i=0; i < Nsrc; i++){
-      for(int j=0; j < Nsrc; j++){
-	blas::caxpy(A[Nsrc*i+j], *(xmH[i]), *(ymH[j]));
+      for(int j=0; j < Msrc; j++){
+	blas::caxpy(A[Msrc*i+j], *(xmH[i]), *(ymH[j]));
       }
     }
     error = 0;
-    for (int i=0; i < Nsrc; i++){
+    for (int i=0; i < Msrc; i++){
       error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
-    error/= Nsrc;
+    error/= Msrc;
     break;
 
   case 34:
