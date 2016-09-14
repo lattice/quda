@@ -92,7 +92,7 @@ namespace quda {
       virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) = 0;
     };
 
-    template <int NXZ, int NYW, typename Float2, typename FloatN>
+    template <int NXZ, typename Float2, typename FloatN>
     struct MultiBlasFunctor {
 
       //! pre-computation routine before the main loop
@@ -253,45 +253,46 @@ namespace quda {
     }
 
 
-    template<int NXZ, int NYW, typename Float2, typename FloatN>
-    struct multicaxpy_ : public MultiBlasFunctor<NXZ, NYW, Float2, FloatN> {
-      multicaxpy_(const Complex *a, const Float2 &b, const Float2 &c)  { }
+    template<int NXZ, typename Float2, typename FloatN>
+    struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      const int NYW;
+      multicaxpy_(const Complex *a, const Float2 &b, const Float2 &c, int NYW) : NYW(NYW) { }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       {
 	// FIXME: this won't work on CPU code
 	Float2 *a = reinterpret_cast<Float2*>(Amatrix); // fetch coefficient matrix from constant memory
 	_caxpy(a[NXZ*j+i], x, y);
       }
-      static int streams() { return 2*NYW + NXZ*NYW; } //! total number of input and output streams
-      static int flops() { return 4*NXZ*NYW; } //! flops per element
+      int streams() { return 2*NYW + NXZ*NYW; } //! total number of input and output streams
+      int flops() { return 4*NXZ*NYW; } //! flops per element
     };
 
     // const quda::Complex *, double2, double2, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField, quda::ColorSpinorField
     void multicaxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, int N) {
       switch (N){
       case 1:
-	multiblasCuda<1,1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
         break;
       case 2:
-	multiblasCuda<2,2,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
         break;
       case 4:
-	multiblasCuda<4,4,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
         break;
       case 8:
-	multiblasCuda<8,8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					     make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
         break;
       case 12:
-	multiblasCuda<12,12,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-						 make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					      make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
         break;
       case 16:
-	multiblasCuda<16,16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
-						 make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+					      make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components(), N);
         break;
       default:
 	errorQuda("multi-caxpy not implemented for N");
