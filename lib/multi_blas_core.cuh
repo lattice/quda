@@ -275,9 +275,9 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
   }
 
   SpinorTexture<RegType,StoreType,M,0> X[NXZ];
-  Spinor<RegType,    yType,M,writeY,1> Y[NYW];
+  Spinor<RegType,    yType,M,writeY,1> Y[MAX_MULTI_BLAS_N];
   SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
-  Spinor<RegType,StoreType,M,writeW,3> W[NYW];
+  Spinor<RegType,StoreType,M,writeW,3> W[MAX_MULTI_BLAS_N];
 
   //MWFIXME
   for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
