@@ -9,7 +9,6 @@
 
 #include <quda_internal.h>
 #include <float_vector.h>
-#include <convert.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>

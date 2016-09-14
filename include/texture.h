@@ -3,6 +3,7 @@
 
 // FIXME - it would not be too hard to get this working on the host as well
 
+#include <convert.h>
 
 #ifdef USE_TEXTURE_OBJECTS
 

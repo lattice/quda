@@ -1,7 +1,6 @@
 #include <blas_quda.h>
 #include <tune_quda.h>
 #include <float_vector.h>
-#include <convert.h>
 #include <color_spinor_field_order.h>
 
 //#define QUAD_SUM
