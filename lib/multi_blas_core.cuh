@@ -21,21 +21,25 @@ struct MultiBlasArg {
   SpinorW W[NYW];
   Functor f;
   const int length;
-  const int out_dim;
-  const int in_dim;
-  MultiBlasArg(SpinorX X[NXZ], SpinorY Y[NYW], SpinorZ Z[NXZ], SpinorW W[NYW], Functor f, int length)
-  :  f(f), length(length), in_dim(NXZ), out_dim(NYW){
 
-    for(int i=0; i<in_dim; ++i){
+  MultiBlasArg(SpinorX X[NXZ], SpinorY Y[NYW], SpinorZ Z[NXZ], SpinorW W[NYW], Functor f, int length)
+  :  f(f), length(length) {
+
+    for(int i=0; i<NXZ; ++i){
       this->X[i] = X[i];
       this->Z[i] = Z[i];
     }
-    for(int i=0; i<out_dim; ++i){
+    for(int i=0; i<NYW; ++i){
       this->Y[i] = Y[i];
       this->W[i] = W[i];
     }
   }
 };
+
+
+// storage for matrix coefficients
+#define MAX_MATRIX_SIZE 4096
+__constant__ signed char Amatrix[MAX_MATRIX_SIZE];
 
 template<int k_, int NXZ, int NYW, typename FloatN, int M, typename Arg>
 __device__ inline void compute(Arg &arg, int idx) {
@@ -81,19 +85,22 @@ __global__ void multiblasKernel(MultiBlasArg<NXZ, NYW, SpinorX,SpinorY,SpinorZ,S
   if (k >= NYW) return;
 
   switch(k) {
-    case 0: compute<0,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 1: compute<1,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 2: compute<2,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 3: compute<3,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 4: compute<4,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 5: compute<5,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 6: compute<6,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 7: compute<7,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 8: compute<8,NXZ,NYW,FloatN,M>(arg,i); break;
-    case 9: compute<9,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  0: compute< 0,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  1: compute< 1,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  2: compute< 2,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  3: compute< 3,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  4: compute< 4,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  5: compute< 5,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  6: compute< 6,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  7: compute< 7,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  8: compute< 8,NXZ,NYW,FloatN,M>(arg,i); break;
+    case  9: compute< 9,NXZ,NYW,FloatN,M>(arg,i); break;
     case 10: compute<10,NXZ,NYW,FloatN,M>(arg,i); break;
     case 11: compute<11,NXZ,NYW,FloatN,M>(arg,i); break;
     case 12: compute<12,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 13: compute<13,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 14: compute<14,NXZ,NYW,FloatN,M>(arg,i); break;
+    case 15: compute<15,NXZ,NYW,FloatN,M>(arg,i); break;
   }
 
 }
@@ -157,28 +164,20 @@ public:
   }
 
   void preTune() {
-    for(int i=0; i<NXZ; ++i){
-      arg.X[i].save(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Z[i].save(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-    }
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].save(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.W[i].save(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
+      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
     }
   }
 
   void postTune() {
-    for(int i=0; i<NXZ; ++i){
-      arg.X[i].load(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Z[i].load(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-    }
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].load(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.W[i].load(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
+      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
     }
   }
 
-  long long flops() const { return arg.f.flops()*vec_length<FloatN>::value*arg.length*M; }
+  long long flops() const { return arg.f.flops()*vec_length<FloatN>::value*(long)arg.length*M; }
 
   long long bytes() const
   {
@@ -204,6 +203,16 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
 		   CompositeColorSpinorField& x, CompositeColorSpinorField& y,
 		   CompositeColorSpinorField& z, CompositeColorSpinorField& w,
 		   int length) {
+
+  typedef typename scalar<RegType>::type Float;
+  typedef typename vector<Float,2>::type Float2;
+  typedef vector<Float,2> vec2;
+
+  if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
+    errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
+  Float2 A[MAX_MATRIX_SIZE/sizeof(Float2)];
+  for (int i=0; i<NXZ*NYW; i++) A[i] = make_Float2<Float2>(a[i]);
+  cudaMemcpyToSymbolAsync(Amatrix, A, NXZ*NYW*sizeof(Complex), 0, cudaMemcpyHostToDevice, *blasStream);
 
   // FIXME implement this as a single kernel
   if (x[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET) {
@@ -264,25 +273,22 @@ void multiblasCuda(const Complex *a, const double2 &b, const double2 &c,
     norm_bytes[i][1] = y[i]->NormBytes(); norm_bytes[i][3] = w[i]->NormBytes();
   }
 
-  Spinor<RegType,StoreType,M,writeX,0> X[NXZ];
+  SpinorTexture<RegType,StoreType,M,0> X[NXZ];
   Spinor<RegType,    yType,M,writeY,1> Y[NYW];
-  Spinor<RegType,StoreType,M,writeZ,2> Z[NXZ];
+  SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
   Spinor<RegType,StoreType,M,writeW,3> W[NYW];
 
-  typedef typename scalar<RegType>::type Float;
-  typedef typename vector<Float,2>::type Float2;
-  typedef vector<Float,2> vec2;
   //MWFIXME
   for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
   for (int i=0; i<NYW; i++) { Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i])); W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));}
   Functor<NXZ,NYW,Float2, RegType> f( a, (Float2)vec2(b), (Float2)vec2(c));
 
   MultiBlasCuda<NXZ,NYW,RegType,M,
-    Spinor<RegType,StoreType,M,writeX,0>,
-    Spinor<RegType,    yType,M,writeY,1>,
-    Spinor<RegType,StoreType,M,writeZ,2>,
-    Spinor<RegType,StoreType,M,writeW,3>,
-    decltype(f) >
+		SpinorTexture<RegType,StoreType,M,0>,
+		Spinor<RegType,    yType,M,writeY,1>,
+		SpinorTexture<RegType,StoreType,M,2>,
+		Spinor<RegType,StoreType,M,writeW,3>,
+		decltype(f) >
     blas(X, Y, Z, W, f, length, bytes, norm_bytes);
   blas.apply(*blasStream);
 

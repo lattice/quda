@@ -142,19 +142,19 @@ public:
   }
 
   void preTune() {
-    arg.X.save(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
-    arg.Y.save(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
-    arg.Z.save(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
-    arg.W.save(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
-    arg.V.save(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
+    arg.X.backup(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.backup(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.backup(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.backup(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.backup(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   void postTune() {
-    arg.X.load(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
-    arg.Y.load(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
-    arg.Z.load(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
-    arg.W.load(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
-    arg.V.load(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
+    arg.X.restore(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.restore(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.restore(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.restore(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.restore(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   long long flops() const { return arg.r.flops()*vec_length<FloatN>::value*arg.length*M; }

@@ -9,6 +9,7 @@
 
 #include <quda_internal.h>
 #include <float_vector.h>
+#include <convert.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
@@ -36,6 +37,7 @@ namespace quda {
 
   namespace blas {
 
+#define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
 #include <texture.h>
 
     unsigned long long flops;
@@ -254,14 +256,13 @@ namespace quda {
 
     template<int NXZ, int NYW, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, NYW, Float2, FloatN> {
-      Float2 a[NXZ*NYW];
-      multicaxpy_(const Complex *a, const Float2 &b, const Float2 &c)  {
-        for (int i=0; i< NXZ*NYW; i++){
-          this->a[i] = make_Float2<Float2>(a[i]);
-        }
-      }
+      multicaxpy_(const Complex *a, const Float2 &b, const Float2 &c)  { }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-      { _caxpy(a[NXZ*j+i], x, y); }
+      {
+	// FIXME: this won't work on CPU code
+	Float2 *a = reinterpret_cast<Float2*>(Amatrix); // fetch coefficient matrix from constant memory
+	_caxpy(a[NXZ*j+i], x, y);
+      }
       static int streams() { return 2*NYW + NXZ*NYW; } //! total number of input and output streams
       static int flops() { return 4*NXZ*NYW; } //! flops per element
     };
@@ -284,6 +285,14 @@ namespace quda {
       case 8:
 	multiblasCuda<8,8,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
 					       make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+        break;
+      case 12:
+	multiblasCuda<12,12,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+						 make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
+        break;
+      case 16:
+	multiblasCuda<16,16,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0),
+						 make_double2(0.0, 0.0), x.Components(), y.Components(), x.Components(), x.Components());
         break;
       default:
 	errorQuda("multi-caxpy not implemented for N");

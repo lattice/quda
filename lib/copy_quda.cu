@@ -2,6 +2,7 @@
 #include <tune_quda.h>
 #include <float_vector.h>
 #include <register_traits.h>
+#include <convert.h>
 
 // For kernels with precision conversion built in
 #define checkSpinorLength(a, b)						\

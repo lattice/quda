@@ -209,21 +209,21 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
 
   void preTune() {
     for(int i=0; i<N; ++i){
-      arg.X[i].save(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Y[i].save(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.Z[i].save(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-      arg.W[i].save(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
-      arg.V[i].save(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
+      arg.X[i].backup(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
+      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.Z[i].backup(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
+      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
+      arg.V[i].backup(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
     }
   }
 
   void postTune() {
     for(int i=0; i<N; ++i){
-      arg.X[i].load(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Y[i].load(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.Z[i].load(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-      arg.W[i].load(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
-      arg.V[i].load(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
+      arg.X[i].restore(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
+      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.Z[i].restore(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
+      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
+      arg.V[i].restore(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
     }
   }
 
