@@ -1038,7 +1038,7 @@ namespace quda {
     virtual ~CalculateY() { }
 
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 
