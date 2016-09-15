@@ -81,7 +81,7 @@ code segements are supplied under the following license:
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 QUDA leverages Google Test for unit testing, contained within tests/gtest.h
-and tests/gtest-all.cc and FineEigen from ceres-solver, contained in
+and tests/gtest-all.cc and FindEigen from ceres-solver, contained in
 cmake/FindEigen.cmake.
 These files are supplied under the following
 license:

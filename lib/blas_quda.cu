@@ -252,7 +252,6 @@ namespace quda {
 			       make_double2(0.0, 0.0), x, y, x, x);
     }
 
-
     template<int NXZ, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
       const int NYW;
@@ -271,8 +270,8 @@ namespace quda {
       int flops() { return 4*NXZ*NYW; } //! flops per real element
     };
 
-    void caxpy(const Complex *a, CompositeColorSpinorField &x, CompositeColorSpinorField &y) {
-      switch (x.size()){
+    void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+      switch (x.size()) {
       case 1:
 	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;

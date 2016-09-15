@@ -91,12 +91,37 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
-    // multi blas
-    void caxpy(const Complex *a, CompositeColorSpinorField &x, CompositeColorSpinorField &y);
+    /**
+       @brief Compute the block "caxpy" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       The dimensions of a can be rectangular, e.g., the width of x
+       and y need not be same, though the maximum width for both is
+       16.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "caxpy" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
     void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
 
     void reDotProduct(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
     void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
+
   } // namespace blas
 
 } // namespace quda
