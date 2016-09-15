@@ -255,7 +255,10 @@ namespace quda {
     template<int NXZ, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
       const int NYW;
-      multicaxpy_(const Complex *a, int NYW) : NYW(NYW) { }
+      // ignore parameter arrays since we place them in constant memory
+      multicaxpy_(const coeff_array<Complex> &a, const coeff_array<Complex> &b,
+		  const coeff_array<Complex> &c, int NYW) : NYW(NYW) { }
+
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       {
 #ifdef __CUDA_ARCH__
@@ -266,64 +269,69 @@ namespace quda {
 	_caxpy(a[NYW*j+i], x, y);
 #endif
       }
+
       int streams() { return 2*NYW + NXZ*NYW; } //! total number of input and output streams
       int flops() { return 4*NXZ*NYW; } //! flops per real element
     };
 
-    void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+    void caxpy(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+
+      // mark true since we will copy the "a" matrix into constant memory
+      coeff_array<Complex> a(a_, true), b, c;
+
       switch (x.size()) {
       case 1:
-	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 2:
-	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 3:
-	multiblasCuda<3,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<3,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 4:
-	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 5:
-	multiblasCuda<5,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<5,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 6:
-	multiblasCuda<6,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<6,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 7:
-	multiblasCuda<7,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<7,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 8:
-	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 9:
-	multiblasCuda<9,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<9,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 10:
-	multiblasCuda<10,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<10,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 11:
-	multiblasCuda<11,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<11,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 12:
-	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 13:
-	multiblasCuda<13,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<13,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 14:
-	multiblasCuda<14,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<14,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 15:
-	multiblasCuda<15,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<15,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       case 16:
-	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, 0, 0, x, y, x, y);
+	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
         break;
       default:
 	// split the problem in half and recurse
-	const Complex *a0 = &a[0];
-	const Complex *a1 = &a[x.size()*y.size()/2];
+	const Complex *a0 = &a_[0];
+	const Complex *a1 = &a_[x.size()*y.size()/2];
 
 	std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
 	std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
@@ -450,22 +458,18 @@ namespace quda {
 
     template<int NXZ, typename Float2, typename FloatN>
     struct multi_axpyBzpcx_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      typedef typename scalar<Float2>::type real;
       const int NYW;
-      multi_axpyBzpcx_(const Complex *a, int NYW) : NYW(NYW) { }
+      real a[MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N];
+
+      multi_axpyBzpcx_(const coeff_array<double> &a, const coeff_array<double> &b, const coeff_array<double> &c, int NYW) : NYW(NYW){
+	// copy arguments into the functor
+	for (int i=0; i<NYW; i++) { this->a[i] = a.data[i]; this->b[i] = b.data[i]; this->c[i] = c.data[i]; }
+      }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       {
-#ifdef __CUDA_ARCH__
-	// fetch coefficient arrays from constant memory
-	Float2 *a = reinterpret_cast<Float2*>(Amatrix_d);
-	Float2 *b = reinterpret_cast<Float2*>(Bmatrix_d);
-	Float2 *c = reinterpret_cast<Float2*>(Cmatrix_d);
-#else
-	Float2 *a = reinterpret_cast<Float2*>(Amatrix_h);
-	Float2 *b = reinterpret_cast<Float2*>(Bmatrix_h);
-	Float2 *c = reinterpret_cast<Float2*>(Cmatrix_h);
-#endif
-	w += a[i].x * y;
-	y = b[i].x * x + c[i].x * y;
+	w += a[i] * y;
+	y = b[i] * x + c[i] * y;
       }
       int streams() { return 4*NYW + NXZ; } //! total number of input and output streams
       int flops() { return 5*NXZ*NYW; } //! flops per real element
@@ -484,17 +488,9 @@ namespace quda {
       std::vector<ColorSpinorField*> x;
       x.push_back(&z_);
 
-      Complex *a = new Complex[y.size()];
-      Complex *b = new Complex[y.size()];
-      Complex *c = new Complex[y.size()];
-
-      for (unsigned int i=0; i<y.size(); i++) { a[i] = Complex(a_[i]); b[i] = Complex(b_[i]); c[i] = Complex(c_[i]); }
-
+      // we will curry the parameter arrays into the functor
+      coeff_array<double> a(a_,false), b(b_,false), c(c_,false);
       multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
-
-      delete []a;
-      delete []b;
-      delete []c;
     }
 
 

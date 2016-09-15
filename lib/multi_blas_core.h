@@ -2,8 +2,8 @@
    Driver for generic blas routine with four loads and two store.
  */
 template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Functor,
-  int writeX, int writeY, int writeZ, int writeW>
-  void multiblasCuda(const Complex* a, const Complex *b, const Complex *c,
+  int writeX, int writeY, int writeZ, int writeW, typename T>
+  void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
 		     CompositeColorSpinorField &x, CompositeColorSpinorField &y,
 		     CompositeColorSpinorField &z, CompositeColorSpinorField &w) {
 

@@ -199,56 +199,23 @@ public:
   int tuningIter() const { return 3; }
 };
 
+template <typename T>
+struct coeff_array {
+  const T *data;
+  const bool use_const;
+  coeff_array() : data(nullptr), use_const(false) { }
+  coeff_array(const T *data, bool use_const) : data(data), use_const(use_const) { }
+};
+
 template <int NXZ, typename RegType, typename StoreType, typename yType, int M,
 	  template <int,typename,typename> class Functor,
-	  int writeX, int writeY, int writeZ, int writeW>
-void multiblasCuda(const Complex *a, const Complex *b, const Complex *c,
+	  int writeX, int writeY, int writeZ, int writeW, typename T>
+void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
 		   CompositeColorSpinorField& x, CompositeColorSpinorField& y,
 		   CompositeColorSpinorField& z, CompositeColorSpinorField& w,
 		   int length) {
 
-  typedef typename scalar<RegType>::type Float;
-  typedef typename vector<Float,2>::type Float2;
-  typedef vector<Float,2> vec2;
-
   const int NYW = y.size();
-
-  if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
-    errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
-
-  if (a) {
-    Float2 A[MAX_MATRIX_SIZE/sizeof(Float2)];
-    // since the kernel doesn't know the width of them matrix at compile
-    // time we stride it and copy the padded matrix to GPU
-    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-      A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(a[NYW * i + j]);
-
-    cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
-    Amatrix_h = reinterpret_cast<signed char*>(const_cast<Complex*>(a));
-  }
-
-  if (b) {
-    Float2 B[MAX_MATRIX_SIZE/sizeof(Float2)];
-    // since the kernel doesn't know the width of them matrix at compile
-    // time we stride it and copy the padded matrix to GPU
-    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-      B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(b[NYW * i + j]);
-
-    cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
-    Bmatrix_h = reinterpret_cast<signed char*>(const_cast<Complex*>(b));
-  }
-
-  if (c) {
-    Float2 C[MAX_MATRIX_SIZE/sizeof(Float2)];
-    // since the kernel doesn't know the width of them matrix at compile
-    // time we stride it and copy the padded matrix to GPU
-    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
-      C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(c[NYW * i + j]);
-
-    cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
-    Cmatrix_h = reinterpret_cast<signed char*>(const_cast<Complex*>(c));
-  }
-
 
   // FIXME implement this as a single kernel
   if (x[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET) {
@@ -282,6 +249,49 @@ void multiblasCuda(const Complex *a, const Complex *b, const Complex *c,
       (a, b, c, xpp, ypp, zpp, wpp, length);
 
     return;
+  }
+
+
+  typedef typename scalar<RegType>::type Float;
+  typedef typename vector<Float,2>::type Float2;
+  typedef vector<Float,2> vec2;
+
+  if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
+    errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
+
+  // FIXME - if NXZ=1 no need to copy entire array
+  // FIXME - do we really need strided access here?
+  if (a.data && a.use_const) {
+    Float2 A[MAX_MATRIX_SIZE/sizeof(Float2)];
+    // since the kernel doesn't know the width of them matrix at compile
+    // time we stride it and copy the padded matrix to GPU
+    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
+      A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+
+    cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
+    Amatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(a.data));
+  }
+
+  if (b.data && b.use_const) {
+    Float2 B[MAX_MATRIX_SIZE/sizeof(Float2)];
+    // since the kernel doesn't know the width of them matrix at compile
+    // time we stride it and copy the padded matrix to GPU
+    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
+      B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+
+    cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
+    Bmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(b.data));
+  }
+
+  if (c.data && c.use_const) {
+    Float2 C[MAX_MATRIX_SIZE/sizeof(Float2)];
+    // since the kernel doesn't know the width of them matrix at compile
+    // time we stride it and copy the padded matrix to GPU
+    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
+      C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+
+    cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
+    Cmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(c.data));
   }
 
   // for (int i=0; i<N; i++) {
@@ -318,7 +328,7 @@ void multiblasCuda(const Complex *a, const Complex *b, const Complex *c,
   for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
   for (int i=0; i<NYW; i++) { Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i])); W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));}
 
-  Functor<NXZ,Float2, RegType> f( a, NYW);
+  Functor<NXZ,Float2, RegType> f(a, b, c, NYW);
 
   MultiBlasCuda<NXZ,RegType,M,
 		SpinorTexture<RegType,StoreType,M,0>,
