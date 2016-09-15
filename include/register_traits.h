@@ -34,9 +34,61 @@ namespace quda {
   template<> struct mapper<float4> { typedef float4 type; };
   template<> struct mapper<short4> { typedef float4 type; };
 
+  template<typename,typename> struct bridge_mapper { };
+  template<> struct bridge_mapper<double2,double2> { typedef double2 type; };
+  template<> struct bridge_mapper<double2,float2> { typedef double2 type; };
+  template<> struct bridge_mapper<double2,short2> { typedef float2 type; };
+  template<> struct bridge_mapper<double2,float4> { typedef double4 type; };
+  template<> struct bridge_mapper<double2,short4> { typedef float4 type; };
+  template<> struct bridge_mapper<float4,double2> { typedef float2 type; };
+  template<> struct bridge_mapper<float4,float4> { typedef float4 type; };
+  template<> struct bridge_mapper<float4,short4> { typedef float4 type; };
+  template<> struct bridge_mapper<float2,double2> { typedef float2 type; };
+  template<> struct bridge_mapper<float2,float2> { typedef float2 type; };
+  template<> struct bridge_mapper<float2,short2> { typedef float2 type; };
+
+  template<typename> struct vec_length { static const int value = 0; };
+  template<> struct vec_length<double4> { static const int value = 4; };
+  template<> struct vec_length<double2> { static const int value = 2; };
+  template<> struct vec_length<double> { static const int value = 1; };
+  template<> struct vec_length<float4> { static const int value = 4; };
+  template<> struct vec_length<float2> { static const int value = 2; };
+  template<> struct vec_length<float> { static const int value = 1; };
+  template<> struct vec_length<short4> { static const int value = 4; };
+  template<> struct vec_length<short2> { static const int value = 2; };
+  template<> struct vec_length<short> { static const int value = 1; };
+
+  template<typename, int N> struct vector { };
+
+  template<> struct vector<double, 2> {
+    typedef double2 type;
+    type a;
+    vector(const type &a) { this->a.x = a.x; this->a.y = a.y; }
+    operator type() const { return a; }
+  };
+
+  template<> struct vector<float, 2> {
+    typedef float2 type;
+    float2 a;
+    vector(const double2 &a) { this->a.x = a.x; this->a.y = a.y; }
+    operator float2() const { return a; }
+  };
+
+  template<typename> struct scalar { };
+  template<> struct scalar<double4> { typedef double type; };
+  template<> struct scalar<double3> { typedef double type; };
+  template<> struct scalar<double2> { typedef double type; };
+  template<> struct scalar<double> { typedef double type; };
+  template<> struct scalar<float4> { typedef float type; };
+  template<> struct scalar<float3> { typedef float type; };
+  template<> struct scalar<float2> { typedef float type; };
+  template<> struct scalar<float> { typedef float type; };
+
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
   template<> struct isHalf<short>{ static const bool value = true; };
+  template<> struct isHalf<short2>{ static const bool value = true; };
+  template<> struct isHalf<short4>{ static const bool value = true; };
 
   template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
 
@@ -154,12 +206,12 @@ namespace quda {
   template <> struct VectorType<double, 1>{typedef double type; };
   template <> struct VectorType<double, 2>{typedef double2 type; };
   template <> struct VectorType<double, 4>{typedef double4 type; };
-  
+
   // single precision
   template <> struct VectorType<float, 1>{typedef float type; };
   template <> struct VectorType<float, 2>{typedef float2 type; };
   template <> struct VectorType<float, 4>{typedef float4 type; };
-  
+
   // half precision
   template <> struct VectorType<short, 1>{typedef short type; };
   template <> struct VectorType<short, 2>{typedef short2 type; };

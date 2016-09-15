@@ -317,9 +317,6 @@ namespace quda {
     virtual unsigned int sharedBytesPerThread() const { return 0; }
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    // don't tune the grid dimension
-    bool tuneGridDim() const { return false; }
-
     const unsigned int vector_length;
 
   public:

@@ -1015,6 +1015,8 @@ namespace quda {
       return threads;
     }
 
+    bool tuneGridDim() const { return false; } // don't tune the grid dimension
+
   public:
     CalculateY(Arg &arg, QudaDiracType dirac, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X, GaugeField &Xinv)
       : TunableVectorY(2), arg(arg), type(COMPUTE_INVALID),
@@ -1036,7 +1038,7 @@ namespace quda {
     virtual ~CalculateY() { }
 
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 

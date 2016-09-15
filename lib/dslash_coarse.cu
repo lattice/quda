@@ -286,7 +286,7 @@ namespace quda {
 	} // 4-d volumeCB
       } // src index
     } // parity
-    
+
   }
 
   // GPU Kernel for applying the coarse Dslash to a vector

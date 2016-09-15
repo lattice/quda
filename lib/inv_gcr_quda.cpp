@@ -68,6 +68,19 @@ namespace quda {
     delete [] Beta;
   }
 
+  void updateAp(Complex **beta, std::vector<ColorSpinorField*> Ap, int begin, int size, int k) {
+
+    Complex *beta_ = new Complex[size];
+    for (int i=0; i<size; i++) beta_[i] = -beta[i+begin][k];
+
+    std::vector<ColorSpinorField*> Ap_(Ap.begin() + begin, Ap.begin() + begin + size);
+    std::vector<ColorSpinorField*> Apk(Ap.begin() + k, Ap.begin() + k + 1);
+
+    blas::caxpy(beta_, Ap_, Apk);
+
+    delete []beta_;
+  }
+
   void orthoDir(Complex **beta, std::vector<ColorSpinorField*> Ap, int k, int pipeline) {
 
     switch (pipeline) {
@@ -86,60 +99,25 @@ namespace quda {
       blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
       break;
     case 2: // two-way pipelining
-      {
-	const int N = 2;
-	for (int i=0; i<k-(N-1); i+=N) {
-	  computeBeta(beta, Ap, i, N, k);
-	  blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
-	}
-
-	if (k%N != 0) { // need to update the remainder
-	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	  blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
-	}
-      }
-      break;
     case 3: // three-way pipelining
-      {
-	const int N = 3;
-	for (int i=0; i<k-(N-1); i+=N) { // 5 (k-1) memory transactions here
-	  computeBeta(beta, Ap, i, N, k);
-	  blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
-	}
-
-	if (k%N != 0) { // need to update the remainder
-	  if ((k%N) % 2 == 0) {
-	    computeBeta(beta, Ap, k-2, 2, k);
-	    blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
-	  } else {
-	    beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	    blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
-	  }
-	}
-      }
-      break;
     case 4: // four-way pipelining
+    case 5: // five-way pipelining
       {
-	const int N = 4;
+	const int N = pipeline;
 	for (int i=0; i<k-(N-1); i+=N) {
 	  computeBeta(beta, Ap, i, N, k);
-	  blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
-	  blas::caxpbypz(-beta[i+2][k], *Ap[i+2], -beta[i+3][k], *Ap[i+3], *Ap[k]);
+	  updateAp(beta, Ap, i, N, k);
 	}
 
 	if (k%N != 0) { // need to update the remainder
-	  if ((k%N) % 3 == 0) {
-	    computeBeta(beta, Ap, k-3, 3, k);
-	    blas::caxpbypczpw(-beta[k-3][k], *Ap[k-3], -beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
-	  } else if ((k%N) % 2 == 0) {
-	    computeBeta(beta, Ap, k-2, 2, k);
-	    blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
-	  } else {
-	    beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	    blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  for (int r = N-1; r>0; r--) {
+	    if ((k%N) % r == 0) { // if true this is the remainder
+	      computeBeta(beta, Ap, k-r, r, k);
+	      updateAp(beta, Ap, k-r, r, k);
+	      break;
+	    }
 	  }
 	}
-
       }
       break;
     default:
@@ -166,15 +144,12 @@ namespace quda {
     // Update the solution vector
     backSubs(alpha, beta, gamma, delta, k);
   
-    //for (int i=0; i<k; i++) blas::caxpy(delta[i], *p[i], x);
-  
-    for (int i=0; i<k-2; i+=3) 
-      blas::caxpbypczpw(delta[i], *p[i], delta[i+1], *p[i+1], delta[i+2], *p[i+2], x); 
-  
-    if (k%3 != 0) { // need to update the remainder
-      if ((k - 3*(k/3)) % 2 == 0) blas::caxpbypz(delta[k-2], *p[k-2], delta[k-1], *p[k-1], x);
-      else blas::caxpy(delta[k-1], *p[k-1], x);
-    }
+    std::vector<ColorSpinorField*> X;
+    X.push_back(&x);
+
+    std::vector<ColorSpinorField*> P;
+    for (int i=0; i<k; i++) P.push_back(p[i]);
+    blas::caxpy(delta, P, X);
 
     delete []delta;
   }

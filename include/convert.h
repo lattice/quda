@@ -10,19 +10,19 @@
 
 #include <quda_internal.h> // for MAX_SHORT
 
-template <typename type> int vecLength() { return 0; }
+template <typename type> inline int vecLength() { return 0; }
 
-template<> int vecLength<short>() { return 1; }
-template<> int vecLength<float>() { return 1; }
-template<> int vecLength<double>() { return 1; }
+template<> inline int vecLength<short>() { return 1; }
+template<> inline int vecLength<float>() { return 1; }
+template<> inline int vecLength<double>() { return 1; }
 
-template<> int vecLength<short2>() { return 2; }
-template<> int vecLength<float2>() { return 2; }
-template<> int vecLength<double2>() { return 2; }
+template<> inline int vecLength<short2>() { return 2; }
+template<> inline int vecLength<float2>() { return 2; }
+template<> inline int vecLength<double2>() { return 2; }
 
-template<> int vecLength<short4>() { return 4; }
-template<> int vecLength<float4>() { return 4; }
-template<> int vecLength<double4>() { return 4; }
+template<> inline int vecLength<short4>() { return 4; }
+template<> inline int vecLength<float4>() { return 4; }
+template<> inline int vecLength<double4>() { return 4; }
 
 // MAX_SHORT 32767
 #define MAX_SHORT_INV 3.051850948e-5

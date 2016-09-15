@@ -158,8 +158,8 @@ namespace quda {
       ColorSpinorField& inB = (parity&1) ? p.Odd() : p.Even();
 
       if(x.Precision() == QUDA_DOUBLE_PRECISION){
-	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
-	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
+	Spinor<double2, double2, 12, 0, 0> spinorA(inA);
+	Spinor<double2, double2, 12, 0, 1> spinorB(inB);
 	computeCloverSigmaOprodCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(oprod),
 					    oprod, spinorA, spinorB, parity, coeff, shift);
       } else {

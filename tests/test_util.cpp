@@ -1575,6 +1575,7 @@ int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 int Nsrc = 1;
+int Msrc = 1;
 bool tune = true;
 int niter = 100;
 int test_type = 0;
@@ -1680,7 +1681,8 @@ void usage(char** argv )
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
-  printf("    --help                                    # Print out this message\n"); 
+  printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
+  printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -2267,9 +2269,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    Nsrc= atoi(argv[i+1]);
+    Nsrc = atoi(argv[i+1]);
     if (Nsrc < 1 || Nsrc > 128){
-      printf("ERROR: invalid number of sources (%d)\n", Nsrc);
+      printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--msrc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    Msrc = atoi(argv[i+1]);
+    if (Msrc < 1 || Msrc > 128){
+      printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
       usage(argv);
     }
     i++;

@@ -36,6 +36,12 @@ if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_CLOVER} OR ${QUDA_DIRAC_TWISTED_MASS} OR
 
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
+
+  if(${QUDA_BLOCKSOLVER})
+    cuda_add_executable(invertmsrc_test invertmsrc_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+    target_link_libraries(invertmsrc_test ${TEST_LIBS})
+  endif()
+
 endif()
 
 cuda_add_executable(deflation_test deflation_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
@@ -47,6 +53,11 @@ if(${QUDA_DIRAC_STAGGERED})
 
   cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
+
+  if(${QUDA_BLOCKSOLVER})
+    cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp  staggered_dslash_reference.cpp  blas_reference.cpp)
+    target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
+  endif()
 endif()
 
 if(${QUDA_MULTIGRID})

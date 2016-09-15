@@ -198,6 +198,7 @@ namespace quda {
     const char *vol_str;
     unsigned int sharedBytesPerThread() const { return 4; } // for dynamic indexing array
     unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
     GaugeForce(Arg &arg, const GaugeField &meta_mom, const GaugeField &meta_u)
