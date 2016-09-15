@@ -33,14 +33,15 @@ extern int Msrc;
 
 extern void usage(char** );
 
-const int Nkernels = 36;
+const int Nkernels = 37;
 
 using namespace quda;
 
 ColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
-ColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD, *xmD, *ymD;
+ColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD, *xmD, *ymD, *zmD;
 std::vector<cpuColorSpinorField*> xmH;
 std::vector<cpuColorSpinorField*> ymH;
+std::vector<cpuColorSpinorField*> zmH;
 int Nspin;
 int Ncolor;
 
@@ -134,7 +135,8 @@ void initFields(int prec)
   for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new cpuColorSpinorField(param));
   ymH.reserve(Msrc);
   for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new cpuColorSpinorField(param));
-
+  zmH.reserve(Nsrc);
+  for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new cpuColorSpinorField(param));
 
 
   static_cast<cpuColorSpinorField*>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
@@ -194,6 +196,9 @@ void initFields(int prec)
   param.composite_dim = Msrc;
   ymD = new cudaColorSpinorField(param);
 
+  param.composite_dim = Nsrc;
+  zmD = new cudaColorSpinorField(param);
+
   param.is_composite = false;
   param.is_component = false;
   param.composite_dim = 1;
@@ -241,6 +246,7 @@ void freeFields()
   delete lD;
   delete xmD;
   delete ymD;
+  delete zmD;
 
   // release memory
   delete vH;
@@ -252,8 +258,10 @@ void freeFields()
   delete lH;
   for (int i=0; i < Nsrc; i++) delete xmH[i];
   for (int i=0; i < Msrc; i++) delete ymH[i];
+  for (int i=0; i < Nsrc; i++) delete zmH[i];
   xmH.clear();
   ymH.clear();
+  zmH.clear();
 }
 
 
@@ -262,6 +270,8 @@ double benchmark(int kernel, const int niter) {
   double a, b, c;
   quda::Complex a2, b2, c2;
   quda::Complex * A = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * B = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * C = new quda::Complex[Nsrc*Msrc];
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -407,15 +417,19 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 33:
-      for (int i=0; i < niter; ++i) blas::caxpy(A, *xmD,* ymD);
-      break;
-
-    case 34:
       for (int i=0; i < niter; ++i) blas::tripleCGReduction(*xD, *yD, *zD);
       break;
 
-    case 35:
+    case 34:
       for (int i=0; i < niter; ++i) blas::tripleCGUpdate(a, b, *xD, *yD, *zD, *wD);
+      break;
+
+    case 35:
+      for (int i=0; i < niter; ++i) blas::caxpy(A, *xmD,* ymD);
+      break;
+
+    case 36:
+      for (int i=0; i < niter; ++i) blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (double*)C);
       break;
 
     default:
@@ -430,6 +444,8 @@ double benchmark(int kernel, const int niter) {
   cudaEventDestroy(start);
   cudaEventDestroy(end);
   delete[] A;
+  delete[] B;
+  delete[] C;
   double secs = runTime / 1000;
   return secs;
 }
@@ -442,8 +458,12 @@ double test(int kernel) {
   quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
   quda::Complex * A = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * B = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * C = new quda::Complex[Nsrc*Msrc];
   for(int i=0; i < Nsrc*Msrc; i++){
     A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
+    B[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
+    C[i] = a2*  (1.0*((M_PI/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
   }
   // A[0] = a2;
   // A[1] = 0.;
@@ -732,6 +752,26 @@ double test(int kernel) {
     break;
 
   case 33:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    { double3 d = blas::tripleCGReduction(*xD, *yD, *zD);
+      double3 h = make_double3(blas::norm2(*xH), blas::norm2(*yH), blas::reDotProduct(*yH, *zH));
+      error = fabs(d.x - h.x) / fabs(h.x) +
+	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+
+  case 34:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *wD = *wH;
+    { blas::tripleCGUpdate(a, b, *xD, *yD, *zD, *wD);
+      blas::tripleCGUpdate(a, b, *xH, *yH, *zH, *wH);
+      error = ERROR(y) + ERROR(z) + ERROR(w); }
+    break;
+
+  case 35:
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
@@ -748,30 +788,34 @@ double test(int kernel) {
     error/= Msrc;
     break;
 
-  case 34:
-    *xD = *xH;
+  case 36:
+    for (int i=0; i < Nsrc; i++) {
+      xmD->Component(i) = *(xmH[i]);
+      zmD->Component(i) = *(zmH[i]);
+    }
     *yD = *yH;
-    *zD = *zH;
-    { double3 d = blas::tripleCGReduction(*xD, *yD, *zD);
-      double3 h = make_double3(blas::norm2(*xH), blas::norm2(*yH), blas::reDotProduct(*yH, *zH));
-      error = fabs(d.x - h.x) / fabs(h.x) +
-	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+
+    blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (const double*)C);
+
+    for (int i=0; i<Nsrc; i++) {
+      blas::axpyBzpcx(((double*)A)[i], *xmH[i], *zmH[i], ((double*)B)[i], *yH, ((double*)C)[i]);
+    }
+
+    error = 0;
+    for (int i=0; i < Nsrc; i++){
+      error+= fabs(blas::norm2((xmD->Component(i))) - blas::norm2(*(xmH[i]))) / blas::norm2(*(xmH[i]));
+      //error+= fabs(blas::norm2((zmD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
+    }
+    error/= Nsrc;
     break;
 
-  case 35:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
-    *wD = *wH;
-    { blas::tripleCGUpdate(a, b, *xD, *yD, *zD, *wD);
-      blas::tripleCGUpdate(a, b, *xH, *yH, *zH, *wH);
-      error = ERROR(y) + ERROR(z) + ERROR(w); }
-    break;
 
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
   delete[] A;
+  delete[] B;
+  delete[] C;
   return error;
 }
 
@@ -811,9 +855,10 @@ const char *names[] = {
   "caxpbypzYmbwcDotProductUYNormY",
   "HeavyQuarkResidualNorm",
   "xpyHeavyQuarkResidualNorm",
-  "caxpy",
   "tripleCGReduction",
-  "tripleCGUpdate"
+  "tripleCGUpdate",
+  "caxpy (block)",
+  "axpyBzpcx (block)",
 };
 
 int main(int argc, char** argv)
@@ -951,9 +996,10 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_half, BlasTest, ::testing::Values( make
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_half, BlasTest, ::testing::Values( make_int2(0,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,32) ));
-INSTANTIATE_TEST_CASE_P(multicaxpy_half, BlasTest, ::testing::Values( make_int2(0,33) ));
-INSTANTIATE_TEST_CASE_P(TripleCGReduction_half, BlasTest, ::testing::Values( make_int2(0,34) ));
-INSTANTIATE_TEST_CASE_P(TripleCGUpdate_half, BlasTest, ::testing::Values( make_int2(0,35) ));
+INSTANTIATE_TEST_CASE_P(TripleCGReduction_half, BlasTest, ::testing::Values( make_int2(0,33) ));
+INSTANTIATE_TEST_CASE_P(TripleCGUpdate_half, BlasTest, ::testing::Values( make_int2(0,34) ));
+INSTANTIATE_TEST_CASE_P(multicaxpy_half, BlasTest, ::testing::Values( make_int2(0,35) ));
+INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_half, BlasTest, ::testing::Values( make_int2(0,36) ));
 
 // single precision
 INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
@@ -989,9 +1035,10 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_single, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_single, BlasTest, ::testing::Values( make_int2(1,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,32) ));
-INSTANTIATE_TEST_CASE_P(multicaxpy_single, BlasTest, ::testing::Values( make_int2(1,33) ));
-INSTANTIATE_TEST_CASE_P(TripleCGReduction_single, BlasTest, ::testing::Values( make_int2(1,34) ));
+INSTANTIATE_TEST_CASE_P(TripleCGReduction_single, BlasTest, ::testing::Values( make_int2(1,33) ));
 INSTANTIATE_TEST_CASE_P(TripleCGUpdate_single, BlasTest, ::testing::Values( make_int2(1,34) ));
+INSTANTIATE_TEST_CASE_P(multicaxpy_single, BlasTest, ::testing::Values( make_int2(1,35) ));
+INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_single, BlasTest, ::testing::Values( make_int2(1,36) ));
 
 // double precision
 INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
@@ -1027,6 +1074,7 @@ INSTANTIATE_TEST_CASE_P(cDotProductNormB_double, BlasTest, ::testing::Values( ma
 INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_double, BlasTest, ::testing::Values( make_int2(2,30) ));
 INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,31) ));
 INSTANTIATE_TEST_CASE_P(xpyHeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,32) ));
-INSTANTIATE_TEST_CASE_P(multicaxpy_double, BlasTest, ::testing::Values( make_int2(2,33) ));
-INSTANTIATE_TEST_CASE_P(TripleCGReduction_double, BlasTest, ::testing::Values( make_int2(2,34) ));
-INSTANTIATE_TEST_CASE_P(TripleCGUpdate_double, BlasTest, ::testing::Values( make_int2(2,35) ));
+INSTANTIATE_TEST_CASE_P(TripleCGReduction_double, BlasTest, ::testing::Values( make_int2(2,33) ));
+INSTANTIATE_TEST_CASE_P(TripleCGUpdate_double, BlasTest, ::testing::Values( make_int2(2,34) ));
+INSTANTIATE_TEST_CASE_P(multicaxpy_double, BlasTest, ::testing::Values( make_int2(2,35) ));
+INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_double, BlasTest, ::testing::Values( make_int2(2,36) ));

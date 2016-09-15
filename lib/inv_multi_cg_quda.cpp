@@ -85,13 +85,23 @@ namespace quda {
     void apply(const cudaStream_t &stream) {      
       static int count = 0;
 
+#if 0
       // on the first call do the first half of the update
       for (int j= (count*n_shift)/n_update+1; j<=((count+1)*n_shift)/n_update && j<n_shift; j++) {
 	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
 	// update p[i] and x[i]
 	blas::axpyBzpcx(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
       }
-      
+#else
+      int zero = (count*n_shift)/n_update+1;
+      std::vector<ColorSpinorField*> P, X;
+      for (int j= (count*n_shift)/n_update+1; j<=((count+1)*n_shift)/n_update && j<n_shift; j++) {
+	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
+	P.push_back(p[j]);
+	X.push_back(x[j]);
+      }
+      if (P.size()) blas::axpyBzpcx(&alpha[zero], P, X, &zeta[zero], *r, &beta[zero]);
+#endif
       if (++count == n_update) count = 0;
     }
     
