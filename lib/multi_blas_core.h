@@ -3,7 +3,7 @@
  */
 template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Functor,
   int writeX, int writeY, int writeZ, int writeW>
-  void multiblasCuda(const Complex* a, const double2 &b, const double2 &c,
+  void multiblasCuda(const Complex* a, const Complex *b, const Complex *c,
 		     CompositeColorSpinorField &x, CompositeColorSpinorField &y,
 		     CompositeColorSpinorField &z, CompositeColorSpinorField &w) {
 
