@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
-// ---------- blas_quda.cu ---------- 
+// ---------- blas_quda.cu ----------
 
 // these defitions are used to avoid calling
 // std::complex<type>::real/imag which have C++11 ABI incompatibility
@@ -17,14 +17,14 @@ namespace quda {
 
   namespace blas {
 
-    // creates and destroys reduction buffers  
-    void init(); 
+    // creates and destroys reduction buffers
+    void init();
     void end(void);
-    
+
     void* getDeviceReduceBuffer();
     void* getMappedHostReduceBuffer();
     void* getHostReduceBuffer();
-    
+
     void setParam(int kernel, int prec, int threads, int blocks);
 
     extern unsigned long long flops;
@@ -32,7 +32,7 @@ namespace quda {
 
     double norm2(const ColorSpinorField &a);
     double norm1(const ColorSpinorField &b);
-  
+
     void zero(ColorSpinorField &a);
     void copy(ColorSpinorField &dst, const ColorSpinorField &src);
 
@@ -52,7 +52,7 @@ namespace quda {
     void mxpy(ColorSpinorField &x, ColorSpinorField &y);
 
     void axpyZpbx(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, const double &b);
-    void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b, ColorSpinorField& z, const double &c); 
+    void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b, ColorSpinorField& z, const double &c);
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
@@ -64,7 +64,7 @@ namespace quda {
 
     double3 cDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
     double3 cDotProductNormB(ColorSpinorField &a, ColorSpinorField &b);
-    double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, 
+    double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,
 					   ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &u);
 
     void cabxpyAx(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
@@ -77,9 +77,9 @@ namespace quda {
 			  ColorSpinorField &y, ColorSpinorField &z);
     double cabxpyAxNorm(const double &a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
 
-    void caxpbypz(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, 
+    void caxpbypz(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &,
 		  ColorSpinorField &);
-    void caxpbypczpw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, 
+    void caxpbypczpw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &,
 		     const Complex &, ColorSpinorField &, ColorSpinorField &);
     Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y,
 		       ColorSpinorField &z);
@@ -91,8 +91,58 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
+    /**
+       @brief Compute the block "caxpy" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       The dimensions of a can be rectangular, e.g., the width of x
+       and y need not be same, though the maximum width for both is
+       16.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "caxpy" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the vectorized "axpyBzpcx" with over the set of
+       ColorSpinorFields, where the third vector, z, is constant over the
+       batch.  E.g., it computes
+
+       y = a * x + y
+       x = b * z + c * x
+
+       The dimensions of a, b, c are the same as the size of x and y,
+       with a maximum size of 16.
+
+       @param a[in] Array of coefficients
+       @param b[in] Array of coefficients
+       @param c[in] Array of coefficients
+       @param x[in,out] vector of ColorSpinorFields
+       @param y[in,out] vector of ColorSpinorFields
+       @param z[in] input ColorSpinorField
+    */
+    void axpyBzpcx(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
+		   const double *b, ColorSpinorField &z, const double *c);
+
     void reDotProduct(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
-    void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b); 
+    void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
+
   } // namespace blas
 
 } // namespace quda

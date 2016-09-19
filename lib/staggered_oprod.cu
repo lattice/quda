@@ -673,15 +673,15 @@ namespace quda {
 
     if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
       // 3 sets number of faces in ghost_stride - we need to set this to 1 for naive staggered
-      Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA, 3);
-      Spinor<double2, double2, double2, 3, 0, 1> spinorB(inB, 3);
+      Spinor<double2, double2, 3, 0, 0> spinorA(inA, 3);
+      Spinor<double2, double2, 3, 0, 1> spinorB(inB, 3);
 
       computeStaggeredOprodCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(outA), gauge::FloatNOrder<double, 18, 2, 18>(outB),
 					 outA, outB, 
 					 spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
     }else if(inEven.Precision() == QUDA_SINGLE_PRECISION){
-      Spinor<float2, float2, float2, 3, 0, 0> spinorA(inA, 3);
-      Spinor<float2, float2, float2, 3, 0, 1> spinorB(inB, 3);
+      Spinor<float2, float2, 3, 0, 0> spinorA(inA, 3);
+      Spinor<float2, float2, 3, 0, 1> spinorB(inB, 3);
       computeStaggeredOprodCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(outA), gauge::FloatNOrder<float, 18, 2, 18>(outB),
 					outA, outB,
 					spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);

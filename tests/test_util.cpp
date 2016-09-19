@@ -1575,6 +1575,7 @@ int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 int Nsrc = 1;
+int Msrc = 1;
 bool tune = true;
 int niter = 100;
 int test_type = 0;
@@ -1602,6 +1603,7 @@ int mg_levels = 2;
 
 int nu_pre = 2;
 int nu_post = 2;
+QudaInverterType smoother_type = QUDA_MR_INVERTER;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 
@@ -1672,13 +1674,15 @@ void usage(char** argv )
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
-  printf("    --help                                    # Print out this message\n"); 
+  printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
+  printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -2265,9 +2269,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    Nsrc= atoi(argv[i+1]);
-    if (Nsrc < 1 || Nsrc > 64){
-      printf("ERROR: invalid number of sources (%d)\n", Nsrc);
+    Nsrc = atoi(argv[i+1]);
+    if (Nsrc < 1 || Nsrc > 128){
+      printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--msrc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    Msrc = atoi(argv[i+1]);
+    if (Msrc < 1 || Msrc > 128){
+      printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
       usage(argv);
     }
     i++;
@@ -2343,6 +2361,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-smoother") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    smoother_type = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

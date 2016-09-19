@@ -125,7 +125,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*in.VolumeCB();
+    flops += (8*n*n-2*n)*(long long)in.VolumeCB();
   }
 
   void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -138,7 +138,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*in.VolumeCB();
+    flops += (8*n*n-2*n)*(long long)in.VolumeCB();
   }
 
   void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
@@ -151,7 +151,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (8*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+    flops += (8*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
   }
 
   void DiracCoarse::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
@@ -167,7 +167,7 @@ namespace quda {
       ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+    flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
   }
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -179,7 +179,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+    flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
   }
 
   void DiracCoarse::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

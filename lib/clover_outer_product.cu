@@ -15,7 +15,7 @@ namespace quda {
   namespace { // anonymous
 #include <texture.h>
   }
- 
+
   template<int N>
   void createEventArray(cudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
   {
@@ -23,15 +23,15 @@ namespace quda {
       cudaEventCreate(&event[i],flags);
     return;
   }
-  
+
   template<int N>
   void destroyEventArray(cudaEvent_t (&event)[N])
   {
     for(int i=0; i<N; ++i)
       cudaEventDestroy(event[i]);
   }
-  
-  
+
+
   static cudaEvent_t packEnd;
   static cudaEvent_t gatherEnd[4];
   static cudaEvent_t scatterEnd[4];
@@ -77,12 +77,12 @@ namespace quda {
       Gauge  gauge;
       Output force;
       Float coeff;
-      
+
     CloverForceArg(const unsigned int parity,
 		   const unsigned int dir,
 		   const unsigned int *ghostOffset,
-		   const unsigned int displacement,   
-		   const KernelType kernelType, 
+		   const unsigned int displacement,
+		   const KernelType kernelType,
 		   const double coeff,
 		   InputA& inA,
 		   InputB& inB_shift,
@@ -91,9 +91,9 @@ namespace quda {
 		   Gauge& gauge,
 		   Output& force,
 		   GaugeField &meta) : length(meta.VolumeCB()), parity(parity), dir(5),
-				       displacement(displacement), kernelType(kernelType), 
-				       coeff(coeff), inA(inA), inB_shift(inB_shift), 
-				       inC(inC), inD_shift(inD_shift), 
+				       displacement(displacement), kernelType(kernelType),
+				       coeff(coeff), inA(inA), inB_shift(inB_shift),
+				       inC(inC), inD_shift(inD_shift),
 				       gauge(gauge), force(force)
       {
         for(int i=0; i<4; ++i) this->X[i] = meta.X()[i];
@@ -110,7 +110,7 @@ namespace quda {
   };
 
   template <IndexType idxType>
-    static __device__ __forceinline__ void coordsFromIndex(int& idx, int c[4],  
+    static __device__ __forceinline__ void coordsFromIndex(int& idx, int c[4],
         const unsigned int cb_idx, const unsigned int parity, const int X[4])
     {
       const int &LX = X[0];
@@ -179,7 +179,7 @@ namespace quda {
       x[0] += (X[0] - displacement);
       x[1] = 2*(cb_idx % Xh[1]) + ((x[0]+x[2]+x[3]+parity)&1);
       break;
-      
+
     case 1:
       x[2] = cb_idx/Xh[0] % X[2];
       x[3] = cb_idx/(Xh[0]*X[2]) % X[3];
@@ -187,7 +187,7 @@ namespace quda {
       x[1] += (X[1] - displacement);
       x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
       break;
-      
+
     case 2:
       x[1] = cb_idx/Xh[0] % X[1];
       x[3] = cb_idx/(Xh[0]*X[1]) % X[3];
@@ -195,13 +195,13 @@ namespace quda {
       x[2] += (X[2] - displacement);
       x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
       break;
-      
+
     case 3:
       x[1] = cb_idx/Xh[0] % X[1];
       x[2] = cb_idx/(Xh[0]*X[1]) % X[2];
       x[3] = cb_idx/(Xh[0]*X[1]*X[2]);
       x[3] += (X[3] - displacement);
-      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);   
+      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
       break;
     }
     return;
@@ -209,17 +209,17 @@ namespace quda {
 
 
   __device__ __forceinline__
-  int neighborIndex(const unsigned int& cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int& parity, 
-		    const int X[4]){    
+  int neighborIndex(const unsigned int& cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int& parity,
+		    const int X[4]){
     int  full_idx;
-    int x[4]; 
+    int x[4];
     coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
-    
+
     for(int dim = 0; dim<4; ++dim){
       if(partitioned[dim])
 	if( (x[dim]+shift[dim])<0 || (x[dim]+shift[dim])>=X[dim]) return -1;
     }
-    
+
     for(int dim=0; dim<4; ++dim){
       x[dim] = shift[dim] ? (x[dim]+shift[dim] + X[dim]) % X[dim] : x[dim];
     }
@@ -239,7 +239,7 @@ namespace quda {
     while (idx<arg.length){
       arg.inA.load(static_cast<Complex*>(A.data), idx);
       arg.inC.load(static_cast<Complex*>(C.data), idx);
-      
+
       for(int dim=0; dim<4; ++dim){
 	int shift[4] = {0,0,0,0};
 	shift[dim] = 1;
@@ -249,16 +249,16 @@ namespace quda {
 	  arg.inB_shift.load(static_cast<Complex*>(B_shift.data), nbr_idx);
 	  arg.inD_shift.load(static_cast<Complex*>(D_shift.data), nbr_idx);
 
-	  B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);	  
+	  B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);
 	  result = outerProdSpinTrace(B_shift,A);
 
 	  D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
 	  result += outerProdSpinTrace(D_shift,C);
-	  
-	  arg.force.load(reinterpret_cast<real*>(temp.data), idx, dim, arg.parity); 
-	  arg.gauge.load(reinterpret_cast<real*>(U.data), idx, dim, arg.parity); 
+
+	  arg.force.load(reinterpret_cast<real*>(temp.data), idx, dim, arg.parity);
+	  arg.gauge.load(reinterpret_cast<real*>(U.data), idx, dim, arg.parity);
 	  result = temp + U*result*arg.coeff;
-	  arg.force.save(reinterpret_cast<real*>(result.data), idx, dim, arg.parity); 
+	  arg.force.save(reinterpret_cast<real*>(result.data), idx, dim, arg.parity);
 	}
       } // dir
       idx += gridDim.x*blockDim.x;
@@ -270,52 +270,52 @@ namespace quda {
   __global__ void exteriorOprodKernel(CloverForceArg<real, Output, Gauge, InputA, InputB, InputC, InputD> arg) {
     typedef complex<real> Complex;
     int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
-    
+
     ColorSpinor<real,3,4> A, B_shift, C, D_shift;
     ColorSpinor<real,3,2> projected_tmp;
     Matrix<Complex,3> U, result, temp;
-    
+
     int x[4];
     while (cb_idx<arg.length){
-      coordsFromIndex(x, cb_idx, arg.X, dim, arg.displacement, arg.parity); 
+      coordsFromIndex(x, cb_idx, arg.X, dim, arg.displacement, arg.parity);
       const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
       arg.inA.load(static_cast<Complex*>(A.data), bulk_cb_idx);
       arg.inC.load(static_cast<Complex*>(C.data), bulk_cb_idx);
-      
+
       const unsigned int ghost_idx = arg.ghostOffset[dim] + cb_idx;
 
       arg.inB_shift.loadGhost(static_cast<Complex*>(projected_tmp.data), ghost_idx, dim);
       B_shift = projected_tmp.reconstruct(dim, 1);
       result = outerProdSpinTrace(B_shift,A);
-      
+
       arg.inD_shift.loadGhost(static_cast<Complex*>(projected_tmp.data), ghost_idx, dim);
       D_shift = projected_tmp.reconstruct(dim,-1);
       result += outerProdSpinTrace(D_shift,C);
-      
-      arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
-      arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, dim, arg.parity); 
+
+      arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity);
+      arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, dim, arg.parity);
       result = temp + U*result*arg.coeff;
-      arg.force.save(reinterpret_cast<real*>(result.data), bulk_cb_idx, dim, arg.parity); 
-      
+      arg.force.save(reinterpret_cast<real*>(result.data), bulk_cb_idx, dim, arg.parity);
+
       cb_idx += gridDim.x*blockDim.x;
     }
     return;
   } // exteriorOprodKernel
-  
+
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
   class CloverForce : public Tunable {
-    
+
   private:
     CloverForceArg<Float,Output,Gauge,InputA,InputB,InputC,InputD> &arg;
     const GaugeField &meta;
     QudaFieldLocation location; // location of the lattice fields
-    
+
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-    
+
     unsigned int minThreads() const { return arg.length; }
     bool tuneGridDim() const { return false; }
-    
+
   public:
     CloverForce(CloverForceArg<Float,Output,Gauge,InputA,InputB,InputC,InputD> &arg,
 		const GaugeField &meta, QudaFieldLocation location)
@@ -324,15 +324,15 @@ namespace quda {
       // this sets the communications pattern for the packing kernel
       int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
       setPackComms(comms);
-    } 
-    
+    }
+
     virtual ~CloverForce() {}
-    
+
     void apply(const cudaStream_t &stream){
       if(location == QUDA_CUDA_FIELD_LOCATION){
 	// Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());
-	
+
 	if(arg.kernelType == OPROD_INTERIOR_KERNEL){
 	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	} else if(arg.kernelType == OPROD_EXTERIOR_KERNEL) {
@@ -347,30 +347,30 @@ namespace quda {
 	errorQuda("No CPU support for staggered outer-product calculation\n");
       }
     } // apply
-    
+
     void preTune(){
       this->arg.force.save();
     }
     void postTune(){
       this->arg.force.load();
     }
-  
-    long long flops() const { 
+
+    long long flops() const {
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
 	return ((long long)arg.length)*4*(24 + 144 + 234); // spin project + spin trace + multiply-add
       } else {
 	return ((long long)arg.length)*(144 + 234); // spin trace + multiply-add
       }
     }
-    long long bytes() const { 
+    long long bytes() const {
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB_shift.Bytes() + arg.inD_shift.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes())); 
+	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB_shift.Bytes() + arg.inD_shift.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes()));
       } else {
-	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inB_shift.Bytes()/2 + arg.inC.Bytes() + arg.inD_shift.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes()); 
+	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inB_shift.Bytes()/2 + arg.inC.Bytes() + arg.inD_shift.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes());
       }
     }
-  
-    TuneKey tuneKey() const { 
+
+    TuneKey tuneKey() const {
       char new_aux[TuneKey::aux_n];
       strcpy(new_aux, aux);
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
@@ -385,7 +385,7 @@ namespace quda {
       return TuneKey(meta.VolString(), typeid(*this).name(), new_aux);
     }
   }; // CloverForce
-  
+
   void exchangeGhost(cudaColorSpinorField &a, int parity, int dag) {
     // need to enable packing in temporal direction to get spin-projector correct
     bool pack_old = getKernelPackT();
@@ -401,31 +401,31 @@ namespace quda {
     for(int i=3; i>=0; i--){
       if(commDimPartitioned(i)){
 	// Initialize the host transfer from the source spinor
-	a.gather(1, dag, 2*i); 
+	a.gather(1, dag, 2*i);
       } // commDim(i)
     } // i=3,..,0
-    
+
     cudaDeviceSynchronize();
-    
+
     for (int i=3; i>=0; i--) {
       if(commDimPartitioned(i)) {
 	a.commsStart(1, 2*i, dag);
       }
     }
-    
+
     for (int i=3; i>=0; i--) {
       if(commDimPartitioned(i)) {
 	a.commsWait(1, 2*i, dag);
 	a.scatter(1, dag, 2*i);
       }
     }
-    
+
     cudaDeviceSynchronize();
     setKernelPackT(pack_old); // restore packing state
   }
 
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
-  void computeCloverForceCuda(Output force, Gauge gauge, cudaGaugeField& out, 
+  void computeCloverForceCuda(Output force, Gauge gauge, cudaGaugeField& out,
 			      InputA& inA, InputB& inB, InputC &inC, InputD &inD,
 			      cudaColorSpinorField& src1, cudaColorSpinorField& src2,
 			      const unsigned int parity, const int faceVolumeCB[4], const double coeff)
@@ -439,7 +439,7 @@ namespace quda {
 	ghostOffset[dir] = (src1.GhostOffset(dir,1))/src1.FieldOrder(); // offset we want is the forwards one
       }
 
-      // Create the arguments for the interior kernel 
+      // Create the arguments for the interior kernel
       CloverForceArg<Float,Output,Gauge,InputA,InputB,InputC,InputD> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, coeff, inA, inB, inC, inD, gauge, force, out);
       CloverForce<Float,Output,Gauge,InputA,InputB,InputC,InputD> oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
 
@@ -449,7 +449,7 @@ namespace quda {
 
       arg.kernelType = OPROD_INTERIOR_KERNEL;
       arg.length = src1.VolumeCB();
-      oprod.apply(0); 
+      oprod.apply(0);
 
       for (int i=3; i>=0; i--) {
 	if (commDimPartitioned(i)) {
@@ -458,16 +458,16 @@ namespace quda {
 	  arg.dir = i;
 	  arg.length = faceVolumeCB[i];
 	  arg.displacement = 1; // forwards displacement
-	  oprod.apply(0); 
+	  oprod.apply(0);
 	}
-      } // i=3,..,0 
+      } // i=3,..,0
     } // computeCloverForceCuda
 
 #endif // GPU_CLOVER_FORCE
 
   void computeCloverForce(cudaGaugeField& force,
 			  const cudaGaugeField& U,
-			  cudaColorSpinorField& x,  
+			  cudaColorSpinorField& x,
 			  cudaColorSpinorField& p,
 			  const double coeff)
   {
@@ -479,7 +479,7 @@ namespace quda {
     static_cast<cudaColorSpinorField&>(p.Odd()).allocateGhostBuffer(1);
 
     if(force.Order() != QUDA_FLOAT2_GAUGE_ORDER)
-      errorQuda("Unsupported output ordering: %d\n", force.Order());    
+      errorQuda("Unsupported output ordering: %d\n", force.Order());
 
     if(x.Precision() != force.Precision())
       errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), force.Precision());
@@ -487,17 +487,17 @@ namespace quda {
     createCloverForceEvents(); // FIXME not actually used
 
     for (int parity=0; parity<2; parity++) {
-      
+
       ColorSpinorField& inA = (parity&1) ? p.Odd() : p.Even();
       ColorSpinorField& inB = (parity&1) ? x.Even(): x.Odd();
       ColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
       ColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
-      
+
       if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
-	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
-	Spinor<double2, double2, double2, 12, 0, 2> spinorC(inC);
-	Spinor<double2, double2, double2, 12, 0, 3> spinorD(inD);
+	Spinor<double2, double2, 12, 0, 0> spinorA(inA);
+	Spinor<double2, double2, 12, 0, 1> spinorB(inB);
+	Spinor<double2, double2, 12, 0, 2> spinorC(inC);
+	Spinor<double2, double2, 12, 0, 3> spinorD(inD);
 	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
 					 gauge::FloatNOrder<double,18, 2, 18>(U),
@@ -545,7 +545,7 @@ namespace quda {
     destroyCloverForceEvents(); // not actually used
 
 #else // GPU_CLOVER_DIRAC not defined
-   errorQuda("Clover Dirac operator has not been built!"); 
+   errorQuda("Clover Dirac operator has not been built!");
 #endif
 
    checkCudaError();

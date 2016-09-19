@@ -76,7 +76,6 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #include <momentum.h>
 
-const int numa_affinity_enabled = 1;
 
 using namespace quda;
 
@@ -423,11 +422,17 @@ void initQudaDevice(int dev) {
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
-if(numa_affinity_enabled){
-  #if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
-  setNumaAffinityNVML(dev);
-  #endif
-}
+
+#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
+  char *enable_numa_env = getenv("QUDA_ENABLE_NUMA");
+  if (enable_numa_env && strcmp(enable_numa_env, "0") == 0) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling numa_affinity\n");
+  }
+  else{
+    setNumaAffinityNVML(dev);
+  }
+#endif
+
 
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
@@ -2490,6 +2495,373 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
+
+/*!
+ * Generic version of the multi-shift solver. Should work for
+ * most fermions. Note that offset[0] is not folded into the mass parameter.
+ *
+ * At present, the solution_type must be MATDAG_MAT or MATPCDAG_MATPC,
+ * and solve_type must be NORMOP or NORMOP_PC.  The solution and solve
+ * preconditioning have to match.
+ */
+void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
+{
+
+  // currently that code is just a copy of invertQuda and cannot work
+  setTuning(param->tune);
+
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
+
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  pushVerbosity(param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
+
+  checkInvertParam(param);
+
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
+
+  // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
+  // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
+  // for now, though, so here we factorize everything for convenience.
+
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
+    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
+    (param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
+    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
+  if (!pc_solve) param->spinorGiB *= 2;
+  param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
+  if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 5 : 7)/(double)(1<<30);
+  } else {
+    param->spinorGiB *= (param->inv_type == QUDA_CG_INVERTER ? 8 : 9)/(double)(1<<30);
+  }
+
+  param->secs = 0;
+  param->gflops = 0;
+  param->iter = 0;
+
+  Dirac *d = NULL;
+  Dirac *dSloppy = NULL;
+  Dirac *dPre = NULL;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *param, pc_solve);
+
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
+
+  profileInvert.TPSTART(QUDA_PROFILE_H2D);
+
+  // std::vector<ColorSpinorField*> b;  // Cuda Solutions
+  // b.resize(param->num_src);
+  // std::vector<ColorSpinorField*> x;  // Cuda Solutions
+  // x.resize(param->num_src);
+  ColorSpinorField* in;  // = NULL;
+  //in.resize(param->num_src);
+  ColorSpinorField* out;  // = NULL;
+  //out.resize(param->num_src);
+
+  // for(int i=0;i < param->num_src;i++){
+  //   in[i] = NULL;
+  //   out[i] = NULL;
+  // }
+
+  const int *X = cudaGauge->X();
+
+
+  // Host pointers for x, take a copy of the input host pointers
+  void** hp_x;
+  hp_x = new void* [ param->num_src ];
+
+  void** hp_b;
+  hp_b = new void* [param->num_src];
+
+  for(int i=0;i < param->num_src;i++){
+    hp_x[i] = _hp_x[i];
+    hp_b[i] = _hp_b[i];
+  }
+
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam(hp_b[0], *param, X, pc_solution, param->input_location);
+  std::vector<ColorSpinorField*> h_b;
+  h_b.resize(param->num_src);
+  for(int i=0; i < param->num_src; i++) {
+    cpuParam.v = hp_b[i]; //MW seems wird in the loop
+    h_b[i] = ColorSpinorField::Create(cpuParam);
+  }
+
+ // cpuParam.v = hp_x;
+  cpuParam.location = param->output_location;
+  std::vector<ColorSpinorField*> h_x;
+  h_x.resize(param->num_src);
+//
+  for(int i=0; i < param->num_src; i++) {
+    cpuParam.v = hp_x[i]; //MW seems wird in the loop
+    h_x[i] = ColorSpinorField::Create(cpuParam);
+  }
+
+
+  // MW currently checked until here
+
+  // download source
+  printfQuda("Setup b\n");
+  ColorSpinorParam cudaParam(cpuParam, *param);
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.is_composite = true;
+  cudaParam.composite_dim = param->num_src;
+
+  printfQuda("Create b \n");
+  ColorSpinorField *b = ColorSpinorField::Create(cudaParam);
+
+
+
+
+  for(int i=0; i < param->num_src; i++) {
+    b->Component(i) = *h_b[i];
+  }
+  printfQuda("Done b \n");
+
+    ColorSpinorField *x;
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
+    // initial guess only supported for single-pass solvers
+    if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
+        (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+      errorQuda("Initial guess not supported for two-pass solver");
+    }
+    cudaParam.is_composite = true;
+    cudaParam.is_component = false;
+    cudaParam.composite_dim = param->num_src;
+
+    x = ColorSpinorField::Create(cudaParam);
+    for(int i=0; i < param->num_src; i++) {
+      x->Component(i) = *h_x[i];
+    }
+
+  } else { // zero initial guess
+    // Create the solution fields filled with zero
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+      printfQuda("Create x \n");
+    x = ColorSpinorField::Create(cudaParam);
+      printfQuda("Done x \n");
+ // solution
+  }
+
+  profileInvert.TPSTOP(QUDA_PROFILE_H2D);
+
+  double * nb = new double[param->num_src];
+  for(int i=0; i < param->num_src; i++) {
+    nb[i] = blas::norm2(b->Component(i));
+    printfQuda("Source %i: CPU = %g, CUDA copy = %g\n", i, nb[i], nb[i]);
+    if (nb[i]==0.0) errorQuda("Source has zero norm");
+
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      double nh_b = blas::norm2(*h_b[i]);
+      double nh_x = blas::norm2(*h_x[i]);
+      double nx = blas::norm2(x->Component(i));
+      printfQuda("Source %i: CPU = %g, CUDA copy = %g\n", i, nh_b, nb[i]);
+      printfQuda("Solution %i: CPU = %g, CUDA copy = %g\n", i, nh_x, nx);
+    }
+  }
+
+  // MW checked until here do far
+
+  // rescale the source and solution vectors to help prevent the onset of underflow
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    for(int i=0; i < param->num_src; i++) {
+      blas::ax(1.0/sqrt(nb[i]), b->Component(i));
+      blas::ax(1.0/sqrt(nb[i]), x->Component(i));
+    }
+  }
+
+  for(int i=0; i < param->num_src; i++) {
+    massRescale(dynamic_cast<cudaColorSpinorField&>( b->Component(i) ), *param);
+  }
+
+  // MW: need to check what dirac.prepare does
+  // for now let's just try looping of num_rhs already here???
+  // for(int i=0; i < param->num_src; i++) {
+    dirac.prepare(in, out, *x, *b, param->solution_type);
+for(int i=0; i < param->num_src; i++) {
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      double nin = blas::norm2((in->Component(i)));
+      double nout = blas::norm2((out->Component(i)));
+      printfQuda("Prepared source %i = %g\n", i, nin);
+      printfQuda("Prepared solution %i = %g\n", i, nout);
+    }
+
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      double nin = blas::norm2(in->Component(i));
+      printfQuda("Prepared source %i post mass rescale = %g\n", i, nin);
+    }
+  }
+
+    // solution_type specifies *what* system is to be solved.
+    // solve_type specifies *how* the system is to be solved.
+    //
+    // We have the following four cases (plus preconditioned variants):
+    //
+    // solution_type    solve_type    Effect
+    // -------------    ----------    ------
+    // MAT              DIRECT        Solve Ax=b
+    // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
+    // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
+    // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+    // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
+    //
+    // We generally require that the solution_type and solve_type
+    // preconditioning match.  As an exception, the unpreconditioned MAT
+    // solution_type may be used with any solve_type, including
+    // DIRECT_PC and NORMOP_PC.  In these cases, preparation of the
+    // preconditioned source and reconstruction of the full solution are
+    // taken care of by Dirac::prepare() and Dirac::reconstruct(),
+    // respectively.
+
+    if (pc_solution && !pc_solve) {
+      errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
+    }
+
+    if (!mat_solution && !pc_solution && pc_solve) {
+      errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
+    }
+
+    if (!mat_solution && norm_error_solve) {
+      errorQuda("Normal-error solve requires Mat solution");
+    }
+
+    if (param->inv_type_precondition == QUDA_MG_INVERTER && (pc_solve || pc_solution || !direct_solve || !mat_solution))
+      errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
+
+    if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
+      for(int i=0; i < param->num_src; i++) {
+        cudaColorSpinorField tmp((in->Component(i)));
+        dirac.Mdag(in->Component(i), tmp);
+      }
+    } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
+      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      SolverParam solverParam(*param);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      solve->solve(*out,*in);
+      for(int i=0; i < param->num_src; i++) {
+        blas::copy(in->Component(i), out->Component(i));
+      }
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    }
+
+    if (direct_solve) {
+      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      SolverParam solverParam(*param);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      solve->solve(*out,*in);
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    } else if (!norm_error_solve) {
+      DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      SolverParam solverParam(*param);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      solve->solve(*out,*in);
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    } else { // norm_error_solve
+      DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      errorQuda("norm_error_solve not supported in multi source solve");
+      //cudaColorSpinorField tmp(*out);
+      // SolverParam solverParam(*param);
+      //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      //(*solve)(tmp, *in); // y = (M M^\dag) b
+      //dirac.Mdag(*out, tmp);  // x = M^dag y
+      //solverParam.updateInvertParam(*param,i,i);
+      // delete solve;
+    }
+
+    if (getVerbosity() >= QUDA_VERBOSE){
+      for(int i=0; i < param->num_src; i++) {
+        double nx = blas::norm2(x->Component(i));
+        printfQuda("Solution %i = %g\n",i, nx);
+      }
+    }
+
+
+  profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
+  for(int i=0; i< param->num_src; i++){
+    dirac.reconstruct(x->Component(i), b->Component(i), param->solution_type);
+  }
+  profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    for(int i=0; i< param->num_src; i++){
+      // rescale the solution
+      blas::ax(sqrt(nb[i]), x->Component(i));
+    }
+  }
+
+  // MW -- not sure how to handle that here
+  if (!param->make_resident_solution) {
+    profileInvert.TPSTART(QUDA_PROFILE_D2H);
+    for(int i=0; i< param->num_src; i++){
+      *h_x[i] = x->Component(i);
+    }
+    profileInvert.TPSTOP(QUDA_PROFILE_D2H);
+  }
+
+//  if (param->make_resident_solution) {
+//    for (unsigned int i=0; i<solutionResident.size(); i++) {
+//      if (solutionResident[i]) delete solutionResident[i];
+//    }
+//    solutionResident.resize(1);
+//    solutionResident[0] = static_cast<cudaColorSpinorField*>(x);
+//  }
+
+  if (getVerbosity() >= QUDA_VERBOSE){
+    for(int i=0; i< param->num_src; i++){
+      double nx = blas::norm2(x->Component(i));
+      double nh_x = blas::norm2(*h_x[i]);
+      printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+    }
+  }
+
+  //FIX need to make sure all deletes are correct again
+  for(int i=0; i < param->num_src; i++){
+    delete h_x[i];
+    // delete x[i];
+    delete h_b[i];
+    // delete b[i];
+  }
+   delete [] hp_b;
+   delete [] hp_x;
+//   delete [] b;
+//  if (!param->make_resident_solution) delete x;
+
+  delete d;
+  delete dSloppy;
+  delete dPre;
+  delete x;
+  delete b;
+
+  popVerbosity();
+
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
+
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
 
 
 /*!

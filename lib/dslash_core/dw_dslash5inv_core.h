@@ -2,7 +2,6 @@
 
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
 
-// NB! Don't trust any MULTI_GPU code
 
 #if (CUDA_VERSION >= 4010)
 #define VOLATILE
@@ -122,17 +121,15 @@ VOLATILE spinorFloat o32_im;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
 
-int boundaryCrossing;
 
-int X, xs;
+int X, coord[5], boundaryCrossing;
 
-// Inline by hand for the moment and assume even dimensions
-//coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-xs = X/(X1*X2*X3*X4);
+coord[4] = X/(X1*X2*X3*X4);
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;
@@ -150,7 +147,7 @@ xs = X/(X1*X2*X3*X4);
 VOLATILE spinorFloat kappa;
 
 #ifdef MDWF_mode   // Check whether MDWF option is enabled
-  kappa = -(mdwf_c5[xs]*(static_cast<spinorFloat>(4.0) + m5) - static_cast<spinorFloat>(1.0))/(mdwf_b5[xs]*(static_cast<spinorFloat>(4.0) + m5) + static_cast<spinorFloat>(1.0));
+  kappa = -(mdwf_c5[ coord[4] ]*(static_cast<spinorFloat>(4.0) + m5) - static_cast<spinorFloat>(1.0))/(mdwf_b5[ coord[4] ]*(static_cast<spinorFloat>(4.0) + m5) + static_cast<spinorFloat>(1.0));
 #else
   kappa = static_cast<spinorFloat>(2.0)*a;
 #endif  // select MDWF mode
@@ -177,8 +174,8 @@ VOLATILE spinorFloat kappa;
 
   for(int s = 0; s < param.Ls; s++)
   {
-    int exponent = xs < s ? param.Ls-s+xs : xs-s;
-    factorR = inv_d_n * POW(kappa,exponent) * ( xs < s ? -mferm : static_cast<spinorFloat>(1.0) );
+    int exponent = coord[4] < s ? param.Ls-s+coord[4] : coord[4]-s;
+    factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0) );
 
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
@@ -209,8 +206,8 @@ VOLATILE spinorFloat kappa;
     o32_re += factorR*(i12_re + i32_re);
     o32_im += factorR*(i12_im + i32_im);
 
-    int exponent2 = xs > s ? param.Ls-xs+s : s-xs;
-    factorL = inv_d_n * POW(kappa,exponent2) * ( xs > s ? -mferm : static_cast<spinorFloat>(1.0));
+    int exponent2 = coord[4] > s ? param.Ls-coord[4]+s : s-coord[4];
+    factorL = inv_d_n * POW(kappa,exponent2) * ( coord[4] > s ? -mferm : static_cast<spinorFloat>(1.0));
 
     o00_re += factorL*(i00_re - i20_re);
     o00_im += factorL*(i00_im - i20_im);
@@ -247,7 +244,7 @@ VOLATILE spinorFloat kappa;
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
- coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
+ coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[coord[4]]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
  coeff *= coeff;
  coeff *= a;
 #else

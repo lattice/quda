@@ -1,6 +1,7 @@
 #include <blas_quda.h>
 #include <tune_quda.h>
 #include <float_vector.h>
+#include <register_traits.h>
 
 // For kernels with precision conversion built in
 #define checkSpinorLength(a, b)						\
@@ -131,26 +132,23 @@ namespace quda {
 	  }
 	} else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	  if (src.Nspin() == 4){
-	    Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
-	    Spinor<float4, float2, double2, 6, 1> dst_spinor(dst);
-	    CopyCuda<float4, 6, Spinor<float4, float2, double2, 6, 1>, 
-		     Spinor<float4, float4, float4, 6, 0, 0> >
+	    Spinor<float4, float4, 6, 0, 0> src_tex(src);
+	    Spinor<float4, double2, 6, 1> dst_spinor(dst);
+	    CopyCuda<float4, 6, Spinor<float4, double2, 6, 1>, Spinor<float4, float4, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else if (src.Nspin() == 2) {
 	    if (src.Length() != src.RealLength() || dst.Length() != dst.RealLength())
 	      errorQuda("Non-zero stride not supported"); // we need to know how many colors to set "M" (requires JIT)
-	    Spinor<float2, float2, float2, 1, 0, 0> src_tex(src);
-	    Spinor<float2, float2, double2, 1, 1> dst_spinor(dst);
-	    CopyCuda<float2, 1, Spinor<float2, float2, double2, 1, 1>,
-		     Spinor<float2, float2, float2, 1, 0, 0> >
+	    Spinor<float2, float2, 1, 0, 0> src_tex(src);
+	    Spinor<float2, double2, 1, 1> dst_spinor(dst);
+	    CopyCuda<float2, 1, Spinor<float2, double2, 1, 1>, Spinor<float2, float2, 1, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Length()/2);
 	    copy.apply(*blas::getStream());
 	  } else if (src.Nspin() == 1) {
-	    Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
-	    Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
-	    CopyCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
-		     Spinor<float2, float2, float2, 3, 0, 0> >
+	    Spinor<float2, float2, 3, 0, 0> src_tex(src);
+	    Spinor<float2, double2, 3, 1> dst_spinor(dst);
+	    CopyCuda<float2, 3, Spinor<float2, double2, 3, 1>,  Spinor<float2, float2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else {
@@ -158,26 +156,23 @@ namespace quda {
 	  }
 	} else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 	  if (src.Nspin() == 4){
-	    Spinor<float4, float2, double2, 6, 0, 0> src_tex(src);
-	    Spinor<float4, float4, float4, 6, 1> dst_spinor(dst);
-	    CopyCuda<float4, 6, Spinor<float4, float4, float4, 6, 1>,
-		     Spinor<float4, float2, double2, 6, 0, 0> >
+	    Spinor<float4, double2, 6, 0, 0> src_tex(src);
+	    Spinor<float4, float4, 6, 1> dst_spinor(dst);
+	    CopyCuda<float4, 6, Spinor<float4, float4, 6, 1>, Spinor<float4, double2, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
-	    copy.apply(*blas::getStream());	
+	      copy.apply(*blas::getStream());
 	  } else if (src.Nspin() == 2) {
 	    if (src.Length() != src.RealLength() || dst.Length() != dst.RealLength())
 	      errorQuda("Non-zero stride not supported"); // we need to know how many colors to set "M" (requires JIT)
-	    Spinor<float2, float2, double2, 1, 0, 0> src_tex(src);
-	    Spinor<float2, float2, float2, 1, 1> dst_spinor(dst);
-	    CopyCuda<float2, 1, Spinor<float2, float2, float2, 1, 1>,
-		     Spinor<float2, float2, double2, 1, 0, 0> >
+	    Spinor<float2, double2, 1, 0, 0> src_tex(src);
+	    Spinor<float2, float2, 1, 1> dst_spinor(dst);
+	    CopyCuda<float2, 1, Spinor<float2, float2, 1, 1>, Spinor<float2, double2, 1, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Length()/2);
 	    copy.apply(*blas::getStream());
 	  } else if (src.Nspin() == 1) {
-	    Spinor<float2, float2, double2, 3, 0, 0> src_tex(src);
-	    Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
-	    CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-		     Spinor<float2, float2, double2, 3, 0, 0> >
+	    Spinor<float2, double2, 3, 0, 0> src_tex(src);
+	    Spinor<float2, float2, 3, 1> dst_spinor(dst);
+	    CopyCuda<float2, 3, Spinor<float2, float2, 3, 1>, Spinor<float2, double2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else {
@@ -186,17 +181,15 @@ namespace quda {
 	} else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	  blas::bytes += (unsigned long long)src.Volume()*sizeof(float);
 	  if (src.Nspin() == 4){      
-	    Spinor<float4, float4, short4, 6, 0, 0> src_tex(src);
-	    Spinor<float4, float4, float4, 6, 1> dst_spinor(dst);
-	    CopyCuda<float4, 6, Spinor<float4, float4, float4, 6, 1>,
-		     Spinor<float4, float4, short4, 6, 0, 0> >
+	    Spinor<float4, short4, 6, 0, 0> src_tex(src);
+	    Spinor<float4, float4, 6, 1> dst_spinor(dst);
+	    CopyCuda<float4, 6, Spinor<float4, float4, 6, 1>, Spinor<float4, short4, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
-	    copy.apply(*blas::getStream());	
+	      copy.apply(*blas::getStream());
 	  } else if (src.Nspin() == 1) {
-	    Spinor<float2, float2, short2, 3, 0, 0> src_tex(src);
-	    Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
-	    CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
-		     Spinor<float2, float2, short2, 3, 0, 0> >
+	    Spinor<float2, short2, 3, 0, 0> src_tex(src);
+	    Spinor<float2, float2, 3, 1> dst_spinor(dst);
+	    CopyCuda<float2, 3, Spinor<float2, float2, 3, 1>, Spinor<float2, short2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else {
@@ -205,17 +198,15 @@ namespace quda {
 	} else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	  blas::bytes += (unsigned long long)dst.Volume()*sizeof(float);
 	  if (src.Nspin() == 4){
-	    Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
-	    Spinor<float4, float4, short4, 6, 1> dst_spinor(dst);
-	    CopyCuda<float4, 6, Spinor<float4, float4, short4, 6, 1>,
-		     Spinor<float4, float4, float4, 6, 0, 0> >
+	    Spinor<float4, float4, 6, 0, 0> src_tex(src);
+	    Spinor<float4, short4, 6, 1> dst_spinor(dst);
+	    CopyCuda<float4, 6, Spinor<float4, short4, 6, 1>,  Spinor<float4, float4, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else if (src.Nspin() == 1) {
-	    Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
-	    Spinor<float2, float2, short2, 3, 1> dst_spinor(dst);
-	    CopyCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
-		     Spinor<float2, float2, float2, 3, 0, 0> >
+	    Spinor<float2, float2, 3, 0, 0> src_tex(src);
+	    Spinor<float2, short2, 3, 1> dst_spinor(dst);
+	    CopyCuda<float2, 3, Spinor<float2, short2, 3, 1>, Spinor<float2, float2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else {
@@ -224,17 +215,15 @@ namespace quda {
 	} else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	  blas::bytes += (unsigned long long)src.Volume()*sizeof(float);
 	  if (src.Nspin() == 4){
-	    Spinor<double2, float4, short4, 12, 0, 0> src_tex(src);
-	    Spinor<double2, double2, double2, 12, 1> dst_spinor(dst);
-	    CopyCuda<double2, 12, Spinor<double2, double2, double2, 12, 1>,
-		     Spinor<double2, float4, short4, 12, 0, 0> >
+	    Spinor<double2, short4, 12, 0, 0> src_tex(src);
+	    Spinor<double2, double2, 12, 1> dst_spinor(dst);
+	    CopyCuda<double2, 12, Spinor<double2, double2, 12, 1>, Spinor<double2, short4, 12, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else if (src.Nspin() == 1) {
-	    Spinor<double2, float2, short2, 3, 0, 0> src_tex(src);
-	    Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
-	    CopyCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
-		     Spinor<double2, float2, short2, 3, 0, 0> >
+	    Spinor<double2, short2, 3, 0, 0> src_tex(src);
+	    Spinor<double2, double2, 3, 1> dst_spinor(dst);
+	    CopyCuda<double2, 3, Spinor<double2, double2, 3, 1>, Spinor<double2, short2, 3, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else {
@@ -243,17 +232,15 @@ namespace quda {
 	} else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 	  blas::bytes += (unsigned long long)dst.Volume()*sizeof(float);
 	  if (src.Nspin() == 4){
-	    Spinor<double2, double2, double2, 12, 0, 0> src_tex(src);
-	    Spinor<double2, double4, short4, 12, 1> dst_spinor(dst);
-	    CopyCuda<double2, 12, Spinor<double2, double4, short4, 12, 1>,
-		     Spinor<double2, double2, double2, 12, 0, 0> >
+	    Spinor<double2, double2, 12, 0, 0> src_tex(src);
+	    Spinor<double2, short4, 12, 1> dst_spinor(dst);
+	    CopyCuda<double2, 12, Spinor<double2, short4, 12, 1>, Spinor<double2, double2, 12, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else if (src.Nspin() == 1) {
-	    Spinor<double2, double2, double2, 3, 0, 0> src_tex(src);
-	    Spinor<double2, double2, short2, 3, 1> dst_spinor(dst);
-	    CopyCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
-		     Spinor<double2, double2, double2, 3, 0, 0> >
+	    Spinor<double2, double2, 3, 0, 0> src_tex(src);
+	    Spinor<double2, short2, 3, 1> dst_spinor(dst);
+	    CopyCuda<double2, 3, Spinor<double2, short2, 3, 1>, Spinor<double2, double2, 3, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
 	  } else {

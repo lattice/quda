@@ -241,6 +241,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifndef CHECK_PARAM
   P(pipeline, 0); /** Whether to use a pipelined solver */
   P(num_offset, 0); /**< Number of offsets in the multi-shift solver */
+  P(num_src, 1); /**< Number of offsets in the multi-shift solver */
   P(overlap, 0); /**< width of domain overlaps */
 #endif
 

@@ -30,9 +30,8 @@ struct ReductionArg : public ReduceArg<ReduceType> {
 /**
    Generic reduction kernel with up to four loads and three saves.
  */
-template <int block_size, typename ReduceType, typename ReduceSimpleType,
-	  typename FloatN, int M, typename SpinorX, typename SpinorY,
-	  typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template <int block_size, typename ReduceType, typename FloatN, int M, typename SpinorX,
+	  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
 
   unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
@@ -72,15 +71,14 @@ __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,Spi
 /**
    Generic reduction kernel launcher
 */
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN,
-  int M, typename SpinorX, typename SpinorY, typename SpinorZ,
-  typename SpinorW, typename SpinorV, typename Reducer>
+template <typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
+	  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> &arg,
 		     const TuneParam &tp, const cudaStream_t &stream) {
   if (tp.grid.x > REDUCE_MAX_BLOCKS)
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
-  LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,ReduceSimpleType,FloatN,M);
+  LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,FloatN,M);
 
   if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
@@ -96,9 +94,8 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
 }
 
 
-template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN,
-  int M, typename SpinorX, typename SpinorY, typename SpinorZ,
-  typename SpinorW, typename SpinorV, typename Reducer>
+template <typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
+	  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 class ReduceCuda : public Tunable {
 
 private:
@@ -141,35 +138,35 @@ public:
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>(arg, tp, stream);
+    result = reduceLaunch<doubleN,ReduceType,FloatN,M>(arg, tp, stream);
   }
 
   void preTune() {
-    arg.X.save(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
-    arg.Y.save(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
-    arg.Z.save(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
-    arg.W.save(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
-    arg.V.save(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
+    arg.X.backup(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.backup(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.backup(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.backup(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.backup(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   void postTune() {
-    arg.X.load(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
-    arg.Y.load(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
-    arg.Z.load(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
-    arg.W.load(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
-    arg.V.load(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
+    arg.X.restore(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.restore(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.restore(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.restore(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.restore(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
-  long long flops() const { return arg.r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
+  long long flops() const { return arg.r.flops()*vec_length<FloatN>::value*arg.length*M; }
 
   long long bytes() const
   {
     // bytes for low-precision vector
-    size_t base_bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    size_t base_bytes = arg.X.Precision()*vec_length<FloatN>::value*M;
     if (arg.X.Precision() == QUDA_HALF_PRECISION) base_bytes += sizeof(float);
 
     // bytes for high precision vector
-    size_t extra_bytes = arg.Y.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    size_t extra_bytes = arg.Y.Precision()*vec_length<FloatN>::value*M;
     if (arg.Y.Precision() == QUDA_HALF_PRECISION) extra_bytes += sizeof(float);
 
     // the factor two here assumes we are reading and writing to the high precision vector
@@ -180,30 +177,74 @@ public:
   int tuningIter() const { return 3; }
 };
 
-double2 make_Float2(double x, double y) {
-  return make_double2( x, y );
-}
 
-float2 make_Float2(float x, float y) {
-  return make_float2( x, y );
-}
+template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
+	  int M, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+	  int writeX, int writeY, int writeZ, int writeW, int writeV>
+doubleN reduceCuda(const double2 &a, const double2 &b,
+		   ColorSpinorField &x, ColorSpinorField &y,
+		   ColorSpinorField &z, ColorSpinorField &w,
+		   ColorSpinorField &v, int length) {
 
-double2 make_Float2(const std::complex<double> &a) {
-  return make_double2( real(a), imag(a) );
-}
+  // FIXME implement this as a single kernel
+  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+    doubleN even = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
+      Reducer,writeX,writeY,writeZ,writeW,writeV>
+      (a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even(), length/2);
+    doubleN odd = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
+      Reducer,writeX,writeY,writeZ,writeW,writeV>
+      (a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd(), length/2);
+    return even + odd;
+  }
 
-float2 make_Float2(const std::complex<float> &a) {
-  return make_float2( real(a), imag(a) );
-}
+  checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x, v);
 
-std::complex<double> make_Complex(const double2 &a) {
-  return std::complex<double>(a.x, a.y);
-}
+  if (!x.isNative()) {
+    warningQuda("Device reductions on non-native fields is not supported\n");
+    doubleN value;
+    ::quda::zero(value);
+    return value;
+  }
 
-std::complex<float> make_Complex(const float2 &a) {
-  return std::complex<float>(a.x, a.y);
-}
+  blasStrings.vol_str = x.VolString();
+  strcpy(blasStrings.aux_tmp, x.AuxString());
+  if (typeid(StoreType) != typeid(zType)) {
+    strcat(blasStrings.aux_tmp, ",");
+    strcat(blasStrings.aux_tmp, z.AuxString());
+  }
 
+  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
+  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
+
+  Spinor<RegType,StoreType,M,writeX,0> X(x);
+  Spinor<RegType,StoreType,M,writeY,1> Y(y);
+  Spinor<RegType,    zType,M,writeZ,2> Z(z);
+  Spinor<RegType,StoreType,M,writeW,3> W(w);
+  Spinor<RegType,StoreType,M,writeV,4> V(v);
+
+  typedef typename scalar<RegType>::type Float;
+  typedef typename vector<Float,2>::type Float2;
+  typedef vector<Float,2> vec2;
+  Reducer<ReduceType, Float2, RegType> r((Float2)vec2(a), (Float2)vec2(b));
+  doubleN value;
+
+  ReduceCuda<doubleN,ReduceType,RegType,M,
+    Spinor<RegType,StoreType,M,writeX,0>,
+    Spinor<RegType,StoreType,M,writeY,1>,
+    Spinor<RegType,    zType,M,writeZ,2>,
+    Spinor<RegType,StoreType,M,writeW,3>,
+    Spinor<RegType,StoreType,M,writeV,4>,
+    Reducer<ReduceType, Float2, RegType> >
+    reduce(value, X, Y, Z, W, V, r, length, bytes, norm_bytes);
+  reduce.apply(*(blas::getStream()));
+
+  blas::bytes += reduce.bytes();
+  blas::flops += reduce.flops();
+
+  checkCudaError();
+
+  return value;
+}
 
 /**
    Generic reduce kernel with four loads and up to four stores.
@@ -225,11 +266,11 @@ ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV
       r.pre();
       for (int s=0; s<X.Nspin(); s++) {
 	for (int c=0; c<X.Ncolor(); c++) {
-	  Float2 X2 = make_Float2( X(parity, x, s, c) );
-	  Float2 Y2 = make_Float2( Y(parity, x, s, c) );
-	  Float2 Z2 = make_Float2( Z(parity, x, s, c) );
-	  Float2 W2 = make_Float2( W(parity, x, s, c) );
-	  Float2 V2 = make_Float2( V(parity, x, s, c) );
+	  Float2 X2 = make_Float2<Float2>( X(parity, x, s, c) );
+	  Float2 Y2 = make_Float2<Float2>( Y(parity, x, s, c) );
+	  Float2 Z2 = make_Float2<Float2>( Z(parity, x, s, c) );
+	  Float2 W2 = make_Float2<Float2>( W(parity, x, s, c) );
+	  Float2 V2 = make_Float2<Float2>( V(parity, x, s, c) );
 	  r(sum, X2, Y2, Z2, W2, V2);
 	  if (writeX) X(parity, x, s, c) = make_Complex(X2);
 	  if (writeY) Y(parity, x, s, c) = make_Complex(Y2);
@@ -249,44 +290,45 @@ template<typename, int N> struct vector { };
 template<> struct vector<double, 2> { typedef double2 type; };
 template<> struct vector<float, 2> { typedef float2 type; };
 
-template <typename ReduceType, typename Float, int nSpin, int nColor, QudaFieldOrder order,
+template <typename ReduceType, typename Float, typename zFloat, int nSpin, int nColor, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
 			   ColorSpinorField &w, ColorSpinorField &v, R r) {
-  colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Y(y), Z(z), W(w), V(v);
-  typedef typename vector<Float,2>::type Float2;
+  colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Y(y), W(w), V(v);
+  colorspinor::FieldOrderCB<zFloat,nSpin,nColor,1,order> Z(z);
+  typedef typename vector<zFloat,2>::type Float2;
   return genericReduce<ReduceType,Float2,writeX,writeY,writeZ,writeW,writeV>(X, Y, Z, W, V, r);
 }
 
-template <typename ReduceType, typename Float, int nSpin, QudaFieldOrder order,
+template <typename ReduceType, typename Float, typename zFloat, int nSpin, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
 			   ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
   if (x.Ncolor() == 2) {
-    value = genericReduce<ReduceType,Float,nSpin,2,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,2,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 3) {
-    value = genericReduce<ReduceType,Float,nSpin,3,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,3,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 4) {
-    value = genericReduce<ReduceType,Float,nSpin,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 6) {
-    value = genericReduce<ReduceType,Float,nSpin,6,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,6,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 8) {
-    value = genericReduce<ReduceType,Float,nSpin,8,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,8,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 12) {
-    value = genericReduce<ReduceType,Float,nSpin,12,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,12,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 16) {
-    value = genericReduce<ReduceType,Float,nSpin,16,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,16,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 20) {
-    value = genericReduce<ReduceType,Float,nSpin,20,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,20,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 24) {
-    value = genericReduce<ReduceType,Float,nSpin,24,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,24,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 32) {
-    value = genericReduce<ReduceType,Float,nSpin,32,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,32,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 72) {
-    value = genericReduce<ReduceType,Float,nSpin,72,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,72,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 576) {
-    value = genericReduce<ReduceType,Float,nSpin,576,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,nSpin,576,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else {
     ::quda::zero(value);
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
@@ -294,18 +336,18 @@ template <typename ReduceType, typename Float, int nSpin, QudaFieldOrder order,
   return value;
 }
 
-template <typename ReduceType, typename Float, QudaFieldOrder order,
+template <typename ReduceType, typename Float, typename zFloat, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
   ::quda::zero(value);
   if (x.Nspin() == 4) {
-    value = genericReduce<ReduceType,Float,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Nspin() == 2) {
-    value = genericReduce<ReduceType,Float,2,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,2,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
 #ifdef GPU_STAGGERED_DIRAC
   } else if (x.Nspin() == 1) {
-    value = genericReduce<ReduceType,Float,1,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+    value = genericReduce<ReduceType,Float,zFloat,1,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
 #endif
   } else {
     errorQuda("nSpin = %d not implemeneted",x.Nspin());
@@ -313,14 +355,14 @@ template <typename ReduceType, typename Float, QudaFieldOrder order,
   return value;
 }
 
-template <typename doubleN, typename ReduceType, typename Float,
+template <typename doubleN, typename ReduceType, typename Float, typename zFloat,
 	  int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
 doubleN genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
 		      ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
   ::quda::zero(value);
   if (x.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-    value = genericReduce<ReduceType,Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
+    value = genericReduce<ReduceType,Float,zFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
       (x, y, z, w, v, r);
   } else {
     errorQuda("Not implemeneted");

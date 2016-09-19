@@ -368,12 +368,30 @@ public:
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-    for (int i=0; i<4; i++) dslashParam.X[i] = in->X(i);
+    // this is a c/b field so double the x dimension
+    dslashParam.X[0] = in->X(0)*2;
+    for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
 #ifdef GPU_DOMAIN_WALL_DIRAC
     dslashParam.Ls = in->X(4); // needed by tuneLaunch()
 #endif
-    // this is a c/b field so double the x dimension
-    dslashParam.X[0] *= 2;
+    dslashParam.Xh[0] = in->X(0);
+    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
+    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
+
+    int face[4];
+    for (int dim=0; dim<4; dim++) {
+      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
+      face[dim] = Nface()/2;
+      
+      dslashParam.face_X[dim] = face[0];
+      dslashParam.face_Y[dim] = face[1];
+      dslashParam.face_Z[dim] = face[2];
+      dslashParam.face_T[dim] = face[3];
+      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
+      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
+      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+    }
+
   }
 
   virtual ~DslashCuda() { }
