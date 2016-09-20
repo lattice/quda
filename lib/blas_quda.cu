@@ -468,8 +468,8 @@ namespace quda {
       }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       {
-	w += a[i] * y;
-	y = b[i] * x + c[i] * y;
+	y += a[i] * w;
+	w = b[i] * x + c[i] * w;
       }
       int streams() { return 4*NYW + NXZ; } //! total number of input and output streams
       int flops() { return 5*NXZ*NYW; } //! flops per real element
@@ -481,8 +481,8 @@ namespace quda {
       // swizzle order since we are writing to x_ and y_, but the
       // multi-blas only allow writing to y and w, and moreover the
       // block width of y and w must match, and x and z must match.
-      std::vector<ColorSpinorField*> &y = x_;
-      std::vector<ColorSpinorField*> &w = y_;
+      std::vector<ColorSpinorField*> &y = y_;
+      std::vector<ColorSpinorField*> &w = x_;
 
       // wrap a container around the third solo vector
       std::vector<ColorSpinorField*> x;
