@@ -729,18 +729,25 @@ namespace quda {
       axpyCGNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
 	typedef typename ScalarType<ReduceType>::type scalar;
-	FloatN y_new = y + a.x*x;
-	norm2_<scalar>(sum.x,y_new);
-	dot_<scalar>(sum.y,y_new,y_new-y);
-	y = y_new;
+	FloatN z_new = z + a.x*x;
+	norm2_<scalar>(sum.x,z_new);
+	dot_<scalar>(sum.y,z_new,z_new-z);
+	z = z_new;
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 6; } //! flops per real element
     };
 
     Complex axpyCGNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y) {
-      double2 cg_norm = reduce::reduceCuda<double2,QudaSumFloat2,axpyCGNorm2,0,1,0,0,0,false>
-	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+      // swizzle since mixed is on z
+      double2 cg_norm ;
+      if (x.Precision() != y.Precision()) {
+	cg_norm = reduce::mixed::reduceCuda<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
+	  (make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
+      } else {
+	cg_norm = reduce::reduceCuda<double2,QudaSumFloat2,axpyCGNorm2,0,0,1,0,0,false>
+	  (make_double2(a, 0.0), make_double2(0.0, 0.0), x, x, y, x, x);
+      }
       return Complex(cg_norm.x, cg_norm.y);
     }
 
