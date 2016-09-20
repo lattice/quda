@@ -397,8 +397,8 @@ namespace quda {
 
 	// explicitly restore the orthogonality of the gradient vector
 	for (int j=0; j<num_offset_now; j++) {
-	  double rp = blas::reDotProduct(*r_sloppy, *p[j]) / (r2[0]);
-	  blas::axpy(-rp, *r_sloppy, *p[j]);
+	  Complex rp = blas::cDotProduct(*r_sloppy, *p[j]) / (r2[0]);
+	  blas::caxpy(-rp, *r_sloppy, *p[j]);
 	}
 
 	// update beta and p

@@ -239,7 +239,6 @@ namespace quda {
         steps_since_reliable++;
       } else {
 
-        printfQuda("\t * Reliable update \n");
         blas::axpy(alpha, p, xSloppy);
         blas::copy(x, xSloppy); // nop when these pointers alias
 
@@ -298,8 +297,8 @@ namespace quda {
           heavy_quark_restart = false;
         } else {
           // explicitly restore the orthogonality of the gradient vector
-          double rp = blas::reDotProduct(rSloppy, p) / (r2);
-          blas::axpy(-rp, rSloppy, p);
+          Complex rp = blas::cDotProduct(rSloppy, p) / (r2);
+          blas::caxpy(-rp, rSloppy, p);
 
           beta = r2 / r2_old;
           blas::xpay(rSloppy, beta, p);
