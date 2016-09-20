@@ -80,6 +80,7 @@ namespace quda {
 #include <blas_mixed_core.h>
 #include <multi_blas_core.cuh>
 #include <multi_blas_core.h>
+#include <multi_blas_mixed_core.h>
 
 
     template <typename Float2, typename FloatN>
@@ -447,7 +448,7 @@ namespace quda {
       if (x.Precision() != y.Precision()) {
 	// call hacked mixed precision kernel
 	mixed::blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0),
-					    make_double2(c,0.0),	x, y, z, x);
+					    make_double2(c,0.0), x, y, z, x);
       } else {
 	// swap arguments around
 	blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0),
@@ -490,7 +491,12 @@ namespace quda {
 
       // we will curry the parameter arrays into the functor
       coeff_array<double> a(a_,false), b(b_,false), c(c_,false);
-      multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
+
+      if (x[0]->Precision() != y[0]->Precision() ) {
+	mixed::multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
+      } else {
+	multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
+      }
     }
 
 
