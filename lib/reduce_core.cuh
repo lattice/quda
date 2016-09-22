@@ -1,11 +1,17 @@
 __host__ __device__ double set(double &x) { return x;}
 __host__ __device__ double2 set(double2 &x) { return x;}
 __host__ __device__ double3 set(double3 &x) { return x;}
+__host__ __device__ void sum(double &a, double &b) { a += b; }
+__host__ __device__ void sum(double2 &a, double2 &b) { a.x += b.x; a.y += b.y; }
+__host__ __device__ void sum(double3 &a, double3 &b) { a.x += b.x; a.y += b.y; a.z += b.z; }
 
 #ifdef QUAD_SUM
 __host__ __device__ double set(doubledouble &a) { return a.head(); }
 __host__ __device__ double2 set(doubledouble2 &a) { return make_double2(a.x.head(),a.y.head()); }
 __host__ __device__ double3 set(doubledouble3 &a) { return make_double3(a.x.head(),a.y.head(),a.z.head()); }
+__host__ __device__ void sum(double &a, doubledouble &b) { a += b.head(); }
+__host__ __device__ void sum(double2 &a, doubledouble2 &b) { a.x += b.x.head(); a.y += b.y.head(); }
+__host__ __device__ void sum(double3 &a, doubledouble3 &b) { a.x += b.x.head(); a.y += b.y.head(); a.z += b.z.head(); }
 #endif
 
 __device__ unsigned int count = 0;
@@ -35,6 +41,7 @@ template <int block_size, typename ReduceType, typename FloatN, int M, typename 
 __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
 
   unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+  unsigned int parity = blockIdx.y;
   unsigned int gridSize = gridDim.x*blockDim.x;
 
   ReduceType sum;
@@ -42,11 +49,11 @@ __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,Spi
 
   while (i < arg.length) {
     FloatN x[M], y[M], z[M], w[M], v[M];
-    arg.X.load(x, i);
-    arg.Y.load(y, i);
-    arg.Z.load(z, i);
-    arg.W.load(w, i);
-    arg.V.load(v, i);
+    arg.X.load(x, i, parity);
+    arg.Y.load(y, i, parity);
+    arg.Z.load(z, i, parity);
+    arg.W.load(w, i, parity);
+    arg.V.load(v, i, parity);
 
     arg.r.pre();
 
@@ -55,16 +62,16 @@ __global__ void reduceKernel(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,Spi
 
     arg.r.post(sum);
 
-    arg.X.save(x, i);
-    arg.Y.save(y, i);
-    arg.Z.save(z, i);
-    arg.W.save(w, i);
-    arg.V.save(v, i);
+    arg.X.save(x, i, parity);
+    arg.Y.save(y, i, parity);
+    arg.Z.save(z, i, parity);
+    arg.W.save(w, i, parity);
+    arg.V.save(v, i, parity);
 
     i += gridSize;
   }
 
-  ::quda::reduce<block_size, ReduceType>(arg, sum);
+  ::quda::reduce<block_size, ReduceType>(arg, sum, parity);
 }
 
 
@@ -90,6 +97,7 @@ doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spi
       { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
   }
   doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
+  if (tp.grid.y==2) sum(cpu_sum, ((ReduceType*)h_reduce)[1]); // add other parity if needed
   return cpu_sum;
 }
 
@@ -101,6 +109,7 @@ class ReduceCuda : public Tunable {
 private:
   mutable ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg;
   doubleN &result;
+  const int nParity;
 
   // host pointers used for backing up fields when tuning
   // these can't be curried into the Spinors because of Tesla argument length restriction
@@ -124,10 +133,10 @@ private:
 
 public:
   ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z,
-	     SpinorW &W, SpinorV &V, Reducer &r, int length,
+	     SpinorW &W, SpinorV &V, Reducer &r, int length, int nParity,
 	     const size_t *bytes, const size_t *norm_bytes) :
-    arg(X, Y, Z, W, V, r, length),
-    result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
+    arg(X, Y, Z, W, V, r, length/nParity),
+    result(result), nParity(nParity), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
     Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0),
     bytes_(bytes), norm_bytes_(norm_bytes) { }
   virtual ~ReduceCuda() { }
@@ -157,7 +166,17 @@ public:
     arg.V.restore(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
-  long long flops() const { return arg.r.flops()*vec_length<FloatN>::value*arg.length*M; }
+  void initTuneParam(TuneParam &param) const {
+    Tunable::initTuneParam(param);
+    param.grid.y = nParity;
+  }
+
+  void defaultTuneParam(TuneParam &param) const {
+    Tunable::defaultTuneParam(param);
+    param.grid.y = nParity;
+  }
+
+  long long flops() const { return arg.r.flops()*vec_length<FloatN>::value*arg.length*nParity*M; }
 
   long long bytes() const
   {
@@ -171,7 +190,7 @@ public:
 
     // the factor two here assumes we are reading and writing to the high precision vector
     // this will evaluate correctly for non-mixed kernels since the +2/-2 will cancel out
-    return ((arg.r.streams()-2)*base_bytes + 2*extra_bytes)*arg.length;
+    return ((arg.r.streams()-2)*base_bytes + 2*extra_bytes)*arg.length*nParity;
   }
 
   int tuningIter() const { return 3; }
@@ -185,17 +204,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
 		   ColorSpinorField &x, ColorSpinorField &y,
 		   ColorSpinorField &z, ColorSpinorField &w,
 		   ColorSpinorField &v, int length) {
-
-  // FIXME implement this as a single kernel
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    doubleN even = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
-      Reducer,writeX,writeY,writeZ,writeW,writeV>
-      (a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even(), length/2);
-    doubleN odd = reduceCuda<doubleN,ReduceType,RegType,StoreType,zType,M,
-      Reducer,writeX,writeY,writeZ,writeW,writeV>
-      (a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd(), length/2);
-    return even + odd;
-  }
 
   checkLength(x, y); checkLength(x, z); checkLength(x, w); checkLength(x, v);
 
@@ -235,7 +243,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
     Spinor<RegType,StoreType,M,writeW,3>,
     Spinor<RegType,StoreType,M,writeV,4>,
     Reducer<ReduceType, Float2, RegType> >
-    reduce(value, X, Y, Z, W, V, r, length, bytes, norm_bytes);
+    reduce(value, X, Y, Z, W, V, r, length, x.SiteSubset(), bytes, norm_bytes);
   reduce.apply(*(blas::getStream()));
 
   blas::bytes += reduce.bytes();

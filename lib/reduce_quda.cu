@@ -75,9 +75,9 @@ namespace quda {
     void initReduce()
     {
 
-      const int MaxReduce = 12;
+      const int MaxReduce = 16;
       // reduction buffer size
-      size_t bytes = MaxReduce*3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat); // Factor of N for composite reductions
+      size_t bytes = 2*MaxReduce*3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat); // Factor of N for composite reductions
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 
