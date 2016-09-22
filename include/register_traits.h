@@ -83,6 +83,10 @@ namespace quda {
   template<> struct scalar<float3> { typedef float type; };
   template<> struct scalar<float2> { typedef float type; };
   template<> struct scalar<float> { typedef float type; };
+  template<> struct scalar<short4> { typedef short type; };
+  template<> struct scalar<short3> { typedef short type; };
+  template<> struct scalar<short2> { typedef short type; };
+  template<> struct scalar<short> { typedef short type; };
 
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
