@@ -479,24 +479,45 @@ namespace quda {
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField*> &x_, std::vector<ColorSpinorField*> &y_,
 		   const double *b_, ColorSpinorField &z_, const double *c_) {
 
-      // swizzle order since we are writing to x_ and y_, but the
-      // multi-blas only allow writing to y and w, and moreover the
-      // block width of y and w must match, and x and z must match.
-      std::vector<ColorSpinorField*> &y = y_;
-      std::vector<ColorSpinorField*> &w = x_;
+      //if (y_.size() <= MAX_MULTI_BLAS_N) {
+	// swizzle order since we are writing to x_ and y_, but the
+	// multi-blas only allow writing to y and w, and moreover the
+	// block width of y and w must match, and x and z must match.
+	std::vector<ColorSpinorField*> &y = y_;
+	std::vector<ColorSpinorField*> &w = x_;
 
-      // wrap a container around the third solo vector
-      std::vector<ColorSpinorField*> x;
-      x.push_back(&z_);
+	// wrap a container around the third solo vector
+	std::vector<ColorSpinorField*> x;
+	x.push_back(&z_);
 
-      // we will curry the parameter arrays into the functor
-      coeff_array<double> a(a_,false), b(b_,false), c(c_,false);
+	// we will curry the parameter arrays into the functor
+	coeff_array<double> a(a_,false), b(b_,false), c(c_,false);
 
-      if (x[0]->Precision() != y[0]->Precision() ) {
-	mixed::multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
-      } else {
-	multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
-      }
+	if (x[0]->Precision() != y[0]->Precision() ) {
+	  mixed::multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
+	} else {
+	  multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
+	}
+	/*} else {
+	// split the problem in half and recurse
+	const double *a0 = &a_[0];
+	const double *b0 = &b_[0];
+	const double *c0 = &c_[0];
+
+	std::vector<ColorSpinorField*> x0(x_.begin(), x_.begin() + x_.size()/2);
+	std::vector<ColorSpinorField*> y0(y_.begin(), y_.begin() + y_.size()/2);
+
+	axpyBzpcx(a0, x0, y0, b0, z_, c0);
+
+	const double *a1 = &a_[y_.size()/2];
+	const double *b1 = &b_[y_.size()/2];
+	const double *c1 = &c_[y_.size()/2];
+
+	std::vector<ColorSpinorField*> x1(x_.begin() + x_.size()/2, x_.end());
+	std::vector<ColorSpinorField*> y1(y_.begin() + y_.size()/2, y_.end());
+
+	axpyBzpcx(a1, x1, y1, b1, z_, c1);
+	}*/
     }
 
 

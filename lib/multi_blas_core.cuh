@@ -223,18 +223,21 @@ template <int NXZ, typename RegType, typename StoreType, typename yType, int M,
 	  template <int,typename,typename> class Functor,
 	  int writeX, int writeY, int writeZ, int writeW, typename T>
 void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-		   CompositeColorSpinorField& x, CompositeColorSpinorField& y,
-		   CompositeColorSpinorField& z, CompositeColorSpinorField& w,
+		   std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
+		   std::vector<ColorSpinorField*> &z, std::vector<ColorSpinorField*> &w,
 		   int length) {
 
   const int NYW = y.size();
 
-  typedef typename scalar<RegType>::type Float;
-  typedef typename vector<Float,2>::type Float2;
-  typedef vector<Float,2> vec2;
+  const int N = NXZ > NYW ? NXZ : NYW;
+  if (N > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N, MAX_MULTI_BLAS_N);
 
   if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
     errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
+
+  typedef typename scalar<RegType>::type Float;
+  typedef typename vector<Float,2>::type Float2;
+  typedef vector<Float,2> vec2;
 
   // FIXME - if NXZ=1 no need to copy entire array
   // FIXME - do we really need strided access here?
@@ -281,9 +284,6 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
     strcat(blasStrings.aux_tmp, ",");
     strcat(blasStrings.aux_tmp, y[0]->AuxString());
   }
-
-  const int N = NXZ > NYW ? NXZ : NYW;
-  if (N > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N, MAX_MULTI_BLAS_N);
 
   size_t **bytes = new size_t*[NYW], **norm_bytes = new size_t*[NYW];
   for (int i=0; i<NYW; i++) {
