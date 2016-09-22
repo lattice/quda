@@ -183,12 +183,12 @@ public:
   }
 
   void initTuneParam(TuneParam &param) const {
-    Tunable::initTuneParam(param);
+    TunableVectorY::initTuneParam(param);
     param.grid.z = nParity;
   }
 
   void defaultTuneParam(TuneParam &param) const {
-    Tunable::initTuneParam(param);
+    TunableVectorY::defaultTuneParam(param);
     param.grid.z = nParity;
   }
 
