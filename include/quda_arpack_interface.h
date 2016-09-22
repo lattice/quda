@@ -40,24 +40,12 @@ namespace quda{
       double tol;
       int   info;
 
-      //experimental: for tests only!
-      //supported oprtions: 2d fields -> 1 (U(1)), 4d fields -> 2 (SU(2))      
-      int reducedColors;
-
-      //experimental: 2d or 4d fields?
-      bool _2d_field;
-
     public:
 
       ArpackArgs(DiracMatrix &matEigen, QudaPrecision prec, int nev, int ncv, char *which) : matEigen(matEigen), mat_precision(prec), 
-            use_full_prec_arpack(true), nev(nev), ncv(ncv), lanczos_which(which), tol(1e-6), info(0), reducedColors(3), _2d_field(false) { };       
+            use_full_prec_arpack(true), nev(nev), ncv(ncv), lanczos_which(which), tol(1e-6), info(0) { };       
 
       virtual ~ArpackArgs() { };
-
-      //Extra setup:
-      void Set2D() {_2d_field = true; } 
-
-      void SetReducedColors(int c) { reducedColors = c;}
 
       void SetTol(double _tol) {tol = _tol;};
       //Main IRA algorithm driver:

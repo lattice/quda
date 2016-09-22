@@ -86,103 +86,21 @@ using namespace quda ;
     return;
   }
 
-
-  template<typename Float, int fineSpin, int fineColor, int reducedColor>
-  void convertFrom2DVector(cpuColorSpinorField &out, std::complex<Float> *in) {
-     if(out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER ) errorQuda("\nIncorrect feild order (%d).\n", out.FieldOrder() );
-     quda::colorspinor::FieldOrderCB<Float,fineSpin,fineColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> outOrder(static_cast<ColorSpinorField&>(out));//fineColor =3 here!
-
-     blas::zero(out);
-
-     for (int parity = 0; parity < 2; parity++) {
-       for(int x_cb = 0; x_cb < out.VolumeCB(); x_cb++) {
-
-         int i = parity*out.VolumeCB() + x_cb;
-         int xx[4] = {0};
-         out.LatticeIndex(xx, i);
-
-         int _2d_idx = (xx[0] + xx[1]*out.X(0))*fineSpin*reducedColor;
-
-         if( xx[2] == 0 && xx[3] == 0 ) for(int s = 0; s < fineSpin; s++) for(int c = 0; c < reducedColor; c++) outOrder(parity, x_cb, s, c) = in[_2d_idx+s*reducedColor+c];
-       }
-     }
-
-     return;
-  }
-
-  template<typename Float, int fineSpin, int fineColor, int reducedColor>
-  void convertTo2DVector(std::complex<Float> *out, cpuColorSpinorField &in) {
-     if(in.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER ) errorQuda("\nIncorrect feild order (%d).\n", in.FieldOrder() );
-     quda::colorspinor::FieldOrderCB<Float,fineSpin,fineColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> inOrder(static_cast<ColorSpinorField&>(in));
-
-     for (int parity = 0; parity < 2; parity++) {
-       for(int x_cb = 0; x_cb < in.VolumeCB(); x_cb++) {
-
-         int i = parity*in.VolumeCB() + x_cb;
-         int xx[4] = {0};
-         in.LatticeIndex(xx, i);
-
-         int _2d_idx = (xx[0] + xx[1]*in.X(0))*fineSpin*reducedColor;
-
-         if( xx[2] == 0 && xx[3] == 0 ) for(int s = 0; s < fineSpin; s++) for(int c = 0; c < reducedColor; c++) out[_2d_idx+s*reducedColor+c] = inOrder(parity, x_cb, s, c);
-       }
-     }
-
-     return;
-  }
-
-  template<typename cpuFloat, typename Float, int fineSpin, int fineColor, int reducedColor>
-  void convertFrom2DVector_v2(cpuColorSpinorField &out, std::complex<Float> *in) {
-     if(out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER ) errorQuda("\nIncorrect feild order (%d).\n", out.FieldOrder() );
-     quda::colorspinor::FieldOrderCB<cpuFloat,fineSpin,fineColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> outOrder(static_cast<ColorSpinorField&>(out));//fineColor =3 here!
-
-     blas::zero(out);
-
-     for (int parity = 0; parity < 2; parity++) {
-       for(int x_cb = 0; x_cb < out.VolumeCB(); x_cb++) {
-
-         int i = parity*out.VolumeCB() + x_cb;
-         int xx[4] = {0};
-         out.LatticeIndex(xx, i);
-
-         int _2d_idx = (xx[0] + xx[1]*out.X(0))*fineSpin*reducedColor;
-
-         if( xx[2] == 0 && xx[3] == 0 ) for(int s = 0; s < fineSpin; s++) for(int c = 0; c < reducedColor; c++) outOrder(parity, x_cb, s, c) = std::complex<cpuFloat>( in[_2d_idx+s*reducedColor+c].real(), in[_2d_idx+s*reducedColor+c].imag() );
-       }
-     }
-
-     return;
-  }
-
-
-  template<typename Float, int fineSpin, int fineColor, int reducedColor, bool do_2d_emulation>
-  void arpack_matvec(std::complex<Float> *out, std::complex<Float> *in,  DiracMatrix &matEigen, QudaPrecision matPrecision, ColorSpinorField &meta)
+  template<typename Float, int fineSpin, int fineColor>
+  void quda_matvec(std::complex<Float> *out, std::complex<Float> *in,  DiracMatrix &matEigen, QudaPrecision matPrecision, ColorSpinorField &meta)
   {
     ColorSpinorParam csParam(meta);
 
-    csParam.create = QUDA_ZERO_FIELD_CREATE;  
     //cpuParam.extendDimensionality();5-dim field
     csParam.location = QUDA_CPU_FIELD_LOCATION;
     csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam.create = QUDA_REFERENCE_FIELD_CREATE;
 
-    if(!do_2d_emulation) 
-    {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      csParam.v      = static_cast<void*>(in);
-    }
-
+    csParam.v      = static_cast<void*>(in);
     cpuColorSpinorField *cpu_tmp1 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
-    
-    if(!do_2d_emulation)
-    {
-      csParam.v      = static_cast<void*>(out);
-    }
-    else
-    {
-      convertFrom2DVector<Float, fineSpin, fineColor, reducedColor>(*cpu_tmp1, in);
-    }
-    
+
+    csParam.v      = static_cast<void*>(out);
     cpuColorSpinorField *cpu_tmp2 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
 
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -198,7 +116,6 @@ using namespace quda ;
     matEigen(*cuda_tmp2, *cuda_tmp1);
 
     *cpu_tmp2 = *cuda_tmp2;
-    if(do_2d_emulation) convertTo2DVector<Float, fineSpin, fineColor, reducedColor>(out, *cpu_tmp2);
 
     delete cpu_tmp1;
     delete cpu_tmp2;
@@ -210,7 +127,7 @@ using namespace quda ;
   }
 
 //copy fields:
-  template<typename Float, int fineSpin, int fineColor, int reducedColor, bool do_2d_emulation> 
+  template<typename Float, int fineSpin, int fineColor> 
   void copy_eigenvectors(std::vector<ColorSpinorField*> &B, std::complex<Float> *arpack_evecs, std::complex<Float> *arpack_evals, const int cldn, const int nev, char *which)
   {
     printfQuda("\nLoad eigenvectors..\n");
@@ -220,10 +137,11 @@ using namespace quda ;
 
     ColorSpinorParam csParam(*B[0]);
 
-    csParam.create = do_2d_emulation ? QUDA_ZERO_FIELD_CREATE : QUDA_REFERENCE_FIELD_CREATE;  
+    csParam.create = QUDA_REFERENCE_FIELD_CREATE;  
     //cpuParam.extendDimensionality();5-dim field
     csParam.location = QUDA_CPU_FIELD_LOCATION;
-    if(!do_2d_emulation) csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+    csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     std::string arpack_which(which);
@@ -250,34 +168,19 @@ using namespace quda ;
       std::complex<Float>* tmp_buffer =  &arpack_evecs[sorted_id*cldn];
       cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*vec);
 
-      if(do_2d_emulation)
-      {
-        cpu_tmp = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
-
-        if      (csParam.precision == QUDA_DOUBLE_PRECISION)
-          convertFrom2DVector_v2<double, Float, fineSpin, fineColor, reducedColor>(*cpu_tmp, tmp_buffer);
-        else if (csParam.precision == QUDA_SINGLE_PRECISION)
-          convertFrom2DVector_v2<float, Float, fineSpin, fineColor, reducedColor>(*cpu_tmp, tmp_buffer);
-        else
-          errorQuda("\nUnsupported precision.\n"); 
-      }
-      else
-      {
-        csParam.v = static_cast<void*>(tmp_buffer);
-        cpu_tmp = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
-      }
+      csParam.v = static_cast<void*>(tmp_buffer);
+      cpu_tmp = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(csParam));
 
       *curr_nullvec = *cpu_tmp;//this does not work for different precision (usual memcpy)?
 
       delete cpu_tmp;
     }
-
-    printfQuda("\n..done.\n");
+    //printfQuda("\n..done.\n");
 
     return;
   }
 
-  template<typename Float, int fineSpin, int fineColor, int reducedColor, bool do_2d_emulation>
+  template<typename Float, int fineSpin, int fineColor>
   int arpack_solve( char *lanczos_which, std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &mat,  QudaPrecision matPrecision, Float tol, int nev, int ncv)
   {
     int *fcomm = nullptr;
@@ -288,7 +191,7 @@ using namespace quda ;
 
     int   max_iter = 4000;
 
-    size_t clen = B[0]->X(0)*B[0]->X(1)*( do_2d_emulation ? reducedColor : (B[0]->X(2)*B[0]->X(3))*fineColor)*fineSpin;
+    size_t clen = B[0]->X(0)*B[0]->X(1)*B[0]->X(2)*B[0]->X(3)*fineColor*fineSpin;
     size_t cldn = clen;
 
     std::complex<Float> *arpack_evecs = new std::complex<Float>[cldn*ncv];     /* workspace for evectors (BLAS-matrix), [ld_evec, >=ncv] */
@@ -342,7 +245,7 @@ using namespace quda ;
         
       if (ido_ == -1 || ido_ == 1) {
          //apply matrix vector here:
-         arpack_matvec<Float, fineSpin, fineColor, reducedColor, do_2d_emulation> (&(w_workd_[(ipntr_[1]-1)]), &(w_workd_[(ipntr_[0]-1)]),  mat, matPrecision, *B[0]) ;
+         quda_matvec<Float, fineSpin, fineColor> (&(w_workd_[(ipntr_[1]-1)]), &(w_workd_[(ipntr_[0]-1)]),  mat, matPrecision, *B[0]) ;
 
          if(iter_cnt % 50 == 0) printfQuda("\nIteration : %d\n", iter_cnt);
       } 
@@ -359,7 +262,7 @@ using namespace quda ;
 
     if (info_ != 0) errorQuda("\nError in ARPACK CNEUPD (error code %d) , exit.\n", info_);    
 //copy fields:
-    copy_eigenvectors<Float, fineSpin, fineColor, reducedColor, do_2d_emulation>(B, arpack_evecs, w_d_, cldn, nev, lanczos_which);
+    copy_eigenvectors<Float, fineSpin, fineColor>(B, arpack_evecs, w_d_, cldn, nev, lanczos_which);
 
     printfQuda("\ndone..\n");
 
@@ -379,18 +282,18 @@ using namespace quda ;
     return 0;
   }
 
-  template <typename Float, int fineSpin, int reducedColor, bool do_2d_emulation>
+  template <typename Float, int fineSpin>
   void arpack_solve( char *lanczos_which, std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &mat,  QudaPrecision matPrecision, Float tol, int nev, int ncv )
   {
     if(B[0]->Ncolor() == 3)
     {
       const int fineColor  = 3;
-      arpack_solve<Float, fineSpin,fineColor,reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin,fineColor>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else if(B[0]->Ncolor() == 4)
     {
       const int fineColor  = 4;
-      arpack_solve<Float, fineSpin,fineColor,reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin,fineColor>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else 
     {
@@ -398,23 +301,23 @@ using namespace quda ;
     }
   }
 
-  template <typename Float, int reducedColor, bool do_2d_emulation>
+  template <typename Float>
   void arpack_solve( char *lanczos_which, std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &mat,  QudaPrecision matPrecision, Float tol, int nev, int ncv )
   {
     if(B[0]->Nspin() == 1)
     {
       const int fineSpin  = 1;
-      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else if(B[0]->Nspin() == 2)
     {
       const int fineSpin  = 2;
-      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else if(B[0]->Nspin() == 4)
     {
       const int fineSpin  = 4;
-      arpack_solve<Float, fineSpin, reducedColor, do_2d_emulation>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
+      arpack_solve<Float, fineSpin>( lanczos_which, B, evals, mat, matPrecision, tol, nev , ncv);
     }
     else 
     {
@@ -428,22 +331,8 @@ using namespace quda ;
  void ArpackArgs::operator()( std::vector<ColorSpinorField*> &B, std::complex<double> *evals )
  {
 #ifdef ARPACK_LIB
-   if(_2d_field)
-   {
-     warningQuda("\nSolving 2d eigen-problem\n");
-     if(reducedColors == 1)
-     {
-        if(use_full_prec_arpack)   arpack_solve<double, 1, true>( lanczos_which, B, (void*)evals, matEigen, mat_precision, tol, nev , ncv  );
-        else                       arpack_solve<float, 1, true>( lanczos_which, B, (void*)evals, matEigen, mat_precision, (float)tol, nev , ncv  );
-     }
-     else errorQuda("\nUnsupported colors.\n");
-   }
-   else 
-   {
-     //Warning: reduced colors not used here:   
-     if(use_full_prec_arpack)   arpack_solve<double, 3, false>( lanczos_which, B, (void*)evals, matEigen, mat_precision, tol, nev , ncv );
-     else                       arpack_solve<float, 3, false>( lanczos_which, B, (void*)evals, matEigen, mat_precision, (float)tol, nev , ncv  );
-   }
+   if(use_full_prec_arpack)   arpack_solve<double>( lanczos_which, B, (void*)evals, matEigen, mat_precision, tol       , nev , ncv );
+   else                       arpack_solve<float >( lanczos_which, B, (void*)evals, matEigen, mat_precision, (float)tol, nev , ncv );
  #endif
    return;
  }
