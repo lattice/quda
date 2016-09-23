@@ -2,6 +2,8 @@
 #include <qio_field.h>
 #include <string.h>
 
+#include <quda_arpack_interface.h>
+
 namespace quda {  
 
   using namespace blas;
@@ -410,6 +412,7 @@ namespace quda {
 
     int nmodes = 128;
     int ncv    = 256;
+    double arpack_tol = 1e-7;
     char *which = (char*)malloc(256*sizeof(char));
     sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
 
@@ -423,15 +426,13 @@ namespace quda {
     evecsBuffer.reserve(nmodes);
 
     for (int i = 0; i < nmodes; i++) evecsBuffer.push_back( new cpuColorSpinorField(cpuParam) );
-    
-    Complex *evalsBuffer = new Complex[nmodes+1];
-    //
-    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
-    ArpackArgs args(param.matResidual, matPrecision, nmodes, ncv, which);    
 
-    args.SetTol(1e-7);
+    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
+    QudaPrecision arpPrecision = QUDA_DOUBLE_PRECISION;//precision used in ARPACK routines, may not coincide with matvec precision
+    
+    void *evalsBuffer =  arpPrecision == QUDA_DOUBLE_PRECISION ? static_cast<void*>(new std::complex<double>[nmodes+1]) : static_cast<void*>( new std::complex<float>[nmodes+1]);
     //
-    args(evecsBuffer, evalsBuffer);
+    arpackSolve( evecsBuffer, evalsBuffer, param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
 
     for (int i=0; i<nmodes; i++) {
       // as well as copying to the correct location this also changes basis if necessary
@@ -448,8 +449,10 @@ namespace quda {
     }
 
     for (unsigned int i = 0; i < evecsBuffer.size(); i++) delete evecsBuffer[i];
-    delete [] evalsBuffer;
 
+    if( arpPrecision == QUDA_DOUBLE_PRECISION )  delete static_cast<std::complex<double>* >(evalsBuffer);
+    else                                         delete static_cast<std::complex<float>* > (evalsBuffer);
+ 
     free(which);
 #endif
 

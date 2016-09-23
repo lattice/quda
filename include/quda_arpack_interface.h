@@ -14,46 +14,10 @@
 #include <mpi.h>
 #endif
 
+#ifdef PRIMME_LIB
+#include "primme.h"
+#endif
 
-namespace quda{
-
-   class ArpackArgs{
-
-    private:
-      //main setup:
-      /**Problem matrix **/
-      DiracMatrix &matEigen;
-
-      /**Matrix vector precision (may not coincide with arpack IRA routines precision) **/
-      QudaPrecision mat_precision;
-
-      /**precision of IRA routines**/
-      bool use_full_prec_arpack;
-
-      /**spectrum info**/
-      int nev;//number of eigenvecs to be comupted
-      int ncv;//search subspace dimension (note that 1 <= NCV-NEV and NCV <= N) 
-
-      char *lanczos_which;// ARPACK which="{S,L}{R,I,M}
-
-      /**general arpack library parameters**/	
-      double tol;
-      int   info;
-
-    public:
-
-      ArpackArgs(DiracMatrix &matEigen, QudaPrecision prec, int nev, int ncv, char *which) : matEigen(matEigen), mat_precision(prec), 
-            use_full_prec_arpack(true), nev(nev), ncv(ncv), lanczos_which(which), tol(1e-6), info(0) { };       
-
-      virtual ~ArpackArgs() { };
-
-      void SetTol(double _tol) {tol = _tol;};
-      //Main IRA algorithm driver:
-      void operator()(std::vector<ColorSpinorField*> &B, std::complex<double> *evals);     
-
-   };
-
-}//endof namespace quda 
 #define ARPACK(s) s ## _
 
 #ifdef __cplusplus
@@ -119,4 +83,13 @@ extern int ARPACK(zneupd) (int *comp_evecs, char *howmany, int *select, std::com
 #ifdef __cplusplus
 }
 #endif
+
+
+namespace quda{
+
+  void arpackSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target);
+//  void primmeSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision primmePrec, double tol, int nev, int ncv, char *target);
+
+
+}//endof namespace quda 
 
