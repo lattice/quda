@@ -42,6 +42,8 @@ namespace quda {
 
     inner.global_reduction = false;
 
+    inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+
     if (outer.inv_type == QUDA_GCR_INVERTER && outer.precision_sloppy != outer.precision_precondition) 
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
     else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
