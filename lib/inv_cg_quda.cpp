@@ -61,6 +61,7 @@ namespace quda {
       csParam.setPrecision(param.precision_sloppy);
       App = ColorSpinorField::Create(csParam);
       tmpp = ColorSpinorField::Create(csParam);
+
       init = true;
 
     }
@@ -69,14 +70,23 @@ namespace quda {
     ColorSpinorField &Ap = *App;
     ColorSpinorField &tmp = *tmpp;
 
-    mat(r, x, y);
-    double r2 = blas::xmyNorm(b, r);
     csParam.setPrecision(param.precision_sloppy);
+
     // tmp2 only needed for multi-gpu Wilson-like kernels
-    ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-    ColorSpinorField::Create(x, csParam) : &tmp;
+    ColorSpinorField *tmp2_p = !mat.isStaggered() ? ColorSpinorField::Create(x, csParam) : &tmp;
     ColorSpinorField &tmp2 = *tmp2_p;
 
+    // additional high-precision temporary if Wilson and mixed-precision
+    csParam.setPrecision(param.precision);
+    ColorSpinorField *tmp3_p = (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
+      ColorSpinorField::Create(x, csParam) : &tmp;
+    ColorSpinorField &tmp3 = *tmp3_p;
+
+    // compute initial residual
+    mat(r, x, y, tmp3);
+    double r2 = blas::xmyNorm(b, r);
+
+    csParam.setPrecision(param.precision_sloppy);
     ColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
       r_sloppy = &r;
@@ -93,13 +103,6 @@ namespace quda {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       x_sloppy = ColorSpinorField::Create(x, csParam);
     }
-
-    // additional high-precision temporary if Wilson and mixed-precision
-    csParam.setPrecision(param.precision);
-    ColorSpinorField *tmp3_p =
-      (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-      ColorSpinorField::Create(x, csParam) : &tmp;
-    ColorSpinorField &tmp3 = *tmp3_p;
 
     ColorSpinorField &xSloppy = *x_sloppy;
     ColorSpinorField &rSloppy = *r_sloppy;
