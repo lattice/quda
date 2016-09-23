@@ -40,7 +40,7 @@ namespace quda {
 
 
   PreconCG::PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param)
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param), nKrylov(1)
   {
 
     fillInnerSolverParam(Kparam, param);
@@ -54,12 +54,31 @@ namespace quda {
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
+
+    p.resize(nKrylov);
+    Ap.resize(nKrylov);
+    pAp = new double[nKrylov];
+  }
+  
+  //Flexible version of CG
+  PreconCG::PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
+	   SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
+    nKrylov(param.Nkrylov)
+  {
+    if(nKrylov <= 1) errorQuda("Running flexible CG with restart length m_max >= 1 (%d provided)\n", (nKrylov - 1));
+    printfQuda("Running flexible CG with restart length m_max = %d\n", (nKrylov - 1));
+    p.resize(nKrylov);
+    Ap.resize(nKrylov);
+    pAp = new double[nKrylov];
   }
 
   PreconCG::~PreconCG(){
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     if(K) delete K;
+
+    delete pAp;
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -86,7 +105,7 @@ namespace quda {
     cudaColorSpinorField* rPre = NULL;
     cudaColorSpinorField* minvr = NULL;
     cudaColorSpinorField* minvrSloppy = NULL;
-    cudaColorSpinorField* p = NULL;
+    //cudaColorSpinorField* p = NULL;
 
 
     ColorSpinorParam csParam(b);
@@ -100,7 +119,12 @@ namespace quda {
 
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField tmpSloppy(x,csParam);
-    cudaColorSpinorField Ap(x,csParam);
+    //cudaColorSpinorField Ap(x,csParam);
+
+    for (int i=0; i<nKrylov; i++) {
+      p[i] = ColorSpinorField::Create(x, csParam);
+      Ap[i] = ColorSpinorField::Create(x, csParam);
+    }
 
     cudaColorSpinorField *r_sloppy;
     if(param.precision_sloppy == x.Precision())
@@ -147,9 +171,11 @@ namespace quda {
       (*K)(*minvrPre, *rPre);  
       commGlobalReductionSet(true);
       *minvrSloppy = *minvrPre;
-      p = new cudaColorSpinorField(*minvrSloppy);
+      //p = new cudaColorSpinorField(*minvrSloppy);
+      *p[0] = *minvrSloppy;
     }else{
-      p = new cudaColorSpinorField(rSloppy);
+      //p = new cudaColorSpinorField(rSloppy);
+      *p[0] = rSloppy;
     }
 
   
@@ -165,7 +191,7 @@ namespace quda {
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x,r).z);
 
     double alpha = 0.0, beta=0.0;
-    double pAp;
+    //double pAp;
     double rMinvr  = 0;
     double rMinvr_old = 0.0;
     double r_new_Minvr_old = 0.0;
@@ -195,107 +221,149 @@ namespace quda {
     
     while(!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter){
 
-      matSloppy(Ap, *p, tmpSloppy);
+      double sigma; 
+      Complex cg_norm;     
 
-      double sigma;
-      pAp   = reDotProduct(*p,Ap);
+      for(int j = 0; j <= nKrylov; j++)
+      {
+        matSloppy(*Ap[j], *p[j], tmpSloppy);
 
-      alpha = (K) ? rMinvr/pAp : r2/pAp;
-      Complex cg_norm = axpyCGNorm(-alpha, Ap, rSloppy); 
-      // r --> r - alpha*A*p
-      r2_old = r2;
-      r2 = real(cg_norm);
+        pAp[j]   = reDotProduct(*p[j],*Ap[j]);
+
+        alpha = (K) ? rMinvr/pAp[j] : r2/pAp[j];
+        cg_norm = axpyCGNorm(-alpha, *Ap[j], rSloppy); 
+        // r --> r - alpha*A*p
+        r2_old = r2;
+        r2 = real(cg_norm);
   
-      sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k-1 - r_k) breaks
+        if(nKrylov > 1)
+        {
+          axpy(+alpha, *p[j], xSloppy);
 
-      if(K) rMinvr_old = rMinvr;
-
-      rNorm = sqrt(r2);
-      if(rNorm > maxrx) maxrx = rNorm;
-      if(rNorm > maxrr) maxrr = rNorm;
-
-
-      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-
-  
-      // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
-    
-
-      if( !(updateR || updateX) ){
-
-        if(K){
-          r_new_Minvr_old = reDotProduct(rSloppy,*minvrSloppy);
           *rPre = rSloppy;
+
 	  commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
 	  commGlobalReductionSet(true);
-      
-
           *minvrSloppy = *minvrPre;
 
           rMinvr = reDotProduct(rSloppy,*minvrSloppy);
-          beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
-          axpyZpbx(alpha, *p, xSloppy, *minvrSloppy, beta);
-        }else{
-          beta = sigma/r2_old; // use the alternative beta computation
-          axpyZpbx(alpha, *p, xSloppy, rSloppy, beta);
+
+          *p[j] = *minvrSloppy;
+ 
+          for(int l = 1; l < j; l++)
+          {
+             double rMinvr_old = reDotProduct(*Ap[l],*minvrSloppy) / pAp[l];
+
+             axpy(- rMinvr_old, *p[l], *p[j]);
+          } 
         }
-      } else { // reliable update
+      }
 
-        axpy(alpha, *p, xSloppy); // xSloppy += alpha*p
-        copy(x, xSloppy);
-        xpy(x, y); // y += x
-        // Now compute r 
-        mat(r, y, x); // x is just a temporary here
-        r2 = xmyNorm(b, r);
-        copy(rSloppy, r); // copy r to rSloppy
-        zero(xSloppy);
+      if(nKrylov = 1)//non-flexible part
+      {
+        sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k-1 - r_k) breaks
 
-
-        // break-out check if we have reached the limit of the precision
-        if(sqrt(r2) > r0Norm && updateX) { 
-        resIncrease++;
-        resIncreaseTotal++;
-        // reuse r0Norm for this 
-        warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
-
-	if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
-
-        } else {
-	  resIncrease = 0;
-	}
+        if(K) rMinvr_old = rMinvr;
 
         rNorm = sqrt(r2);
-        maxrr = rNorm;
-        maxrx = rNorm;
-        r0Norm = rNorm;
-        ++rUpdate;
+        if(rNorm > maxrx) maxrx = rNorm;
+        if(rNorm > maxrr) maxrr = rNorm;
 
-        if(K){
-          *rPre = rSloppy;
-	  commGlobalReductionSet(false);
-          (*K)(*minvrPre, *rPre);
-	  commGlobalReductionSet(true);
 
-          *minvrSloppy = *minvrPre;
+        int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+        int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+  
+        // force a reliable update if we are within target tolerance (only if doing reliable updates)
+        if( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
 
-          rMinvr = reDotProduct(rSloppy,*minvrSloppy);
-          beta = rMinvr/rMinvr_old;        
+        if( !(updateR || updateX) ){
 
-          xpay(*minvrSloppy, beta, *p); // p = minvrSloppy + beta*p
-        }else{ // standard CG - no preconditioning
+          if(K){
+            r_new_Minvr_old = reDotProduct(rSloppy,*minvrSloppy);
+            *rPre = rSloppy;
+	    commGlobalReductionSet(false);
+            (*K)(*minvrPre, *rPre);
+	    commGlobalReductionSet(true);
 
-          // explicitly restore the orthogonality of the gradient vector
-          double rp = reDotProduct(rSloppy, *p)/(r2);
-          axpy(-rp, rSloppy, *p);
+            *minvrSloppy = *minvrPre;
 
-          beta = r2/r2_old;
-          xpay(rSloppy, beta, *p);
+            rMinvr = reDotProduct(rSloppy,*minvrSloppy);
+            beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
+            axpyZpbx(alpha, *p[0], xSloppy, *minvrSloppy, beta);
+          }else{
+            beta = sigma/r2_old; // use the alternative beta computation
+            axpyZpbx(alpha, *p[0], xSloppy, rSloppy, beta);
+          }
+
+
+        } else { // reliable update
+
+          axpy(alpha, *p[0], xSloppy); // xSloppy += alpha*p
+          copy(x, xSloppy);
+          xpy(x, y); // y += x
+          // Now compute r 
+          mat(r, y, x); // x is just a temporary here
+          r2 = xmyNorm(b, r);
+          copy(rSloppy, r); // copy r to rSloppy
+          zero(xSloppy);
+
+
+          // break-out check if we have reached the limit of the precision
+          if(sqrt(r2) > r0Norm && updateX) { 
+          resIncrease++;
+          resIncreaseTotal++;
+          // reuse r0Norm for this 
+          warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
+
+	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
+
+          } else {
+	    resIncrease = 0;
+	  }
+
+          rNorm = sqrt(r2);
+          maxrr = rNorm;
+          maxrx = rNorm;
+          r0Norm = rNorm;
+          ++rUpdate;
+
+          if(K){
+            *rPre = rSloppy;
+	    commGlobalReductionSet(false);
+            (*K)(*minvrPre, *rPre);
+	    commGlobalReductionSet(true);
+
+            *minvrSloppy = *minvrPre;
+
+            rMinvr = reDotProduct(rSloppy,*minvrSloppy);
+            beta = rMinvr/rMinvr_old;        
+
+            xpay(*minvrSloppy, beta, *p[0]); // p = minvrSloppy + beta*p
+          }else{ // standard CG - no preconditioning
+
+            // explicitly restore the orthogonality of the gradient vector
+            double rp = reDotProduct(rSloppy, *p[0])/(r2);
+            axpy(-rp, rSloppy, *p[0]);
+
+            beta = r2/r2_old;
+            xpay(rSloppy, beta, *p[0]);
+          }
         }
-      }      
-      ++k;
+      }//flexible branch:
+      else
+      {
+          axpy(alpha, *p[0], xSloppy); // xSloppy += alpha*p
+          copy(x, xSloppy);
+          xpy(x, y); // y += x
+          // Now compute r 
+          mat(r, y, x); // x is just a temporary here
+          r2 = xmyNorm(b, r);
+          copy(rSloppy, r); // copy r to rSloppy
+          zero(xSloppy);
+      }
+      
+      k += nKrylov;//+1 for the regular pcg
       PrintStats("PCG", k, r2, b2, heavy_quark_res);
     }
 
@@ -343,7 +411,12 @@ namespace quda {
       delete minvr;
       if(x.Precision() != param.precision_sloppy)  delete minvrSloppy;
     }
-    delete p;
+    
+    for(int i = 0; i < nKrylov; i++)
+    {
+      delete p[i];
+      delete Ap[i];
+    }
 
     if(x.Precision() != param.precision_sloppy){
       delete x_sloppy;

@@ -429,9 +429,18 @@ namespace quda {
       Solver *K;
       SolverParam Kparam; // parameters for preconditioner solve
 
+      int nKrylov;//corresponds to m_{max}+1, if nKrylov = 1 , use standard pcg
+      double *pAp;
+  
+      std::vector<ColorSpinorField*> p;  // CG conjugate vectors
+      std::vector<ColorSpinorField*> Ap; // mat * conj.vectors 
+
     public:
-      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-               SolverParam &param, TimeProfile &profile);
+      /**
+        @param K Preconditioner
+      */
+      PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+
       virtual ~PreconCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
