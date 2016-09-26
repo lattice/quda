@@ -87,9 +87,8 @@ extern int ARPACK(zneupd) (int *comp_evecs, char *howmany, int *select, std::com
 
 namespace quda{
 
-  void arpackSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target);
+  void arpackSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target );
 //  void primmeSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision primmePrec, double tol, int nev, int ncv, char *target);
-
 
 }//endof namespace quda 
 

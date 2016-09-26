@@ -189,7 +189,11 @@ ifeq ($(strip $(BUILD_ARPACK)), yes)
   ifeq ($(strip $(BUILD_ARPACK_VARS)),yes)
      LIB += ${ARPACK_LIB}
   else
-     LIB += $(shell pkg-config --libs arpack)
+    ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
+        LIB += $(shell pkg-config --libs parpack)
+     else
+        LIB += $(shell pkg-config --libs arpack)
+     endif
   endif
 
   ARPACK_FLAGS   = -DARPACK_LIB

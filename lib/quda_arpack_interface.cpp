@@ -1,7 +1,7 @@
 #include <quda_arpack_interface.h>
 #include <color_spinor_field_order.h>
 
-using namespace quda ;
+//using namespace quda ;
 
   struct SortEvals{
     double _val;
@@ -87,6 +87,7 @@ using namespace quda ;
     return;
   }
 
+namespace quda{
 
   template<typename Float> class QudaMatvec {
 
@@ -108,6 +109,7 @@ using namespace quda ;
          csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
          csParam.location   = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
          csParam.create     = QUDA_ZERO_FIELD_CREATE;
+         csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
          csParam.setPrecision(matPrecision);
 
          cuda_in = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
@@ -175,10 +177,10 @@ using namespace quda ;
 
       ArpackArgs(QudaMatvec<Float> &matvec, std::vector<ColorSpinorField*> &evecs, std::complex<Float> *evals, int nev, int ncv, char *which, Float tol) : matvec(matvec), evecs(evecs), w_d_(evals), nev(nev), ncv(ncv), lanczos_which(which), tol(tol), info(0) 
       {
-         size_t clen = evecs[0]->Length() >> 1;//complex length
-         size_t cldn = clen;
+         clen = evecs[0]->Length() >> 1;//complex length
+         cldn = clen;
 
-         std::complex<Float> *w_v_ = new std::complex<Float>[cldn*ncv];     /* workspace for evectors (BLAS-matrix), [ld_evec, >=ncv] */ 
+         w_v_ = new std::complex<Float>[cldn*ncv];     /* workspace for evectors (BLAS-matrix), [ld_evec, >=ncv] */ 
       }       
 
       virtual ~ArpackArgs() {  delete w_v_; }
@@ -331,7 +333,7 @@ using namespace quda ;
 
 ///////////////////////////////////////////////////ARPACK SOLVER////////////////////////////////////////////////////////
  template<typename Float>
- void arpackSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target)
+ void arpack_solve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target)
  {
    QudaMatvec<Float> mv(matEigen, matPrec, *B[0]);
    ArpackArgs<Float> arg(mv, B, static_cast<std::complex<Float> *> (evals), nev , ncv, target, (Float)tol);
@@ -344,10 +346,12 @@ using namespace quda ;
  void arpackSolve( std::vector<ColorSpinorField*> &B, void* evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target)
  {
 #ifdef ARPACK_LIB
-   if(arpackPrec == QUDA_DOUBLE_PRECISION) arpackSolve<double>(B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
-   else                                    arpackSolve<float> (B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
+   if(arpackPrec == QUDA_DOUBLE_PRECISION) arpack_solve<double>(B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
+   else                                    arpack_solve<float> (B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
  #endif
    return;
  }
+
+}
 
 
