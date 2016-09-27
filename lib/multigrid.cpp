@@ -406,6 +406,12 @@ namespace quda {
       delete v2;
     }
 #endif
+
+    printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
+    deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
+    printfQuda("L2 relative deviation = %e\n\n", deviation);
+    if (deviation > tol) errorQuda("failed");
+    
 #if 1
     printfQuda("\n");
     printfQuda("Check eigenvector overlap for level %d\n", param.level );
@@ -421,6 +427,11 @@ namespace quda {
 
     cpuParam.location = QUDA_CPU_FIELD_LOCATION;
     cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) { 
+      cpuParam.x[0] /= 2; 
+      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
+    }
 
     std::vector<ColorSpinorField*> evecsBuffer;
     evecsBuffer.reserve(nmodes);
@@ -456,11 +467,6 @@ namespace quda {
     free(which);
 #endif
 
-    printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
-    deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-    printfQuda("L2 relative deviation = %e\n\n", deviation);
-    if (deviation > tol) errorQuda("failed");
-    
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
