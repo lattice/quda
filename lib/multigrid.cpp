@@ -612,8 +612,12 @@ namespace quda {
     }
 
     if (strcmp(vec_infile.c_str(),"")!=0) {
+#ifdef HAVE_QIO
       read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+#else
+      errorQuda("\nQIO library was not built.\n");      
+#endif
     } else {
       printfQuda("Using %d constant nullvectors\n", Nvec);
       //errorQuda("No nullspace file defined");
@@ -649,6 +653,7 @@ namespace quda {
   }
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
+#ifdef HAVE_QIO
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     std::string vec_outfile(param.mg_global.vec_outfile);
@@ -676,6 +681,9 @@ namespace quda {
 
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
+#else
+    errorQuda("\nQIO library was not built.\n");      
+#endif
   }
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {
