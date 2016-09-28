@@ -429,13 +429,29 @@ namespace quda {
       Solver *K;
       SolverParam Kparam; // parameters for preconditioner solve
 
-      int nKrylov;//corresponds to m_{max}+1, if nKrylov = 1 , use standard pcg
+      int nKrylov;//corresponds to m_{max}+1, if nKrylov = 0 , use standard pcg
       double *pAp;
   
-      std::vector<ColorSpinorField*> p;  // CG conjugate vectors
-      std::vector<ColorSpinorField*> Ap; // mat * conj.vectors 
+      std::vector<ColorSpinorField*> p;  // FCG search vectors
+      std::vector<ColorSpinorField*> Ap; // mat * search vectors
+
+      /**
+       Solver uses lazy allocation: this flag to determine whether we have allocated.
+      */
+      bool init;
+      bool use_ipcg_iters;//which algorithm to use:  (true & K) => ipcg, (false & K) => fcg, !K => regilar CG
+
+      ColorSpinorField *rp;       //! residual vector
+      ColorSpinorField *yp;       //! high precision accumulator
+      ColorSpinorField *tmpp;     //! temporary for mat-vec
+      ColorSpinorField *x_sloppy; //! sloppy solution vector
+      ColorSpinorField *r_sloppy; //! sloppy residual vector
+      ColorSpinorField *r_pre;    //! residual passed to preconditioner
+      ColorSpinorField *p_pre;    //! preconditioner result
+      ColorSpinorField *wp;       //! preconditioner result in sloppy precision
 
     public:
+      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
       /**
         @param K Preconditioner
       */

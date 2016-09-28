@@ -13,6 +13,14 @@
 #include <face_quda.h>
 #include <iostream>
 
+/***
+* IPCG algorithm (nKrylov = 0):
+* G.H. Golub, Q. Ye, "Inexact Preconditioned Conjugate Gradient Method with Inner-Outer Iteration", SIAM J. Sci. Comput., 21(4), 1305–1320
+*
+* FCG algorithm (nKrylov > 0):
+* Y. Notay, "Flexible Conjugate Gradients", SIAM J. Sci. Comput., 22(4), 1444–1460
+***/
+
 namespace quda {
 
   using namespace blas;
@@ -40,10 +48,12 @@ namespace quda {
 
 
   PreconCG::PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param), nKrylov(1)
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param), nKrylov(param.Nkrylov), init(false)
   {
-
     fillInnerSolverParam(Kparam, param);
+
+    if(nKrylov < 1) printfQuda("Running Inexact Preconditioned CG.\n");
+    printfQuda("Running flexible CG with restart length m_max = %d\n", nKrylov);
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
       K = new CG(matPrecon, matPrecon, Kparam, profile);
@@ -54,31 +64,55 @@ namespace quda {
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
-
-    p.resize(nKrylov);
-    Ap.resize(nKrylov);
-    pAp = new double[nKrylov];
+    //
+    p.reserve(nKrylov+1);
+    Ap.reserve(nKrylov+1);
+    use_ipcg_iters = nKrylov == 0 ? true : false;
   }
   
   //Flexible version of CG
   PreconCG::PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
 	   SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov)
+    nKrylov(param.Nkrylov), init(false)
   {
-    if(nKrylov <= 1) errorQuda("Running flexible CG with restart length m_max >= 1 (%d provided)\n", (nKrylov - 1));
-    printfQuda("Running flexible CG with restart length m_max = %d\n", (nKrylov - 1));
-    p.resize(nKrylov);
-    Ap.resize(nKrylov);
-    pAp = new double[nKrylov];
+    if(nKrylov < 1) printfQuda("Running Inexact Preconditioned CG.\n");
+    printfQuda("Running flexible CG with restart length m_max = %d\n", nKrylov);
+    //
+    p.reserve(nKrylov+1);
+    Ap.reserve(nKrylov+1);
+    use_ipcg_iters = nKrylov == 0 ? true : false;
   }
 
   PreconCG::~PreconCG(){
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    if(K) delete K;
+    if (init) {
+      if (param.precision_sloppy != param.precision) {
+        delete x_sloppy;
+        delete r_sloppy;
+      }
 
-    delete pAp;
+      if ((param.precision_precondition != param.precision_sloppy) && K) {
+        delete p_pre;
+        delete r_pre;
+      }
+
+      for (int i=0; i<nKrylov; i++) {
+        delete p[i];
+        delete Ap[i];
+      }
+
+      delete tmpp;
+      delete rp;
+      delete yp;
+
+      if(use_ipcg_iters && K) delete wp;
+
+      delete pAp;
+    }
+
+    if(K) delete K;
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -86,14 +120,73 @@ namespace quda {
 
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-
     profile.TPSTART(QUDA_PROFILE_INIT);
+
+    if (!init) {
+      ColorSpinorParam csParam(b);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      // high precision residual:
+      rp = ColorSpinorField::Create(csParam);
+      // high precision accumulator:
+      yp = ColorSpinorField::Create(csParam);
+
+      // create sloppy fields used for orthogonalization
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.setPrecision(param.precision_sloppy);
+
+      for (int i = 0; i < nKrylov; i++) {
+	p.push_back(ColorSpinorField::Create(csParam));
+	Ap.Push_back(ColorSpinorField::Create(csParam));
+      }
+
+      tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
+
+      if (param.precision_sloppy != param.precision) {
+	x_sloppy = ColorSpinorField::Create(csParam);
+	r_sloppy = ColorSpinorField::Create(csParam);
+      } else {
+	x_sloppy = &x;
+	r_sloppy = rp;
+      }
+
+      if(K) {
+
+        if(use_ipcg_iters) wp = ColorSpinorField::Create(csParam);
+        else               wp = tmpp;//pointer alias
+
+        // these low precision fields are used by the inner solver
+        if (param.precision_precondition != param.precision_sloppy) {
+	  csParam.setPrecision(param.precision_precondition);
+	  p_pre = ColorSpinorField::Create(csParam);
+	  r_pre = ColorSpinorField::Create(csParam);
+        } else {
+	  p_pre = nullptr;
+	  r_pre = r_sloppy;
+        }
+      } else {
+        wp    = nullptr;
+        p_pre = nullptr;
+        r_pre = nullptr;
+      }
+
+      pAp = new double[nKrylov+1];
+
+      init = true;
+    }
+
+    ColorSpinorField &r = *rp;
+    ColorSpinorField &y = *yp;
+    ColorSpinorField &xSloppy = *x_sloppy;
+    ColorSpinorField &rSloppy = *r_sloppy;
+    ColorSpinorField &rPre = *r_pre;
+    ColorSpinorField &tmp  = *tmpp;
+
     // Check to see that we're not trying to invert on a zero-field source
-    const double b2 = norm2(b);
+    const double b2 = blas::norm2(b);
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
-      x=b;
+      blas::copy(x, b);
       param.true_res = 0.0;
       param.true_res_hq = 0.0;
     }
@@ -101,99 +194,47 @@ namespace quda {
     int k=0;
     int rUpdate=0;
 
-    cudaColorSpinorField* minvrPre = NULL;
-    cudaColorSpinorField* rPre = NULL;
-    cudaColorSpinorField* minvr = NULL;
-    cudaColorSpinorField* minvrSloppy = NULL;
-    //cudaColorSpinorField* p = NULL;
-
-
-    ColorSpinorParam csParam(b);
-    cudaColorSpinorField r(b);
-    if(K) minvr = new cudaColorSpinorField(b);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(b,csParam);
-
     mat(r, x, y); // => r = A*x;
-    double r2 = xmyNorm(b,r);
-
-    csParam.setPrecision(param.precision_sloppy);
-    cudaColorSpinorField tmpSloppy(x,csParam);
-    //cudaColorSpinorField Ap(x,csParam);
-
-    for (int i=0; i<nKrylov; i++) {
-      p[i] = ColorSpinorField::Create(x, csParam);
-      Ap[i] = ColorSpinorField::Create(x, csParam);
-    }
-
-    cudaColorSpinorField *r_sloppy;
-    if(param.precision_sloppy == x.Precision())
-    {
-      r_sloppy = &r;
-      minvrSloppy = minvr;
-    }else{
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(r,csParam);
-      if(K) minvrSloppy = new cudaColorSpinorField(*minvr,csParam);
-    }
-  
-
-    cudaColorSpinorField *x_sloppy;
-    if(param.precision_sloppy == x.Precision() ||
-        !param.use_sloppy_partial_accumulator) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      x_sloppy = &static_cast<cudaColorSpinorField&>(x);
-    }else{
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = new cudaColorSpinorField(x,csParam);
-    }
-
-
-    cudaColorSpinorField &xSloppy = *x_sloppy;
-    cudaColorSpinorField &rSloppy = *r_sloppy;
+    double r2 = blas::xmyNorm(b,r);
 
     if(&x != &xSloppy){
-      copy(y, x); // copy x to y
-      zero(xSloppy);
+      blas::copy(y, x); // copy x to y
+      blas::zero(xSloppy);
     }else{
-      zero(y); // no reliable updates // NB: check this
+      blas::zero(y); // no reliable updates // NB: check this
     }
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    const bool precMatch           = (param.precision_precondition != param.precision_sloppy) ? false : true;
+
+    ColorSpinorField &pPre = !precMatch ? *p_pre : ( K ? *wp : rSloppy );
+
+    blas::copy(rSloppy, r);
 
     if(K){
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      csParam.setPrecision(param.precision_precondition);
-      rPre = new cudaColorSpinorField(rSloppy,csParam);
-      // Create minvrPre 
-      minvrPre = new cudaColorSpinorField(*rPre);
+      if( !precMatch )  blas::copy(rPre, rSloppy);
       commGlobalReductionSet(false);
-      (*K)(*minvrPre, *rPre);  
+      (*K)(pPre, rPre);
       commGlobalReductionSet(true);
-      *minvrSloppy = *minvrPre;
-      //p = new cudaColorSpinorField(*minvrSloppy);
-      *p[0] = *minvrSloppy;
+      if( !precMatch ) blas::copy(*wp, pPre);
+
+      blas::copy(*p[0], *wp);
     }else{
-      //p = new cudaColorSpinorField(rSloppy);
-      *p[0] = rSloppy;
+      blas::copy(*p[0], rSloppy);
     }
 
   
     profile.TPSTOP(QUDA_PROFILE_INIT);
-
-
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     double heavy_quark_res = 0.0; // heavy quark residual 
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x,r).z);
 
     double alpha = 0.0, beta=0.0;
-    //double pAp;
-    double rMinvr  = 0;
-    double rMinvr_old = 0.0;
+
+    double rMinvr          = 0.0;
+    double rMinvr_old      = 0.0;
     double r_new_Minvr_old = 0.0;
     double r2_old = 0;
     r2 = norm2(r);
@@ -202,65 +243,71 @@ namespace quda {
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
-    double delta = param.delta;
+    //double delta = param.delta;
 
-
-    if(K) rMinvr = reDotProduct(rSloppy,*minvrSloppy);
+    if(K) rMinvr = blas::reDotProduct(rSloppy,*wp);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-
     blas::flops = 0;
 
-    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
     
     int resIncrease = 0;
     int resIncreaseTotal = 0;
-    
+
+    int j = 0;//needed to incriment global index    
+
     while(!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter){
 
-      double sigma; 
-      Complex cg_norm;     
+      matSloppy(*Ap[0], *p[0], tmp);
+      //
+      pAp[0]   = blas::reDotProduct(*p[0],*Ap[0]);
+      alpha    = (K) ? rMinvr/pAp[0] : r2/pAp[0];
 
-      for(int j = 0; j <= nKrylov; j++)
+      //update solution vector:
+      blas::axpy(+alpha, *p[0], xSloppy);
+      //update residual:
+      Complex cg_norm = blas::axpyCGNorm(-alpha, *Ap[0], rSloppy); 
+
+      r2_old = r2;
+      r2 = real(cg_norm);
+
+      for( j = 1; j < nKrylov; j++ )
       {
-        matSloppy(*Ap[j], *p[j], tmpSloppy);
+        if((sqrt(r2/r2_old) < param.delta)) break; //we need reliable update.
 
-        pAp[j]   = reDotProduct(*p[j],*Ap[j]);
+        if( !precMatch )  blas::copy(rPre, rSloppy);
+        commGlobalReductionSet(false);
+        (*K)(pPre, rPre);
+        commGlobalReductionSet(true);
+        if( !precMatch ) blas::copy(*wp, pPre);
 
-        alpha = (K) ? rMinvr/pAp[j] : r2/pAp[j];
-        cg_norm = axpyCGNorm(-alpha, *Ap[j], rSloppy); 
+        blas::copy(*p[j], *wp);
+ 
+        for(int l = 1; l < j; l++)
+        {
+          beta = blas::reDotProduct(*Ap[l],*wp) / pAp[l];
+          blas::axpy(- beta, *p[l], *p[j]);//!
+        }
+
+        matSloppy(*Ap[j], *p[j], tmp)
+        pAp[j]   = blas::reDotProduct(*p[j],*Ap[j]);
+
+        rMinvr = blas::reDotProduct(rSloppy,*p[j]);
+        alpha  = rMinvr/pAp[j];
+
+        //update solution vector:
+        blas::axpy(+alpha, *p[j], xSloppy);
+        cg_norm = blas::axpyCGNorm(-alpha, *Ap[j], rSloppy); 
         // r --> r - alpha*A*p
         r2_old = r2;
         r2 = real(cg_norm);
-  
-        if(nKrylov > 1)
-        {
-          axpy(+alpha, *p[j], xSloppy);
-
-          *rPre = rSloppy;
-
-	  commGlobalReductionSet(false);
-          (*K)(*minvrPre, *rPre);
-	  commGlobalReductionSet(true);
-          *minvrSloppy = *minvrPre;
-
-          rMinvr = reDotProduct(rSloppy,*minvrSloppy);
-
-          *p[j] = *minvrSloppy;
- 
-          for(int l = 1; l < j; l++)
-          {
-             double rMinvr_old = reDotProduct(*Ap[l],*minvrSloppy) / pAp[l];
-
-             axpy(- rMinvr_old, *p[l], *p[j]);
-          } 
-        }
       }
 
-      if(nKrylov = 1)//non-flexible part
+      if( use_ipcg_iters )//
       {
         sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k-1 - r_k) breaks
 
@@ -280,35 +327,35 @@ namespace quda {
         if( !(updateR || updateX) ){
 
           if(K){
-            r_new_Minvr_old = reDotProduct(rSloppy,*minvrSloppy);
-            *rPre = rSloppy;
-	    commGlobalReductionSet(false);
-            (*K)(*minvrPre, *rPre);
-	    commGlobalReductionSet(true);
+            r_new_Minvr_old = blas::reDotProduct(rSloppy,*wp);
 
-            *minvrSloppy = *minvrPre;
+            if( !precMatch )  blas::copy(rPre, rSloppy);
+            commGlobalReductionSet(false);
+            (*K)(pPre, rPre);
+            commGlobalReductionSet(true);
+            if( !precMatch ) blas::copy(*wp, pPre);
 
-            rMinvr = reDotProduct(rSloppy,*minvrSloppy);
+            rMinvr = reDotProduct(rSloppy,*wp);
+            //Polak-Ribiere formula:
             beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
-            axpyZpbx(alpha, *p[0], xSloppy, *minvrSloppy, beta);
+            blas::axpyZpbx(alpha, *p[0], xSloppy, *wp, beta);
+
           }else{
             beta = sigma/r2_old; // use the alternative beta computation
-            axpyZpbx(alpha, *p[0], xSloppy, rSloppy, beta);
+            blas::axpyZpbx(alpha, *p[0], xSloppy, rSloppy, beta);
           }
 
 
         } else { // reliable update
 
-          axpy(alpha, *p[0], xSloppy); // xSloppy += alpha*p
-          copy(x, xSloppy);
-          xpy(x, y); // y += x
+          blas::axpy(alpha, *p[0], xSloppy); // xSloppy += alpha*p
+          blas::copy(x, xSloppy);
+          blas::xpy(x, y); // y += x
           // Now compute r 
           mat(r, y, x); // x is just a temporary here
-          r2 = xmyNorm(b, r);
-          copy(rSloppy, r); // copy r to rSloppy
-          zero(xSloppy);
-
-
+          r2 = blas::xmyNorm(b, r);
+          blas::copy(rSloppy, r); // copy r to rSloppy
+          blas::zero(xSloppy);
           // break-out check if we have reached the limit of the precision
           if(sqrt(r2) > r0Norm && updateX) { 
           resIncrease++;
@@ -329,52 +376,53 @@ namespace quda {
           ++rUpdate;
 
           if(K){
-            *rPre = rSloppy;
-	    commGlobalReductionSet(false);
-            (*K)(*minvrPre, *rPre);
-	    commGlobalReductionSet(true);
-
-            *minvrSloppy = *minvrPre;
-
-            rMinvr = reDotProduct(rSloppy,*minvrSloppy);
+            if( !precMatch )  blas::copy(rPre, rSloppy);
+            commGlobalReductionSet(false);
+            (*K)(pPre, rPre);
+            commGlobalReductionSet(true);
+            if( !precMatch ) blas::copy(*wp, pPre);
+            //
+            rMinvr = blas::reDotProduct(rSloppy,*wp);
+            //Fletcher-Reeves formula:
             beta = rMinvr/rMinvr_old;        
-
-            xpay(*minvrSloppy, beta, *p[0]); // p = minvrSloppy + beta*p
+            blas::xpay(*minvrSloppy, beta, *p[0]); // p = minvrSloppy + beta*p
           }else{ // standard CG - no preconditioning
-
             // explicitly restore the orthogonality of the gradient vector
-            double rp = reDotProduct(rSloppy, *p[0])/(r2);
-            axpy(-rp, rSloppy, *p[0]);
+            double rp = blas::reDotProduct(rSloppy, *p[0])/(r2);
+            blas::axpy(-rp, rSloppy, *p[0]);
 
             beta = r2/r2_old;
-            xpay(rSloppy, beta, *p[0]);
+            blas::xpay(rSloppy, beta, *p[0]);
           }
         }
-      }//flexible branch:
-      else
-      {
-          axpy(alpha, *p[0], xSloppy); // xSloppy += alpha*p
-          copy(x, xSloppy);
-          xpy(x, y); // y += x
-          // Now compute r 
-          mat(r, y, x); // x is just a temporary here
-          r2 = xmyNorm(b, r);
-          copy(rSloppy, r); // copy r to rSloppy
-          zero(xSloppy);
+      } else {//FCG branch : do reliable update 
+        blas::copy(x, xSloppy);
+        blas::xpy(x, y); // y += x
+        // Now compute r 
+        mat(r, y, x); // x is just a temporary here
+        r2 = blas::xmyNorm(b, r);
+        blas::copy(rSloppy, r); // copy r to rSloppy
+        blas::zero(xSloppy);
+
+        if( !precMatch )  blas::copy(rPre, rSloppy);
+        commGlobalReductionSet(false);
+        (*K)(pPre, rPre);
+        commGlobalReductionSet(true);
+        if( !precMatch ) blas::copy(*wp, pPre);
+
+        blas::copy(*p[0], *wp);
       }
       
-      k += nKrylov;//+1 for the regular pcg
-      PrintStats("PCG", k, r2, b2, heavy_quark_res);
+      k += (j+1);//+1 for the regular pcg
+      PrintStats(nKrylov == 0 ? "IPCG" : "FCG", k, r2, b2, heavy_quark_res);
     }
 
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    if(x.Precision() != param.precision_sloppy) copy(x, xSloppy);
-    xpy(y, x); // x += y
-
+    if(x.Precision() != param.precision_sloppy) blas::copy(x, xSloppy);
+    blas::xpy(y, x); // x += y
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
@@ -385,15 +433,11 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("CG: Reliable updates = %d\n", rUpdate);
-
-
-
-
+      printfQuda("PCG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residual 
     mat(r, x, y);
-    double true_res = xmyNorm(b, r);
+    double true_res = blas::xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
 
     // reset the flops counters
@@ -404,24 +448,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
-
-    if(K){ // These are only needed if preconditioning is used
-      delete minvrPre;
-      delete rPre;
-      delete minvr;
-      if(x.Precision() != param.precision_sloppy)  delete minvrSloppy;
-    }
-    
-    for(int i = 0; i < nKrylov; i++)
-    {
-      delete p[i];
-      delete Ap[i];
-    }
-
-    if(x.Precision() != param.precision_sloppy){
-      delete x_sloppy;
-      delete r_sloppy;
-    }
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
     return;
