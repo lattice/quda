@@ -373,7 +373,7 @@ doubleN genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField
     value = genericReduce<ReduceType,Float,zFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
       (x, y, z, w, v, r);
   } else {
-    errorQuda("Not implemeneted");
+    warningQuda("CPU reductions not implemeneted for %d field order", x.FieldOrder());
   }
   return set(value);
 }
