@@ -486,7 +486,41 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class BiCGStabL : public Solver {
 
+  private:
+    DiracMatrix &mat;
+
+    /**
+       The size of the Krylov space that BiCGstabL uses.
+     */
+    int nKrylov; // in the language of BiCGstabL, this is L.
+    
+    // Various coefficients and params needed on each iteration.
+    Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L. 
+    Complex *gamma, *gamma_prime, *gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    Complex **tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    double *sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
+    
+    // pointers to fields to avoid multiple creation overhead
+    ColorSpinorField *r0p;    //! Shadow residual, in BiCG language.
+    ColorSpinorField *tempp;  //! Temporary vector, used to hold residuals and such.
+    std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
+    std::vector<ColorSpinorField*> u; // Search directions.
+    
+    
+    
+    /**
+       Solver uses lazy allocation: this flag determines whether we have allocated or not.
+     */
+    bool init;
+
+  public:
+    BiCGStabL(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~BiCGStabL();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
 
   class GCR : public Solver {
 
