@@ -204,71 +204,89 @@ namespace quda {
       gamma[nKrylov] = gamma_prime[nKrylov];
       omega = gamma[nKrylov];
       
+      // gamma = T^(-1) gamma_prime. It's in the paper, I promise.
+      for (int j = nKrylov-1; j > 0; j--)
+      {
+        // Internal def: gamma[j] = gamma'_j - \sum_{i = j+1 to nKrylov} tau_ji gamma_i
+        gamma[j] = gamma_prime[j];
+        for (int i = j+1; i <= nKrylov; i++)
+        {
+          gamma[j] = gamma[j] - tau[j][i]*gamma[i];
+        }
+      }
       
-          
-   
-      mat(Ap,p,temp); 
-      mat(A2p,Ap,temp);
-      mat(Ar,r,temp);   
-
- 
-      r0r   = cDotProductCuda(r0,r);
-      alpha = r0r/cDotProductCuda(r0,Ap); 
-
-
-      Complex omega_num    =  cDotProductCuda(r,Ar) 
-                           -  alpha*cDotProductCuda(r,A2p)
-                           -  conj(alpha)*cDotProductCuda(Ap,Ar)
-                           +  conj(alpha)*alpha*cDotProductCuda(Ap,A2p);
-
-
-      Complex omega_denom  = cDotProductCuda(Ar,Ar) 
-                           - alpha*cDotProductCuda(Ar,A2p) 
-                           - conj(alpha)*cDotProductCuda(A2p,Ar)
-                           + conj(alpha)*alpha*cDotProductCuda(A2p,A2p);
-
-
-      omega = omega_num/omega_denom;
-
-
+      // gamma'' = T S gamma. Check paper for defn of S.
+      for (int j = 1; j < nKrylov; j++)
+      {
+        gamma_prime_prime[j] = gamma[j+1];
+        for (int i = j+1; i < nKrylov; i++)
+        {
+          gamma_prime_prime[j] = gamma_prime_prime[j] + tau[j][i]*gamma[i+1];
+        }
+      }
+      
+      // Update x, r, u.
+      // x = x+ gamma_l r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
+      // I bet there's some fancy blas for this.
+      blas::axpy(gamma[nKrylov], *r[0], x);
+      blas::axpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
+      blas::axpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
+      
+      // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
+      for (int j = 1; j < nKrylov; j++)
+      {
+        blas::axpy(-gamma[j], *u[j], *u[0]);
+        blas::axpy(gamma_prime_prime[j], *r[j], *x[0]);
+        blas::axpy(-gamma_prime[j], *r[j], *r[0]);
+      }
+      
+      // sigma[0] = r_0^2
+      sigma[0] = blas::norm2(*r[0]);
+      r2 = sigma[0];
+      
+      // Check convergence.
+      k += nKrylov;
+      PrintStats("BiCGStab-l", k, r2, b2, 0.0); // last thing should be heavy quark res...
+    } // Done iterating.
     
-      // x ---> x + alpha p + omega s 
-      caxpyCuda(alpha,p,x);
-      caxpyCuda(omega,r,x);
-      caxpyCuda(-alpha*omega,Ap,x);
-
-
-      // r_new = r - omega*Ar - alpha*Ap + alpha*omega*A2p
-      r_new = r;
-      caxpyCuda(-omega,Ar,r_new);
-      caxpyCuda(-alpha,Ap,r_new);
-      caxpyCuda(alpha*omega,A2p,r_new);
-
-      beta = (cDotProductCuda(r0,r_new)/r0r)*(alpha/omega);
-
-      
-      // p = r_new + beta p - omega*beta Ap
-      p_new = r_new;
-      caxpyCuda(beta, p, p_new);
-      caxpyCuda(-beta*omega, Ap, p_new); 
-   
-      p = p_new; 
-      r = r_new;
-      r2 = norm2(r);
-      p2 = norm2(p);
-      k++;
-    }
-
-  
-    if(k == param.maxiter)
+    // Done with compute, begin the epilogue.
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    
+    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+    param.gflops = gflops;
+    param.iter += k;
+    
+    if (k >= param.maxiter) // >= if nKrylov doesn't divide max iter.
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
+    // Compute true residual
+    
+
     // compute the true residual
-    mat(r, x, temp);
-    param.true_res = sqrt(xmyNormCuda(b, r)/b2);
-
-    PrintSummary("BiCGstabL", k, r2, b2);
-
+    if (param.compute_true_res) {
+      mat(*r[0], x, temp);
+      double true_res = blas::xmyNorm(b, *r[0]);
+      param.true_res = sqrt(true_res);
+      // Probably some heavy quark stuff...
+      param.true_res_hq = 0.0;
+    }
+    
+    // Reset flops counters.
+    blas::flops = 0;
+    mat.flops();
+    
+    // Done with epilogue, begin free.
+    
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
+    
+    // ...yup...
+    PrintSummary("GCR", k, r2, b2);
+    
+    // Done!
+    profile.TPSTOP(QUDA_PROFILE_FREE);
     return;
   }
 
