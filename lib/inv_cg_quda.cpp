@@ -504,7 +504,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTOP(QUDA_PROFILE_INIT);
   profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-  // MatrixXcd r2_old(param.num_src, param.num_src);
   double stop[QUDA_MAX_MULTI_SHIFT];
 
   for(int i = 0; i < param.num_src; i++){
@@ -512,10 +511,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   }
 
   // Eigen Matrices instead of scalars
-  // some cleanup possible here
   MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
   MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
-  // MatrixXcd gamma = MatrixXcd::Zero(param.num_src,param.num_src);
   MatrixXcd C = MatrixXcd::Zero(param.num_src,param.num_src);
   MatrixXcd S = MatrixXcd::Identity(param.num_src,param.num_src);
   MatrixXcd pAp = MatrixXcd::Identity(param.num_src,param.num_src);
@@ -525,10 +522,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
   #endif
 
-  // reliable updates not yet implemented
-  int rUpdate = 0;
 
 
+
+  //FIXME:reliable updates currently not implemented
+  /*
   double rNorm[QUDA_MAX_MULTI_SHIFT];
   double r0Norm[QUDA_MAX_MULTI_SHIFT];
   double maxrx[QUDA_MAX_MULTI_SHIFT];
@@ -540,11 +538,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     maxrx[i] = rNorm[i];
     maxrr[i] = rNorm[i];
   }
-
-
-  //FIXME:reliable updates currently not implemented
-
   bool L2breakdown = false;
+  int rUpdate = 0;
+  nt steps_since_reliable = 1;
+  */
 
   profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -553,7 +550,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   int k = 0;
 
   PrintStats("CG", k, r2avg / param.num_src, b2avg, 0.);
-  int steps_since_reliable = 1;
   bool allconverged = true;
   bool converged[QUDA_MAX_MULTI_SHIFT];
   for(int i=0; i<param.num_src; i++){
@@ -561,9 +557,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     allconverged = allconverged && converged[i];
   }
 
-  // CHolesky decomposition // r2.llt().matrixL() should do as well
-  Eigen::LLT<MatrixXcd> lltOfA(r2); // compute the Cholesky decomposition of A
-  MatrixXcd L = lltOfA.matrixL(); // retrieve factor L  in the decomposition
+  // CHolesky decomposition
+  MatrixXcd L = r2.llt().matrixL();//// retrieve factor L  in the decomposition
   C = L.adjoint();
   MatrixXcd Linv = C.inverse();
 
@@ -582,7 +577,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   }
   blas::caxpy(AC,r,p);
 
-
   // set rsloppy to to QR decompoistion of r (p)
   for(int i=0; i< param.num_src; i++){
     blas::copy(rSloppy.Component(i), p.Component(i));
@@ -600,6 +594,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #endif
 
   while ( !allconverged && k < param.maxiter ) {
+    // apply matrix
     for(int i=0; i<param.num_src; i++){
       matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
     }
@@ -637,20 +632,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     for(int i=0; i< param.num_src; i++){
       blas::copy(rnew.Component(i), rSloppy.Component(i));
     }
-    // update r2
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
         r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
         if (i!=j) r2(j,i) = std::conj(r2(i,j));
       }
     }
-
     // Cholesky decomposition
-    Eigen::LLT<MatrixXcd> lltOfr2(r2); // compute the Cholesky decomposition of A
-    L = lltOfr2.matrixL(); // retrieve factor L  in the decomposition
+    L = r2.llt().matrixL();// retrieve factor L  in the decomposition
     S = L.adjoint();
     Linv = S.inverse();
-
     // temporary hack
     for(int i=0; i<param.num_src; i++){
       blas::zero(rSloppy.Component(i));
@@ -682,10 +673,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     blas::caxpy(AC,p,rnew);
-
-    // copy sclae with nsrc
+    // set p = rnew
     for(int i=0; i < param.num_src; i++){
-      blas::copy(p.Component(i),rnew.Component(i)); // do we need components here?
+      blas::copy(p.Component(i),rnew.Component(i));
     }
 
     // update C
@@ -710,14 +700,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       r2avg += r2(j,j).real();
     }
 
-
-
     k++;
-
-    allconverged = true;
-
-
     PrintStats("CG", k, r2avg / param.num_src, b2avg, 0);
+    // check convergence
+    allconverged = true;
     for(int i=0; i<param.num_src; i++){
       converged[i] = convergence(r2(i,i).real(), 0, stop[i], param.tol_hq);
       allconverged = allconverged && converged[i];
@@ -727,7 +713,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   }
 
   for(int i=0; i<param.num_src; i++){
-    blas::xpy(y.Component(i), x.Component(i));
+    blas::xpy(y.Component(i), xSloppy.Component(i));
   }
 
   profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -741,8 +727,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if (k == param.maxiter)
   warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-  if (getVerbosity() >= QUDA_VERBOSE)
-  printfQuda("CG: Reliable updates = %d\n", rUpdate);
+  // if (getVerbosity() >= QUDA_VERBOSE)
+  // printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
   // compute the true residuals
   for(int i=0; i<param.num_src; i++){
@@ -770,18 +756,13 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
 
   delete rpnew;
-
   delete pp;
-
-  #ifndef NOTMULTCAXPY
   delete[] AC;
-  #endif
   profile.TPSTOP(QUDA_PROFILE_FREE);
 
   return;
 
   #endif
-
 }
 
 #else
