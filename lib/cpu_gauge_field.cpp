@@ -46,7 +46,8 @@ namespace quda {
       }
     
     } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  || 
-	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER) {
+	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER ||
+	       order == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
 	size_t nbytes = siteDim * volume * nInternal * precision;

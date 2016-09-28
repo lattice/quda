@@ -105,6 +105,16 @@ namespace quda {
       errorQuda("TIFR interface has not been built\n");
 #endif
 
+    } else if (out.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      copyGauge<FloatOut,FloatIn,length>
+	(TIFRPaddedOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
     }
@@ -146,7 +156,7 @@ namespace quda {
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In, inGhost), 
+      copyGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In, inGhost),
 					 out, location, Out, outGhost, type);
 #else
       errorQuda("QDP interface has not been built\n");
@@ -155,7 +165,7 @@ namespace quda {
     } else if (in.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>(QDPJITOrder<FloatIn,length>(in, In, inGhost), 
+      copyGauge<FloatOut,FloatIn,length>(QDPJITOrder<FloatIn,length>(in, In, inGhost),
 					 out, location, Out, outGhost, type);
 #else
       errorQuda("QDPJIT interface has not been built\n");
@@ -164,7 +174,7 @@ namespace quda {
     } else if (in.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 
 #ifdef BUILD_CPS_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>(CPSOrder<FloatIn,length>(in, In, inGhost), 
+      copyGauge<FloatOut,FloatIn,length>(CPSOrder<FloatIn,length>(in, In, inGhost),
 					 out, location, Out, outGhost, type);
 #else
       errorQuda("CPS interface has not been built\n");
@@ -173,7 +183,7 @@ namespace quda {
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(in, In, inGhost), 
+      copyGauge<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(in, In, inGhost),
 					 out, location, Out, outGhost, type);
 #else
       errorQuda("MILC interface has not been built\n");
@@ -182,7 +192,7 @@ namespace quda {
     } else if (in.Order() == QUDA_BQCD_GAUGE_ORDER) {
 
 #ifdef BUILD_BQCD_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>(BQCDOrder<FloatIn,length>(in, In, inGhost), 
+      copyGauge<FloatOut,FloatIn,length>(BQCDOrder<FloatIn,length>(in, In, inGhost),
 					 out, location, Out, outGhost, type);
 #else
       errorQuda("BQCD interface has not been built\n");
@@ -191,7 +201,16 @@ namespace quda {
     } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>(TIFROrder<FloatIn,length>(in, In, inGhost), 
+      copyGauge<FloatOut,FloatIn,length>(TIFROrder<FloatIn,length>(in, In, inGhost),
+					 out, location, Out, outGhost, type);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
+    } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      copyGauge<FloatOut,FloatIn,length>(TIFRPaddedOrder<FloatIn,length>(in, In, inGhost),
 					 out, location, Out, outGhost, type);
 #else
       errorQuda("TIFR interface has not been built\n");
