@@ -5361,11 +5361,28 @@ void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) {
   if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
   invertQuda(hp_x, hp_b, param);
 }
-void invert_multishift_quda_(void *hp_x[QUDA_MAX_MULTI_SHIFT], void *hp_b, QudaInvertParam *param) {
+
+void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
   // ensure that fifth dimension is set to 1
   if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
+
+  if (!gaugePrecise) errorQuda("Resident gauge field not allocated");
+
+  // get data into array of pointers
+  int nSpin = (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) ? 1 : 4;
+
+  // compute offset assuming TIFR padded ordering (FIXME)
+  if (param->dirac_order != QUDA_TIFR_PADDED_DIRAC_ORDER)
+    errorQuda("Fortran multi-shift solver presently only supports QUDA_TIFR_PADDED_DIRAC_ORDER");
+
+  const int *X = gaugePrecise->X();
+  size_t cb_offset = (X[0]/2) * X[1] * (X[2] + 4) * X[3] * gaugePrecise->Ncolor() * nSpin * 2 * param->cpu_prec;
+  void *hp_x[QUDA_MAX_MULTI_SHIFT];
+  for (int i=0; i<param->num_offset; i++) hp_x[i] = static_cast<char*>(h_x) + i*cb_offset;
+
   invertMultiShiftQuda(hp_x, hp_b, param);
 }
+
 void new_quda_gauge_param_(QudaGaugeParam *param) {
   *param = newQudaGaugeParam();
 }

@@ -159,12 +159,12 @@ extern "C" {
 
   /**
    * Solve for multiple shifts (e.g., masses).
-   * @param _hp_x    Array of solution spinor fields
+   * @param _hp_x    Array of solution spinor fields (large contiguous allocation)
    * @param _hp_b    Array of source spinor fields
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invert_multi_shift_quda_(void *_hp_x[QUDA_MAX_MULTI_SHIFT], void *_hp_b, QudaInvertParam *param);
+  void invert_multishift_quda_(void *_hp_x, void *_hp_b, QudaInvertParam *param);
 
 
   /**
