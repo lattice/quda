@@ -2,21 +2,24 @@
    Driver for generic blas routine with four loads and two store.
  */
 template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Functor,
-  int writeX, int writeY, int writeZ, int writeW>
-  void multiblasCuda(const Complex* a, const Complex *b, const Complex *c,
+  int writeX, int writeY, int writeZ, int writeW, typename T>
+  void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
 		     CompositeColorSpinorField &x, CompositeColorSpinorField &y,
 		     CompositeColorSpinorField &z, CompositeColorSpinorField &w) {
 
   if (Location(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
 
-    if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
+    if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
+
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
       const int M = 1;
       multiblasCuda<NXZ,double2,double2,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
-    } else if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+
+    } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
+
       if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 1;
@@ -24,7 +27,9 @@ template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Fu
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
+
       } else if (x[0]->Nspin()==2 || x[0]->Nspin()==1) {
+
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
 	const int M = 1;
 	multiblasCuda<NXZ,float2,float2,float2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Length()/(2*M));
@@ -32,7 +37,9 @@ template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Fu
 	errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
       } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
-    } else {
+
+    } else if (y[0]->Precision() == QUDA_HALF_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
+
       if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
       if (x[0]->Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
@@ -51,6 +58,11 @@ template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Fu
       } else {
 	errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
       }
+
+    } else {
+
+      errorQuda("Precision combination x=%d not supported\n", x[0]->Precision());
+
     }
   } else { // fields on the cpu
     // using namespace quda::colorspinor;

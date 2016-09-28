@@ -156,7 +156,7 @@ namespace quda {
   void updateGaugeField(UpdateGaugeArg<Float,Gauge,Mom> arg) {
 
     for (unsigned int parity=0; parity<2; parity++) {
-      for (unsigned int x=0; x<arg.out.volumeCB; x++) {
+      for (int x=0; x<arg.out.volumeCB; x++) {
 	updateGaugeFieldCompute<Float,Gauge,Mom,N,conj_mom,exact>
 	  (arg, x, parity);
       }
