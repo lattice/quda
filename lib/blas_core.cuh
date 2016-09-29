@@ -21,24 +21,25 @@ template <typename FloatN, int M, typename SpinorX, typename SpinorY,
   typename SpinorZ, typename SpinorW, typename Functor>
   __global__ void blasKernel(BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg) {
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
+  unsigned int parity = blockIdx.y;
   unsigned int gridSize = gridDim.x*blockDim.x;
 
   arg.f.init();
 
   while (i < arg.length) {
     FloatN x[M], y[M], z[M], w[M];
-    arg.X.load(x, i);
-    arg.Y.load(y, i);
-    arg.Z.load(z, i);
-    arg.W.load(w, i);
+    arg.X.load(x, i, parity);
+    arg.Y.load(y, i, parity);
+    arg.Z.load(z, i, parity);
+    arg.W.load(w, i, parity);
 
 #pragma unroll
     for (int j=0; j<M; j++) arg.f(x[j], y[j], z[j], w[j]);
 
-    arg.X.save(x, i);
-    arg.Y.save(y, i);
-    arg.Z.save(z, i);
-    arg.W.save(w, i);
+    arg.X.save(x, i, parity);
+    arg.Y.save(y, i, parity);
+    arg.Z.save(z, i, parity);
+    arg.W.save(w, i, parity);
     i += gridSize;
   }
 }
@@ -50,8 +51,10 @@ class BlasCuda : public Tunable {
 private:
   mutable BlasArg<SpinorX,SpinorY,SpinorZ,SpinorW,Functor> arg;
 
+  const int nParity;
+
   // host pointers used for backing up fields when tuning
-  // these can't be curried into the Spinors because of Tesla argument length restriction
+  // dont't these curry these in to minimize Arg size
   char *X_h, *Y_h, *Z_h, *W_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h;
   const size_t *bytes_;
@@ -72,8 +75,8 @@ private:
 
 public:
   BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor &f,
-	   int length, const size_t *bytes, const size_t *norm_bytes) :
-  arg(X, Y, Z, W, f, length), X_h(0), Y_h(0), Z_h(0), W_h(0),
+	   int length, int nParity, const size_t *bytes, const size_t *norm_bytes) :
+    arg(X, Y, Z, W, f, length/nParity), nParity(nParity), X_h(0), Y_h(0), Z_h(0), W_h(0),
     Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), bytes_(bytes), norm_bytes_(norm_bytes) { }
 
   virtual ~BlasCuda() { }
@@ -101,7 +104,17 @@ public:
     arg.W.restore(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
   }
 
-  long long flops() const { return arg.f.flops()*vec_length<FloatN>::value*arg.length*M; }
+  void initTuneParam(TuneParam &param) const {
+    Tunable::initTuneParam(param);
+    param.grid.y = nParity;
+  }
+
+  void defaultTuneParam(TuneParam &param) const {
+    Tunable::initTuneParam(param);
+    param.grid.y = nParity;
+  }
+
+  long long flops() const { return arg.f.flops()*vec_length<FloatN>::value*arg.length*nParity*M; }
   long long bytes() const
   {
     // bytes for low-precision vector
@@ -113,7 +126,7 @@ public:
     if (arg.Y.Precision() == QUDA_HALF_PRECISION) extra_bytes += sizeof(float);
 
     // the factor two here assumes we are reading and writing to the high precision vector
-    return ((arg.f.streams()-2)*base_bytes + 2*extra_bytes)*arg.length;
+    return ((arg.f.streams()-2)*base_bytes + 2*extra_bytes)*arg.length*nParity;
   }
   int tuningIter() const { return 3; }
 };
@@ -124,15 +137,6 @@ template <typename RegType, typename StoreType, typename yType, int M,
 void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	      ColorSpinorField &x, ColorSpinorField &y,
 	      ColorSpinorField &z, ColorSpinorField &w, int length) {
-
-  // FIXME implement this as a single kernel
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    blasCuda<RegType,StoreType,yType,M,Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Even(), y.Even(), z.Even(), w.Even(), length/2);
-    blasCuda<RegType,StoreType,yType,M,Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd(), length/2);
-    return;
-  }
 
   checkLength(x, y); checkLength(x, z); checkLength(x, w);
 
@@ -164,7 +168,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   BlasCuda<RegType,M,
     decltype(X), decltype(Y), decltype(Z), decltype(W),
     Functor<Float2, RegType> >
-    blas(X, Y, Z, W, f, length, bytes, norm_bytes);
+    blas(X, Y, Z, W, f, length, x.SiteSubset(), bytes, norm_bytes);
   blas.apply(*blasStream);
 
   blas::bytes += blas.bytes();

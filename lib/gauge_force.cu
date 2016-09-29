@@ -12,7 +12,7 @@ namespace quda {
     Mom mom;
     const Gauge u;
 
-    unsigned long threads;
+    int threads;
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
     int border[4]; // radius of border

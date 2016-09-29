@@ -104,7 +104,7 @@ namespace quda {
 	  param.block.x = step;
 	} else { // not tuning the grid dimension so have to set a valid grid size
 	  // ensure the blockDim is large enough given the limit on gridDim
-	  param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1); 
+	  param.block.x = (minThreads()+max_blocks-1)/max_blocks;
 	  param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	  if(param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
 	}

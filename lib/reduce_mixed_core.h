@@ -64,10 +64,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       } else if (x.Nspin() == 1) { //staggered
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = 3; // determines how much work per thread to do
-	const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
 	value = reduce::reduceCuda<doubleN,ReduceType,double2,short2,double2,M,Reducer,
 	  writeX,writeY,writeZ,writeW,writeV>
-	  (a, b, x, y, z, w, v, reduce_length/(2*M));
+	  (a, b, x, y, z, w, v, x.Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
