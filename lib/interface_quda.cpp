@@ -2513,7 +2513,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     // if we have filled the space yet just augment
     if ((int)basis.size() < param->max_chrono_dim) {
-      printfQuda("Augmenting chrono size to %lu\n", basis.size()+1);
       ColorSpinorParam cs_param(*x);
       basis.push_back(std::pair<ColorSpinorField*,ColorSpinorField*>(ColorSpinorField::Create(cs_param),ColorSpinorField::Create(cs_param)));
     }
