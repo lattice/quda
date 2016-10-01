@@ -233,8 +233,20 @@ module quda_fortran
      real(8)::inc_tol     ! initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle
 
      ! Parameters for setting data residency of the solver
-     integer(8)::make_resident_solution ! Whether to make the solution vector(s) after the solve
-     integer(8)::use_resident_solution  ! Whether to use the resident solution vector(s)
+     integer(4)::make_resident_solution ! Whether to make the solution vector(s) after the solve
+     integer(4)::use_resident_solution  ! Whether to use the resident solution vector(s)
+
+     ! Whether to use the solution vector to augment the chronological forecast
+     integer(4)::make_resident_chrono
+
+     ! Whether to use the resident chronological basis
+     integer(4)::use_resident_chrono
+
+     ! The maximum length of the chronological history to store
+     integer(4)::max_chrono_dim
+
+     ! The index to indeicate which chrono history we are augmenting */
+     integer(4)::chrono_index;
 
   end type quda_invert_param
 

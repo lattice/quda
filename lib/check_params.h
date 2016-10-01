@@ -440,6 +440,18 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 
+#if defined INIT_PARAM
+  P(use_resident_chrono, 0);
+  P(make_resident_chrono, 0);
+  P(max_chrono_dim, 0);
+  P(chrono_index, 0);
+#else
+  P(use_resident_chrono, INVALID_INT);
+  P(make_resident_chrono, INVALID_INT);
+  P(max_chrono_dim, INVALID_INT);
+  P(chrono_index, INVALID_INT);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif

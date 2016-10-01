@@ -69,7 +69,7 @@ namespace quda {
   private:
     const gFloat *gauge0, *gauge1;
     const double a;
-    const int nSrc;
+    const unsigned int nSrc;
 
   protected:
     unsigned int sharedBytesPerThread() const

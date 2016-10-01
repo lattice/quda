@@ -71,7 +71,7 @@ namespace quda {
     const longGFloat *long0, *long1;
     const phaseFloat *phase0, *phase1;
     const double a;
-    const int nSrc;
+    const unsigned int nSrc;
 
   protected:
     unsigned int sharedBytesPerThread() const

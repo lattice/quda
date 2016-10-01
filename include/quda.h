@@ -292,6 +292,18 @@ extern "C" {
     /** Whether to use the resident solution vector(s) */
     int use_resident_solution;
 
+    /** Whether to use the solution vector to augment the chronological basis */
+    int make_resident_chrono;
+
+    /** Whether to use the resident chronological basis */
+    int use_resident_chrono;
+
+    /** The maximum length of the chronological history to store */
+    int max_chrono_dim;
+
+    /** The index to indeicate which chrono history we are augmenting */
+    int chrono_index;
+
   } QudaInvertParam;
 
 
@@ -1011,6 +1023,13 @@ extern "C" {
                       const unsigned int stopWtheta,
                       QudaGaugeParam* param,
                       double* timeinfo);
+
+  /**
+   * @brief Flush the chronological history for the given index
+   * @param[in] index Index for which we are flushing
+   */
+  void flushChronoQuda(int index);
+
 
   /**
   * Open/Close MAGMA library

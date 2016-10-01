@@ -221,6 +221,13 @@ extern "C" {
    */
   void set_kernel_pack_t_(int *pack);
 
+  /**
+   * @brief Flush the chronological history for the given index
+   * @param[in] index Index for which we are flushing
+   */
+  void flush_chrono_quda_(int index);
+
+
 #ifdef __cplusplus
 }
 #endif 

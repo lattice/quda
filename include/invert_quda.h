@@ -654,32 +654,50 @@ namespace quda {
   /**
      This computes the optimum guess for the system Ax=b in the L2
      residual norm.  For use in the HMD force calculations using a
-     minimal residual chronological method This computes the guess
+     minimal residual chronological method.  This computes the guess
      solution as a linear combination of a given number of previous
      solutions.  Following Brower et al, only the orthogonalised vector
      basis is stored to conserve memory.
+
+     If Eigen support is enabled then Eigen's SVD algorithm is used
+     for solving the linear system, else Gaussian eliminiation with
+     partial pivots is used.
   */
   class MinResExt {
 
   protected:
     const DiracMatrix &mat;
+    bool orthogonal; //! Whether to construct an orthogonal basis or not
+    bool apply_mat; //! Whether to compute q = Ap or assume it is provided
     TimeProfile &profile;
 
   public:
-    MinResExt(DiracMatrix &mat, TimeProfile &profile);
+    /**
+       @param mat The operator for the linear system we wish to solve
+       @param orthogonal Whether to construct an orthogonal basis prior to constructing the linear system
+       @param apply_mat Whether to apply the operator in place or assume q already contains this
+       @profile Timing profile to use
+    */
+    MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, TimeProfile &profile);
     virtual ~MinResExt();
 
     /**
-       param x The optimum for the solution vector.
-       param b The source vector in the equation to be solved. This is not preserved.
-       param p The basis vectors in which we are building the guess
-       param q The basis vectors multipled by A
-       param N The number of basis vectors
-       return The residue of this guess.
+       @param x The optimum for the solution vector.
+       @param b The source vector in the equation to be solved. This is not preserved and is overwritten by the new residual.
+       @param basis Vector of pairs storing the basis (p,Ap)
+    */
+    void operator()(ColorSpinorField &x, ColorSpinorField &b,
+		    std::vector<std::pair<ColorSpinorField*,ColorSpinorField*> > basis);
+
+    /**
+       @param x The optimum for the solution vector.
+       @param b The source vector in the equation to be solved. This is not preserved.
+       @param p The basis vectors in which we are building the guess
+       @param q The basis vectors multipled by A
     */
     void operator()(ColorSpinorField &x, ColorSpinorField &b,
 		    std::vector<ColorSpinorField*> p,
-		    std::vector<ColorSpinorField*> q, int N);
+		    std::vector<ColorSpinorField*> q);
   };
 
   class DeflatedSolver {
