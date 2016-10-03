@@ -1654,7 +1654,7 @@ void usage(char** argv )
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
-  printf("    --inv-type <cg/bicgstab/gcr/bicgstab-l>   # The type of solver to use (default cg)\n");
+  printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
 	 "                                                  For multigrid this sets the smoother type.\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
