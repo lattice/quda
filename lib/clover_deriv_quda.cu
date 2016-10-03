@@ -51,7 +51,8 @@
 
 // When using dynamic mu/nu indexing, to avoid local spills use shared
 // memory for the per thread indexing arrays.
-#define SHARED_ARRAY
+// FIXME for reasons I don't understand, the shared array breaks in multi-GPU mode
+//#define SHARED_ARRAY
 
 #endif // DYNAMIC_MU_NU
 
