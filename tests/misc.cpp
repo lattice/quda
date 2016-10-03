@@ -1086,6 +1086,8 @@ get_solver_type(char* s)
     ret = QUDA_FGMRESDR_INVERTER;
   } else if (strcmp(s, "mg") == 0){
     ret = QUDA_MG_INVERTER;
+  } else if (strcmp(s, "bicgstab-l") == 0){
+    ret = QUDA_BICGSTABL_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);

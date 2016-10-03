@@ -61,6 +61,7 @@ extern double clover_coeff;
 extern bool compute_clover;
 
 extern int niter; // max solver iterations
+extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
 extern char latfile[];
 
 extern void usage(char** );
@@ -216,7 +217,7 @@ int main(int argc, char **argv)
   inv_param.pipeline = 0;
 
   inv_param.Nsteps = 2;
-  inv_param.gcrNkrylov = 10;
+  inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
   if(tol_hq == 0 && tol == 0){

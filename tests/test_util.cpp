@@ -1578,6 +1578,7 @@ int Nsrc = 1;
 int Msrc = 1;
 bool tune = true;
 int niter = 100;
+int gcrNkrylov = 10;
 int test_type = 0;
 int nvec[QUDA_MAX_MG_LEVEL] = { };
 char vec_infile[256] = "";
@@ -1652,7 +1653,8 @@ void usage(char** argv )
   printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
-  printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
+  printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
+  printf("    --inv-type <cg/bicgstab/gcr/bicgstab-l>   # The type of solver to use (default cg)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
 	 "                                                  For multigrid this sets the smoother type.\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
@@ -2496,6 +2498,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     niter= atoi(argv[i+1]);
+    if (niter < 1 || niter > 1e6){
+      printf("ERROR: invalid number of iterations (%d)\n", niter);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--ngcrkrylov") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    gcrNkrylov = atoi(argv[i+1]);
     if (niter < 1 || niter > 1e6){
       printf("ERROR: invalid number of iterations (%d)\n", niter);
       usage(argv);
