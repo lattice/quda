@@ -486,7 +486,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
-  class BiCGStabL : public Solver {
+  class BiCGstabL : public Solver {
 
   private:
     DiracMatrix &mat;
@@ -516,8 +516,8 @@ namespace quda {
     bool init;
 
   public:
-    BiCGStabL(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-    virtual ~BiCGStabL();
+    BiCGstabL(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~BiCGstabL();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
