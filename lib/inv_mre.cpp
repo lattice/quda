@@ -1,6 +1,10 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 
+#ifdef EIGEN
+#include <Eigen/Dense>
+#endif
+
 namespace quda {
 
   MinResExt::MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, TimeProfile &profile)
@@ -12,10 +16,7 @@ namespace quda {
 
   }
 
-#undef EIGEN
 #ifdef EIGEN
-
-#include <Eigen/Dense>
 
   /**
      @brief Solve the equation A p_k psi_k = b by minimizing the
