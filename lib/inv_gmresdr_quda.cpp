@@ -631,42 +631,25 @@ namespace quda {
 
     DiracMatrix *sloppy_mat = matSloppy;
 
+    //Full precision fields:
+    ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision accumulation field
     ColorSpinorField *rp = ColorSpinorField::Create(*in); //high precision residual
-    ColorSpinorField &r = *rp;
-    //
-    ColorSpinorField &x = *out;
-    //
-    ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision aux field
-    ColorSpinorField &y = *yp;
 
     //Sloppy precision fields:
     ColorSpinorParam csParam(*in);//create spinor parameters
 
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-
     csParam.setPrecision(gmres_space_prec);
 
-    ColorSpinorField *r_sloppy, *x_sloppy;
+    ColorSpinorField *r_sloppy = (mixed_precision_GMResDR) ? ColorSpinorField::Create(csParam) : &r;
+    ColorSpinorField *x_sloppy = (mixed_precision_GMResDR) ? ColorSpinorField::Create(csParam) : &x;
+    ColorSpinorField *tmp1_p   = ColorSpinorField::Create(csParam);
 
-    if (mixed_precision_GMResDR)
-    {
-       r_sloppy = ColorSpinorField::Create(r, csParam);
-       x_sloppy = ColorSpinorField::Create(x, csParam);
-    }
-    else
-    {
-       r_sloppy = &r;
-       x_sloppy = &x;
-    }
+    ColorSpinorField &r = *rp;
+    ColorSpinorField &x = *out;
+    ColorSpinorField &y = *yp;
 
-    ColorSpinorField *tmp1_p = ColorSpinorField::Create(*in, csParam);
     ColorSpinorField &tmp = *tmp1_p;
-
-    ColorSpinorField *tmp2_p;
-
-    tmp2_p = ColorSpinorField::Create(*in, csParam);
-
-    ColorSpinorField &tmp2 = *tmp2_p;
 
     //Allocate Vm array:
     if(gmres_alloc == false) AllocateKrylovSubspace(csParam);
@@ -683,10 +666,8 @@ namespace quda {
     //GMRES objects:
     //Givens rotated matrix (m+1, m):
     Complex *givensH = new Complex[ldH*m];//complex
-
     //Auxilary objects:
     Complex *g = new Complex[(m+1)];
-
     //Givens coefficients:
     Complex *Cn = new Complex[m];
     //
@@ -731,11 +712,11 @@ namespace quda {
     profile->TPSTART(QUDA_PROFILE_COMPUTE);
     blas::flops = 0;
 
-    while(j < m)//we allow full cycle
+    while( j < m )//we allow full cycle
     {
       ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>( &Vm->Component(j+1));
 
-      (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);
+      (*sloppy_mat)(*Av, Vm->Component(j), tmp);
 
       ///////////
       Complex h0 = cDotProduct(Vm->Component(0), *Av);//
@@ -819,7 +800,6 @@ namespace quda {
 
    //For the deflated cycles: just pointer aliases, for the projected cycles: new (half precision) objects
    ColorSpinorField *ctmp1_p = &tmp;
-   ColorSpinorField *ctmp2_p = tmp2_p;
 
    ColorSpinorField *x_sloppy2 = x_sloppy;
 
@@ -883,7 +863,7 @@ namespace quda {
        //pointer aliasing:
        ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>(&Vm->Component(j+1));
 
-       (*sloppy_mat)(*Av, Vm->Component(j), *ctmp1_p, *ctmp2_p);
+       (*sloppy_mat)(*Av, Vm->Component(j), *ctmp1_p);
        //
        Complex h0(0.0, 0.0);
        //
@@ -983,8 +963,6 @@ namespace quda {
 
        ctmp1_p   = ColorSpinorField::Create(csParam);
 
-       ctmp2_p   = ColorSpinorField::Create(csParam);
-
        sloppy_mat = const_cast<DiracMatrix*> (matDefl);
 
        use_deflated_cycles = false;
@@ -1041,11 +1019,9 @@ namespace quda {
        printfQuda("\nDealocating resources from the projector cycles...\n");
        delete x_sloppy2;
        delete ctmp1_p;
-       delete ctmp2_p;
      }
    }
 
-   delete tmp2_p;
    delete tmp1_p;
    delete yp;
    delete rp;
@@ -1064,24 +1040,24 @@ namespace quda {
      DiracMatrix *sloppy_mat;
 
      ColorSpinorField *rp = ColorSpinorField::Create(*in); //high precision residual
+     ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision solution
+
      ColorSpinorField &r  = *rp;
-     //
      ColorSpinorField &x = *out;
-     //
-     ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision aux field
      ColorSpinorField &y = *yp;
 
      //Sloppy precision fields:
      ColorSpinorParam csParam(*in);//create spinor parameters
 
      csParam.create = QUDA_ZERO_FIELD_CREATE;
+     csParam.setPrecision(gmres_space_prec);//this is a solo precision solver
 
-     ColorSpinorField *r_sloppy = NULL, *x_sloppy = NULL;
+     ColorSpinorField *r_sloppy = nullptr, *x_sloppy = nullptr;
 
      csParam.setPrecision(gmres_space_prec);//this is a solo precision solver
 
-     ColorSpinorField *r_sloppy_proj = NULL;
-     ColorSpinorField *x_sloppy_proj = NULL;
+     ColorSpinorField *r_sloppy_proj = nullptr;
+     ColorSpinorField *x_sloppy_proj = nullptr;
 
      if (mixed_precision_gmres)
      {
@@ -1109,12 +1085,6 @@ namespace quda {
 
      ColorSpinorField *tmp1_p = ColorSpinorField::Create(*in, csParam);
      ColorSpinorField &tmp = *tmp1_p;
-
-     ColorSpinorField *tmp2_p;
-
-     tmp2_p = ColorSpinorField::Create(*in, csParam);
-
-     ColorSpinorField &tmp2 = *tmp2_p;
 
      //Allocate Vm array:
      if(gmres_alloc == false)
@@ -1219,7 +1189,7 @@ namespace quda {
       {
         ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>(&Vm->Component(j+1));
 
-        (*sloppy_mat)(*Av, Vm->Component(j), tmp, tmp2);//must be matDefl
+        (*sloppy_mat)(*Av, Vm->Component(j), tmp);//must be matDefl
 
         ///////////
         Complex h0 = cDotProduct(Vm->Component(0), *Av);//
@@ -1336,7 +1306,6 @@ namespace quda {
    }
 
    delete tmp1_p; 
-   delete tmp2_p;
 
    delete yp;
    delete rp;
