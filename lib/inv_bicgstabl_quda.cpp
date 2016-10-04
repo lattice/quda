@@ -57,7 +57,7 @@ namespace quda {
     
   }
 
-  void BiCGstabL::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void BiCGstabL::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
     // BiCGstab-l is based on the algorithm outlined in
     // BICGSTAB(L) FOR LINEAR EQUATIONS INVOLVING UNSYMMETRIC MATRICES WITH COMPLEX SPECTRUM
