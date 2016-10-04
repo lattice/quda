@@ -17,7 +17,7 @@ namespace quda {
   }
 
   // This is the maximum number of color spinors we can process in a single kernel
-  #define MAX_NVECTOR 8
+  #define MAX_NVECTOR 9
 
   template<typename Float, typename Output, typename InputA, typename InputB>
   struct CloverSigmaOprodArg {
@@ -138,6 +138,7 @@ namespace quda {
 	case  6: sigmaOprodKernel< 6><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
 	case  7: sigmaOprodKernel< 7><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
 	case  8: sigmaOprodKernel< 8><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+	case  9: sigmaOprodKernel< 9><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
 	}
       } else { // run the CPU code
 	errorQuda("No CPU support for staggered outer-product calculation\n");

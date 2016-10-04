@@ -107,7 +107,7 @@ namespace quda {
     {
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       // first try to advance block.y (number of right-hand sides per block)
-      if (param.block.y < (int)nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
+      if (param.block.y < nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
 	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
 	  (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
 	param.block.y++;
