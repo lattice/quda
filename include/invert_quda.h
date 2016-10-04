@@ -700,9 +700,9 @@ namespace quda {
 
     virtual ~DeflatedSolver() { ; }
 
-    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
+    virtual void operator()(ColorSpinorField *out, ColorSpinorField *in) = 0;
 
-//    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
+//    virtual void Deflate(ColorSpinorField &out, ColorSpinorField &in) = 0;//extrenal method (not implemented yet)
     virtual void StoreRitzVecs(void *host_buffer, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
 
     virtual void CleanResources() = 0;
@@ -729,7 +729,7 @@ namespace quda {
   };
 
   struct DeflationParam;//Forward declaration
-  typedef cudaColorSpinorField cudaColorSpinorFieldSet;
+  typedef ColorSpinorField ColorSpinorFieldSet;
 
   class IncEigCG : public DeflatedSolver {
 
@@ -742,7 +742,7 @@ namespace quda {
     const DiracMatrix *matDefl;
 
     QudaPrecision search_space_prec;
-    cudaColorSpinorFieldSet *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
+    ColorSpinorFieldSet *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
     SolverParam initCGparam; // parameters for initCG solver
     TimeProfile *profile;    //time profile for initCG solver
@@ -758,18 +758,18 @@ namespace quda {
     virtual ~IncEigCG();
 
     //EigCG solver
-    int EigCG(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    int EigCG(ColorSpinorField &out, ColorSpinorField &in);
 
     //Incremental eigCG solver (for eigcg and initcg calls)
-    void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
+    void operator()(ColorSpinorField *out, ColorSpinorField *in);
 
     //Compute  u dH^{-1} u^{dagger}b:
-    void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
+    void DeflateSpinor(ColorSpinorField &out, ColorSpinorField &in, DeflationParam *param, bool set2zero = true);
     //
-    void DeflateSpinorReduced(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
+    void DeflateSpinorReduced(ColorSpinorField &out, ColorSpinorField &in, DeflationParam *param, bool set2zero = true);
 
     //Deflation space management
-    void CreateDeflationSpace(cudaColorSpinorField &eigcgSpinor, DeflationParam *&param);
+    void CreateDeflationSpace(ColorSpinorField &eigcgSpinor, DeflationParam *&param);
 
     //extend projection matrix:
     //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
@@ -809,7 +809,7 @@ namespace quda {
 
     QudaPrecision gmres_space_prec;
 
-    cudaColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
 
     TimeProfile *profile;    //time profile for initCG solver
 
@@ -825,20 +825,20 @@ namespace quda {
     virtual ~GMResDR();
 
     //GMRES-DR solver
-    //void   GmresDRCycle(cudaColorSpinorField &out, cudaColorSpinorField &in, Complex *u);
-    double GMResDRCycle(cudaColorSpinorField &x, double r2, Complex *u, const double stop);
+    //void   GmresDRCycle(ColorSpinorField &out, ColorSpinorField &in, Complex *u);
+    double GMResDRCycle(ColorSpinorField &x, double r2, Complex *u, const double stop);
     //GMRES-DR solver
-    void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
+    void operator()(ColorSpinorField *out, ColorSpinorField *in);
     //
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
     //
     void CleanResources();
     //
-    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
+    void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method
-    void RunDeflatedCycles (cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
+    void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
     //
-    void RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
+    void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
     void AllocateKrylovSubspace(ColorSpinorParam &csParam);
 
