@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <complex>
+
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -91,14 +93,13 @@ namespace quda {
     // Folowing the GCR inverter...
     ColorSpinorField &r0 = *r0p;
     ColorSpinorField &temp = *tempp;
-    blas::zero(y); 
     
     double b2 = blas::norm2(b); // norm sq of source.
     double r2;                  // norm sq of residual
     
     // Compute initial residual depending on whether we have an initial guess or not.
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r[0], x, temp); // r[0] = Ax
+      mat(*r[0], x, temp); // r[0] = Ax
       r2 = blas::xmyNorm(b, *r[0]); // r = b - Ax, return norm.
     } else {
       blas::copy(*r[0], b); // r[0] = b
@@ -159,7 +160,8 @@ namespace quda {
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         for (int i = 0; i <= j; i++)
         {
-          blas::xpay(*r[i], -beta, *u[i]);
+          //blas::xpay(*r[i], -beta, *u[i]);
+		  blas::caxpby(1.0, *r[i], -beta, *u[1]);
         }
         
         // u[j+1] = A ( u[j] )
@@ -171,12 +173,12 @@ namespace quda {
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
         for (int i = 0; i <= j; i++)
         {
-          blas::axpy(-alpha, *u[i+1], *r[i]);
+          blas::caxpy(-alpha, *u[i+1], *r[i]);
         }
         
         // r[j+1] = A r[j], x = x + alpha*u[0]
         mat(*r[j+1], *r[j], temp);
-        blas::axpy(alpha, *u[0], x);
+        blas::caxpy(alpha, *u[0], x);
       } // End BiCG part.
       
       // MR part. Really just modified Gram-Schmidt.
@@ -192,7 +194,7 @@ namespace quda {
           tau[i][j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
           
           // r_j = r_j - tau_ij r_i;
-          blas::axpy(-tau[i][j], *r[i], *r[j]);
+          blas::caxpy(-tau[i][j], *r[i], *r[j]);
         }
         
         // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
@@ -228,16 +230,16 @@ namespace quda {
       // Update x, r, u.
       // x = x+ gamma_l r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
       // I bet there's some fancy blas for this.
-      blas::axpy(gamma[nKrylov], *r[0], x);
-      blas::axpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
-      blas::axpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
+      blas::caxpy(gamma[nKrylov], *r[0], x);
+      blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
+      blas::caxpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
       
       // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
       for (int j = 1; j < nKrylov; j++)
       {
-        blas::axpy(-gamma[j], *u[j], *u[0]);
-        blas::axpy(gamma_prime_prime[j], *r[j], *x[0]);
-        blas::axpy(-gamma_prime[j], *r[j], *r[0]);
+        blas::caxpy(-gamma[j], *u[j], *u[0]);
+        blas::caxpy(gamma_prime_prime[j], *r[j], *x[0]);
+        blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
       }
       
       // sigma[0] = r_0^2
@@ -254,7 +256,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
     
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops()/* + matSloppy.flops()*/)*1e-9;
     param.gflops = gflops;
     param.iter += k;
     
