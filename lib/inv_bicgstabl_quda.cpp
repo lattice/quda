@@ -133,8 +133,8 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
     
     blas::flops = 0;
-    bool l2_converge = false;
-    double r2_old = r2;
+    //bool l2_converge = false;
+    //double r2_old = r2;
     
     // done with preamble, begin computing.
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -238,7 +238,7 @@ namespace quda {
       for (int j = 1; j < nKrylov; j++)
       {
         blas::caxpy(-gamma[j], *u[j], *u[0]);
-        blas::caxpy(gamma_prime_prime[j], *r[j], *x[0]);
+        blas::caxpy(gamma_prime_prime[j], *r[j], x);
         blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
       }
       
