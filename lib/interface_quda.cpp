@@ -4973,14 +4973,18 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   }
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
+  profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  std::vector<double> force_coeff(nvector);
 
   // loop over different quark fields
-  for(int i=0; i<nvector; ++i){
+  for(int i=0; i<nvector; i++){
     ColorSpinorField &x = *(quarkX[i]);
     ColorSpinorField &p = *(quarkP[i]);
 
     if (!inv_param->use_resident_solution) {
       // Wrap the even-parity MILC quark field
+      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
       qParam.v = h_x[i];
       cpuColorSpinorField cpuQuarkX(qParam); // create host quark field
@@ -4992,17 +4996,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
       profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
       gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Even()), static_cast<cudaColorSpinorField*>(&x.Even()));
-      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     } else {
-      profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
       x.Even() = *(solutionResident[i]);
-      profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-      profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
-      delete solutionResident[i];
-      profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
     }
-    profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
     dirac->M(p.Even(), x.Even());
     dirac->Dagger(QUDA_DAG_YES);
@@ -5014,14 +5011,19 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Even()), static_cast<cudaColorSpinorField*>(&p.Even()));
     gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Odd()), static_cast<cudaColorSpinorField*>(&p.Odd()));
 
-    checkCudaError();
-
-    computeCloverForce(cudaForce, *gaugePrecise, x, p, 2.0*dt*coeff[i]*kappa2);
-    profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+    force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
   }
 
+  computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
+
+  checkCudaError();
+  profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+
   profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
-  if (inv_param->use_resident_solution) solutionResident.clear();
+  if (inv_param->use_resident_solution) {
+    for (int i=0; i<nvector; i++) delete solutionResident[i];
+    solutionResident.clear();
+  }
   delete dirac;
   profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
 

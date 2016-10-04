@@ -271,15 +271,15 @@ namespace quda {
       p(even) = M * x(even)
       p(odd)  = A_odd^{-1} * Dslash^dag * M * x(even). 
 
-     @param force The resulting force field
+     @param force[out,in] The resulting force field
      @param U The input gauge field
      @param x Solution field (both parities)
      @param p Intermediate vectors (both parities)
      @param coeff Multiplicative coefficient (e.g., dt * residue)
    */
-  void computeCloverForce(cudaGaugeField& force, const cudaGaugeField& U,
-			  ColorSpinorField& x, ColorSpinorField& p,
-			  const double coeff);
+  void computeCloverForce(GaugeField& force, const GaugeField& U,
+			  std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &p,
+			  std::vector<double> &coeff);
   /**
      @brief Compute the outer product from the solver solution fields
      arising from the diagonal term of the fermion bilinear in
@@ -309,7 +309,7 @@ namespace quda {
      mu,nu and compute the resulting force given the outer-product
      field
 
-     @param force The compute force field (read/write update)
+     @param force The computed force field (read/write update)
      @param gauge The input gauge field
      @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)

@@ -240,6 +240,7 @@ namespace quda {
       arg.inA.load(static_cast<Complex*>(A.data), idx);
       arg.inC.load(static_cast<Complex*>(C.data), idx);
 
+#pragma unroll
       for(int dim=0; dim<4; ++dim){
 	int shift[4] = {0,0,0,0};
 	shift[dim] = 1;
@@ -425,7 +426,7 @@ namespace quda {
   }
 
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
-  void computeCloverForceCuda(Output force, Gauge gauge, cudaGaugeField& out,
+  void computeCloverForceCuda(Output force, Gauge gauge, GaugeField& out,
 			      InputA& inA, InputB& inB, InputC &inC, InputD &inD,
 			      cudaColorSpinorField& src1, cudaColorSpinorField& src2,
 			      const unsigned int parity, const int faceVolumeCB[4], const double coeff)
@@ -465,80 +466,63 @@ namespace quda {
 
 #endif // GPU_CLOVER_FORCE
 
-  void computeCloverForce(cudaGaugeField& force,
-			  const cudaGaugeField& U,
-			  ColorSpinorField& x,
-			  ColorSpinorField& p,
-			  const double coeff)
+  void computeCloverForce(GaugeField& force,
+			  const GaugeField& U,
+			  std::vector<ColorSpinorField*> &x,
+			  std::vector<ColorSpinorField*> &p,
+			  std::vector<double> &coeff)
   {
 
 #ifdef GPU_CLOVER_DIRAC
-    static_cast<cudaColorSpinorField&>(x.Even()).allocateGhostBuffer(1);
-    static_cast<cudaColorSpinorField&>(x.Odd()).allocateGhostBuffer(1);
-    static_cast<cudaColorSpinorField&>(p.Even()).allocateGhostBuffer(1);
-    static_cast<cudaColorSpinorField&>(p.Odd()).allocateGhostBuffer(1);
-
     if(force.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", force.Order());
 
-    if(x.Precision() != force.Precision())
-      errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), force.Precision());
+    if(x[0]->Precision() != force.Precision())
+      errorQuda("Mixed precision not supported: %d %d\n", x[0]->Precision(), force.Precision());
 
     createCloverForceEvents(); // FIXME not actually used
 
-    for (int parity=0; parity<2; parity++) {
+    for (unsigned int i=0; i<x.size(); i++) {
+      static_cast<cudaColorSpinorField&>(x[i]->Even()).allocateGhostBuffer(1);
+      static_cast<cudaColorSpinorField&>(x[i]->Odd()).allocateGhostBuffer(1);
+      static_cast<cudaColorSpinorField&>(p[i]->Even()).allocateGhostBuffer(1);
+      static_cast<cudaColorSpinorField&>(p[i]->Odd()).allocateGhostBuffer(1);
 
-      ColorSpinorField& inA = (parity&1) ? p.Odd() : p.Even();
-      ColorSpinorField& inB = (parity&1) ? x.Even(): x.Odd();
-      ColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
-      ColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
+      for (int parity=0; parity<2; parity++) {
 
-      if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	Spinor<double2, double2, 12, 0, 0> spinorA(inA);
-	Spinor<double2, double2, 12, 0, 1> spinorB(inB);
-	Spinor<double2, double2, 12, 0, 2> spinorC(inC);
-	Spinor<double2, double2, 12, 0, 3> spinorD(inD);
-	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
-					 gauge::FloatNOrder<double,18, 2, 18>(U),
-					 force, spinorA, spinorB, spinorC, spinorD,
-					 static_cast<cudaColorSpinorField&>(inB),
-					 static_cast<cudaColorSpinorField&>(inD),
-					 parity, inB.GhostFace(), coeff);
-	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
-					 gauge::FloatNOrder<double,18, 2, 12>(U),
-					 force, spinorA, spinorB, spinorC, spinorD,
-					 static_cast<cudaColorSpinorField&>(inB),
-					 static_cast<cudaColorSpinorField&>(inD),
-					 parity, inB.GhostFace(), coeff);
-	} else {
-	  errorQuda("Unsupported recontruction type");
-	}
-      } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	ColorSpinorField& inA = (parity&1) ? p[i]->Odd() : p[i]->Even();
+	ColorSpinorField& inB = (parity&1) ? x[i]->Even(): x[i]->Odd();
+	ColorSpinorField& inC = (parity&1) ? x[i]->Odd() : x[i]->Even();
+	ColorSpinorField& inD = (parity&1) ? p[i]->Even(): p[i]->Odd();
+
+	if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
+	  Spinor<double2, double2, 12, 0, 0> spinorA(inA);
+	  Spinor<double2, double2, 12, 0, 1> spinorB(inB);
+	  Spinor<double2, double2, 12, 0, 2> spinorC(inC);
+	  Spinor<double2, double2, 12, 0, 3> spinorD(inD);
+	  if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	    computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
+					   gauge::FloatNOrder<double,18, 2, 18>(U),
+					   force, spinorA, spinorB, spinorC, spinorD,
+					   static_cast<cudaColorSpinorField&>(inB),
+					   static_cast<cudaColorSpinorField&>(inD),
+					   parity, inB.GhostFace(), coeff[i]);
+	  } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	    computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
+					   gauge::FloatNOrder<double,18, 2, 12>(U),
+					   force, spinorA, spinorB, spinorC, spinorD,
+					   static_cast<cudaColorSpinorField&>(inB),
+					   static_cast<cudaColorSpinorField&>(inD),
+					   parity, inB.GhostFace(), coeff[i]);
+	  } else {
+	    errorQuda("Unsupported recontruction type");
+	  }
 #if 0 // FIXME - Spinor class expect float4 pointer not Complex pointer
-	Spinor<float4, float4, float4, 6, 0, 0> spinorA(inA);
-	Spinor<float4, float4, float4, 6, 0, 1> spinorB(inB);
-	Spinor<float4, float4, float4, 6, 0, 2> spinorC(inC);
-	Spinor<float4, float4, float4, 6, 0, 3> spinorD(inD);
-	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  computeCloverForceCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(force),
-					gauge::FloatNOrder<float, 18, 2, 18>(U),
-					force, spinorA, spinorB, spinorC, spinorD,
-					static_cast<cudaColorSpinorField&>(inB),
-					static_cast<cudaColorSpinorField&>(inD),
-					parity, inB.GhostFace(), coeff);
-	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  computeCloverForceCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(force),
-					gauge::FloatNOrder<float, 18, 4, 12>(U),
-					force, spinorA, spinorB, spinorC, spinorD,
-					static_cast<cudaColorSpinorField&>(inB),
-					static_cast<cudaColorSpinorField&>(inD),
-					parity, inB.GhostFace(), coeff);
-	}
+	} else if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
 #endif
-      } else {
-	errorQuda("Unsupported precision: %d\n", x.Precision());
+	} else {
+	  errorQuda("Unsupported precision: %d\n", x[0]->Precision());
+	}
       }
     }
 
