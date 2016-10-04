@@ -245,7 +245,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(overlap, 0); /**< width of domain overlaps */
 #endif
 
+  P(evaluate_action, INVALID_INT);
+
   if (param->num_offset > 0) {
+
     for (int i=0; i<param->num_offset; i++) {
       P(offset[i], INVALID_DOUBLE);
       P(tol_offset[i], INVALID_DOUBLE);     
@@ -255,7 +258,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
       P(true_res_offset[i], INVALID_DOUBLE); 
       P(iter_res_offset[i], INVALID_DOUBLE);
 #endif
+      if (param->evaluate_action) P(residue[i], INVALID_DOUBLE);
     }
+#ifndef CHECK_PARAM
+    P(action[0], INVALID_DOUBLE);
+    P(action[1], INVALID_DOUBLE);
+#endif
   }
 
   P(solution_type, QUDA_INVALID_SOLUTION);

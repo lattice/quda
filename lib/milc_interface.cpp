@@ -639,6 +639,7 @@ static void setInvertParams(const int dim[4],
   invertParam->verbosity_precondition = QUDA_SILENT;
   invertParam->cuda_prec_precondition = cuda_prec_precondition;
 
+  invertParam->evaluate_action = 0;
 
   return;
 }
@@ -1383,6 +1384,8 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.clover_cuda_prec_sloppy       = device_precision_sloppy;
   invertParam.clover_cuda_prec_precondition = device_precision_sloppy;
   invertParam.clover_order                  = QUDA_PACKED_CLOVER_ORDER;
+
+  invertParam.evaluate_action = 0;
 }
 
 
