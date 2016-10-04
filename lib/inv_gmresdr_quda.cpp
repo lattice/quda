@@ -237,7 +237,7 @@ namespace quda {
 
       void ConjugateH();//rows = cols+1
 
-      void SetHessenbergElement(const int i, const int j, const Complex h_ij);
+      void UpdateHessenberg(const int row, const int col, const Complex &el) { H[col*ldm+row]  = el; cH[row*ldm+col] = conj(el); }
       //
       void UpdateGivens(const int row, const int col, Complex &h0, Complex &h1);
       //
@@ -314,20 +314,9 @@ namespace quda {
   void GMResDRArgs::ConjugateH()//rows = cols+1
   {
     for(int c = 0; c < nev; c++ )
-    {
       for(int r = 0; r < (nev+1); r++ ) cH[r*ldm+c] = conj(H[c*ldm+r]);
-    }
 
     return;
-  }
-
-  //helper method
-  void GMResDRArgs::SetHessenbergElement(const int row, const int col, const Complex el)
-  {
-     H[col*ldm+row]  = el;
-     cH[row*ldm+col] = conj(el);
-
-     return;
   }
 
   double GMResDRArgs::UpdateGivensCoeff(const int row, const int col, Complex &h0, double &h1)
@@ -758,7 +747,7 @@ namespace quda {
 
       ///////////
       Complex h0 = cDotProduct(Vm->Component(0), *Av);//
-      args->SetHessenbergElement(0, j, h0);
+      args->UpdateHessenberg(0, j, h0);
       //scale w:
       caxpy(-h0, Vm->Component(0), *Av);
       //
@@ -766,7 +755,7 @@ namespace quda {
       {
         Complex h1 = cDotProduct(Vm->Component(i), *Av);//
         //load columns:
-        args->SetHessenbergElement(i, j, h1);
+        args->UpdateHessenberg(i, j, h1);
         //scale:
         caxpy(-h1, Vm->Component(i), *Av);
         //lets do Givens rotations:
@@ -776,7 +765,7 @@ namespace quda {
       double h_jp1j = sqrt(norm2(*Av));
 
       //Update H-matrix (j+1) element:
-      args->SetHessenbergElement((j+1), j, Complex(h_jp1j, 0.0));
+      args->UpdateHessenberg((j+1), j, Complex(h_jp1j, 0.0));
       //
       ax(1. / h_jp1j, *Av);
       //
@@ -833,7 +822,7 @@ namespace quda {
 
      int j = args->nev;//here also a column index of H
 
-     if(use_deflated_cycles) //use Galerkin projection instead:
+     if(!use_deflated_cycles) //use Galerkin projection instead:
      {
        j = 0; //we will launch "projected" GMRES cycles
 
@@ -848,9 +837,10 @@ namespace quda {
          zero(*x_sloppy);
          copy(r, *r_sloppy);//ok
        }
+       args->PrepareCycle(Vm, r);
      }
-
-     args->PrepareCycle(Vm, use_deflated_cycles ? *r_sloppy : r, use_deflated_cycles);
+     else
+       args->PrepareCycle(Vm, *r_sloppy, true);
 
      const int jlim = j;//=nev for deflated restarts and 0 for "projected" restarts (abused terminology!)
 
@@ -868,7 +858,7 @@ namespace quda {
           h0 = cDotProduct(Vm->Component(i), *Av);//
           //Warning: column major format!!! (m+1) size of a column.
           //load columns:
-          args->SetHessenbergElement(i, j, h0);
+          args->UpdateHessenberg(i, j, h0);
           //
           caxpy(-h0, Vm->Component(i), *Av);
        }
@@ -883,7 +873,7 @@ namespace quda {
           Complex h1 = cDotProduct(Vm->Component(i), *Av);//
           //Warning: column major format!!! (m+1) size of a column.
           //load columns:
-          args->SetHessenbergElement(i, j, h1);
+          args->UpdateHessenberg(i, j, h1);
           //
           caxpy(-h1, Vm->Component(i), *Av);
           //lets do Givens rotations:
@@ -894,7 +884,7 @@ namespace quda {
        double h_jp1j = sqrt(norm2(*Av));
 
        //Update H-matrix (j+1) element:
-       args->SetHessenbergElement((j+1), j, Complex(h_jp1j,0.0));
+       args->UpdateHessenberg((j+1), j, Complex(h_jp1j,0.0));
        //
        ax(1. / h_jp1j, *Av);
        //
@@ -1124,7 +1114,7 @@ namespace quda {
 
         ///////////
         Complex h0 = cDotProduct(Vm->Component(0), *Av);//
-        args->SetHessenbergElement(0, j, h0);
+        args->UpdateHessenberg(0, j, h0);
         //scale w:
         caxpy(-h0, Vm->Component(0), *Av);
         //
@@ -1132,7 +1122,7 @@ namespace quda {
         {
           Complex h1 = cDotProduct(Vm->Component(i), *Av);//
           //load columns:
-          args->SetHessenbergElement(i, j, h1);
+          args->UpdateHessenberg(i, j, h1);
           //scale:
           caxpy(-h1, Vm->Component(i), *Av);
 
@@ -1142,7 +1132,7 @@ namespace quda {
         //Compute h(j+1,j):
         double h_jp1j = sqrt(norm2(*Av));
         //Update H-matrix (j+1) element:
-        args->SetHessenbergElement((j+1), j, Complex(h_jp1j, 0.0));
+        args->UpdateHessenberg((j+1), j, Complex(h_jp1j, 0.0));
         //
         ax(1. / h_jp1j, *Av);
         //
