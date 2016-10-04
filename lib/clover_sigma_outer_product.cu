@@ -183,13 +183,17 @@ namespace quda {
       std::vector<ColorSpinorField*> x0(x.begin(), x.begin()+x.size()/2);
       std::vector<ColorSpinorField*> p0(p.begin(), p.begin()+p.size()/2);
       std::vector<std::vector<double> > coeff0(coeff.begin(), coeff.begin()+coeff.size()/2);
-      for (unsigned int i = 0; i<x0.size(); i++) { coeff0[i].reserve(2); coeff0[i] = coeff[i]; }
+      for (unsigned int i=0; i<coeff0.size(); i++) {
+	coeff0[i].reserve(2); coeff0[i][0] = coeff[i][0]; coeff0[i][1] = coeff[i][1];
+      }
       computeCloverSigmaOprod(oprod, x0, p0, coeff0);
 
       std::vector<ColorSpinorField*> x1(x.begin()+x.size()/2, x.end());
       std::vector<ColorSpinorField*> p1(p.begin()+p.size()/2, p.end());
       std::vector<std::vector<double> > coeff1(coeff.begin()+coeff.size()/2, coeff.end());
-      for (unsigned int i = 0; i<x1.size(); i++) { coeff1[i].reserve(2); coeff1[i] = coeff[coeff.size()/2 + i]; }
+      for (unsigned int i=0; i<coeff1.size(); i++) {
+	coeff1[i].reserve(2); coeff1[i][0] = coeff[coeff.size()/2 + i][0]; coeff1[i][1] = coeff[coeff.size()/2 + i][1];
+      }
       computeCloverSigmaOprod(oprod, x1, p1, coeff1);
 
       return;
