@@ -17,7 +17,11 @@ namespace quda {
   }
 
   // This is the maximum number of color spinors we can process in a single kernel
-  #define MAX_NVECTOR 9
+#if (CUDA_VERSION < 8000)
+#define MAX_NVECTOR 1 // multi-vector code doesn't seem to work well with CUDA 7.x
+#else
+#define MAX_NVECTOR 9
+#endif
 
   template<typename Float, typename Output, typename InputA, typename InputB>
   struct CloverSigmaOprodArg {
