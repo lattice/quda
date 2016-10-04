@@ -467,8 +467,8 @@ namespace quda {
 
   void computeCloverForce(cudaGaugeField& force,
 			  const cudaGaugeField& U,
-			  cudaColorSpinorField& x,
-			  cudaColorSpinorField& p,
+			  ColorSpinorField& x,
+			  ColorSpinorField& p,
 			  const double coeff)
   {
 

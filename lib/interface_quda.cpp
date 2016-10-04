@@ -4923,6 +4923,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   cudaGaugeField cudaForce(fParam);
 
   ColorSpinorParam qParam;
+  qParam.location = QUDA_CUDA_FIELD_LOCATION;
   qParam.nColor = 3;
   qParam.nSpin = 4;
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -4937,12 +4938,17 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  cudaColorSpinorField **cudaQuarkX = new cudaColorSpinorField*[nvector];
-  cudaColorSpinorField **cudaQuarkP = new cudaColorSpinorField*[nvector];
+  std::vector<ColorSpinorField*> quarkX(nvector);
+  std::vector<ColorSpinorField*> quarkP(nvector);
+
   for (int i=0; i<nvector; i++) {
-    cudaQuarkX[i] = new cudaColorSpinorField(qParam);
-    cudaQuarkP[i] = new cudaColorSpinorField(qParam);
+    quarkX[i] = ColorSpinorField::Create(qParam);
+    quarkP[i] = ColorSpinorField::Create(qParam);
   }
+
+  qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  qParam.x[0] /= 2;
+  cudaColorSpinorField tmp(qParam);
 
   // create the host quark field
   qParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -4953,6 +4959,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc_solve);
+  diracParam.tmp1 = &tmp; // use as temporary for dirac->M
   Dirac *dirac = Dirac::create(diracParam);
 
   // for downloading x_e
@@ -4969,8 +4976,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   // loop over different quark fields
   for(int i=0; i<nvector; ++i){
-    cudaColorSpinorField &x = *(cudaQuarkX[i]);
-    cudaColorSpinorField &p = *(cudaQuarkP[i]);
+    ColorSpinorField &x = *(quarkX[i]);
+    ColorSpinorField &p = *(quarkP[i]);
 
     if (!inv_param->use_resident_solution) {
       // Wrap the even-parity MILC quark field
@@ -5025,28 +5032,14 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   // create oprod and trace fields
   fParam.geometry = QUDA_TENSOR_GEOMETRY;
   cudaGaugeField oprod(fParam);
-  cudaGaugeField &trace = oprod;
 
   // create extended oprod field
   for (int i=0; i<4; i++) fParam.x[i] += 2*R[i];
   fParam.nFace = 1; // breaks with out this - why?
 
   cudaGaugeField oprodEx(fParam);
-  cudaGaugeField &traceEx = oprodEx;
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
-
-  profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  computeCloverSigmaTrace(trace, *cloverPrecise, QUDA_CUDA_FIELD_LOCATION);
-  copyExtendedGauge(traceEx, trace, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to traceEx
-
-  profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
-
-  traceEx.exchangeExtendedGhost(R,redundant_comms);
-
-  profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
   // In double precision the clover derivative is faster with no reconstruct
@@ -5058,14 +5051,19 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     u -> copy(gaugeEx);
   }
 
-  cloverDerivative(cudaForce, *u, traceEx, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
+  computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt);
 
   /* Now the U dA/dU terms */
-  for(int shift = 0; shift < nvector; shift++){
-    double ferm_epsilon = 2.0*dt*coeff[shift];
-    computeCloverSigmaOprod(oprod, *(cudaQuarkX[shift]), *(cudaQuarkP[shift]), ferm_epsilon, shift);
+  std::vector< std::vector<double> > ferm_epsilon(nvector);
+  for (int shift = 0; shift < nvector; shift++) {
+    ferm_epsilon[shift].reserve(2);
+    ferm_epsilon[shift][0] = 2.0*ck*coeff[shift]*dt;
+    ferm_epsilon[shift][1] = -kappa2 * 2.0*ck*coeff[shift]*dt;
   }
+
+  computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
   copyExtendedGauge(oprodEx, oprod, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to oprod
+  cudaDeviceSynchronize();
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
@@ -5075,11 +5073,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  // TODO this first derivative can be combined with the previous one
-  // if we sum project oprodEx and sum to traceEx with the appropriate
-  // weights.  This will also half the amount of communication
-  cloverDerivative(cudaForce, *u, oprodEx, -kappa2*ck, QUDA_ODD_PARITY, 1);
-  cloverDerivative(cudaForce, *u, oprodEx, ck, QUDA_EVEN_PARITY, 1);
+  cloverDerivative(cudaForce, *u, oprodEx, 1.0, QUDA_ODD_PARITY);
+  cloverDerivative(cudaForce, *u, oprodEx, 1.0, QUDA_EVEN_PARITY);
 
   if (u != &gaugeEx) delete u;
 
@@ -5094,11 +5089,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
 
   for (int i=0; i<nvector; i++) {
-    delete cudaQuarkX[i];
-    delete cudaQuarkP[i];
+    delete quarkX[i];
+    delete quarkP[i];
   }
-  delete []cudaQuarkX;
-  delete []cudaQuarkP;
 
   checkCudaError();
 
