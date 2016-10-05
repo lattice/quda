@@ -93,6 +93,8 @@ namespace quda {
         r[i] = ColorSpinorField::Create(csParam);
         u[i] = ColorSpinorField::Create(csParam);
       }
+      
+      init = true; 
     }
     
     // Folowing the GCR inverter...
@@ -133,6 +135,10 @@ namespace quda {
     omega = 1.0;
     
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver.
+    
+    // While I don't have heavy quark checks implemented yet, here's a start...
+    //const bool use_heavy_quark_res = 
+    //  (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
     // done with the initialization, start preamble.
     profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -273,12 +279,13 @@ namespace quda {
     
 
     // compute the true residual
-    if (param.compute_true_res) {
+    // !param.is_preconditioner comes from bicgstab, param.compute_true_res came from gcr.
+    if (!param.is_preconditioner && param.compute_true_res) { // do not do the below if this is an inner solver.
       mat(*r[0], x, temp);
       double true_res = blas::xmyNorm(b, *r[0]);
-      param.true_res = sqrt(true_res);
+      param.true_res = sqrt(true_res / b2);
       // Probably some heavy quark stuff...
-      param.true_res_hq = 0.0;
+      param.true_res_hq = 0.0; //use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,*r[0]).z) : 0.0;
     }
     
     // Reset flops counters.
