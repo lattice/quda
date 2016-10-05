@@ -608,15 +608,16 @@ namespace quda {
       @param stream Which stream to use for the kernel
       @param buffer Optional parameter where the ghost should be
       stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
+      @param zero_copy Whether we are packing directly into zero_copy memory
       @param a Twisted mass parameter (default=0)
       @param b Twisted mass parameter (default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-        cudaStream_t* stream, void *buffer=0, double a=0, double b=0);
+		   cudaStream_t* stream, void *buffer=0, bool zero_copy=false, double a=0, double b=0);
 
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
-        const int dagger,cudaStream_t* stream, void *buffer=0);
+			   const int dagger,cudaStream_t* stream, void *buffer=0, bool zero_copy=false);
 
 
     void packGhost(FullClover &clov, FullClover &clovInv, const int nFace, const QudaParity parity, const int dim,
@@ -655,9 +656,10 @@ namespace quda {
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
       @param dagger Whether the operator is daggered or not
       @param stream The array of streams to use
+      @param zero_copy Whether we are unpacking from zero_copy memory
       */
     void unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
-        const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream);
+			     const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream, bool zero_copy);
 
 
     void streamInit(cudaStream_t *stream_p);

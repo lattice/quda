@@ -88,7 +88,9 @@
 #define QUDA_GPU_COMMS_DSLASH 3
 #define QUDA_FUSED_DSLASH 4
 #define QUDA_FUSED_GPU_COMMS_DSLASH 5
-#define QUDA_DSLASH_NC 6
+#define QUDA_ZERO_COPY_DSLASH 6
+#define QUDA_FUSED_ZERO_COPY_DSLASH 7
+#define QUDA_DSLASH_NC 8
 
 #define QudaInverterType integer(4)
 #define QUDA_CG_INVERTER 0

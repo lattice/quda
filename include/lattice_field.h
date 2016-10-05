@@ -142,11 +142,13 @@ namespace quda {
 
     /** Memory buffer used for sending all messages (regardless of Nface) */
     void *my_face[2];
+    void *my_face_d[2]; // mapped version of the above
     void *my_fwd_face[2][QUDA_MAX_DIM];
     void *my_back_face[2][QUDA_MAX_DIM];
 
     /** Memory buffer used for sending all messages (regardless of Nface) */
     void *from_face[2];
+    void *from_face_d[2]; // mapped version of the above
     void *from_back_face[2][QUDA_MAX_DIM];
     void *from_fwd_face[2][QUDA_MAX_DIM];
     

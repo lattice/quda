@@ -740,7 +740,7 @@ namespace quda {
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
                                        const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
-				       void *buffer, double a, double b) 
+				       void *buffer, bool zero_copy, double a, double b)
   {
 #ifdef MULTI_GPU
     int face_num;
@@ -752,7 +752,7 @@ namespace quda {
       face_num = 2;
     }
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
-    packFace(packBuffer, *this, nFace, dagger, parity, dim, face_num, *stream, a, b);
+    packFace(packBuffer, *this, zero_copy, nFace, dagger, parity, dim, face_num, *stream, a, b);
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
@@ -895,9 +895,9 @@ namespace quda {
 
    // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhostExtended(const int nFace, const int R[], const QudaParity parity,
-                                       const int dim, const QudaDirection dir,
-                                       const int dagger, cudaStream_t *stream,
-                                       void *buffer)
+					       const int dim, const QudaDirection dir,
+					       const int dagger, cudaStream_t *stream,
+					       void *buffer, bool zero_copy)
   {
 #ifdef MULTI_GPU
     int face_num;
@@ -909,7 +909,7 @@ namespace quda {
       face_num = 2;
     }
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
-    packFaceExtended(packBuffer, *this, nFace, R, dagger, parity, dim, face_num, *stream);
+    packFaceExtended(packBuffer, *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream);
 #else
     errorQuda("packGhostExtended not built on single-GPU build");
 #endif
@@ -922,7 +922,7 @@ namespace quda {
   // copy data from host buffer into boundary region of device field
   void cudaColorSpinorField::unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
                                                  const int dim, const QudaDirection dir, 
-                                                 const int dagger, cudaStream_t* stream)
+                                                 const int dagger, cudaStream_t* stream, bool zero_copy)
   {
 
      
@@ -942,7 +942,7 @@ namespace quda {
     const int face_num = 2;
     const bool unpack = true;
     const int R[4] = {0,0,0,0};
-    packFaceExtended(ghostFaceBuffer[bufferIndex], *this, nFace, R, dagger, parity, dim, face_num, *stream, unpack);
+    packFaceExtended(ghostFaceBuffer[bufferIndex], *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream, unpack);
 #else
     errorQuda("unpackGhostExtended not built on single-GPU build");
 #endif
@@ -995,10 +995,20 @@ namespace quda {
 #ifndef GPU_COMMS
       // use static pinned memory for face buffers
       for (int b=0; b<2; ++b) {
-        resizeBufferPinned(2*faceBytes, b); // oversizes for GPU_COMMS case
+	if (faceBytes > 0) {
+	  resizeBufferPinned(2*faceBytes, b); // oversizes for GPU_COMMS case
 
-        my_face[b] = bufferPinned[b];
-        from_face[b] = static_cast<char*>(bufferPinned[b]) + faceBytes;
+	  my_face[b] = bufferPinned[b];
+	  cudaHostGetDevicePointer(&my_face_d[b], my_face[b], 0); // set the matching device pointer
+
+	  from_face[b] = static_cast<char*>(my_face[b]) + faceBytes;
+	  from_face_d[b] = static_cast<char*>(my_face_d[b]) + faceBytes;
+	} else {
+	  from_face[b] = nullptr;
+	  from_face_d[b] = nullptr;
+	  my_face[b] = nullptr;
+	  my_face_d[b] = nullptr;
+	}
       }
 
       // assign pointers for each face - it's ok to alias for different Nface parameters
@@ -1079,7 +1089,6 @@ namespace quda {
 	  }
 #endif	
 	} // loop over b
-
 
 	for (int i=0; i<nDimComms; i++) {
 	  if (!commDimPartitioned(i)) continue;
@@ -1460,7 +1469,7 @@ namespace quda {
 
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
-				  bool zeroCopyPack, double a, double b) {
+				  bool zero_copy, double a, double b) {
 
     createComms(nFace); // must call this first
 
@@ -1468,12 +1477,10 @@ namespace quda {
     
     const int dim=-1; // pack all partitioned dimensions
  
-    if (zeroCopyPack) {
-      void *my_face_d;
-      cudaHostGetDevicePointer(&my_face_d, my_face[bufferIndex], 0); // set the matching device pointer
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d, a, b);
+    if (zero_copy) {
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d[bufferIndex], true, a, b);
     } else {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[Nstream-1], 0, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[Nstream-1], 0, false, a, b);
     }
   }
 
@@ -1485,28 +1492,24 @@ namespace quda {
     const int dim=-1; // pack all partitioned dimensions
  
     if (zeroCopyPack) {
-      void *my_face_d;
-      cudaHostGetDevicePointer(&my_face_d, my_face[bufferIndex], 0); // set the matching device pointer
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d[bufferIndex], true, a, b);
     } else {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[stream_idx], 0, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], 0, false, a, b);
     }
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 
                                           const int dagger, const int dim,
-                                          cudaStream_t *stream_p, const bool zeroCopyPack) {
+                                          cudaStream_t *stream_p, const bool zero_copy) {
 
     createComms(nFace); // must call this first
 
     stream = stream_p;
  
-    void *my_face_d = NULL;
-    if (zeroCopyPack) {
-      cudaHostGetDevicePointer(&my_face_d, my_face[bufferIndex], 0);
-      packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d);
+    if (zero_copy) {
+      packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d[bufferIndex], true);
     }else{
-      packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[Nstream-1], my_face_d);
+      packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[Nstream-1], 0, false);
     }
   }
                                                       
@@ -1857,12 +1860,13 @@ namespace quda {
   
   void cudaColorSpinorField::scatterExtended(int nFace, int parity, int dagger, int dir)
   {
+    bool zero_copy = false;
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return;
     if (dir%2==0) {// receive from forwards
-      unpackGhostExtended(from_fwd_face[bufferIndex][dim], nFace, static_cast<QudaParity>(parity), dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/]);
+      unpackGhostExtended(from_fwd_face[bufferIndex][dim], nFace, static_cast<QudaParity>(parity), dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/], zero_copy);
     } else { // receive from backwards
-      unpackGhostExtended(from_back_face[bufferIndex][dim], nFace, static_cast<QudaParity>(parity),  dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
+      unpackGhostExtended(from_back_face[bufferIndex][dim], nFace, static_cast<QudaParity>(parity),  dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/], zero_copy);
     }
   }
  
