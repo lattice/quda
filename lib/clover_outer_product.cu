@@ -383,7 +383,7 @@ namespace quda {
 	else if (arg.dir==2) strcat(new_aux, ",dir=2");
 	else if (arg.dir==3) strcat(new_aux, ",dir=3");
       }
-      return TuneKey(meta.VolString(), typeid(*this).name(), new_aux);
+      return TuneKey(meta.VolString(), "CloverForce", new_aux);
     }
   }; // CloverForce
 
