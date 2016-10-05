@@ -2,7 +2,6 @@
 
 /**
    @brief Parameter struct for generic multi-blas kernel.
-
    @tparam NXZ is dimension of input vectors: X,Z
    @tparam NYW is dimension of in-output vectors: Y,W
    @tparam SpinorX Type of input spinor for x argument
@@ -73,7 +72,6 @@ __device__ inline void compute(Arg &arg, int idx, int parity) {
 
 /**
    @brief Generic multi-blas kernel with four loads and up to four stores.
-
    @param[in,out] arg Argument struct with required meta data
    (input/output fields, functor, etc.)
 */
@@ -248,7 +246,7 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
     for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
       A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
-    cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
+    cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
     Amatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(a.data));
   }
 
@@ -259,7 +257,7 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
     for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
       B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
-    cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
+    cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
     Bmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(b.data));
   }
 
@@ -270,7 +268,7 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
     for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
       C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
-    cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *blasStream);
+    cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
     Cmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(c.data));
   }
 
@@ -314,7 +312,7 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
 		Spinor<RegType,StoreType,M,writeW,3>,
 		decltype(f) >
     blas(X, Y, Z, W, f, NYW, length, x[0]->SiteSubset(), bytes, norm_bytes);
-  blas.apply(*blasStream);
+  blas.apply(*getStream());
 
   blas::bytes += blas.bytes();
   blas::flops += blas.flops();
@@ -332,7 +330,6 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
 
 /**
    Generic blas kernel with four loads and up to four stores.
-
    FIXME - this is hacky due to the lack of std::complex support in
    CUDA.  The functors are defined in terms of FloatN vectors, whereas
    the operator() accessor returns std::complex<Float>

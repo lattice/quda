@@ -1,5 +1,3 @@
-
-
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
@@ -26,7 +24,8 @@ set (QUDA_OBJS
   dslash_twisted_clover.cu dslash_domain_wall.cu
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
-  copy_quda.cu reduce_quda.cu face_buffer.cpp face_gauge.cpp
+  multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu
@@ -62,7 +61,6 @@ ENDFOREACH(item ${QUDA_OBJS})
 LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
-  set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
 # QUDA_CU_OBJS shoudl contain all cuda files now

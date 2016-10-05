@@ -1,4 +1,25 @@
+__host__ __device__ inline double set(double &x) { return x;}
+__host__ __device__ inline double2 set(double2 &x) { return x;}
+__host__ __device__ inline double3 set(double3 &x) { return x;}
+__host__ __device__ inline void sum(double &a, double &b) { a += b; }
+__host__ __device__ inline void sum(double2 &a, double2 &b) { a.x += b.x; a.y += b.y; }
+__host__ __device__ inline void sum(double3 &a, double3 &b) { a.x += b.x; a.y += b.y; a.z += b.z; }
+
+#ifdef QUAD_SUM
+__host__ __device__ inline double set(doubledouble &a) { return a.head(); }
+__host__ __device__ inline double2 set(doubledouble2 &a) { return make_double2(a.x.head(),a.y.head()); }
+__host__ __device__ inline double3 set(doubledouble3 &a) { return make_double3(a.x.head(),a.y.head(),a.z.head()); }
+__host__ __device__ inline void sum(double &a, doubledouble &b) { a += b.head(); }
+__host__ __device__ inline void sum(double2 &a, doubledouble2 &b) { a.x += b.x.head(); a.y += b.y.head(); }
+__host__ __device__ inline void sum(double3 &a, doubledouble3 &b) { a.x += b.x.head(); a.y += b.y.head(); a.z += b.z.head(); }
+#endif
+
 //#define WARP_MULTI_REDUCE
+
+__device__ static unsigned int count = 0;
+__shared__ static bool isLastBlockDone;
+
+#include <launch_kernel.cuh>
 
 template <int N, typename ReduceType, typename SpinorX, typename SpinorY, 
   typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
@@ -113,11 +134,11 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M,
     while(cudaSuccess != cudaEventQuery(reduceEnd)) {}
   } else
 #endif
-    { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType)*N, cudaMemcpyDeviceToHost); }
+    { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), sizeof(ReduceType)*N, cudaMemcpyDeviceToHost); }
 
   for(int i=0; i<N; ++i) {
-    result[i] = set(((ReduceType*)h_reduce)[i]);
-    if (arg.nParity==2) sum(result[i],((ReduceType*)h_reduce)[N+i]);
+    result[i] = set(((ReduceType*)getHostReduceBuffer())[i]);
+    if (arg.nParity==2) sum(result[i],((ReduceType*)getHostReduceBuffer())[N+i]);
   }
 }
 
