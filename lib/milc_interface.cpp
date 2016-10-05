@@ -639,7 +639,7 @@ static void setInvertParams(const int dim[4],
   invertParam->verbosity_precondition = QUDA_SILENT;
   invertParam->cuda_prec_precondition = cuda_prec_precondition;
 
-  invertParam->evaluate_action = 0;
+  invertParam->compute_action = 0;
 
   return;
 }
