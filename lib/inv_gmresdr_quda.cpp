@@ -486,11 +486,10 @@ namespace quda {
  {
    if(!init_flag) errorQuda("\nGMResDR resources were not allocated.\n");
 
-   memset(givensH, 0, ldH*m*sizeof(Complex));
-   memset(g, 0 , (m+1)*sizeof(Complex));
-   //
-   memset(Cn, 0 , m*sizeof(Complex));
-   memset(Sn, 0 , m*sizeof(double));
+   memset(givensH, 0, ldm*m*sizeof(Complex));
+   memset(g,       0, (m+1)*sizeof(Complex));
+   memset(Cn,      0, m*sizeof(Complex));
+   memset(Sn,      0, m*sizeof(double));
 
    if(run_deflated_cycle)
    {
@@ -518,8 +517,7 @@ namespace quda {
    } else {
 
      double r2 = norm2(r);//compute residual
-     printfQuda("\nInitial/restart residual squared: %1.16e\n", sqrt(r2));
-
+     printfQuda("\nInitial/restarted residual squared: %1.16e\n", sqrt(r2));
      //copy the first vector:
      double beta = sqrt(r2);
      //scale residual vector:
@@ -535,7 +533,7 @@ namespace quda {
    return;
  }
 
- void GMResDRArgs::PrepareGivens(Complex *givensH, const int col, const bool use_deflated_cycles)
+ void GMResDRArgs::PrepareGivens(const int col, const bool use_deflated_cycles)
  {
    if(!use_deflated_cycles) return; //we are in the "projected" cycle nothing to do..
 
@@ -688,6 +686,9 @@ namespace quda {
     //Full precision fields:
     ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision accumulation field
     ColorSpinorField *rp = ColorSpinorField::Create(*in); //high precision residual
+    ColorSpinorField &r = *rp;
+    ColorSpinorField &x = *out;
+    ColorSpinorField &y = *yp;
 
     //Sloppy precision fields:
     ColorSpinorParam csParam(*in);//create spinor parameters
@@ -698,10 +699,6 @@ namespace quda {
     ColorSpinorField *r_sloppy = (mixed_precision_GMResDR) ? ColorSpinorField::Create(csParam) : &r;
     ColorSpinorField *x_sloppy = (mixed_precision_GMResDR) ? ColorSpinorField::Create(csParam) : &x;
     ColorSpinorField *tmp1_p   = ColorSpinorField::Create(csParam);
-
-    ColorSpinorField &r = *rp;
-    ColorSpinorField &x = *out;
-    ColorSpinorField &y = *yp;
 
     ColorSpinorField &tmp = *tmp1_p;
 
@@ -738,7 +735,9 @@ namespace quda {
     profile->TPSTART(QUDA_PROFILE_COMPUTE);
     blas::flops = 0;
 
-    //run initial cycle
+    //run initial cycle:
+    int j  = 0;
+
     while( j < args->m )//we allow full cycle
     {
       ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>( &Vm->Component(j+1));
@@ -820,10 +819,14 @@ namespace quda {
 
      if (mixed_precision_GMResDR) copy(*r_sloppy, r);
 
-     int j = args->nev;//here also a column index of H
+     j = args->nev;//here also a column index of H
 
-     if(!use_deflated_cycles) //use Galerkin projection instead:
+     if( use_deflated_cycles ) //use Galerkin projection instead:
      {
+       j = args->nev;//here also a column index of H
+       args->PrepareCycle(Vm, *r_sloppy, true);
+
+     } else {
        j = 0; //we will launch "projected" GMRES cycles
 
        if(defl_param->projType == QUDA_INVALID_PROJECTION) defl_param->projType = QUDA_GALERKIN_PROJECTION;
@@ -839,8 +842,6 @@ namespace quda {
        }
        args->PrepareCycle(Vm, r);
      }
-     else
-       args->PrepareCycle(Vm, *r_sloppy, true);
 
      const int jlim = j;//=nev for deflated restarts and 0 for "projected" restarts (abused terminology!)
 
