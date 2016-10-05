@@ -15,6 +15,7 @@
 #include <face_quda.h>
 
 #include <iostream>
+#include <sstream>
 
 namespace quda {
 
@@ -31,6 +32,10 @@ namespace quda {
     
     tau = new Complex*[nKrylov+1];
     for (int i = 0; i < nKrylov+1; i++) { tau[i] = new Complex[nKrylov+1]; }
+    
+    std::stringstream ss;
+    ss << "BiCGstab-" << nKrylov;
+    solver_name = ss.str();
   }
 
   BiCGstabL::~BiCGstabL() {
@@ -84,7 +89,7 @@ namespace quda {
       // Residual (+ extra residuals for BiCG steps), Search directions.
       // Remark: search directions are sloppy in GCR. I wonder if we can
       //           get away with that here.
-      for (int i = 0; i < nKrylov; i++) {
+      for (int i = 0; i <= nKrylov; i++) {
         r[i] = ColorSpinorField::Create(csParam);
         u[i] = ColorSpinorField::Create(csParam);
       }
@@ -107,9 +112,12 @@ namespace quda {
       blas::zero(x); // defensive measure in case solution isn't already zero
     }
     
+    std::cout << "r2 " << r2 << " b2 " << b2 << "\n" << std::flush;
+    
     // Set some initial values.
     sigma[0] = blas::norm2(*r[0]);
     blas::copy(r0, *r[0]);
+    blas::zero(*u[0]);
     
     // Check to see that we're not trying to invert on a zero-field source    
     if(b2 == 0){
@@ -141,7 +149,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     
     int k = 0;
-    PrintStats("BiCGstab-l", k, r2, b2, 0.0); // 0.0 is heavy quark residual.
+    PrintStats(solver_name.c_str(), k, r2, b2, 0.0); // 0.0 is heavy quark residual.
     while(!convergence(r2, 0.0, stop, 0.0) && k < param.maxiter) {
 
       //PrintStats("BiCGstab-l", k, r2, b2, 0.0);
@@ -157,11 +165,13 @@ namespace quda {
         beta = alpha*rho1/rho0;
         rho0 = rho1;
         
+        std::cout << "j " << j << " rho0 " << rho0 << "\n" << std::flush;
+        
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         for (int i = 0; i <= j; i++)
         {
           //blas::xpay(*r[i], -beta, *u[i]);
-		  blas::caxpby(1.0, *r[i], -beta, *u[1]);
+		      blas::caxpby(1.0, *r[i], -beta, *u[i]);
         }
         
         // u[j+1] = A ( u[j] )
@@ -179,7 +189,7 @@ namespace quda {
         // r[j+1] = A r[j], x = x + alpha*u[0]
         mat(*r[j+1], *r[j], temp);
         blas::caxpy(alpha, *u[0], x);
-      } // End BiCG part.
+      } // End BiCG part.      
       
       // MR part. Really just modified Gram-Schmidt.
       // The algorithm uses the byproducts of the Gram-Schmidt to update x
@@ -228,11 +238,11 @@ namespace quda {
       }
       
       // Update x, r, u.
-      // x = x+ gamma_l r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
+      // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
       // I bet there's some fancy blas for this.
-      blas::caxpy(gamma[nKrylov], *r[0], x);
-      blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
+      blas::caxpy(gamma[1], *r[0], x);
       blas::caxpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
+      blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
       
       // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
       for (int j = 1; j < nKrylov; j++)
@@ -248,7 +258,7 @@ namespace quda {
       
       // Check convergence.
       k += nKrylov;
-      PrintStats("BiCGStab-l", k, r2, b2, 0.0); // last thing should be heavy quark res...
+      PrintStats(solver_name.c_str(), k, r2, b2, 0.0); // last thing should be heavy quark res...
     } // Done iterating.
     
     // Done with compute, begin the epilogue.
@@ -285,7 +295,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
     
     // ...yup...
-    PrintSummary("GCR", k, r2, b2);
+    PrintSummary(solver_name.c_str(), k, r2, b2);
     
     // Done!
     profile.TPSTOP(QUDA_PROFILE_FREE);

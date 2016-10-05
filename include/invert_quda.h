@@ -514,6 +514,8 @@ namespace quda {
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
     bool init;
+    
+    std::string solver_name; // holds BiCGstab-l, where 'l' literally equals nKrylov.
 
   public:
     BiCGstabL(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
