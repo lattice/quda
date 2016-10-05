@@ -112,8 +112,6 @@ namespace quda {
       blas::zero(x); // defensive measure in case solution isn't already zero
     }
     
-    std::cout << "r2 " << r2 << " b2 " << b2 << "\n" << std::flush;
-    
     // Set some initial values.
     sigma[0] = blas::norm2(*r[0]);
     blas::copy(r0, *r[0]);
@@ -164,8 +162,6 @@ namespace quda {
         rho1 = blas::cDotProduct(r0, *r[j]);
         beta = alpha*rho1/rho0;
         rho0 = rho1;
-        
-        std::cout << "j " << j << " rho0 " << rho0 << "\n" << std::flush;
         
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         for (int i = 0; i <= j; i++)
