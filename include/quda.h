@@ -154,14 +154,14 @@ extern "C" {
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Residuals in the partial faction expansion */
-    double residue[QUDA_MAX_MULTI_SHIFT+1];
+    double residue[QUDA_MAX_MULTI_SHIFT];
 
     /** Whether we should evaluate the action after the linear solver*/
-    int evaluate_action;
+    int compute_action;
 
     /** Computed value of the bilinear action (complex-valued)
 	invert: \phi^\dagger A^{-1} \phi
-	multishift: \phi^\dagger r(x) \phi = \phi^\dagger (residue[0] + sum_k residue[k+1] * (A + offset[k])^{-1} ) \phi */
+	multishift: \phi^\dagger r(x) \phi = \phi^\dagger (sum_k residue[k] * (A + offset[k])^{-1} ) \phi */
     double action[2];
 
     QudaSolutionType solution_type;  /**< Type of system to solve */

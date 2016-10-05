@@ -2533,7 +2533,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solutionResident[0] = static_cast<cudaColorSpinorField*>(x);
   }
 
-  if (param->evaluate_action) {
+  if (param->compute_action) {
     Complex action = blas::cDotProduct(*b, *x);
     param->action[0] = action.real();
     param->action[1] = action.imag();
@@ -3230,9 +3230,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   profileMulti.TPSTART(QUDA_PROFILE_D2H);
-  if (param->evaluate_action) {
-    Complex action = param->residue[0];
-    for (int i=0; i<param->num_offset; i++) action += param->residue[i+1] * blas::cDotProduct(*b, *x[i]);
+
+  if (param->compute_action) {
+    Complex action(0);
+    for (int i=0; i<param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(*b, *x[i]);
     param->action[0] = action.real();
     param->action[1] = action.imag();
   }

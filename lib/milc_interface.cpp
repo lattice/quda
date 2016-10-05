@@ -1385,7 +1385,7 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.clover_cuda_prec_precondition = device_precision_sloppy;
   invertParam.clover_order                  = QUDA_PACKED_CLOVER_ORDER;
 
-  invertParam.evaluate_action = 0;
+  invertParam.compute_action = 0;
 }
 
 

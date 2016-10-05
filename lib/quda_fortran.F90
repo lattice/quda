@@ -133,11 +133,11 @@ module quda_fortran
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: residue
 
      ! Whether we should evaluate the action after the linear solve
-     integer(4) :: evaluate_action
+     integer(4) :: compute_action
 
      ! Computed value of the bilinear action (complex valued)
      !   invert: \phi^\dagger A^{-1} \phi
-     !   multishift: \phi^\dagger r(x) \phi = \phi^\dagger (residue[0] + sum_k residue[k+1] * (A + offset[k])^{-1} ) \phi
+     !   multishift: \phi^\dagger r(x) \phi = \phi^\dagger (sum_k residue[k] * (A + offset[k])^{-1} ) \phi
      real(8), dimension(2) :: action
 
      QudaSolutionType :: solution_type  ! Type of system to solve
