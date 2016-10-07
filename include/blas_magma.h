@@ -89,6 +89,7 @@
 
       //Collection of methods for GMRESDR solver:
       void RestartVH(void *dV, const int vld, const int vlen, const int vprec, void *sortedHarVecs, void *H, const int ldh);//ldm: leading dim for both dharVecs and dH. additional info: nev, nev+1 = max_nev, m
+      void RestartZVH(void *dZ, void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh);
 
       void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn);
 

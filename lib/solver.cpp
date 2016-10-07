@@ -174,22 +174,34 @@ namespace quda {
   }
 
   // Deflated solver factory
-  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile)
+  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matSloppy2, DiracMatrix *matDeflate, TimeProfile *profile)
   {
     DeflatedSolver* solver=0;
 
     if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
       report("Incremental EIGCG");
-      if(profile != NULL)
-        solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
+      if(profile != nullptr)
+        solver = new IncEigCG(mat, matSloppy, matSloppy2, matDeflate, param, profile);
       else
         solver = new IncEigCG(param);//hack to clean deflation resources
     }else if (param.inv_type == QUDA_GMRESDR_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ){
       report("GMRESDR");
-      if(profile != NULL)
-        solver = new GMResDR(mat, matSloppy, matDeflate, param, profile);
-      else
-        solver = new GMResDR(param);
+
+      if (param.preconditioner && param.maxiter == 11) { // FIXME - dirty hack
+	MG *mg = static_cast<MG*>(param.preconditioner);
+	solver = new GMResDR(mat, *(mg), matSloppy, matDeflate, matSloppy2, param, profile);
+      } else if (param.preconditioner) {
+	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
+	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
+	param.precision_precondition = param.precision_sloppy;
+	solver = new GMResDR(mat, *(mg->mg), matSloppy, matDeflate, matSloppy2, param, profile);
+      } else {
+        if(profile != nullptr)
+          solver = new GMResDR(mat, matSloppy, matDeflate, matSloppy2, param, profile);
+        else
+          solver = new GMResDR(param);
+      }
+
     }else{
       errorQuda("Invalid solver type");
     }

@@ -802,14 +802,17 @@ namespace quda {
   private:
 
     DiracMatrix *mat;
-
     DiracMatrix *matSloppy;
+    DiracMatrix *matDefl;
+    DiracMatrix *matPrecon;
 
-    const DiracMatrix *matDefl;
+    Solver *K;
+    SolverParam Kparam; // parameters for preconditioner solve
 
     QudaPrecision gmres_space_prec;
 
     ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Zm;//arnoldi basis vectors, size (m+1)
 
     TimeProfile *profile;    //time profile for initCG solver
 
@@ -819,7 +822,8 @@ namespace quda {
 
   public:
 
-    GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
+    GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile *profile);
+    GMResDR(DiracMatrix *mat, Solver &K, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile &profile);
     GMResDR(SolverParam &param);
 
     virtual ~GMResDR();

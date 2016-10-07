@@ -997,6 +997,190 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
     return;
 }
 
+
+void BlasMagmaArgs::RestartZVH(void *dZ, void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh)
+{
+#ifdef MAGMA_LIB
+    if(prec == 4)
+    {
+       errorQuda("\nError: single precision is not currently supported\n");
+    }
+
+    if( (vld % 32) != 0) errorQuda("\nError: leading dimension must be multiple of the warp size\n");
+
+    int nev  = (max_nev - 1); //(nev+1) - 1 for GMRESDR
+
+    int _m   = m;//matrix size
+
+    int _k   = nev;
+
+    int _kp1 = max_nev; //(nev+1)
+
+    int _mp1 = (m+1);
+
+    int _ldm = ldh;
+
+    magma_side_t  _s = _cR;//apply P-matrix from the right
+
+    magma_trans_t _t = _cN;//no left eigenvectors
+
+    int info  = 0;
+
+    int lwork = -1;
+
+    Complex  *work = NULL;
+    Complex qwork; //parameter to extract optimal size of work
+
+    const int cprec  = 2*prec; //currently: sizeof(Complex)
+    const int cvprec = 2*vprec;
+
+    const int l = max_nev;
+
+    int lbsize           = 2*((nev / 16)*16);
+
+    //const int bufferSize = 2*vld+lbsize*lbsize;
+    //int bufferBlock = bufferSize / lbsize;//or: lbsize = (nev+1)
+
+    int bufferBlock = (2*vld) / lbsize;
+    bufferBlock     = (bufferBlock / 32) * 32;//corrected bufferBlock to be multiple of the warp size
+    int bufferSize  = (bufferBlock * lbsize);
+
+    void  *buffer = NULL;
+    void  *dQmat  = NULL;
+
+    magma_malloc(&buffer, bufferSize*cvprec);
+    cudaMemset(buffer, 0, bufferSize*cvprec);
+
+    magma_malloc(&dQmat, l*ldh*cprec);
+
+    //GPU code:
+    Complex *tau  = new Complex[l];//nev+1 =>max_nev
+
+    Complex *Qmat = new Complex[ldh*_mp1];//need (m+1)x(m+1) matrix on input...
+
+    ComputeQR(l, (Complex*)sortedHarVecs, _mp1, ldh, tau);//lapack version
+
+    //max_nev vectors are stored in Qmat (output):
+    //restoreOrthVectors(Qmat, max_nev, (Complex*)sortedHarVecs, (m+1), ldh, tau);
+    //Load diagonal units
+    for(int d = 0; d < (m+1); d++) Qmat[ldh*d+d] = Complex(1.0, 0.0);
+
+    magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
+
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
+
+    lwork = (int) qwork.real();
+    work = new Complex[lwork];
+
+    magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, (magmaDoubleComplex *)work, lwork, &info);
+
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
+
+    //Copy (nev+1) vectors on the device:
+    qudaMemcpy(dQmat, Qmat, (max_nev)*ldh*cprec, cudaMemcpyDefault);
+
+    if(cvprec == sizeof(magmaDoubleComplex))
+    {
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock)
+      {
+        if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+//printfQuda("\nBuffer block : %d\n", bufferBlock);
+
+        magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
+
+        magmablas_zgemm(_cN, _cN, bufferBlock, max_nev, _mp1, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dQmat, ldh, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
+
+        cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, max_nev, cudaMemcpyDefault);//make this async!
+
+        magmaDoubleComplex *ptrZ = &(((magmaDoubleComplex*)dZ)[blockOffset]);
+
+        magmablas_zgemm(_cN, _cN, bufferBlock, nev, _m, MAGMA_Z_ONE, ptrZ, vld, (magmaDoubleComplex*)dQmat, ldh, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
+
+        cudaMemcpy2D(ptrZ, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, nev, cudaMemcpyDefault);//make this async!
+      }
+
+      cudaMemset(&(((magmaDoubleComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaDoubleComplex));//= m - nev
+      cudaMemset(&(((magmaDoubleComplex*)dZ)[vld*nev]), 0, (m-nev)*vld*sizeof(magmaDoubleComplex));//= m - nev
+    }
+    else // low precision field
+    {
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock)
+      {
+        if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+        magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[blockOffset]);
+
+        sMM_v2(buffer, bufferBlock, ptrV, bufferBlock, _mp1, vld, dQmat, _mp1, max_nev, ldh);
+
+        cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, max_nev, cudaMemcpyDefault);
+
+        magmaFloatComplex *ptrZ = &(((magmaFloatComplex*)dZ)[blockOffset]);
+
+        sMM_v2(buffer, bufferBlock, ptrZ, bufferBlock, _m, vld, dQmat, _m, nev, ldh);
+
+        cudaMemcpy2D(ptrZ, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, nev, cudaMemcpyDefault);
+      }
+
+      cudaMemset(&(((magmaFloatComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaFloatComplex));//= m - nev
+      cudaMemset(&(((magmaFloatComplex*)dZ)[vld*nev]), 0, (m-nev)*vld*sizeof(magmaFloatComplex));//= m - nev
+    }
+
+    //Construct H_new = Pdagger_{k+1} \bar{H}_{m} P_{k}
+
+    //bar{H}_{m} P_{k}
+
+    lwork = -1;
+
+    magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
+
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
+
+    delete[] work;
+    lwork = (int) qwork.real();
+    work = new Complex[lwork];
+
+    magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)work, lwork, &info);
+
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
+
+    //Pdagger_{k+1} PrevRes
+    lwork = -1;
+
+    _s = _cL;
+    _t = _cC;
+
+    magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
+
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
+
+    delete [] work;
+    lwork = (int) qwork.real();
+    work = new Complex[lwork];
+
+    magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)work, lwork, &info);
+
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
+
+    const int len = ldh - nev-1;
+    for(int i = 0; i < nev; i++) memset(&(((Complex*)H)[ldh*i+nev+1]), 0, len*sizeof(Complex) );
+
+    //
+    memset(&(((Complex*)H)[ldh*(nev)]), 0, (m-nev)*ldh*sizeof(Complex));
+
+    delete [] work;
+
+    magma_free(buffer);
+    magma_free(dQmat);
+
+    delete [] Qmat;
+    delete [] tau ;
+#endif
+    return;
+}
+
+
+
 #define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
     ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
     : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )

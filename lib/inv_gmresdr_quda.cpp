@@ -44,6 +44,31 @@ namespace quda {
 
     };
 
+    // set the required parameters for the inner solver
+    void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
+      inner.tol = outer.tol_precondition;
+      inner.maxiter = outer.maxiter_precondition;
+      inner.delta = 1e-20; // no reliable updates within the inner solver
+  
+      inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
+      inner.precision_sloppy = outer.precision_precondition;
+  
+      inner.iter = 0;
+      inner.gflops = 0;
+      inner.secs = 0;
+
+      inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+      inner.is_preconditioner = true; // tell inner solver it is a preconditionis_re
+
+      inner.global_reduction = false;
+
+      inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+
+      if (outer.inv_type == QUDA_GCR_INVERTER && outer.precision_sloppy != outer.precision_precondition) 
+        inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+      else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+    }
+
     struct GMResDRDeflationParam
     {
 
@@ -245,13 +270,13 @@ namespace quda {
       //
       void ComputeHarmonicRitzPairs();
 
-      void RestartVH(ColorSpinorFieldSet *Vm);
+      void RestartZVH(ColorSpinorFieldSet *Vm, ColorSpinorFieldSet *Zm);
 
-      void PrepareCycle(ColorSpinorFieldSet *Vm, ColorSpinorField &r, const bool use_deflated_cycles = false);
+      void PrepareCycle(ColorSpinorFieldSet *Vm, ColorSpinorFieldSet *Zm, ColorSpinorField &r, const bool use_deflated_cycles = false);
 
       void PrepareGivens(const int col, const bool use_deflated_cycles = false);
 
-      void UpdateSolution(ColorSpinorField *x, ColorSpinorFieldSet *Vm, const int j);
+      void UpdateSolution(ColorSpinorField *x, ColorSpinorFieldSet *Wm, const int j);
    };
 
   GMResDRArgs::GMResDRArgs(int m, int ldm, int nev): GMResDR_magma_args(0), harVecs(0), harVals(0), sortedHarVecs(0), sortedHarVals(0), harMat(0), qrH(0), tauH(0), srtRes(0),
@@ -380,7 +405,7 @@ namespace quda {
 
 
 //Note: in fact, x is an accumulation field initialized to zero (if a sloppy field is used!) and has the same precision as Vm
- void GMResDRArgs::UpdateSolution(ColorSpinorField *x, ColorSpinorFieldSet *Vm, const int j)
+ void GMResDRArgs::UpdateSolution(ColorSpinorField *x, ColorSpinorFieldSet *Wm, const int j)
  {
    //if (mixed_precision_GMResDR) zero(*x);//it's done in the main loop, no need for this
    memset(lsqSol, 0, (m+1)*sizeof(Complex));
@@ -399,8 +424,8 @@ namespace quda {
      lsqSol[l] = (g[l] - accum) / givensH[ldm*l+l];
    }
    //
-   //compute x = x0+Vm*lsqSol
-   for(int l = 0; l < j; l++)  caxpy(lsqSol[l], Vm->Component(l), *x);
+   //compute x = x0+Wm*lsqSol, where Wm is Vm or Zm (if preconditioned)
+   for(int l = 0; l < j; l++)  caxpy(lsqSol[l], Wm->Component(l), *x);
 
    return;
  }
@@ -438,7 +463,7 @@ namespace quda {
    return;
  }
 
- void GMResDRArgs::RestartVH(ColorSpinorFieldSet *Vm)
+ void GMResDRArgs::RestartZVH(ColorSpinorFieldSet *Vm, ColorSpinorFieldSet *Zm )
  {
    if(!init_flag) errorQuda("\nGMResDR resources were not allocated.\n");
 
@@ -458,7 +483,9 @@ namespace quda {
    }
 
    /**** Update Vm and H ****/
-   GMResDR_magma_args->RestartVH(Vm->V(), clen, cldn, Vm->Precision(), sortedHarVecs, H, ldm);//check ldm with internal (magma) ldm
+//@@@
+   if( K ) GMResDR_magma_args->RestartZVH(Zm->V(), Vm->V(), clen, cldn, Vm->Precision(), sortedHarVecs, H, ldm);//check ldm with internal (magma) ldm
+   else    GMResDR_magma_args->RestartVH (Vm->V(), clen, cldn, Vm->Precision(), sortedHarVecs, H, ldm);//check ldm with internal (magma) ldm
 
    checkCudaError();
 
@@ -482,7 +509,7 @@ namespace quda {
  }
 
 
- void GMResDRArgs::PrepareCycle(ColorSpinorFieldSet *Vm, ColorSpinorField &r, const bool run_deflated_cycle)
+ void GMResDRArgs::PrepareCycle(ColorSpinorFieldSet *Vm, ColorSpinorFieldSet *Zm, ColorSpinorField &r, const bool run_deflated_cycle)
  {
    if(!init_flag) errorQuda("\nGMResDR resources were not allocated.\n");
 
@@ -494,7 +521,7 @@ namespace quda {
    if(run_deflated_cycle)
    {
      ComputeHarmonicRitzPairs();
-     RestartVH( Vm );
+     RestartZVH( Vm, Zm );
 
      for(int i = 0; i <= nev ; i++ ) g[i] = cDotProduct(Vm->Component(i), r);//
 
@@ -515,7 +542,6 @@ namespace quda {
 
      GMResDR_magma_args->LeftConjZUNMQR(nev /*number of reflectors*/, 1 /*number of columns of mat*/, g, (nev+1) /*number of rows*/, ldm, qrH, ldm, tauH);
    } else {
-
      double r2 = norm2(r);//compute residual
      printfQuda("\nInitial/restarted residual squared: %1.16e\n", sqrt(r2));
      //copy the first vector:
@@ -547,9 +573,9 @@ namespace quda {
  }
 
 
- GMResDR::GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), gmres_space_prec(QUDA_INVALID_PRECISION),
-    Vm(0), profile(profile), args(0), gmres_alloc(false)
+ GMResDR::GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile *profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), matPrecon(matPrecon), K(nullptr), gmres_space_prec(QUDA_INVALID_PRECISION),
+    Vm(nullptr), Zm(nullptr), profile(profile), args(nullptr), gmres_alloc(false)
  {
      //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMResDR is not currently supported.\n");
      //
@@ -557,7 +583,38 @@ namespace quda {
 
      //create GMResDR objects:
      int mp1    = param.m + 1;
+     int ldm    = mp1;//((mp1+15)/16)*16;//leading dimension
 
+     args = new GMResDRArgs(param.m, ldm, param.nev);//use_deflated_cycles flag is true by default
+
+     fillInnerSolveParam(Kparam, param);
+
+     if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
+       K = new CG(matPrecon, matPrecon, Kparam, profile);
+     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
+       K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
+     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
+       K = new MR(matPrecon, matPrecon, Kparam, profile);
+     else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner MR preconditioner
+       K = new SD(matPrecon, Kparam, profile);
+     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unknown preconditioner
+       K = nullptr;
+     else 
+       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
+
+     return;
+ }
+
+ GMResDR::GMResDR(DiracMatrix *mat, Solver &K, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile *profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), matPrecon(matPrecon), K(&K), gmres_space_prec(QUDA_INVALID_PRECISION),
+    Vm(nullptr), Zm(nullptr), profile(profile), args(nullptr), gmres_alloc(false)
+ {
+     //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMResDR is not currently supported.\n");
+     //
+     gmres_space_prec = param.precision_sloppy;//We don't allow half precision, do we?
+
+     //create GMResDR objects:
+     int mp1    = param.m + 1;
      int ldm    = mp1;//((mp1+15)/16)*16;//leading dimension
 
      args = new GMResDRArgs(param.m, ldm, param.nev);//use_deflated_cycles flag is true by default
@@ -566,8 +623,8 @@ namespace quda {
  }
 
  GMResDR::GMResDR(SolverParam &param) :
-    DeflatedSolver(param, NULL), mat(NULL), matSloppy(NULL), matDefl(NULL), gmres_space_prec(QUDA_INVALID_PRECISION),
-    Vm(0), profile(NULL), args(0), gmres_alloc(false) { }
+    DeflatedSolver(param, nullptr), mat(nullptr), matSloppy(nullptr), matDefl(nullptr), matPrecon(nullptr), gmres_space_prec(QUDA_INVALID_PRECISION),
+    Vm(nullptr), profile(nullptr), args(nullptr), gmres_alloc(false) { }
 
 
  GMResDR::~GMResDR() {
@@ -577,7 +634,8 @@ namespace quda {
     if(gmres_alloc)
     {
       delete Vm;
-      Vm = NULL;
+      Vm = nillptr;
+      if(K) delete Zm;
     }
 
  }
@@ -590,14 +648,16 @@ namespace quda {
 
    csParam.is_composite  = true;
    csParam.composite_dim = param.m+1;
+   Vm       = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
 
-   Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+   csParam.composite_dim = param.m;
+   if(K) Zm = ColorSpinorFieldSet::Create(csParam);
+   else  Zm = Vm;
 
    csParam.is_composite  = false;
    csParam.composite_dim = 0;
 
    checkCudaError();
-
    printfQuda("\n..done.\n");
 
    gmres_alloc = true;
@@ -652,9 +712,7 @@ namespace quda {
 
     for(int j = 0; j < (dpar->nv+1); j++)
       for (int i = 0; i < (dpar->nv); i++)
-      {
          c[j] +=  (dpar->projMat[i*dpar->ld + j] * d[i]);//column major format
-      }
 
     for(int l = 0; l < (dpar->nv+1); l++)  caxpy(-c[l], dpar->projVecs->Component(l), r_sloppy);
 
@@ -702,6 +760,16 @@ namespace quda {
 
     ColorSpinorField &tmp = *tmp1_p;
 
+    bool precMatch = ( param.precision_precondition != param.precision_sloppy ) ? false : true;
+
+    ColorSpinorField *r_pre = nullptr, *p_pre = nullptr;
+
+    if ( !precMatch && K) {
+      csParam.setPrecision(param.precision_precondition);
+      p_pre = ColorSpinorField::Create(csParam);
+      r_pre = ColorSpinorField::Create(csParam);
+    }
+
     //Allocate Vm array:
     if(gmres_alloc == false) AllocateKrylovSubspace(csParam);
 
@@ -721,7 +789,7 @@ namespace quda {
 
     printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
 
-    args->PrepareCycle(Vm, r);//pass initial residual
+    args->PrepareCycle(Vm, Zm, r);//pass initial residual
 
     bool use_deflated_cycles = true;
 
@@ -742,13 +810,26 @@ namespace quda {
     {
       ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>( &Vm->Component(j+1));
 
-      (*sloppy_mat)(*Av, Vm->Component(j), tmp);
+      if(K) {
+        if( !precMatch ) copy(*r_pre, Vm->Component(j));
+        else
+        {             
+          r_pre = &Vm->Component(j);
+          p_pre = &Zm->Component(j);
+        }
+
+        (*K)( *p_pre ,*r_pre );
+
+        if( !precMatch ) copy(Zm->Component(j), p_pre);
+      }
+
+      (*sloppy_mat)(*Av, Zm->Component(j), tmp);
 
       ///////////
-      Complex h0 = cDotProduct(Vm->Component(0), *Av);//
+      Complex h0 = cDotProduct(Vm->Component(j), *Av);//
       args->UpdateHessenberg(0, j, h0);
       //scale w:
-      caxpy(-h0, Vm->Component(0), *Av);
+      caxpy(-h0, Vm->Component(j), *Av);
       //
       for (int i = 1; i <= j; i++)//i is a row index
       {
@@ -783,7 +864,7 @@ namespace quda {
 
     //j -> m+1
     //update solution and final residual:
-    args->UpdateSolution(x_sloppy, Vm, j);
+    args->UpdateSolution(x_sloppy, Zm, j);
 
     if (mixed_precision_GMResDR)
     {
@@ -824,7 +905,7 @@ namespace quda {
      if( use_deflated_cycles ) //use Galerkin projection instead:
      {
        j = args->nev;//here also a column index of H
-       args->PrepareCycle(Vm, *r_sloppy, true);
+       args->PrepareCycle(Vm, Zm, *r_sloppy, true);
 
      } else {
        j = 0; //we will launch "projected" GMRES cycles
@@ -840,7 +921,7 @@ namespace quda {
          zero(*x_sloppy);
          copy(r, *r_sloppy);//ok
        }
-       args->PrepareCycle(Vm, r);
+       args->PrepareCycle(Vm, nullptr, r);
      }
 
      const int jlim = j;//=nev for deflated restarts and 0 for "projected" restarts (abused terminology!)
@@ -850,7 +931,19 @@ namespace quda {
        //pointer aliasing:
        ColorSpinorField *Av = dynamic_cast<ColorSpinorField*>(&Vm->Component(j+1));
 
-       (*sloppy_mat)(*Av, Vm->Component(j), *ctmp1_p);
+       if(K) {
+         if( !precMatch ) copy(*r_pre, Vm->Component(j));
+         else
+         {             
+           r_pre = &Vm->Component(j);
+           p_pre = &Zm->Component(j);
+         }
+         (*K)( *p_pre ,*r_pre );
+
+         if( !precMatch ) copy(Zm->Component(j), p_pre);
+       }
+
+       (*sloppy_mat)(*Av, Zm->Component(j), *ctmp1_p);
        //
        Complex h0(0.0, 0.0);
        //
@@ -899,7 +992,7 @@ namespace quda {
        PrintStats("GMResDR:", tot_iters, r2, b2, heavy_quark_res);
      }//end of main loop.
 
-     args->UpdateSolution(x_sloppy2, Vm, j);
+     args->UpdateSolution(x_sloppy2, Zm, j);
 
      if (mixed_precision_GMResDR)
      {
@@ -918,14 +1011,16 @@ namespace quda {
 
        args->ComputeHarmonicRitzPairs();
 
-       args->RestartVH( Vm );
+       args->RestartZVH( Vm, Zm );
 
-       defl_param->LoadData(Vm, args->H, args->nev, args->ldm);
+       defl_param->LoadData(Vm, Zm, args->H, args->nev, args->ldm);//Vm or Zm
 
        //Allocate low precision fields:
        csParam.setPrecision(QUDA_HALF_PRECISION);
 
        delete Vm;
+       if(K) delete Zm;
+
        gmres_alloc = false;
 
        AllocateKrylovSubspace(csParam);
@@ -983,6 +1078,12 @@ namespace quda {
      }
    }
 
+   if(K && !precMatch) 
+   {
+      delete r_pre;
+      delete p_pre;
+   }
+
    delete tmp1_p;
    delete yp;
    delete rp;
@@ -994,6 +1095,8 @@ namespace quda {
 
  void GMResDR::RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision)
  {
+     if(K) errorQuda("\nFGRESDR-Proj is not implemented.\n");
+
      bool mixed_precision_gmres = enforce_mixed_precision || (param.precision != param.precision_sloppy);
 
      profile->TPSTART(QUDA_PROFILE_INIT);
@@ -1004,10 +1107,8 @@ namespace quda {
      ColorSpinorField *yp = ColorSpinorField::Create(*in); //high precision aux field
 
      ColorSpinorField &r  = *rp;
-     //
-     ColorSpinorField &x = *out;
-     //
-     ColorSpinorField &y = *yp;
+     ColorSpinorField &x  = *out;
+     ColorSpinorField &y  = *yp;
 
      //Sloppy precision fields:
      ColorSpinorParam csParam(*in);//create spinor parameters
