@@ -57,7 +57,6 @@ namespace quda {
     return;
   }
 
-
   enum KernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
 
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
@@ -209,9 +208,8 @@ namespace quda {
 
 
   __device__ __forceinline__
-  int neighborIndex(const unsigned int& cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int& parity,
-		    const int X[4]){
-    int  full_idx;
+  int neighborIndex(const unsigned int cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int parity, const int X[4]){
+    int full_idx;
     int x[4];
     coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
 
@@ -261,7 +259,8 @@ namespace quda {
 	  result = temp + U*result*arg.coeff;
 	  arg.force.save(reinterpret_cast<real*>(result.data), idx, dim, arg.parity);
 	}
-      } // dir
+      } // dim
+
       idx += gridDim.x*blockDim.x;
     }
     return;
@@ -337,10 +336,10 @@ namespace quda {
 	if(arg.kernelType == OPROD_INTERIOR_KERNEL){
 	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	} else if(arg.kernelType == OPROD_EXTERIOR_KERNEL) {
-	  if (arg.dir == 0) exteriorOprodKernel<0><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-	  if (arg.dir == 1) exteriorOprodKernel<1><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-	  if (arg.dir == 2) exteriorOprodKernel<2><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-	  if (arg.dir == 3) exteriorOprodKernel<3><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	       if (arg.dir == 0) exteriorOprodKernel<0><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  else if (arg.dir == 1) exteriorOprodKernel<1><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  else if (arg.dir == 2) exteriorOprodKernel<2><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  else if (arg.dir == 3) exteriorOprodKernel<3><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	} else {
 	  errorQuda("Kernel type not supported\n");
 	}
