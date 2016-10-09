@@ -150,10 +150,10 @@ using namespace gauge;
       for (int d=0; d<4; d++) {
 	arg.mom.load(reinterpret_cast<Float*>(m.data), x, d, parity);
 	arg.force.load(reinterpret_cast<Float*>(f.data), x, d, parity);
-	
+
 	m = m + arg.coeff * f;
 	makeAntiHerm(m);
-	
+
 	arg.mom.save(reinterpret_cast<Float*>(m.data), x, d, parity); 
       }
       
@@ -271,7 +271,7 @@ using namespace gauge;
 
 	f = u * f;
 
-  arg.force.save(reinterpret_cast<Float*>(f.data), x, d, parity);
+	arg.force.save(reinterpret_cast<Float*>(f.data), x, d, parity);
       }
 
       x += gridDim.x*blockDim.x;
@@ -319,6 +319,7 @@ using namespace gauge;
     ApplyUArg<Float,Force,Gauge> arg(force, U, meta);
     ApplyU<Float,Force,Gauge> applyU(arg, meta);
     applyU.apply(0);
+    cudaDeviceSynchronize();
   }
   template <typename Float>
   void applyU(GaugeField &force, GaugeField &U) {

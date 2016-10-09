@@ -181,7 +181,19 @@ extern "C" {
   void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, 
 				bool *conj_mom, bool *exact, QudaGaugeParam* param);
 
-  void compute_staggered_force_quda_(void* cudaMom, void* qudaQuark, double *coeff);
+  /**
+   * Compute the naive staggered force.  All fields must be in the same precision.
+   *
+   * @param mom Momentum field
+   * @param dt Integrating step size
+   * @param delta Additional scale factor when updating momentum (mom += delta * [force]_TA
+   * @param gauge Gauge field (at present only supports resident gauge field)
+   * @param x Array of single-parity solution vectors (at present only supports resident solutions)
+   * @param gauge_param Gauge field meta data
+   * @param invert_param Dirac and solver meta data
+   */
+  void compute_staggered_force_quda_(void *mom, double *dt, double *delta, void *gauge, void *x,
+				     QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
    * Compute the gauge force and update the mometum field

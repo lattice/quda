@@ -897,14 +897,18 @@ extern "C" {
   void computeStaggeredOprodQuda(void** oprod, void** quark, int num, double** coeff, QudaGaugeParam* param);
 
   /**
-   * Compute the naive staggered force (experimental).  All fields are
-   * QUDA device fields and must be in the same precision.
+   * Compute the naive staggered force.  All fields must be in the same precision.
    *
-   * mom Momentum field (QUDA device field)
-   * quark Quark field solution vectors
-   * coeff Step-size coefficient
+   * @param mom Momentum field
+   * @param dt Integrating step size
+   * @param delta Additional scale factor when updating momentum (mom += delta * [force]_TA
+   * @param gauge Gauge field (at present only supports resident gauge field)
+   * @param x Array of single-parity solution vectors (at present only supports resident solutions)
+   * @param gauge_param Gauge field meta data
+   * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, void* quark, double* coeff);
+  void computeStaggeredForceQuda(void* mom, double dt, double delta, void **x, void *gauge,
+				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
    * Compute the fermion force for the asqtad quark action.

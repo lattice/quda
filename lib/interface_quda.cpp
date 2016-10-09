@@ -193,6 +193,9 @@ static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 //!<Profiler for computeCloverForceQuda
 static TimeProfile profileCloverForce("computeCloverForceQuda");
 
+//!<Profiler for computeStaggeredForceQuda
+static TimeProfile profileStaggeredForce("computeStaggeredForceQuda");
+
 //!<Profiler for computeStaggeredOprodQuda
 static TimeProfile profileStaggeredOprod("computeStaggeredOprodQuda");
 
@@ -360,6 +363,7 @@ extern char* gitversion;
  * Set the device that QUDA uses.
  */
 void initQudaDevice(int dev) {
+
   //static bool initialized = false;
   if (initialized) return;
   initialized = true;
@@ -1246,6 +1250,7 @@ void endQuda(void)
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
     profileCloverForce.Print();
+    profileStaggeredForce.Print();
     profileStaggeredOprod.Print();
     profileAsqtadForce.Print();
     profileHISQForce.Print();
@@ -3859,7 +3864,10 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 #ifdef MULTI_GPU
   // do extended fill so we can reuse this extended gauge field if needed
   GaugeFieldParam gParamEx(gParam);
-  for (int d=0; d<4; d++) gParamEx.x[d] = gParam.x[d] + 2*R[d];
+  for (int d=0; d<4; d++) {
+    gParamEx.x[d] = gParam.x[d] + 2*R[d];
+    gParamEx.r[d] = R[d];
+  }
 #endif
 
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -3899,6 +3907,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   gParamEx.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO ||
       qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+
   qudaGaugeParam->site_ga_pad = gParamEx.pad;//need to set this value
 
   cudaGaugeField *cudaGauge = new cudaGaugeField(gParamEx);
@@ -3921,7 +3931,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParamMom.create = QUDA_REFERENCE_FIELD_CREATE;
   gParamMom.gauge=mom;
-  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER) gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER) gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
   else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
 
   cpuGaugeField* cpuMom = (!qudaGaugeParam->use_resident_mom) ? new cpuGaugeField(gParamMom) : NULL;
@@ -4112,88 +4122,164 @@ void destroyGaugeFieldQuda(void* gauge){
 }
 
 
-void computeKSOprodQuda(void* oprod,
-    void* fermion,
-    double coeff,
-    int X[4],
-    QudaPrecision prec)
-
+ namespace quda {
+ namespace experimental {
+   void computeStaggeredOprod(GaugeField& outA, GaugeField& outB, ColorSpinorField& inEven, ColorSpinorField& inOdd,
+			      const unsigned int parity, const double coeff[2], int nFace);
+ }
+ }
+ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_force, void **x,
+				QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
-/*
-  using namespace quda;
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_INIT);
 
-  cudaGaugeField* cudaOprod;
-  cudaColorSpinorField* cudaQuark;
+  GaugeFieldParam gParam(0, *gauge_param);
 
-  const int Ls = 1;
-  const int Ninternal = 6;
-#ifdef BUILD_TIFR_INTERFACE
-  const int Nface = 1;
-#else
-  const int Nface = 3;
-#endif
-  FaceBuffer fB(X, 4, Ninternal, Nface, prec, Ls);
-  cudaOprod = reinterpret_cast<cudaGaugeField*>(oprod);
-  cudaQuark = reinterpret_cast<cudaColorSpinorField*>(fermion);
+  // create the host momentum field
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.reconstruct = gauge_param->reconstruct;
+  gParam.order = gauge_param->gauge_order;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.t_boundary = QUDA_PERIODIC_T;
+  gParam.gauge = h_mom;
+  gParam.nFace = 1;
+  cpuGaugeField cpuMom(gParam);
 
-  double new_coeff[2] = {0,0};
-  new_coeff[0] = coeff;
-  // Operate on even-parity sites
-  computeStaggeredOprod(*cudaOprod, *cudaOprod, *cudaQuark, fB, 0, new_coeff);
+  // create the host momentum field
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.gauge = h_force;
+  cpuGaugeField cpuForce(gParam);
 
-  // Operator on odd-parity sites
-  computeStaggeredOprod(*cudaOprod, *cudaOprod, *cudaQuark, fB, 1, new_coeff);
+  // create the device momentum field
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.create = QUDA_ZERO_FIELD_CREATE; // FIXME
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  cudaGaugeField cudaMom(gParam);
 
-*/
-  return;
-}
-
-void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
-{
-  bool use_resident_solution = false;
-  if (solutionResident[0]) {
-    qudaQuark = solutionResident[0];
-    use_resident_solution = true;
+  if (gauge_param->use_resident_mom) {
+    errorQuda("Resident momentum field not yet supported");
   } else {
-    errorQuda("No input quark field defined");
+    // download the initial momentum (FIXME make an option just to return?)
+    cudaMom.loadCPUField(cpuMom);
   }
 
-  if (momResident) {
-    cudaMom = momResident;
-  } else {
-    errorQuda("No input momentum defined");
+  // FIXME use resident momentum field?
+
+  ColorSpinorParam qParam;
+  qParam.location = QUDA_CUDA_FIELD_LOCATION;
+  qParam.nColor = 3;
+  qParam.nSpin = 1;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.nDim = 5; // 5 since staggered mrhs
+  qParam.precision = gParam.precision;
+  qParam.pad = 0;
+  for(int dir=0; dir<4; ++dir) qParam.x[dir] = gParam.x[dir];
+  qParam.x[4] = 1;
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+  // resident gauge field is required
+  if (!gauge_param->use_resident_gauge || !gaugePrecise)
+    errorQuda("Resident gauge field is required");
+
+  const int nvector = inv_param->num_offset;
+
+  std::vector<ColorSpinorField*> X(nvector);
+  for ( int i=0; i<nvector; i++) X[i] = ColorSpinorField::Create(qParam);
+
+  if (inv_param->use_resident_solution) {
+    if (solutionResident.size() != (unsigned int)nvector)
+      errorQuda("solutionResident.size() %lu does not match number of shifts %d",
+		solutionResident.size(), nvector);
   }
 
-  if (!gaugePrecise) {
-    errorQuda("No resident gauge field");
+  // create the staggered operator
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, QUDA_NORMOP_PC_SOLVE);
+  Dirac *dirac = Dirac::create(diracParam);
+
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_INIT);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_PREAMBLE);
+
+  for (int i=0; i<nvector; i++) {
+    ColorSpinorField &x = *(X[i]);
+
+    if (inv_param->use_resident_solution) x.Even() = *(solutionResident[i]);
+    else errorQuda("%s requires resident solution", __func__);
+
+    // set the odd solution component
+    dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
   }
 
-  int pad = 0;
-  GaugeFieldParam oParam(gaugePrecise->X(), gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
-      pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-  oParam.create = QUDA_ZERO_FIELD_CREATE;
-  oParam.order  = QUDA_FLOAT2_GAUGE_ORDER;
-  oParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  oParam.t_boundary = QUDA_PERIODIC_T;
-  oParam.nFace = 1;
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_FREE);
 
-  // create temporary field for quark-field outer product
-  cudaGaugeField cudaOprod(oParam);
-
-  // compute quark-field outer product
-  computeKSOprodQuda(&cudaOprod, qudaQuark, coeff,
-      const_cast<int*>(gaugePrecise->X()),
-      gaugePrecise->Precision());
-
-  cudaGaugeField* mom = reinterpret_cast<cudaGaugeField*>(cudaMom);
-
-  completeKSForce(*mom, cudaOprod, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-
-  if (use_resident_solution) {
-    delete solutionResident[0];
+  if (inv_param->use_resident_solution) {
+    for (int i=0; i<nvector; i++) delete solutionResident[i];
     solutionResident.clear();
   }
+  delete dirac;
 
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_INIT);
+
+  // create temporary field for quark-field outer product
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaGaugeField cudaForce(gParam);
+
+#if 0 // only needed if not using QUDA for gauge force
+  {
+    // download the bosonic force and add this to the momentum
+    cudaGaugeField cudaGaugeForce(gParam);
+    cudaGaugeForce.loadCPUField(cpuForce);
+    updateMomentum(cudaMom, delta, cudaGaugeForce);
+  }
+#endif
+
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_INIT);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  // compute quark-field outer product
+  for (int i=0; i<nvector; i++) {
+    ColorSpinorField &x = *(X[i]);
+    // second component is zero since we have no three hop term
+    double coeff[2] = {dt * inv_param->residue[i], 0.0};
+
+    // Operate on even-parity sites
+    experimental::computeStaggeredOprod(cudaForce, cudaForce, x.Even(), x.Odd(), 0, coeff, 1);
+
+    // Operator on odd-parity sites
+    coeff[0] *= -1; // need to multiply by -1 on odd sites
+    experimental::computeStaggeredOprod(cudaForce, cudaForce, x.Even(), x.Odd(), 1, coeff, 1);
+  }
+
+  // mom += delta * [U * force]TA
+  applyU(cudaForce, *gaugePrecise);
+  updateMomentum(cudaMom, delta, cudaForce);
+
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_D2H);
+
+  // for now just copy back outer product for testing
+  // copy the momentum field back to the host
+  cudaMom.saveCPUField(cpuMom);
+
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_D2H);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_FREE);
+
+  for (int i=0; i<nvector; i++) delete X[i];
+
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  checkCudaError();
   return;
 }
 
@@ -4917,11 +5003,11 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   GaugeFieldParam fParam(0, *gauge_param);
   // create the host momentum field
   fParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  fParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   fParam.reconstruct = QUDA_RECONSTRUCT_10;
   fParam.order = gauge_param->gauge_order;
   fParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   fParam.gauge = h_mom;
+  fParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   cpuGaugeField cpuMom(fParam);
 
   // create the device momentum field
@@ -5503,8 +5589,8 @@ int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int 
   return 0;
 }
 
-void compute_staggered_force_quda_(void* cudaMom, void* qudaQuark, double *coeff) {
-  computeStaggeredForceQuda(cudaMom, qudaQuark, *coeff);
+void compute_staggered_force_quda_(void* h_mom, double *dt, double *delta, void *gauge, void *x, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param) {
+  computeStaggeredForceQuda(h_mom, *dt, *delta, gauge, (void**)x, gauge_param, inv_param);
 }
 
 // apply the staggered phases
