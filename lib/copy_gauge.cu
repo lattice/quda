@@ -19,13 +19,13 @@ namespace quda {
   void checkMomOrder(const GaugeField &u) {
     if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
-  errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
-    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER || u.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_NO)
-  errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
-  errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else {
       errorQuda("Unsupported gauge field order %d", u.Order());
     }

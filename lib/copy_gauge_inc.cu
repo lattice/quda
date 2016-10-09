@@ -290,6 +290,16 @@ namespace quda {
 #else
 	    errorQuda("TIFR interface has not been built\n");
 #endif
+	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+#ifdef BUILD_TIFR_INTERFACE
+	    typedef FloatNOrder<FloatOut,10,2,11> momOut;
+	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+				     faceVolumeCB, in.Ndim(), in.Geometry());
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+#else
+	    errorQuda("TIFR interface has not been built\n");
+#endif
 	  } else {
 	    errorQuda("Gauge field orders %d not supported", in.Order());
 	  }
@@ -323,6 +333,26 @@ namespace quda {
 	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 	    typedef TIFROrder<FloatIn,18> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+				     faceVolumeCB, in.Ndim(), in.Geometry());
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	  } else {
+	    errorQuda("Gauge field orders %d not supported", in.Order());
+	  }
+#else
+	  errorQuda("TIFR interface has not been built\n");
+#endif
+	} else if (out.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+	  typedef TIFRPaddedOrder<FloatOut,18> momOut;
+#ifdef BUILD_TIFR_INTERFACE
+	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
+	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+				     faceVolumeCB, in.Ndim(), in.Geometry());
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
