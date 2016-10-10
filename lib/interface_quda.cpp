@@ -4157,7 +4157,7 @@ void destroyGaugeFieldQuda(void* gauge){
   gParam.create = QUDA_ZERO_FIELD_CREATE; // FIXME
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
-  cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : nullptr;
+  cudaGaugeField *cudaMom = !gauge_param->use_resident_mom ? new cudaGaugeField(gParam) : nullptr;
 
   // create temporary field for quark-field outer product
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -5447,7 +5447,7 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   gParam.pad = 0;
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER) ?
+  gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER || gParam.order == QUDA_TIFR_PADDED_GAUGE_ORDER) ?
     QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.gauge = momentum;
@@ -5614,6 +5614,12 @@ void remove_staggered_phase_quda_() {
   }
   cudaDeviceSynchronize();
 }
+
+// evaluate the kinetic term
+void kinetic_quda_(double *kin, void* momentum, QudaGaugeParam* param) {
+  *kin = momActionQuda(momentum, param);
+}
+
 
 /**
  * BQCD wants a node mapping with x varying fastest.

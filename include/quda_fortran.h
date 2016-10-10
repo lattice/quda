@@ -213,23 +213,34 @@ extern "C" {
 				QudaGaugeParam *qudaGaugeParam);
 
   /**
-   * Apply the staggered phase factors to the resident gauge field
+   * @brief Apply the staggered phase factors to the resident gauge field
    */
   void apply_staggered_phase_quda_();
 
   /**
-   * Remove the staggered phase factors to the resident gauge field
+   * @brief Remove the staggered phase factors to the resident gauge field
    */
   void remove_staggered_phase_quda_();
 
   /**
-   * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+   * @brief Evaluate the kinetic (momentum) contribution to classical
+   * Hamiltonian for Hybrid Monte Carlo.
+   *
+   * @param kin Kinetic energy
+   * @param momentum The momentum field
+   * @param param The parameters of the external fields and the computation settings
+   * @return momentum action
+   */
+  void kinetic_quda_(double *kin, void* momentum, QudaGaugeParam* param);
+
+  /**
+   * @param Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
   void plaq_quda_(double plaq[3]);
 
   /**
-   * Temporary function exposed for TIFR benchmarking
+   * @brief fTemporary function exposed for TIFR benchmarking
    */
   void set_kernel_pack_t_(int *pack);
 

@@ -822,7 +822,7 @@ extern "C" {
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
-   * action.  The momentum field is assumed to be in MILC order.
+   * action.
    *
    * @param momentum The momentum field
    * @param param The parameters of the external fields and the computation settings
