@@ -245,7 +245,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(overlap, 0); /**< width of domain overlaps */
 #endif
 
+#ifdef INIT_PARAM
+  P(compute_action, 0);
+#else
   P(compute_action, INVALID_INT);
+#endif
 
   if (param->num_offset > 0) {
 
