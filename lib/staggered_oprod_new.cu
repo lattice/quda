@@ -413,11 +413,7 @@ namespace quda {
       StaggeredOprodArg<Float,Output,InputA,InputB> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, nFace, coeff, inA, inB, outA, outB, outFieldA);
       StaggeredOprodField<Float,Output,InputA,InputB> oprod(arg, outFieldA);
 
-      cudaDeviceSynchronize(); checkCudaError();
-
       exchangeGhost(src, parity, 0);
-
-      cudaDeviceSynchronize(); checkCudaError();
 
       arg.kernelType = OPROD_INTERIOR_KERNEL;
       arg.length = src.VolumeCB();
@@ -443,7 +439,9 @@ namespace quda {
 	    oprod.apply(streams[Nstream-1]);
 	  } 
 	}
-      } // i=3,..,0 
+      } // i=3,..,0
+
+      checkCudaError();
     } // computeStaggeredOprodCuda
 
 #endif // GPU_STAGGERED_DIRAC
