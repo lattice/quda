@@ -11,7 +11,7 @@ namespace quda {
 
   namespace experimental {
 
-#ifdef GPU_STAGGERED_OPROD
+#ifdef GPU_STAGGERED_DIRAC
 
   namespace { // anonymous
 #include <texture.h>
@@ -446,12 +446,12 @@ namespace quda {
       } // i=3,..,0 
     } // computeStaggeredOprodCuda
 
-#endif // GPU_STAGGERED_OPROD
+#endif // GPU_STAGGERED_DIRAC
 
   void computeStaggeredOprod(GaugeField& outA, GaugeField& outB, ColorSpinorField& inEven, ColorSpinorField& inOdd,
 			     const unsigned int parity, const double coeff[2], int nFace)
   {
-#ifdef GPU_STAGGERED_OPROD 
+#ifdef GPU_STAGGERED_DIRAC
     if(outA.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", outA.Order());    
 
@@ -480,7 +480,7 @@ namespace quda {
       errorQuda("Unsupported precision: %d\n", inEven.Precision());
     }
 
-#else // GPU_STAGGERED_OPROD not defined
+#else // GPU_STAGGERED_DIRAC not defined
     errorQuda("Staggered Outer Product has not been built!"); 
 #endif
 
