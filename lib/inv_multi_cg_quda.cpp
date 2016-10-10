@@ -472,35 +472,44 @@ namespace quda {
     param.gflops = gflops;
     param.iter += k;
 
-    // only allocate temporaries if necessary
-    csParam.setPrecision(param.precision);
-    ColorSpinorField *tmp4_p = reliable ? y[0] : tmp1.Precision() == x[0]->Precision() ? &tmp1 : ColorSpinorField::Create(csParam);
-    ColorSpinorField *tmp5_p = mat.isStaggered() ? tmp4_p :
-      reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
+    if (param.compute_true_res) {
+      // only allocate temporaries if necessary
+      csParam.setPrecision(param.precision);
+      ColorSpinorField *tmp4_p = reliable ? y[0] : tmp1.Precision() == x[0]->Precision() ? &tmp1 : ColorSpinorField::Create(csParam);
+      ColorSpinorField *tmp5_p = mat.isStaggered() ? tmp4_p :
+	reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
 
-    for(int i=0; i < num_offset; i++) { 
-      mat(*r, *x[i], *tmp4_p, *tmp5_p);
-      if (r->Nspin()==4) {
-	blas::axpy(offset[i], *x[i], *r); // Offset it.
-      } else if (i!=0) {
-	blas::axpy(offset[i]-offset[0], *x[i], *r); // Offset it.
+      for(int i=0; i < num_offset; i++) {
+	mat(*r, *x[i], *tmp4_p, *tmp5_p);
+	if (r->Nspin()==4) {
+	  blas::axpy(offset[i], *x[i], *r); // Offset it.
+	} else if (i!=0) {
+	  blas::axpy(offset[i]-offset[0], *x[i], *r); // Offset it.
+	}
+	double true_res = blas::xmyNorm(b, *r);
+	param.true_res_offset[i] = sqrt(true_res/b2);
+	param.iter_res_offset[i] = sqrt(r2[i]/b2);
+	param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
       }
-      double true_res = blas::xmyNorm(b, *r);
-      param.true_res_offset[i] = sqrt(true_res/b2);
-      param.iter_res_offset[i] = sqrt(r2[i]/b2);
-      param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
-    }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE){
-      printfQuda("MultiShift CG: Converged after %d iterations\n", k);
-      for(int i=0; i < num_offset; i++) { 
-	printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n", 
-		   i, param.iter_res_offset[i], param.true_res_offset[i]);
+      if (getVerbosity() >= QUDA_SUMMARIZE){
+	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+	for(int i=0; i < num_offset; i++) {
+	  printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n",
+		     i, param.iter_res_offset[i], param.true_res_offset[i]);
+	}
+      }
+
+      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && tmp5_p != y[1]) delete tmp5_p;
+      if (tmp4_p != &tmp1 && tmp4_p != y[0]) delete tmp4_p;
+    } else {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+	for(int i=0; i < num_offset; i++) {
+	  printfQuda(" shift=%d, relative residual: iterated = %e\n", i, param.iter_res_offset[i]);
+	}
       }
     }
-
-    if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && tmp5_p != y[1]) delete tmp5_p;
-    if (tmp4_p != &tmp1 && tmp4_p != y[0]) delete tmp4_p;
 
     // reset the flops counters
     blas::flops = 0;

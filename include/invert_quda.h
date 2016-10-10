@@ -78,6 +78,9 @@ namespace quda {
     /**< Solver tolerance in the heavy quark residual norm */
     double tol_hq;
 
+    /**< Whether to compute the true residual post solve */
+    bool compute_true_res;
+
     /**< Actual L2 residual norm achieved in solver */
     double true_res;
 
@@ -181,8 +184,6 @@ namespace quda {
 
     QudaVerbosity verbosity_precondition; //! verbosity to use for preconditioner
 
-    bool compute_true_res; //! whether to compute the true residual or not at the end
-
     bool is_preconditioner; //! whether the solver acting as a preconditioner for another solver
 
     bool global_reduction; //! whether to use a global or local (node) reduction for this solver
@@ -190,7 +191,7 @@ namespace quda {
     /**
        Default constructor
      */
-    SolverParam() : verbosity_precondition(QUDA_SILENT), compute_true_res(true) { ; }
+    SolverParam() : compute_true_res(true), verbosity_precondition(QUDA_SILENT) { ; }
 
     /**
        Constructor that matches the initial values to that of the
@@ -204,8 +205,8 @@ namespace quda {
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      true_res(param.true_res), true_res_hq(param.true_res_hq),
-      maxiter(param.maxiter), iter(param.iter),
+      compute_true_res(param.compute_true_res), true_res(param.true_res),
+      true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
       precision_precondition(param.cuda_prec_precondition),
       preserve_source(param.preserve_source), num_src(param.num_src), num_offset(param.num_offset),
@@ -217,7 +218,7 @@ namespace quda {
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
-      verbosity_precondition(param.verbosity_precondition), compute_true_res(true),
+      verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(false), global_reduction(true)
     {
       for (int i=0; i<num_offset; i++) {
@@ -242,8 +243,8 @@ namespace quda {
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      true_res(param.true_res), true_res_hq(param.true_res_hq),
-      maxiter(param.maxiter), iter(param.iter),
+      compute_true_res(param.compute_true_res), true_res(param.true_res),
+      true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.precision), precision_sloppy(param.precision_sloppy),
       precision_precondition(param.precision_precondition),
       preserve_source(param.preserve_source), num_offset(param.num_offset),
@@ -255,7 +256,7 @@ namespace quda {
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
-      verbosity_precondition(param.verbosity_precondition), compute_true_res(param.compute_true_res),
+      verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction)
     {
       for (int i=0; i<num_offset; i++) {

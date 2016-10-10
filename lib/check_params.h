@@ -247,8 +247,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #ifdef INIT_PARAM
   P(compute_action, 0);
+  P(compute_true_res, 1);
 #else
   P(compute_action, INVALID_INT);
+  P(compute_true_res, INVALID_INT);
 #endif
 
   if (param->num_offset > 0) {
