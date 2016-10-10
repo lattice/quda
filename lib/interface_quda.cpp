@@ -5562,32 +5562,110 @@ void update_gauge_field_quda_(void *gauge, void *momentum, double *dt,
   updateGaugeFieldQuda(gauge, momentum, *dt, (int)*conj_mom, (int)*exact, param);
 }
 
-int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int *path_length,
-    double *loop_coeff, int *num_paths, int *max_length, double *dt,
-    QudaGaugeParam *param) {
+static inline int opp(int dir) { return 7-dir; }
 
-  // fortran uses multi-dimensional arrays which we have convert into an array of pointers to pointers
-  const int dim = 4;
-  int ***input_path = (int***)safe_malloc(dim*sizeof(int**));
-  for (int i=0; i<dim; i++) {
-    input_path[i] = (int**)safe_malloc(*num_paths*sizeof(int*));
-    for (int j=0; j<*num_paths; j++) {
-      input_path[i][j] = (int*)safe_malloc(path_length[j]*sizeof(int));
-      for (int k=0; k<path_length[j]; k++) {
-        input_path[i][j][k] = input_path_buf[(i* (*num_paths) + j)* (*max_length) + k];
-      }
+static void createGaugeForcePaths(int **paths, int dir, int num_loop_types){
+
+  int index=0;
+  // Plaquette paths
+  if (num_loop_types >= 1)
+    for(int i=0; i<4; ++i){
+      if(i==dir) continue;
+      paths[index][0] = i;        paths[index][1] = opp(dir);   paths[index++][2] = opp(i);
+      paths[index][0] = opp(i);   paths[index][1] = opp(dir);   paths[index++][2] = i;
+    }
+
+  // Rectangle Paths
+  if (num_loop_types >= 2)
+    for(int i=0; i<4; ++i){
+      if(i==dir) continue;
+      paths[index][0] = paths[index][1] = i;       paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = opp(i);
+      index++;
+      paths[index][0] = paths[index][1] = opp(i);  paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = i;
+      index++;
+      paths[index][0] = dir; paths[index][1] = i; paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = opp(i);
+      index++;
+      paths[index][0] = dir; paths[index][1] = opp(i); paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = i;
+      index++;
+      paths[index][0] = i;  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = opp(i); paths[index][4] = dir;
+      index++;
+      paths[index][0] = opp(i);  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = i; paths[index][4] = dir;
+      index++;
+    }
+
+  if (num_loop_types >= 3) {
+    // Staple paths
+    for(int i=0; i<4; ++i){
+      for(int j=0; j<4; ++j){
+	if(i==dir || j==dir || i==j) continue;
+	paths[index][0] = i; paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = opp(j);
+	index++;
+	paths[index][0] = i; paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = j;
+	index++;
+	paths[index][0] = opp(i); paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = opp(j);
+	index++;
+	paths[index][0] = opp(i); paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = j;
+	index++;
+     }
     }
   }
 
-  computeGaugeForceQuda(mom, gauge, input_path, path_length, loop_coeff, *num_paths, *max_length, *dt, param);
+}
 
-  for (int i=0; i<dim; i++) {
-    for (int j=0; j<*num_paths; j++) { host_free(input_path[i][j]); }
-    host_free(input_path[i]);
+void compute_gauge_force_quda_(void *mom, void *gauge, int *num_loop_types, double *coeff, double *dt,
+			       QudaGaugeParam *param) {
+
+  int numPaths = 0;
+  switch (*num_loop_types) {
+  case 1:
+    numPaths = 6;
+    break;
+  case 2:
+    numPaths = 24;
+    break;
+  case 3:
+    numPaths = 48;
+    break;
+  default:
+    errorQuda("Invalid num_loop_types = %d\n", *num_loop_types);
   }
-  host_free(input_path);
 
-  return 0;
+  double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
+  int *path_length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
+
+  if (*num_loop_types >= 1) for(int i= 0; i< 6; ++i) {
+      loop_coeff[i] = coeff[0];
+      path_length[i] = 3;
+    }
+  if (*num_loop_types >= 2) for(int i= 6; i<24; ++i) {
+      loop_coeff[i] = coeff[1];
+      path_length[i] = 5;
+    }
+  if (*num_loop_types >= 3) for(int i=24; i<48; ++i) {
+      loop_coeff[i] = coeff[2];
+      path_length[i] = 5;
+    }
+
+  int** input_path_buf[4];
+  for(int dir=0; dir<4; ++dir){
+    input_path_buf[dir] = static_cast<int**>(safe_malloc(numPaths*sizeof(int*)));
+    for(int i=0; i<numPaths; ++i){
+      input_path_buf[dir][i] = static_cast<int*>(safe_malloc(path_length[i]*sizeof(int)));
+    }
+    createGaugeForcePaths(input_path_buf[dir], dir, *num_loop_types);
+  }
+
+  int max_length = 6;
+
+  computeGaugeForceQuda(mom, gauge, input_path_buf, path_length, loop_coeff, numPaths, max_length, *dt, param);
+
+  for(int dir=0; dir<4; ++dir){
+    for(int i=0; i<numPaths; ++i) host_free(input_path_buf[dir][i]);
+    host_free(input_path_buf[dir]);
+  }
+
+  host_free(path_length);
+  host_free(loop_coeff);
 }
 
 void compute_staggered_force_quda_(void* h_mom, double *dt, double *delta, void *gauge, void *x, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param) {

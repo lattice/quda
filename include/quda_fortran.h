@@ -196,21 +196,17 @@ extern "C" {
 				     QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
-   * Compute the gauge force and update the mometum field
+   * @brief Compute the gauge force and update the mometum field
    *
-   * @param mom The momentum field to be updated
-   * @param gauge The gauge field from which we compute the force
-   * @param input_path_buf[dim][num_paths][path_length] (Fortran 3-d array)
-   * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
-   * @param loop_coeff Coefficients of the different loops in the Symanzik action
-   * @param num_paths How many contributions from path_length different "staples"
-   * @param max_length The maximum number of non-zero of links in any path in the action
-   * @param dt The integration step size (for MILC this is dt*beta/3)
-   * @param param The parameters of the external fields and the computation settings
+   * @param[in,out] mom The momentum field to be updated
+   * @param[in] gauge The gauge field from which we compute the force
+   * @param[in] num_loop_types Number of loop types in the gauge action
+   * @param[in] loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param[in] dt The integration step size
+   * @param[in] param The parameters of the external fields and the computation settings
    */
-  int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int *path_length,
-				double *loop_coeff, int *num_paths, int *max_length, double *dt,
-				QudaGaugeParam *qudaGaugeParam);
+  void compute_gauge_force_quda_(void *mom, void *gauge, int *num_loop_types, double *coeff, double *dt,
+				 QudaGaugeParam *param);
 
   /**
    * @brief Apply the staggered phase factors to the resident gauge field
