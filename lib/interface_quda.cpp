@@ -3938,7 +3938,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   cudaGaugeField* cudaMom = NULL;
   if (qudaGaugeParam->use_resident_mom) {
-    if (!gaugePrecise) errorQuda("No resident momentum field to use");
+    if (!momResident) errorQuda("No resident momentum field to use");
     cudaMom = momResident;
     if (qudaGaugeParam->overwrite_mom) cudaMom->zero();
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
@@ -4157,7 +4157,7 @@ void destroyGaugeFieldQuda(void* gauge){
   gParam.create = QUDA_ZERO_FIELD_CREATE; // FIXME
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
-  cudaGaugeField cudaMom(gParam);
+  cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : nullptr;
 
   // create temporary field for quark-field outer product
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -4185,12 +4185,10 @@ void destroyGaugeFieldQuda(void* gauge){
 
   if (gauge_param->use_resident_mom) {
     if (!momResident) errorQuda("Cannot use resident momentum field since none appears resident");
-    cudaMom.copy(*momResident);
-    delete momResident;
-    momResident = nullptr;
+    cudaMom = momResident;
   } else {
     // download the initial momentum (FIXME make an option just to return?)
-    cudaMom.loadCPUField(cpuMom);
+    cudaMom->loadCPUField(cpuMom);
   }
 
   // resident gauge field is required
@@ -4256,19 +4254,23 @@ void destroyGaugeFieldQuda(void* gauge){
 
   // mom += delta * [U * force]TA
   applyU(cudaForce, *gaugePrecise);
-  updateMomentum(cudaMom, delta, cudaForce);
+  updateMomentum(*cudaMom, delta, cudaForce);
   cudaDeviceSynchronize();
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_D2H);
 
-  if (gauge_param->make_resident_mom) {
-    errorQuda("Making momentum field resident not supported");
+  if (gauge_param->return_result_mom) {
+    // copy the momentum field back to the host
+    cudaMom->saveCPUField(cpuMom);
   }
 
-  // for now just copy back outer product for testing
-  // copy the momentum field back to the host
-  cudaMom.saveCPUField(cpuMom);
+  if (gauge_param->make_resident_mom) {
+    // make the momentum field resident
+    momResident = cudaMom;
+  } else {
+    delete cudaMom;
+  }
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_D2H);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_FREE);
@@ -5205,11 +5207,11 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
 
 void updateGaugeFieldQuda(void* gauge,
-    void* momentum,
-    double dt,
-    int conj_mom,
-    int exact,
-    QudaGaugeParam* param)
+			  void* momentum,
+			  double dt,
+			  int conj_mom,
+			  int exact,
+			  QudaGaugeParam* param)
 {
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5228,7 +5230,7 @@ void updateGaugeFieldQuda(void* gauge,
   bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
   cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
-  gParam.reconstruct = gParam.order == QUDA_TIFR_GAUGE_ORDER ?
+  gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER || gParam.order == QUDA_TIFR_PADDED_GAUGE_ORDER) ?
    QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.gauge = momentum;
