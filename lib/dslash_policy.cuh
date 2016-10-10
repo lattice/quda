@@ -1327,7 +1327,7 @@ struct DslashFactory {
    virtual ~DslashPolicyTune() { }
 
    void apply(const cudaStream_t &stream) {
-     TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
      (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);

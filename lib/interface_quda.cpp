@@ -527,9 +527,6 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  //printfQuda("loadGaugeQuda use_resident_gauge = %d phase=%d\n",
-  //param->use_resident_gauge, param->staggered_phase_applied);
-
   profileGauge.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -5285,7 +5282,6 @@ void updateGaugeFieldQuda(void* gauge,
     profileGaugeUpdate.TPSTOP(QUDA_PROFILE_D2H);
   }
 
-
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_FREE);
   if (param->make_resident_gauge) {
     if (gaugePrecise != NULL) delete gaugePrecise;
@@ -5674,7 +5670,6 @@ void compute_staggered_force_quda_(void* h_mom, double *dt, double *delta, void 
 
 // apply the staggered phases
 void apply_staggered_phase_quda_() {
-  printfQuda("applying staggered phase\n");
   if (gaugePrecise) {
     gaugePrecise->applyStaggeredPhase();
   } else {
@@ -5684,7 +5679,6 @@ void apply_staggered_phase_quda_() {
 
 // remove the staggered phases
 void remove_staggered_phase_quda_() {
-  printfQuda("removing staggered phase\n");
   if (gaugePrecise) {
     gaugePrecise->removeStaggeredPhase();
   } else {
