@@ -4184,7 +4184,10 @@ void destroyGaugeFieldQuda(void* gauge){
   profileStaggeredForce.TPSTART(QUDA_PROFILE_H2D);
 
   if (gauge_param->use_resident_mom) {
-    errorQuda("Resident momentum field not yet supported");
+    if (!momResident) errorQuda("Cannot use resident momentum field since none appears resident");
+    cudaMom.copy(*momResident);
+    delete momResident;
+    momResident = nullptr;
   } else {
     // download the initial momentum (FIXME make an option just to return?)
     cudaMom.loadCPUField(cpuMom);
@@ -4258,6 +4261,10 @@ void destroyGaugeFieldQuda(void* gauge){
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_D2H);
+
+  if (gauge_param->make_resident_mom) {
+    errorQuda("Making momentum field resident not supported");
+  }
 
   // for now just copy back outer product for testing
   // copy the momentum field back to the host
