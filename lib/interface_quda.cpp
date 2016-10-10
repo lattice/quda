@@ -3115,114 +3115,115 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  // check each shift has the desired tolerance and use sequential CG to refine
-
-  profileMulti.TPSTART(QUDA_PROFILE_INIT);
-  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaColorSpinorField r(*b, cudaParam);
-  profileMulti.TPSTOP(QUDA_PROFILE_INIT);
+  if (param->compute_true_res) {
+    // check each shift has the desired tolerance and use sequential CG to refine
+    profileMulti.TPSTART(QUDA_PROFILE_INIT);
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+    cudaColorSpinorField r(*b, cudaParam);
+    profileMulti.TPSTOP(QUDA_PROFILE_INIT);
 
 #define REFINE_INCREASING_MASS
 #ifdef REFINE_INCREASING_MASS
-  for(int i=0; i < param->num_offset; i++) {
+    for(int i=0; i < param->num_offset; i++) {
 #else
-  for(int i=param->num_offset-1; i >= 0; i--) {
+    for(int i=param->num_offset-1; i >= 0; i--) {
 #endif
-    double rsd_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
-      param->true_res_hq_offset[i] : 0;
-    double tol_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
-      param->tol_hq_offset[i] : 0;
+      double rsd_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
+	param->true_res_hq_offset[i] : 0;
+      double tol_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
+	param->tol_hq_offset[i] : 0;
 
-    /*
-      In the case where the shifted systems have zero tolerance
-      specified, we refine these systems until either the limit of
-      precision is reached (prec_tol) or until the tolerance reaches
-      the iterated residual tolerance of the previous multi-shift
-      solver (iter_res_offset[i]), which ever is greater.
-     */
-    const double prec_tol = pow(10.,(-2*(int)param->cuda_prec+2));
-    const double iter_tol = (param->iter_res_offset[i] < prec_tol ? prec_tol : (param->iter_res_offset[i] *1.1));
-    const double refine_tol = (param->tol_offset[i] == 0.0 ? iter_tol : param->tol_offset[i]);
-    // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0
-    if ((param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq)) {
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
-            i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
+      /*
+	In the case where the shifted systems have zero tolerance
+	specified, we refine these systems until either the limit of
+	precision is reached (prec_tol) or until the tolerance reaches
+	the iterated residual tolerance of the previous multi-shift
+	solver (iter_res_offset[i]), which ever is greater.
+      */
+      const double prec_tol = pow(10.,(-2*(int)param->cuda_prec+2));
+      const double iter_tol = (param->iter_res_offset[i] < prec_tol ? prec_tol : (param->iter_res_offset[i] *1.1));
+      const double refine_tol = (param->tol_offset[i] == 0.0 ? iter_tol : param->tol_offset[i]);
+      // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0
+      if ((param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq)) {
+	if (getVerbosity() >= QUDA_SUMMARIZE)
+	  printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
+		     i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
 
-      // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
-      if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-          param->dslash_type == QUDA_STAGGERED_DSLASH) {
-        dirac.setMass(sqrt(param->offset[i]/4));
-        diracSloppy.setMass(sqrt(param->offset[i]/4));
-      }
-
-      DiracMdagM m(dirac), mSloppy(diracSloppy);
-
-      // need to curry in the shift if we are not doing staggered
-      if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
-          param->dslash_type != QUDA_STAGGERED_DSLASH) {
-        m.shift = param->offset[i];
-        mSloppy.shift = param->offset[i];
-      }
-
-      if (0) { // experimenting with Minimum residual extrapolation
-	// only perform MRE using current and previously refined solutions
-#ifdef REFINE_INCREASING_MASS
-	const int nRefine = i+1;
-#else
-	const int nRefine = param->num_offset - i + 1;
-#endif
-
-	std::vector<ColorSpinorField*> q;
-	q.resize(nRefine);
-	std::vector<ColorSpinorField*> z;
-	z.resize(nRefine);
-	cudaParam.create = QUDA_NULL_FIELD_CREATE;
-	cudaColorSpinorField tmp(cudaParam);
-
-	for(int j=0; j < nRefine; j++) {
-	  q[j] = new cudaColorSpinorField(cudaParam);
-	  z[j] = new cudaColorSpinorField(cudaParam);
+	// for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
+	if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+	    param->dslash_type == QUDA_STAGGERED_DSLASH) {
+	  dirac.setMass(sqrt(param->offset[i]/4));
+	  diracSloppy.setMass(sqrt(param->offset[i]/4));
 	}
 
-	*z[0] = *x[0]; // zero solution already solved
+	DiracMdagM m(dirac), mSloppy(diracSloppy);
+
+	// need to curry in the shift if we are not doing staggered
+	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
+	    param->dslash_type != QUDA_STAGGERED_DSLASH) {
+	  m.shift = param->offset[i];
+	  mSloppy.shift = param->offset[i];
+	}
+
+	if (0) { // experimenting with Minimum residual extrapolation
+	  // only perform MRE using current and previously refined solutions
 #ifdef REFINE_INCREASING_MASS
-	for (int j=1; j<nRefine; j++) *z[j] = *x[j];
+	  const int nRefine = i+1;
 #else
-	for (int j=1; j<nRefine; j++) *z[j] = *x[param->num_offset-j];
+	  const int nRefine = param->num_offset - i + 1;
 #endif
 
-	bool orthogonal = true;
-	bool apply_mat = true;
-	MinResExt mre(m, orthogonal, apply_mat, profileMulti);
-	blas::copy(tmp, *b);
-	mre(*x[i], tmp, z, q);
+	  std::vector<ColorSpinorField*> q;
+	  q.resize(nRefine);
+	  std::vector<ColorSpinorField*> z;
+	  z.resize(nRefine);
+	  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+	  cudaColorSpinorField tmp(cudaParam);
 
-	for(int j=0; j < nRefine; j++) {
-	  delete q[j];
-	  delete z[j];
+	  for(int j=0; j < nRefine; j++) {
+	    q[j] = new cudaColorSpinorField(cudaParam);
+	    z[j] = new cudaColorSpinorField(cudaParam);
+	  }
+
+	  *z[0] = *x[0]; // zero solution already solved
+#ifdef REFINE_INCREASING_MASS
+	  for (int j=1; j<nRefine; j++) *z[j] = *x[j];
+#else
+	  for (int j=1; j<nRefine; j++) *z[j] = *x[param->num_offset-j];
+#endif
+
+	  bool orthogonal = true;
+	  bool apply_mat = true;
+	  MinResExt mre(m, orthogonal, apply_mat, profileMulti);
+	  blas::copy(tmp, *b);
+	  mre(*x[i], tmp, z, q);
+
+	  for(int j=0; j < nRefine; j++) {
+	    delete q[j];
+	    delete z[j];
+	  }
 	}
+
+	SolverParam solverParam(*param);
+	solverParam.iter = 0;
+	solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+	solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
+	solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
+
+	CG cg(m, mSloppy, solverParam, profileMulti);
+	cg(*x[i], *b);
+
+	solverParam.true_res_offset[i] = solverParam.true_res;
+	solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
+	solverParam.updateInvertParam(*param,i);
+
+	if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+	    param->dslash_type == QUDA_STAGGERED_DSLASH) {
+	  dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
+	  diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
+	}
+
       }
-
-      SolverParam solverParam(*param);
-      solverParam.iter = 0;
-      solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
-      solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
-
-      CG cg(m, mSloppy, solverParam, profileMulti);
-      cg(*x[i], *b);
-
-      solverParam.true_res_offset[i] = solverParam.true_res;
-      solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
-      solverParam.updateInvertParam(*param,i);
-
-      if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
-          param->dslash_type == QUDA_STAGGERED_DSLASH) {
-        dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
-        diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
-      }
-
     }
   }
 
