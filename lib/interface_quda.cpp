@@ -4159,14 +4159,11 @@ void destroyGaugeFieldQuda(void* gauge){
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   cudaGaugeField cudaMom(gParam);
 
-  if (gauge_param->use_resident_mom) {
-    errorQuda("Resident momentum field not yet supported");
-  } else {
-    // download the initial momentum (FIXME make an option just to return?)
-    cudaMom.loadCPUField(cpuMom);
-  }
-
-  // FIXME use resident momentum field?
+  // create temporary field for quark-field outer product
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaGaugeField cudaForce(gParam);
 
   ColorSpinorParam qParam;
   qParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -4183,12 +4180,24 @@ void destroyGaugeFieldQuda(void* gauge){
   qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_INIT);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_H2D);
+
+  if (gauge_param->use_resident_mom) {
+    errorQuda("Resident momentum field not yet supported");
+  } else {
+    // download the initial momentum (FIXME make an option just to return?)
+    cudaMom.loadCPUField(cpuMom);
+  }
+
   // resident gauge field is required
   if (!gauge_param->use_resident_gauge || !gaugePrecise)
     errorQuda("Resident gauge field is required");
 
-  const int nvector = inv_param->num_offset;
+  profileStaggeredForce.TPSTOP(QUDA_PROFILE_H2D);
+  profileStaggeredForce.TPSTART(QUDA_PROFILE_INIT);
 
+  const int nvector = inv_param->num_offset;
   std::vector<ColorSpinorField*> X(nvector);
   for ( int i=0; i<nvector; i++) X[i] = ColorSpinorField::Create(qParam);
 
@@ -4226,24 +4235,6 @@ void destroyGaugeFieldQuda(void* gauge){
   delete dirac;
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_FREE);
-  profileStaggeredForce.TPSTART(QUDA_PROFILE_INIT);
-
-  // create temporary field for quark-field outer product
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaGaugeField cudaForce(gParam);
-
-#if 0 // only needed if not using QUDA for gauge force
-  {
-    // download the bosonic force and add this to the momentum
-    cudaGaugeField cudaGaugeForce(gParam);
-    cudaGaugeForce.loadCPUField(cpuForce);
-    updateMomentum(cudaMom, delta, cudaGaugeForce);
-  }
-#endif
-
-  profileStaggeredForce.TPSTOP(QUDA_PROFILE_INIT);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
   // compute quark-field outer product
@@ -4263,6 +4254,7 @@ void destroyGaugeFieldQuda(void* gauge){
   // mom += delta * [U * force]TA
   applyU(cudaForce, *gaugePrecise);
   updateMomentum(cudaMom, delta, cudaForce);
+  cudaDeviceSynchronize();
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_D2H);
