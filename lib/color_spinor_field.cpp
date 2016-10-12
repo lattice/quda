@@ -15,7 +15,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), v(0), norm(0), ghost_field(0), nFaceComms(0),
+    : LatticeField(param), init(false), v(0), norm(0), nFaceComms(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
       ghost_length(0), ghost_norm_length(0),
       bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
@@ -28,7 +28,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), v(0), norm(0), ghost_field(0), nFaceComms(0),
+    : LatticeField(field), init(false), v(0), norm(0), nFaceComms(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
       ghost_length(0), ghost_norm_length(0),
       bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
@@ -104,9 +104,6 @@ namespace quda {
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE)
-      printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
-
     // ghost zones are calculated on c/b volumes
     ghost_length = ghostVolume*nColor*nSpin*2;
     ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
@@ -117,6 +114,7 @@ namespace quda {
     }
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
+      printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
       printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
     }
 

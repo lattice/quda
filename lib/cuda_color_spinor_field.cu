@@ -23,7 +23,8 @@ namespace quda {
 
   int cudaColorSpinorField::bufferIndex = 0;
   bool cudaColorSpinorField::initGhostFaceBuffer = false;
-  void* cudaColorSpinorField::ghostFaceBuffer[2]; //gpu memory
+  void *cudaColorSpinorField::ghost_field = nullptr;
+  void* cudaColorSpinorField::ghostFaceBuffer[2] = {nullptr, nullptr}; //gpu memory
   void* cudaColorSpinorField::fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
@@ -33,8 +34,19 @@ namespace quda {
   int cudaColorSpinorField::buffer_send_p2p_back[QUDA_MAX_DIM];
   int cudaColorSpinorField::buffer_recv_p2p_back[QUDA_MAX_DIM];
 
+  MsgHandle* cudaColorSpinorField::mh_send_p2p_fwd[QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_send_p2p_back[QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_recv_p2p_fwd[QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_recv_p2p_back[QUDA_MAX_DIM];
+
+  cudaEvent_t cudaColorSpinorField::ipcCopyEvent[2][QUDA_MAX_DIM];
+  cudaEvent_t cudaColorSpinorField::ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
+
+  void* cudaColorSpinorField::fwdGhostSendDest[QUDA_MAX_DIM];
+  void* cudaColorSpinorField::backGhostSendDest[QUDA_MAX_DIM];
+
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-    ColorSpinorField(param), alloc(false), init(true), ghostInit(false), texInit(false),
+    ColorSpinorField(param), alloc(false), init(true), texInit(false),
     ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     // this must come before create
@@ -57,7 +69,7 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-    ColorSpinorField(src), alloc(false), init(true), ghostInit(false), texInit(false),
+    ColorSpinorField(src), alloc(false), init(true), texInit(false),
     ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
@@ -67,7 +79,7 @@ namespace quda {
   // creates a copy of src, any differences defined in param
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
-    ColorSpinorField(src), alloc(false), init(true), ghostInit(false), texInit(false),
+    ColorSpinorField(src), alloc(false), init(true), texInit(false),
     ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
@@ -115,7 +127,7 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
-    : ColorSpinorField(src), alloc(false), init(true), ghostInit(false), texInit(false),
+    : ColorSpinorField(src), alloc(false), init(true), texInit(false),
       ghostTexInit(false), initComms(false), initIPCComms(false), bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
@@ -433,8 +445,6 @@ namespace quda {
 #endif
 
   void cudaColorSpinorField::destroy() {
-    if (ghost_field) device_pinned_free(ghost_field);
-
     if (alloc) {
       device_free(v);
       if (precision == QUDA_HALF_PRECISION) device_free(norm);
@@ -586,74 +596,53 @@ namespace quda {
     return;
   }
 
+  static bool ghost_field_reset = false;
+
   void cudaColorSpinorField::allocateGhostBuffer(int nFace) {
-    if (!ghostInit || nFace != nFaceComms) {
 
-      size_t ghost_bytes_old = ghost_bytes;
+    createGhostZone(nFace);
 
-      createGhostZone(nFace);
+    // only allocate if not already allocated or buffer required is bigger than previously
+    if (!initGhostFaceBuffer || ghost_bytes > ghostFaceBytes || nFace != nFaceComms) {
 
-      if (ghost_bytes_old != ghost_bytes) {
+      if (initGhostFaceBuffer) {
 #ifdef USE_TEXTURE_OBJECTS
 	destroyGhostTexObject();
 #endif
-	if (ghostInit && ghost_bytes) device_pinned_free(ghost_field);
+	if (initGhostFaceBuffer && ghost_bytes) device_pinned_free(ghost_field);
 
-	// all fields create their own unique ghost zone.  Used GPU
-	// pinned allocator to avoid this allocation being redirected,
-	// e.g., by QDPJIT
+        for (int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]);
+      }
+
+      if (ghost_bytes > 0) {
+	// GPU pinned allocator to avoid this being redirected, e.g., by QDPJIT
 	if (ghost_bytes) ghost_field = device_pinned_malloc(ghost_bytes);
+	ghost_field_reset = true;
 
 #ifdef USE_TEXTURE_OBJECTS
 	createGhostTexObject();
 #endif
-      }
 
-      // initialize the ghost pointers
-      if (siteSubset == QUDA_PARITY_SITE_SUBSET) {
-	for (int i=0; i<nDim; ++i) {
-	  if (commDimPartitioned(i)) {
-	    ghost[i] = (char*)ghost_field + ghostOffset[i][0]*precision;
-	    if (precision == QUDA_HALF_PRECISION)
-	      ghostNorm[i] = (char*)ghost_field + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
-	  }
-	}
-      }
-
-      ghostInit = true;
-    }
-
-    int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
-    if (nSpin == 4) Nint /= 2; // spin projection for Wilson
-
-    // compute size of buffer required
-    size_t faceBytes = 0;
-    for (int i=0; i<4; i++) {
-      if (!commDimPartitioned(i)) continue;
-      faceBytes += 2*nFace*ghostFace[i]*Nint*precision;
-      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*precision;
-      // add extra space for the norms for half precision
-      if (precision == QUDA_HALF_PRECISION) {
-        faceBytes += 2*nFace*ghostFace[i]*sizeof(float);
-        ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
-      }
-    }
-
-    // only allocate if not already allocated or buffer required is bigger than previously
-    if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes) {
-
-      if (initGhostFaceBuffer) {
-        for (int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]);
-      }
-
-      if (faceBytes > 0) {
-	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(faceBytes);
+	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(ghost_bytes);
 	initGhostFaceBuffer = true;
-	ghostFaceBytes = faceBytes;
+	ghostFaceBytes = ghost_bytes;
       }
 
     }
 
+    // always initialize the ghost receive pointers
+    if (siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      for (int i=0; i<nDim; ++i) {
+	if (commDimPartitioned(i)) {
+	ghost[i] = (char*)ghost_field + ghostOffset[i][0]*precision;
+	if (precision == QUDA_HALF_PRECISION)
+	  ghostNorm[i] = (char*)ghost_field + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
+      }
+      }
+    }
+
+    // always initialize the ghost send pointers
+    int Nint = nColor * nSpin * 2 / (nSpin == 4 ? 2 : 1); // number of internal degrees of freedom
     size_t offset = 0;
     for (int i=0; i<4; i++) {
       if (!commDimPartitioned(i)) continue;
@@ -724,7 +713,11 @@ namespace quda {
   {
     if (!initGhostFaceBuffer) return;
   
-    for (int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]);
+    if (ghost_field) device_pinned_free(ghost_field);
+
+    for (int b=0; b<2; ++b) {
+      if (ghostFaceBuffer[b]) device_free(ghostFaceBuffer[b]);
+    }
 
     for (int i=0;i < 4; i++) {
       if (!commDimPartitioned(i)) continue;
@@ -756,7 +749,6 @@ namespace quda {
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
-
   }
  
   // send the ghost zone to the host
@@ -1217,7 +1209,7 @@ namespace quda {
    
   void cudaColorSpinorField::createIPCComms() {
 
-    if (initIPCComms || comm_size() == 1) return;
+    if (initIPCComms || comm_size() == 1 || !ghost_field_reset) return;
 
     if (!initComms) errorQuda("Can only be called after create comms");
     if (!ghost_field) errorQuda("ghost_field appears not to be allocated");
