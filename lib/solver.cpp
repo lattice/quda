@@ -173,6 +173,19 @@ namespace quda {
     }
   }
 
+
+  bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
+
+    for (int i=0; i<n; i++) {
+      // check the L2 relative residual norm if necessary
+      if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
+	    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2[i] > r2_tol[i]) )
+	return false;
+    }
+
+    return true;
+  }
+
   // Deflated solver factory
   DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile)
   {

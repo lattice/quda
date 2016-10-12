@@ -635,6 +635,7 @@ namespace quda {
     virtual ~MultiShiftSolver() { ; }
 
     virtual void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in) = 0;
+    bool convergence(const double *r2, const double *r2_tol, int n) const;
   };
 
   class MultiShiftCG : public MultiShiftSolver {
