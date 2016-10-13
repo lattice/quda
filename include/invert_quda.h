@@ -508,7 +508,10 @@ namespace quda {
     std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
     std::vector<ColorSpinorField*> u; // Search directions.
     
-    
+    /**
+       Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
+     */
+    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
     
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.

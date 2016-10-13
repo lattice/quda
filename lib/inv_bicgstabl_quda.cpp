@@ -63,6 +63,23 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
     
   }
+  
+  // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
+  // Technically, there are ways to check both 'x' and 'r' for reliable updates...
+  // the current status in BiCGstab is to just look for reliable updates in 'r'.
+  int BiCGstabL::reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+    // reliable updates
+    rNorm = sqrt(r2);
+    if (rNorm > maxrx) maxrx = rNorm;
+    if (rNorm > maxrr) maxrr = rNorm;
+    //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
+    //int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0
+    int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+    
+    //printf("reliable %d %e %e %e %e\n", updateR, rNorm, maxrx, maxrr, r2);
+
+    return updateR;
+  }
 
   void BiCGstabL::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
@@ -152,7 +169,16 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     
-    int k = 0;
+    // count iteration counts
+    int k = 0; 
+    
+    // Various variables related to reliable updates.
+    int rUpdate = 0; // count reliable updates. 
+    double delta = param.delta; // delta for reliable updates. 
+    double rNorm = sqrt(r2); // The current residual norm. 
+    double maxrr = rNorm; // The maximum residual norm since the last reliable update.
+    double maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
+    
     PrintStats(solver_name.c_str(), k, r2, b2, 0.0); // 0.0 is heavy quark residual.
     while(!convergence(r2, 0.0, stop, 0.0) && k < param.maxiter) {
 
@@ -258,6 +284,27 @@ namespace quda {
       sigma[0] = blas::norm2(*r[0]);
       r2 = sigma[0];
       
+      // Check if we need to do a reliable update.
+      // In inv_bicgstab_quda.cpp, there's a variable 'updateR' that holds the check.
+      // That variable gets carried about because there are a few different places 'r' can get
+      // updated (depending on if you're using pipelining or not). In BiCGstab-L, there's only
+      // one place (for now) to get the updated residual, so we just do away with 'updateR'.
+      // Further remark: "reliable" updates rNorm, maxrr, maxrx!! 
+      if (reliable(rNorm, maxrx, maxrr, r2, delta))
+      {
+        // Explicitly recompute the residual.
+        mat(*r[0], x, temp); // r[0] = Ax
+        r2 = blas::xmyNorm(b, *r[0]); // r = b - Ax, return norm.
+        
+        // Update rNorm, maxrr, maxrx.
+        rNorm = sqrt(r2);
+        maxrr = rNorm;
+        maxrx = rNorm;
+        
+        // Increment the reliable update count.
+        rUpdate++; 
+      }
+      
       // Check convergence.
       k += nKrylov;
       PrintStats(solver_name.c_str(), k, r2, b2, 0.0); // last thing should be heavy quark res...
@@ -275,8 +322,8 @@ namespace quda {
     if (k >= param.maxiter) // >= if nKrylov doesn't divide max iter.
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    // Compute true residual
-    
+    // Print number of reliable updates.
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Reliable updates = %d\n", solver_name.c_str(), rUpdate);
 
     // compute the true residual
     // !param.is_preconditioner comes from bicgstab, param.compute_true_res came from gcr.
