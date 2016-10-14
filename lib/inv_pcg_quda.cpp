@@ -127,6 +127,7 @@ namespace quda {
     //this is a hack, just in case if we want to run unpreconditioned solver:
     if(param.inv_type_precondition == QUDA_INVALID_INVERTER)
     {
+      printfQuda("\nRunning regular CG.\n");
       (*K)(x, b);//this is just a regular CG
       return;
     }
@@ -139,9 +140,9 @@ namespace quda {
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_COPY_FIELD_CREATE;
       // high precision residual:
-      rp = ColorSpinorField::Create(csParam);
+      rp = ColorSpinorField::Create(b, csParam);
       // high precision accumulator:
-      yp = ColorSpinorField::Create(csParam);
+      yp = ColorSpinorField::Create(b, csParam);
 
       // create sloppy fields used for orthogonalization
       csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -190,7 +191,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
     if(b2 == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      //profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       blas::copy(x, b);
       param.true_res = 0.0;
@@ -210,8 +211,6 @@ namespace quda {
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     const bool precMatch           = (param.precision_precondition != param.precision_sloppy) ? false : true;
-
-    ColorSpinorField &zp   = use_ipcg_iters ? *wp : *p[0] ;   
 
     blas::copy(rSloppy, r);
 
@@ -258,25 +257,24 @@ namespace quda {
     while(!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter){
 
       int j = 0;//internal index
-      bool refresh_cycle = (((k+1) % (nKrylov+1)) == 0);
-
+      bool refresh_cycle = (((k+1) % (nKrylov+1)) == 0) && !use_ipcg_iters;
       //run FCG(nKrylov) cycles:
       do {
         matSloppy(*Ap[j], *p[j], tmp);
         //
-        pAp[j]   = blas::reDotProduct( (j== 0 ? zp : *p[j]), *Ap[j]);
+        pAp[j]   = blas::reDotProduct( *p[j], *Ap[j]);
         alpha    = rMinvr/pAp[j];
         //update residual:
         cg_norm = blas::axpyCGNorm(-alpha, *Ap[j], rSloppy); 
         //
         r2     = real(cg_norm);
-
         //stop here if we run IPCG algorithm:
         if(use_ipcg_iters) break;
 
         //apply preconditioner 
         if( !precMatch )  blas::copy(rPre, rSloppy);
         commGlobalReductionSet(false);
+        blas::zero(pPre);
         (*K)(pPre, rPre);
         commGlobalReductionSet(true);
         if( !precMatch ) blas::copy(*wp, pPre);
@@ -317,12 +315,14 @@ namespace quda {
           //apply preconditioner 
           if( !precMatch )  blas::copy(rPre, rSloppy);
           commGlobalReductionSet(false);
+
+          blas::zero(pPre); 
           (*K)(pPre, rPre);
+
           commGlobalReductionSet(true);
           if( !precMatch ) blas::copy(*wp, pPre);
 
           rMinvr      = reDotProduct(rSloppy,*wp);
-          //Polak-Ribiere formula:
           beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
           blas::axpyZpbx(alpha, *p[0], xSloppy, *wp, beta);
         }
