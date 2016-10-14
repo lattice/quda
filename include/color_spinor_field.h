@@ -268,8 +268,8 @@ namespace quda {
 
     int nFaceComms; // number of faces allocated
 
-    void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
-    void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
+    void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
+    void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
     int ghostFace[QUDA_MAX_DIM];// the size of each face
     int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
@@ -464,8 +464,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
-    cudaTextureObject_t ghostTex;
-    cudaTextureObject_t ghostTexNorm;
+    cudaTextureObject_t ghostTex[2]; // these are double buffered
+    cudaTextureObject_t ghostTexNorm[2];
     void createTexObject();
     void createGhostTexObject();
     void destroyTexObject();
@@ -489,47 +489,50 @@ namespace quda {
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
-    static void *ghost_field;        // GPU halo receive buffer
+    static void *ghost_field[2];     // GPU halo receive buffer
     static void *ghostFaceBuffer[2]; // GPU halo send buffer
     static void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static bool initGhostFaceBuffer;
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
+    static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_send_p2p_back[QUDA_MAX_DIM];
+    static MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_recv_p2p_fwd[QUDA_MAX_DIM];
+    static MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_recv_p2p_back[QUDA_MAX_DIM];
+    static MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
 
     /** Buffer used by peer-to-peer message handler */
-    static int buffer_send_p2p_fwd[QUDA_MAX_DIM];
+    static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
 
     /** Buffer used by peer-to-peer message handler */
-    static int buffer_recv_p2p_fwd[QUDA_MAX_DIM];
+    static int buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
 
     /** Buffer used by peer-to-peer message handler */
-    static int buffer_send_p2p_back[QUDA_MAX_DIM];
+    static int buffer_send_p2p_back[2][QUDA_MAX_DIM];
 
     /** Buffer used by peer-to-peer message handler */
-    static int buffer_recv_p2p_back[QUDA_MAX_DIM];
+    static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
 
     /** Local copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcCopyEvent[2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Remote copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Remote ghost pointer for sending ghost to */
-    static void* fwdGhostSendDest[QUDA_MAX_DIM];
+    static void* fwdGhostSendDest[2][QUDA_MAX_DIM];
 
     /** Remote ghost pointer for sending ghost to */
-    static void* backGhostSendDest[QUDA_MAX_DIM];
+    static void* backGhostSendDest[2][QUDA_MAX_DIM];
+
+    /** Whether we have initialized peer-to-peer communication for this field */
+    static bool initIPCComms;
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -548,9 +551,6 @@ namespace quda {
 
     /** Whether we have initialized communication for this field */
     bool initComms;
-
-    /** Whether we have initialized peer-to-peer communication for this field */
-    bool initIPCComms;
 
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
@@ -581,9 +581,6 @@ namespace quda {
     /** Create the inter-process communication handlers */
     void createIPCComms();
 
-    /** Destroy the inter-process communication handlers */
-    void destroyIPCComms();
-
     /** Handle to remote copy event used for peer-to-peer synchronization */
     const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
 
@@ -595,6 +592,9 @@ namespace quda {
 
     /** Free statically allocated ghost buffers */
     static void freeGhostBuffer(void);
+
+    /** Destroy the statically allocated inter-process communication handlers */
+    static void destroyIPCComms();
 
     /**
       Packs the cudaColorSpinorField's ghost zone
@@ -696,7 +696,7 @@ namespace quda {
     /** Helper function to determine if local-to-remote (receive) peer-to-peer copy is complete */
     inline bool ipcRemoteCopyComplete(int dir, int dim);
 
-    const void* Ghost2() const { return ghost_field; }
+    const void* Ghost2() const { return ghost_field[bufferIndex]; }
 
     /**
        Do a ghost exchange between neighbouring nodes.  All dimensions
@@ -708,8 +708,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
-    const cudaTextureObject_t& GhostTex() const { return ghostTex; }
-    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm; }
+    const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
+    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
 #endif
 
     cudaColorSpinorField& Component(const int idx) const;

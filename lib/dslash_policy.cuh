@@ -1452,11 +1452,8 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-    cudaDeviceSynchronize(); checkCudaError();
     inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    cudaDeviceSynchronize(); checkCudaError();
     inputSpinor->createComms(dslash.Nface()/2);
-    cudaDeviceSynchronize(); checkCudaError();
     inputSpinor->streamInit(streams);
 
     DslashCommsPattern pattern(dslashParam.commDim);
