@@ -55,7 +55,7 @@ namespace quda {
     use_ipcg_iters = nKrylov == 0 ? true : false;
 
     if(use_ipcg_iters) printfQuda("Running Inexact Preconditioned CG.\n");
-    //printfQuda("Running flexible CG with restart length m_max = %d\n", nKrylov);
+    else printfQuda("Running flexible CG with truncation length m_max = %d\n", nKrylov);
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
       K = new CG(matPrecon, matPrecon, Kparam, profile);
@@ -82,14 +82,14 @@ namespace quda {
     use_ipcg_iters = nKrylov == 0 ? true : false;
 
     if(use_ipcg_iters) printfQuda("Running Inexact Preconditioned CG.\n");
-    printfQuda("Running flexible CG with restart length m_max = %d\n", nKrylov);
+    printfQuda("Running flexible CG with truncation length m_max = %d\n", nKrylov);
     //
     p.reserve(nKrylov+1);
     Ap.reserve(nKrylov+1);
   }
 
   PreconCG::~PreconCG(){
-    //profile.TPSTART(QUDA_PROFILE_FREE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
     if (init) {
       if (param.precision_sloppy != param.precision) {
@@ -118,24 +118,22 @@ namespace quda {
 
     if(K) delete K;
 
-    //profile.TPSTOP(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
-
-#define DEBUG_IPCG_
 
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     //this is a hack, just in case if we want to run unpreconditioned solver:
     if(param.inv_type_precondition == QUDA_INVALID_INVERTER)
     {
-      printfQuda("\nRunning regular CG.\n");
+      warningQuda("\nRunning regular CG.\n");
       (*K)(x, b);//this is just a regular CG
       return;
     }
     //for the remaining part,  we don't allow for empty preconditioner:
     if(K == nullptr) errorQuda("\nInvalid inner solver\n");
 
-    //profile.TPSTART(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     if (!init) {
       ColorSpinorParam csParam(b);
@@ -192,7 +190,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
     if(b2 == 0){
-      //profile.TPSTOP(QUDA_PROFILE_INIT);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       blas::copy(x, b);
       param.true_res = 0.0;
@@ -224,8 +222,8 @@ namespace quda {
     blas::copy(*p[0], *wp);
 
   
-    //profile.TPSTOP(QUDA_PROFILE_INIT);
-    //profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     double heavy_quark_res = 0.0; // heavy quark residual 
@@ -240,8 +238,8 @@ namespace quda {
  
     double rMinvr = blas::reDotProduct(rSloppy,*wp);
 
-    //profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    //profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     blas::flops = 0;
 
@@ -263,7 +261,7 @@ namespace quda {
 
       mk = std::max(1, (k+1-truncation_shift) % (nKrylov+1)); 
 
-      if (j >= mk || !use_ipcg_iters)//note tht for ipcg j always equals to zero
+      if (j >= mk && !use_ipcg_iters)//note tht for ipcg j always equals to zero
       {
          *p[0] = *p[j];
          j = 0;
@@ -279,7 +277,6 @@ namespace quda {
       cg_norm = blas::axpyCGNorm(-alpha, *Ap[j], rSloppy); 
       //
       r2     = real(cg_norm);
-      printfQuda("\nCheck residual : %le :: %le\n", cg_norm.real(), cg_norm.imag());
       
       rNorm = sqrt(r2);
       if(rNorm > maxrx) maxrx = rNorm;
@@ -360,25 +357,37 @@ namespace quda {
         commGlobalReductionSet(true);
         if( !precMatch ) blas::copy(*wp, pPre);
 
-        double rMinvr_old  = rMinvr;
-        rMinvr = blas::reDotProduct(rSloppy,*wp);
-        //Fletcher-Reeves formula:
-        beta = rMinvr/rMinvr_old;        
-        blas::xpay(*wp, beta, *p[j]); // p = *wp + beta*p
+        if( use_ipcg_iters ){
+          double rMinvr_old  = rMinvr;
+          rMinvr = blas::reDotProduct(rSloppy,*wp);
+          //Fletcher-Reeves formula:
+          beta = rMinvr/rMinvr_old;        
+          blas::xpay(*wp, beta, *p[j]); // p = *wp + beta*p
 
-        if( !use_ipcg_iters && j != 0) *p[0] = *p[j];
- 
-        truncation_shift = k+1;
-        j = 0;
+        } else {
+          j += 1;
+          blas::copy(*p[j], *wp);
+
+          for(int l = 0; l < mk; l++)
+          {
+            beta = blas::reDotProduct(*Ap[l],*wp) / pAp[l];
+            blas::axpy(- beta, *p[l], *p[j]);//!
+          }
+          //
+          rMinvr = blas::reDotProduct(rSloppy, *p[j]);
+
+          truncation_shift = k+1;
+          *p[0] = *p[j];
+          j = 0;
+        } 
       }
      
-      k += 1;//+1 for the regular pcg
+      k += 1;
       PrintStats( use_ipcg_iters ? "IPCG" : "FCG", k, r2, b2, heavy_quark_res);
     }
 
-
-    //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    //profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     if(x.Precision() != param.precision_sloppy) blas::copy(x, xSloppy);
     blas::xpy(y, x); // x += y
@@ -405,10 +414,11 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
-    //profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    //profile.TPSTART(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
-    //profile.TPSTOP(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
+
     return;
   }
 
