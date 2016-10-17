@@ -970,10 +970,7 @@ namespace quda {
 
   void cudaColorSpinorField::createComms(int nFace) {
 
-    checkCudaError();
-
     allocateGhostBuffer(nFace); // allocate the ghost buffer if not yet allocated
-    checkCudaError();
 
     if (bufferMessageHandler != bufferPinnedResizeCount) destroyComms();
 
@@ -1080,7 +1077,7 @@ namespace quda {
 
       }
 
-    checkCudaError();
+      checkCudaError();
 
       // create a different message handler for each direction and Nface
       for (int b=0; b<2; ++b) {
@@ -1113,7 +1110,7 @@ namespace quda {
 	  }
 #endif	
 	} // loop over b
-    checkCudaError();
+	checkCudaError();
 
 	for (int i=0; i<nDimComms; i++) {
 	  if (!commDimPartitioned(i)) continue;
@@ -1156,7 +1153,6 @@ namespace quda {
 	    // start of last time slice chunk we are sending forwards
 	    int endOffset = (volume - (j+1)*ghostFace[i]);
 
-    checkCudaError();
 	    size_t offset[4];
 	    void *base[4];
 	    if (nSpin == 1) { // staggered is invariant with dagger
@@ -1184,8 +1180,6 @@ namespace quda {
 
 	    if (blksize * Nblocks != nbytes_Nface) 
 	      errorQuda("Total strided message size does not match expected size");
-
-    checkCudaError();
 
 	    //printf("%d strided sends with Nface=%d Nblocks=%d blksize=%d Stride=%d\n", i, j+1, Nblocks, blksize, Stride);
 
@@ -1217,8 +1211,6 @@ namespace quda {
 	    }
 
 	  }
-    checkCudaError();
-
 	  if (precision == QUDA_HALF_PRECISION) {
             for (int b=0; b<2; ++b) {
 	      mh_recv_norm_fwd[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm) : NULL;
@@ -1238,8 +1230,9 @@ namespace quda {
       bufferMessageHandler = bufferPinnedResizeCount;
       initComms = true;
       nFaceComms = nFace;
+
+      checkCudaError();
     }
-    checkCudaError();
 
     createIPCComms();
   }
