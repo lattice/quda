@@ -35,7 +35,7 @@ namespace quda {
     CloverSigmaOprodArg(Output &oprod, InputA *inA_, InputB *inB_,
 			const std::vector<std::vector<double> > &coeff_,
 			const GaugeField &meta,	int nvector)
-      : oprod(oprod), inA(inA), inB(inB), length(meta.VolumeCB()), nvector(nvector)
+      : oprod(oprod), length(meta.VolumeCB()), nvector(nvector)
     {
       for (int i=0; i<nvector; i++) {
 	inA[i] = inA_[i];
