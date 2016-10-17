@@ -422,6 +422,9 @@ namespace quda {
 
     cudaDeviceSynchronize();
     setKernelPackT(pack_old); // restore packing state
+
+    a.bufferIndex = (1 - a.bufferIndex);
+    comm_barrier();
   }
 
   template<typename Float, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
@@ -442,10 +445,6 @@ namespace quda {
       // Create the arguments for the interior kernel
       CloverForceArg<Float,Output,Gauge,InputA,InputB,InputC,InputD> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, coeff, inA, inB, inC, inD, gauge, force, out);
       CloverForce<Float,Output,Gauge,InputA,InputB,InputC,InputD> oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
-
-      int dag = 1;
-      exchangeGhost(src1, parity, dag);
-      exchangeGhost(src2, parity, 1-dag);
 
       arg.kernelType = OPROD_INTERIOR_KERNEL;
       arg.length = src1.VolumeCB();
@@ -481,6 +480,8 @@ namespace quda {
 
     createCloverForceEvents(); // FIXME not actually used
 
+    int dag = 1;
+
     for (unsigned int i=0; i<x.size(); i++) {
       static_cast<cudaColorSpinorField&>(x[i]->Even()).allocateGhostBuffer(1);
       static_cast<cudaColorSpinorField&>(x[i]->Odd()).allocateGhostBuffer(1);
@@ -496,9 +497,15 @@ namespace quda {
 
 	if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 	  Spinor<double2, double2, 12, 0, 0> spinorA(inA);
+
 	  Spinor<double2, double2, 12, 0, 1> spinorB(inB);
+	  exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, dag);
+
 	  Spinor<double2, double2, 12, 0, 2> spinorC(inC);
+
 	  Spinor<double2, double2, 12, 0, 3> spinorD(inD);
+	  exchangeGhost(static_cast<cudaColorSpinorField&>(inD), parity, 1-dag);
+
 	  if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	    computeCloverForceCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(force),
 					   gauge::FloatNOrder<double,18, 2, 18>(U),

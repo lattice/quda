@@ -400,6 +400,9 @@ namespace quda {
 
     cudaDeviceSynchronize();
     setKernelPackT(pack_old); // restore packing state
+
+    a.bufferIndex = (1 - a.bufferIndex);
+    comm_barrier();
   }
 
   template<typename Float, typename Output, typename InputA, typename InputB>
@@ -412,8 +415,6 @@ namespace quda {
       // Create the arguments for the interior kernel
       StaggeredOprodArg<Float,Output,InputA,InputB> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, nFace, coeff, inA, inB, outA, outB, outFieldA);
       StaggeredOprodField<Float,Output,InputA,InputB> oprod(arg, outFieldA);
-
-      exchangeGhost(src, parity, 0);
 
       arg.kernelType = OPROD_INTERIOR_KERNEL;
       arg.length = src.VolumeCB();
@@ -467,11 +468,15 @@ namespace quda {
     if (inEven.Precision() == QUDA_DOUBLE_PRECISION) {
       Spinor<double2, double2, 3, 0, 0> spinorA(inA, nFace);
       Spinor<double2, double2, 3, 0, 1> spinorB(inB, nFace);
+      exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, 0);
+
       computeStaggeredOprodCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(outA), gauge::FloatNOrder<double, 18, 2, 18>(outB),
 					outA, outB, spinorA, spinorB, inB, parity, inB.GhostFace(), coeff, nFace);
     } else if (inEven.Precision() == QUDA_SINGLE_PRECISION) {
       Spinor<float2, float2, 3, 0, 0> spinorA(inA, nFace);
       Spinor<float2, float2, 3, 0, 1> spinorB(inB, nFace);
+      exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, 0);
+
       computeStaggeredOprodCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(outA), gauge::FloatNOrder<float, 18, 2, 18>(outB),
 				       outA, outB, spinorA, spinorB, inB, parity, inB.GhostFace(), coeff, nFace);
     } else {
