@@ -1691,6 +1691,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   invertParam.verbosity_precondition = QUDA_SILENT;
 
   invertParam.make_resident_solution = inv_args.make_resident_solution;
+  invertParam.compute_true_res = 0;
 
   if (num_offsets==1 && offset[0] == 0) {
     // set the solver
