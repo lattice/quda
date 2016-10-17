@@ -61,6 +61,15 @@ if (face_num) {
   case 0:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
@@ -92,6 +101,15 @@ if (face_num) {
   case 1:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
@@ -123,6 +141,15 @@ if (face_num) {
   case 2:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
@@ -154,6 +181,15 @@ if (face_num) {
   case 3:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
@@ -190,6 +226,15 @@ if (face_num) {
   case 0:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
@@ -221,6 +266,15 @@ if (face_num) {
   case 1:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
@@ -252,6 +306,15 @@ if (face_num) {
   case 2:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
@@ -283,6 +346,15 @@ if (face_num) {
   case 3:
     {
       // read spinor from device memory
+#ifdef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+      const spinorFloat a = param.a;
+      const spinorFloat b = param.b;
+#else
+      const spinorFloat a = param.a_f;
+      const spinorFloat b = param.b_f;
+#endif
+#endif
       READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       

@@ -710,8 +710,7 @@ namespace quda {
     virtual int outputPerSite() const = 0;
 
     // prepare the param struct with kernel arguments
-    PackParam<FloatN> prepareParam(TuneParam &tp, int dim=-1, int face_num=2) {
-      PackParam<FloatN> param;
+    void prepareParam(PackParam<FloatN> &param, TuneParam &tp, int dim=-1, int face_num=2) {
       param.in = (FloatN*)in->V();
       param.inNorm = (float*)in->Norm();
       param.dim = dim;
@@ -737,7 +736,6 @@ namespace quda {
         param.threadDimMapUpper[i] = param.threadDimMapLower[i] + 2*nFace*in->GhostFace()[i];
 
         size_t faceBytes = nFace*outputPerSite()*in->GhostFace()[i]*sizeof(faces->x);
-
         if (typeid(FloatN) == typeid(short4) || typeid(FloatN) == typeid(short2)) {
           faceBytes += nFace*in->GhostFace()[i]*sizeof(float);
           param.out[2*i] = (FloatN*)((char*)faces + 
@@ -791,8 +789,6 @@ namespace quda {
       }
 
       param.swizzle = tp.aux.x;
-
-      return param;
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -897,7 +893,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_WILSON_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -957,7 +954,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_TWISTED_MASS_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
       } else {
@@ -1321,7 +1319,8 @@ namespace quda {
 
 #ifdef GPU_STAGGERED_DIRAC
 
-      PackParam<FloatN> param = this->prepareParam(tp,this->dim, this->face_num);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp,this->dim, this->face_num);
       if(!R){
         if (PackFace<FloatN,Float>::nFace==1) {
           packFaceStaggeredKernel<FloatN, 1> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
@@ -1600,7 +1599,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packFaceDWKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -1632,7 +1632,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
 	packFaceDW4DKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -1791,7 +1792,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packFaceNdegTMKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {

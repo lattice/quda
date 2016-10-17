@@ -769,7 +769,15 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 def twisted():
 
     str = ""
-    #str += "#ifdef DSLASH_TWIST\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "const spinorFloat a = param.a;\n"
+    str += "const spinorFloat b = param.b;\n"
+    str += "#else\n"
+    str += "const spinorFloat a = param.a_f;\n"
+    str += "const spinorFloat b = param.b_f;\n"
+    str += "#endif\n"
+
+
     str += "//Perform twist rotation first:\n"
     if dagger :
        str += "//(1 + i*a*gamma_5 * tau_3 + b * tau_1)\n"
@@ -828,6 +836,15 @@ def twisted():
 
 def xpay():
     str = "\n"
+
+    str += "#if !defined(DSLASH_XPAY) || defined(DSLASH_TWIST)\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "const spinorFloat c = param.c;\n"
+    str += "#else\n"
+    str += "const spinorFloat c = param.c_f;\n"
+    str += "#endif\n"
+    str += "#endif\n"
+
     str += "#ifndef DSLASH_XPAY\n"
 
     for s in range(0,4):
@@ -924,6 +941,13 @@ def xpay():
 
     str += "  READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, param.fl_stride)\n\n"
 
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "const spinorFloat a = param.a;\n"
+    str += "const spinorFloat b = param.b;\n"
+    str += "#else\n"
+    str += "const spinorFloat a = param.a_f;\n"
+    str += "const spinorFloat b = param.b_f;\n"
+    str += "#endif\n"
 
     str += "  //Perform twist rotation:\n"
     if dagger :
@@ -976,6 +1000,12 @@ def xpay():
             str += acc2_re(h,c) + " = x2_re;  " + acc2_im(h,c) + " = x2_im;\n"
             str += acc2_re(h+2,c) + " = y2_re;  " + acc2_im(h+2,c) + " = y2_im;\n\n"
 
+
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "const spinorFloat k = param.d;\n"
+    str += "#else\n"
+    str += "const spinorFloat k = param.d_f;\n"
+    str += "#endif\n"
 
     for s in range(0,4):
         for c in range(0,3):

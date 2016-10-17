@@ -2020,7 +2020,19 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
 }
 
 {
+#if !defined(CLOVER_TWIST_INV_DSLASH)
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
+#endif
 #ifdef DSLASH_XPAY
+#ifdef SPINOR_DOUBLE
+  spinorFloat b = param.b;
+#else
+  spinorFloat b = param.b_f;
+#endif
   READ_ACCUM(ACCUMTEX, param.sp_stride)
   
 #ifndef CLOVER_TWIST_INV_DSLASH

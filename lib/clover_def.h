@@ -27,11 +27,12 @@
 
 #if (DD_PREC==0) // double-precision spinor field
 #define DD_PREC_F D
+#define FLOATN double2
 #define DD_PARAM1 double2* out, float *null1
 #define DD_PARAM3 const double2* in, const float *null3
 #if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -48,11 +49,12 @@
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #elif (DD_PREC==1) // single-precision spinor field
 #define DD_PREC_F S
+#define FLOATN float4
 #define DD_PARAM1 float4* out, float *null1
 #define DD_PARAM3 const float4* in, const float *null3
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -68,9 +70,10 @@
 #endif
 #else            // half-precision spinor field
 #define DD_PREC_F H
+#define FLOATN short4
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_HALF
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -92,7 +95,7 @@
 #define DD_PREC_F D
 #define DD_PARAM2 const double2* clover, const float *null
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
-#define CLOVERTEX clover
+#define CLOVERTEX param.clover
 #define READ_CLOVER READ_CLOVER_DOUBLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -108,7 +111,7 @@
 #define DD_PREC_F S
 #define DD_PARAM2 const float4* clover, const float *null
 #ifdef DIRECT_ACCESS_CLOVER
-#define CLOVERTEX clover
+#define CLOVERTEX param.clover
 #define READ_CLOVER READ_CLOVER_SINGLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -122,7 +125,8 @@
 #define DD_PREC_F H
 #define DD_PARAM2 const short4* clover, const float *cloverNorm
 #ifdef DIRECT_ACCESS_CLOVER
-#define CLOVERTEX clover
+#define CLOVERTEX param.clover
+#define CLOVERTEXNORM param.cloverNorm
 #define READ_CLOVER READ_CLOVER_HALF
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -137,12 +141,12 @@
 #endif
 
 //#define DD_CONCAT(s,c,x) clover ## s ## c ## x ## Kernel
-#define DD_CONCAT(x) clover ## x ## Kernel
-#define DD_FUNC(x) DD_CONCAT(x)
+#define DD_CONCAT(p,x) clover ## p ## x ## Kernel
+#define DD_FUNC(p,x) DD_CONCAT(p,x)
 
 // define the kernel
 
-__global__ void DD_FUNC(DD_XPAY_F)(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+__global__ void DD_FUNC(DD_PREC_F,DD_XPAY_F)(DD_PARAM4) {
 
 #ifdef GPU_CLOVER_DIRAC
 #include "clover_core.h"
@@ -152,6 +156,7 @@ __global__ void DD_FUNC(DD_XPAY_F)(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 
 // clean up
 
+#undef FLOATN
 #undef DD_PREC_F
 #undef DD_XPAY_F
 #undef DD_PARAM1

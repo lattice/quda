@@ -55,6 +55,14 @@
 #define DD_XPAY_F Xpay
 #endif
 
+#if (DD_PREC == 0)
+#define DD_PREC_F D
+#elif (DD_PREC == 1)
+#define DD_PREC_F S
+#else
+#define DD_PREC_F H
+#endif
+
 #if (DD_TWIST==0) // twisted input 
 #define DD_NAME_F twistedCloverInvDslash
 #define CLOVER_TWIST_INV_DSLASH
@@ -66,9 +74,9 @@
 #if (DD_PREC == 0)
 	#define DD_PARAMCLOVER const double2 *clover, const float *null2, const double2 *cloverInv, const float *null3
 	#if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
-		#define TMCLOVERTEX clover
+#define TMCLOVERTEX (param.clover)
 		#ifndef DYNAMIC_CLOVER
-			#define TM_INV_CLOVERTEX cloverInv
+#define TM_INV_CLOVERTEX (param.cloverInv)
 		#endif
 		#define READ_CLOVER READ_CLOVER_DOUBLE_STR
 		#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_STR
@@ -91,9 +99,9 @@
 #elif (DD_PREC == 1)
 	#define DD_PARAMCLOVER const float4 *clover, const float *null2, const float4 *cloverInv,  const float *null3
 	#ifdef DIRECT_ACCESS_CLOVER
-		#define TMCLOVERTEX clover
+#define TMCLOVERTEX (param.clover)
 		#ifndef DYNAMIC_CLOVER
-			#define TM_INV_CLOVERTEX cloverInv
+#define TM_INV_CLOVERTEX (param.cloverInv)
 		#endif
 		#define READ_CLOVER READ_CLOVER_SINGLE
 		#define ASSN_CLOVER ASSN_CLOVER_SINGLE
@@ -115,9 +123,9 @@
 #else             // half-precision fields
 	#define DD_PARAMCLOVER const short4 *clover, const float *cNorm, const short4 *cloverInv, const float *cNrm2
 	#ifdef DIRECT_ACCESS_CLOVER
-		#define TMCLOVERTEX clover
+		#define TMCLOVERTEX param.clover
 		#ifndef DYNAMIC_CLOVER
-			#define TM_INV_CLOVERTEX cloverInv
+			#define TM_INV_CLOVERTEX param.cloverInv
 		#endif
 		#define READ_CLOVER READ_CLOVER_HALF
 		#define ASSN_CLOVER ASSN_CLOVER_HALF
@@ -271,7 +279,7 @@
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
@@ -286,7 +294,7 @@
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -299,7 +307,7 @@
 #define SPINOR_DOUBLE
 #if (DD_XPAY!=0)
 #if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -345,7 +353,7 @@
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
@@ -360,7 +368,7 @@
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -372,7 +380,7 @@
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_SINGLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -415,7 +423,7 @@
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
@@ -430,7 +438,7 @@
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -445,7 +453,7 @@
 //!0513
 #if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_HALF
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -462,13 +470,12 @@
 
 #endif
 
-#define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
-#define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
+#define DD_CONCAT(n,p,r,d,x) n ## p ## r ## d ## x ## Kernel
+#define DD_FUNC(n,p,r,d,x) DD_CONCAT(n,p,r,d,x)
 
 // define the kernel
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-(DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -494,8 +501,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef MULTI_GPU
 template <>
-__global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -532,8 +539,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #define DD_NAME_F twistedCloverDslashTwist
   
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -561,8 +567,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef MULTI_GPU
 template <>
-__global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -602,8 +608,8 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #define DD_NAME_F twistedCloverDslashTwist
   
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+(DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -618,6 +624,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 // clean up
 
+#undef DD_PREC_F
 #undef DD_NAME_F
 #undef DD_RECON_F
 #undef DD_DAG_F

@@ -577,6 +577,11 @@ if ( isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1 )
   B2_im += g22_re * b2_im;
   B2_im += g22_im * b2_re;
   
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
   o00_re += a*A0_re;
   o00_im += a*A0_im;
   o10_re += a*B0_re;
@@ -739,6 +744,11 @@ if ( isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
   B2_im += gT22_re * b2_im;
   B2_im += gT22_im * b2_re;
   
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
   o00_re += a*A0_re;
   o00_im += a*A0_im;
   o10_re += a*B0_re;
@@ -901,6 +911,11 @@ if ( isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1 )
   B2_im += g22_re * b2_im;
   B2_im += g22_im * b2_re;
   
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
   o00_re += a*A0_re;
   o00_im += a*A0_im;
   o10_re += a*B0_re;
@@ -1063,6 +1078,11 @@ if ( isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
   B2_im += gT22_re * b2_im;
   B2_im += gT22_im * b2_re;
   
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
   o00_re += a*A0_re;
   o00_im += a*A0_im;
   o10_re += a*B0_re;
@@ -1225,6 +1245,11 @@ if ( isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1 )
   B2_im += g22_re * b2_im;
   B2_im += g22_im * b2_re;
   
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
   o00_re += a*A0_re;
   o00_im += a*A0_im;
   o10_re += a*B0_re;
@@ -1387,6 +1412,11 @@ if ( isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
   B2_im += gT22_re * b2_im;
   B2_im += gT22_im * b2_re;
   
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
   o00_re += a*A0_re;
   o00_im += a*A0_im;
   o10_re += a*B0_re;
@@ -1464,6 +1494,11 @@ if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
     spinorFloat A2_re = a2_re; spinorFloat A2_im = a2_im;
     spinorFloat B2_re = b2_re; spinorFloat B2_im = b2_im;
     
+#ifdef SPINOR_DOUBLE
+    spinorFloat a = param.a;
+#else
+    spinorFloat a = param.a_f;
+#endif
     o00_re += a*A0_re;
     o00_im += a*A0_im;
     o10_re += a*B0_re;
@@ -1598,6 +1633,11 @@ if ( isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
     B2_im += g22_re * b2_im;
     B2_im += g22_im * b2_re;
     
+#ifdef SPINOR_DOUBLE
+    spinorFloat a = param.a;
+#else
+    spinorFloat a = param.a_f;
+#endif
     o00_re += a*A0_re;
     o00_im += a*A0_im;
     o10_re += a*B0_re;
@@ -1664,6 +1704,11 @@ if ( isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     spinorFloat A2_re = a2_re; spinorFloat A2_im = a2_im;
     spinorFloat B2_re = b2_re; spinorFloat B2_im = b2_im;
     
+#ifdef SPINOR_DOUBLE
+    spinorFloat a = param.a;
+#else
+    spinorFloat a = param.a_f;
+#endif
     o20_re += a*A0_re;
     o20_im += a*A0_im;
     o30_re += a*B0_re;
@@ -1798,6 +1843,11 @@ if ( isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
     B2_im += gT22_re * b2_im;
     B2_im += gT22_im * b2_re;
     
+#ifdef SPINOR_DOUBLE
+    spinorFloat a = param.a;
+#else
+    spinorFloat a = param.a_f;
+#endif
     o20_re += a*A0_re;
     o20_im += a*A0_im;
     o30_re += a*B0_re;
