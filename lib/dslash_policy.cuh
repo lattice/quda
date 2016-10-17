@@ -995,7 +995,7 @@ struct DslashFusedExterior : DslashPolicyImp {
 
 struct DslashAsync : DslashPolicyImp {
 
-#if (CUDA_VERSION >= 8000)
+#if 0 //(CUDA_VERSION >= 8000)
 
   void operator()(DslashCuda &dslash, cudaColorSpinorField* inputSpinor, const size_t regSize, const int parity, const int dagger,
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
@@ -1613,7 +1613,7 @@ struct DslashFactory {
 
 
 // which policies are we going to tune over?
-#if (CUDA_VERSION >= 8000)
+#if 0 //(CUDA_VERSION >= 8000)
 // Async variants are only supported on CUDA 8.0
  static constexpr int n_policy = 6;
  static constexpr QudaDslashPolicy policy[n_policy] = { QUDA_DSLASH2, QUDA_FUSED_DSLASH, QUDA_DSLASH_ASYNC, QUDA_FUSED_DSLASH_ASYNC, QUDA_ZERO_COPY_DSLASH, QUDA_FUSED_ZERO_COPY_DSLASH };
@@ -1668,7 +1668,7 @@ struct DslashFactory {
    virtual ~DslashPolicyTune() { }
 
    void apply(const cudaStream_t &stream) {
-     TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);//getVerbosity());
+     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
      (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
