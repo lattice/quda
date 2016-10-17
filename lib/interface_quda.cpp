@@ -5115,6 +5115,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
 
+  cudaDeviceSynchronize(); // ensure compute timing is correct
   checkCudaError();
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -5164,7 +5165,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
   copyExtendedGauge(oprodEx, oprod, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to oprod
-  cudaDeviceSynchronize();
+  cudaDeviceSynchronize(); // ensure compute timing is correct
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileCloverForce.TPSTART(QUDA_PROFILE_COMMS);
