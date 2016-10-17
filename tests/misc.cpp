@@ -1147,6 +1147,9 @@ get_solver_str(QudaInverterType type)
   case QUDA_MG_INVERTER:
     ret= "mg";
     break;
+  case QUDA_BICGSTABL_INVERTER:
+    ret = "bicgstab-l";
+    break;
   default:
     ret = "unknown";
     errorQuda("Error: invalid solver type %d\n", type);

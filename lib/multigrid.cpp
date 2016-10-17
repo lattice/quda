@@ -193,7 +193,7 @@ namespace quda {
 	param_coarse_solver->global_reduction = true;
 	param_coarse_solver->compute_true_res = false;
 	param_coarse_solver->delta = 1e-8;
-	param_coarse_solver->verbosity_precondition = QUDA_SILENT;
+	param_coarse_solver->verbosity_precondition = QUDA_VERBOSE; //QUDA_SILENT;
 	param_coarse_solver->pipeline = 5;
 
 	// need this to ensure we don't use half precision on the preconditioner in GCR
@@ -628,11 +628,19 @@ namespace quda {
     SolverParam solverParam(param);
 
     // set null-space generation options - need to expose these
-    solverParam.maxiter = 500;
+    //solverParam.maxiter = 500;
+    solverParam.maxiter = 1500;
     solverParam.tol = 5e-6;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    solverParam.delta = 1e-7;
-    solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
+    solverParam.delta = 1e-1;
+    
+    // ESW ADDITIONS
+    //solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
+    solverParam.inv_type = QUDA_BICGSTABL_INVERTER;
+    solverParam.Nkrylov = 6;
+    solverParam.verbosity_precondition = QUDA_VERBOSE;
+    // END ESW ADDITIONS
+    
     if (param.level == 0) { // this enables half precision on the fine grid only if set
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
       solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;

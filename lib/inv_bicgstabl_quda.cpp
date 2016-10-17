@@ -89,8 +89,8 @@ namespace quda {
     // My implementation is based on Kate Clark's implementation in CPS, to be found in
     // src/util/dirac_op/d_op_wilson_types/bicgstab.C
     
-    // Begin profiling initialization.
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    // Begin profiling preamble.
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
     
     if (!init) {
       // Initialize fields.
@@ -137,13 +137,37 @@ namespace quda {
     blas::zero(*u[0]);
     
     // Check to see that we're not trying to invert on a zero-field source    
-    if(b2 == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      warningQuda("Warning: inverting on zero-field source\n");
-      x = b;
-      param.true_res = 0.0;
-      param.true_res_hq = 0.0;
-      return;
+    if(b2 == 0) {
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        warningQuda("Warning: inverting on zero-field source\n");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+        return;
+      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        printfQuda("%s: Computing null vector\n", solver_name.c_str());
+        b2 = r2;
+      } else {
+        errorQuda("Null vector computing requires non-zero guess!");
+      }
+    }
+    
+    // Check to see that we're not trying to invert on a zero-field source
+    if (b2 == 0) {
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+        warningQuda("inverting on zero-field source");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+	profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        return;
+      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        printfQuda("BiCGstab: Computing null vector\n");
+        b2 = r2;
+      } else {
+        errorQuda("Null vector computing requires non-zero guess!");
+      }
     }
 
     // Initialize values.
@@ -156,10 +180,6 @@ namespace quda {
     // While I don't have heavy quark checks implemented yet, here's a start...
     //const bool use_heavy_quark_res = 
     //  (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-
-    // done with the initialization, start preamble.
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
     
     blas::flops = 0;
     //bool l2_converge = false;
@@ -198,7 +218,7 @@ namespace quda {
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         for (int i = 0; i <= j; i++)
         {
-          //blas::xpay(*r[i], -beta, *u[i]);
+          // could use block blas
 		      blas::caxpby(1.0, *r[i], -beta, *u[i]);
         }
         
@@ -211,6 +231,7 @@ namespace quda {
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
         for (int i = 0; i <= j; i++)
         {
+          
           blas::caxpy(-alpha, *u[i+1], *r[i]);
         }
         
@@ -222,6 +243,7 @@ namespace quda {
       // MR part. Really just modified Gram-Schmidt.
       // The algorithm uses the byproducts of the Gram-Schmidt to update x
       //   and other such niceties. One day I'll read the paper more closely.
+      // Can take this from 'orthoDir' in inv_gcr_quda.cpp, hard code pipelining up to l = 8.
       for (int j = 1; j <= nKrylov; j++)
       {
         for (int i = 1; i < j; i++)
