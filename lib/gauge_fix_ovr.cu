@@ -601,7 +601,7 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps = Tunable::paramString(param);
+      std::stringstream ps(Tunable::paramString(param));
       ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
@@ -879,7 +879,7 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps = Tuanble::paramString(param);
+      std::stringstream ps(Tunable::paramString(param));
       ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
@@ -1159,7 +1159,7 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps = Tunable::paramString(param);
+      std::stringstream ps(Tunable::paramString(param));
       ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
