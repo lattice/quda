@@ -69,13 +69,13 @@ namespace quda {
     QudaBoolean global_reduction;
 
     /** The Dirac operator to use for residual computation */
-    DiracMatrix &matResidual;
+    DiracMatrix *matResidual;
 
     /** The Dirac operator to use for smoothing */
-    DiracMatrix &matSmooth;
+    DiracMatrix *matSmooth;
 
     /** The sloppy Dirac operator to use for smoothing */
-    DiracMatrix &matSmoothSloppy;
+    DiracMatrix *matSmoothSloppy;
 
     /** What type of smoother to use */
     QudaInverterType smoother;
@@ -98,9 +98,9 @@ namespace quda {
      */
     MGParam(QudaMultigridParam &param,
 	    std::vector<ColorSpinorField*> &B,
-	    DiracMatrix &matResidual, 
-	    DiracMatrix &matSmooth,
-	    DiracMatrix &matSmoothSloppy,
+	    DiracMatrix *matResidual,
+	    DiracMatrix *matSmooth,
+	    DiracMatrix *matSmoothSloppy,
 	    int level=0) :
       SolverParam(*(param.invert_param)), 
       mg_global(param), 
@@ -131,9 +131,9 @@ namespace quda {
 
     MGParam(const MGParam &param, 
 	    std::vector<ColorSpinorField*> &B,
-	    DiracMatrix &matResidual, 
-	    DiracMatrix &matSmooth,
-	    DiracMatrix &matSmoothSloppy,
+	    DiracMatrix *matResidual,
+	    DiracMatrix *matSmooth,
+	    DiracMatrix *matSmoothSloppy,
 	    int level=0) :
       SolverParam(param),
       mg_global(param.mg_global),
@@ -266,6 +266,16 @@ namespace quda {
        instance
      */
     virtual ~MG();
+
+    /**
+       @brief Create the smoothers
+    */
+    void createSmoother();
+
+    /**
+       @brief Free the smoothers
+    */
+    void destroySmoother();
 
     /**
        This method is a placeholder for reseting the solver, e.g.,

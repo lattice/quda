@@ -26,7 +26,7 @@ namespace quda {
     if (param.level < param.Nlevel-1) {
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
 	if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) generateNullVectors(param.B);
-      } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only laod if infile is defined and not computing
+      } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
 	loadVectors(param.B);
       }
     }
@@ -34,44 +34,7 @@ namespace quda {
     if (param.level >= QUDA_MAX_MG_LEVEL)
       errorQuda("Level=%d is greater than limit of multigrid recursion depth", param.level+1);
 
-    // create the smoother for this level
-    printfQuda("smoother has operator %s\n", typeid(param.matSmooth).name());
-
-    param_presmooth = new SolverParam(param);
-
-    param_presmooth->inv_type = param.smoother;
-    param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
-    param_presmooth->is_preconditioner = false;
-    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-    param_presmooth->maxiter = param.nu_pre;
-    param_presmooth->Nkrylov = 4;
-    param_presmooth->tol = param.smoother_tol;
-    param_presmooth->global_reduction = param.global_reduction;
-    if (param.level == 0) {
-       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
-       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
-    }
-
-    if (param.level==param.Nlevel-1) {
-      param_presmooth->Nkrylov = 20;
-      param_presmooth->maxiter = 1000;
-      param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-8;
-      param_presmooth->compute_true_res = false;
-      param_presmooth->pipeline = 5;
-    }
-
-    presmoother = Solver::create(*param_presmooth, param.matSmooth,
-				 param.matSmoothSloppy, param.matSmoothSloppy, profile);
-
-    if (param.level < param.Nlevel-1) { //Create the post smoother
-      param_postsmooth = new SolverParam(*param_presmooth);
-      param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      param_postsmooth->maxiter = param.nu_post;
-      postsmoother = Solver::create(*param_postsmooth, param.matSmooth,
-				    param.matSmoothSloppy, param.matSmoothSloppy, profile);
-    }
+    createSmoother();
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
@@ -127,8 +90,8 @@ namespace quda {
       DiracParam diracParam;
       diracParam.transfer = transfer;
 
-      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth.Expose()) : const_cast<Dirac*>(param.matResidual.Expose());
-      diracParam.kappa = param.matResidual.Expose()->Kappa();
+      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
+      diracParam.kappa = param.matResidual->Expose()->Kappa();
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
       diracParam.tmp1 = &(tmp_coarse->Even());
@@ -138,7 +101,7 @@ namespace quda {
       matCoarseResidual = new DiracM(*diracCoarseResidual);
 
       // create smoothing operators
-      diracParam.dirac = const_cast<Dirac*>(param.matSmooth.Expose());
+      diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
       diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
 	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
 	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
@@ -165,7 +128,7 @@ namespace quda {
 
       // create the next multigrid level
       printfQuda("Creating next multigrid level\n");
-      param_coarse = new MGParam(param, *B_coarse, *matCoarseResidual, *matCoarseSmoother, *matCoarseSmootherSloppy, param.level+1);
+      param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level+1);
       param_coarse->fine = this;
       param_coarse->delta = 1e-20;
 
@@ -240,6 +203,62 @@ namespace quda {
     if (param.level < param.Nlevel-2) coarse->reset();
   }
 
+
+  void MG::createSmoother() {
+    // create the smoother for this level
+    printfQuda("smoother has operator %s\n", typeid(param.matSmooth).name());
+
+    param_presmooth = new SolverParam(param);
+
+    param_presmooth->inv_type = param.smoother;
+    param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
+    param_presmooth->is_preconditioner = false;
+    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
+    param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
+    param_presmooth->maxiter = param.nu_pre;
+    param_presmooth->Nkrylov = 4;
+    param_presmooth->tol = param.smoother_tol;
+    param_presmooth->global_reduction = param.global_reduction;
+    if (param.level == 0) {
+       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
+       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+    }
+
+    if (param.level==param.Nlevel-1) {
+      param_presmooth->Nkrylov = 20;
+      param_presmooth->maxiter = 1000;
+      param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
+      param_presmooth->delta = 1e-8;
+      param_presmooth->compute_true_res = false;
+      param_presmooth->pipeline = 5;
+    }
+
+    presmoother = Solver::create(*param_presmooth, *param.matSmooth,
+				 *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+
+    if (param.level < param.Nlevel-1) { //Create the post smoother
+      param_postsmooth = new SolverParam(*param_presmooth);
+      param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      param_postsmooth->maxiter = param.nu_post;
+      postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
+				    *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    }
+  }
+
+  void MG::destroySmoother() {
+    if (param.level < param.Nlevel-1) {
+      if (postsmoother) delete postsmoother;
+      postsmoother = nullptr;
+    }
+    if (presmoother) delete presmoother;
+    presmoother = nullptr;
+
+    if (param_presmooth) delete param_presmooth;
+    param_presmooth = nullptr;
+    if (param_postsmooth) delete param_postsmooth;
+    param_postsmooth = nullptr;
+  }
+
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
       if (param.level < param.Nlevel-2 && param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
@@ -260,9 +279,9 @@ namespace quda {
       if (diracCoarseSmoother) delete diracCoarseSmoother;
       if (matCoarseResidual) delete matCoarseResidual;
       if (diracCoarseResidual) delete diracCoarseResidual;
-      if (postsmoother) delete postsmoother;
     }
-    if (presmoother) delete presmoother;
+
+    destroySmoother();
 
     if (b_tilde && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) delete b_tilde;
     if (r) delete r;
@@ -271,8 +290,6 @@ namespace quda {
     if (tmp_coarse) delete tmp_coarse;
 
     if (param_coarse) delete param_coarse;
-    if (param_presmooth) delete param_presmooth;
-    if (param_postsmooth) delete param_postsmooth;
 
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
   }
@@ -367,8 +384,8 @@ namespace quda {
     transfer->P(*tmp1, *tmp_coarse);
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      const Dirac &dirac = *(param.matSmooth.Expose());
-      double kappa = param.matResidual.Expose()->Kappa();
+      const Dirac &dirac = *(param.matSmooth->Expose());
+      double kappa = param.matResidual->Expose()->Kappa();
       if (param.level==0) {
 	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
 	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
@@ -377,11 +394,11 @@ namespace quda {
 	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
       }
     } else {
-      param.matResidual(*tmp2,*tmp1);
+      (*param.matResidual)(*tmp2,*tmp1);
     }
 
     transfer->R(*x_coarse, *tmp2);
-    param_coarse->matResidual(*r_coarse, *tmp_coarse);
+    (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     {
@@ -449,7 +466,7 @@ namespace quda {
       // FIXME only need to make a copy if not preconditioning
       residual = b; // copy source vector since we will overwrite source with iterated residual
 
-      const Dirac &dirac = *(param.matSmooth.Expose());
+      const Dirac &dirac = *(param.matSmooth->Expose());
       dirac.prepare(in, out, x, residual, outer_solution_type);
 
       // b_tilde holds either a copy of preconditioned source or a pointer to original source
@@ -473,7 +490,7 @@ namespace quda {
       if (use_solver_residual) {
 	if (debug) r2 = norm2(*r);
       } else {
-	param.matResidual(*r, x);
+	(*param.matResidual)(*r, x);
 	if (debug) r2 = xmyNorm(b, *r);
 	else axpby(1.0, b, -1.0, *r);
       }
@@ -517,7 +534,7 @@ namespace quda {
 
     } else { // do the coarse grid solve
 
-      const Dirac &dirac = *(param.matSmooth.Expose());
+      const Dirac &dirac = *(param.matSmooth->Expose());
       ColorSpinorField *out=nullptr, *in=nullptr;
 
       dirac.prepare(in, out, x, b, outer_solution_type);
@@ -526,7 +543,7 @@ namespace quda {
     }
 
     if ( debug ) {
-      param.matResidual(*r, x);
+      (*param.matResidual)(*r, x);
       double r2 = xmyNorm(b, *r);
       printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
     }
@@ -667,9 +684,9 @@ namespace quda {
 
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
 
-	Solver *solve = Solver::create(solverParam, param.matSmooth, param.matSmoothSloppy, param.matSmoothSloppy, profile);
+	Solver *solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
 
-	const Dirac &dirac = *(param.matSmooth.Expose());
+	const Dirac &dirac = *(param.matSmooth->Expose());
 	ColorSpinorField *out=nullptr, *in=nullptr;
 	dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
 	(*solve)(*out, *in);

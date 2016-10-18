@@ -649,9 +649,16 @@ extern "C" {
   void* newMultigridQuda(QudaMultigridParam *param);
 
   /**
-   * Free resources allocated by the multigrid solver
+   * @brief Free resources allocated by the multigrid solver
+   * @param mg_instance Pointer to instance of multigrid_solver
    */
   void destroyMultigridQuda(void *mg_instance);
+
+  /**
+   * @brief Updates the multigrid preconditioner for the new gauge / clover field
+   * @param mg_instance Pointer to instance of multigrid_solver
+   */
+  void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
    * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).
