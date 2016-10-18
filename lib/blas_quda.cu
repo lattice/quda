@@ -552,6 +552,27 @@ namespace quda {
 				    x, y, z, x);
       }
     }
+    
+    /**
+       Functor performing the operations y[i] = a*x[i] + y[i] and z[i] = b*x[i] + z[i]
+    */
+    template <typename Float2, typename FloatN>
+    struct caxpyBxpz_ : public BlasFunctor<Float2,FloatN> {
+      const Float2 a;
+      const Float2 b;
+      caxpyBxpz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w)
+      { _caxpy(a, x, y); _caxpy(b, x, z); }
+
+      static int streams() { return 5; } //! total number of input and output streams
+      static int flops() { return 8; } //! flops per element
+    };
+
+    void caxpyBxpz(const Complex &a, ColorSpinorField &x,
+		      ColorSpinorField &y, const Complex &b, ColorSpinorField &z) {
+      blasCuda<caxpyBxpz_,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)),
+				     make_double2(0.0,0.0), x, y, z, x);
+    }
 
     /**
        Functor performing the operations z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]

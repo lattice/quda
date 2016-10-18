@@ -58,6 +58,7 @@ namespace quda {
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
     void cxpaypbz(ColorSpinorField &, const Complex &b, ColorSpinorField &y, const Complex &c, ColorSpinorField &z);
     void caxpbypzYmbw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, ColorSpinorField &, ColorSpinorField &);
+    void caxpyBxpz(const Complex &, ColorSpinorField &, ColorSpinorField &, const Complex &, ColorSpinorField &);
 
     Complex cDotProduct(ColorSpinorField &, ColorSpinorField &);
     Complex xpaycDotzy(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z);
