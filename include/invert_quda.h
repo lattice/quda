@@ -490,6 +490,7 @@ namespace quda {
 
   private:
     DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
 
     /**
        The size of the Krylov space that BiCGstabL uses.
@@ -503,10 +504,18 @@ namespace quda {
     double *sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
     
     // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *r0p;    //! Shadow residual, in BiCG language.
-    ColorSpinorField *tempp;  //! Temporary vector, used to hold residuals and such.
+    // full precision fields
+    ColorSpinorField *r_fullp;   //! Full precision residual.
+    ColorSpinorField *yp;        //! Full precision temporary.
+    // sloppy precision fields
+    ColorSpinorField *tempp;     //! Sloppy temporary vector. 
     std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
     std::vector<ColorSpinorField*> u; // Search directions.
+    
+    // Saved, preallocated vectors. (may or may not get used depending on precision.)
+    ColorSpinorField *x_sloppy_saved_p; //! Sloppy solution vector.
+    ColorSpinorField *r0_saved_p;       //! Shadow residual, in BiCG language.
+    ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
     
     /**
        Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
@@ -516,12 +525,12 @@ namespace quda {
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
-    bool init;
+    bool init; 
     
     std::string solver_name; // holds BiCGstab-l, where 'l' literally equals nKrylov.
 
   public:
-    BiCGstabL(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstabL();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);

@@ -249,8 +249,13 @@ namespace quda {
     };
 
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
-      blasCuda<caxpy_,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
+      if (x.Precision() != y.Precision()) {
+      mixed::blasCuda<caxpy_,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
 			       make_double2(0.0, 0.0), x, y, x, x);
+} else {
+            blasCuda<caxpy_,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0),
+			       make_double2(0.0, 0.0), x, y, x, x);
+}
     }
 
     template<int NXZ, typename Float2, typename FloatN>

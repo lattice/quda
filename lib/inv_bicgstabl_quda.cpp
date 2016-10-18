@@ -19,8 +19,8 @@
 
 namespace quda {
 
-  BiCGstabL::BiCGstabL(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), nKrylov(param.Nkrylov), init(false)
+  BiCGstabL::BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), nKrylov(param.Nkrylov), init(false)
   {
     r.resize(nKrylov+1);
     u.resize(nKrylov+1);
@@ -49,13 +49,18 @@ namespace quda {
     delete[] tau; 
     
     if (init) {
-      for (int i = 0; i < nKrylov+1; i++) {
+      delete r_sloppy_saved_p; 
+      delete u[0];
+      for (int i = 1; i < nKrylov+1; i++) {
         delete r[i];
         delete u[i];
       }
       
-      delete r0p;
-      delete tempp;
+      delete x_sloppy_saved_p; 
+      delete r_fullp;
+      delete r0_saved_p;
+      delete yp;
+      delete tempp; 
       
       init = false;
     }
@@ -95,13 +100,25 @@ namespace quda {
     if (!init) {
       // Initialize fields.
       ColorSpinorParam csParam(x);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
       
-      // Shadow residual.
-      r0p = ColorSpinorField::Create(csParam);
+      // Full precision variables.
+      r_fullp = ColorSpinorField::Create(csParam);
       
       // Create temporary.
-      tempp = ColorSpinorField::Create(csParam);
+      yp = ColorSpinorField::Create(csParam);
+      
+      // Sloppy precision variables.
+      csParam.setPrecision(param.precision_sloppy); 
+      
+      // Sloppy solution.
+      x_sloppy_saved_p = ColorSpinorField::Create(csParam); // Used depending on precision.
+      
+      // Shadow residual.
+      r0_saved_p = ColorSpinorField::Create(csParam); // Used depending on precision. 
+      
+      // Temporary
+      tempp = ColorSpinorField::Create(csParam); 
       
       // Residual (+ extra residuals for BiCG steps), Search directions.
       // Remark: search directions are sloppy in GCR. I wonder if we can
@@ -110,47 +127,30 @@ namespace quda {
         r[i] = ColorSpinorField::Create(csParam);
         u[i] = ColorSpinorField::Create(csParam);
       }
+      r_sloppy_saved_p = r[0]; // Used depending on precision. 
       
       init = true; 
     }
     
-    // Folowing the GCR inverter...
-    ColorSpinorField &r0 = *r0p;
-    ColorSpinorField &temp = *tempp;
-    
     double b2 = blas::norm2(b); // norm sq of source.
     double r2;                  // norm sq of residual
     
+    ColorSpinorField &r_full = *r_fullp;
+    ColorSpinorField &y = *yp;
+    ColorSpinorField &temp = *tempp;
+    
+    ColorSpinorField *r0p, *x_sloppyp; // Get assigned below. 
+    
     // Compute initial residual depending on whether we have an initial guess or not.
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(*r[0], x, temp); // r[0] = Ax
-      r2 = blas::xmyNorm(b, *r[0]); // r = b - Ax, return norm.
+      mat(r_full, x, y); // r[0] = Ax
+      r2 = blas::xmyNorm(b, r_full); // r = b - Ax, return norm.
+      blas::copy(y, x);
     } else {
-      blas::copy(*r[0], b); // r[0] = b
+      blas::copy(r_full, b); // r[0] = b
       r2 = b2;
       blas::zero(x); // defensive measure in case solution isn't already zero
-    }
-    
-    // Set some initial values.
-    sigma[0] = blas::norm2(*r[0]);
-    blas::copy(r0, *r[0]);
-    blas::zero(*u[0]);
-    
-    // Check to see that we're not trying to invert on a zero-field source    
-    if(b2 == 0) {
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-        warningQuda("Warning: inverting on zero-field source\n");
-        x = b;
-        param.true_res = 0.0;
-        param.true_res_hq = 0.0;
-        return;
-      } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        printfQuda("%s: Computing null vector\n", solver_name.c_str());
-        b2 = r2;
-      } else {
-        errorQuda("Null vector computing requires non-zero guess!");
-      }
+      blas::zero(y);
     }
     
     // Check to see that we're not trying to invert on a zero-field source
@@ -169,8 +169,60 @@ namespace quda {
         errorQuda("Null vector computing requires non-zero guess!");
       }
     }
+    
+    
+    
+    // Set field aliasing according to whether we're doing mixed precision or not.
+    // There probably be bugs and headaches hiding here. 
+    if (param.precision_sloppy == x.Precision()) {
+      r[0] = &r_full; // r[0] \equiv r_sloppy points to the same memory location as r.
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
+      {
+        r0p = &b; // r0, b point to the same vector in memory.
+      }
+      else
+      {
+        r0p = r0_saved_p; // r0p points to the saved r0 memory.
+        *r0p = r_full; // and is set equal to r.
+      }
+    }
+    else
+    {
+      r0p = r0_saved_p; // r0p points to saved r0 memory.
+      r[0] = r_sloppy_saved_p; // r[0] points to saved r_sloppy memory.
+      *r0p = r_full; // and is set equal to r.
+      *r[0] = r_full; // yup.
+    }
+    
+    if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) 
+    {
+      x_sloppyp = &x; // x_sloppy and x point to the same vector in memory.
+      blas::zero(*x_sloppyp); // x_sloppy is zeroed out (and, by extension, so is x).
+    }
+    else
+    {
+      x_sloppyp = x_sloppy_saved_p; // x_sloppy point to saved x_sloppy memory.
+      blas::zero(*x_sloppyp); // and is zeroed out. 
+    }
+    
+    // Syntatic sugar.
+    ColorSpinorField &r0 = *r0p;
+    ColorSpinorField &x_sloppy = *x_sloppyp;
+    
+    // Zero out the first search direction. 
+    blas::zero(*u[0]);
+    
+    
+    // Set some initial values.
+    sigma[0] = blas::norm2(r_full);
+    
 
     // Initialize values.
+    for (int i = 1; i <= nKrylov; i++)
+    {
+      blas::zero(*r[i]);
+    }
+    
     rho0 = 1.0;
     alpha = 0.0;
     omega = 1.0;
@@ -209,7 +261,6 @@ namespace quda {
       
       // BiCG part of calculation.
       for (int j = 0; j < nKrylov; j++) {
-        
         // rho1 = <r0, r_j>, beta = alpha*rho1/rho0, rho0 = rho1;
         rho1 = blas::cDotProduct(r0, *r[j]);
         beta = alpha*rho1/rho0;
@@ -223,21 +274,21 @@ namespace quda {
         }
         
         // u[j+1] = A ( u[j] )
-        mat(*u[j+1], *u[j], temp);
+        matSloppy(*u[j+1], *u[j], temp);
         
         // alpha = rho0/<r0, u[j+1]>
         alpha = rho0/blas::cDotProduct(r0, *u[j+1]);
         
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
         for (int i = 0; i <= j; i++)
-        {
-          
+        { 
           blas::caxpy(-alpha, *u[i+1], *r[i]);
         }
         
         // r[j+1] = A r[j], x = x + alpha*u[0]
-        mat(*r[j+1], *r[j], temp);
-        blas::caxpy(alpha, *u[0], x);
+        matSloppy(*r[j+1], *r[j], temp);
+        blas::caxpy(alpha, *u[0], x_sloppy);
+        
       } // End BiCG part.      
       
       // MR part. Really just modified Gram-Schmidt.
@@ -290,7 +341,7 @@ namespace quda {
       // Update x, r, u.
       // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
       // I bet there's some fancy blas for this.
-      blas::caxpy(gamma[1], *r[0], x);
+      blas::caxpy(gamma[1], *r[0], x_sloppy);
       blas::caxpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
       blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
       
@@ -298,7 +349,7 @@ namespace quda {
       for (int j = 1; j < nKrylov; j++)
       {
         blas::caxpy(-gamma[j], *u[j], *u[0]);
-        blas::caxpy(gamma_prime_prime[j], *r[j], x);
+        blas::caxpy(gamma_prime_prime[j], *r[j], x_sloppy);
         blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
       }
       
@@ -314,9 +365,25 @@ namespace quda {
       // Further remark: "reliable" updates rNorm, maxrr, maxrx!! 
       if (reliable(rNorm, maxrx, maxrr, r2, delta))
       {
+        if (x.Precision() != x_sloppy.Precision())
+        {
+          blas::copy(x, x_sloppy);
+        }
+        
+        blas::xpy(x, y); // swap these around? (copied from bicgstab)
+        
         // Explicitly recompute the residual.
-        mat(*r[0], x, temp); // r[0] = Ax
-        r2 = blas::xmyNorm(b, *r[0]); // r = b - Ax, return norm.
+        mat(r_full, y, x); // r[0] = Ax
+        
+        r2 = blas::xmyNorm(b, r_full); // r = b - Ax, return norm.
+        
+        sigma[0] = r2;
+        
+        if (x.Precision() != r[0]->Precision())
+        {
+          blas::copy(*r[0], r_full);
+        }
+        blas::zero(x_sloppy);
         
         // Update rNorm, maxrr, maxrx.
         rNorm = sqrt(r2);
@@ -331,6 +398,13 @@ namespace quda {
       k += nKrylov;
       PrintStats(solver_name.c_str(), k, r2, b2, 0.0); // last thing should be heavy quark res...
     } // Done iterating.
+    
+    if (x.Precision() != x_sloppy.Precision())
+    {
+      blas::copy(x, x_sloppy);
+    }
+    
+    blas::xpy(y, x);
     
     // Done with compute, begin the epilogue.
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -350,8 +424,8 @@ namespace quda {
     // compute the true residual
     // !param.is_preconditioner comes from bicgstab, param.compute_true_res came from gcr.
     if (!param.is_preconditioner && param.compute_true_res) { // do not do the below if this is an inner solver.
-      mat(*r[0], x, temp);
-      double true_res = blas::xmyNorm(b, *r[0]);
+      mat(r_full, x, y);
+      double true_res = blas::xmyNorm(b, r_full);
       param.true_res = sqrt(true_res / b2);
       // Probably some heavy quark stuff...
       param.true_res_hq = 0.0; //use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,*r[0]).z) : 0.0;
@@ -360,6 +434,12 @@ namespace quda {
     // Reset flops counters.
     blas::flops = 0;
     mat.flops();
+    
+    // copy the residual to b so we can use it outside of the solver.
+    if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO)
+    {
+      blas::copy(b, r_full);
+    }
     
     // Done with epilogue, begin free.
     

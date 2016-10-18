@@ -74,7 +74,7 @@ namespace quda {
       break;
     case QUDA_BICGSTABL_INVERTER:
       report("BICGSTABL");
-      solver = new BiCGstabL(mat, param, profile);
+      solver = new BiCGstabL(mat, matSloppy, param, profile);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
