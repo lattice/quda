@@ -17,8 +17,115 @@
 #include <iostream>
 #include <sstream>
 
+
 namespace quda {
 
+  
+  // Utility functions for Gram-Schmidt. Based on GCR functions.
+  // Big change is we need to go from 1 to nKrylov, not 0 to nKrylov-1. 
+  
+  void BiCGstabL::computeTau(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j)
+  {
+    Complex *Tau = new Complex[size];
+    std::vector<cudaColorSpinorField*> a(size), b(size);
+    for (int k=0; k<size; k++)
+    {
+      a[k] = static_cast<cudaColorSpinorField*>(r[begin+k]);
+      b[k] = static_cast<cudaColorSpinorField*>(r[j]);
+      Tau[k] = 0;
+    }
+    blas::cDotProduct(Tau, a, b); // vectorized dot product
+#if 0
+    for (int k=0; k<size; k++)
+    {
+      printfQuda("%d/%d vectorized %e %e, regular %e %e\n", k+1, size, Tau[k].real(), Tau[k].imag(),
+		  blas::cDotProduct(*a[k], *b[k]).real(), blas::cDotProduct(*a[k], *b[k]).imag());
+    }
+#endif
+
+    for (int k=0; k<size; k++)
+    {
+      tau[begin+k][j] = Tau[k];
+    }
+    delete [] Tau;
+  }
+  
+  void BiCGstabL::updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j)
+  {
+
+    Complex *tau_ = new Complex[size];
+    for (int i=0; i<size; i++)
+    {
+      tau_[i] = -tau[i+begin][j];
+    }
+
+    std::vector<ColorSpinorField*> r_(r.begin() + begin, r.begin() + begin + size);
+    std::vector<ColorSpinorField*> rj(r.begin() + j, r.begin() + j + 1);
+
+    blas::caxpy(tau_, r_, rj);
+
+    delete[] tau_;
+  }
+
+  void BiCGstabL::orthoDir(Complex **tau, std::vector<ColorSpinorField*> r, int j, int pipeline)
+  {
+
+    switch (pipeline)
+    {
+      case 0: // no kernel fusion
+        for (int i=1; i<j; i++) // 5 (j-2) memory transactions here. Start at 1 b/c bicgstabl convention.
+        { 
+          tau[i][j] = blas::cDotProduct(*r[i], *r[j]);
+          blas::caxpy(-tau[i][j], *r[i], *r[j]);
+        }
+        break;
+      case 1: // basic kernel fusion
+        if (j==1) // start at 1.
+        {
+          break;
+        }
+        tau[1][j] = blas::cDotProduct(*r[1], *r[j]);
+        for (int i=1; i<j-1; i++) // 4 (j-2) memory transactions here. start at 1.
+        {
+          tau[i+1][j] = blas::caxpyDotzy(-tau[i][j], *r[i], *r[j], *r[i+1]);
+        }
+        blas::caxpy(-tau[j-1][j], *r[j-1], *r[j]);
+        break;
+      case 2: // two-way pipelining
+      case 3: // three-way pipelining
+      case 4: // four-way pipelining
+      case 5: // five-way pipelining
+      case 6: // six-way pipelining
+      case 7: // seven-way pipelining
+      case 8: // eight-way pipelining
+        {
+          const int N = pipeline;
+          // We're orthogonalizing r[j] against r[1], ..., r[j-1].
+          // We need to do (j-1)/N updates of length N, at 1,1+N,1+2*N,...
+          // After, we do 1 update of length (j-1)%N.
+          
+          // (j-1)/N updates of length N, at 1,1+N,1+2*N,...
+          int step;
+          for (step = 0; step < (j-1)/N; step++)
+          {
+            computeTau(tau, r, 1+step*N, N, j);
+            updateR(tau, r, 1+step*N, N, j);
+          }
+
+          if ((j-1)%N != 0) // need to update the remainder
+          {
+            // 1 update of length (j-1)%N.
+            computeTau(tau, r, 1+step*N, (j-1)%N, j);
+            updateR(tau, r, 1+step*N, (j-1)%N, j);
+          }
+        }
+        break;
+      default:
+        errorQuda("Pipeline length %d type not defined", pipeline);
+    }
+
+  }
+  
   BiCGstabL::BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), nKrylov(param.Nkrylov), init(false)
   {
@@ -236,6 +343,9 @@ namespace quda {
     blas::flops = 0;
     //bool l2_converge = false;
     //double r2_old = r2;
+
+    int pipeline = param.pipeline;
+
     
     // done with preamble, begin computing.
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -278,7 +388,7 @@ namespace quda {
         
         // alpha = rho0/<r0, u[j+1]>
         alpha = rho0/blas::cDotProduct(r0, *u[j+1]);
-        
+
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
         for (int i = 0; i <= j; i++)
         { 
@@ -297,7 +407,23 @@ namespace quda {
       // Can take this from 'orthoDir' in inv_gcr_quda.cpp, hard code pipelining up to l = 8.
       for (int j = 1; j <= nKrylov; j++)
       {
+        
+
+        // This becomes a fused operator below.
+
+        // NOTE: The pipelined operations assume previous r[j]'s, j > 0, are 
+        // normalized. BiCGstab-L as written in the aforementioned paper doesn't make this 
+        // assumption. This means we need to rescale the r[j]'s later by
+        // sigma[j], which holds the norm.
+        orthoDir(tau, r, j, pipeline);
+        
+        // Correct a scaling difference when we use pipelined orthoDir.
         for (int i = 1; i < j; i++)
+        {
+          tau[i][j] /= sqrt(sigma[i]);
+        }
+
+        /*for (int i = 1; i < j; i++)
         {
           // tau_ij = <r_i,r_j>/sigma_i.
           // This doesn't break on the first iteration because i < j is true.
@@ -306,11 +432,23 @@ namespace quda {
           
           // r_j = r_j - tau_ij r_i;
           blas::caxpy(-tau[i][j], *r[i], *r[j]);
-        }
+        }*/
+        
         
         // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
-        sigma[j] = blas::norm2(*r[j]);
-        gamma_prime[j] = blas::cDotProduct(*r[j], *r[0])/sigma[j];
+        
+        // This becomes a fused operator below.
+        //sigma[j] = blas::norm2(*r[j]);
+        //gamma_prime[j] = blas::cDotProduct(*r[j], *r[0])/sigma[j];
+        
+        // rjr.x = Re(<r[j],r[0]), rjr.y = Im(<r[j],r[0]>), rjr.z = <r[j],r[j]>
+        double3 rjr = blas::cDotProductNormA(*r[j], *r[0]); 
+        sigma[j] = rjr.z;
+        gamma_prime[j] = Complex(rjr.x, rjr.y)/sigma[j];
+        
+        // If we're using the pipelining, we need to normalize r[j]. Could fuse this into an updated blas::cDotProductNormA
+        blas::ax(1.0/sqrt(sigma[j]), *r[j]);
+
       }
       
       // gamma[nKrylov] = gamma'[nKrylov], omega = gamma[nKrylov]
@@ -345,7 +483,9 @@ namespace quda {
       // This became a fused operator.
       //blas::caxpy(gamma[1], *r[0], x_sloppy);
       //blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
-      blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
+      // Need a scaling correction due to pipelining
+      //blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
+      blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov]*sqrt(sigma[nKrylov]), *r[nKrylov]);
       
       // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
       for (int j = 1; j < nKrylov; j++)
@@ -355,7 +495,10 @@ namespace quda {
         // This became a fused operator
         //blas::caxpy(gamma_prime_prime[j], *r[j], x_sloppy);
         //blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
-        blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x_sloppy, -gamma_prime[j], *r[0]);
+        // Need a scaling correction due to pipelining.
+        //blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x_sloppy, -gamma_prime[j], *r[0]);
+        blas::caxpyBxpz(gamma_prime_prime[j]*sqrt(sigma[j]), *r[j], x_sloppy, -gamma_prime[j]*sqrt(sigma[j]), *r[0]);
+
       }
       
       // sigma[0] = r_0^2

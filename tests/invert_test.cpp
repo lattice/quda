@@ -62,6 +62,7 @@ extern bool compute_clover;
 
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
+extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern char latfile[];
 
 extern void usage(char** );
@@ -214,7 +215,7 @@ int main(int argc, char **argv)
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   }
 
-  inv_param.pipeline = 0;
+  inv_param.pipeline = pipeline;
 
   inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = gcrNkrylov;

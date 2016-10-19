@@ -523,6 +523,13 @@ namespace quda {
     int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
     
     /**
+       Internal routines for pipelined Gram-Schmidt. Made to not conflict with GCR's implementation.
+     */
+    void computeTau(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
+    void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
+    void orthoDir(Complex **tau, std::vector<ColorSpinorField*> r, int j, int pipeline);
+    
+    /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
     bool init; 

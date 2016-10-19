@@ -579,6 +579,18 @@ namespace quda {
         reduce::multiReduceCuda<5,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
 	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
+      case 6:
+        reduce::multiReduceCuda<6,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
+	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 7:
+        reduce::multiReduceCuda<7,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
+	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 8:
+        reduce::multiReduceCuda<8,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
+	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
       default:
         errorQuda("Unsupported vector size\n");
         break;
