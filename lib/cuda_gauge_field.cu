@@ -39,7 +39,7 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      gauge = device_malloc(bytes);
+      gauge = LatticeField::allocateDevice(bytes);
       if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
     } else {
       gauge = param.gauge;
@@ -48,7 +48,7 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         size_t nbytes = nFace * surface[i] * nInternal * precision;
-        ghost[i] = nbytes ? device_malloc(nbytes) : NULL;
+        ghost[i] = nbytes ? LatticeField::allocateDevice(nbytes) : NULL;
       }        
     }
 
@@ -144,12 +144,12 @@ namespace quda {
 #endif
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (gauge) device_free(gauge);
+      if (gauge) LatticeField::freeDevice(gauge);
     }
 
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
-        if (ghost[i]) device_free(ghost[i]);
+        if (ghost[i]) LatticeField::freeDevice(ghost[i]);
       }
     }
 
@@ -168,8 +168,8 @@ namespace quda {
     void *ghost_[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
-      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
-      send[d] = device_malloc(nFace*surface[d]*nInternal*precision);
+      ghost_[d] = isNative() ? LatticeField::allocateDevice(nFace*surface[d]*nInternal*precision) : ghost[d];
+      send[d] = LatticeField::allocateDevice(nFace*surface[d]*nInternal*precision);
     }
 
     // get the links into contiguous buffers
@@ -178,12 +178,12 @@ namespace quda {
     // communicate between nodes
     exchange(ghost_, send, QUDA_FORWARDS);
 
-    for (int d=0; d<nDim; d++) device_free(send[d]);
+    for (int d=0; d<nDim; d++) LatticeField::freeDevice(send[d]);
 
     if (isNative()) {
       // copy from ghost into the padded region in gauge
       copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost_, 1);
-      for (int d=0; d<nDim; d++) device_free(ghost_[d]);
+      for (int d=0; d<nDim; d++) LatticeField::freeDevice(ghost_[d]);
     }
   }
 
@@ -201,8 +201,8 @@ namespace quda {
     void *ghost_[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
-      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
-      recv[d] = device_malloc(nFace*surface[d]*nInternal*precision);
+      ghost_[d] = isNative() ? LatticeField::allocateDevice(nFace*surface[d]*nInternal*precision) : ghost[d];
+      recv[d] = LatticeField::allocateDevice(nFace*surface[d]*nInternal*precision);
     }
 
     if (isNative()) {
@@ -217,8 +217,8 @@ namespace quda {
     extractGaugeGhost(*this, recv, false);
 
     for (int d=0; d<nDim; d++) {
-      device_free(recv[d]);
-      if (isNative()) device_free(ghost_[d]);
+      LatticeField::freeDevice(recv[d]);
+      if (isNative()) LatticeField::freeDevice(ghost_[d]);
     }
   }
 
@@ -234,8 +234,8 @@ namespace quda {
       if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
       // store both parities and directions in each
       bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-      send_d[d] = device_malloc(2 * bytes[d]);
-      recv_d[d] = device_malloc(2 * bytes[d]);
+      send_d[d] = LatticeField::allocateDevice(2 * bytes[d]);
+      recv_d[d] = LatticeField::allocateDevice(2 * bytes[d]);
     }
 
 #ifndef GPU_COMMS
@@ -351,8 +351,8 @@ namespace quda {
 	comm_free(mh_recv_fwd[d]);
       }
 
-      device_free(send_d[d]);
-      device_free(recv_d[d]);
+      LatticeField::freeDevice(send_d[d]);
+      LatticeField::freeDevice(recv_d[d]);
     }
 
   }
