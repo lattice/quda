@@ -170,8 +170,8 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      v = device_malloc(bytes);
-      if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
+      v = LatticeField::allocateDevice(bytes);
+      if (precision == QUDA_HALF_PRECISION) norm = LatticeField::allocateDevice(norm_bytes);
       alloc = true;
     }
 
@@ -436,8 +436,8 @@ namespace quda {
     if (ghost_field) device_pinned_free(ghost_field);
 
     if (alloc) {
-      device_free(v);
-      if (precision == QUDA_HALF_PRECISION) device_free(norm);
+      LatticeField::freeDevice(v);
+      if (precision == QUDA_HALF_PRECISION) LatticeField::freeDevice(norm);
       alloc = false;
     }
 
