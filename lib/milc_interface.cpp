@@ -1669,7 +1669,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   // if doing a pure double-precision multi-shift solve don't use reliable updates
   const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
                                      ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
-  double reliable_delta = (use_mixed_precision) ? 1e-1 : 0.0;
+  double reliable_delta = (use_mixed_precision) ? 1e-2 : 0.0;
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
   invertParam.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
