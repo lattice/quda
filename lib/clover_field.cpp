@@ -77,8 +77,8 @@ namespace quda {
 
     if (param.direct) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	clover = device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
+	clover = LatticeField::allocateDevice(bytes);
+	if (precision == QUDA_HALF_PRECISION) norm = LatticeField::allocateDevice(norm_bytes);
       } else {
 	clover = param.clover;
 	norm = param.norm;
@@ -105,8 +105,8 @@ namespace quda {
 
     if (param.inverse) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	cloverInv = device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(norm_bytes);
+	cloverInv = LatticeField::allocateDevice(bytes);
+	if (precision == QUDA_HALF_PRECISION) invNorm = LatticeField::allocateDevice(norm_bytes);
       } else {
 	cloverInv = param.cloverInv;
 	invNorm = param.invNorm;
@@ -235,11 +235,11 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (clover != cloverInv) {
-	if (clover) device_free(clover);
-	if (norm) device_free(norm);
+	if (clover) LatticeField::freeDevice(clover);
+	if (norm) LatticeField::freeDevice(norm);
       }
-      if (cloverInv) device_free(cloverInv);
-      if (invNorm) device_free(invNorm);
+      if (cloverInv) LatticeField::freeDevice(cloverInv);
+      if (invNorm) LatticeField::freeDevice(invNorm);
     }
     
     checkCudaError();
