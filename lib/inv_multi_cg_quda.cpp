@@ -216,7 +216,7 @@ namespace quda {
 
     // FIXME - hack from hell since static ghosts seem to be broken
     static int hack = 0;
-    if (hack==0) {
+    if (hack==0 && reliable) {
       mat(*y[3], *y[2], *y[1], *y[0]);
       for (int i=0; i<4; i++) blas::zero(*y[i]);
       hack = 1;
