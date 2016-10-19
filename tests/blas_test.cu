@@ -33,7 +33,7 @@ extern int Msrc;
 
 extern void usage(char** );
 
-const int Nkernels = 39;
+const int Nkernels = 40;
 
 using namespace quda;
 
@@ -440,6 +440,10 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::caxpyBxpz(a2, *xD, *yD, b2, *zD); 
       break; 
 
+    case 39:
+      for (int i=0; i < niter; ++i) blas::caxpyBxpz(a2, *xD, *yD, b2, *zD); 
+      break; 
+        
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -834,6 +838,14 @@ double test(int kernel) {
      error = ERROR(x) + ERROR(z);}
     break;
 
+  case 39:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    {blas::caxpyBzpx(a, *xD, *yD, b2, *zD);
+     blas::caxpyBzpx(a, *xH, *yH, b2, *zH);
+     error = ERROR(x) + ERROR(z);}
+    break;
 
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
@@ -885,7 +897,8 @@ const char *names[] = {
   "axpyReDot",
   "caxpy (block)",
   "axpyBzpcx (block)",
-  "caxpyBxpz"
+  "caxpyBxpz",
+  "caxpyBzpx"
 };
 
 int main(int argc, char** argv)
@@ -1029,6 +1042,7 @@ INSTANTIATE_TEST_CASE_P(axpyReDot_half, BlasTest, ::testing::Values( make_int2(0
 INSTANTIATE_TEST_CASE_P(multicaxpy_half, BlasTest, ::testing::Values( make_int2(0,36) ));
 INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_half, BlasTest, ::testing::Values( make_int2(0,37) ));
 INSTANTIATE_TEST_CASE_P(caxpyBxpz_half, BlasTest, ::testing::Values( make_int2(0,38) ));
+INSTANTIATE_TEST_CASE_P(caxpyBzpx_half, BlasTest, ::testing::Values( make_int2(0,39) ));
 
 // single precision
 INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
@@ -1070,6 +1084,7 @@ INSTANTIATE_TEST_CASE_P(axpyReDot_single, BlasTest, ::testing::Values( make_int2
 INSTANTIATE_TEST_CASE_P(multicaxpy_single, BlasTest, ::testing::Values( make_int2(1,36) ));
 INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_single, BlasTest, ::testing::Values( make_int2(1,37) ));
 INSTANTIATE_TEST_CASE_P(caxpyBxpz_single, BlasTest, ::testing::Values( make_int2(1,38) ));
+INSTANTIATE_TEST_CASE_P(caxpyBzpx_single, BlasTest, ::testing::Values( make_int2(1,39) ));
 
 // double precision
 INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
@@ -1111,4 +1126,5 @@ INSTANTIATE_TEST_CASE_P(axpyReDot_double, BlasTest, ::testing::Values( make_int2
 INSTANTIATE_TEST_CASE_P(multicaxpy_double, BlasTest, ::testing::Values( make_int2(2,36) ));
 INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_double, BlasTest, ::testing::Values( make_int2(2,37) ));
 INSTANTIATE_TEST_CASE_P(caxpyBxpz_double, BlasTest, ::testing::Values( make_int2(2,38) ));
+INSTANTIATE_TEST_CASE_P(caxpyBzpx_double, BlasTest, ::testing::Values( make_int2(2,39) ));
 

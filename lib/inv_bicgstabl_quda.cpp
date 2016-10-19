@@ -340,17 +340,22 @@ namespace quda {
       
       // Update x, r, u.
       // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
-      // I bet there's some fancy blas for this.
-      blas::caxpy(gamma[1], *r[0], x_sloppy);
       blas::caxpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
-      blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
+      
+      // This became a fused operator.
+      //blas::caxpy(gamma[1], *r[0], x_sloppy);
+      //blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
+      blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
       
       // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
       for (int j = 1; j < nKrylov; j++)
       {
         blas::caxpy(-gamma[j], *u[j], *u[0]);
-        blas::caxpy(gamma_prime_prime[j], *r[j], x_sloppy);
-        blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
+        
+        // This became a fused operator
+        //blas::caxpy(gamma_prime_prime[j], *r[j], x_sloppy);
+        //blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
+        blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x_sloppy, -gamma_prime[j], *r[0]);
       }
       
       // sigma[0] = r_0^2
