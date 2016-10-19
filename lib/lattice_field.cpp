@@ -24,6 +24,12 @@ namespace quda {
   // sizes of active allocations
   std::map<void *, size_t> LatticeField::pinnedSize;
 
+  // cache of inactive allocations
+  std::multimap<size_t, void *> LatticeField::deviceCache;
+
+  // sizes of active allocations
+  std::map<void *, size_t> LatticeField::deviceSize;
+
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
@@ -200,6 +206,50 @@ namespace quda {
       host_free(ptr);
     }
     pinnedCache.clear();
+  }
+
+  void *LatticeField::allocateDevice(size_t nbytes) const
+  {
+    std::multimap<size_t, void *>::iterator it;
+    void *ptr = 0;
+
+    if (deviceCache.empty()) {
+      ptr = device_malloc(nbytes);
+    } else {
+      it = deviceCache.lower_bound(nbytes);
+      if (it != deviceCache.end()) { // sufficiently large allocation found
+	nbytes = it->first;
+	ptr = it->second;
+	deviceCache.erase(it);
+      } else { // sacrifice the smallest cached allocation
+	it = deviceCache.begin();
+	ptr = it->second;
+	deviceCache.erase(it);
+	device_free(ptr);
+	ptr = device_malloc(nbytes);
+      }
+    }
+    deviceSize[ptr] = nbytes;
+    return ptr;
+  }
+
+  void LatticeField::freeDevice(void *ptr) const
+  {
+    if (!deviceSize.count(ptr)) {
+      errorQuda("Attempt to free invalid pointer");
+    }
+    deviceCache.insert(std::make_pair(deviceSize[ptr], ptr));
+    deviceSize.erase(ptr);
+  }
+
+  void LatticeField::flushDeviceCache()
+  {
+    std::multimap<size_t, void *>::iterator it;
+    for (it = deviceCache.begin(); it != deviceCache.end(); it++) {
+      void *ptr = it->second;
+      device_free(ptr);
+    }
+    deviceCache.clear();
   }
 
 
