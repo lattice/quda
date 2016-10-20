@@ -336,9 +336,10 @@ namespace quda {
     
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver.
     
-    // While I don't have heavy quark checks implemented yet, here's a start...
-    //const bool use_heavy_quark_res = 
-    //  (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    const bool use_heavy_quark_res = 
+      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
+    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
     
     blas::flops = 0;
     //bool l2_converge = false;
@@ -361,7 +362,7 @@ namespace quda {
     double maxrr = rNorm; // The maximum residual norm since the last reliable update.
     double maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
     
-    PrintStats(solver_name.c_str(), k, r2, b2, 0.0); // 0.0 is heavy quark residual.
+    PrintStats(solver_name.c_str(), k, r2, b2, heavy_quark_res); 
     while(!convergence(r2, 0.0, stop, 0.0) && k < param.maxiter) {
 
       //PrintStats("BiCGstab-l", k, r2, b2, 0.0);
@@ -484,6 +485,20 @@ namespace quda {
       sigma[0] = blas::norm2(*r[0]);
       r2 = sigma[0];
       
+      // Check the heavy quark residual if we need to.
+      if (use_heavy_quark_res && k%heavy_quark_check==0) {
+        if (&x != &x_sloppy)
+        {
+          blas::copy(temp,y);
+          heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x_sloppy, temp, *r[0]).z);
+        }
+        else
+        {
+           blas::copy(r_full, *r[0]);
+           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r_full).z);
+        }
+      }
+      
       // Check if we need to do a reliable update.
       // In inv_bicgstab_quda.cpp, there's a variable 'updateR' that holds the check.
       // That variable gets carried about because there are a few different places 'r' can get
@@ -523,7 +538,7 @@ namespace quda {
       
       // Check convergence.
       k += nKrylov;
-      PrintStats(solver_name.c_str(), k, r2, b2, 0.0); // last thing should be heavy quark res...
+      PrintStats(solver_name.c_str(), k, r2, b2, heavy_quark_res);
     } // Done iterating.
     
     if (x.Precision() != x_sloppy.Precision())
@@ -554,8 +569,8 @@ namespace quda {
       mat(r_full, x, y);
       double true_res = blas::xmyNorm(b, r_full);
       param.true_res = sqrt(true_res / b2);
-      // Probably some heavy quark stuff...
-      param.true_res_hq = 0.0; //use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,*r[0]).z) : 0.0;
+      
+      param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,*r[0]).z) : 0.0;
     }
     
     // Reset flops counters.
