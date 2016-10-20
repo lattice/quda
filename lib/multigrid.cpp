@@ -640,9 +640,8 @@ namespace quda {
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {
     printfQuda("\nGenerate null vectors\n");
-    //Create spinor field parameters:
 
-    SolverParam solverParam(param);
+    SolverParam solverParam(param);  // Set solver field parameters:
 
     // set null-space generation options - need to expose these
     solverParam.maxiter = 500;
@@ -655,13 +654,10 @@ namespace quda {
       solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
       if (solverParam.precision_sloppy == QUDA_HALF_PRECISION) solverParam.delta = 1e-1;
     }
-    // end setting null-space generation options
-
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
 
-    ColorSpinorParam csParam(*B[0]);
-
+    ColorSpinorParam csParam(*B[0]);  // Create spinor field parameters:
     // to force setting the field to be native first set to double-precision native order
     // then use the setPrecision method to set to native order
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -670,51 +666,53 @@ namespace quda {
 
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+
+    std::vector<ColorSpinorField*> B_gpu;
+
+    Solver *solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    const Dirac &dirac = *(param.matSmooth->Expose());
 
     // Generate sources and launch solver for each source:
-    for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec) {
-	cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*nullvec);
-	curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
+    for(unsigned int i=0; i<B.size(); i++) {
+      B[i]->Source(QUDA_RANDOM_SOURCE); //random initial guess
 
-	csParam.create = QUDA_ZERO_FIELD_CREATE;
-	ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
-	//copy fields:
-	csParam.create = QUDA_COPY_FIELD_CREATE;
-	ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, csParam));
+      B_gpu.push_back(ColorSpinorField::Create(csParam));
+      ColorSpinorField *x = B_gpu[i];
+      *x = *B[i]; // copy initial guess to GPU:
 
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
+      zero(*b); // need zero rhs
 
-	Solver *solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
 
-	const Dirac &dirac = *(param.matSmooth->Expose());
-	ColorSpinorField *out=nullptr, *in=nullptr;
-	dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
-	(*solve)(*out, *in);
-	dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
+      ColorSpinorField *out=nullptr, *in=nullptr;
+      dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
+      (*solve)(*out, *in);
+      dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
-	delete solve;
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
 
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
+      // global orthonormalization of the generated null-space vectors
+      for (int i=0; B_gpu[i] != x; ++i) {
+	Complex alpha = cDotProduct(*B_gpu[i], *x);//<j,i>
+	caxpy(-alpha, *B_gpu[i], *x); //i-<j,i>j
+      }
 
-	*curr_nullvec = *x;
+      double nrm2 = norm2(*x);
+      if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *x);
+      else errorQuda("\nCannot orthogonalize %u vector\n", i);
 
-	// global orthoonormalization of the generated null-space vectors
-	for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != nullvec; ++prevvec)//row id
-	  {
-	    cpuColorSpinorField *prev_nullvec = static_cast<cpuColorSpinorField*> (*prevvec);
+    }
 
-	    Complex alpha = cDotProduct(*prev_nullvec, *curr_nullvec);//<j,i>
-	    caxpy(-alpha, *prev_nullvec, *curr_nullvec); //i-<j,i>j
-	  }
+    delete solve;
+    delete b;
 
-	double nrm2 = norm2(*curr_nullvec);
-	if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *curr_nullvec);
-	else errorQuda("\nCannot orthogonalize %ld vector\n", nullvec-B.begin());
-
-	delete b;
-	delete x;
-
-      }//stop for-loop:
+    for (int i=0; i<(int)B.size(); i++) {
+      *B[i] = *B_gpu[i];
+      delete B_gpu[i];
+    }
 
     saveVectors(B);
 
