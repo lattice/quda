@@ -628,18 +628,16 @@ namespace quda {
     SolverParam solverParam(param);
 
     // set null-space generation options - need to expose these
-    //solverParam.maxiter = 500;
-    solverParam.maxiter = 1500;
+    solverParam.maxiter = 500;
     solverParam.tol = 5e-6;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    solverParam.delta = 1e-1;
+    solverParam.delta = 1e-1; // For BICGSTABL, was 1e-7 for BICGSTAB
     
-    // ESW ADDITIONS
     //solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
     solverParam.inv_type = QUDA_BICGSTABL_INVERTER;
-    solverParam.Nkrylov = 6;
+    solverParam.Nkrylov = 4;
+    solverParam.pipeline = 4;
     solverParam.verbosity_precondition = QUDA_VERBOSE;
-    // END ESW ADDITIONS
     
     if (param.level == 0) { // this enables half precision on the fine grid only if set
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
