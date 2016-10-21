@@ -143,35 +143,47 @@ namespace quda {
       delete[] gamma_;
   }
   
-  void BiCGstabL::updateXRend(Complex* gamma_prime_prime, std::vector<ColorSpinorField*> r, ColorSpinorField& x,
-                            Complex* gamma_prime, int nKrylov)
+  void BiCGstabL::updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
+                            std::vector<ColorSpinorField*> r, ColorSpinorField& x, int nKrylov)
   {
     /*
+    blas::caxpy(gamma[1], *r[0], x_sloppy);
+    blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
     for (j = 1; j < nKrylov; j++)
     {
       caxpy(gamma_prime_prime[j], *r[j], x);
       caxpy(-gamma_prime[j], *r[j], *r[0]);
     }
     OR
+    blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
     for (j = 1; j < nKrylov; j++)
     {
       blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x, -gamma_prime[j], *r[0]);
     }
     But wait, it gets better.
     */
-    Complex *gamma_prime_prime_ = new Complex[nKrylov-1];
-    Complex *gamma_prime_ = new Complex[nKrylov-1];
-    for (int i = 0; i < nKrylov-1; i++)
+    
+    // This does two "wasted" caxpys (so 2*nKrylov+2 instead of 2*nKrylov), but
+    // the alternative way would be un-fusing some calls, which would require
+    // loading and saving x twice. In a solve where the sloppy precision is lower than
+    // the full precision, this can be a killer. 
+    Complex *gamma_prime_prime_ = new Complex[nKrylov+1];
+    Complex *gamma_prime_ = new Complex[nKrylov+1];
+    gamma_prime_prime_[0] = gamma[1];
+    gamma_prime_prime_[nKrylov] = 0.0; // x never gets updated with r[nKrylov]
+    gamma_prime_[0] = 0.0; // r[0] never gets updated with r[0]... obvs.
+    gamma_prime_[nKrylov] = -gamma_prime[nKrylov];
+    for (int i = 1; i < nKrylov; i++)
     {
-      gamma_prime_prime_[i] = gamma_prime_prime[i+1];
-      gamma_prime_[i] = -gamma_prime[i+1];
+      gamma_prime_prime_[i] = gamma_prime_prime[i];
+      gamma_prime_[i] = -gamma_prime[i];
     }
     
-    std::vector<ColorSpinorField*> r_(r.begin() + 1, r.end()-1);
+    //std::vector<ColorSpinorField*> r_(r.begin() + 1, r.end()-1);
     //std::vector<ColorSpinorField*> r0_(r.begin(), r.begin()+1);
     //std::vector<ColorSpinorField*> x_(1,&x);
     
-    blas::caxpyBxpz(gamma_prime_prime_, r_, x, gamma_prime_, *r[0]);
+    blas::caxpyBxpz(gamma_prime_prime_, r, x, gamma_prime_, *r[0]);
     
     delete[] gamma_prime_prime_;
     delete[] gamma_prime_;
@@ -522,7 +534,7 @@ namespace quda {
       // This became a fused operator.
       //blas::caxpy(gamma[1], *r[0], x_sloppy);
       //blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
-      blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
+      //blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
       
       // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
       for (int j = 1; j < nKrylov; j++)
@@ -538,10 +550,7 @@ namespace quda {
       
       // for (j = 1; j <= nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
       updateUend(gamma, u, nKrylov);
-      if (nKrylov > 1)
-      {
-        updateXRend(gamma_prime_prime, r, x_sloppy, gamma_prime, nKrylov);
-      }
+      updateXRend(gamma, gamma_prime, gamma_prime_prime, r, x_sloppy, nKrylov);
       
       // sigma[0] = r_0^2
       sigma[0] = blas::norm2(*r[0]);
