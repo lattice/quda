@@ -126,6 +126,57 @@ namespace quda {
 
   }
   
+  void BiCGstabL::updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov)
+  {
+      // for (j = 1; j <= nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
+      Complex *gamma_ = new Complex[nKrylov];
+      for (int i = 0; i < nKrylov; i++)
+      {
+          gamma_[i] = -gamma[i+1];
+      }
+
+      std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
+      std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
+
+      blas::caxpy(gamma_, u_, u0);
+
+      delete[] gamma_;
+  }
+  
+  void BiCGstabL::updateXRend(Complex* gamma_prime_prime, std::vector<ColorSpinorField*> r, ColorSpinorField& x,
+                            Complex* gamma_prime, int nKrylov)
+  {
+    /*
+    for (j = 1; j < nKrylov; j++)
+    {
+      caxpy(gamma_prime_prime[j], *r[j], x);
+      caxpy(-gamma_prime[j], *r[j], *r[0]);
+    }
+    OR
+    for (j = 1; j < nKrylov; j++)
+    {
+      blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x, -gamma_prime[j], *r[0]);
+    }
+    But wait, it gets better.
+    */
+    Complex *gamma_prime_prime_ = new Complex[nKrylov-1];
+    Complex *gamma_prime_ = new Complex[nKrylov-1];
+    for (int i = 0; i < nKrylov-1; i++)
+    {
+      gamma_prime_prime_[i] = gamma_prime_prime[i+1];
+      gamma_prime_[i] = -gamma_prime[i+1];
+    }
+    
+    std::vector<ColorSpinorField*> r_(r.begin() + 1, r.end()-1);
+    //std::vector<ColorSpinorField*> r0_(r.begin(), r.begin()+1);
+    //std::vector<ColorSpinorField*> x_(1,&x);
+    
+    blas::caxpyBxpz(gamma_prime_prime_, r_, x, gamma_prime_, *r[0]);
+    
+    delete[] gamma_prime_prime_;
+    delete[] gamma_prime_;
+  }
+  
   BiCGstabL::BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), nKrylov(param.Nkrylov), init(false)
   {
@@ -338,7 +389,7 @@ namespace quda {
     
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
+    double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r_full).z) : 0.0;
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
     
     blas::flops = 0;
@@ -364,8 +415,6 @@ namespace quda {
     
     PrintStats(solver_name.c_str(), k, r2, b2, heavy_quark_res); 
     while(!convergence(r2, 0.0, stop, 0.0) && k < param.maxiter) {
-
-      //PrintStats("BiCGstab-l", k, r2, b2, 0.0);
       
       // rho0 = -omega*rho0;
       rho0 *= -omega;
@@ -378,9 +427,10 @@ namespace quda {
         rho0 = rho1;
         
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
+        // All but i == j can be hidden with comms---auxillary work for next dslash.
+        // Do i = j first, make rest aux work.
         for (int i = 0; i <= j; i++)
         {
-          // could use block blas
 		      blas::caxpby(1.0, *r[i], -beta, *u[i]);
         }
         
@@ -391,6 +441,8 @@ namespace quda {
         alpha = rho0/blas::cDotProduct(r0, *u[j+1]);
 
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
+        // All but i == j can be hidden with comms---auxillary work for next dslash. 
+        // Do i = j first, make rest aux work.
         for (int i = 0; i <= j; i++)
         { 
           blas::caxpy(-alpha, *u[i+1], *r[i]);
@@ -398,7 +450,7 @@ namespace quda {
         
         // r[j+1] = A r[j], x = x + alpha*u[0]
         matSloppy(*r[j+1], *r[j], temp);
-        blas::caxpy(alpha, *u[0], x_sloppy);
+        blas::caxpy(alpha, *u[0], x_sloppy); // this guy could be added as auxillary work to the prev. matSloppy.
         
       } // End BiCG part.      
       
@@ -463,7 +515,9 @@ namespace quda {
       
       // Update x, r, u.
       // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
-      blas::caxpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
+      
+      // All updates to u can be fused into a BLAS3.
+      //blas::caxpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
       
       // This became a fused operator.
       //blas::caxpy(gamma[1], *r[0], x_sloppy);
@@ -473,12 +527,20 @@ namespace quda {
       // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
       for (int j = 1; j < nKrylov; j++)
       {
-        blas::caxpy(-gamma[j], *u[j], *u[0]);
+        // All updates to u can be fused into a BLAS3.
+        //blas::caxpy(-gamma[j], *u[j], *u[0]);
         
         // This became a fused operator
         //blas::caxpy(gamma_prime_prime[j], *r[j], x_sloppy);
         //blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
-        blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x_sloppy, -gamma_prime[j], *r[0]);
+        //blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x_sloppy, -gamma_prime[j], *r[0]);
+      }
+      
+      // for (j = 1; j <= nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
+      updateUend(gamma, u, nKrylov);
+      if (nKrylov > 1)
+      {
+        updateXRend(gamma_prime_prime, r, x_sloppy, gamma_prime, nKrylov);
       }
       
       // sigma[0] = r_0^2
@@ -553,7 +615,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
     
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops()/* + matSloppy.flops()*/)*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
     param.gflops = gflops;
     param.iter += k;
     

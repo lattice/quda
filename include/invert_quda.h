@@ -529,6 +529,10 @@ namespace quda {
     void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
     void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
     
+    void updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov);
+    void updateXRend(Complex* gamma_prime_prime, std::vector<ColorSpinorField*> r, ColorSpinorField& x,
+                     Complex* gamma_prime, int nKrylov);
+    
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
