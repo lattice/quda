@@ -189,6 +189,114 @@ namespace quda {
     delete[] gamma_prime_;
   }
   
+  /**
+     The following code is based on Kate's worker class in Multi-CG.
+     
+     This worker class is used to update most of the u and r vectors.
+     On BiCG iteration j, r[0] through r[j] and u[0] through u[j]
+     all get updated, but the subsequent mat-vec operation only gets
+     applied to r[j] and u[j]. Thus, we can hide updating r[0] through
+     r[j-1] and u[0] through u[j-1], respectively, in the comms for 
+     the matvec on r[j] and u[j]. This results in improved strong
+     scaling for BiCGstab-L.
+
+     Since the matrix-vector consists of multiple dslash applications,
+     we partition the shifts between these successive dslash
+     applications for optimal communications hiding.
+
+     In general, when using a Worker class to hide communication in
+     the dslash, one must be aware whether auto-tuning on the dslash
+     policy that envelops the dslash will occur.  If so, then the
+     Worker class instance will be called multiple times during this
+     tuning, potentially rendering the results wrong.  This isn't a
+     problem in the multi-shift solve, since we are guaranteed to not
+     run the worker class on the first iteration (when the dslash
+     policy tuning will take place), but this is something that will
+     need to be addressed in the future as the Worker idea to applied
+     elsewhere.
+   */
+  enum BiCGstabLUpdateType
+  {
+    BICGSTABL_UPDATE_U = 0,
+    BICGSTABL_UPDATE_R = 1
+  };
+  
+  class BiCGstabLUpdate : public Worker {
+
+    ColorSpinorField* x;
+    std::vector<ColorSpinorField*> &r;
+    std::vector<ColorSpinorField*> &u;
+
+    Complex* alpha;
+    Complex* beta;
+    
+    BiCGstabLUpdateType update_type;
+    
+    /**
+       On a BiCG iteration j, u[0] through u[j-1] need to get updated,
+       similarly r[0] through r[j-1] need to get updated. j_max = j.
+     */
+    int j_max;
+
+    /**
+       How much to partition the shifted update. For now, we assume
+       we always need to partition into two pieces (since BiCGstab-L
+       should only be getting even/odd preconditioned operators).
+    */
+    int n_update; 
+
+  public:
+    BiCGstabLUpdate(ColorSpinorField* x, std::vector<ColorSpinorField*>& r, std::vector<ColorSpinorField*>& u,
+		Complex* alpha, Complex* beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
+      x(x), r(r), u(u), alpha(alpha), beta(beta), j_max(j_max),
+      n_update(n_update)
+    {
+      
+    }
+    virtual ~BiCGstabLUpdate() { }
+    
+    void update_j_max(int new_j_max) { j_max = new_j_max; }
+    void update_update_type(BiCGstabLUpdateType new_update_type) { update_type = new_update_type; }
+    
+    // note that we can't set the stream parameter here so it is
+    // ignored.  This is more of a future design direction to consider
+    void apply(const cudaStream_t &stream) {      
+      static int count = 0;
+
+      // on the first call do the first half of the update
+      if (update_type == BICGSTABL_UPDATE_U)
+      {
+        for (int i= (count*j_max)/n_update; i<((count+1)*j_max)/n_update && i<j_max; i++)
+        {
+          blas::caxpby(1.0, *r[i], -*beta, *u[i]);
+        }
+      }
+      else // (update_type == BICGSTABL_UPDATE_R)
+      {
+        if (count == 0)
+        {
+          blas::caxpy(*alpha, *u[0], *x); 
+        }
+        if (j_max > 0)
+        {
+          for (int i= (count*j_max)/n_update; i<((count+1)*j_max)/n_update && i<j_max; i++)
+          {
+            blas::caxpy(-*alpha, *u[i+1], *r[i]);
+          }
+        }
+      }
+      
+      if (++count == n_update) count = 0;
+      
+    }
+    
+  };
+
+  // this is the Worker pointer that the dslash uses to launch the shifted updates
+  namespace dslash {
+    extern Worker* aux_worker;
+  } 
+  
   BiCGstabL::BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), nKrylov(param.Nkrylov), init(false)
   {
@@ -409,6 +517,9 @@ namespace quda {
     //double r2_old = r2;
 
     int pipeline = param.pipeline;
+    
+    // Create the worker class for updating non-critical r, u vectors.
+    BiCGstabLUpdate bicgstabl_update(&x_sloppy, r, u, &alpha, &beta, BICGSTABL_UPDATE_U, 0, 2 /* const_cast<Dirac*>(matSloppy.Expose())->getStencilSteps() */);
 
     
     // done with preamble, begin computing.
@@ -439,11 +550,24 @@ namespace quda {
         rho0 = rho1;
         
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
-        // All but i == j can be hidden with comms---auxillary work for next dslash.
-        // Do i = j first, make rest aux work.
-        for (int i = 0; i <= j; i++)
+        // Below loop can be hidden in comms.
+        /*for (int i = 0; i <= j; i++)
         {
 		      blas::caxpby(1.0, *r[i], -beta, *u[i]);
+        }*/
+        
+        // All but i == j can be hidden with comms---auxillary work for next dslash.
+        // Do i = j first, make rest aux work.
+        blas::caxpby(1.0, *r[j], -beta, *u[j]);
+        if (j > 0)
+        {
+          dslash::aux_worker = &bicgstabl_update;
+          bicgstabl_update.update_j_max(j);
+          bicgstabl_update.update_update_type(BICGSTABL_UPDATE_U);
+        }
+        else
+        {
+          dslash::aux_worker = NULL;
         }
         
         // u[j+1] = A ( u[j] )
@@ -453,16 +577,25 @@ namespace quda {
         alpha = rho0/blas::cDotProduct(r0, *u[j+1]);
 
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
-        // All but i == j can be hidden with comms---auxillary work for next dslash. 
-        // Do i = j first, make rest aux work.
-        for (int i = 0; i <= j; i++)
+        // Below loop can be hidden in comms.
+        /*for (int i = 0; i <= j; i++)
         { 
           blas::caxpy(-alpha, *u[i+1], *r[i]);
-        }
+        }*/
+        // This can be hidden in comms, too.
+        //blas::caxpy(alpha, *u[0], x_sloppy);
+        
+        
+        // All but i == j can be hidden with comms---auxillary work for next dslash. 
+        // Do i = j first, make rest aux work.
+        blas::caxpy(-alpha, *u[j+1], *r[j]);
+        // We can always at least update x.
+        dslash::aux_worker = &bicgstabl_update;
+        bicgstabl_update.update_j_max(j);
+        bicgstabl_update.update_update_type(BICGSTABL_UPDATE_R);
         
         // r[j+1] = A r[j], x = x + alpha*u[0]
         matSloppy(*r[j+1], *r[j], temp);
-        blas::caxpy(alpha, *u[0], x_sloppy); // this guy could be added as auxillary work to the prev. matSloppy.
         
       } // End BiCG part.      
       
@@ -584,6 +717,9 @@ namespace quda {
         }
         
         blas::xpy(x, y); // swap these around? (copied from bicgstab)
+        
+        // Don't do aux work!
+        dslash::aux_worker = NULL;
         
         // Explicitly recompute the residual.
         mat(r_full, y, x); // r[0] = Ax

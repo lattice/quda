@@ -11,16 +11,16 @@ namespace quda {
 
   Dirac::Dirac(const DiracParam &param) 
     : gauge(param.gauge), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
-      dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
-      profile("Dirac", false)
+      dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), type(param.type), 
+      tune(QUDA_TUNE_NO), profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
   }
 
   Dirac::Dirac(const Dirac &dirac) 
     : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
-      dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
-      profile("Dirac", false)
+      dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), type(dirac.type), 
+      tune(QUDA_TUNE_NO), profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
@@ -209,6 +209,44 @@ namespace quda {
     }
 
     return 0;
+  }
+  
+  // Count the number of stencil applications per dslash application.
+  int Dirac::getStencilSteps() const
+  {
+    int steps = 0;
+    switch (type)
+    {
+      case QUDA_WILSON_DIRAC:
+      case QUDA_CLOVER_DIRAC:
+      case QUDA_DOMAIN_WALL_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+      case QUDA_STAGGERED_DIRAC:
+      case QUDA_ASQTAD_DIRAC:
+      case QUDA_TWISTED_CLOVER_DIRAC:
+      case QUDA_TWISTED_MASS_DIRAC:
+      case QUDA_COARSE_DIRAC:
+        steps = 1;
+        break;
+      case QUDA_WILSONPC_DIRAC:
+      case QUDA_CLOVERPC_DIRAC:
+      case QUDA_DOMAIN_WALLPC_DIRAC:
+      case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+      case QUDA_STAGGEREDPC_DIRAC:
+      case QUDA_ASQTADPC_DIRAC:
+      case QUDA_TWISTED_CLOVERPC_DIRAC:
+      case QUDA_TWISTED_MASSPC_DIRAC:
+      case QUDA_COARSEPC_DIRAC:
+        steps = 2;
+        break;
+      case QUDA_INVALID_DIRAC:
+        steps = 0;
+        break;
+    }
+    
+    // Multiply by 2 if MdagM or MMdag, 1 if M or Mdag. Not sure how to do this.
+    return steps; 
   }
 
 } // namespace quda

@@ -100,6 +100,7 @@ namespace quda {
     mutable unsigned long long flops;
     mutable ColorSpinorField *tmp1; // temporary hack
     mutable ColorSpinorField *tmp2; // temporary hack
+    QudaDiracType type; 
 
     bool newTmp(ColorSpinorField **, const ColorSpinorField &) const;
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
@@ -146,6 +147,7 @@ namespace quda {
 
 
     QudaMatPCType getMatPCType() const { return matpcType; }
+    int getStencilSteps() const;
     void Dagger(QudaDagType dag) { dagger = dag; }
 
     /**
