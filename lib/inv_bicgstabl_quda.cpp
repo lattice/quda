@@ -35,13 +35,6 @@ namespace quda {
       Tau[k] = 0;
     }
     blas::cDotProduct(Tau, a, b); // vectorized dot product
-#if 0
-    for (int k=0; k<size; k++)
-    {
-      printfQuda("%d/%d vectorized %e %e, regular %e %e\n", k+1, size, Tau[k].real(), Tau[k].imag(),
-		  blas::cDotProduct(*a[k], *b[k]).real(), blas::cDotProduct(*a[k], *b[k]).imag());
-    }
-#endif
 
     for (int k=0; k<size; k++)
     {
@@ -128,7 +121,7 @@ namespace quda {
   
   void BiCGstabL::updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov)
   {
-      // for (j = 1; j <= nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
+      // for (j = 0; j <= nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
       Complex *gamma_ = new Complex[nKrylov];
       for (int i = 0; i < nKrylov; i++)
       {
@@ -154,13 +147,6 @@ namespace quda {
       caxpy(gamma_prime_prime[j], *r[j], x);
       caxpy(-gamma_prime[j], *r[j], *r[0]);
     }
-    OR
-    blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
-    for (j = 1; j < nKrylov; j++)
-    {
-      blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x, -gamma_prime[j], *r[0]);
-    }
-    But wait, it gets better.
     */
     
     // This does two "wasted" caxpys (so 2*nKrylov+2 instead of 2*nKrylov), but
@@ -178,11 +164,6 @@ namespace quda {
       gamma_prime_prime_[i] = gamma_prime_prime[i];
       gamma_prime_[i] = -gamma_prime[i];
     }
-    
-    //std::vector<ColorSpinorField*> r_(r.begin() + 1, r.end()-1);
-    //std::vector<ColorSpinorField*> r0_(r.begin(), r.begin()+1);
-    //std::vector<ColorSpinorField*> x_(1,&x);
-    
     blas::caxpyBxpz(gamma_prime_prime_, r, x, gamma_prime_, *r[0]);
     
     delete[] gamma_prime_prime_;
@@ -200,20 +181,8 @@ namespace quda {
      the matvec on r[j] and u[j]. This results in improved strong
      scaling for BiCGstab-L.
 
-     Since the matrix-vector consists of multiple dslash applications,
-     we partition the shifts between these successive dslash
-     applications for optimal communications hiding.
-
-     In general, when using a Worker class to hide communication in
-     the dslash, one must be aware whether auto-tuning on the dslash
-     policy that envelops the dslash will occur.  If so, then the
-     Worker class instance will be called multiple times during this
-     tuning, potentially rendering the results wrong.  This isn't a
-     problem in the multi-shift solve, since we are guaranteed to not
-     run the worker class on the first iteration (when the dslash
-     policy tuning will take place), but this is something that will
-     need to be addressed in the future as the Worker idea to applied
-     elsewhere.
+     See paragraphs 2 and 3 in the comments on the Worker class in
+     Multi-CG for more remarks. 
    */
   enum BiCGstabLUpdateType
   {
@@ -247,7 +216,7 @@ namespace quda {
 
   public:
     BiCGstabLUpdate(ColorSpinorField* x, std::vector<ColorSpinorField*>& r, std::vector<ColorSpinorField*>& u,
-		Complex* alpha, Complex* beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
+        Complex* alpha, Complex* beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
       x(x), r(r), u(u), alpha(alpha), beta(beta), j_max(j_max),
       n_update(n_update)
     {
@@ -438,7 +407,7 @@ namespace quda {
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
-	profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
       } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         printfQuda("BiCGstab: Computing null vector\n");
@@ -545,19 +514,17 @@ namespace quda {
       // BiCG part of calculation.
       for (int j = 0; j < nKrylov; j++) {
         // rho1 = <r0, r_j>, beta = alpha*rho1/rho0, rho0 = rho1;
+        // Can fuse into updateXRend.
         rho1 = blas::cDotProduct(r0, *r[j]);
         beta = alpha*rho1/rho0;
         rho0 = rho1;
         
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
-        // Below loop can be hidden in comms.
+        // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
         /*for (int i = 0; i <= j; i++)
         {
-		      blas::caxpby(1.0, *r[i], -beta, *u[i]);
+          blas::caxpby(1.0, *r[i], -beta, *u[i]);
         }*/
-        
-        // All but i == j can be hidden with comms---auxillary work for next dslash.
-        // Do i = j first, make rest aux work.
         blas::caxpby(1.0, *r[j], -beta, *u[j]);
         if (j > 0)
         {
@@ -574,20 +541,15 @@ namespace quda {
         matSloppy(*u[j+1], *u[j], temp);
         
         // alpha = rho0/<r0, u[j+1]>
+        // The machinary isn't there yet, but this could be fused with the matSloppy above.
         alpha = rho0/blas::cDotProduct(r0, *u[j+1]);
 
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
-        // Below loop can be hidden in comms.
+        // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
         /*for (int i = 0; i <= j; i++)
         { 
           blas::caxpy(-alpha, *u[i+1], *r[i]);
         }*/
-        // This can be hidden in comms, too.
-        //blas::caxpy(alpha, *u[0], x_sloppy);
-        
-        
-        // All but i == j can be hidden with comms---auxillary work for next dslash. 
-        // Do i = j first, make rest aux work.
         blas::caxpy(-alpha, *u[j+1], *r[j]);
         // We can always at least update x.
         dslash::aux_worker = &bicgstabl_update;
@@ -611,8 +573,6 @@ namespace quda {
         /*for (int i = 1; i < j; i++)
         {
           // tau_ij = <r_i,r_j>/sigma_i.
-          // This doesn't break on the first iteration because i < j is true.
-          // (I was confused about this.)
           tau[i][j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
           
           // r_j = r_j - tau_ij r_i;
@@ -660,29 +620,15 @@ namespace quda {
       
       // Update x, r, u.
       // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
+      // for (j = 0; j < nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
+      updateUend(gamma, u, nKrylov);
       
-      // All updates to u can be fused into a BLAS3.
-      //blas::caxpy(-gamma[nKrylov], *u[nKrylov], *u[0]);
-      
-      // This became a fused operator.
       //blas::caxpy(gamma[1], *r[0], x_sloppy);
       //blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
-      //blas::caxpyBzpx(gamma[1], *r[0], x_sloppy, -gamma_prime[nKrylov], *r[nKrylov]);
-      
-      // for j = 1 .. nKrylov-1: u[0] -= gamma_j u[j], x += gamma''_j r[j], r[0] -= gamma'_j r[j]
-      for (int j = 1; j < nKrylov; j++)
-      {
-        // All updates to u can be fused into a BLAS3.
-        //blas::caxpy(-gamma[j], *u[j], *u[0]);
-        
-        // This became a fused operator
-        //blas::caxpy(gamma_prime_prime[j], *r[j], x_sloppy);
-        //blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
-        //blas::caxpyBxpz(gamma_prime_prime[j], *r[j], x_sloppy, -gamma_prime[j], *r[0]);
-      }
-      
-      // for (j = 1; j <= nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
-      updateUend(gamma, u, nKrylov);
+      //for (j = 1; j < nKrylov; j++) {
+      //  blas::caxpy(gamma_gamma_prime[j], *r[j], x_sloppy);
+      //  blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
+      //}
       updateXRend(gamma, gamma_prime, gamma_prime_prime, r, x_sloppy, nKrylov);
       
       // sigma[0] = r_0^2

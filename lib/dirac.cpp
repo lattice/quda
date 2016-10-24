@@ -225,8 +225,7 @@ namespace quda {
       case QUDA_ASQTAD_DIRAC:
       case QUDA_TWISTED_CLOVER_DIRAC:
       case QUDA_TWISTED_MASS_DIRAC:
-      case QUDA_COARSE_DIRAC:
-        steps = 1;
+        steps = 2; // For D_{eo} and D_{oe} piece.
         break;
       case QUDA_WILSONPC_DIRAC:
       case QUDA_CLOVERPC_DIRAC:
@@ -237,10 +236,10 @@ namespace quda {
       case QUDA_ASQTADPC_DIRAC:
       case QUDA_TWISTED_CLOVERPC_DIRAC:
       case QUDA_TWISTED_MASSPC_DIRAC:
-      case QUDA_COARSEPC_DIRAC:
         steps = 2;
         break;
-      case QUDA_INVALID_DIRAC:
+	  default:
+	    errorQuda("Unsupported Dslash type %d.\n", type);
         steps = 0;
         break;
     }

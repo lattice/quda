@@ -267,8 +267,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.reliable_delta = 1e-10;
   inv_param.gcrNkrylov = 10;
 
-  inv_param.verbosity = QUDA_VERBOSE; //QUDA_SUMMARIZE;
-  inv_param.verbosity_precondition = QUDA_VERBOSE; //QUDA_SUMMARIZE;
+  inv_param.verbosity = QUDA_SUMMARIZE;
+  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -331,7 +331,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_VERBOSE; //QUDA_SILENT;
+  inv_param.verbosity_precondition = QUDA_SILENT;
 
 
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
