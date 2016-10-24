@@ -519,7 +519,7 @@ namespace quda {
     int pipeline = param.pipeline;
     
     // Create the worker class for updating non-critical r, u vectors.
-    BiCGstabLUpdate bicgstabl_update(&x_sloppy, r, u, &alpha, &beta, BICGSTABL_UPDATE_U, 0, 2 /* const_cast<Dirac*>(matSloppy.Expose())->getStencilSteps() */);
+    BiCGstabLUpdate bicgstabl_update(&x_sloppy, r, u, &alpha, &beta, BICGSTABL_UPDATE_U, 0, matSloppy.getStencilSteps() );
 
     
     // done with preamble, begin computing.
