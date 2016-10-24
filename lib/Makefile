@@ -6,7 +6,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	coarsecoarse_op.o multigrid.o transfer.o transfer_util.o	\
 	prolongator.o restrictor.o gauge_phase.o timer.o malloc.o	\
 	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
-	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o		\
+	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o	 inv_fgcrodr_quda.o	\
 	gauge_ape.o gauge_stout.o gauge_plaq.o               		\
 	inv_gcr_quda.o inv_mr_quda.o                     		\
 	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\

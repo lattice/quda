@@ -849,6 +849,63 @@ namespace quda {
   };
 
 
+//forward declaration
+ struct FGCRODRDeflationParam;
+ class FGCRODRDRArgs;
+
+ class FGCRODR : public DeflatedSolver {
+
+  private:
+
+    DiracMatrix *mat;
+    DiracMatrix *matSloppy;
+    DiracMatrix *matDefl;
+    DiracMatrix *matPrecon;
+
+    Solver *K;
+    SolverParam Kparam; // parameters for preconditioner solve
+
+    QudaPrecision fgcrodr_space_prec;
+
+    ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Wm;//arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Zm;//arnoldi basis vectors, size (m)
+
+    TimeProfile *profile;    //time profile for initCG solver
+
+    FGCRODRArgs *args;
+
+    bool gmres_alloc;
+
+  public:
+
+    FGCRODR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile *profile);
+    FGCRODR(DiracMatrix *mat, Solver &K, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile &profile);
+    FGCRODR(SolverParam &param);
+
+    virtual ~FGCRODR();
+
+    //FGCRODR solver
+    //void   GmresDRCycle(ColorSpinorField &out, ColorSpinorField &in, Complex *u);
+    double GMResDRCycle(ColorSpinorField &x, double r2, Complex *u, const double stop);//we need FGMRESDR cycle
+    //GMRES-DR solver
+    void operator()(ColorSpinorField *out, ColorSpinorField *in);
+    //
+    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
+    //
+    void CleanResources();
+    //
+    void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
+    //GMRESDR method
+    void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
+    //
+    void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
+
+    void AllocateKrylovSubspace(ColorSpinorParam &csParam);
+
+  };
+
+
 
 } // namespace quda
 
