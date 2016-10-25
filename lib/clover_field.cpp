@@ -77,8 +77,8 @@ namespace quda {
 
     if (param.direct) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	clover = device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
+	clover = bytes ? device_malloc(bytes) : nullptr;
+	if (precision == QUDA_HALF_PRECISION) norm = norm_bytes ? device_malloc(norm_bytes) : nullptr;
       } else {
 	clover = param.clover;
 	norm = param.norm;
@@ -105,8 +105,8 @@ namespace quda {
 
     if (param.inverse) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	cloverInv = device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(norm_bytes);
+	cloverInv = bytes ? device_malloc(bytes) : nullptr;
+	if (precision == QUDA_HALF_PRECISION) invNorm = norm_bytes ? device_malloc(norm_bytes): nullptr;
       } else {
 	cloverInv = param.cloverInv;
 	invNorm = param.invNorm;
