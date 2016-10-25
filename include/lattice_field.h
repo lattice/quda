@@ -354,7 +354,7 @@ namespace quda {
    */
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
 				    const LatticeField &c, const LatticeField &d) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d));
+    return static_cast<QudaFieldLocation>(Location(a,b,c) & Location(a,d));
   }
 
   /**
@@ -369,7 +369,7 @@ namespace quda {
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
 				    const LatticeField &c, const LatticeField &d,
 				    const LatticeField &e) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d) & Location(a,e));
+    return static_cast<QudaFieldLocation>(Location(a,b,c,d) & Location(a,e));
   }
 
   /**
@@ -385,7 +385,44 @@ namespace quda {
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
 				    const LatticeField &c, const LatticeField &d,
 				    const LatticeField &e, const LatticeField &f) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d) & Location(a,e) & Location(a,f));
+    return static_cast<QudaFieldLocation>(Location(a,b,c,d,e) & Location(a,f));
+  }
+
+  /**
+     Helper function for determining if the location of the fields is the same.
+     @param a Input field
+     @param b Input field
+     @param c Input field
+     @param d Input field
+     @param e Input field
+     @param f Input field
+     @param g Input field
+     @return If location is unique return the location
+   */
+  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
+				    const LatticeField &c, const LatticeField &d,
+				    const LatticeField &e, const LatticeField &f,
+				    const LatticeField &g) {
+    return static_cast<QudaFieldLocation>(Location(a,b,c,d,e,f) & Location(a,g));
+  }
+
+  /**
+     Helper function for determining if the location of the fields is the same.
+     @param a Input field
+     @param b Input field
+     @param c Input field
+     @param d Input field
+     @param e Input field
+     @param f Input field
+     @param g Input field
+     @param h Input field
+     @return If location is unique return the location
+   */
+  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
+				    const LatticeField &c, const LatticeField &d,
+				    const LatticeField &e, const LatticeField &f,
+				    const LatticeField &g, const LatticeField &h) {
+    return static_cast<QudaFieldLocation>(Location(a,b,c,d,e,f,h) & Location(a,h));
   }
 
   /**

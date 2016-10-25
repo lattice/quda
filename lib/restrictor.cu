@@ -27,7 +27,7 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the input field (if single parity)
     const int nParity; // number of parities of input fine field
-    int swizzle; // swizzle factor for transposing blockIdx.x mappnig to coarse grid coordinate
+    int swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
 
     RestrictArg(Out &out, const In &in, const Rotator &V,
 		const int *fine_to_coarse, const int *coarse_to_fine,
