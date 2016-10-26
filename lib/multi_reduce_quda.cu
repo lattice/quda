@@ -58,9 +58,12 @@ namespace quda {
 
     namespace reduce {
 
+      namespace multi {
 #include <texture.h>
+      }
+
+#include <multi_reduce_core.cuh>
 #include <multi_reduce_core.h>
-      
 
     } // namespace reduce
 
