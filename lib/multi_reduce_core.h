@@ -130,8 +130,8 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M,
 
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
   if(deviceProp.canMapHostMemory){
-    cudaEventRecord(reduceEnd, stream);
-    while(cudaSuccess != cudaEventQuery(reduceEnd)) {}
+    cudaEventRecord(*getReduceEvent(), stream);
+    while(cudaSuccess != cudaEventQuery(*getReduceEvent())) {}
   } else
 #endif
     { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), sizeof(ReduceType)*N, cudaMemcpyDeviceToHost); }

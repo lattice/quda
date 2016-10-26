@@ -71,6 +71,7 @@ namespace quda {
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
+    cudaEvent_t* getReduceEvent() { return &reduceEnd; }
 
     void initReduce()
     {
