@@ -34,9 +34,7 @@ namespace quda {
       b[k] = static_cast<cudaColorSpinorField*>(r[j]);
       Tau[k] = 0;
     }
-    std::cout << "About to perform cDotProduct.\n" << std::flush;
     blas::cDotProduct(Tau, a, b); // vectorized dot product
-    std::cout << "Performed cDotProduct.\n" << std::flush;
 
     for (int k=0; k<size; k++)
     {
@@ -103,21 +101,15 @@ namespace quda {
           int step;
           for (step = 0; step < (j-1)/N; step++)
           {
-            std::cout << "About to compute Tau for pipeline = " << pipeline << "\n" << std::flush;
             computeTau(tau, sigma, r, 1+step*N, N, j);
-            std::cout << "Finished Tau, About to compute R for pipeline = " << pipeline << "\n" << std::flush;
             updateR(tau, r, 1+step*N, N, j);
-            std::cout << "Finished R.\n" << std::flush;
           }
 
           if ((j-1)%N != 0) // need to update the remainder
           {
             // 1 update of length (j-1)%N.
-            std::cout << "About to compute Tau for pipeline = " << pipeline << "\n" << std::flush;
             computeTau(tau, sigma, r, 1+step*N, (j-1)%N, j);
-            std::cout << "Finished Tau, About to compute R for pipeline = " << pipeline << "\n" << std::flush;
             updateR(tau, r, 1+step*N, (j-1)%N, j);
-            std::cout << "Finished R.\n" << std::flush;
           }
         }
         break;
@@ -139,9 +131,7 @@ namespace quda {
     std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
     std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
 
-    std::cout << "About to apply block caxpy.\n" << std::flush;
     blas::caxpy(gamma_, u_, u0);
-    std::cout << "Applied block caxpy.\n" << std::flush;
 
     delete[] gamma_;
   }
@@ -249,7 +239,6 @@ namespace quda {
         {
           blas::caxpby(1.0, *r[i], -*beta, *u[i]);
         }
-        std::cout << "Updated U.\n" << std::flush;
       }
       else // (update_type == BICGSTABL_UPDATE_R)
       {
@@ -264,7 +253,6 @@ namespace quda {
             blas::caxpy(-*alpha, *u[i+1], *r[i]);
           }
         }
-        std::cout << "Updated X and R.\n" << std::flush;
       }
       
       if (++count == n_update) count = 0;
@@ -517,8 +505,6 @@ namespace quda {
     double maxrr = rNorm; // The maximum residual norm since the last reliable update.
     double maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
     
-    std::cout << "Made it to start of loop.\n" << std::flush;
-    
     PrintStats(solver_name.c_str(), k, r2, b2, heavy_quark_res); 
     while(!convergence(r2, 0.0, stop, 0.0) && k < param.maxiter) {
       
@@ -532,8 +518,6 @@ namespace quda {
         rho1 = blas::cDotProduct(r0, *r[j]);
         beta = alpha*rho1/rho0;
         rho0 = rho1;
-        
-        std::cout << "Computed cDotProduct.\n" << std::flush;
         
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
@@ -594,10 +578,7 @@ namespace quda {
           // r_j = r_j - tau_ij r_i;
           blas::caxpy(-tau[i][j], *r[i], *r[j]);
         }*/
-        std::cout << "About to apply orthoDir, j = " << j << "\n" << std::flush; 
         orthoDir(tau, sigma, r, j, pipeline);
-        
-        std::cout << "Performed orthoDir, j = " << j << ".\n" << std::flush;
         
         // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
         
@@ -606,9 +587,7 @@ namespace quda {
         //gamma_prime[j] = blas::cDotProduct(*r[j], *r[0])/sigma[j];
         
         // rjr.x = Re(<r[j],r[0]), rjr.y = Im(<r[j],r[0]>), rjr.z = <r[j],r[j]>
-        std::cout << "About to apply cDotProductNormA.\n" << std::flush;
         double3 rjr = blas::cDotProductNormA(*r[j], *r[0]); 
-        std::cout << "Applied cDotProductNormA.\n" << std::flush;
         sigma[j] = rjr.z;
         gamma_prime[j] = Complex(rjr.x, rjr.y)/sigma[j];
       }
@@ -642,7 +621,6 @@ namespace quda {
       // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = nKrylov.
       // for (j = 0; j < nKrylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
       updateUend(gamma, u, nKrylov);
-      std::cout << "Performed updateUend.\n" << std::flush;
       
       //blas::caxpy(gamma[1], *r[0], x_sloppy);
       //blas::caxpy(-gamma_prime[nKrylov], *r[nKrylov], *r[0]);
@@ -651,7 +629,6 @@ namespace quda {
       //  blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
       //}
       updateXRend(gamma, gamma_prime, gamma_prime_prime, r, x_sloppy, nKrylov);
-      std::cout << "Performed updateXRend.\n" << std::flush;
       
       // sigma[0] = r_0^2
       sigma[0] = blas::norm2(*r[0]);
