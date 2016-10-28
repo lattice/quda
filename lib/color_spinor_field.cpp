@@ -120,7 +120,7 @@ namespace quda {
       printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
     }
 
-    ghost_bytes = ghost_length*precision;
+    ghost_bytes = (size_t)ghost_length*precision;
     if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
 
@@ -167,7 +167,7 @@ namespace quda {
 
     real_length = volume*nColor*nSpin*2; // physical length
 
-    bytes = length * precision; // includes pads and ghost zones
+    bytes = (size_t)length * precision; // includes pads and ghost zones
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
@@ -311,7 +311,7 @@ namespace quda {
 
     real_length = volume*nColor*nSpin*2;
 
-    bytes = length * precision; // includes pads
+    bytes = (size_t)length * precision; // includes pads
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
