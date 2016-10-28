@@ -71,6 +71,7 @@ namespace quda {
     ColorSpinorField &tmp = *tmpp;
 
     csParam.setPrecision(param.precision_sloppy);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
 
     // tmp2 only needed for multi-gpu Wilson-like kernels
     ColorSpinorField *tmp2_p = !mat.isStaggered() ? ColorSpinorField::Create(x, csParam) : &tmp;

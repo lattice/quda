@@ -479,7 +479,7 @@ namespace quda {
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField*> &x_, std::vector<ColorSpinorField*> &y_,
 		   const double *b_, ColorSpinorField &z_, const double *c_) {
 
-      //if (y_.size() <= MAX_MULTI_BLAS_N) {
+      if (y_.size() <= MAX_MULTI_BLAS_N) {
 	// swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
@@ -498,7 +498,7 @@ namespace quda {
 	} else {
 	  multiblasCuda<1,multi_axpyBzpcx_,0,1,0,1>(a, b, c, x, y, x, w);
 	}
-	/*} else {
+      } else {
 	// split the problem in half and recurse
 	const double *a0 = &a_[0];
 	const double *b0 = &b_[0];
@@ -517,7 +517,7 @@ namespace quda {
 	std::vector<ColorSpinorField*> y1(y_.begin() + y_.size()/2, y_.end());
 
 	axpyBzpcx(a1, x1, y1, b1, z_, c1);
-	}*/
+      }
     }
 
 
