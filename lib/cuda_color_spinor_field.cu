@@ -1886,11 +1886,11 @@ namespace quda {
     if (dir%2==0) {// receive from forwards
       if (comm_peer2peer_enabled(1,dim)) return;
 
-      unpackGhost(from_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/]);
+      unpackGhost(from_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim+0]);
     } else { // receive from backwards
       if (comm_peer2peer_enabled(0,dim)) return;
 
-      unpackGhost(from_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
+      unpackGhost(from_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim+1]);
     }
   }
 

@@ -267,20 +267,21 @@ struct DslashCuda2 : DslashPolicyImp {
 	  if (comm_peer2peer_enabled(0,i)) {
 	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
 		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  } else {
+	    // Record the end of the scattering
+	    PROFILE(cudaEventRecord(scatterEnd[2*i+0], streams[2*i+0]), profile, QUDA_PROFILE_EVENT_RECORD);
+	    // wait for scattering to finish and then launch dslash
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	  }
+
 	  if (comm_peer2peer_enabled(1,i)) {
 	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(1,i), 0),
 		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-	  }
-
-	  // if non peer-to-peer in a given direction then we have to wait on a scatter event
-	  if (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) {
+	  } else {
 	    // Record the end of the scattering
-	    PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]),
-		    profile, QUDA_PROFILE_EVENT_RECORD);
+	    PROFILE(cudaEventRecord(scatterEnd[2*i+1], streams[2*i+1]), profile, QUDA_PROFILE_EVENT_RECORD);
 	    // wait for scattering to finish and then launch dslash
-	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0),
-		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i+1], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	  }
 
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
@@ -422,7 +423,7 @@ struct DslashPthreads : DslashPolicyImp {
 	      completeSum++;
 
 	      // Scatter into the end zone
-	      // Both directions use the same stream
+	      // Both directions use the same stream // FIXME
 	      PROFILE(inputSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir), 
 		      profile, QUDA_PROFILE_SCATTER);
 	    }
@@ -790,7 +791,7 @@ struct DslashFaceBuffer : DslashPolicyImp {
 	      completeSum++;
 
 	      // Scatter into the end zone
-	      // Both directions use the same stream
+	      // Both directions use the same stream // FIXME
 	      PROFILE(face[it]->scatter(*inputSpinor, dagger, 2*i+dir), 
 		      profile, QUDA_PROFILE_SCATTER);
 	    }
