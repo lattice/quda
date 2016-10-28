@@ -45,7 +45,7 @@ namespace quda {
     real_length = 2*volumeCB*nColor*nColor*nSpin*nSpin/2;  // block-diagonal Hermitian (72 reals)
     length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
-    bytes = length*precision;
+    bytes = (size_t)length*precision;
     bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
