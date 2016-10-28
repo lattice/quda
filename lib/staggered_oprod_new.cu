@@ -383,7 +383,7 @@ namespace quda {
       } // commDim(i)
     } // i=3,..,0
 
-    cudaDeviceSynchronize();
+    cudaDeviceSynchronize(); comm_barrier();
 
     for (int i=3; i>=0; i--) {
       if(commDimPartitioned(i)) {
