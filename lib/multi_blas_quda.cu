@@ -36,8 +36,10 @@ namespace quda {
 
   namespace blas {
 
+    namespace multi {
 #define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
 #include <texture.h>
+    }
 
     cudaStream_t* getStream();
 
@@ -242,6 +244,154 @@ namespace quda {
       }
     }
 
+    /**
+       Functor performing the operations y[i] = a*x[i] + y[i] and z[i] = b*x[i] + z[i]
+    */
+    template<int NXZ, typename Float2, typename FloatN>
+    struct multi_caxpyBxpz_ : public MultiBlasFunctor<NXZ, Float2, FloatN>
+    {
+      typedef typename scalar<Float2>::type real;
+      const int NYW;
+      Float2 a[MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N];
+
+      multi_caxpyBxpz_(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) : NYW(NYW)
+      {
+        // copy arguments into the functor
+        for (int i=0; i<NXZ; i++)
+        {
+          this->a[i] = make_Float2<Float2>(a.data[i]);
+          this->b[i] = make_Float2<Float2>(b.data[i]);
+        }
+      }
+      
+      // i loops over NYW, j loops over NXZ
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      {
+        _caxpy(a[j], x, y); _caxpy(b[j], x, w); // b/c we swizzled z into w.
+      }
+      int streams() { return 4*NYW + NXZ; } //! total number of input and output streams
+      int flops() { return 8*NXZ*NYW; } //! flops per real element
+    };
+
+    void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
+		   const Complex *b_, ColorSpinorField &z_)
+    {
+
+      const int xsize = x_.size();
+      if (xsize <= 10) // only swizzle if we have to. BiCGstab-10 is as far as I ever want to push.
+      {
+        // swizzle order since we are writing to y_ and z_, but the
+        // multi-blas only allow writing to y and w, and moreover the
+        // block width of y and w must match, and x and z must match.
+        // Also, wrap a container around them.
+        std::vector<ColorSpinorField*> y;
+        y.push_back(&y_);
+        std::vector<ColorSpinorField*> w;
+        w.push_back(&z_);
+
+        // we're reading from x
+        std::vector<ColorSpinorField*> &x = x_;
+
+        // we will carry the parameter arrays into the functor
+        coeff_array<Complex> a(a_,false), b(b_,false), c; 
+
+        if (x[0]->Precision() != y[0]->Precision() )
+        {
+          switch(xsize)
+          {
+            case 1:
+              mixed::multiblasCuda<1,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 2:
+              mixed::multiblasCuda<2,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 3:
+              mixed::multiblasCuda<3,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 4:
+              mixed::multiblasCuda<4,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 5:
+              mixed::multiblasCuda<5,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 6:
+              mixed::multiblasCuda<6,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 7:
+              mixed::multiblasCuda<7,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 8:
+              mixed::multiblasCuda<8,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 9:
+              mixed::multiblasCuda<9,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 10:
+              mixed::multiblasCuda<10,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            default:
+              // we can't hit the default, it ends up in the else below.
+              break;
+          }
+        }
+        else
+        {
+          switch(xsize)
+          {
+            case 1:
+              multiblasCuda<1,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 2:
+              multiblasCuda<2,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 3:
+              multiblasCuda<3,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 4:
+              multiblasCuda<4,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 5:
+              multiblasCuda<5,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 6:
+              multiblasCuda<6,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 7:
+              multiblasCuda<7,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 8:
+              multiblasCuda<8,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 9:
+              multiblasCuda<9,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            case 10:
+              multiblasCuda<10,multi_caxpyBxpz_,0,1,0,1>(a, b, c, x, y, x, w);
+              break;
+            default:
+              // we can't hit the default, it ends up in the else below.
+              break;
+          } 
+        }
+      }
+      else
+      {
+        // split the problem in half and recurse
+        const Complex *a0 = &a_[0];
+        const Complex *b0 = &b_[0];
+
+        std::vector<ColorSpinorField*> x0(x_.begin(), x_.begin() + x_.size()/2);
+
+        caxpyBxpz(a0, x0, y_, b0, z_);
+
+        const Complex *a1 = &a_[x_.size()/2];
+        const Complex *b1 = &b_[x_.size()/2];
+
+        std::vector<ColorSpinorField*> x1(x_.begin() + x_.size()/2, x_.end());
+
+        caxpyBxpz(a1, x1, y_, b1, z_);
+      }
+    }
 
   } // namespace blas
 

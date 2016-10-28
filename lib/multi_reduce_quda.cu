@@ -50,16 +50,19 @@ static struct {
   char aux_tmp[quda::TuneKey::aux_n];
 } blasStrings;
 
-static cudaEvent_t reduceEnd;
-
 namespace quda {
   namespace blas {
 
     cudaStream_t* getStream();
+    cudaEvent_t* getReduceEvent();
 
     namespace reduce {
 
+      namespace multi {
 #include <texture.h>
+      }
+
+#include <multi_reduce_core.cuh>
 #include <multi_reduce_core.h>
 
     } // namespace reduce

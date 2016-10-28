@@ -2,7 +2,6 @@
 
 /**
    @brief Parameter struct for generic multi-blas kernel.
-
    @tparam NXZ is dimension of input vectors: X,Z
    @tparam NYW is dimension of in-output vectors: Y,W
    @tparam SpinorX Type of input spinor for x argument
@@ -73,7 +72,6 @@ __device__ inline void compute(Arg &arg, int idx, int parity) {
 
 /**
    @brief Generic multi-blas kernel with four loads and up to four stores.
-
    @param[in,out] arg Argument struct with required meta data
    (input/output fields, functor, etc.)
 */
@@ -296,10 +294,10 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
     norm_bytes[i][1] = w[i]->NormBytes();
   }
 
-  SpinorTexture<RegType,StoreType,M,0> X[NXZ];
-  Spinor<RegType,    yType,M,writeY,1> Y[MAX_MULTI_BLAS_N];
-  SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
-  Spinor<RegType,StoreType,M,writeW,3> W[MAX_MULTI_BLAS_N];
+  multi::SpinorTexture<RegType,StoreType,M,0> X[NXZ];
+  multi::Spinor<RegType,    yType,M,writeY,1> Y[MAX_MULTI_BLAS_N];
+  multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
+  multi::Spinor<RegType,StoreType,M,writeW,3> W[MAX_MULTI_BLAS_N];
 
   //MWFIXME
   for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
@@ -308,10 +306,10 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
   Functor<NXZ,Float2, RegType> f(a, b, c, NYW);
 
   MultiBlasCuda<NXZ,RegType,M,
-		SpinorTexture<RegType,StoreType,M,0>,
-		Spinor<RegType,    yType,M,writeY,1>,
-		SpinorTexture<RegType,StoreType,M,2>,
-		Spinor<RegType,StoreType,M,writeW,3>,
+		multi::SpinorTexture<RegType,StoreType,M,0>,
+		multi::Spinor<RegType,    yType,M,writeY,1>,
+		multi::SpinorTexture<RegType,StoreType,M,2>,
+		multi::Spinor<RegType,StoreType,M,writeW,3>,
 		decltype(f) >
     blas(X, Y, Z, W, f, NYW, length, x[0]->SiteSubset(), bytes, norm_bytes);
   blas.apply(*getStream());
@@ -332,7 +330,6 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
 
 /**
    Generic blas kernel with four loads and up to four stores.
-
    FIXME - this is hacky due to the lack of std::complex support in
    CUDA.  The functors are defined in terms of FloatN vectors, whereas
    the operator() accessor returns std::complex<Float>

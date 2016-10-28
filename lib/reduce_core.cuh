@@ -256,7 +256,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
 
 /**
    Generic reduce kernel with four loads and up to four stores.
-
    FIXME - this is hacky due to the lack of std::complex support in
    CUDA.  The functors are defined in terms of FloatN vectors, whereas
    the operator() accessor returns std::complex<Float>
