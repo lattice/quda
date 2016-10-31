@@ -833,18 +833,24 @@ namespace quda {
     double GMResDRCycle(ColorSpinorField &x, double r2, Complex *u, const double stop);
     //GMRES-DR solver
     void operator()(ColorSpinorField *out, ColorSpinorField *in);
-    //
+
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
     //
     void CleanResources();
     //
-    void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
+    //void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method
     void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
     //
-    void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
+    //void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
-    void AllocateKrylovSubspace(ColorSpinorParam &csParam);
+    int RunAugmentedFlexArnoldiProcess(int j, ColorSpinorField &rPre, ColorSpinorField &pPre,  ColorSpinorField &tmp, bool precMatch);
+
+    void RestartVZH();
+
+    void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
+
+    void AllocateFlexArnoldiVectors(ColorSpinorField &meta);
 
   };
 
@@ -890,18 +896,24 @@ namespace quda {
     double GMResDRCycle(ColorSpinorField &x, double r2, Complex *u, const double stop);//we need FGMRESDR cycle
     //GMRES-DR solver
     void operator()(ColorSpinorField *out, ColorSpinorField *in);
-    //
+
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
     //
     void CleanResources();
     //
-    void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
+    //void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method
     void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
     //
-    void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
+    //void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
-    void AllocateKrylovSubspace(ColorSpinorParam &csParam);
+    int RunAugmentedFlexArnoldiProcess(int j, ColorSpinorField &rPre, ColorSpinorField &pPre,  ColorSpinorField &tmp, bool precMatch);
+
+    void RestartVZH();
+
+    void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
+
+    void AllocateFlexArnoldiVectors(ColorSpinorField &meta);
 
   };
 
