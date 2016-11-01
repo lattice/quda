@@ -794,7 +794,6 @@ namespace quda {
   };
 
 //forward declaration
- struct GMResDRDeflationParam;
  class GMResDRArgs;
 
  class GMResDR : public DeflatedSolver {
@@ -814,6 +813,14 @@ namespace quda {
     ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
     ColorSpinorFieldSet *Zm;//arnoldi basis vectors, size (m+1)
 
+    ColorSpinorField *rp;       //! residual vector
+    ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField *tmpp;     //! temporary for mat-vec
+    ColorSpinorField *x_sloppy; //! sloppy solution vector
+    ColorSpinorField *r_sloppy; //! sloppy residual vector
+    ColorSpinorField *r_pre;    //! residual passed to preconditioner
+    ColorSpinorField *p_pre;    //! preconditioner result
+
     TimeProfile *profile;    //time profile for initCG solver
 
     GMResDRArgs *args;
@@ -829,9 +836,6 @@ namespace quda {
     virtual ~GMResDR();
 
     //GMRES-DR solver
-    //void   GmresDRCycle(ColorSpinorField &out, ColorSpinorField &in, Complex *u);
-    double GMResDRCycle(ColorSpinorField &x, double r2, Complex *u, const double stop);
-    //GMRES-DR solver
     void operator()(ColorSpinorField *out, ColorSpinorField *in);
 
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
@@ -844,13 +848,11 @@ namespace quda {
     //
     //void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
-    int RunAugmentedFlexArnoldiProcess(int j, ColorSpinorField &rPre, ColorSpinorField &pPre,  ColorSpinorField &tmp, bool precMatch);
+    int RunFlexArnoldiProcess(const int start_idx, const bool do_givens);
 
     void RestartVZH();
 
     void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
-
-    void AllocateFlexArnoldiVectors(ColorSpinorField &meta);
 
   };
 
@@ -907,7 +909,7 @@ namespace quda {
     //
     //void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
-    int RunAugmentedFlexArnoldiProcess(int j, ColorSpinorField &rPre, ColorSpinorField &pPre,  ColorSpinorField &tmp, bool precMatch);
+    int RunFlexArnoldiProcess(int j, ColorSpinorField &rPre, ColorSpinorField &pPre,  ColorSpinorField &tmp, bool precMatch);
 
     void RestartVZH();
 
