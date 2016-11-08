@@ -121,6 +121,78 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
+
+  void PreconCG::ComputeBeta(double *beta, int begin, int size)
+  {
+    std::vector<cudaColorSpinorField*> _Ap(size);
+    std::vector<cudaColorSpinorField*> _wp(size);
+
+    for (int  l = 0; l < size; l++)
+    {
+      _Ap[l]  = static_cast<cudaColorSpinorField*>(Ap[begin+l]);
+      _wp[l]  = static_cast<cudaColorSpinorField*>(wp);
+      beta[l] = 0.0;
+    }
+
+    blas::reDotProduct(beta, _Ap, _wp); // vectorized dot product
+
+    for (int  l = 0; l < size; l++) beta[l] /= pAp[begin+l];
+  }
+
+  void PreconCG::UpdateP(double *beta, int begin, int j, int size)
+  {
+    std::vector<ColorSpinorField*> _p (p.begin()+begin, p.begin()+begin+size);
+    std::vector<ColorSpinorField*> _pj(p.begin()+j, p.begin()+j+1);
+
+    for (int  l = 0; l < size; l++) beta[l] = -beta[l];//flip sign
+    blas::axpy(beta, _p, _pj);
+  }
+
+
+  void PreconCG::orthoDir(int mk, int j, int pipeline) 
+  {
+    double *beta_ = new double[pipeline+1]; 
+
+    switch (pipeline) {
+    case 0: // no kernel fusion
+    case 1: // basic kernel fusion
+      for(int l = 0; l < mk; l++)
+      {
+         beta_[0] = blas::reDotProduct(*Ap[l],*wp) / pAp[l];
+         blas::axpy(- beta_[0], *p[l], *p[j]);//!
+      }
+      break;
+    case 2: // two-way pipelining
+    case 3: // three-way pipelining
+    case 4: // four-way pipelining
+    case 5: // five-way pipelining
+    case 6: // six-way pipelining
+    case 7: // seven-way pipelining
+    case 8: // eight-way pipelining
+      {
+	const int N = std::min(pipeline, mk);
+	for (int l = 0; l < mk-(N-1); l += N) {
+	  ComputeBeta(beta_, l, N);
+	  UpdateP(beta_, l, j, N);
+	}
+	if (mk % N != 0) { // need to update the remainder
+	  for (int r = (N-1); r > 0; r--) {
+	    if ((mk % N) % r == 0) { // if true this is the remainder
+	      ComputeBeta(beta_, mk-r, r);
+	      UpdateP(beta_, mk-r, j, r);
+	      break;
+	    }
+	  }
+	}
+      }
+      break;
+    default:
+      errorQuda("Pipeline length %d type not defined", pipeline);
+    }
+
+    delete beta_;
+  }
+
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     //this is a hack, just in case if we want to run unpreconditioned solver:
@@ -207,23 +279,13 @@ namespace quda {
     }else{
       blas::zero(y); // no reliable updates // NB: check this
     }
+    blas::copy(rSloppy, r);
+
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     const bool precMatch           = (param.precision_precondition != param.precision_sloppy) ? false : true;
-
-    blas::copy(rSloppy, r);
-
-    if( !precMatch )  blas::copy(rPre, rSloppy);
-    commGlobalReductionSet(false);
-    (*K)(pPre, rPre);
-    commGlobalReductionSet(true);
-    if( !precMatch ) blas::copy(*wp, pPre);
-
-    blas::copy(*p[0], *wp);
-
-  
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     double heavy_quark_res = 0.0; // heavy quark residual 
@@ -235,12 +297,20 @@ namespace quda {
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
- 
-    double rMinvr = blas::reDotProduct(rSloppy,*wp);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    //profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
+    if( !precMatch )  blas::copy(rPre, rSloppy);
+    commGlobalReductionSet(false);
+    (*K)(pPre, rPre);
+    commGlobalReductionSet(true);
+    if( !precMatch ) blas::copy(*wp, pPre);
+
+    blas::copy(*p[0], *wp);
+
+    double rMinvr = blas::reDotProduct(rSloppy,*wp);
+  
     blas::flops = 0;
 
     const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
@@ -259,22 +329,20 @@ namespace quda {
 
     while(!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter){
 
-      mk = std::max(1, (k+1-truncation_shift) % (nKrylov+1)); 
+      if(!use_ipcg_iters) {
+        mk = std::max(1, (k+1-truncation_shift) % (nKrylov+1)); 
+        //note tht for ipcg j always equals to zero
+        if (j >= mk) *p[0] = *p[j],  j = 0;
 
-      if (j >= mk && !use_ipcg_iters)//note tht for ipcg j always equals to zero
-      {
-         *p[0] = *p[j];
-         j = 0;
+        if (j > p.size()) errorQuda("\nTruncation index is out of bound.\n");
       }
-
-      if(j > p.size()) errorQuda("\nTruncation index is out of bound.\n");
 
       matSloppy(*Ap[j], *p[j], tmp);
       //
       pAp[j]   = blas::reDotProduct( *Ap[j], *p[j]);
       alpha    = rMinvr/pAp[j];
       //update residual:
-      cg_norm = blas::axpyCGNorm(-alpha, *Ap[j], rSloppy); 
+      cg_norm = blas::axpyCGNorm(-alpha, *Ap[j], rSloppy);
       //
       r2     = real(cg_norm);
       
@@ -301,6 +369,7 @@ namespace quda {
         if( !precMatch ) blas::copy(*wp, pPre);
 
         if( use_ipcg_iters ){
+
           double rMinvr_old      = rMinvr;
           rMinvr                 = reDotProduct(rSloppy,*wp);
           beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
@@ -311,12 +380,15 @@ namespace quda {
           blas::axpy(+alpha, *p[j++], xSloppy);
           //orthogonalize agains previously computed search vectors
           blas::copy(*p[j], *wp);
-
+#if 0
           for(int l = 0; l < mk; l++)
           {
             beta = blas::reDotProduct(*Ap[l],*wp) / pAp[l];
             blas::axpy(- beta, *p[l], *p[j]);//!
           }
+#else
+          orthoDir(mk, j, param.pipeline);
+#endif
           //
           rMinvr = blas::reDotProduct(rSloppy, *p[j]);
         }
@@ -352,7 +424,7 @@ namespace quda {
 
         if( !precMatch )  blas::copy(rPre, rSloppy);
         commGlobalReductionSet(false);
-        blas::zero(pPre); 
+        blas::zero(pPre);
         (*K)(pPre, rPre);
         commGlobalReductionSet(true);
         if( !precMatch ) blas::copy(*wp, pPre);
@@ -367,12 +439,15 @@ namespace quda {
         } else {
           j += 1;
           blas::copy(*p[j], *wp);
-
+#if 0
           for(int l = 0; l < mk; l++)
           {
             beta = blas::reDotProduct(*Ap[l],*wp) / pAp[l];
             blas::axpy(- beta, *p[l], *p[j]);//!
           }
+#else
+          orthoDir(mk, j, param.pipeline);
+#endif
           //
           rMinvr = blas::reDotProduct(rSloppy, *p[j]);
 
@@ -386,7 +461,7 @@ namespace quda {
       PrintStats( use_ipcg_iters ? "IPCG" : "FCG", k, r2, b2, heavy_quark_res);
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     if(x.Precision() != param.precision_sloppy) blas::copy(x, xSloppy);

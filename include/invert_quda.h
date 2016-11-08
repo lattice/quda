@@ -460,6 +460,10 @@ namespace quda {
       virtual ~PreconCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
+      //optimization methods:
+      void ComputeBeta(double *beta, int begin, int size);
+      void UpdateP(double *beta, int begin, int j, int size);
+      void orthoDir(int mk, int j, int pipeline); 
   };
 
 
