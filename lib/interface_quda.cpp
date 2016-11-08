@@ -4548,6 +4548,7 @@ computeHISQForceQuda(void* const milc_momentum,
   param.link_type = QUDA_ASQTAD_MOM_LINKS;
   param.reconstruct = QUDA_RECONSTRUCT_10;
   param.gauge = (void*)milc_momentum;
+  param.ghostExchange =  QUDA_GHOST_EXCHANGE_NO;
   cpuGaugeField* cpuMom = (!gParam->use_resident_mom) ? new cpuGaugeField(param) : NULL;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -4566,7 +4567,6 @@ computeHISQForceQuda(void* const milc_momentum,
   cpuGaugeField cpuULink(param);
   param.create = QUDA_ZERO_FIELD_CREATE;
 
-  param.ghostExchange =  QUDA_GHOST_EXCHANGE_NO;
   param.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaGaugeField* cudaGauge = new cudaGaugeField(param);
 
