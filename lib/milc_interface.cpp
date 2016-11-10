@@ -840,15 +840,15 @@ void qudaMultishiftInvert(int external_precision,
 
   // set the solver
   char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-  QudaReconstruct long_reconstruct = QUDA_RECONSTRUCT_INVALID;
+  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
   if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
-    long_reconstruct = QUDA_RECONSTRUCT_18;
-  } else if (strcmp(quda_reconstruct,"13")) {
+    long_reconstruct = QUDA_RECONSTRUCT_NO;
+  } else if (strcmp(quda_reconstruct,"13")==0) {
     long_reconstruct = QUDA_RECONSTRUCT_13;
-  } else if (strcmp(quda_reconstruct,"9")) {
+  } else if (strcmp(quda_reconstruct,"9")==0) {
     long_reconstruct = QUDA_RECONSTRUCT_9;
   } else {
-    errorQuda("reconstruct request %s not supported", long_reconstruct);
+    errorQuda("reconstruct request %s not supported", quda_reconstruct);
   }
 
 
