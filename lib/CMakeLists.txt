@@ -51,15 +51,6 @@ set (QUDA_OBJS
   quda_memcpy.cpp version.cpp )
 
 
-## split source into cu and cpp files
-FOREACH(item ${QUDA_OBJS})
-  STRING(REGEX MATCH ".+\\.cu$" item_match ${item})
-  IF(item_match)
-    LIST(APPEND QUDA_CU_OBJS ${item})
-  ENDIF(item_match)
-ENDFOREACH(item ${QUDA_OBJS})
-
-LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
@@ -81,8 +72,7 @@ include_directories(dslash_core)
 include_directories(.)
 
 # generate a cmake object library for all cpp files first
-add_library(quda_cpp OBJECT ${QUDA_OBJS})
-cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+cuda_add_library(quda SHARED ${QUDA_OBJS})
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
