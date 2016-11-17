@@ -12,7 +12,7 @@
 
 namespace quda {
 
-#ifdef GPU_FATLINK
+//#ifdef GPU_FATLINK
 
   namespace fatlink {
 #include <dslash_constants.h>
@@ -1176,7 +1176,7 @@ namespace quda {
 
   }
 
-#endif
+//#endif
 
   void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 			  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
