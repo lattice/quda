@@ -81,12 +81,15 @@ include_directories(dslash_core)
 include_directories(.)
 
 # generate a cmake object library for all cpp files first
-add_library(quda_device SHARED ${QUDA_OBJS})
-cuda_add_library(quda_host SHARED ${QUDA_CU_OBJS})
-
-# until we define an install step copy the include directory to the build directory
-ADD_CUSTOM_COMMAND(TARGET quda_host POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
-
+if(QUDA_BUILD_SHAREDLIB)
+  add_library(quda_device SHARED ${QUDA_OBJS})
+  cuda_add_library(quda_host SHARED ${QUDA_CU_OBJS})
+  ADD_CUSTOM_COMMAND(TARGET quda_host POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+else()
+  add_library(quda_cpp OBJECT ${QUDA_OBJS})
+  cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+endif()
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
