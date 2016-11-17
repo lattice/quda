@@ -1,5 +1,3 @@
-// #ifdef GPU_CONTRACT
-
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -133,6 +131,7 @@ namespace quda
 
   void covDevCuda(DslashCuda &dslash, const size_t regSize, const int mu, TimeProfile &profile)
   {
+    #ifdef GPU_CONTRACT
     const int	dir = mu%4;
 
     dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -157,6 +156,10 @@ namespace quda
       }
     #endif // MULTI_GPU
     cudaStreamSynchronize(streams[Nstream-1]);
+    #else
+      errorQuda("Contraction kernels have not been built");
+    #endif
+
   }
 
   /**
@@ -610,4 +613,3 @@ namespace quda
       #endif
     }
   }
-// #endif

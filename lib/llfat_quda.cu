@@ -12,7 +12,7 @@
 
 namespace quda {
 
-//#ifdef GPU_FATLINK
+
 
   namespace fatlink {
 #include <dslash_constants.h>
@@ -68,7 +68,7 @@ namespace quda {
   gauge[idx + 5*fl.staple_stride] = STAPLE5;	\
   gauge[idx + 6*fl.staple_stride] = STAPLE6;	\
   gauge[idx + 7*fl.staple_stride] = STAPLE7;	\
-  gauge[idx + 8*fl.staple_stride] = STAPLE8;					
+  gauge[idx + 8*fl.staple_stride] = STAPLE8;
 
 
 #define SCALAR_MULT_SU3_MATRIX(a, b, c)		\
@@ -114,7 +114,7 @@ namespace quda {
   float4 var##0 = gauge[idx + dir*3*stride];				\
   float4 var##1 = gauge[idx + dir*3*stride + stride];			\
   float4 var##2 = gauge[idx + dir*3*stride + 2*stride];			\
-  float4 var##3, var##4;					
+  float4 var##3, var##4;
 
 #define LOAD_MATRIX_12_SINGLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
   float4 var##0 = tex1Dfetch(gauge, idx + dir*3*stride);		\
@@ -131,7 +131,7 @@ namespace quda {
   float2 var##5 = gauge[idx + dir*9*stride + 5*stride];			\
   float2 var##6 = gauge[idx + dir*9*stride + 6*stride];			\
   float2 var##7 = gauge[idx + dir*9*stride + 7*stride];			\
-  float2 var##8 = gauge[idx + dir*9*stride + 8*stride];			
+  float2 var##8 = gauge[idx + dir*9*stride + 8*stride];
 
 
 #define LOAD_MATRIX_18_SINGLE_TEX_DECLARE(gauge, dir, idx, var, stride)	\
@@ -143,7 +143,7 @@ namespace quda {
   float2 var##5 = tex1Dfetch(gauge, idx + dir*9*stride + 5*stride);	\
   float2 var##6 = tex1Dfetch(gauge, idx + dir*9*stride + 6*stride);	\
   float2 var##7 = tex1Dfetch(gauge, idx + dir*9*stride + 7*stride);	\
-  float2 var##8 = tex1Dfetch(gauge, idx + dir*9*stride + 8*stride);			
+  float2 var##8 = tex1Dfetch(gauge, idx + dir*9*stride + 8*stride);
 
 
 
@@ -156,7 +156,7 @@ namespace quda {
   double2 var##5 = gauge[idx + dir*9*stride + 5*stride];		\
   double2 var##6 = gauge[idx + dir*9*stride + 6*stride];		\
   double2 var##7 = gauge[idx + dir*9*stride + 7*stride];		\
-  double2 var##8 = gauge[idx + dir*9*stride + 8*stride];			
+  double2 var##8 = gauge[idx + dir*9*stride + 8*stride];
 
 
 #define LOAD_MATRIX_18_DOUBLE_TEX_DECLARE(gauge_tex, gauge, dir, idx, var, stride) \
@@ -168,7 +168,7 @@ namespace quda {
   double2 var##5 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 5*stride); \
   double2 var##6 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 6*stride); \
   double2 var##7 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 7*stride); \
-  double2 var##8 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 8*stride);	
+  double2 var##8 = READ_DOUBLE2_TEXTURE(gauge_tex, gauge, idx + dir*9*stride + 8*stride);
 
 
 #define LOAD_MATRIX_12_DOUBLE_DECLARE(gauge, dir, idx, var, stride)	\
@@ -208,7 +208,7 @@ namespace quda {
   mc##21_re = ma##21_re + mb##21_re;		\
   mc##21_im = ma##21_im + mb##21_im;		\
   mc##22_re = ma##22_re + mb##22_re;		\
-  mc##22_im = ma##22_im + mb##22_im;		
+  mc##22_im = ma##22_im + mb##22_im;
 
 
 
@@ -235,7 +235,7 @@ namespace quda {
 
     fl_h.site_ga_stride = param->site_ga_pad + Vh;
     fl_h.staple_stride = param->staple_pad + Vh;
-    fl_h.fat_ga_stride = param->llfat_ga_pad + Vh;  
+    fl_h.fat_ga_stride = param->llfat_ga_pad + Vh;
     fl_h.long_ga_stride = param->llfat_ga_pad + Vh; // temporary
 
     cudaMemcpyToSymbol(fl, &fl_h, sizeof(fat_force_const_t));
@@ -263,7 +263,7 @@ namespace quda {
       }
 
     cudaMemcpyToSymbol(dir1_array, &dir1, sizeof(dir1));
-    cudaMemcpyToSymbol(dir2_array, &dir2, sizeof(dir2));   
+    cudaMemcpyToSymbol(dir2_array, &dir2, sizeof(dir2));
 
     checkCudaError();
   }
@@ -364,7 +364,7 @@ namespace quda {
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink_odd, dir, idx, var, fl.site_ga_stride)
 #endif
 #define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_SINGLE_DECLARE(sitelink, dir, idx, var, fl.site_ga_stride)
-#define RECONSTRUCT_SITE_LINK(sign, var)  
+#define RECONSTRUCT_SITE_LINK(sign, var)
 #define FloatN float2
 #define FloatM float2
 #define RECONSTRUCT 18
@@ -422,7 +422,7 @@ namespace quda {
 #define LOAD_ODD_SITE_MATRIX(dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink_odd, dir, idx, var, fl.site_ga_stride)
 #endif
 #define LOAD_SITE_MATRIX(sitelink, dir, idx, var) LOAD_MATRIX_18_DOUBLE_DECLARE(sitelink, dir, idx, var, fl.site_ga_stride)
-#define RECONSTRUCT_SITE_LINK(sign, var)  
+#define RECONSTRUCT_SITE_LINK(sign, var)
 #define FloatN double2
 #define FloatM double2
 #define RECONSTRUCT 18
@@ -823,27 +823,27 @@ namespace quda {
       if(recon == QUDA_RECONSTRUCT_NO){
 
 	computeLongLinkParity18Kernel<0>
-	  <<<halfGridDim, blockDim>>>((double2*)outEven, (double2*)inEven, (double2*)inOdd, coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((double2*)outEven, (double2*)inEven, (double2*)inOdd, coeff, kparam);
 	computeLongLinkParity18Kernel<1>
-	  <<<halfGridDim, blockDim>>>((double2*)outOdd, (double2*)inOdd, (double2*)inEven, coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((double2*)outOdd, (double2*)inOdd, (double2*)inEven, coeff, kparam);
 
       }else if(recon == QUDA_RECONSTRUCT_12){
 
 	computeLongLinkParity12Kernel<0>
-	  <<<halfGridDim, blockDim>>>((double2*)outEven, (double2*)inEven, (double2*)inOdd, coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((double2*)outEven, (double2*)inEven, (double2*)inOdd, coeff, kparam);
 	computeLongLinkParity12Kernel<1>
-	  <<<halfGridDim, blockDim>>>((double2*)outOdd, (double2*)inOdd, (double2*)inEven, coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((double2*)outOdd, (double2*)inOdd, (double2*)inEven, coeff, kparam);
 
-      }else{ 
+      }else{
 	errorQuda("Reconstruct %d is not supported\n", recon);
       }
     }else if(prec == QUDA_SINGLE_PRECISION){
       if(recon == QUDA_RECONSTRUCT_NO){
 
 	computeLongLinkParity18Kernel<0>
-	  <<<halfGridDim, blockDim>>>((float2*)outEven, (float2*)inEven, (float2*)inOdd, (float)coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((float2*)outEven, (float2*)inEven, (float2*)inOdd, (float)coeff, kparam);
 	computeLongLinkParity18Kernel<1>
-	  <<<halfGridDim, blockDim>>>((float2*)outOdd, (float2*)inOdd, (float2*)inEven, (float)coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((float2*)outOdd, (float2*)inOdd, (float2*)inEven, (float)coeff, kparam);
 
       }else if(recon == QUDA_RECONSTRUCT_12){
 
@@ -862,9 +862,9 @@ namespace quda {
   }
 
 
-  void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd, 
-					const void* sitelink_even, const void* sitelink_odd, 
-					void* fatlink_even, void* fatlink_odd,	
+  void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd,
+					const void* sitelink_even, const void* sitelink_odd,
+					void* fatlink_even, void* fatlink_odd,
 					int mu, int nu, double mycoeff,
 					QudaReconstructType recon, QudaPrecision prec,
 					dim3 halfGridDim,  llfat_kernel_param_t kparam,
@@ -925,8 +925,8 @@ namespace quda {
     }
 
 
-    dim3 blockDim(BLOCK_DIM , 1, 1);  
-    ENUMERATE_FUNCS(mu,nu);  
+    dim3 blockDim(BLOCK_DIM , 1, 1);
+    ENUMERATE_FUNCS(mu,nu);
 
 #undef CALL_FUNCTION
 
@@ -935,10 +935,10 @@ namespace quda {
 
 
   void
-  computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd, 
+  computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd,
 				    const void* sitelink_even, const void* sitelink_odd,
-				    void* fatlink_even, void* fatlink_odd,			    
-				    const void* mulink_even, const void* mulink_odd, 
+				    void* fatlink_even, void* fatlink_odd,
+				    const void* mulink_even, const void* mulink_odd,
 				    int mu, int nu, int save_staple,
 				    double mycoeff,
 				    QudaReconstructType recon, QudaPrecision prec,
@@ -1011,14 +1011,14 @@ namespace quda {
 
     UNBIND_MU_LINK();
 
-#undef CALL_FUNCTION 
+#undef CALL_FUNCTION
 
   }
 
 
-  void siteComputeGenStapleParityKernel_ex(void* staple_even, void* staple_odd, 
-					   const void* sitelink_even, const void* sitelink_odd, 
-					   void* fatlink_even, void* fatlink_odd,	
+  void siteComputeGenStapleParityKernel_ex(void* staple_even, void* staple_odd,
+					   const void* sitelink_even, const void* sitelink_odd,
+					   void* fatlink_even, void* fatlink_odd,
 					   int mu, int nu, double mycoeff,
 					   QudaReconstructType recon, QudaPrecision prec,
 					   llfat_kernel_param_t kparam)
@@ -1082,7 +1082,7 @@ namespace quda {
     }
 
 
-    ENUMERATE_FUNCS(mu,nu);  
+    ENUMERATE_FUNCS(mu,nu);
 
 #undef CALL_FUNCTION
 
@@ -1092,10 +1092,10 @@ namespace quda {
 
 
   void
-  computeGenStapleFieldParityKernel_ex(void* staple_even, void* staple_odd, 
+  computeGenStapleFieldParityKernel_ex(void* staple_even, void* staple_odd,
 				       const void* sitelink_even, const void* sitelink_odd,
-				       void* fatlink_even, void* fatlink_odd,			    
-				       const void* mulink_even, const void* mulink_odd, 
+				       void* fatlink_even, void* fatlink_odd,
+				       const void* mulink_even, const void* mulink_odd,
 				       int mu, int nu, int save_staple,
 				       double mycoeff,
 				       QudaReconstructType recon, QudaPrecision prec,
@@ -1172,22 +1172,21 @@ namespace quda {
 
     UNBIND_MU_LINK();
 
-#undef CALL_FUNCTION 
+#undef CALL_FUNCTION
 
   }
 
-//#endif
 
   void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 			  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 			  QudaGaugeParam* param, double* act_path_coeff)
-  {  
+  {
 #ifdef GPU_FATLINK
     QudaPrecision prec = cudaSiteLink.Precision();
     QudaReconstructType recon = cudaSiteLink.Reconstruct();
 
     BIND_SITE_AND_FAT_LINK;
-    int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];  
+    int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
     dim3 gridDim((volume + BLOCK_DIM-1)/BLOCK_DIM,1,1);
     dim3 blockDim(BLOCK_DIM , 1, 1);
 
@@ -1197,23 +1196,23 @@ namespace quda {
       if(recon == QUDA_RECONSTRUCT_NO){
 	llfatOneLink18Kernel<<<gridDim, blockDim>>>((const double2*)cudaSiteLink.Even_p(), (const double2*)cudaSiteLink.Odd_p(),
 						    (double2*)cudaFatLink.Even_p(), (double2*)cudaFatLink.Odd_p(),
-						    (double)act_path_coeff[0], (double)act_path_coeff[5], volume);    
+						    (double)act_path_coeff[0], (double)act_path_coeff[5], volume);
       }else{
 
 	llfatOneLink12Kernel<<<gridDim, blockDim>>>((const double2*)cudaSiteLink.Even_p(), (const double2*)cudaSiteLink.Odd_p(),
 						    (double2*)cudaFatLink.Even_p(), (double2*)cudaFatLink.Odd_p(),
-						    (double)act_path_coeff[0], (double)act_path_coeff[5], volume);    
+						    (double)act_path_coeff[0], (double)act_path_coeff[5], volume);
 
       }
     }else{ //single precision
-      if(recon == QUDA_RECONSTRUCT_NO){    
+      if(recon == QUDA_RECONSTRUCT_NO){
 	llfatOneLink18Kernel<<<gridDim, blockDim>>>((float2*)cudaSiteLink.Even_p(), (float2*)cudaSiteLink.Odd_p(),
 						    (float2*)cudaFatLink.Even_p(), (float2*)cudaFatLink.Odd_p(),
-						    (float)act_path_coeff[0], (float)act_path_coeff[5], volume);    						  
+						    (float)act_path_coeff[0], (float)act_path_coeff[5], volume);
       }else{
 	llfatOneLink12Kernel<<<gridDim, blockDim>>>((float4*)cudaSiteLink.Even_p(), (float4*)cudaSiteLink.Odd_p(),
 						    (float2*)cudaFatLink.Even_p(), (float2*)cudaFatLink.Odd_p(),
-						    (float)act_path_coeff[0], (float)act_path_coeff[5], volume);    
+						    (float)act_path_coeff[0], (float)act_path_coeff[5], volume);
       }
     }
 #else
