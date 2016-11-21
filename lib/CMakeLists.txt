@@ -82,8 +82,8 @@ include_directories(.)
 
 # generate a cmake object library for all cpp files first
 if(QUDA_BUILD_SHAREDLIB)
-  add_library(quda_device SHARED ${QUDA_OBJS})
-  cuda_add_library(quda_host SHARED ${QUDA_CU_OBJS})
+  add_library(quda_host SHARED ${QUDA_OBJS})
+  cuda_add_library(quda_device SHARED ${QUDA_CU_OBJS})
   ADD_CUSTOM_COMMAND(TARGET quda_host POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 else()
   add_library(quda_cpp OBJECT ${QUDA_OBJS})
