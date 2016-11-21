@@ -148,6 +148,13 @@ void qudaSetLayout(QudaLayout_t input)
   initQuda(device);
 }
 
+void* qudaAllocatePinned(size_t bytes) {
+  return LatticeField::allocatePinned(bytes);
+}
+
+void qudaFreePinned(void *ptr) {
+  LatticeField::freePinned(ptr);
+}
 
 void qudaHisqParamsInit(QudaHisqParams_t params)
 {
@@ -832,6 +839,20 @@ void qudaMultishiftInvert(int external_precision,
     invalidateGaugeQuda();
   }
 
+  // set the solver
+  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
+  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_NO;
+  } else if (strcmp(quda_reconstruct,"13")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_13;
+  } else if (strcmp(quda_reconstruct,"9")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_9;
+  } else {
+    errorQuda("reconstruct request %s not supported", quda_reconstruct);
+  }
+
+
   if(invalidate_quda_gauge || !create_quda_gauge ){
     const int fat_pad  = getFatLinkPadding(localDim);
     gaugeParam.type = QUDA_GENERAL_LINKS;
@@ -842,7 +863,7 @@ void qudaMultishiftInvert(int external_precision,
     const int long_pad = 3*fat_pad;
     gaugeParam.type = QUDA_THREE_LINKS;
     gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     invalidate_quda_gauge = false;
   }

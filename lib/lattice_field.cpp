@@ -164,7 +164,7 @@ namespace quda {
     }
   }
 
-  void *LatticeField::allocatePinned(size_t nbytes) const
+  void *LatticeField::allocatePinned(size_t nbytes)
   {
     std::multimap<size_t, void *>::iterator it;
     void *ptr = 0;
@@ -189,7 +189,7 @@ namespace quda {
     return ptr;
   }
 
-  void LatticeField::freePinned(void *ptr) const
+  void LatticeField::freePinned(void *ptr)
   {
     if (!pinnedSize.count(ptr)) {
       errorQuda("Attempt to free invalid pointer");
