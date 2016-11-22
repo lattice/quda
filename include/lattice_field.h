@@ -204,31 +204,6 @@ namespace quda {
      */
     void freeDevice(void *ptr) const;
 
-
-    /** Cache of inactive device-memory allocations.  We cache pinned
-    memory allocations so that fields can reuse these with minimal
-    overhead.*/
-    static std::multimap<size_t, void *> deviceCache;
-
-    /** Sizes of active device-memory allocations.  For convenience,
-     we keep track of the sizes of active allocations (i.e., those not
-     in the cache). */
-    static std::map<void *, size_t> deviceSize;
-
-    /**
-       Allocate device-memory.  If free pre-existing allocation exists
-       reuse this.
-       @param bytes Size of allocation
-       @return Pointer to allocated memory
-     */
-    void *allocateDevice(size_t nbytes) const;
-
-    /**
-       Virtual free of pinned-memory allocation.
-       @param ptr Pointer to be (virtually) freed
-     */
-    void freeDevice(void *ptr) const;
-
   public:
 
     /**
