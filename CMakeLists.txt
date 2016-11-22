@@ -104,7 +104,7 @@ set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 # that ususally should not be changed by users
 #######################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
-set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build shared quda_device and quda_host libs instead of static quda")
+set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
 set(QUDA_BUILD_SHARED_SEPARATE OFF CACHE BOOL "when building a shared lib separate into quda_host and quda_device")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
