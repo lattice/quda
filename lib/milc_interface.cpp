@@ -1501,11 +1501,12 @@ void qudaCloverInvert(int external_precision,
     exit(1);
   }
 
-  qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
+  if (link) qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
-//  double clover_coeff = 0.0;
-  qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
-      QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+  if (clover || cloverInverse) {
+    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
+			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+  }
 
   double reliable_delta = 1e-1;
 
@@ -1522,17 +1523,18 @@ void qudaCloverInvert(int external_precision,
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
-  invertParam.solve_type         = QUDA_DIRECT_PC_SOLVE;
-  invertParam.inv_type           = QUDA_BICGSTAB_INVERTER;
+  invertParam.inv_type           = inv_args.solver_type == QUDA_CG_INVERTER ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
+  invertParam.solve_type         = invertParam.inv_type == QUDA_CG_INVERTER ? QUDA_NORMOP_PC_SOLVE : QUDA_DIRECT_PC_SOLVE;
   invertParam.matpc_type         = QUDA_MATPC_ODD_ODD;
 
   invertQuda(solution, source, &invertParam);
+
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  qudaFreeGaugeField();
-  qudaFreeCloverField();
+  if (clover || cloverInverse) qudaFreeCloverField();
+  if (link) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
   return;
 } // qudaCloverInvert
