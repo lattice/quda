@@ -2352,7 +2352,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   b = new cudaColorSpinorField(*h_b, cudaParam);
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  if ((int)solutionResident.size() >= 1) {
+  if ((int)solutionResident.size() >= 1 && cudaParam.siteSubset == solutionResident[0]->SiteSubset()) {
     // perhaps need to make this more robust in case solutionResident[0] is of the correct type for x
     x = solutionResident[0];
   } else {
@@ -2572,7 +2572,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_b;
   delete h_x;
   delete b;
-  if (!param->make_resident_solution) delete x;
+  //if (!param->make_resident_solution) delete x;
+  if (x != solutionResident[0]) delete x;
 
   delete d;
   delete dSloppy;
@@ -3291,7 +3292,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.TPSTART(QUDA_PROFILE_FREE);
   for(int i=0; i < param->num_offset; i++){
     delete h_x[i];
-    if (!param->make_resident_solution) delete x[i];
+    //if (!param->make_resident_solution) delete x[i];
   }
 
   delete h_b;
