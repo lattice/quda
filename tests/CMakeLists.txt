@@ -4,15 +4,8 @@ include_directories(.)
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-if(${QUDA_BUILD_SHAREDLIB} AND ${QUDA_BUILD_SHARED_SEPARATE})
-  set(QUDA_LIBS quda_device quda_host)
-else()
-  set(QUDA_LIBS quda)
-endif()
 
-
-
-set(TEST_LIBS ${QUDA_LIBS} quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} cuda)
+set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} cuda)
 
 if(QUDA_QIO)
   LIST(APPEND TEST_LIBS ${QIO_LIB} ${LIME_LIB})

@@ -81,20 +81,15 @@ include_directories(dslash_core)
 include_directories(.)
 
 # generate a cmake object library for all cpp files first
+    add_library(quda_cpp OBJECT ${QUDA_OBJS})
 if(QUDA_BUILD_SHAREDLIB)
-  if(QUDA_BUILD_SHARED_SEPARATE)
-    add_library(quda_host SHARED ${QUDA_OBJS})
-    cuda_add_library(quda_device SHARED ${QUDA_CU_OBJS})
-    ADD_CUSTOM_COMMAND(TARGET quda_host POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
-  else()
-    cuda_add_library(quda SHARED ${QUDA_OBJS} ${QUDA_CU_OBJS})
-    ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
-  endif()
+    set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+    cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS} )
 else()
-  add_library(quda_cpp OBJECT ${QUDA_OBJS})
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
-  ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 endif()
+ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
