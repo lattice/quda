@@ -165,7 +165,7 @@ namespace quda
   /**
      Class for covariant derivative, is based on SharedDslashCuda
   */
-
+#ifdef GPU_CONTRACT
   template <typename Float, typename Float2>
   class CovDevCuda : public SharedDslashCuda
   {
@@ -563,7 +563,7 @@ namespace quda
 
       long long flops() const { return 144 * in->Volume(); } // Correct me if I'm wrong
   };
-
+#endif
 
   /**
      The function applies the color matrices of a gauge configuration to a spinor, so it is not exactly a covariant derivative, although a combination of calls to
