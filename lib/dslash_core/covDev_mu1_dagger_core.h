@@ -217,7 +217,19 @@ if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
   const int dims[] = {X1, X2, X3, X4};
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
+  //Declare 5d int array to store x1,x2,x3,x4
+  int coord[5] = {0,0,0,0,0};
+  coord[0] = x1;
+  coord[1] = x2;
+  coord[2] = x3;
+  coord[3] = x4;
+  //Call new function template
+  coordsFromFaceIndex<4,QUDA_4D_PC,kernel_type,1>(X, sid, coord, face_idx, face_num, param);
+  //Update x1,x2,x3,x4
+  x1 = coord[0];
+  x2 = coord[1];
+  x3 = coord[2];
+  x4 = coord[3];
 
   o00_re = 0.;  o00_im = 0.;
   o01_re = 0.;  o01_im = 0.;
