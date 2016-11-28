@@ -70,12 +70,6 @@ namespace quda {
     ColorSpinorField &Ap = *App;
     ColorSpinorField &tmp = *tmpp;
 
-    if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) 
-    {
-      b = r;
-      b2 = r2;
-    }
-
     csParam.setPrecision(param.precision_sloppy);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
@@ -92,6 +86,12 @@ namespace quda {
     // compute initial residual
     mat(r, x, y, tmp3);
     double r2 = blas::xmyNorm(b, r);
+
+    if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
+    {
+      b = r;
+      b2 = r2;
+    }
 
     csParam.setPrecision(param.precision_sloppy);
     ColorSpinorField *r_sloppy;

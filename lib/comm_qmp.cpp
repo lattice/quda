@@ -131,7 +131,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   if (!peer2peer_init && !disable_peer_to_peer) {
 
-    first check that the local GPU supports UVA
+    //first check that the local GPU supports UVA
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop,gpuid);
     if(!prop.unifiedAddressing) return;
