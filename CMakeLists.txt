@@ -375,8 +375,8 @@ include_directories(lib)
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
-set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
-add_definitions(-DQUDA_HASH=${HASH})
+set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
+#add_definitions(-DQUDA_HASH="${HASH}")
 
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
@@ -390,9 +390,9 @@ if(DEBUG_BUILD)
   endif()
 endif()
 
-IF(GITVERSION)
-  add_definitions(-DGITVERSION="${GITVERSION}")
-ENDIF()
+#IF(GITVERSION)
+#  add_definitions(-DGITVERSION="${GITVERSION}")
+#ENDIF()
 
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
