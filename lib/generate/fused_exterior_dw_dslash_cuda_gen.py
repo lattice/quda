@@ -353,14 +353,10 @@ int sp_norm_idx;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
 
-
-int dim; 
+int dim;
 int face_idx;
-int Y[4] = {X1,X2,X3,X4};
-
-
-int x1, x2, x3, x4, xs;
-
+int coord[5];
+int X;
 int s_parity;
 
 
@@ -371,7 +367,7 @@ int s_parity;
 """
 { // exterior kernel
 
-dim = dimFromDWFaceIndex(sid, param); // sid is also modified
+dim = dimFromFaceIndex<5>(sid, param); // sid is also modified
 
 const int face_volume = ((param.threadDimMapUpper[dim] - param.threadDimMapLower[dim])*param.Ls >> 1);
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
@@ -381,19 +377,29 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-const int dims[] = {X1, X2, X3, X4};
-coordsFromDWFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
-
-{
-  bool active = false;
-  for(int dir=0; dir<4; ++dir){
-    active = active || isActive(dim,dir,+1,x1,x2,x3,x4,param.commDim,param.X);
-  }
-  if(!active) return;
+switch(dim) {
+case 0:
+  coordsFromFaceIndex<5,QUDA_5D_PC,0,1>(X, sid, coord, face_idx, face_num, param);
+  break;
+case 1:
+  coordsFromFaceIndex<5,QUDA_5D_PC,1,1>(X, sid, coord, face_idx, face_num, param);
+  break;
+case 2:
+  coordsFromFaceIndex<5,QUDA_5D_PC,2,1>(X, sid, coord, face_idx, face_num, param);
+  break;
+case 3:
+  coordsFromFaceIndex<5,QUDA_5D_PC,3,1>(X, sid, coord, face_idx, face_num, param);
+  break;
 }
 
+bool active = false;
+for(int dir=0; dir<4; ++dir){
+  active = active || isActive(dim,dir,+1,coord,param.commDim,param.X);
+}
+if(!active) return;
 
-s_parity = ( sid/(X4*X3*X2*X1h) ) % 2;
+
+s_parity = ( sid/param.volume4CB ) % 2;
 
 READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 
@@ -488,10 +494,8 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-# boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-# interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
-    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
+    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
+    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
     offset = ["+1", "-1", "+1", "-1", "+1", "-1", "+1", "-1"]
     dim = ["X", "Y", "Z", "T"]
 
@@ -503,7 +507,7 @@ def gen(dir, pack_only=False):
                    "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
 
     cond = ""
-    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " + boundary[dir] + " )\n"
+    cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",coord,param.commDim,param.X) && " + boundary[dir] + " )\n"
 
 
     str = ""
@@ -514,7 +518,7 @@ def gen(dir, pack_only=False):
         str += "//"+l+"\n"
     str += "\n"
 
-    str += "faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs," + `dir/2` + ",Y);\n"
+    str += "faceIndexFromCoords<5,1>(face_idx,coord," + `dir/2` + ",param);\n"
     str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "][" + `1-dir%2` + "];\n"
     str += "#if (DD_PREC==2) // half precision\n"
     str += "  sp_norm_idx = face_idx + "

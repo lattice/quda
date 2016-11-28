@@ -83,6 +83,7 @@ namespace quda {
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
+      param_presmooth->pipeline = 5;
     }
 
     presmoother = Solver::create(*param_presmooth, param.matSmooth,
@@ -229,6 +230,7 @@ namespace quda {
 	param_coarse_solver->compute_true_res = false;
 	param_coarse_solver->delta = 1e-8;
 	param_coarse_solver->verbosity_precondition = QUDA_SILENT;
+	param_coarse_solver->pipeline = 5;
 
 	// need this to ensure we don't use half precision on the preconditioner in GCR
 	param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;

@@ -434,7 +434,7 @@ namespace quda {
 #endif
 
   void cudaColorSpinorField::destroy() {
-    if (ghost_field) device_free(ghost_field);
+    if (ghost_field) device_pinned_free(ghost_field);
 
     if (alloc) {
       device_free(v);
@@ -598,10 +598,12 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
 	destroyGhostTexObject();
 #endif
-	if (ghostInit && ghost_bytes) device_free(ghost_field);
+	if (ghostInit && ghost_bytes) device_pinned_free(ghost_field);
 
-	// all fields create their own unique ghost zone
-	if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
+	// all fields create their own unique ghost zone.  Used GPU
+	// pinned allocator to avoid this allocation being redirected,
+	// e.g., by QDPJIT
+	if (ghost_bytes) ghost_field = device_pinned_malloc(ghost_bytes);
 
 #ifdef USE_TEXTURE_OBJECTS
 	createGhostTexObject();

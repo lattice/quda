@@ -83,8 +83,8 @@ namespace quda {
 
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.  
-      int half_phase_bytes = (length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
-      int half_gauge_bytes = (length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
+      int half_phase_bytes = ((size_t)length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
+      int half_gauge_bytes = ((size_t)length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
       // Adjust the alignments for the gauge and phase separately
       half_phase_bytes = ((half_phase_bytes + (512-1))/512)*512;
       half_gauge_bytes = ((half_gauge_bytes + (512-1))/512)*512;
@@ -92,9 +92,8 @@ namespace quda {
       phase_offset = half_gauge_bytes;
       phase_bytes = half_phase_bytes*2;
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
-    }else{
-      //bytes = length*precision;
-      bytes = static_cast<unsigned long long>(length)*static_cast<unsigned long long>(precision);//temporary fix for MG
+    } else {
+      bytes = (size_t)length*precision;
       bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;

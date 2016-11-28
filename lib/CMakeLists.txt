@@ -62,6 +62,7 @@ ENDFOREACH(item ${QUDA_OBJS})
 LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
+  set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
 # QUDA_CU_OBJS shoudl contain all cuda files now

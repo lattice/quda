@@ -51,7 +51,8 @@
 
 // When using dynamic mu/nu indexing, to avoid local spills use shared
 // memory for the per thread indexing arrays.
-#define SHARED_ARRAY
+// FIXME for reasons I don't understand, the shared array breaks in multi-GPU mode
+//#define SHARED_ARRAY
 
 #endif // DYNAMIC_MU_NU
 
@@ -438,7 +439,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     unsigned int minThreads() const { return arg.volumeCB; }
-    bool tuneGridDim() const { return false; }
+    bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
     CloverDerivative(const Arg &arg, const GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) {

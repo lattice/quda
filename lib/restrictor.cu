@@ -419,6 +419,12 @@ namespace quda {
         } else if (block_size == 100) {  // for 5x5x2x4 aggregates
           RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,100>
             <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 108) {  // for 3x3x3x8 aggregates
+          RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,108>
+            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        } else if (block_size == 128) { // for 4x4x4x4 aggregates
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,128>
+	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         } else if (block_size == 200) { // for 5x5x2x8  aggregates
           RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,200>
           <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);

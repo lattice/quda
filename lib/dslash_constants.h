@@ -15,11 +15,22 @@ enum KernelType {
     char do_not_delete; // work around for bug in CUDA 6.5
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
-    int X[4];
+    int_fastdiv X[4];
+    int_fastdiv Xh[4];
+    int_fastdiv volume4CB;
     int Ls;
 
     int_fastdiv block[4]; // dslash tile block parameter
     int_fastdiv grid[4]; // dslash tile grid parameter
+    int_fastdiv swizzle; // block index swizzle factor
+
+    int_fastdiv face_XYZT[4];
+    int_fastdiv face_XYZ[4];
+    int_fastdiv face_XY[4];
+    int_fastdiv face_X[4];
+    int_fastdiv face_Y[4];
+    int_fastdiv face_Z[4];
+    int_fastdiv face_T[4];
 
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
@@ -27,6 +38,7 @@ enum KernelType {
     int ghostOffset[QUDA_MAX_DIM+1][2];
     int ghostNormOffset[QUDA_MAX_DIM+1][2];
     int sp_stride; // spinor stride
+
 #ifdef GPU_CLOVER_DIRAC
     int cl_stride; // clover stride
 #endif
@@ -69,7 +81,7 @@ enum KernelType {
     void print() {
       printfQuda("threads = %d\n", threads);
       printfQuda("parity = %d\n", parity);
-      printfQuda("X = {%d, %d, %d, %d}\n", X[0], X[1], X[2], X[3]);
+      printfQuda("X = {%d, %d, %d, %d}\n", (int)X[0], (int)X[1], (int)X[2], (int)X[3]);
 #ifdef GPU_DOMAIN_WALL_DIRAC
       printfQuda("Ls = %d\n", Ls);
 #endif

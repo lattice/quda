@@ -12,7 +12,7 @@ namespace quda {
     Mom mom;
     const Gauge u;
 
-    unsigned long threads;
+    int threads;
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
     int border[4]; // radius of border
@@ -78,7 +78,7 @@ namespace quda {
     extern __shared__ int s[];
     int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
     s[tid] = 0;
-    char *dx = (char*)&s[tid];
+    signed char *dx = (signed char*)&s[tid];
 #else
     int dx[4] = {0, 0, 0, 0};
 #endif
@@ -198,6 +198,7 @@ namespace quda {
     const char *vol_str;
     unsigned int sharedBytesPerThread() const { return 4; } // for dynamic indexing array
     unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
     GaugeForce(Arg &arg, const GaugeField &meta_mom, const GaugeField &meta_u)

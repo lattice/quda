@@ -2,7 +2,6 @@
 
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
 
-// NB! Don't trust any MULTI_GPU code
 
 #if (CUDA_VERSION >= 4010)
 #define VOLATILE
@@ -122,17 +121,15 @@ VOLATILE spinorFloat o32_im;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
 
-int boundaryCrossing;
 
-int X, xs;
+int X, coord[5], boundaryCrossing;
 
-// Inline by hand for the moment and assume even dimensions
-//coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-xs = X/(X1*X2*X3*X4);
+coord[4] = X/(X1*X2*X3*X4);
 
  o00_re = 0; o00_im = 0;
  o01_re = 0; o01_im = 0;
@@ -152,12 +149,12 @@ xs = X/(X1*X2*X3*X4);
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
-     int sp_idx = ( xs == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
+     int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
 
 // read spinor from device memory
      READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
-     if ( xs != param.Ls-1 )
+     if ( coord[4] != param.Ls-1 )
      {
    o00_re += +i00_re-i20_re;   o00_im += +i00_im-i20_im;
    o01_re += +i01_re-i21_re;   o01_im += +i01_im-i21_im;
@@ -192,17 +189,17 @@ xs = X/(X1*X2*X3*X4);
    o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
    o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
    o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
-    } // end if ( xs != param.Ls-1 )
+    } // end if ( coord[4] != param.Ls-1 )
   } // end P_L
 
  // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
   {
-    int sp_idx = ( xs == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
+    int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
 
 // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
-    if ( xs != 0 )
+    if ( coord[4] != 0 )
     {
    o00_re += +i00_re+i20_re;   o00_im += +i00_im+i20_im;
    o01_re += +i01_re+i21_re;   o01_im += +i01_im+i21_im;
@@ -237,7 +234,7 @@ xs = X/(X1*X2*X3*X4);
    o30_re += -mferm*(+i10_re+i30_re);   o30_im += -mferm*(+i10_im+i30_im);
    o31_re += -mferm*(+i11_re+i31_re);   o31_im += -mferm*(+i11_im+i31_im);
    o32_re += -mferm*(+i12_re+i32_re);   o32_im += -mferm*(+i12_im+i32_im);
-    } // end if ( xs != 0 )
+    } // end if ( coord[4] != 0 )
   } // end P_R
 
   // MDWF Dslash_5 operator is given as follow
@@ -254,8 +251,8 @@ xs = X/(X1*X2*X3*X4);
 #if (MDWF_mode==1)
   VOLATILE spinorFloat C_5;
   VOLATILE spinorFloat B_5;
-  C_5 = mdwf_c5[xs]*static_cast<spinorFloat>(0.5);
-  B_5 = mdwf_b5[xs];
+  C_5 = mdwf_c5[ coord[4] ]*static_cast<spinorFloat>(0.5);
+  B_5 = mdwf_b5[ coord[4] ];
 
   READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + B_5*i00_re;
@@ -284,7 +281,7 @@ xs = X/(X1*X2*X3*X4);
   o32_im = C_5*o32_im + B_5*i32_im;
 #elif (MDWF_mode==2)
   VOLATILE spinorFloat C_5;
-  C_5 = static_cast<spinorFloat>(0.5)*(mdwf_c5[xs]*(m5+static_cast<spinorFloat>(4.0)) - static_cast<spinorFloat>(1.0))/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
+  C_5 = static_cast<spinorFloat>(0.5)*(mdwf_c5[ coord[4] ]*(m5+static_cast<spinorFloat>(4.0)) - static_cast<spinorFloat>(1.0))/(mdwf_b5[ coord[4] ]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
 
   READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + i00_re;
@@ -322,7 +319,7 @@ xs = X/(X1*X2*X3*X4);
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
- coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[xs]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
+ coeff = static_cast<spinorFloat>(0.5)/(mdwf_b5[coord[4]]*(m5+static_cast<spinorFloat>(4.0)) + static_cast<spinorFloat>(1.0));
  coeff *= coeff;
  coeff *= a;
 #else

@@ -85,12 +85,15 @@ namespace quda {
 
     virtual unsigned int maxBlockSize() const { return deviceProp.maxThreadsDim[0]; }
 
+    virtual int blockStep() const { return deviceProp.warpSize; }
+    virtual int blockMin() const { return deviceProp.warpSize; }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize();
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-      const int step = deviceProp.warpSize;
+      const int step = blockStep();
       bool ret;
 
       param.block.x += step;
@@ -101,7 +104,7 @@ namespace quda {
 	  param.block.x = step;
 	} else { // not tuning the grid dimension so have to set a valid grid size
 	  // ensure the blockDim is large enough given the limit on gridDim
-	  param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1); 
+	  param.block.x = (minThreads()+max_blocks-1)/max_blocks;
 	  param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	  if(param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
 	}
@@ -128,11 +131,11 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
 	const int max_shared = deviceProp.sharedMemPerBlock;
-	const int max_blocks_per_sm = 8; // FIXME: derive from deviceProp
+	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), 8u);
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
-	if (blocks_per_sm == 0) return false;
-	param.shared_bytes = max_shared / blocks_per_sm + 1;
+	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
+
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
@@ -197,7 +200,7 @@ namespace quda {
     {
       const unsigned int max_threads = deviceProp.maxThreadsDim[0];
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
-      const int min_block_size = deviceProp.warpSize;
+      const int min_block_size = blockMin();
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
@@ -205,9 +208,8 @@ namespace quda {
 	param.grid = dim3(1,1,1);
       } else {
 	// find the minimum valid blockDim
-	const int warp = deviceProp.warpSize;
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
-	param.block.x = ((param.block.x+warp-1) / warp) * warp; // round up to the nearest warp
+	param.block.x = ((param.block.x+min_block_size-1) / min_block_size) * min_block_size; // round up to the nearest multiple of desired minimum block size
 	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
@@ -314,9 +316,6 @@ namespace quda {
   protected:
     virtual unsigned int sharedBytesPerThread() const { return 0; }
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-    // don't tune the grid dimension
-    bool tuneGridDim() const { return false; }
 
     const unsigned int vector_length;
 

@@ -65,6 +65,7 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 
 extern int Nsrc; // number of spinors to apply to simultaneously
+extern int niter;
 
 // Dirac operator type
 extern QudaDslashType dslash_type;
@@ -72,7 +73,6 @@ extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 
-extern int niter; // max solver iterations
 
 static void end();
 
