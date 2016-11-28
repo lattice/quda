@@ -207,7 +207,7 @@ int main(int argc, char **argv)
       dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
       dslash_type == QUDA_TWISTED_MASS_DSLASH || 
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
-      multishift || inv_type == QUDA_CG_INVERTER) {
+      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -216,7 +216,7 @@ int main(int argc, char **argv)
   inv_param.pipeline = 0;
 
   inv_param.Nsteps = 2;
-  inv_param.gcrNkrylov = 10;
+  inv_param.gcrNkrylov = 0;
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
   if(tol_hq == 0 && tol == 0){
