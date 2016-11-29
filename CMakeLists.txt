@@ -53,7 +53,13 @@ project("QUDA")
 # QUDA OPTIONS
 # likely to be changed by users
 #######################################################################
-set(QUDA_GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
+if(DEFINED ENV{QUDA_GPU_ARCH})
+  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
+else()
+  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+endif()
+
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
