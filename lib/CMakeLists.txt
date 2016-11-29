@@ -81,13 +81,23 @@ include_directories(dslash_core)
 include_directories(.)
 
 # generate a cmake object library for all cpp files first
-    add_library(quda_cpp OBJECT ${QUDA_OBJS})
+add_library(quda_cpp OBJECT ${QUDA_OBJS})
+
+# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
+IF(GITVERSION)
+  target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
+ENDIF()
+
+# make one library
 if(QUDA_BUILD_SHAREDLIB)
     set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
     cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS} )
 else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
+
+# until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 
 
