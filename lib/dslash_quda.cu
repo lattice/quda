@@ -385,9 +385,6 @@ class TwistGamma5Cuda : public Tunable {
   private:
     cudaColorSpinorField *out;
     const cudaColorSpinorField *in;
-    double a;
-    double b;
-    double c;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -408,21 +405,23 @@ class TwistGamma5Cuda : public Tunable {
     dslashParam.inNorm = (float*)in->Norm();
     dslashParam.sp_stride = in->Stride();
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
-      setTwistParam(a, b, kappa, mu, dagger, twist);
+      setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, twist);
+      dslashParam.c = 0.0;
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
       dslashParam.fl_stride = in->VolumeCB();
 #endif
     } else {//twist doublet
-      a = kappa, b = mu, c = epsilon;
+      dslashParam.a = kappa, dslashParam.b = mu, dslashParam.c = epsilon;
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
       dslashParam.fl_stride = in->VolumeCB()/2;
 #endif
-    } 
+    }
+    dslashParam.a_f = dslashParam.a;
+    dslashParam.b_f = dslashParam.b;
+    dslashParam.c_f = dslashParam.c;
   }
 
-    virtual ~TwistGamma5Cuda() {
-      unbindSpinorTex<sFloat>(in);    
-    }
+    virtual ~TwistGamma5Cuda() { unbindSpinorTex<sFloat>(in); }
 
     TuneKey tuneKey() const { return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString()); }
 
@@ -504,9 +503,6 @@ class TwistCloverGamma5Cuda : public Tunable {
     QudaTwistGamma5Type twist;
     cudaColorSpinorField *out;
     const cudaColorSpinorField *in;
-    double a;
-    double b;
-    double c;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -520,38 +516,35 @@ class TwistCloverGamma5Cuda : public Tunable {
         double kappa, double mu, double epsilon, const int dagger, QudaTwistGamma5Type tw,
 			  cFloat *clov, const float *cN, cFloat *clovInv, const float *cN2, int cl_stride) :
       clover(clov), cNorm(cN), cloverInv(clovInv), cNrm2(cN2), twist(tw), out(out), in(in)
-  {
-    bindSpinorTex<sFloat>(in);
-    dslashParam.out = (void*)out->V();
-    dslashParam.outNorm = (float*)out->Norm();
-    dslashParam.in = (void*)in->V();
-    dslashParam.inNorm = (float*)in->Norm();
-    dslashParam.clover = (void*)clov;
-    dslashParam.cloverNorm = (float*)cN;
-    dslashParam.clover = (void*)clovInv;
-    dslashParam.cloverNorm = (float*)cN2;
-    dslashParam.sp_stride = in->Stride();
+    {
+      bindSpinorTex<sFloat>(in);
+      dslashParam.out = (void*)out->V();
+      dslashParam.outNorm = (float*)out->Norm();
+      dslashParam.in = (void*)in->V();
+      dslashParam.inNorm = (float*)in->Norm();
+      dslashParam.clover = (void*)clov;
+      dslashParam.cloverNorm = (float*)cN;
+      dslashParam.clover = (void*)clovInv;
+      dslashParam.cloverNorm = (float*)cN2;
+      dslashParam.sp_stride = in->Stride();
 #ifdef GPU_TWISTED_CLOVER_DIRAC
-    dslashParam.cl_stride = cl_stride;
-    dslashParam.fl_stride = in->VolumeCB();
+      dslashParam.cl_stride = cl_stride;
+      dslashParam.fl_stride = in->VolumeCB();
 #endif
 
-    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
-      setTwistParam(a, b, kappa, mu, dagger, tw);
-    else{//twist doublet
-      errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
-    } 
+      if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
+	setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, tw);
+      } else {//twist doublet
+	errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
+      }
+      dslashParam.a_f = dslashParam.a;
+      dslashParam.b_f = dslashParam.b;
 
-    strcpy(aux_string,in->AuxString());
-    if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-      strcat(aux_string,",direct");
-    } else {
-      strcat(aux_string,",inverse");
+      strcpy(aux_string,in->AuxString());
+      strcat(aux_string, twist == QUDA_TWIST_GAMMA5_DIRECT ? ",direct" : ",inverse");
     }
-  }
-    virtual ~TwistCloverGamma5Cuda() {
-      unbindSpinorTex<sFloat>(in);    
-    }
+
+    virtual ~TwistCloverGamma5Cuda() { unbindSpinorTex<sFloat>(in); }
 
     TuneKey tuneKey() const {
       return TuneKey(in->VolString(), typeid(*this).name(), aux_string);
