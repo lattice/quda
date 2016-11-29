@@ -1728,18 +1728,13 @@ namespace quda {
 
   bool cudaColorSpinorField::ipcCopyComplete(int dir, int dim)
   {
-    return cudaSuccess == cudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false;
+    return (cudaSuccess == cudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
   bool cudaColorSpinorField::ipcRemoteCopyComplete(int dir, int dim)
   {
-    return cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false;
+    return (cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
-
-  static bool comm_query_mh_recv_p2p_fwd[QUDA_MAX_DIM] = { };
-  static bool comm_query_mh_recv_p2p_back[QUDA_MAX_DIM] = { };
-  static bool comm_query_mh_send_p2p_fwd[QUDA_MAX_DIM] = { };
-  static bool comm_query_mh_send_p2p_back[QUDA_MAX_DIM] = { };
 
   static bool complete_recv_fwd[QUDA_MAX_DIM] = { };
   static bool complete_recv_back[QUDA_MAX_DIM] = { };
@@ -1754,51 +1749,43 @@ namespace quda {
     if (dir%2==0) {
 
       if (comm_peer2peer_enabled(1,dim)) {
-	if (!comm_query_mh_recv_p2p_fwd[dim]) comm_query_mh_recv_p2p_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
-	//if (comm_query_mh_recv_p2p_fwd[dim] && !complete_recv_fwd[dim]) complete_recv_fwd[dim] = ipcRemoteCopyComplete(1,dim);
-	if (comm_query_mh_recv_p2p_fwd[dim]) complete_recv_fwd[dim] = true;
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
       } else {
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]);
       }
 
       if (comm_peer2peer_enabled(0,dim)) {
-	if (!comm_query_mh_send_p2p_back[dim]) comm_query_mh_send_p2p_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
-	if (comm_query_mh_send_p2p_back[dim]) complete_send_back[dim] = true; // no need to query send, fire and forget
+	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
       } else {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
       }
 
       if (complete_recv_fwd[dim] && complete_send_back[dim]) {
-	comm_query_mh_recv_p2p_fwd[dim] = false;
-	comm_query_mh_send_p2p_back[dim] = false;
 	complete_recv_fwd[dim] = false;
 	complete_send_back[dim] = false;
 	return 1;
       }
 
     } else { // dir%2 == 1
+
       if (comm_peer2peer_enabled(0,dim)) {
-	if (!comm_query_mh_recv_p2p_back[dim]) comm_query_mh_recv_p2p_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
-        //if (comm_query_mh_recv_p2p_back[dim] && !complete_recv_back[dim]) complete_recv_back[dim] = ipcRemoteCopyComplete(0,dim);
-        if (comm_query_mh_recv_p2p_back[dim]) complete_recv_back[dim] = true;//ipcRemoteCopyComplete(0,dim);
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
       } else {
 	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][nFace-1][dim]);
       }
 
       if (comm_peer2peer_enabled(1,dim)) {
-	if (!comm_query_mh_send_p2p_fwd[dim]) comm_query_mh_send_p2p_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
-	if (comm_query_mh_send_p2p_fwd[dim]) complete_send_fwd[dim] = true; // no need to query send, fire and forget
+	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
       } else {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
       }
 
       if (complete_recv_back[dim] && complete_send_fwd[dim]) {
-	comm_query_mh_recv_p2p_back[dim] = false;
-	comm_query_mh_send_p2p_fwd[dim] = false;
 	complete_recv_back[dim] = false;
 	complete_send_fwd[dim] = false;
 	return 1;
       }
+
     }
 
     return 0;
@@ -1863,7 +1850,6 @@ namespace quda {
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return;
 
-    // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
       if (comm_peer2peer_enabled(1,dim)) return;
 
@@ -1882,7 +1868,6 @@ namespace quda {
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return;
 
-    // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
       if (comm_peer2peer_enabled(1,dim)) return;
 
