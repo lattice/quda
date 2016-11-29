@@ -2573,7 +2573,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_x;
   delete b;
   //if (!param->make_resident_solution) delete x;
-  if (x != solutionResident[0]) delete x;
+  if (!solutionResident.size() || x != solutionResident[0]) {
+    delete x;
+  }
 
   delete d;
   delete dSloppy;
