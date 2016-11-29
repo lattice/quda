@@ -1609,7 +1609,7 @@ struct DslashFactory {
 
 
 // which policies are we going to tune over?
-#if CUDA_VERSION >= 8000)
+#if (CUDA_VERSION >= 8000)
 // Async variants are only supported on CUDA 8.0
  static constexpr int n_policy = 6;
 #else
