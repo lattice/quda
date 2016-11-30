@@ -575,10 +575,11 @@ namespace quda
   */
 
   void covDev(cudaColorSpinorField *out, cudaGaugeField &gauge, const cudaColorSpinorField *in, const int parity, const int mu, TimeProfile &profile) {
+
+#ifdef GPU_CONTRACT
     DslashCuda *covdev = 0;
     size_t regSize = sizeof(float);
 
-      #ifdef GPU_CONTRACT
         if (Location(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
           errorQuda("Error: CPU fields not supported for covariant derivative");
 
