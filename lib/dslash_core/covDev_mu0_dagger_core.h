@@ -203,7 +203,6 @@ if (kernel_type == INTERIOR_KERNEL) {
 } else { // exterior kernel
 
   const int dim = static_cast<int>(kernel_type);
-  const int face_volume = param.threads;           // volume of one face
   const int face_num = 0;
 
   face_idx = sid;               // index into the respective face
@@ -213,10 +212,9 @@ if (kernel_type == INTERIOR_KERNEL) {
   //sp_idx = face_idx + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
+  sp_norm_idx = sid + param.ghostNormOffset[dim];
 #endif
 
-  const int dims[] = {X1, X2, X3, X4};
   //Declare 5d int array to store x1,x2,x3,x4
   int coord[5] = {0,0,0,0,0};
   coord[0] = x1;
@@ -224,7 +222,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   coord[2] = x3;
   coord[3] = x4;
   //Call new function template
-  coordsFromFaceIndex<4,QUDA_4D_PC,kernel_type,1>(X, sid, coord, face_idx, face_num, param);
+  coordsFromFaceIndex<4,QUDA_4D_PC,dim,1>(X, sid, coord, face_idx, face_num, param);
   //Update x1,x2,x3,x4
   x1 = coord[0];
   x2 = coord[1];
