@@ -4,6 +4,7 @@ include_directories(.)
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
+
 set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} cuda)
 
 if(QUDA_QIO)
