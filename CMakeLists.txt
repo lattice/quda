@@ -53,7 +53,16 @@ project("QUDA")
 # QUDA OPTIONS
 # likely to be changed by users
 #######################################################################
-set(QUDA_GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
+if(DEFINED ENV{QUDA_GPU_ARCH})
+  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
+else()
+  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+endif()
+if(NOT QUDA_GPU_ARCH)
+  message ("-- Building QUDA for arch " "${QUDA_DEFAULT_GPU_ARCH}")
+endif()
+
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
@@ -104,6 +113,7 @@ set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 # that ususally should not be changed by users
 #######################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
+set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
@@ -127,6 +137,7 @@ set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
+mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
@@ -383,12 +394,11 @@ include_directories(lib)
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
-set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
-add_definitions(-DQUDA_HASH=${HASH})
+set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
-
+# build up git version
 # add -debug to GITVERSION if we build with debug options enabled
 if(DEBUG_BUILD)
   if(GITVERSION)
@@ -397,10 +407,6 @@ if(DEBUG_BUILD)
     set(GITVERSION debug)
   endif()
 endif()
-
-IF(GITVERSION)
-  add_definitions(-DGITVERSION="${GITVERSION}")
-ENDIF()
 
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})

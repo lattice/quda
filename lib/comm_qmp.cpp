@@ -134,7 +134,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     // first check that the local GPU supports UVA
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop,gpuid);
-    if(!prop.unifiedAddressing || prop.computeMode != cudaComputeModeDefault) return;
+    if(!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
 

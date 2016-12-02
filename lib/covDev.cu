@@ -1,5 +1,3 @@
-#ifdef GPU_CONTRACT
-
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -125,7 +123,7 @@ namespace quda
   #define PROFILE(f, profile, idx)		\
     profile.TPSTART(idx);			\
     f;						\
-    profile.TPSTOP(idx); 
+    profile.TPSTOP(idx);
 
   /**
      This is a simpler version of the dslashCuda function to call the right kernels
@@ -133,6 +131,7 @@ namespace quda
 
   void covDevCuda(DslashCuda &dslash, const size_t regSize, const int mu, TimeProfile &profile)
   {
+    #ifdef GPU_CONTRACT
     const int	dir = mu%4;
 
     dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -147,22 +146,26 @@ namespace quda
         dslashParam.kernel_type = static_cast<KernelType>(dir);
         dslashParam.ghostDim[dir] = commDimPartitioned(dir);     // determines whether to use regular or ghost indexing at boundary
         dslashParam.commDim[dir] = commDimPartitioned(dir);      // switch off comms if override = 0
-			
+
         PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
         checkCudaError();
 
-        dslashParam.ghostDim[dir] = 0;                           // not sure whether neccessary 
-        dslashParam.commDim[dir] = 0; 
+        dslashParam.ghostDim[dir] = 0;                           // not sure whether neccessary
+        dslashParam.commDim[dir] = 0;
       }
     #endif // MULTI_GPU
     cudaStreamSynchronize(streams[Nstream-1]);
+    #else
+      errorQuda("Contraction kernels have not been built");
+    #endif
+
   }
 
   /**
      Class for covariant derivative, is based on SharedDslashCuda
   */
-
+#ifdef GPU_CONTRACT
   template <typename Float, typename Float2>
   class CovDevCuda : public SharedDslashCuda
   {
@@ -175,7 +178,7 @@ namespace quda
       void *gauge0, *gauge1;
 
       bool binded;
-			
+
       #ifdef MULTI_GPU
         Float *ghostBuffer;             // For the ghosts, I did my own implementation, jsut because the number of functions to overload was absurd
         int ghostVolume;
@@ -220,10 +223,10 @@ namespace quda
         //if(dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::advanceBlockDim(param);
         const unsigned int min_threads = 2;
         const unsigned int max_threads = 512;            // FIXME: use deviceProp.maxThreadsDim[0];
-    
+
         param.block.x += 2;
-        param.block.y = 1;  
-        param.block.z = 1;  
+        param.block.y = 1;
+        param.block.z = 1;
         param.grid = createGrid(param.block);
 
         if((param.block.x > min_threads) && (param.block.x < max_threads))
@@ -469,12 +472,12 @@ namespace quda
         checkCudaError();
       }
 
-	
+
     public:
       CovDevCuda(cudaColorSpinorField *out, const cudaGaugeField *gauge, const cudaColorSpinorField *in, const int parity, const int mu)
       : SharedDslashCuda(out, in, 0, gauge->Reconstruct(), mu<4 ? 0 : 1), gauge(gauge), parity(parity), mu(mu), dir(mu%4), binded(false)
-      { 
-        bindSpinorTex<Float2>(in, out); 
+      {
+        bindSpinorTex<Float2>(in, out);
         bindGaugeTex(*gauge, parity, &gauge0, &gauge1);
 
         #ifdef MULTI_GPU
@@ -503,14 +506,14 @@ namespace quda
                 ghostVolume = in->X(0)*in->X(1)*in->X(2);
                 offset = in->Volume() - ghostVolume;
                 break;
-            }	
+            }
 
             ghostBytes = ghostVolume*Nint*sizeof(Float);
             allocateGhosts();
           }
         #endif
       }
-	
+
       virtual ~CovDevCuda() {
         #ifdef MULTI_GPU
           if(comm_dim(dir) > 1) {
@@ -523,7 +526,7 @@ namespace quda
 
       void apply(const cudaStream_t &stream) {
         #ifdef SHARED_WILSON_DSLASH
-          if(dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
+          if(dslashParam.kernel_type == EXTERIOR_KERNEL_X)
             errorQuda("Shared dslash (covariant derivative) does not yet support X-dimension partitioning");
         #endif
         if((dslashParam.kernel_type == EXTERIOR_KERNEL_X) || (dslashParam.kernel_type == EXTERIOR_KERNEL_Y))
@@ -560,7 +563,7 @@ namespace quda
 
       long long flops() const { return 144 * in->Volume(); } // Correct me if I'm wrong
   };
-
+#endif
 
   /**
      The function applies the color matrices of a gauge configuration to a spinor, so it is not exactly a covariant derivative, although a combination of calls to
@@ -572,10 +575,11 @@ namespace quda
   */
 
   void covDev(cudaColorSpinorField *out, cudaGaugeField &gauge, const cudaColorSpinorField *in, const int parity, const int mu, TimeProfile &profile) {
+
+#ifdef GPU_CONTRACT
     DslashCuda *covdev = 0;
     size_t regSize = sizeof(float);
 
-      #ifdef GPU_CONTRACT
         if (Location(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
           errorQuda("Error: CPU fields not supported for covariant derivative");
 
@@ -610,4 +614,3 @@ namespace quda
       #endif
     }
   }
-#endif
