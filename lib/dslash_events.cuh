@@ -17,5 +17,5 @@ namespace dslash {
   extern Worker *aux_worker;
 
   extern int *commsEnd_h;
-  extern CUdeviceptr commsEnd_d;
+  extern CUdeviceptr commsEnd_d[Nstream];
 }

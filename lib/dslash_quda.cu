@@ -102,8 +102,8 @@ namespace quda {
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
 
-    int *commsEnd_h;
-    CUdeviceptr *commsEnd_d;
+    cuuint32_t *commsEnd_h;
+    CUdeviceptr commsEnd_d[Nstream];
   }
 
   void createDslashEvents()
@@ -125,9 +125,11 @@ namespace quda {
 
     aux_worker = NULL;
 
-    commsEnd_h = static_cast<int*>(mapped_malloc(Nstream*sizeof(int)));
-    cudaHostGetDevicePointer(&commsEnd_d, commsEnd_h, 0);
-    for (int i=0; i<Nstream; i++) commsEnd_h[i] = 0;
+    commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));
+    for (int i=0; i<Nstream; i++) {
+      cudaHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
+      commsEnd_h[i] = 0;
+    }
 
     checkCudaError();
   }
@@ -139,7 +141,6 @@ namespace quda {
 
     host_free(commsEnd_h);
     commsEnd_h = 0;
-    commsEnd_d = 0;
 
     for (int i=0; i<Nstream; i++) {
       cudaEventDestroy(packEnd[i]);
