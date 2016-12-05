@@ -67,6 +67,12 @@ enum KernelType {
     double d;
     float d_f;
 
+    double a_inv;
+    float a_inv_f;
+
+    double mferm;
+    float mferm_f;
+
     void *out;
     float *outNorm;
     
@@ -81,6 +87,12 @@ enum KernelType {
 
     void *gauge0;
     void *gauge1;
+
+    void *longGauge0;
+    void *longGauge1;
+
+    void *longPhase0;
+    void *longPhase1;
 
     void *clover;
     float *cloverNorm;

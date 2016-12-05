@@ -38,7 +38,7 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
   }
 
 
-#define EVEN_MORE_GENERIC_STAGGERED_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
+#define EVEN_MORE_GENERIC_STAGGERED_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
@@ -162,7 +162,7 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
 #define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param)	\
   GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param)
 
-#define IMPROVED_STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param, ...) \
+#define IMPROVED_STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param) \
   GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) 
 
 #define EVEN_MORE_GENERIC_ASYM_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \

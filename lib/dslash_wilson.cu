@@ -60,10 +60,6 @@ namespace quda {
   template <typename sFloat, typename gFloat>
   class WilsonDslashCuda : public SharedDslashCuda {
 
-  private:
-    const gFloat *gauge0, *gauge1;
-    const double a;
-
   protected:
     unsigned int sharedBytesPerThread() const
     {
@@ -79,7 +75,7 @@ namespace quda {
     WilsonDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
 		     const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 		     const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a)
+      : SharedDslashCuda(out, in, x, reconstruct, dagger)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
       dslashParam.gauge0 = (void*)gauge0;

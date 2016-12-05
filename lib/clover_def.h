@@ -14,22 +14,14 @@
 
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#define DD_PARAM4 DslashParam param
 #else            // xpay
 #define DD_XPAY_F Xpay
-#if (DD_PREC == 0)
-#define DD_PARAM4 DslashParam param, double a
-#else
-#define DD_PARAM4 DslashParam param, float a
-#endif
 #define DSLASH_XPAY
 #endif
 
 #if (DD_PREC==0) // double-precision spinor field
 #define DD_PREC_F D
 #define FLOATN double2
-#define DD_PARAM1 double2* out, float *null1
-#define DD_PARAM3 const double2* in, const float *null3
 #if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define SPINORTEX param.in
@@ -50,8 +42,6 @@
 #elif (DD_PREC==1) // single-precision spinor field
 #define DD_PREC_F S
 #define FLOATN float4
-#define DD_PARAM1 float4* out, float *null1
-#define DD_PARAM3 const float4* in, const float *null3
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define SPINORTEX param.in
@@ -82,8 +72,6 @@
 #define SPINORTEX spinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
-#define DD_PARAM1 short4* out, float *outNorm
-#define DD_PARAM3 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
 #if (DD_XPAY==1)
 #define ACCUMTEX accumTexHalf
@@ -93,7 +81,6 @@
 
 #if (DD_PREC==0) // double-precision clover term
 #define DD_PREC_F D
-#define DD_PARAM2 const double2* clover, const float *null
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
 #define CLOVERTEX param.clover
 #define READ_CLOVER READ_CLOVER_DOUBLE
@@ -109,7 +96,6 @@
 #define CLOVER_DOUBLE
 #elif (DD_PREC==1) // single-precision clover term
 #define DD_PREC_F S
-#define DD_PARAM2 const float4* clover, const float *null
 #ifdef DIRECT_ACCESS_CLOVER
 #define CLOVERTEX param.clover
 #define READ_CLOVER READ_CLOVER_SINGLE
@@ -123,7 +109,6 @@
 #endif
 #else               // half-precision clover term
 #define DD_PREC_F H
-#define DD_PARAM2 const short4* clover, const float *cloverNorm
 #ifdef DIRECT_ACCESS_CLOVER
 #define CLOVERTEX param.clover
 #define CLOVERTEXNORM param.cloverNorm
@@ -146,7 +131,7 @@
 
 // define the kernel
 
-__global__ void DD_FUNC(DD_PREC_F,DD_XPAY_F)(DD_PARAM4) {
+__global__ void DD_FUNC(DD_PREC_F,DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_CLOVER_DIRAC
 #include "clover_core.h"
@@ -159,10 +144,6 @@ __global__ void DD_FUNC(DD_PREC_F,DD_XPAY_F)(DD_PARAM4) {
 #undef FLOATN
 #undef DD_PREC_F
 #undef DD_XPAY_F
-#undef DD_PARAM1
-#undef DD_PARAM2
-#undef DD_PARAM3
-#undef DD_PARAM4
 #undef DD_CONCAT
 #undef DD_FUNC
 

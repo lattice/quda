@@ -60,12 +60,6 @@ namespace quda {
   template <typename sFloat, typename gFloat, typename cFloat>
   class AsymCloverDslashCuda : public SharedDslashCuda {
 
-  private:
-    const gFloat *gauge0, *gauge1;
-    const cFloat *clover;
-    const float *cloverNorm;
-    const double a;
-
   protected:
     unsigned int sharedBytesPerThread() const
     {
@@ -82,8 +76,7 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cFloat *clover, 
 			 const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cloverNorm(cloverNorm), a(a)
+      : SharedDslashCuda(out, in, x, reconstruct, dagger)
     { 
       bindSpinorTex<sFloat>(in, out, x);
       dslashParam.gauge0 = (void*)gauge0;
