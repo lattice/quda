@@ -25,6 +25,15 @@
 #define t02_re T2.x
 #define t02_im T2.y
 
+//Experimental: 2link term only
+#define l00_re L0.x
+#define l00_im L0.y
+#define l01_re L1.x
+#define l01_im L1.y
+#define l02_re L2.x
+#define l02_im L2.y
+
+
 #define time_boundary t_boundary
 
 #else
@@ -48,6 +57,14 @@
 #define t01_im T1.y
 #define t02_re T2.x
 #define t02_im T2.y
+
+//Experimental: 2link term only
+#define l00_re L0.x
+#define l00_im L0.y
+#define l01_re L1.x
+#define l01_im L1.y
+#define l02_re L2.x
+#define l02_im L2.y
 
 #define time_boundary t_boundary_f
 
@@ -387,7 +404,6 @@ int full_idx=0;
   int half_idx = full_idx>>1;
 
 
-
 #if (DD_PREC == 0) // double precision
   o00_re = o00_im = 0.0;
   o01_re = o01_im = 0.0;
@@ -403,7 +419,8 @@ int fat_sign = 1;
 #if((DD_LONG_RECON == 13 || DD_LONG_RECON == 9) && DD_IMPROVED==1)
 int long_sign = 1;
 #endif
-
+//Experimental: 2link term only
+double omega = param.omega;
 
 #ifdef PARALLEL_DIR
 if (threadId.z & 1)
@@ -417,23 +434,54 @@ if (threadId.z & 1)
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
   int long_sign = (y[3]%2 == 1) ? -1 : 1;
 #endif
+  int dir =0;
 
   int ga_idx = half_idx;
 
 #ifdef MULTI_GPU
+  int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;
   if ( isActive(dim,0,NFACE,y,param.commDim,X) && y[0] >= (X[0]-1) )
 #endif
   {
     int sp_idx_1st_nbr = ((y[0]==(X[0]-1)) ? full_idx-(X[0]-1) : full_idx+1) >> 1;
-    READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx, fat_stride);
-    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
     int stride1 = param.sp_stride;
+
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int fat_idx2 = sp_idx_1st_nbr;
+        READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int sp_idx_2nd_nbr = ((y[0]>=(X[0]-2)) ? full_idx-(X[0]-2) : full_idx+2) >> 1;
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;//hack : re-use norm_idx3 
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        MAT_MUL_V(C, fat, t);        
+
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
+      }
+    }
+    //int sp_idx_1st_nbr = ((y[0]==(X[0]-1)) ? full_idx-(X[0]-1) : full_idx+1) >> 1;
+    READ_FAT_MATRIX(FATLINK0TEX, dir, ga_idx, fat_stride);
+    int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
+    //int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	    
 #ifdef MULTI_GPU
     active = true;
-    int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;	
+    //int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;	
     nbr_idx1 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0] + space_con;
     stride1 = NFACE*ghostFace[0]*param.Ls;
 #if (DD_PREC == 2) //half precision
@@ -449,6 +497,19 @@ if (threadId.z & 1)
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
+
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        MAT_MUL_V(A, fat, l);        
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
+      }
+    }
   }
 
 #if (DD_IMPROVED==1)
@@ -457,8 +518,8 @@ if (threadId.z & 1)
 #endif
   {
     int sp_idx_3rd_nbr = ((y[0] >= (X[0]-3)) ? full_idx-(X[0]-3) : full_idx+3) >> 1;
-    READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx, long_stride);        
-    READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx, long_stride);
+    READ_LONG_MATRIX(LONGLINK0TEX, dir, ga_idx, long_stride);        
+    READ_LONG_PHASE(LONGPHASE0TEX, dir, ga_idx, long_stride);
     int nbr_idx3 = sp_idx_3rd_nbr + src_idx*Vh;
     int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -466,7 +527,7 @@ if (threadId.z & 1)
 #endif	 
 #ifdef MULTI_GPU
     active = true;
-    int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;		
+    //int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;		
     nbr_idx3 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
     stride3 = NFACE*ghostFace[0]*param.Ls;
 #if (DD_PREC == 2) //half precision
@@ -491,6 +552,8 @@ if (threadId.z & 1)
 } // direction: +X
 
 
+#ifndef COMPILE_TREE
+
 #ifdef PARALLEL_DIR
 if (!(threadIdx.z & 1))
 #endif // PARALLEL_DIR
@@ -510,6 +573,35 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[0]==0) ? full_idx+(X[0]-1) : full_idx-1) >> 1;
+    int stride1 = param.sp_stride;
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int sp_idx_2nd_nbr = ((y[0]<2) ? full_idx+(X[0]-2): full_idx-2)>>1; 
+        int fat_idx2 = sp_idx_2nd_nbr;
+
+        READ_FAT_MATRIX(FATLINK0TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        ADJ_MAT_MUL_V(C, fat, t);        
+
+        l00_re = -C0_re;
+        l00_im = -C0_im;
+        l01_re = -C1_re;
+        l01_im = -C1_im;
+        l02_re = -C2_re;
+        l02_im = -C2_im;
+      }
+    }
+
     int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
     if ((y[0] -1) < 0){
@@ -518,7 +610,6 @@ if (!(threadIdx.z & 1))
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
@@ -539,6 +630,19 @@ if (!(threadIdx.z & 1))
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
+
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        ADJ_MAT_MUL_V(A, fat, l);        
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
+      }
+    }
   }
 
 #if (DD_IMPROVED==1)
@@ -599,6 +703,7 @@ if (threadId.z & 1)
 #endif
 
   int ga_idx = half_idx;
+  int dir =2;
 
 #ifdef MULTI_GPU
   int space_con = ((y[3]*X[2]+y[2])*X[0]+y[0])/2;
@@ -606,9 +711,36 @@ if (threadId.z & 1)
 #endif
   {
     int sp_idx_1st_nbr = ((y[1]==(X[1]-1)) ? full_idx-(X1X0-X[0]) : full_idx+X[0]) >> 1;
+    int stride1 = param.sp_stride;
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int fat_idx2 = sp_idx_1st_nbr;
+        READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int sp_idx_2nd_nbr = ((y[1] >= (X[1]-2) ) ? full_idx-(X[1]-2)*X[0] : full_idx+2*X[0]) >> 1;
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        MAT_MUL_V(C, fat, t);        
+
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
+      }
+    }
+
     READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx, fat_stride);
     int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
@@ -629,6 +761,18 @@ if (threadId.z & 1)
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        MAT_MUL_V(A, fat, l);        
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
+      }
+    }
   }
 
 #if (DD_IMPROVED==1)
@@ -688,6 +832,34 @@ if (!(threadIdx.z & 1))
   if (isActive(dim,1,NFACE,y,param.commDim,X) && y[1] < 1)
 #endif
   {
+    int stride1 = param.sp_stride;
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int sp_idx_2nd_nbr = ((y[1] < 2) ? full_idx + (X[1]-2)*X[0]: full_idx -2*X[0] )>> 1; 
+        int fat_idx2 = sp_idx_2nd_nbr;
+
+        READ_FAT_MATRIX(FATLINK0TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        ADJ_MAT_MUL_V(C, fat, t);        
+
+        l00_re = -C0_re;
+        l00_im = -C0_im;
+        l01_re = -C1_re;
+        l01_im = -C1_im;
+        l02_re = -C2_re;
+        l02_im = -C2_im;
+      }
+    }
     int sp_idx_1st_nbr = ((y[1]==0)    ? full_idx+(X1X0-X[0]) : full_idx-X[0]) >> 1;
     int fat_idx=sp_idx_1st_nbr;
 #ifdef MULTI_GPU
@@ -697,7 +869,6 @@ if (!(threadIdx.z & 1))
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
@@ -718,6 +889,19 @@ if (!(threadIdx.z & 1))
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
+
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        ADJ_MAT_MUL_V(A, fat, l);        
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
+      }
+    }
   }
 
 #if (DD_IMPROVED==1)
@@ -820,6 +1004,7 @@ if (threadId.z & 1)
 #endif
 
   int ga_idx = half_idx;
+  int dir =4;
 
 #ifdef MULTI_GPU
   int space_con = ((y[3]*X[1]+y[1])*X[0]+y[0])/2;
@@ -827,9 +1012,36 @@ if (threadId.z & 1)
 #endif
   {
     int sp_idx_1st_nbr = ((y[2]==(X[2]-1)) ? full_idx-(X[2]-1)*X1X0 : full_idx+X1X0) >> 1;
+    int stride1 = param.sp_stride;
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int fat_idx2 = sp_idx_1st_nbr;
+        READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int sp_idx_2nd_nbr = ((y[2]>= (X[2]-2))? full_idx -(X[2]-2)*X1X0: full_idx + 2*X1X0)>> 1;  
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        MAT_MUL_V(C, fat, t);        
+
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
+      }
+    }
+
     READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx, fat_stride);
     int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
@@ -850,6 +1062,18 @@ if (threadId.z & 1)
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        MAT_MUL_V(A, fat, l);        
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
+      }
+    }
   }
 
 #if (DD_IMPROVED==1)
@@ -911,6 +1135,34 @@ if (!(threadIdx.z & 1))
   if (isActive(dim,2,NFACE,y,param.commDim,X) && y[2] < 1)
 #endif
   {
+    int stride1 = param.sp_stride;
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int sp_idx_2nd_nbr = ((y[2] <2) ? full_idx + (X[2]-2)*X1X0: full_idx - 2*X1X0)>>1; 
+        int fat_idx2 = sp_idx_2nd_nbr;
+
+        READ_FAT_MATRIX(FATLINK0TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        ADJ_MAT_MUL_V(C, fat, t);        
+
+        l00_re = -C0_re;
+        l00_im = -C0_im;
+        l01_re = -C1_re;
+        l01_im = -C1_im;
+        l02_re = -C2_re;
+        l02_im = -C2_im;
+      }
+    }
     int sp_idx_1st_nbr = ((y[2]==0)    ? full_idx+(X[2]-1)*X1X0 : full_idx-X1X0) >> 1;
     int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
@@ -920,7 +1172,6 @@ if (!(threadIdx.z & 1))
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
@@ -941,6 +1192,18 @@ if (!(threadIdx.z & 1))
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        ADJ_MAT_MUL_V(A, fat, l);        
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
+      }
+    }
   }
 
 #if (DD_IMPROVED==1)
@@ -1001,6 +1264,7 @@ if (threadId.z & 1)
 #endif
 
   int ga_idx = half_idx;
+  int dir =6;
 
 #ifdef MULTI_GPU
   int space_con = (y[2]*X1X0+y[1]*X[0]+y[0])/2;
@@ -1008,9 +1272,36 @@ if (threadId.z & 1)
 #endif
   {    
     int sp_idx_1st_nbr = ((y[3]==(X[3]-1)) ? full_idx-(X[3]-1)*X2X1X0 : full_idx+X2X1X0) >> 1;
+    int stride1 = param.sp_stride;
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int fat_idx2 = sp_idx_1st_nbr;
+        READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int sp_idx_2nd_nbr = ((y[3]>=(X[3]-2))? full_idx -(X[3]-2)*X2X1X0 : full_idx + 2*X2X1X0)>> 1;  
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        MAT_MUL_V(C, fat, t);        
+
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
+      }
+    }
+
     READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx, fat_stride);
     int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif
@@ -1031,6 +1322,19 @@ if (threadId.z & 1)
     o01_im += A1_im;
     o02_re += A2_re;
     o02_im += A2_im;
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        MAT_MUL_V(A, fat, l);        
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
+      }
+    }
+
   }
 
 
@@ -1092,10 +1396,38 @@ if (!(threadIdx.z & 1))
   if ((y[3] < 1) && isActive(dim,3,NFACE,y,param.commDim,X))
 #endif
   {
+    int stride1 = param.sp_stride;
+//NEW (2-link improvement, with periodic BC and no multi gpu support at the moment):
+    spinorFloat2 L0, L1, L2;
+    {
+      if( param.staggered_2link_term ) {
+        int sp_idx_2nd_nbr = ((y[3]<2) ? full_idx + (X[3]-2)*X2X1X0: full_idx - 2*X2X1X0) >> 1; 
+        int fat_idx2 = sp_idx_2nd_nbr;
+
+        READ_FAT_MATRIX(FATLINK0TEX, dir, fat_idx2, fat_stride);//ok for single GPU
+
+        int nbr_idx2 = sp_idx_2nd_nbr + src_idx*Vh;
+#if (DD_PREC == 2) //half precision
+        int norm_idx3 = nbr_idx2;
+#endif
+        spinorFloat2 T0, T1, T2;
+        READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx2, stride1);//re-use t-regs	    
+
+        RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
+        ADJ_MAT_MUL_V(C, fat, t);        
+
+        l00_re = -C0_re;
+        l00_im = -C0_im;
+        l01_re = -C1_re;
+        l01_im = -C1_im;
+        l02_re = -C2_re;
+        l02_im = -C2_im;
+      }
+    }
+
     int sp_idx_1st_nbr = ((y[3]==0)    ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
     int fat_idx = sp_idx_1st_nbr;    
     int nbr_idx1 = sp_idx_1st_nbr + src_idx*Vh;
-    int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif
@@ -1119,6 +1451,18 @@ if (!(threadIdx.z & 1))
     o01_im -= A1_im;
     o02_re -= A2_re;
     o02_im -= A2_im;
+//2-link term final contribution (also applies 0.5*omega):
+    {
+      if( param.staggered_2link_term ) {
+        ADJ_MAT_MUL_V(A, fat, l);        
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
+      }
+    }
   }
 
 #if (DD_IMPROVED==1)
@@ -1200,7 +1544,7 @@ if (active){
 }
 #endif
 
-
+#endif  // see COMPILE_TREE
 
 
 // undefine to prevent warning when precision is changed

@@ -96,7 +96,7 @@ extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
-extern QudaInverterType precon_type;
+extern QudaInverterType smoother_type;
 
  //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -109,8 +109,12 @@ QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 
-const bool _2d_u1_emulation = true;
-int latt_dim[4] = {0} ; 
+const bool _2d_u1_emulation = false;
+const bool _2link_term      = true;
+
+const double _2link_omega   = 0.1;
+
+int latt_dim[QUDA_MAX_DIM] = {0} ; 
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -182,6 +186,8 @@ void setGaugeParam(QudaGaugeParam &gaugeParam, double tadpole_coeff) {
   gaugeParam.tadpole_coeff = tadpole_coeff;
 
   gaugeParam._2d_u1_emulation = _2d_u1_emulation;
+  gaugeParam._2link_term = _2link_term;
+  gaugeParam.omega = _2link_term ? 0.5*_2link_omega : 0.0;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
@@ -236,8 +242,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.dslash_type = dslash_type;
 
   //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (4 + mass));
+  inv_param.mass = _2link_term ? mass+_2link_omega : mass;
+  inv_param.kappa = 1.0 / (2.0 * (4 + inv_param.mass));
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
@@ -262,7 +268,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_VCYCLE;//QUDA_MG_CYCLE_RECURSIVE;
 
-    mg_param.smoother[i] = precon_type;
+    mg_param.smoother[i] = smoother_type;
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
     mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
@@ -344,6 +350,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   //Experimental: for 2d U1 field tests
   mg_param._2d_u1_emulation = _2d_u1_emulation;
+
+  //Smoothed transfer operators:
+  mg_param.alpha = nullptr;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -368,8 +377,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.dslash_type = dslash_type;
 
   //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (4 + mass));
+  inv_param.mass = _2link_term ? mass+_2link_omega : mass;
+  inv_param.kappa = 1.0 / (2.0 * (4 + inv_param.mass));
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
@@ -759,6 +768,7 @@ void mg_test(int argc, char** argv)
 */
   if(!_2d_u1_emulation) in->Source(QUDA_RANDOM_SOURCE);
   else generic2DSource(*in);
+  printfQuda("\nSource norm : %1.15e\n", sqrt(blas::norm2(*in)));
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
   tmp_value = MAX(tmp_value, xdim*ydim*tdim/2);
@@ -829,12 +839,17 @@ void mg_test(int argc, char** argv)
 
   if(inv_type != QUDA_GCR_INVERTER){
       inv_param.inv_type = QUDA_GCR_INVERTER;
-      inv_param.gcrNkrylov = 24;
+      inv_param.gcrNkrylov = 64;
   }
 
   printfQuda("\nMass %le\n", mg_param.invert_param->mass);
 
   // setup the multigrid solver
+#if 1
+  //Set alpha here:
+  std::complex<double> _alpha = std::complex<double>(0.0, 0.0);
+  mg_param.alpha = static_cast<void*> (&_alpha);
+
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
   
@@ -842,9 +857,36 @@ void mg_test(int argc, char** argv)
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);
   //multigridQuda(out->V(), in->V(), &mg_param);
+#else
+  //Set alpha here:
+  //for(std::complex<double> _alpha = std::complex<double>(2.0*0.00889, 0.0); _alpha.imag() < 12.0; _alpha += std::complex<double>(0.0, 0.5))
+  for(std::complex<double> _alpha = std::complex<double>(2.0*0.00889, 850.0); _alpha.imag() < 2850.0; _alpha += std::complex<double>(0.0, 25.0))
+  {
+    mg_param.alpha = static_cast<void*> (&_alpha);
 
+    void *mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  
+    invertQuda(out->V(), in->V(), &inv_param);
+    // free the multigrid solver
+    destroyMultigridQuda(mg_preconditioner);
+  }
+
+  for(std::complex<double> _alpha = std::complex<double>(2.0*0.00889, -850.0); _alpha.imag() > -2850.0; _alpha -= std::complex<double>(0.0, 25.0))
+  {
+    mg_param.alpha = static_cast<void*> (&_alpha);
+
+    void *mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  
+    invertQuda(out->V(), in->V(), &inv_param);
+    // free the multigrid solver
+    destroyMultigridQuda(mg_preconditioner);
+  }
+#endif
   time0 += clock(); 
   time0 /= CLOCKS_PER_SEC;
+
 
 //MULTI_GPU code for staggered MG is not ready.
 //#ifdef MULTI_GPU    
@@ -852,8 +894,8 @@ void mg_test(int argc, char** argv)
 //          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 //#else
   //matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
-  double kappa = 1.0 / (2.0*mass);
-  mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), kappa, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+  double kappa = 0.5;
+  mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), inv_param.mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
 //#endif
   ax( kappa, in->V(), V*mySpinorSiteSize, inv_param.cpu_prec );
   mxpy(in->V(), ref->V(), V*mySpinorSiteSize, inv_param.cpu_prec);

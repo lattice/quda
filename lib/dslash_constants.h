@@ -51,6 +51,8 @@ enum KernelType {
     float fat_link_max;
 //Experimental only!
     int staggered_u1_emulation;
+    int staggered_2link_term;
+    double omega;
 #endif 
 #ifdef MULTI_GPU
     int threadDimMapLower[4];

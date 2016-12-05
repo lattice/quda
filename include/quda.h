@@ -63,7 +63,10 @@ extern "C" {
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
+
     bool _2d_u1_emulation;  /**< Experimental : whether we want 2d u1 field*/
+    bool _2link_term; /**< Experimental : whether we want compute 2-link term in staggered dslash*/
+    double omega; /**< Experimental : scaling factor for 2-link term in staggered dslash*/
 
     double i_mu; /**< Imaginary chemical potential */
 
@@ -399,6 +402,9 @@ extern "C" {
 
     /**< Experimental: for 2d U1 tests */
     bool _2d_u1_emulation;
+
+    /**< Experimental: smoothed transfer operator (requires emulation!) */
+    void* alpha;
 
   } QudaMultigridParam;
 
