@@ -205,9 +205,9 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
 
   int rank = comm_rank_displaced(topo, displacement);
 
-  int tag = displacement[ndim-1];
-  for (int i=ndim-2; i>=0; i--) tag = tag * max_displacement + displacement[i];
-  tag = tag >= 0 ? tag : 2*pow(max_displacement,ndim) + tag;
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
 
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
@@ -228,9 +228,9 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
 
   int rank = comm_rank_displaced(topo, displacement);
 
-  int tag = -displacement[ndim-1];
-  for (int i=ndim-2; i>=0; i--) tag = tag * max_displacement - displacement[i];
-  tag = tag >= 0 ? tag : 2*pow(max_displacement,ndim) + tag;
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
 
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
@@ -247,9 +247,15 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
 					       size_t blksize, int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement, ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = comm_rank();
+
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement + displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
   // create a new strided MPI type
@@ -270,9 +276,15 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 						  size_t blksize, int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement,ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = rank;
+
+  int tag = 0;
+  for (int i=ndim-1; i>=0; i--) tag = tag * 4 * max_displacement - displacement[i] + max_displacement;
+  tag = tag >= 0 ? tag : 2*pow(4*max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
   // create a new strided MPI type
