@@ -46,7 +46,6 @@ static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
 
-
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
   int initialized;
@@ -185,15 +184,31 @@ int comm_gpuid(void)
 }
 
 
+static const int max_displacement = 4;
+
+static void check_displacement(const int displacement[], int ndim) {
+  for (int i=0; i<ndim; i++) {
+    if (abs(displacement[i]) > max_displacement){
+      errorQuda("Requested displacement[%d] = %d is greater than maximum allowed", i, displacement[i]);
+    }
+  }
+}
+
 /**
  * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
  */
 MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement, ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = comm_rank();
+
+  int tag = displacement[ndim-1];
+  for (int i=ndim-2; i>=0; i--) tag = tag * max_displacement + displacement[i];
+  tag = tag >= 0 ? tag : 2*pow(max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
   mh->custom = false;
@@ -208,9 +223,15 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
 MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes)
 {
   Topology *topo = comm_default_topology();
+  int ndim = comm_ndim(topo);
+  check_displacement(displacement,ndim);
 
   int rank = comm_rank_displaced(topo, displacement);
-  int tag = rank;
+
+  int tag = -displacement[ndim-1];
+  for (int i=ndim-2; i>=0; i--) tag = tag * max_displacement - displacement[i];
+  tag = tag >= 0 ? tag : 2*pow(max_displacement,ndim) + tag;
+
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
   mh->custom = false;
