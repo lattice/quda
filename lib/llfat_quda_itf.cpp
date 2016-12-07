@@ -26,6 +26,8 @@ namespace quda {
         cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
         QudaGaugeParam* param, double* act_path_coeff)
     {
+
+#ifdef GPU_FATLINK
       int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
       int Vh = volume/2;
       dim3 gridDim((volume + BLOCK_DIM-1)/BLOCK_DIM,1,1);
@@ -270,7 +272,9 @@ namespace quda {
       for(int i=0;i < nStream; i++){
         cudaStreamDestroy(stream[i]);
       }
-
+#else
+      errorQuda("Fat-link computation not enabled");
+#endif
       return;
     }
 
@@ -283,6 +287,7 @@ namespace quda {
         QudaGaugeParam* param, double* act_path_coeff)
     {
 
+#ifdef GPU_FATLINK
       dim3 blockDim(BLOCK_DIM, 1,1);
 
       int volume = (param->X[0])*(param->X[1])*(param->X[2])*(param->X[3]);
@@ -432,6 +437,9 @@ namespace quda {
 
       cudaDeviceSynchronize(); 
       checkCudaError();
+#else
+      errorQuda("Fat-link computation not enabled");
+#endif
 
       return;
     }
