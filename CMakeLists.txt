@@ -220,12 +220,6 @@ if(QUDA_ARPACK)
   add_definitions(-DARPACK_LIB)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(ARPACK  arpack)
-
-if(${QUDA_MPI} OR ${QUDA_QMP})
-  add_definitions(-DMULTI_GPU)
-  find_package(MPI)
-endif()
-
 endif(QUDA_ARPACK)
 
 if(QUDA_SSTEP)
