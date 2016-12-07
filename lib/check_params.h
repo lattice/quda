@@ -241,6 +241,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifndef CHECK_PARAM
   P(pipeline, 0); /** Whether to use a pipelined solver */
   P(num_offset, 0); /**< Number of offsets in the multi-shift solver */
+  P(num_src, 1); /**< Number of offsets in the multi-shift solver */
   P(overlap, 0); /**< width of domain overlaps */
 #endif
 
@@ -355,9 +356,18 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
     P(compute_clover_trlog, 0);
+    P(compute_clover, 0);
+    P(compute_clover_inverse, 0);
+    P(return_clover, 0);
+    P(return_clover_inverse, 0);
 #else
-  if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
-    param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+    if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
+      param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+    P(compute_clover_trlog, QUDA_INVALID_PRECISION);
+    P(compute_clover, QUDA_INVALID_PRECISION);
+    P(compute_clover_inverse, QUDA_INVALID_PRECISION);
+    P(return_clover, QUDA_INVALID_PRECISION);
+    P(return_clover_inverse, QUDA_INVALID_PRECISION);
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);

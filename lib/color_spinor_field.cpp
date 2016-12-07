@@ -15,7 +15,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), v(0), norm(0), ghost_field(0),
+    : LatticeField(param), init(false), v(0), norm(0), ghost_field(0), nFaceComms(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
       ghost_length(0), ghost_norm_length(0),
       bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
@@ -28,7 +28,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), v(0), norm(0), ghost_field(0),
+    : LatticeField(field), init(false), v(0), norm(0), ghost_field(0), nFaceComms(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
       ghost_length(0), ghost_norm_length(0),
       bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
@@ -96,19 +96,19 @@ namespace quda {
         ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
       }
 
-      if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
-	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d %6d ghostNormOffset = %6d, %6d\n", 
+      if (getVerbosity() == QUDA_DEBUG_VERBOSE)
+	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d %6d ghostNormOffset = %6d, %6d\n",
 		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i][0], ghostOffset[i][1], ghostNormOffset[i][0], ghostNormOffset[i][1]);
     } // dim
 
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
-    if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
+    if (getVerbosity() == QUDA_DEBUG_VERBOSE)
       printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
 
     // ghost zones are calculated on c/b volumes
-    ghost_length = ghostVolume*nColor*nSpin*2; 
+    ghost_length = ghostVolume*nColor*nSpin*2;
     ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -120,15 +120,15 @@ namespace quda {
       printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
     }
 
-    ghost_bytes = ghost_length*precision;
+    ghost_bytes = (size_t)ghost_length*precision;
     if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone
 
-  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
-				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
-				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
+  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
+				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset,
+				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
 				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
@@ -159,7 +159,7 @@ namespace quda {
     pad = Pad;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       stride = volume/2 + pad; // padding is based on half volume
-      length = 2*stride*nColor*nSpin*2;    
+      length = 2*stride*nColor*nSpin*2;
     } else {
       stride = volume + pad;
       length = stride*nColor*nSpin*2;
@@ -167,7 +167,7 @@ namespace quda {
 
     real_length = volume*nColor*nSpin*2; // physical length
 
-    bytes = length * precision; // includes pads and ghost zones
+    bytes = (size_t)length * precision; // includes pads and ghost zones
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
@@ -191,13 +191,13 @@ namespace quda {
       composite_descr.length = length;
       composite_descr.real_length = real_length;
       composite_descr.bytes       = bytes;
-      composite_descr.norm_bytes  = norm_bytes; 
-      
+      composite_descr.norm_bytes  = norm_bytes;
+
       volume *= composite_descr.dim;
       stride *= composite_descr.dim;
       length *= composite_descr.dim;
       real_length *= composite_descr.dim;
-      
+
       bytes *= composite_descr.dim;
       norm_bytes *= composite_descr.dim;
     }  else if (composite_descr.is_component) {
@@ -248,7 +248,7 @@ namespace quda {
         this->composite_descr.is_composite = true;
         this->composite_descr.dim          = src.composite_descr.dim;
         this->composite_descr.is_component = false;
-        this->composite_descr.id           = 0; 
+        this->composite_descr.id           = 0;
       }
       else if(src.composite_descr.is_component){
         this->composite_descr.is_composite = false;
@@ -258,8 +258,8 @@ namespace quda {
       }
 
       create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor,
-	     src.precision, src.pad, src.siteSubset, 
-	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);    
+	     src.precision, src.pad, src.siteSubset,
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);
     }
     return *this;
   }
@@ -286,7 +286,7 @@ namespace quda {
       if (param.x[d] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
-    volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
+    volumeCB = param.siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
     if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
       errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
@@ -298,7 +298,7 @@ namespace quda {
       length = 2*stride*nColor*nSpin*2;
     } else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
       stride = volume + pad;
-      length = stride*nColor*nSpin*2;  
+      length = stride*nColor*nSpin*2;
     } else {
       //errorQuda("SiteSubset not defined %d", param.siteSubset);
       //do nothing, not an error (can't remember why - need to document this sometime! )
@@ -311,7 +311,7 @@ namespace quda {
 
     real_length = volume*nColor*nSpin*2;
 
-    bytes = length * precision; // includes pads
+    bytes = (size_t)length * precision; // includes pads
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
@@ -329,12 +329,12 @@ namespace quda {
       composite_descr.real_length       = real_length;
       composite_descr.bytes             = bytes;
       composite_descr.norm_bytes        = norm_bytes;
-      
+
       volume            *= composite_descr.dim;
       stride            *= composite_descr.dim;
       length            *= composite_descr.dim;
       real_length       *= composite_descr.dim;
-      
+
       bytes      *= composite_descr.dim;
       norm_bytes *= composite_descr.dim;
     } else {
@@ -525,7 +525,7 @@ namespace quda {
   bool ColorSpinorField::isNative() const {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || 
+    } else if (precision == QUDA_SINGLE_PRECISION ||
 	       precision == QUDA_HALF_PRECISION) {
       if (nSpin == 4) {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
@@ -589,11 +589,38 @@ namespace quda {
     return *odd;
   }
 
+  ColorSpinorField& ColorSpinorField::Component(const int idx) {
+    if (this->IsComposite()) {
+      if (idx < this->CompositeDim()) {  //  setup eigenvector form the set
+        return *(dynamic_cast<ColorSpinorField*>(components[idx]));
+      }
+      else{
+        errorQuda("Incorrect component index...");
+      }
+    }
+    errorQuda("Cannot get requested component");
+    exit(-1);
+  }
+
+  ColorSpinorField& ColorSpinorField::Component(const int idx) const {
+    if (this->IsComposite()) {
+      if (idx < this->CompositeDim()) {  //  setup eigenvector form the set
+        return *(dynamic_cast<ColorSpinorField*>(components[idx]));
+      }
+      else{
+        errorQuda("Incorrect component index...");
+      }
+    }
+    errorQuda("Cannot get requested component");
+    exit(-1);
+  }
+
+
   void* ColorSpinorField::Ghost(const int i) {
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
     return ghost[i];
   }
-  
+
   const void* ColorSpinorField::Ghost(const int i) const {
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
     return ghost[i];
@@ -630,7 +657,7 @@ namespace quda {
 
     for (int d=0; d<nDim; d++) {
       y[d] = i % z[d];
-      i /= z[d];    
+      i /= z[d];
     }
 
     parity = i;
@@ -688,16 +715,30 @@ namespace quda {
     return field;
   }
 
-  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec, 
+  ColorSpinorField* ColorSpinorField::Create(const ColorSpinorField &src, const ColorSpinorParam &param) {
+
+    ColorSpinorField *field = NULL;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuColorSpinorField(src, param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaColorSpinorField(src, param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
+  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
 						   QudaFieldLocation new_location) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin 
+    coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin
 
     coarseParam.nColor = Nvec;
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
-    
+
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
 
@@ -716,7 +757,7 @@ namespace quda {
     return coarse;
   }
 
-  ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec, 
+  ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
 						 QudaFieldLocation new_location) {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
@@ -724,7 +765,7 @@ namespace quda {
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
     fineParam.create = QUDA_ZERO_FIELD_CREATE;
-    
+
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
 

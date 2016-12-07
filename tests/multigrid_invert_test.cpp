@@ -59,7 +59,7 @@ extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
-extern QudaInverterType precon_type;
+extern QudaInverterType smoother_type;
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -72,7 +72,8 @@ extern QudaTwistFlavorType twist_flavor;
 
 extern void usage(char** );
 
-double clover_coeff = 1.0;
+extern double clover_coeff;
+extern bool compute_clover;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -171,6 +172,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.clover_coeff = clover_coeff;
   }
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
@@ -195,8 +197,6 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     }
   }
 
-  inv_param.clover_coeff = clover_coeff;
-
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
@@ -219,7 +219,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
-    mg_param.smoother[i] = precon_type;
+    mg_param.smoother[i] = smoother_type;
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
     mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
@@ -415,7 +415,7 @@ int main(int argc, char **argv)
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-  void *gauge[4], *clover_inv=0;//, *clover=0;
+  void *gauge[4], *clover=0, *clover_inv=0;
 
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V*gaugeSiteSize*gSize);
@@ -436,25 +436,15 @@ int main(int argc, char **argv)
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
-    size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+    size_t cSize = inv_param.clover_cpu_prec;
+    clover = malloc(V*cloverSiteSize*cSize);
     clover_inv = malloc(V*cloverSiteSize*cSize);
-    construct_clover_field(clover_inv, norm, diag, inv_param.clover_cpu_prec);
+    if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
 
-    // The uninverted clover term is only needed when solving the unpreconditioned
-    // system or when using "asymmetric" even/odd preconditioning.
-    int preconditioned = (inv_param.solve_type == QUDA_DIRECT_PC_SOLVE ||
-			  inv_param.solve_type == QUDA_NORMOP_PC_SOLVE);
-    int asymmetric = preconditioned &&
-                         (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC ||
-                          inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC);
-    if (!preconditioned) {
-      //clover = clover_inv;
-      clover_inv = NULL;
-    } else if (asymmetric) { // fake it by using the same random matrix
-      //clover = clover_inv;   // for both clover and clover_inv
-    } else {
-      //clover = NULL;
-    }
+    inv_param.compute_clover = compute_clover;
+    if (compute_clover) inv_param.return_clover = 1;
+    inv_param.compute_clover_inverse = 1;
+    inv_param.return_clover_inverse = 1;
   }
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
@@ -472,12 +462,10 @@ int main(int argc, char **argv)
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
 
-  // load the clover term, if desired
-  //if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
-
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(NULL, NULL, &inv_param);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
+
   inv_param.solve_type = solve_type; // restore actual solve_type we want to do
 
   // setup the multigrid solver
@@ -577,11 +565,14 @@ int main(int argc, char **argv)
   endQuda();
 
   // finalize the communications layer
-#if defined(QMP_COMMS)
-  QMP_finalize_msg_passing();
-#elif defined(MPI_COMMS)
-  MPI_Finalize();
-#endif
+  finalizeComms();
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (clover) free(clover);
+    if (clover_inv) free(clover_inv);
+  }
+
+  for (int dir = 0; dir<4; dir++) free(gauge[dir]);
 
   return 0;
 }

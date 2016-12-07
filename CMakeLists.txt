@@ -10,6 +10,9 @@ set(CMAKE_CXX_STANDARD 11)
 # otherwise overwrite the existing makefiles
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
+# add a directory for cmake modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 
 
 find_package(Git)
@@ -31,6 +34,8 @@ ENDIF(GIT_FOUND)
 
 set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG )
 SET(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING  "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG)
+
 string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
 LIST(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
 
@@ -48,8 +53,17 @@ project("QUDA")
 # QUDA OPTIONS
 # likely to be changed by users
 #######################################################################
-set(QUDA_GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
+if(DEFINED ENV{QUDA_GPU_ARCH})
+  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
+else()
+  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+endif()
+if(NOT QUDA_GPU_ARCH)
+  message ("-- Building QUDA for arch " "${QUDA_DEFAULT_GPU_ARCH}")
+endif()
 
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
@@ -98,9 +112,11 @@ set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 #QUDA ADVANCED OPTIONS
 # that ususally should not be changed by users
 #######################################################################
+set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
+set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
-set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
+set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 
 # NVTX options
@@ -117,10 +133,13 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
+set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 
+mark_as_advanced(QUDA_BUILD_ALL_TESTS)
+mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
-mark_as_advanced(QUDA_NUMA_AFFINITY)
+mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 
 mark_as_advanced(QUDA_MPI_NVTX)
@@ -132,6 +151,8 @@ mark_as_advanced(QUDA_GPU_COMMS)
 mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
+mark_as_advanced(QUDA_BLOCKSOVER)
+mark_as_advanced(QUDA_MULTIGRID)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -200,6 +221,13 @@ endif()
 if (QUDA_MULTIGRID)
   add_definitions(-DGPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
+
+if(QUDA_BLOCKSOLVER)
+  add_definitions(-DBLOCKSOLVER)
+  find_package(Eigen REQUIRED)
+  include_directories(${EIGEN_INCLUDE_DIRS})
+  set(QUDA_NVTX ON)
+endif()
 
 if(QUDA_POSIX_THREADS)
   add_definitions(-DPTHREADS)
@@ -278,7 +306,6 @@ if(QUDA_INTERFACE_NVTX)
   set(QUDA_NVTX ON)
 endif(QUDA_INTERFACE_NVTX)
 
-#TODO: move to tests, check lib64
 if(QUDA_NVTX)
   FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
   LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
@@ -334,12 +361,15 @@ if(DEVICE_PACK)
   add_definitions(-DDEVICE_PACK)
 endif(DEVICE_PACK)
 
-if(NOT ${APPLE})
-  if(QUDA_NUMA_AFFINITY)
-    add_definitions(-DNUMA_AFFINITY)
-    set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
-  endif(QUDA_NUMA_AFFINITY)
-endif(NOT ${APPLE})
+
+
+if(QUDA_NUMA_NVML)
+  add_definitions(-DNUMA_NVML)
+  set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
+  find_package(NVML REQUIRED)
+  include_directories(NVML_INCLUDE_DIR)
+endif(QUDA_NUMA_NVML)
+
 
 if(QUDA_CONTRACT)
   add_definitions(-DGPU_CONTRACT)
@@ -356,12 +386,11 @@ include_directories(lib)
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
-set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
-add_definitions(-DQUDA_HASH=${HASH})
+set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
-
+# build up git version
 # add -debug to GITVERSION if we build with debug options enabled
 if(DEBUG_BUILD)
   if(GITVERSION)
@@ -370,10 +399,6 @@ if(DEBUG_BUILD)
     set(GITVERSION debug)
   endif()
 endif()
-
-IF(GITVERSION)
-  add_definitions(-DGITVERSION="${GITVERSION}")
-ENDIF()
 
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
@@ -391,6 +416,10 @@ endif(QUDA_VERBOSE_BUILD)
 # some clang warnings shouds be warning even when turning warnings into errors
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CLANG_NOERROR "-Wno-error=unused-private-field")
+# this is a hack to get colored diagnostics back when using Ninja and clang
+    if(CMAKE_GENERATOR MATCHES "Ninja")
+      set(CLANG_FORCE_COLOR "-fcolor-diagnostics")
+    endif()
 endif()
 
 ## define NVCC flags
@@ -414,17 +443,17 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     FORCE )
 
 #define CXX FLAGS
-set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
 "Flags used by the C++ compiler during rstrict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds.")
-set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds.")
-set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds.")
 
 #define C FLAGS

@@ -294,7 +294,7 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + DSLASH_SHARED_FLOATS_PER_THREAD
 #include "read_gauge.h"
 #include "io_spinor.h"
 
-int x1, x2, x3, x4;
+int coord[5];
 int X;
 
 int sid;
@@ -308,13 +308,12 @@ int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
-  // Inline by hand for the moment and assume even dimensions
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
+  // Assume even dimensions
+  coordsFromIndex3D<EVEN_X>(X, coord, sid, param);
 
   // only need to check Y and Z dims currently since X and T set to match exactly
-  if (x2 >= X2) return;
-  if (x3 >= X3) return;
+  if (coord[1] >= param.X[1]) return;
+  if (cpprd[2] >= param.X[2]) return;
 
 """)
         else:
@@ -328,9 +327,8 @@ if (kernel_type == INTERIOR_KERNEL) {
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
 
-  // Inline by hand for the moment and assume even dimensions
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
+  // Assume even dimensions
+  coordsFromIndex<4,QUDA_4D_PC,EVEN_X>(X, coord, sid, param);
 
 """)
 
@@ -348,7 +346,6 @@ if (kernel_type == INTERIOR_KERNEL) {
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
 
-  const int dim = static_cast<int>(kernel_type);
   const int face_volume = (param.threads >> 1);           // volume of one face
   const int face_num = (sid >= face_volume);              // is this thread updating face 0 or 1
   face_idx = sid - face_num*face_volume;        // index into the respective face
@@ -357,8 +354,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
   //sp_idx = face_idx + param.ghostOffset[dim];
 
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
+  coordsFromFaceIndex<4,QUDA_4D_PC,kernel_type,1>(X, sid, coord, face_idx, face_num, param);
 
   READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 
@@ -391,8 +387,8 @@ def gen(dir, pack_only=False):
         if proj(i,1) == 0j:
             return (0, proj(i,0))
 
-    boundary = ["x1==X1m1", "x1==0", "x2==X2m1", "x2==0", "x3==X3m1", "x3==0", "x4==X4m1", "x4==0"]
-    interior = ["x1<X1m1", "x1>0", "x2<X2m1", "x2>0", "x3<X3m1", "x3>0", "x4<X4m1", "x4>0"]
+    boundary = ["coord[0]==X1m1", "coord[0]==0", "coord[1]==X2m1", "coord[1]==0", "coord[2]==X3m1", "coord[2]==0", "coord[3]==X4m1", "coord[3]==0"]
+    interior = ["coord[0]<X1m1", "coord[0]>0", "coord[1]<X2m1", "coord[1]>0", "coord[2]<X3m1", "coord[2]>0", "coord[3]<X4m1", "coord[3]>0"]
     dim = ["X", "Y", "Z", "T"]
 
     # index of neighboring site when not on boundary
@@ -557,28 +553,28 @@ READ_SPINOR_SHARED(tx, threadIdx.y, threadIdx.z);\n
 
     load_shared_2 = (
 """// load spinor from shared memory
-int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+int tx = (threadIdx.x + blockDim.x - ((coord[0]+1)&1) ) % blockDim.x;
 int ty = (threadIdx.y < blockDim.y - 1) ? threadIdx.y + 1 : 0;
 READ_SPINOR_SHARED(tx, ty, threadIdx.z);\n
 """)
 
     load_shared_3 = (
 """// load spinor from shared memory
-int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+int tx = (threadIdx.x + blockDim.x - ((coord[0]+1)&1)) % blockDim.x;
 int ty = (threadIdx.y > 0) ? threadIdx.y - 1 : blockDim.y - 1;
 READ_SPINOR_SHARED(tx, ty, threadIdx.z);\n
 """)
 
     load_shared_4 = (
 """// load spinor from shared memory
-int tx = (threadIdx.x + blockDim.x - ((x1+1)&1) ) % blockDim.x;
+int tx = (threadIdx.x + blockDim.x - ((coord[0]+1)&1) ) % blockDim.x;
 int tz = (threadIdx.z < blockDim.z - 1) ? threadIdx.z + 1 : 0;
 READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 """)
 
     load_shared_5 = (
 """// load spinor from shared memory
-int tx = (threadIdx.x + blockDim.x - ((x1+1)&1)) % blockDim.x;
+int tx = (threadIdx.x + blockDim.x - ((coord[0]+1)&1)) % blockDim.x;
 int tz = (threadIdx.z > 0) ? threadIdx.z - 1 : blockDim.z - 1;
 READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 """)
@@ -793,13 +789,13 @@ int incomplete = 0; // Have all 8 contributions been computed for this site?
 
 switch(kernel_type) { // intentional fall-through
 case INTERIOR_KERNEL:
-  incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
+  incomplete = incomplete || (param.commDim[3] && (coord[3]==0 || coord[3]==X4m1));
 case EXTERIOR_KERNEL_T:
-  incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
+  incomplete = incomplete || (param.commDim[2] && (coord[2]==0 || coord[2]==X3m1));
 case EXTERIOR_KERNEL_Z:
-  incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
+  incomplete = incomplete || (param.commDim[1] && (coord[1]==0 || coord[1]==X2m1));
 case EXTERIOR_KERNEL_Y:
-  incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
+  incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
 }
 
 """)    

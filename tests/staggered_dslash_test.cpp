@@ -42,7 +42,7 @@ QudaInvertParam inv_param;
 cpuGaugeField *cpuFat = NULL;
 cpuGaugeField *cpuLong = NULL;
 
-cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
+cpuColorSpinorField *spinor, *spinorOut, *spinorRef, *tmpCpu;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
 
 cudaColorSpinorField* tmp;
@@ -51,12 +51,10 @@ void *hostGauge[4];
 void *fatlink[4], *longlink[4];
 
 #ifdef MULTI_GPU
-const void **ghost_fatlink, **ghost_longlink;
+void **ghost_fatlink, **ghost_longlink;
 #endif
 
-const int loops = 100;
-
-QudaParity parity;
+QudaParity parity = QUDA_EVEN_PARITY;
 extern QudaDagType dagger;
 int transfer = 0; // include transfer time in the benchmark?
 extern int xdim;
@@ -69,10 +67,14 @@ extern QudaPrecision prec;
 
 extern int device;
 extern bool verify_results;
+extern int niter;
 
 extern bool kernel_pack_t;
 
+extern double mass; // the mass of the Dirac operator
+
 int X[4];
+extern int Nsrc; // number of spinors to apply to simultaneously
 
 Dirac* dirac;
 
@@ -94,6 +96,7 @@ void init()
   gaugeParam.X[3] = X[3] = tdim;
 
   setDims(gaugeParam.X);
+  dw_setDims(gaugeParam.X,Nsrc); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
@@ -122,6 +125,7 @@ void init()
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = dslash_type;
+  inv_param.mass = mass;
 
   // ensure that the default is improved staggered
   if (inv_param.dslash_type != QUDA_STAGGERED_DSLASH &&
@@ -142,10 +146,12 @@ void init()
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
-  csParam.nDim=4;
+  csParam.nDim=5;
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gaugeParam.X[d];
   }
+  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
   if (test_type < 2) {
@@ -165,6 +171,7 @@ void init()
   spinor = new cpuColorSpinorField(csParam);
   spinorOut = new cpuColorSpinorField(csParam);
   spinorRef = new cpuColorSpinorField(csParam);
+  tmpCpu = new cpuColorSpinorField(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gaugeParam.X[0];
@@ -260,9 +267,8 @@ void init()
     double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
     printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
-    if(test_type == 2){
-      csParam.x[0] /=2;
-    }
+    if(test_type == 2) csParam.x[0] /=2;
+
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp = new cudaColorSpinorField(csParam);
 
@@ -298,6 +304,7 @@ void end(void)
   delete spinor;
   delete spinorOut;
   delete spinorRef;
+  delete tmpCpu;
 
   if (cpuFat) delete cpuFat;
   if (cpuLong) delete cpuLong;
@@ -315,7 +322,6 @@ double dslashCUDA(int niter) {
   for (int i = 0; i < niter; i++) {
     switch (test_type) {
       case 0:
-        parity = QUDA_EVEN_PARITY;
         if (transfer){
           //dslashQuda(spinorOdd, spinorEven, &inv_param, parity);
         } else {
@@ -323,11 +329,10 @@ double dslashCUDA(int niter) {
         }	   
         break;
       case 1:
-        parity = QUDA_ODD_PARITY;
         if (transfer){
-          //MatPCQuda(spinorOdd, spinorEven, &inv_param);
+          //MatPCDagMatPcQuda(spinorOdd, spinorEven, &inv_param);
         } else {
-          dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+          dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case 2:
@@ -360,37 +365,25 @@ double dslashCUDA(int niter) {
 
 void staggeredDslashRef()
 {
-#ifndef MULTI_GPU
-  int cpu_parity = 0;
-#endif
 
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
   fflush(stdout);
   switch (test_type) {
-    case 0:    
+    case 0:
 #ifdef MULTI_GPU
-
-      staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
-          spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink,
+			      spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-      cpu_parity = 0; //EVEN
-      staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
-          inv_param.cpu_prec, gaugeParam.cpu_prec);
-
+      staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif    
-
-
       break;
-    case 1: 
+    case 1:
 #ifdef MULTI_GPU
-      staggered_dslash_mg4dir(spinorRef, fatlink, longlink, (void**)ghost_fatlink, (void**)ghost_longlink, 
-          spinor, parity, dagger, inv_param.cpu_prec, gaugeParam.cpu_prec);    
-
+      matdagmat_mg4dir(spinorRef, fatlink, longlink, ghost_fatlink, ghost_longlink,
+		       spinor, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu, parity);
 #else
-      cpu_parity=1; //ODD
-      staggered_dslash(spinorRef->V(), fatlink, longlink, spinor->V(), cpu_parity, dagger, 
-          inv_param.cpu_prec, gaugeParam.cpu_prec);
+      matdagmat(spinorRef->V(), fatlink, longlink, spinor->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmpCpu->V(), parity);
 #endif
       break;
     case 2:
@@ -427,12 +420,12 @@ static int dslashTest()
       setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
-    printfQuda("Executing %d kernel loops...", loops);	
+    printfQuda("Executing %d kernel loops...", niter);
 
     // reset flop counter
     dirac->Flops();
 
-    double secs = dslashCUDA(loops);
+    double secs = dslashCUDA(niter);
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
@@ -444,6 +437,7 @@ static int dslashTest()
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
     double spinor_out_norm2 =  blas::norm2(*spinorOut);
+
     if (!transfer) {
       double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
       printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n",  spinor_ref_norm2, cuda_spinor_out_norm2,

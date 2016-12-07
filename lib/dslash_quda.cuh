@@ -1,3 +1,4 @@
+//#define DSLASH_TUNE_TILE
 
 static FaceBuffer *face[2];
 
@@ -367,26 +368,86 @@ public:
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);
 
-    for (int i=0; i<4; i++) dslashParam.X[i] = in->X(i);
+    // this is a c/b field so double the x dimension
+    dslashParam.X[0] = in->X(0)*2;
+    for (int i=1; i<4; i++) dslashParam.X[i] = in->X(i);
 #ifdef GPU_DOMAIN_WALL_DIRAC
     dslashParam.Ls = in->X(4); // needed by tuneLaunch()
 #endif
-    // this is a c/b field so double the x dimension
-    dslashParam.X[0] *= 2;
+    dslashParam.Xh[0] = in->X(0);
+    for (int i=1; i<4; i++) dslashParam.Xh[i] = in->X(i)/2;
+    dslashParam.volume4CB = in->VolumeCB() / (in->Ndim()==5 ? in-> X(4) : 1);
+
+    int face[4];
+    for (int dim=0; dim<4; dim++) {
+      for (int j=0; j<4; j++) face[j] = dslashParam.X[j];
+      face[dim] = Nface()/2;
+      
+      dslashParam.face_X[dim] = face[0];
+      dslashParam.face_Y[dim] = face[1];
+      dslashParam.face_Z[dim] = face[2];
+      dslashParam.face_T[dim] = face[3];
+      dslashParam.face_XY[dim] = dslashParam.face_X[dim] * face[1];
+      dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
+      dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
+    }
+
   }
 
   virtual ~DslashCuda() { }
   virtual TuneKey tuneKey() const  
   { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
 
-  std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
-  {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
   virtual int Nface() { return 2; }
+
+#if defined(DSLASH_TUNE_TILE)
+  // Experimental autotuning of the thread ordering
+  bool advanceAux(TuneParam &param) const
+  {
+    if (in->Nspin()==1 || in->Ndim()==5) return false;
+    const int *X = in->X();
+
+    if (param.aux.w < X[3] && param.aux.x > 1 && param.aux.w < 2) {
+      do { param.aux.w++; } while( (X[3]) % param.aux.w != 0);
+      if (param.aux.w <= X[3]) return true;
+    } else {
+      param.aux.w = 1;
+
+      if (param.aux.z < X[2] && param.aux.x > 1 && param.aux.z < 8) {
+	do { param.aux.z++; } while( (X[2]) % param.aux.z != 0);
+	if (param.aux.z <= X[2]) return true;
+      } else {
+
+	param.aux.z = 1;
+	if (param.aux.y < X[1] && param.aux.x > 1 && param.aux.y < 32) {
+	  do { param.aux.y++; } while( X[1] % param.aux.y != 0);
+	  if (param.aux.y <= X[1]) return true;
+	} else {
+	  param.aux.y = 1;
+	  if (param.aux.x < (2*X[0]) && param.aux.x < 32) {
+	    do { param.aux.x++; } while( (2*X[0]) % param.aux.x != 0);
+	    if (param.aux.x <= (2*X[0]) ) return true;
+	  }
+	}
+      }
+    }
+    param.aux = make_int4(2,1,1,1);
+    return false;
+  }
+
+  void initTuneParam(TuneParam &param) const
+  {
+    Tunable::initTuneParam(param);
+    param.aux = make_int4(2,1,1,1);
+  }
+
+  /** sets default values for when tuning is disabled */
+  void defaultTuneParam(TuneParam &param) const
+  {
+    Tunable::defaultTuneParam(param);
+    param.aux = make_int4(2,1,1,1);
+  }
+#endif
 
   virtual void preTune()
   {
@@ -601,14 +662,6 @@ public:
 		   const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
     : DslashCuda(out, in, x, reconstruct, dagger) { ; }
   virtual ~SharedDslashCuda() { ; }
-  std::string paramString(const TuneParam &param) const // override and print out grid as well
-  {
-    std::stringstream ps;
-    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-    ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-    ps << "shared=" << param.shared_bytes;
-    return ps.str();
-  }
 
   virtual void initTuneParam(TuneParam &param) const
   {

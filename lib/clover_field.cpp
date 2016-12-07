@@ -7,8 +7,30 @@
 #include <quda_internal.h>
 #include <clover_field.h>
 #include <gauge_field.h>
+#include <color_spinor_field.h>
+#include <blas_quda.h>
 
 namespace quda {
+
+  CloverFieldParam::CloverFieldParam(const CloverField &a)
+    : LatticeFieldParam(),
+      direct(false),
+      inverse(false),
+      clover(NULL),
+      norm(NULL),
+      cloverInv(NULL),
+      invNorm(NULL),
+      twisted(a.Twisted()),
+      mu2(a.Mu2()),
+      order(a.Order()),
+      create(QUDA_NULL_FIELD_CREATE)
+      {
+	precision = a.Precision();
+	nDim = a.Ndim();
+	pad = a.Pad();
+	siteSubset = QUDA_FULL_SITE_SUBSET;
+	for(int dir=0; dir<nDim; ++dir) x[dir] = a.X()[dir];
+      }
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
@@ -23,7 +45,7 @@ namespace quda {
     real_length = 2*volumeCB*nColor*nColor*nSpin*nSpin/2;  // block-diagonal Hermitian (72 reals)
     length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
-    bytes = length*precision;
+    bytes = (size_t)length*precision;
     bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
@@ -231,9 +253,8 @@ namespace quda {
       if (src.V(false))	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION);
       if (src.V(true)) copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION);
     } else if (typeid(src) == typeid(cpuCloverField)) {
-      resizeBufferPinned(bytes + norm_bytes);
-      void *packClover = bufferPinned[0];
-      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
+      void *packClover = allocatePinned(bytes + norm_bytes);
+      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
       
       if (src.V(false)) {
 	copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
@@ -248,6 +269,8 @@ namespace quda {
 	if (precision == QUDA_HALF_PRECISION) 
 	  qudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
+
+      freePinned(packClover);
     } else {
       errorQuda("Invalid clover field type");
     }
@@ -262,9 +285,8 @@ namespace quda {
 
     // we know we are copying from GPU to CPU here, so for now just
     // assume that reordering is on CPU
-    resizeBufferPinned(bytes + norm_bytes);
-    void *packClover = bufferPinned[0];
-    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(bufferPinned[0]) + bytes : 0;
+    void *packClover = allocatePinned(bytes + norm_bytes);
+    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
 
     // first copy over the direct part (if it exists)
     if (V(false) && cpu.V(false)) {
@@ -272,8 +294,7 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION)
 	qudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
-    }
-    else if((V(false) && !cpu.V(false)) || (!V(false) && cpu.V(false))) {
+    } else if((V(false) && !cpu.V(false)) || (!V(false) && cpu.V(false))) {
       errorQuda("Mismatch between Clover field GPU V(false) and CPU.V(false)");
     }
 
@@ -283,11 +304,11 @@ namespace quda {
 	if (precision == QUDA_HALF_PRECISION)
 	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
-    }
-    else if((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
+    } else if ((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");
     } 
 
+    freePinned(packClover);
   }
 
   /**
@@ -356,6 +377,46 @@ namespace quda {
     output << "order = "     << param.order << std::endl;
     output << "create = "    << param.create << std::endl;
     return output;  // for multiple << operators.
+  }
+
+  ColorSpinorParam colorSpinorParam(const CloverField &a, bool inverse) {
+
+    if (a.Precision() == QUDA_HALF_PRECISION)
+      errorQuda("Casting a CloverField into ColorSpinorField not possible in half precision");
+
+    ColorSpinorParam spinor_param;
+    // 72 = 9 * 4 * 2
+    spinor_param.nColor = 9;
+    spinor_param.nSpin = 4;
+    spinor_param.nDim = a.Ndim();
+    for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
+    spinor_param.precision = a.Precision();
+    spinor_param.pad = a.Pad();
+    spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    spinor_param.fieldOrder = a.Precision() == QUDA_DOUBLE_PRECISION ?
+      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
+    spinor_param.v = (void*)a.V(inverse);
+    spinor_param.location = a.Location();
+    return spinor_param;
+  }
+
+  // Return the L2 norm squared of the clover field
+  double norm2(const CloverField &a, bool inverse) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
+    double nrm2 = blas::norm2(*b);
+    delete b;
+    return nrm2;
+  }
+
+  // Return the L1 norm of the clover field
+  double norm1(const CloverField &a, bool inverse) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
+    double nrm1 = blas::norm1(*b);
+    delete b;
+    return nrm1;
   }
 
 } // namespace quda

@@ -176,6 +176,33 @@ namespace quda {
 
 
   /**
+   * Perform a cuMemAlloc with error-checking.  This function is to
+   * guarantee a unique memory allocation on the device, since
+   * cudaMalloc can be redirected (as is the case with QDPJIT).  This
+   * should only be called via the device_pinned_malloc() macro,
+   * defined in malloc_quda.h.
+   */
+  void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+    void *ptr;
+
+    a.size = a.base_size = size;
+
+    CUresult err = cuMemAlloc((CUdeviceptr*)&ptr, size);
+    if (err != CUDA_SUCCESS) {
+      printfQuda("ERROR: Failed to allocate device memory (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    track_malloc(DEVICE, a, ptr);
+#ifdef HOST_DEBUG
+    cudaMemset(ptr, 0xff, size);
+#endif
+    return ptr;
+  }
+
+
+  /**
    * Perform a standard malloc() with error-checking.  This function
    * should only be called via the safe_malloc() macro, defined in
    * malloc_quda.h
@@ -265,6 +292,30 @@ namespace quda {
     }
     cudaError_t err = cudaFree(ptr);
     if (err != cudaSuccess) {
+      printfQuda("ERROR: Failed to free device memory (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    track_free(DEVICE, ptr);
+  }
+
+
+  /**
+   * Free device memory allocated with device_pinned malloc().  This
+   * function should only be called via the device_pinned_free()
+   * macro, defined in malloc_quda.h
+   */
+  void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) {
+      printfQuda("ERROR: Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    if (!alloc[DEVICE].count(ptr)) {
+      printfQuda("ERROR: Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    CUresult err = cuMemFree((CUdeviceptr)ptr);
+    if (err != CUDA_SUCCESS) {
       printfQuda("ERROR: Failed to free device memory (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }

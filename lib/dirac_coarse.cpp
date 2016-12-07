@@ -81,6 +81,9 @@ namespace quda {
     Y_h = new cpuGaugeField(gParam);
     Yhat_h = new cpuGaugeField(gParam);
 
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gParam.nFace = 0;
+
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X_h = new cpuGaugeField(gParam);
     Xinv_h = new cpuGaugeField(gParam);
@@ -88,6 +91,8 @@ namespace quda {
     dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer);
 
     if (enable_gpu) {
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      gParam.nFace = 1;
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
       gParam.geometry = QUDA_COARSE_GEOMETRY;
       int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
@@ -96,6 +101,10 @@ namespace quda {
       Yhat_d = new cudaGaugeField(gParam);
       Y_d->copy(*Y_h);
       Yhat_d->copy(*Yhat_h);
+
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gParam.nFace = 0;
+      gParam.pad = 0;
 
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -116,7 +125,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*in.VolumeCB();
+    flops += (8*n*n-2*n)*(long long)in.VolumeCB();
   }
 
   void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -129,7 +138,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*in.VolumeCB();
+    flops += (8*n*n-2*n)*(long long)in.VolumeCB();
   }
 
   void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
@@ -142,7 +151,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (8*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+    flops += (8*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
   }
 
   void DiracCoarse::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
@@ -158,7 +167,7 @@ namespace quda {
       ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+    flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
   }
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -170,7 +179,7 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa);
     }
     int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+    flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
   }
 
   void DiracCoarse::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

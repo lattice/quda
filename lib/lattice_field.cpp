@@ -216,4 +216,9 @@ namespace quda {
     return output;  // for multiple << operators.
   }
 
+  static QudaFieldLocation reorder_location_ = QUDA_CUDA_FIELD_LOCATION;
+
+  QudaFieldLocation reorder_location() { return reorder_location_; }
+  void reorder_location_set(QudaFieldLocation _reorder_location) { reorder_location_ = _reorder_location; }
+
 } // namespace quda

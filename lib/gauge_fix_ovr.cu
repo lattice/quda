@@ -601,9 +601,7 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
+      std::stringstream ps = Tunable::paramString(param);
       ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
@@ -881,9 +879,7 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
+      std::stringstream ps = Tuanble::paramString(param);
       ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
@@ -1163,9 +1159,7 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
+      std::stringstream ps = Tunable::paramString(param);
       ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }

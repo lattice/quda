@@ -69,19 +69,24 @@ namespace quda {
   private:
     const gFloat *gauge0, *gauge1;
     const double a;
+    const int nSrc;
 
   protected:
     unsigned int sharedBytesPerThread() const
     {
+#ifdef PARALLEL_DIR
       int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
       return 6 * reg_size;
+#else
+      return 0;
+#endif
     }
 
   public:
     StaggeredDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a)
+      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a), nSrc(in->X(4))
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
@@ -91,12 +96,55 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+      dslashParam.swizzle = tp.aux.x;
+      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 		       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 		       (sFloat*)in->V(), (float*)in->Norm(), 
 		       (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
     }
+
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      const unsigned int max_shared = deviceProp.sharedMemPerBlock;
+      // first try to advance block.y (number of right-hand sides per block)
+      if (param.block.y < nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
+	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
+	  (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
+	param.block.y++;
+	param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
+	return true;
+      } else {
+	bool rtn = DslashCuda::advanceBlockDim(param);
+	param.block.y = 1;
+	param.grid.y = nSrc;
+	return rtn;
+      }
+    }
+
+    bool advanceAux(TuneParam &param) const
+    {
+#ifdef SWIZZLE
+      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+        param.aux.x++;
+	return true;
+      } else {
+        param.aux.x = 1;
+	return false;
+      }
+#else
+      return false;
+#endif
+    }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      DslashCuda::initTuneParam(param);
+      param.block.y = 1;
+      param.grid.y = nSrc;
+      param.aux.x = 1;
+    }
+
+    void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
     int Nface() { return 2; } 
   };
@@ -113,6 +161,8 @@ namespace quda {
     inSpinor->allocateGhostBuffer(1);
 
 #ifdef GPU_STAGGERED_DIRAC
+
+    dslashParam.Ls = out->X(4);
 
     dslashParam.parity = parity;
     dslashParam.gauge_stride = gauge.Stride();
@@ -154,12 +204,17 @@ namespace quda {
 	(out, (short2*)gauge0, (short2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
     }
 
+    // the parameters passed to dslashCuda must be 4-d volume and 3-d
+    // faces because Ls is added as the y-dimension in thread space
+    int ghostFace[QUDA_MAX_DIM];
+    for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
+
 #ifndef GPU_COMMS
-    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger,  in->Volume(), in->GhostFace(), profile);
+    DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger,  in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
     delete dslashImp;
 #endif
 

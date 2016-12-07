@@ -565,9 +565,9 @@ hisq_force_test(void)
 #ifdef MULTI_GPU
   int R[4] = {2, 2, 2, 2};
   cpuGauge_ex->exchangeExtendedGhost(R,true);
-  cudaGauge_ex->loadCPUField(*cpuGauge_ex, QUDA_CPU_FIELD_LOCATION);
+  cudaGauge_ex->loadCPUField(*cpuGauge_ex);
 #else
-  cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaGauge->loadCPUField(*cpuGauge);
 #endif
 
 
@@ -575,9 +575,9 @@ hisq_force_test(void)
 
 #ifdef MULTI_GPU
   cpuOprod_ex->exchangeExtendedGhost(R,true);
-  cudaOprod_ex->loadCPUField(*cpuOprod_ex, QUDA_CPU_FIELD_LOCATION);
+  cudaOprod_ex->loadCPUField(*cpuOprod_ex);
 #else
-  cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cudaOprod->loadCPUField(*cpuOprod);
 #endif
 
 
@@ -620,7 +620,7 @@ hisq_force_test(void)
   delete cudaOprod_ex; //doing this to lower the peak memory usage
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
-  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod_ex, QUDA_CPU_FIELD_LOCATION);
+  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod_ex);
   fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
   cudaDeviceSynchronize(); 
 
@@ -632,7 +632,7 @@ hisq_force_test(void)
   gettimeofday(&t1, NULL);
 
   checkCudaError();
-  cudaLongLinkOprod->loadCPUField(*cpuLongLinkOprod,QUDA_CPU_FIELD_LOCATION);
+  cudaLongLinkOprod->loadCPUField(*cpuLongLinkOprod);
   fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 
   gettimeofday(&t2, NULL);
@@ -662,7 +662,7 @@ hisq_force_test(void)
 
   checkCudaError();
 
-  cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  cudaMom->saveCPUField(*cpuMom);
 
   int accuracy_level = 3;
   if(verify_results){

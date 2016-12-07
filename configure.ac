@@ -334,12 +334,6 @@ AC_ARG_ENABLE(fermi-double-tex,
  [ fermi_double_tex="yes" ]
 )
 
-AC_ARG_ENABLE(numa-affinity,
- AC_HELP_STRING([--enable-numa-affinity], [ Enable NUMA affinity support (default: enabled, always disabled on osx target)]),
- [ numa_affinity=${enableval}],
- [ numa_affinity="yes" ]
-)
-
 AC_ARG_ENABLE(force-ac,
   AC_HELP_STRING([--enable-force-ac], [ Force using deprecated autoconf based build system. (default: disabled)]),
   [ force_ac=${enableval} ],
@@ -702,12 +696,7 @@ yes|no);;
   ;;
 esac
 
-case ${numa_affinity} in
-yes|no);;
-*)
-  AC_MSG_ERROR([ invalid value for --enable-numa-affinity ])
-  ;;
-esac
+
 
 dnl Output Substitutions
 AC_MSG_NOTICE([Setting CUDA_INSTALL_PATH = ${cuda_home} ])
@@ -859,9 +848,6 @@ AC_SUBST( BLAS_TEX, [${blas_tex}])
 
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
-
-AC_MSG_NOTICE([Setting NUMA_AFFINITY= ${numa_affinity}])
-AC_SUBST( NUMA_AFFINITY, [${numa_affinity}])
 
 AC_MSG_NOTICE([Setting USE_QDPJIT = ${build_qdpjit} ])
 AC_SUBST( USE_QDPJIT, [${build_qdpjit}])

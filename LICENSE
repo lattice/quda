@@ -81,10 +81,12 @@ code segements are supplied under the following license:
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 QUDA leverages Google Test for unit testing, contained within tests/gtest.h
-and tests/gtest-all.cc.  These files are supplied under the following
+and tests/gtest-all.cc and FindEigen from ceres-solver, contained in
+cmake/FindEigen.cmake.
+These files are supplied under the following
 license:
 
-  Copyright 2008, Google Inc.
+  Copyright 2008,2015, Google Inc.
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -112,6 +114,37 @@ license:
   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+QUDA uses the FINDNVML.cmake script contained in cmake/FindNVML.cmake.
+This file is supplied under the following license.
+
+  Jiri Kraus, NVIDIA Corp (nvidia.com - jkraus)
+  Copyright (c) 2008 - 2014 NVIDIA Corporation.  All rights reserved.
+
+  This code is licensed under the MIT License.  See the FindNVML.cmake script
+  for the text of the license.
+
+  The MIT License
+
+  License for the specific language governing rights and limitations under
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"),
+  to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+  and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+  THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  DEALINGS IN THE SOFTWARE.
+
 
 
 QUDA leverages LLNL's PMPI wrapper generator for generation of NVTX
@@ -178,3 +211,11 @@ following license:
      those of the United States Government or Lawrence Livermore
      National Security, LLC, and shall not be used for advertising or
      product endorsement purposes.
+
+
+  Additional Notices
+
+  QUDA utilizes Maxim Milakov's int_fastdiv library for fast run-time
+  integer division.  This is distributed under the Apache License,
+  Version 2.0.  See declaration at top of int_fastdiv.h for license
+  specifics.

@@ -95,7 +95,6 @@ namespace quda {
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
       Float diag[6];
       Complex triangle[15];
-      Float A[72];
 
       // This uses lots of unnecessary memory
       for(int ch=0; ch<2; ++ch){ 
@@ -129,18 +128,17 @@ namespace quda {
         triangle[14] =   block1[ch](2,1);
 
 
-        for(int i=0; i<6; ++i){
-          A[ch*36 + i] = 0.5*diag[i];
-        } 
+	Float A[36];
+        for(int i=0; i<6; ++i) A[i] = static_cast<Float>(0.5)*diag[i];
+
         for(int i=0; i<15; ++i){
-          A[ch*36+6+2*i]     = 0.5*triangle[idtab[i]].x;
-          A[ch*36+6+2*i + 1] = 0.5*triangle[idtab[i]].y;
+          A[6+2*i]     = 0.5*triangle[idtab[i]].x;
+          A[6+2*i + 1] = 0.5*triangle[idtab[i]].y;
         } 
+	arg.clover.save(A, idx, parity, ch);
       } // ch
       // 84 floating-point ops
 
-
-      arg.clover.save(A, idx, parity);
       return;
     }
 
@@ -196,15 +194,6 @@ namespace quda {
 	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
-      std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
-      void preTune(){}
-      void postTune(){}
       long long flops() const { return 480*arg.threads; } 
       long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } 
     };

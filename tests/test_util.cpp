@@ -774,8 +774,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int j=0;j < 6; j++){
-	gauge[d][i*gaugeSiteSize + 12+ j] *= sign;
+      for (int j=0; j < 18; j++) {
+	gauge[d][i*gaugeSiteSize + j] *= sign;
       }
     }
     //odd
@@ -804,8 +804,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int j=0;j < 6; j++){
-	gauge[d][(Vh+i)*gaugeSiteSize + 12 + j] *= sign;
+      for (int j=0; j<18; j++){
+	gauge[d][(Vh+i)*gaugeSiteSize + j] *= sign;
       }
     }
 
@@ -825,9 +825,9 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int i = 0; i < 6; i++) {
-	gauge[3][j*gaugeSiteSize+ 12+ i ] *= sign;
-	gauge[3][(Vh+j)*gaugeSiteSize+12 +i] *= sign;
+      for (int i=0; i<18; i++) {
+	gauge[3][j*gaugeSiteSize + i] *= sign;
+	gauge[3][(Vh+j)*gaugeSiteSize + i] *= sign;
       }
     }
   }
@@ -943,7 +943,7 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
 	for (int m = 0; m < 3; m++) { // last 2 rows
 	  for (int n = 0; n < 3; n++) { // 3 columns
 	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] =1.0* rand() / (Float)RAND_MAX;
-	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] =2.0* rand() / (Float)RAND_MAX;
+	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 2.0* rand() / (Float)RAND_MAX;
 	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 3.0*rand() / (Float)RAND_MAX;
 	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 4.0*rand() / (Float)RAND_MAX;
 	  }
@@ -1057,23 +1057,20 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     }
   }
 
-  if(param->reconstruct == QUDA_RECONSTRUCT_9 || 
-     param->reconstruct == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
-    const double cos_pi_3 = 0.5; // Cos(pi/3)
-    const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j+=2){
-          if(precision == QUDA_DOUBLE_PRECISION){
-            const double real = ((double*)longlink[dir])[i*gaugeSiteSize + j];
-            const double imag = ((double*)longlink[dir])[i*gaugeSiteSize + j + 1];
-            ((double*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
-            ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
-          }else{
-            const float real = ((float*)longlink[dir])[i*gaugeSiteSize + j];
-            const float imag = ((float*)longlink[dir])[i*gaugeSiteSize + j + 1];
-            ((float*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
-            ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+  if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
+    // incorporate non-trivial phase into long links
+
+    const double phase = (M_PI * rand())/RAND_MAX;
+    const complex<double> z = polar(1.0, phase);
+    for (int dir=0; dir<4; ++dir) {
+      for (int i=0; i<V; ++i) {
+        for (int j=0; j<gaugeSiteSize; j+=2) {
+          if (precision == QUDA_DOUBLE_PRECISION) {
+            complex<double> *l = (complex<double>*)( &(((double*)longlink[dir])[i*gaugeSiteSize + j]) );
+	    *l *= z;
+          } else {
+            complex<float> *l = (complex<float>*)( &(((float*)longlink[dir])[i*gaugeSiteSize + j]) );
+	    *l *= z;
           }
         } 
       }
@@ -1577,6 +1574,8 @@ QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
+int Nsrc = 1;
+int Msrc = 1;
 bool tune = true;
 int niter = 100;
 int test_type = 0;
@@ -1590,6 +1589,8 @@ bool verify_results = true;
 double mass = 0.1;
 double mu = 0.1;
 double anisotropy = 1.0;
+double clover_coeff = 0.1;
+bool compute_clover = false;
 double tol = 1e-7;
 double tol_hq = 0.;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
@@ -1602,6 +1603,7 @@ int mg_levels = 2;
 
 int nu_pre = 2;
 int nu_post = 2;
+QudaInverterType smoother_type = QUDA_MR_INVERTER;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 
@@ -1656,6 +1658,8 @@ void usage(char** argv )
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
+  printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
@@ -1670,12 +1674,15 @@ void usage(char** argv )
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
-  printf("    --help                                    # Print out this message\n"); 
+  printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
+  printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
+  printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -2150,6 +2157,34 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--compute-clover") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    if (strcmp(argv[i+1], "true") == 0){
+      compute_clover = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      compute_clover = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid compute_clover type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--clover-coeff") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    clover_coeff = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mu") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2230,6 +2265,34 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--nsrc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    Nsrc = atoi(argv[i+1]);
+    if (Nsrc < 1 || Nsrc > 128){
+      printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--msrc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    Msrc = atoi(argv[i+1]);
+    if (Msrc < 1 || Msrc > 128){
+      printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--test") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2298,6 +2361,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-smoother") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    smoother_type = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

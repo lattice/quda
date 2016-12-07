@@ -311,12 +311,12 @@
   o20_re *= scale; o20_im *= scale; o21_re *= scale; o21_im *= scale;	\
   o22_re *= scale; o22_im *= scale; o30_re *= scale; o30_im *= scale;	\
   o31_re *= scale; o31_im *= scale; o32_re *= scale; o32_im *= scale;	\
-  out[sid+0*(stride)] = make_short4((short)o00_re, (short)o00_im, (short)o01_re, (short)o01_im); \
-  out[sid+1*(stride)] = make_short4((short)o02_re, (short)o02_im, (short)o10_re, (short)o10_im); \
-  out[sid+2*(stride)] = make_short4((short)o11_re, (short)o11_im, (short)o12_re, (short)o12_im); \
-  out[sid+3*(stride)] = make_short4((short)o20_re, (short)o20_im, (short)o21_re, (short)o21_im); \
-  out[sid+4*(stride)] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
-  out[sid+5*(stride)] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
+  out[sid+0*(stride)] = make_short4(f2i(o00_re), f2i(o00_im), f2i(o01_re), f2i(o01_im)); \
+  out[sid+1*(stride)] = make_short4(f2i(o02_re), f2i(o02_im), f2i(o10_re), f2i(o10_im)); \
+  out[sid+2*(stride)] = make_short4(f2i(o11_re), f2i(o11_im), f2i(o12_re), f2i(o12_im)); \
+  out[sid+3*(stride)] = make_short4(f2i(o20_re), f2i(o20_im), f2i(o21_re), f2i(o21_im)); \
+  out[sid+4*(stride)] = make_short4(f2i(o22_re), f2i(o22_im), f2i(o30_re), f2i(o30_im)); \
+  out[sid+5*(stride)] = make_short4(f2i(o31_re), f2i(o31_im), f2i(o32_re), f2i(o32_im));
 
 #define WRITE_SPINOR_DOUBLE2_STR(stride)			\
   store_streaming_double2(&out[0*stride+sid], o00_re, o00_im);	\
@@ -372,12 +372,12 @@
   o20_re *= scale; o20_im *= scale; o21_re *= scale; o21_im *= scale;	\
   o22_re *= scale; o22_im *= scale; o30_re *= scale; o30_im *= scale;	\
   o31_re *= scale; o31_im *= scale; o32_re *= scale; o32_im *= scale;	\
-  store_streaming_short4(&out[0*(stride)+sid], (short)o00_re, (short)o00_im, (short)o01_re, (short)o01_im); \
-  store_streaming_short4(&out[1*(stride)+sid], (short)o02_re, (short)o02_im, (short)o10_re, (short)o10_im); \
-  store_streaming_short4(&out[2*(stride)+sid], (short)o11_re, (short)o11_im, (short)o12_re, (short)o12_im); \
-  store_streaming_short4(&out[3*(stride)+sid], (short)o20_re, (short)o20_im, (short)o21_re, (short)o21_im); \
-  store_streaming_short4(&out[4*(stride)+sid], (short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
-  store_streaming_short4(&out[5*(stride)+sid], (short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
+  store_streaming_short4(&out[0*(stride)+sid], f2i(o00_re), f2i(o00_im), f2i(o01_re), f2i(o01_im)); \
+  store_streaming_short4(&out[1*(stride)+sid], f2i(o02_re), f2i(o02_im), f2i(o10_re), f2i(o10_im)); \
+  store_streaming_short4(&out[2*(stride)+sid], f2i(o11_re), f2i(o11_im), f2i(o12_re), f2i(o12_im)); \
+  store_streaming_short4(&out[3*(stride)+sid], f2i(o20_re), f2i(o20_im), f2i(o21_re), f2i(o21_im)); \
+  store_streaming_short4(&out[4*(stride)+sid], f2i(o22_re), f2i(o22_im), f2i(o30_re), f2i(o30_im)); \
+  store_streaming_short4(&out[5*(stride)+sid], f2i(o31_re), f2i(o31_im), f2i(o32_re), f2i(o32_im));
 
 // macros used for exterior Wilson Dslash kernels and face packing
 
@@ -413,9 +413,9 @@
   a0_re *= scale; a0_im *= scale; a1_re *= scale; a1_im *= scale;	\
   a2_re *= scale; a2_im *= scale; b0_re *= scale; b0_im *= scale;	\
   b1_re *= scale; b1_im *= scale; b2_re *= scale; b2_im *= scale;	\
-  out[sid+0*(stride)] = make_short4((short)a0_re, (short)a0_im, (short)a1_re, (short)a1_im); \
-  out[sid+1*(stride)] = make_short4((short)a2_re, (short)a2_im, (short)b0_re, (short)b0_im); \
-  out[sid+2*(stride)] = make_short4((short)b1_re, (short)b1_im, (short)b2_re, (short)b2_im);
+  out[sid+0*(stride)] = make_short4(f2i(a0_re), f2i(a0_im), f2i(a1_re), f2i(a1_im)); \
+  out[sid+1*(stride)] = make_short4(f2i(a2_re), f2i(a2_im), f2i(b0_re), f2i(b0_im)); \
+  out[sid+2*(stride)] = make_short4(f2i(b1_re), f2i(b1_im), f2i(b2_re), f2i(b2_im));
 
 //!ndeg tm:
 /******************used by non-degenerate twisted mass**********************/
@@ -493,12 +493,12 @@
   o1_20_re *= scale; o1_20_im *= scale; o1_21_re *= scale; o1_21_im *= scale;	\
   o1_22_re *= scale; o1_22_im *= scale; o1_30_re *= scale; o1_30_im *= scale;	\
   o1_31_re *= scale; o1_31_im *= scale; o1_32_re *= scale; o1_32_im *= scale;	\
-  out[sid+0*(param.sp_stride)] = make_short4((short)o1_00_re, (short)o1_00_im, (short)o1_01_re, (short)o1_01_im); \
-  out[sid+1*(param.sp_stride)] = make_short4((short)o1_02_re, (short)o1_02_im, (short)o1_10_re, (short)o1_10_im); \
-  out[sid+2*(param.sp_stride)] = make_short4((short)o1_11_re, (short)o1_11_im, (short)o1_12_re, (short)o1_12_im); \
-  out[sid+3*(param.sp_stride)] = make_short4((short)o1_20_re, (short)o1_20_im, (short)o1_21_re, (short)o1_21_im); \
-  out[sid+4*(param.sp_stride)] = make_short4((short)o1_22_re, (short)o1_22_im, (short)o1_30_re, (short)o1_30_im); \
-  out[sid+5*(param.sp_stride)] = make_short4((short)o1_31_re, (short)o1_31_im, (short)o1_32_re, (short)o1_32_im); \
+  out[sid+0*(param.sp_stride)] = make_short4(f2i(o1_00_re), f2i(o1_00_im), f2i(o1_01_re), f2i(o1_01_im)); \
+  out[sid+1*(param.sp_stride)] = make_short4(f2i(o1_02_re), f2i(o1_02_im), f2i(o1_10_re), f2i(o1_10_im)); \
+  out[sid+2*(param.sp_stride)] = make_short4(f2i(o1_11_re), f2i(o1_11_im), f2i(o1_12_re), f2i(o1_12_im)); \
+  out[sid+3*(param.sp_stride)] = make_short4(f2i(o1_20_re), f2i(o1_20_im), f2i(o1_21_re), f2i(o1_21_im)); \
+  out[sid+4*(param.sp_stride)] = make_short4(f2i(o1_22_re), f2i(o1_22_im), f2i(o1_30_re), f2i(o1_30_im)); \
+  out[sid+5*(param.sp_stride)] = make_short4(f2i(o1_31_re), f2i(o1_31_im), f2i(o1_32_re), f2i(o1_32_im)); \
   c0 = fmaxf(fabsf(o2_00_re), fabsf(o2_00_im));			\
   c1 = fmaxf(fabsf(o2_01_re), fabsf(o2_02_im));			\
   c2 = fmaxf(fabsf(o2_02_re), fabsf(o2_01_im));			\
@@ -530,12 +530,12 @@
   o2_20_re *= scale; o2_20_im *= scale; o2_21_re *= scale; o2_21_im *= scale;	\
   o2_22_re *= scale; o2_22_im *= scale; o2_30_re *= scale; o2_30_im *= scale;	\
   o2_31_re *= scale; o2_31_im *= scale; o2_32_re *= scale; o2_32_im *= scale;	\
-  out[sid+param.fl_stride+0*(param.sp_stride)] = make_short4((short)o2_00_re, (short)o2_00_im, (short)o2_01_re, (short)o2_01_im); \
-  out[sid+param.fl_stride+1*(param.sp_stride)] = make_short4((short)o2_02_re, (short)o2_02_im, (short)o2_10_re, (short)o2_10_im); \
-  out[sid+param.fl_stride+2*(param.sp_stride)] = make_short4((short)o2_11_re, (short)o2_11_im, (short)o2_12_re, (short)o2_12_im); \
-  out[sid+param.fl_stride+3*(param.sp_stride)] = make_short4((short)o2_20_re, (short)o2_20_im, (short)o2_21_re, (short)o2_21_im); \
-  out[sid+param.fl_stride+4*(param.sp_stride)] = make_short4((short)o2_22_re, (short)o2_22_im, (short)o2_30_re, (short)o2_30_im); \
-  out[sid+param.fl_stride+5*(param.sp_stride)] = make_short4((short)o2_31_re, (short)o2_31_im, (short)o2_32_re, (short)o2_32_im);  
+  out[sid+param.fl_stride+0*(param.sp_stride)] = make_short4(f2i(o2_00_re), f2i(o2_00_im), f2i(o2_01_re), f2i(o2_01_im)); \
+  out[sid+param.fl_stride+1*(param.sp_stride)] = make_short4(f2i(o2_02_re), f2i(o2_02_im), f2i(o2_10_re), f2i(o2_10_im)); \
+  out[sid+param.fl_stride+2*(param.sp_stride)] = make_short4(f2i(o2_11_re), f2i(o2_11_im), f2i(o2_12_re), f2i(o2_12_im)); \
+  out[sid+param.fl_stride+3*(param.sp_stride)] = make_short4(f2i(o2_20_re), f2i(o2_20_im), f2i(o2_21_re), f2i(o2_21_im)); \
+  out[sid+param.fl_stride+4*(param.sp_stride)] = make_short4(f2i(o2_22_re), f2i(o2_22_im), f2i(o2_30_re), f2i(o2_30_im)); \
+  out[sid+param.fl_stride+5*(param.sp_stride)] = make_short4(f2i(o2_31_re), f2i(o2_31_im), f2i(o2_32_re), f2i(o2_32_im));
 
 
 /************* the following is used by staggered *****************/
@@ -643,7 +643,7 @@
   out[1*mystride+sid] = make_float2(o01_re, o01_im);	\
   out[2*mystride+sid] = make_float2(o02_re, o02_im);
 
-#define WRITE_ST_SPINOR_SHORT2(out, sid, mystride)					\
+#define WRITE_ST_SPINOR_SHORT2(out, sid, mystride)			\
   float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));			\
   float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im));			\
   float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im));			\
@@ -653,9 +653,9 @@
   float scale = __fdividef(MAX_SHORT, c0);				\
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
-  out[sid+0*mystride] = make_short2((short)o00_re, (short)o00_im);	\
-  out[sid+1*mystride] = make_short2((short)o01_re, (short)o01_im);	\
-  out[sid+2*mystride] = make_short2((short)o02_re, (short)o02_im);
+  out[sid+0*mystride] = make_short2(f2i(o00_re), f2i(o00_im));		\
+  out[sid+1*mystride] = make_short2(f2i(o01_re), f2i(o01_im));		\
+  out[sid+2*mystride] = make_short2(f2i(o02_re), f2i(o02_im));
 
 // Non-cache writes to minimize cache polution
 #define WRITE_ST_SPINOR_DOUBLE2_STR(out, sid, mystride) \
@@ -678,9 +678,9 @@
   float scale = __fdividef(MAX_SHORT, c0);			    \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
-  store_streaming_short2(&g_out[0*mystride+sid], (short)o00_re, (short)o00_im); \
-  store_streaming_short2(&g_out[1*mystride+sid], (short)o01_re, (short)o01_im); \
-  store_streaming_short2(&g_out[2*mystride+sid], (short)o02_re, (short)o02_im);
+  store_streaming_short2(&g_out[0*mystride+sid], f2i(o00_re), f2i(o00_im)); \
+  store_streaming_short2(&g_out[1*mystride+sid], f2i(o01_re), f2i(o01_im)); \
+  store_streaming_short2(&g_out[2*mystride+sid], f2i(o02_re), f2i(o02_im));
 
 #define READ_AND_SUM_ST_SPINOR_DOUBLE_TEX(spinor,sid) {			\
   double2 tmp0 = fetch_double2((spinor), sid + 0*(param.sp_stride));		\

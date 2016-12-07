@@ -12,9 +12,9 @@
 #include <dslash_quda.h>
 
 #ifdef DEVICE_PACK
-static const QudaFieldLocation reorder_location = QUDA_CUDA_FIELD_LOCATION;
+static const QudaFieldLocation reorder_location_ = QUDA_CUDA_FIELD_LOCATION;
 #else
-static const QudaFieldLocation reorder_location = QUDA_CPU_FIELD_LOCATION;
+static const QudaFieldLocation reorder_location_ = QUDA_CPU_FIELD_LOCATION;
 #endif
 
 int zeroCopy = 0;
@@ -433,7 +433,7 @@ namespace quda {
 #endif
 
   void cudaColorSpinorField::destroy() {
-    if (ghost_field) device_free(ghost_field);
+    if (ghost_field) device_pinned_free(ghost_field);
 
     if (alloc) {
       device_free(v);
@@ -509,21 +509,20 @@ namespace quda {
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
-    if (reorder_location == QUDA_CPU_FIELD_LOCATION &&
-	typeid(src) == typeid(cpuColorSpinorField)) {
-      for (int b=0; b<2; ++b) {
-        resizeBufferPinned(bytes + norm_bytes, b);
-        memset(bufferPinned[b], 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
-      }
-      copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 
-			     bufferPinned[bufferIndex], 0, (char*)bufferPinned[bufferIndex]+bytes, 0);
+    if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&typeid(src) == typeid(cpuColorSpinorField)) {
+      void *buffer = allocatePinned(bytes + norm_bytes);
+      memset(buffer, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
 
-      qudaMemcpy(v, bufferPinned[bufferIndex], bytes, cudaMemcpyHostToDevice);
-      qudaMemcpy(norm, (char*)bufferPinned[bufferIndex]+bytes, norm_bytes, cudaMemcpyHostToDevice);
+      copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0, static_cast<char*>(buffer)+bytes, 0);
+
+      qudaMemcpy(v, buffer, bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(norm, static_cast<char*>(buffer)+bytes, norm_bytes, cudaMemcpyHostToDevice);
+
+      freePinned(buffer);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else {
-      void *Src, *srcNorm;
+      void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
 	resizeBufferDevice(src.Bytes()+src.NormBytes());
 	Src = bufferDevice;
@@ -531,18 +530,18 @@ namespace quda {
 	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
 	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
-	for (int b=0; b<2; ++b) {
-	 resizeBufferPinned(src.Bytes()+src.NormBytes(), b);
-	}
-	memcpy(bufferPinned[bufferIndex], src.V(), src.Bytes());
-	memcpy((char*)bufferPinned[bufferIndex]+src.Bytes(), src.Norm(), src.NormBytes());
+	buffer = allocatePinned(src.Bytes()+src.NormBytes());
+	memcpy(buffer, src.V(), src.Bytes());
+	memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
 
-	cudaHostGetDevicePointer(&Src, bufferPinned[bufferIndex], 0);
+	cudaHostGetDevicePointer(&Src, buffer, 0);
 	srcNorm = (void*)((char*)Src + src.Bytes());
       }
 
       cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
+
+      if (zeroCopy) freePinned(buffer);
     }
 
     return;
@@ -551,25 +550,24 @@ namespace quda {
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
-    if (reorder_location == QUDA_CPU_FIELD_LOCATION &&
-	typeid(dest) == typeid(cpuColorSpinorField)) {
-      for (int b=0; b<2; ++b) resizeBufferPinned(bytes+norm_bytes,b);
-      qudaMemcpy(bufferPinned[bufferIndex], v, bytes, cudaMemcpyDeviceToHost);
-      qudaMemcpy((char*)bufferPinned[bufferIndex]+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&	typeid(dest) == typeid(cpuColorSpinorField)) {
+      void *buffer = allocatePinned(bytes+norm_bytes);
+      qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
 
-      copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 
-			     0, bufferPinned[bufferIndex], 0, (char*)bufferPinned[bufferIndex]+bytes);
+      copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 0, buffer, 0, static_cast<char*>(buffer)+bytes);
+      freePinned(buffer);
     } else if (typeid(dest) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION);
     } else {
-      void *dst, *dstNorm;
+      void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
 	resizeBufferDevice(dest.Bytes()+dest.NormBytes());
 	dst = bufferDevice;
 	dstNorm = (char*)bufferDevice+dest.Bytes();
       } else {
-	for (int b=0; b<2; ++b) resizeBufferPinned(dest.Bytes()+dest.NormBytes(),b);
-	cudaHostGetDevicePointer(&dst, bufferPinned[bufferIndex], 0);
+	buffer = allocatePinned(dest.Bytes()+dest.NormBytes());
+	cudaHostGetDevicePointer(&dst, buffer, 0);
 	dstNorm = (char*)dst+dest.Bytes();
       }
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
@@ -578,9 +576,11 @@ namespace quda {
 	qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
 	qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
       } else {
-	memcpy(dest.V(), bufferPinned[bufferIndex], dest.Bytes());
-	memcpy(dest.Norm(), (char*)bufferPinned[bufferIndex]+dest.Bytes(), dest.NormBytes());
+	memcpy(dest.V(), buffer, dest.Bytes());
+	memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
       }
+
+      if (zeroCopy) freePinned(buffer);
     }
 
     return;
@@ -597,10 +597,12 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
 	destroyGhostTexObject();
 #endif
-	if (ghostInit && ghost_bytes) device_free(ghost_field);
+	if (ghostInit && ghost_bytes) device_pinned_free(ghost_field);
 
-	// all fields create their own unique ghost zone
-	if (ghost_bytes) ghost_field = device_malloc(ghost_bytes);
+	// all fields create their own unique ghost zone.  Used GPU
+	// pinned allocator to avoid this allocation being redirected,
+	// e.g., by QDPJIT
+	if (ghost_bytes) ghost_field = device_pinned_malloc(ghost_bytes);
 
 #ifdef USE_TEXTURE_OBJECTS
 	createGhostTexObject();
@@ -780,7 +782,9 @@ namespace quda {
 
     } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) { // do multiple cudaMemcpys
 
-      int Nt_minus1_offset = (volume - nFace*ghostFace[3]); // N_t -1 = Vh-Vsh
+      const int x4 = nDim==5 ? x[4] : 1;
+      const int Nt_minus1_offset = (volumeCB - nFace*ghostFace[3])/x4; // N_t -1 = Vh-Vsh
+
       int offset = 0;
       if (nSpin == 1) {
 	offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset;
@@ -794,22 +798,26 @@ namespace quda {
 	else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
       }
     
+      size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
+      size_t dpitch = x4*len;
+      size_t spitch = stride*Nvec*precision;
+
       // QUDA Memcpy NPad's worth. 
       //  -- Dest will point to the right beginning PAD. 
       //  -- Each Pad has size Nvec*Vsh Floats. 
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
+      for (int s=0; s<x4; s++) { // loop over multiple 4-d volumes (if they exist)
+	void *dst = (char*)ghost_spinor + s*len;
+	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
-      void *dst = (char*)ghost_spinor;
-      void *src = (char*)v + offset*Nvec*precision;
-      size_t len = nFace*ghostFace[3]*Nvec*precision;
-      size_t spitch = stride*Nvec*precision;
-      cudaMemcpy2DAsync(dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
-
-      if (precision == QUDA_HALF_PRECISION) {
-	int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
-	void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision;
-	void *src = (char*)norm + norm_offset;
-	cudaMemcpyAsync(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream);
+	if (precision == QUDA_HALF_PRECISION) {
+	  size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
+	  int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
+	  void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision + s*len;
+	  void *src = (char*)norm + norm_offset + s*(volumeCB/x4)*sizeof(float);
+	  cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
+	}
       }
     }else{
       int flavorVolume = volume / 2;
@@ -1568,6 +1576,8 @@ namespace quda {
       // all goes here
       void* ghost_dst = (dir == 0) ? (void*)((char*)(backGhostSendDest[dim]) + precision*ghostOffset[dim][1]) :
 	(void*)((char*)(fwdGhostSendDest[dim]) + precision*ghostOffset[dim][0]);
+      void *ghost_norm_dst = (dir == 0) ? static_cast<char*>(backGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1] :
+	static_cast<char*>(fwdGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
 
       if (dim != 3 || getKernelPackT()) {
 	cudaMemcpyAsync(ghost_dst,
@@ -1576,8 +1586,10 @@ namespace quda {
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy to forward processor
       } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) {
-	// start the copy
-	int Nt_minus_offset = (volume - nFace*ghostFace[3]);
+
+	const int x4 = nDim==5 ? x[4] : 1;
+	const int Nt_minus_offset = (volumeCB - nFace*ghostFace[3])/x4;
+
 	int offset = 0;
 	if (nSpin == 1) {
 	  offset = (dir == 0) ? 0 : Nt_minus_offset;
@@ -1594,18 +1606,23 @@ namespace quda {
 	  }
 	}
 
-	void* src = (char*)v + offset*Nvec*precision;
-	size_t len = nFace*ghostFace[3]*Nvec*precision;
+	size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
+	size_t dpitch = x4*len;
 	size_t spitch = stride*Nvec*precision;
-	// start the copy
-	cudaMemcpy2DAsync(ghost_dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	if (precision == QUDA_HALF_PRECISION) {
-	  void *ghost_norm_dst = (dir == 0) ? static_cast<char*>(backGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1] :
-	    static_cast<char*>(fwdGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
-	  int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
-	  void* src = static_cast<char*>(norm) + norm_offset;
-	  cudaMemcpyAsync(ghost_norm_dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToDevice, *copy_stream);
+	for (int s=0; s<x4; s++) {
+	  void *dst = (char*)ghost_dst + s*len;
+	  void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	  // start the copy
+	  cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
+
+	  if (precision == QUDA_HALF_PRECISION) {
+	    size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
+	    int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
+	    void *dst = (char*)ghost_norm_dst + s*len;
+	    void *src = static_cast<char*>(norm) + norm_offset + s*(volumeCB/x4)*sizeof(float);
+	    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
+	  }
 	}
       } else { // twisted doublet
 	int flavorVolume = volume / 2;
@@ -1642,8 +1659,6 @@ namespace quda {
 	cudaMemcpy2DAsync(static_cast<char*>(ghost_dst)+len, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
 	if (precision == QUDA_HALF_PRECISION) {
-	  void *ghost_norm_dst = (dir == 0) ? static_cast<char*>(backGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1] :
-	    static_cast<char*>(fwdGhostSendDest[dim]) + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
 	  int norm_offset = (dir == 0) ? 0 : flavor1_Nt_minus1_offset*sizeof(float);
 	  void *src = static_cast<char*>(norm) + norm_offset;
 	  size_t dpitch = flavorTFace*sizeof(float);

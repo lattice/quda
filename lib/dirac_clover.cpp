@@ -158,8 +158,7 @@ namespace quda {
   }
 
   void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    cudaCloverField *cInv = NULL;
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, cInv, kappa, 0.0, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, 0.0, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
@@ -379,8 +378,7 @@ namespace quda {
   }
 
   void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    cudaCloverField *cInv = NULL;
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, cInv, kappa, 0.0, QUDA_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, 0.0, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
 } // namespace quda

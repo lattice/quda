@@ -56,13 +56,13 @@ TESTS = su3_test pack_test blas_test dslash_test invert_test		\
 
 all: $(TESTS)
 
-dslash_test: dslash_test.o test_util.o gtest-all.o wilson_dslash_reference.o domain_wall_dslash_reference.o misc.o $(QUDA)
+dslash_test: dslash_test.o test_util.o gtest-all.o wilson_dslash_reference.o clover_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
+invert_test: invert_test.o test_util.o wilson_dslash_reference.o clover_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-multigrid_invert_test: multigrid_invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
+multigrid_invert_test: multigrid_invert_test.o test_util.o wilson_dslash_reference.o clover_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 multigrid_benchmark_test: multigrid_benchmark_test.o test_util.o misc.o $(QUDA)
@@ -71,7 +71,7 @@ multigrid_benchmark_test: multigrid_benchmark_test.o test_util.o misc.o $(QUDA)
 deflation_test: deflation_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-staggered_dslash_test: staggered_dslash_test.o gtest-all.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
+staggered_dslash_test: staggered_dslash_test.o gtest-all.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS) 
 
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
@@ -98,7 +98,7 @@ gauge_force_test: gauge_force_test.o gauge_force_reference.o test_util.o misc.o 
 fermion_force_test: fermion_force_test.o fermion_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-unitarize_link_test: unitarize_link_test.o test_util.o misc.o $(QUDA)
+unitarize_link_test: unitarize_link_test.o gtest-all.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force_reference2.o fermion_force_reference.o test_util.o misc.o $(QUDA)

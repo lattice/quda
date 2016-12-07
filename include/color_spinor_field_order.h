@@ -123,11 +123,12 @@ namespace quda {
 	accessor(field), ghostAccessor(field)
       { 
 	for (int d=0; d<4; d++) {
-	  x[d]=field.X(d); 
 	  void * const *_ghost = ghost_ ? ghost_ : field.Ghost();
 	  ghost[2*d+0] = static_cast<complex<Float>*>(_ghost[2*d+0]);
 	  ghost[2*d+1] = static_cast<complex<Float>*>(_ghost[2*d+1]);
 	}
+
+	for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
       }
 
       /**
@@ -539,7 +540,7 @@ namespace quda {
 	  }
 	}
 
-	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x, int parity=0) {
+	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x, int parity=1) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {

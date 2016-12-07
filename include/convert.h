@@ -1,5 +1,4 @@
-#ifndef _CONVERT_H
-#define _CONVERT_H
+#pragma once
 
 /**
  * @file convert.h
@@ -11,24 +10,24 @@
 
 #include <quda_internal.h> // for MAX_SHORT
 
-template <typename type> int vecLength() { return 0; }
+template <typename type> inline int vecLength() { return 0; }
 
-template<> int vecLength<short>() { return 1; }
-template<> int vecLength<float>() { return 1; }
-template<> int vecLength<double>() { return 1; }
+template<> inline int vecLength<short>() { return 1; }
+template<> inline int vecLength<float>() { return 1; }
+template<> inline int vecLength<double>() { return 1; }
 
-template<> int vecLength<short2>() { return 2; }
-template<> int vecLength<float2>() { return 2; }
-template<> int vecLength<double2>() { return 2; }
+template<> inline int vecLength<short2>() { return 2; }
+template<> inline int vecLength<float2>() { return 2; }
+template<> inline int vecLength<double2>() { return 2; }
 
-template<> int vecLength<short4>() { return 4; }
-template<> int vecLength<float4>() { return 4; }
-template<> int vecLength<double4>() { return 4; }
+template<> inline int vecLength<short4>() { return 4; }
+template<> inline int vecLength<float4>() { return 4; }
+template<> inline int vecLength<double4>() { return 4; }
 
 // MAX_SHORT 32767
 #define MAX_SHORT_INV 3.051850948e-5
 static inline __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
-static inline __device__ float s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
+static inline __device__ double s2d(const short &a) { return static_cast<double>(a) * MAX_SHORT_INV; }
 
 template <typename FloatN>
 __device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }
@@ -44,11 +43,17 @@ __device__ inline void copyFloatN(double2 &a, const float2 &b) { a = make_double
 __device__ inline void copyFloatN(float4 &a, const double4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
 __device__ inline void copyFloatN(double4 &a, const float4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
 
+// Fast float to integer round
+__device__ inline int f2i(float f) { f += 12582912.0f; return reinterpret_cast<int&>(f); }
+
+// Fast double to integer round
+__device__ inline int d2i(double d) { d += 6755399441055744.0; return reinterpret_cast<int&>(d); }
+
 /* Here we assume that the input data has already been normalized and shifted. */
-__device__ inline void copyFloatN(short2 &a, const float2 &b) { a = make_short2(b.x, b.y); }
-__device__ inline void copyFloatN(short4 &a, const float4 &b) { a = make_short4(b.x, b.y, b.z, b.w); }
-__device__ inline void copyFloatN(short2 &a, const double2 &b) { a = make_short2(b.x, b.y); }
-__device__ inline void copyFloatN(short4 &a, const double4 &b) { a = make_short4(b.x, b.y, b.z, b.w); }
+__device__ inline void copyFloatN(short2 &a, const float2 &b) { a = make_short2(f2i(b.x), f2i(b.y)); }
+__device__ inline void copyFloatN(short4 &a, const float4 &b) { a = make_short4(f2i(b.x), f2i(b.y), f2i(b.z), f2i(b.w)); }
+__device__ inline void copyFloatN(short2 &a, const double2 &b) { a = make_short2(d2i(b.x), d2i(b.y)); }
+__device__ inline void copyFloatN(short4 &a, const double4 &b) { a = make_short4(d2i(b.x), d2i(b.y), d2i(b.z), d2i(b.w)); }
 
 
 /**
@@ -109,7 +114,7 @@ template<> __device__ inline void convert<float2,float4>(float2 x[], float4 y[],
 
 template<> __device__ inline void convert<short4,float2>(short4 x[], float2 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j++) x[j] = make_short4(y[2*j].x, y[2*j].y, y[2*j+1].x, y[2*j+1].y);
+  for (int j=0; j<N; j++) x[j] = make_short4(f2i(y[2*j].x), f2i(y[2*j].y), f2i(y[2*j+1].x), f2i(y[2*j+1].y));
 }
 
 template<> __device__ inline void convert<float2,short4>(float2 x[], short4 y[], const int N) {
@@ -128,14 +133,14 @@ template<> __device__ inline void convert<float4,short2>(float4 x[], short2 y[],
 template<> __device__ inline void convert<short2,float4>(short2 x[], float4 y[], const int N) {
 #pragma unroll
   for (int j=0; j<N/2; j++) {
-    x[2*j] = make_short2(y[j].x, y[j].y);
-    x[2*j+1] = make_short2(y[j].z, y[j].w);
+    x[2*j] = make_short2(f2i(y[j].x), f2i(y[j].y));
+    x[2*j+1] = make_short2(f2i(y[j].z), f2i(y[j].w));
   }
 }
 
 template<> __device__ inline void convert<short4,double2>(short4 x[], double2 y[], const int N) {
 #pragma unroll
-  for (int j=0; j<N; j++) x[j] = make_short4(y[2*j].x, y[2*j].y, y[2*j+1].x, y[2*j+1].y);
+  for (int j=0; j<N; j++) x[j] = make_short4(d2i(y[2*j].x), d2i(y[2*j].y), d2i(y[2*j+1].x), d2i(y[2*j+1].y));
 }
 
 template<> __device__ inline void convert<double2,short4>(double2 x[], short4 y[], const int N) {
@@ -154,8 +159,8 @@ template<> __device__ inline void convert<double4,short2>(double4 x[], short2 y[
 template<> __device__ inline void convert<short2,double4>(short2 x[], double4 y[], const int N) {
 #pragma unroll
   for (int j=0; j<N/2; j++) {
-    x[2*j] = make_short2(y[j].x, y[j].y);
-    x[2*j+1] = make_short2(y[j].z, y[j].w);
+    x[2*j] = make_short2(d2i(y[j].x), d2i(y[j].y));
+    x[2*j+1] = make_short2(d2i(y[j].z), d2i(y[j].w));
   }
 }
 
@@ -185,4 +190,3 @@ template<> __device__ inline void convert<float2,double4>(float2 x[], double4 y[
   }
 }
 
-#endif // _CONVERT_H

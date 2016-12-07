@@ -20,13 +20,15 @@ namespace quda {
     dim3 block;
     dim3 grid;
     int shared_bytes;
-    dim3 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
     float time;
     long long n_calls;
 
-  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(1, 1, 1), time(FLT_MAX), n_calls(0) { }
+  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
+      aux = make_int4(1,1,1,1);
+    }
 
     TuneParam(const TuneParam &param)
       : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
@@ -83,12 +85,15 @@ namespace quda {
 
     virtual unsigned int maxBlockSize() const { return deviceProp.maxThreadsDim[0]; }
 
+    virtual int blockStep() const { return deviceProp.warpSize; }
+    virtual int blockMin() const { return deviceProp.warpSize; }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize();
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-      const int step = deviceProp.warpSize;
+      const int step = blockStep();
       bool ret;
 
       param.block.x += step;
@@ -99,7 +104,7 @@ namespace quda {
 	  param.block.x = step;
 	} else { // not tuning the grid dimension so have to set a valid grid size
 	  // ensure the blockDim is large enough given the limit on gridDim
-	  param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1); 
+	  param.block.x = (minThreads()+max_blocks-1)/max_blocks;
 	  param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	  if(param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
 	}
@@ -126,11 +131,11 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
 	const int max_shared = deviceProp.sharedMemPerBlock;
-	const int max_blocks_per_sm = 8; // FIXME: derive from deviceProp
+	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), 8u);
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
-	if (blocks_per_sm == 0) return false;
-	param.shared_bytes = max_shared / blocks_per_sm + 1;
+	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
+
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
@@ -172,9 +177,12 @@ namespace quda {
       {
 	std::stringstream ps;
 	ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-	ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
+	if (tuneGridDim()) ps << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
 	ps << "shared=" << param.shared_bytes << ", ";
-	ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << ")";
+
+	// determine if we are tuning the auxiliary dimension
+	TuneParam dummy; initTuneParam(dummy);
+	if (advanceAux(dummy)) ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
 	return ps.str();
       }
 
@@ -192,7 +200,7 @@ namespace quda {
     {
       const unsigned int max_threads = deviceProp.maxThreadsDim[0];
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
-      const int min_block_size = deviceProp.warpSize;
+      const int min_block_size = blockMin();
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
@@ -200,9 +208,8 @@ namespace quda {
 	param.grid = dim3(1,1,1);
       } else {
 	// find the minimum valid blockDim
-	const int warp = deviceProp.warpSize;
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
-	param.block.x = ((param.block.x+warp-1) / warp) * warp; // round up to the nearest warp
+	param.block.x = ((param.block.x+min_block_size-1) / min_block_size) * min_block_size; // round up to the nearest multiple of desired minimum block size
 	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
@@ -291,6 +298,11 @@ namespace quda {
       param.block.y = 2;
     }
 
+    void defaultTuneParam(TuneParam &param) const {
+      Tunable::defaultTuneParam(param);
+      param.block.y = 2;
+    }
+
   };
   
   /**
@@ -302,11 +314,8 @@ namespace quda {
   class TunableVectorY : public Tunable {
 
   protected:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-    // don't tune the grid dimension
-    bool tuneGridDim() const { return false; }
+    virtual unsigned int sharedBytesPerThread() const { return 0; }
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     const unsigned int vector_length;
 
@@ -329,7 +338,7 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y <= vector_length) {
+	if (param.block.y < vector_length) {
 	  param.block.y++;
 	  param.grid.y = (vector_length + param.block.y - 1) / param.block.y;
 	  return true;
@@ -358,9 +367,18 @@ namespace quda {
 
   };
 
-  void loadTuneCache(QudaVerbosity verbosity);
-  void saveTuneCache(QudaVerbosity verbosity);
-  void saveProfile(QudaVerbosity verbosity);
+  void loadTuneCache();
+  void saveTuneCache();
+
+  /**
+   * @brief Save profile to disk.
+   */
+  void saveProfile(const std::string label = "");
+
+  /**
+   * @brief Flush profile contents, setting all counts to zero.
+   */
+  void flushProfile();
 
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
