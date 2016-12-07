@@ -209,15 +209,8 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 #ifdef MULTI_GPU
 } else { // exterior kernel
-/*
-  const int dim = static_cast<int>(kernel_type);
-  const int face_volume = (param.threads >> 1);           // volume of one face
-  const int face_num = (sid >= face_volume);
 
-  face_idx = sid - face_num*face_volume;               // index into the respective face
-*/
   const int dim = static_cast<int>(kernel_type);
-  const int face_volume = param.threads;           // volume of one face
   const int face_num = 1;		//Era 1
 
   face_idx = sid;               // index into the respective face
@@ -227,11 +220,22 @@ if (kernel_type == INTERIOR_KERNEL) {
   //sp_idx = face_idx + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
+  sp_norm_idx = sid + param.ghostNormOffset[dim];
 #endif
 
-  const int dims[] = {X1, X2, X3, X4};
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
+  //Declare 5d int array to store x1,x2,x3,x4
+  int coord[5] = {0,0,0,0,0};
+  coord[0] = x1;
+  coord[1] = x2;
+  coord[2] = x3;
+  coord[3] = x4;
+  //Call new function template
+  coordsFromFaceIndex<4,QUDA_4D_PC,dim,1>(X, sid, coord, face_idx, face_num, param);
+  //Update x1,x2,x3,x4
+  x1 = coord[0];
+  x2 = coord[1];
+  x3 = coord[2];
+  x4 = coord[3];
 
   o00_re = 0.;  o00_im = 0.;
   o01_re = 0.;  o01_im = 0.;
