@@ -1,11 +1,9 @@
-
-
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
-  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp
+  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
@@ -26,7 +24,8 @@ set (QUDA_OBJS
   dslash_twisted_clover.cu dslash_domain_wall.cu
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
-  copy_quda.cu reduce_quda.cu face_buffer.cpp face_gauge.cpp
+  multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu
@@ -50,7 +49,6 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
   quda_memcpy.cpp version.cpp )
 
-
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
   STRING(REGEX MATCH ".+\\.cu$" item_match ${item})
@@ -60,9 +58,9 @@ FOREACH(item ${QUDA_OBJS})
 ENDFOREACH(item ${QUDA_OBJS})
 
 LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
+
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
-  set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
 # QUDA_CU_OBJS shoudl contain all cuda files now
@@ -82,7 +80,20 @@ include_directories(.)
 
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
-cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+
+# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
+IF(GITVERSION)
+  target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
+ENDIF()
+
+# make one library
+if(QUDA_BUILD_SHAREDLIB)
+    set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+    cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS} )
+else()
+  cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+endif()
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)

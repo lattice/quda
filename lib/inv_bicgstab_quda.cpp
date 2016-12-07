@@ -102,7 +102,6 @@ namespace quda {
 	profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
       } else if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        printfQuda("BiCGstab: Computing null vector\n");
         b2 = r2;
       } else {
         errorQuda("Null vector computing requires non-zero guess!");
