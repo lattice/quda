@@ -219,7 +219,7 @@ endif(QUDA_MAGMA)
 if(QUDA_ARPACK)
   add_definitions(-DARPACK_LIB)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(ARPACK  arpack)
+  pkg_check_modules(ARPACK REQUIRED  arpack)
 endif(QUDA_ARPACK)
 
 if(QUDA_SSTEP)
