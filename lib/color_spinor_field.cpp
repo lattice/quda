@@ -122,7 +122,7 @@ namespace quda {
 
     ghost_bytes = (size_t)ghost_length*precision;
     if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
-    ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
+    if (isNative()) ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone
 
@@ -168,12 +168,11 @@ namespace quda {
     real_length = volume*nColor*nSpin*2; // physical length
 
     bytes = (size_t)length * precision; // includes pads and ghost zones
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }
@@ -312,11 +311,11 @@ namespace quda {
     real_length = volume*nColor*nSpin*2;
 
     bytes = (size_t)length * precision; // includes pads
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }

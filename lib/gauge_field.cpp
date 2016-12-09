@@ -93,7 +93,7 @@ namespace quda {
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
     } else {
       bytes = (size_t)length*precision;
-      bytes = 2*ALIGNMENT_ADJUST(bytes/2);
+      if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
   }

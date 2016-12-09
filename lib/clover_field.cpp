@@ -46,10 +46,10 @@ namespace quda {
     length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
     bytes = (size_t)length*precision;
-    bytes = 2*ALIGNMENT_ADJUST(bytes/2);
+    if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
-      norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
+      if (isNative()) norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
 //for twisted mass only:
     twisted = false;//param.twisted;
