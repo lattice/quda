@@ -143,7 +143,7 @@ namespace quda {
     posix_memalign(&ptr, page_size, a.base_size);
 #endif
     if (!ptr) {
-      printfQuda("ERROR: Failed to allocate aligned host memory (%s:%d in %s())\n", a.file.c_str(), a.line, a.func.c_str());
+      printfQuda("ERROR: Failed to allocate aligned host memory of size %zu (%s:%d in %s())\n", size, a.file.c_str(), a.line, a.func.c_str());
       errorQuda("Aborting");
     }
     return ptr;
@@ -164,7 +164,7 @@ namespace quda {
 
     cudaError_t err = cudaMalloc(&ptr, size);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to allocate device memory (%s:%d in %s())\n", file, line, func);
+      printfQuda("ERROR: Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
     track_malloc(DEVICE, a, ptr);
@@ -191,7 +191,7 @@ namespace quda {
 
     CUresult err = cuMemAlloc((CUdeviceptr*)&ptr, size);
     if (err != CUDA_SUCCESS) {
-      printfQuda("ERROR: Failed to allocate device memory (%s:%d in %s())\n", file, line, func);
+      printfQuda("ERROR: Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
     track_malloc(DEVICE, a, ptr);
@@ -214,7 +214,7 @@ namespace quda {
 
     void *ptr = malloc(size);
     if (!ptr) {
-      printfQuda("ERROR: Failed to allocate host memory (%s:%d in %s())\n", file, line, func);
+      printfQuda("ERROR: Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
     track_malloc(HOST, a, ptr);
@@ -241,7 +241,7 @@ namespace quda {
     
     cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterDefault);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to register pinned memory (%s:%d in %s())\n", file, line, func);
+      printfQuda("ERROR: Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
     track_malloc(PINNED, a, ptr);
@@ -264,7 +264,7 @@ namespace quda {
     
     cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped);
     if (err != cudaSuccess) {
-      printfQuda("ERROR: Failed to register host-mapped memory (%s:%d in %s())\n", file, line, func);
+      printfQuda("ERROR: Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
       errorQuda("Aborting");
     }
     track_malloc(MAPPED, a, ptr);
