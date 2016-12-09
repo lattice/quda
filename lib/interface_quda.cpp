@@ -166,9 +166,6 @@ static TimeProfile profileInvert("invertQuda");
 //!< Profiler for invertMultiShiftQuda
 static TimeProfile profileMulti("invertMultiShiftQuda");
 
-//!< Profiler for invertMultiShiftMixedQuda
-static TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
-
 //!< Profiler for computeFatLinkQuda
 static TimeProfile profileFatLink("computeKSLinkQuda");
 
@@ -515,9 +512,6 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  //printfQuda("loadGaugeQuda use_resident_gauge = %d phase=%d\n",
-  //param->use_resident_gauge, param->staggered_phase_applied);
-
   profileGauge.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -1214,7 +1208,6 @@ void endQuda(void)
     profileClover.Print();
     profileInvert.Print();
     profileMulti.Print();
-    profileMultiMixed.Print();
     profileFatLink.Print();
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
