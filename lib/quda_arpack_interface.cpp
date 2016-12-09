@@ -16,6 +16,7 @@
   template<typename Float> void arpack_naupd(int &ido, char &bmat, int &n, char *which, int &nev, Float &tol,  std::complex<Float> *resid, int &ncv, std::complex<Float> *v, int &ldv,
                     int *iparam, int *ipntr, std::complex<Float> *workd, std::complex<Float> *workl, int &lworkl, Float *rwork, int &info, int *fcomm)
   {
+#ifdef ARPACK_LIB
     if(sizeof(Float) == sizeof(float))
     {
        float _tol  = static_cast<float>(tol);
@@ -25,7 +26,7 @@
 #else
        ARPACK(cnaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v),
                        &ldv, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl), &lworkl, reinterpret_cast<float*>(rwork), &info);
-#endif
+#endif //MPI_COMMS
     }
     else
     {
@@ -36,9 +37,9 @@
 #else
        ARPACK(znaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v),
                        &ldv, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl), &lworkl, reinterpret_cast<double*>(rwork), &info);
-#endif
+#endif //MPI_COMMS
     }
-
+#endif //ARPACK_LIB
     return;
   }
 
@@ -46,6 +47,7 @@
 		       char bmat, int &n, char *which, int &nev, Float tol,  std::complex<Float>* resid, int &ncv, std::complex<Float>* v1, int &ldv1, int *iparam, int *ipntr, 
                        std::complex<Float>* workd, std::complex<Float>* workl, int &lworkl, Float* rwork, int &info, int *fcomm)
   {
+#ifdef ARPACK_LIB
     if(sizeof(Float) == sizeof(float))
     {   
        float _tol = static_cast<float>(tol);
@@ -63,7 +65,7 @@
                      &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
                      &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
                      &lworkl, reinterpret_cast<float *>(rwork), &info); 
-#endif
+#endif //MPI_COMMS
     }
     else
     {
@@ -81,9 +83,9 @@
                      &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
                      &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
                      &lworkl, reinterpret_cast<double *>(rwork), &info);
-#endif
+#endif //MPI_COMMS
     }
-
+#endif //ARPACK_LIB
     return;
   }
 
@@ -346,8 +348,12 @@ namespace quda{
  void arpackSolve( std::vector<ColorSpinorField*> &B, void* evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target)
  {
 #ifdef ARPACK_LIB
+   if((nev <= 0) or (nev > B[0]->Length()))      errorQuda("Wrong number of the requested eigenvectors.\n");
+   if(((ncv-nev) < 2) or (ncv > B[0]->Length())) errorQuda("Wrong size of the IRAM work subspace.\n");
    if(arpackPrec == QUDA_DOUBLE_PRECISION) arpack_solve<double>(B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
    else                                    arpack_solve<float> (B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
+#else
+   errorQuda("Arpack library was not built.\n");
  #endif
    return;
  }
