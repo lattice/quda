@@ -389,6 +389,7 @@ hisq_force_init()
   gParam.pad = 0;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_MILC_GAUGE_ORDER;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuMom = new cpuGaugeField(gParam);

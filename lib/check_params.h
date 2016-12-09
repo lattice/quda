@@ -102,13 +102,6 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(overlap, 0);
-  P(preserve_gauge, 0);
-#else
-  P(preserve_gauge, INVALID_INT);
-#endif
-
-#if defined INIT_PARAM
   P(overwrite_mom, 0);
   P(use_resident_gauge, 0);
   P(use_resident_mom, 0);

@@ -229,17 +229,11 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 {
   qudamilc_called<true>(__func__);
 
-#ifdef MULTI_GPU
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
-#else
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
-#endif
-
   QudaGaugeParam param = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
-  computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
+  computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
@@ -256,17 +250,12 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 			    const double act_path_coeff[6], void* inlink, void* fatlink, void* ulink)
 {
   qudamilc_called<true>(__func__);
-#ifdef MULTI_GPU
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
-#else
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
-#endif
 
   QudaGaugeParam param = newMILCGaugeParam(localDim,
 					   (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 					   QUDA_GENERAL_LINKS);
 
-  computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param, method);
+  computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver

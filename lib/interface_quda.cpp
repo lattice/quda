@@ -79,9 +79,6 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 using namespace quda;
 
-static cudaGaugeField* cudaStapleField = NULL;
-static cudaGaugeField* cudaStapleField1 = NULL;
-
 static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
@@ -1176,9 +1173,6 @@ void endQuda(void)
   LatticeField::flushDeviceCache();
   freeGaugeQuda();
   freeCloverQuda();
-
-  if(cudaStapleField) delete cudaStapleField; cudaStapleField=NULL;
-  if(cudaStapleField1) delete cudaStapleField1; cudaStapleField1=NULL;
 
   for (unsigned int i=0; i<solutionResident.size(); i++) {
     if(solutionResident[i]) delete solutionResident[i];
@@ -3491,56 +3485,28 @@ void destroyDeflationQuda(QudaInvertParam *param, const int *X,  void *_h_u, dou
 
 
 #ifdef GPU_FATLINK
-/*   @method
- *   QUDA_COMPUTE_FAT_STANDARD: standard method (default)
- *   QUDA_COMPUTE_FAT_EXTENDED_VOLUME, extended volume method
- *
- */
 #include <sys/time.h>
 
-void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param)
+void setFatLinkPadding(QudaGaugeParam* param)
 {
   int* X    = param->X;
-#ifdef MULTI_GPU
   int Vsh_x = X[1]*X[2]*X[3]/2;
   int Vsh_y = X[0]*X[2]*X[3]/2;
   int Vsh_z = X[0]*X[1]*X[3]/2;
-#endif
   int Vsh_t = X[0]*X[1]*X[2]/2;
 
   int E[4];
   for (int i=0; i<4; i++) E[i] = X[i] + 4;
 
   // fat-link padding
-  param->llfat_ga_pad = Vsh_t;
+  param->llfat_ga_pad = std::max(Vsh_x, std::max(Vsh_y, std::max(Vsh_z, Vsh_t)));
 
   // site-link padding
-  if(method ==  QUDA_COMPUTE_FAT_STANDARD) {
-#ifdef MULTI_GPU
-    int Vh_2d_max = MAX(X[0]*X[1]/2, X[0]*X[2]/2);
-    Vh_2d_max = MAX(Vh_2d_max, X[0]*X[3]/2);
-    Vh_2d_max = MAX(Vh_2d_max, X[1]*X[2]/2);
-    Vh_2d_max = MAX(Vh_2d_max, X[1]*X[3]/2);
-    Vh_2d_max = MAX(Vh_2d_max, X[2]*X[3]/2);
-    param->site_ga_pad = 3*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + 4*Vh_2d_max;
-#else
-    param->site_ga_pad = Vsh_t;
-#endif
-  } else {
-    param->site_ga_pad = (E[0]*E[1]*E[2]/2)*3;
-  }
+  param->site_ga_pad = (E[0]*E[1]*E[2]/2)*3;
   param->ga_pad = param->site_ga_pad;
 
   // staple padding
-  if(method == QUDA_COMPUTE_FAT_STANDARD) {
-#ifdef MULTI_GPU
-    param->staple_pad = 3*(Vsh_x + Vsh_y + Vsh_z+ Vsh_t);
-#else
-    param->staple_pad = 3*Vsh_t;
-#endif
-  } else {
-    param->staple_pad = (E[0]*E[1]*E[2]/2)*3;
-  }
+  param->staple_pad = (E[0]*E[1]*E[2]/2)*3;
 
   return;
 }
@@ -3548,50 +3514,34 @@ void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param)
 
 namespace quda {
   void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
-			  QudaGaugeParam* qudaGaugeParam, QudaComputeFatMethod method,
-			  cudaGaugeField* cudaFatLink, cudaGaugeField* cudaLongLink,
-			  TimeProfile &profile)
+			  QudaGaugeParam* qudaGaugeParam, cudaGaugeField* cudaFatLink,
+			  cudaGaugeField* cudaLongLink, TimeProfile &profile)
   {
 
     profile.TPSTART(QUDA_PROFILE_INIT);
-    const int flag = qudaGaugeParam->preserve_gauge;
     GaugeFieldParam gParam(0,*qudaGaugeParam);
 
-    if (method == QUDA_COMPUTE_FAT_STANDARD) {
-      for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir];
-    } else {
-      for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
-    }
+    for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
 
-    if (cudaStapleField == NULL || cudaStapleField1 == NULL) {
-      gParam.pad    = qudaGaugeParam->staple_pad;
-      gParam.create = QUDA_NULL_FIELD_CREATE;
-      gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-      gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
-      gParam.setPrecision(gParam.precision);
-#ifdef MULTI_GPU
-      if(method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME) gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-#else
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-#endif
-      cudaStapleField  = new cudaGaugeField(gParam);
-      cudaStapleField1 = new cudaGaugeField(gParam);
-    }
+    gParam.pad    = qudaGaugeParam->staple_pad;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
+    gParam.setPrecision(gParam.precision);
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+    cudaGaugeField *cudaStapleField  = new cudaGaugeField(gParam);
+    cudaGaugeField *cudaStapleField1 = new cudaGaugeField(gParam);
+
     profile.TPSTOP(QUDA_PROFILE_INIT);
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    if (method == QUDA_COMPUTE_FAT_STANDARD) {
-      llfat_cuda(cudaFatLink, cudaLongLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
-    } else { //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
-      llfat_cuda_ex(cudaFatLink, cudaLongLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
-    }
+    llfat_cuda_ex(cudaFatLink, cudaLongLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     profile.TPSTART(QUDA_PROFILE_FREE);
-    if (!(flag & QUDA_FAT_PRESERVE_GPU_GAUGE) ){
-      delete cudaStapleField; cudaStapleField = NULL;
-      delete cudaStapleField1; cudaStapleField1 = NULL;
-    }
+    delete cudaStapleField;
+    delete cudaStapleField1;
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
@@ -3607,7 +3557,7 @@ namespace quda {
 
 #endif // GPU_FATLINK
 
-void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method)
+void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param)
 {
 #ifdef GPU_FATLINK
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
@@ -3637,7 +3587,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   for(int dir=0; dir<4; ++dir){ qudaGaugeParam_ex->X[dir] = param->X[dir]+2*R[dir]; }
 
   // fat-link padding
-  setFatLinkPadding(method, param);
+  setFatLinkPadding(param);
   qudaGaugeParam_ex->llfat_ga_pad = param->llfat_ga_pad;
   qudaGaugeParam_ex->staple_pad   = param->staple_pad;
   qudaGaugeParam_ex->site_ga_pad  = param->site_ga_pad;
@@ -3676,41 +3626,28 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.link_type   = param->type;
   cudaGaugeField* cudaInLink = new cudaGaugeField(gParam);
 
-  if(method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME){
-    for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    cudaInLinkEx = new cudaGaugeField(gParam);
-  }
+  for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaInLinkEx = new cudaGaugeField(gParam);
 
   profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
   fatlink::initLatticeConstants(*cudaFatLink, profileFatLink);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-
   cudaGaugeField* inlinkPtr;
-  if(method == QUDA_COMPUTE_FAT_STANDARD){
-    llfat_init_cuda(param);
-    param->ga_pad = param->site_ga_pad;
-    inlinkPtr = cudaInLink;
-  }else{
-    llfat_init_cuda_ex(qudaGaugeParam_ex);
-    inlinkPtr = cudaInLinkEx;
-  }
+  llfat_init_cuda_ex(qudaGaugeParam_ex);
+  inlinkPtr = cudaInLinkEx;
   profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
   profileFatLink.TPSTART(QUDA_PROFILE_H2D);
   cudaInLink->loadCPUField(cpuInLink);
   profileFatLink.TPSTOP(QUDA_PROFILE_H2D);
 
-  if(method != QUDA_COMPUTE_FAT_STANDARD){
-    profileFatLink.TPSTART(QUDA_PROFILE_COMMS);
-    copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
-#ifdef MULTI_GPU
-    cudaInLinkEx->exchangeExtendedGhost(R,true);
-#endif
-    profileFatLink.TPSTOP(QUDA_PROFILE_COMMS);
-  } // Initialise and load siteLinks
+  profileFatLink.TPSTART(QUDA_PROFILE_COMMS);
+  copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
+  cudaInLinkEx->exchangeExtendedGhost(R,true);
+  profileFatLink.TPSTOP(QUDA_PROFILE_COMMS);
 
-  quda::computeFatLinkCore(inlinkPtr, const_cast<double*>(path_coeff), param, method, cudaFatLink, cudaLongLink, profileFatLink);
+  quda::computeFatLinkCore(inlinkPtr, const_cast<double*>(path_coeff), param, cudaFatLink, cudaLongLink, profileFatLink);
 
   if(ulink){
     profileFatLink.TPSTART(QUDA_PROFILE_INIT);
@@ -5414,7 +5351,7 @@ void compute_staggered_force_quda_(void* cudaMom, void* qudaQuark, double *coeff
 
 // apply the staggered phases
 void apply_staggered_phase_quda_() {
-  printfQuda("applying staggered phase\n");
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("applying staggered phase\n");
   if (gaugePrecise) {
     gaugePrecise->applyStaggeredPhase();
   } else {
@@ -5424,7 +5361,7 @@ void apply_staggered_phase_quda_() {
 
 // remove the staggered phases
 void remove_staggered_phase_quda_() {
-  printfQuda("removing staggered phase\n");
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("removing staggered phase\n");
   if (gaugePrecise) {
     gaugePrecise->removeStaggeredPhase();
   } else {

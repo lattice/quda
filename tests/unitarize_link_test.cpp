@@ -114,11 +114,8 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.type=QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
   qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct;
-  qudaGaugeParam.preserve_gauge = QUDA_FAT_PRESERVE_CPU_GAUGE
-    | QUDA_FAT_PRESERVE_GPU_GAUGE
-    | QUDA_FAT_PRESERVE_COMM_MEM;
 
-  setFatLinkPadding(QUDA_COMPUTE_FAT_STANDARD, &qudaGaugeParam);
+  setFatLinkPadding(&qudaGaugeParam);
 
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
@@ -194,8 +191,7 @@ static int unitarize_link_test(int &test_rc)
 
     quda::fatlink::initLatticeConstants(*cudaFatLink, profile);
 
-    computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
-		      QUDA_COMPUTE_FAT_STANDARD);
+    computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam);
 
     cudaFatLink->loadCPUField(*cpuFatLink);
   }
