@@ -89,7 +89,6 @@
 
       //Collection of methods for GMRESDR solver:
       void RestartVH(void *dV, const int vld, const int vlen, const int vprec, void *sortedHarVecs, void *H, const int ldh);//ldm: leading dim for both dharVecs and dH. additional info: nev, nev+1 = max_nev, m
-      void RestartZVH(void *dZ, void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh);
 
       void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn);
 
@@ -116,5 +115,14 @@
       void BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch);
 
    };
+
+  void magma_Xgesv(void* sol, const int ldn, const int n, void* Mat, const int ldm, const int prec);
+
+  void magma_Xgeev(void *Mat, const int m, const int ldm, void *vr, void *evalues, const int ldv, const int prec);
+
+  void magma_Xgels(void *Mat, void *c, void *y, int rows, int cols, int ldm, const int prec);
+
+  void magma_Xheev(void *Mat, const int m, const int ldm, void *evalues, const int prec);
+
 
 #endif // _BLAS_MAGMA_H

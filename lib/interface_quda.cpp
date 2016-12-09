@@ -29,6 +29,7 @@
 #include <ks_force_quda.h>
 
 #include <multigrid.h>
+#include <deflation.h>
 
 #ifdef NUMA_NVML
 #include <numa_affinity.h>
@@ -2234,6 +2235,75 @@ void destroyMultigridQuda(void *mg) {
   delete static_cast<multigrid_solver*>(mg);
 }
 
+
+deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
+  : profile(profile) {
+  profile.TPSTART(QUDA_PROFILE_INIT);
+  QudaInvertParam *param = eig_param.invert_param;
+
+  cudaGaugeField *cudaGauge = checkGauge(param);
+  //checkDeflationParam(&eig_param);
+
+  setTuning(param->tune);
+  eig_param.secs   = 0;
+  eig_param.gflops = 0;
+
+  // this is the Dirac operator we use for to deflate spinor
+  DiracParam diracParam;
+  if(eig_param.cuda_prec_ritz == param->cuda_prec)
+  {
+    setDiracParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
+  } else {
+    setDiracSloppyParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
+  } 
+
+  const bool pc_solve = (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+
+  d = Dirac::create(diracParam);
+  m = pc_solve ? static_cast<DiracMatrix*>( new DiracMdagM(*d) ) : static_cast<DiracMatrix*>( new DiracM(*d));
+
+  ColorSpinorParam ritzParam(0, *param, cudaGauge->X(), pc_solve, eig_param.location);
+
+  ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
+  ritzParam.is_composite  = true;
+  ritzParam.is_component  = false;
+  ritzParam.composite_dim = param->nev*param->deflation_grid;
+
+  ritzParam.setPrecision(param->cuda_prec_ritz);
+
+  if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
+    // all coarse GPU vectors use FLOAT2 ordering
+    ritzParam.fieldOrder = (param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ) ?  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  }
+
+  RV = ColorSpinorField::Create(ritzParam); 
+
+  // fill out the MG parameters for the fine level
+  deflParam = new DeflationParam(eig_param, RV, *m);
+
+  defl = new Deflation(*deflParam, profile);
+
+  profile.TPSTOP(QUDA_PROFILE_INIT);
+}
+
+void* newDeflationQuda(QudaEigParam *eig_param) {
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);//we may not need magma
+  openMagma();
+
+  deflated_solver *defl = new deflated_solver(*eig_param, profileInvert);
+
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  saveProfile(__func__);
+  flushProfile();
+  return static_cast<void*>(defl);
+}
+
+void destroyDeflationQuda(void *df) {
+  closeMagma();
+  delete static_cast<deflated_solver*>(df);
+}
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {

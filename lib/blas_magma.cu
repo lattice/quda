@@ -144,12 +144,13 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
 
 #undef BLOCK_SIZE
 
+#ifdef MAGMA_LIB
 //Wrapper for magma_Xgesv routines, where X={c,z}
 
   template<typename magmaFloat> void magma_gesv(void *sol, const int ldn, const int n, void *Mat, const int ldm)
   {
     cudaPointerAttributes ptr_attr;
-    cudaPointerGetAttributes(&ptr_attr, Mat);
+    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_gesv, a pointer was not allocated in, mapped by or registered with current CUDA context.\n"); 
 
     magma_int_t *ipiv;
     magma_int_t err, info;
@@ -189,7 +190,7 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
   template<typename magmaFloat> void magma_geev(void *Mat, const int m, const int ldm, void *vr, void *evalues, const int ldv)
   {
     cudaPointerAttributes ptr_attr;
-    cudaPointerGetAttributes(&ptr_attr, Mat);
+    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_geev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n"); 
 
     magma_int_t err, info;
 
@@ -211,7 +212,7 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
         err = magma_cgeev(_cNV, _cV, m, nullptr, ldm, nullptr, nullptr, ldv, nullptr, ldv, &qwork, -1, nullptr, &info);
         if( err != 0 ) errorQuda( "Error: CGEEVX, info %d\n",info);
 
-        magma_int_t lwork = static_cast<magma_int_t>( MAGMA_Z_REAL(qwork));
+        magma_int_t lwork = static_cast<magma_int_t>( MAGMA_C_REAL(qwork));
 
         magma_smalloc_pinned(&rwork, 2*m);
         magma_cmalloc_pinned(&work, lwork);
@@ -251,7 +252,7 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
   template<typename  magmaFloat> void magma_gels(void *Mat, void *c, void *y, int rows, int cols, int ldm) 
   {
     cudaPointerAttributes ptr_attr;
-    cudaPointerGetAttributes(&ptr_attr, Mat);
+    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_gels, a pointer was not allocated in, mapped by or registered with current CUDA context.\n"); 
 
     magma_int_t err, info, lwork;
     void *hwork_ = nullptr;
@@ -309,8 +310,78 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
     if(hwork_) magma_free_cpu(hwork_);
 
     return;
-
   }
+
+  template<typename magmaFloat> void magma_heev(void *Mat, const int m, const int ldm, void *evalues)
+  {
+    cudaPointerAttributes ptr_attr;
+    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_heev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n"); 
+
+    magma_int_t err, info;
+
+    void *work_  = nullptr, *rwork_ = nullptr;
+    int *iwork   = nullptr;
+    int qiwork; //parameter to extract optimal size of iwork
+
+    if ( ptr_attr.memoryType == cudaMemoryTypeDevice ) {
+      errorQuda("\nGPU version is not supported.\n");
+      //we can add it if needed.
+    }  else if ( ptr_attr.memoryType == cudaMemoryTypeHost ) {
+      if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
+      {
+        magmaFloatComplex qwork; //parameter to extract optimal size of work
+        float qrwork; //parameter to extract optimal size of rwork
+
+        magmaFloatComplex *work = static_cast<magmaFloatComplex*>(work_); 
+        float *rwork = static_cast<float*>(rwork_); 
+
+        //Get optimal work:
+        err = magma_cheevd(_cV, _cU, m, nullptr, ldm, nullptr, &qwork, -1, &qrwork, -1, &qiwork, -1, &info);
+        if( err != 0 ) errorQuda( "Error: CHEEVD, info %d\n",info);
+
+        magma_int_t lwork  = static_cast<magma_int_t>( MAGMA_C_REAL(qwork));
+        magma_int_t lrwork = static_cast<magma_int_t>( qrwork );
+        magma_int_t liwork = static_cast<magma_int_t>( qiwork );
+
+        magma_cmalloc_pinned(&work,  lwork);
+        magma_smalloc_pinned(&rwork, lrwork);
+        magma_imalloc_pinned(&iwork, liwork);
+
+        err = magma_cheevd(_cV, _cU, m, static_cast<magmaFloatComplex*>(Mat), ldm, static_cast<float*>(evalues), work, lwork, rwork, lrwork, iwork, liwork, &info);
+        if( err != 0 ) errorQuda( "Error: CHEEVD, info %d\n",info);
+      }
+      else
+      {
+        magmaDoubleComplex qwork; //parameter to extract optimal size of work
+        double qrwork; //parameter to extract optimal size of rwork
+
+        magmaDoubleComplex *work = static_cast<magmaDoubleComplex*>(work_); 
+        double *rwork = static_cast<double*>(rwork_);
+
+        //Get optimal work:
+        err = magma_zheevd(_cV, _cU, m, nullptr, ldm, nullptr, &qwork, -1, &qrwork, -1, &qiwork, -1, &info);
+        if( err != 0 ) errorQuda( "Error: ZHEEVD, info %d\n",info);
+
+        magma_int_t lwork  = static_cast<magma_int_t>( MAGMA_Z_REAL(qwork));
+        magma_int_t lrwork = static_cast<magma_int_t>( qrwork );
+        magma_int_t liwork = static_cast<magma_int_t>( qiwork );
+
+        magma_zmalloc_pinned(&work,  lwork);
+        magma_dmalloc_pinned(&rwork, lrwork);
+        magma_imalloc_pinned(&iwork, liwork);
+
+        err = magma_zheevd(_cV, _cU, m, static_cast<magmaDoubleComplex*>(Mat), ldm, static_cast<double*>(evalues), work, lwork, rwork, lrwork, iwork, liwork, &info);
+        if( err != 0 ) errorQuda( "Error: ZHEEVD, info %d\n",info);
+      }
+    }
+
+    if(rwork_)  magma_free_pinned(rwork_);
+    if(work_ )  magma_free_pinned(work_);
+    if(iwork )  magma_free_pinned(iwork);
+
+    return;
+  }
+#endif
 
   void magma_Xgesv(void* sol, const int ldn, const int n, void* Mat, const int ldm, const int prec)
   {
@@ -343,6 +414,15 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
     return;
   }
 
+  void magma_Xheev(void *Mat, const int m, const int ldm, void *evalues, const int prec)
+  {
+#ifdef MAGMA_LIB
+    if      (prec == sizeof(std::complex< double >)) magma_heev<magmaDoubleComplex>(Mat, m, ldm, evalues);
+    else if (prec == sizeof(std::complex< float  >)) magma_heev<magmaFloatComplex >(Mat, m, ldm, evalues);
+    else errorQuda("\nPrecision is not supported.\n");
+#endif
+    return;
+  }
 
 
 

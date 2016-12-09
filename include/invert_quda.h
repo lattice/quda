@@ -31,6 +31,11 @@ namespace quda {
     void *preconditioner;
 
     /**
+     * Deflation operator
+     */
+    void *deflation_op;
+
+    /**
      * Whether to use the L2 relative residual, L2 absolute residual
      * or Fermilab heavy-quark residual, or combinations therein to
      * determine convergence.  To require that multiple stopping
@@ -198,7 +203,7 @@ namespace quda {
        @param param The QudaInvertParam instance from which the values are copied
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
-      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
@@ -236,7 +241,7 @@ namespace quda {
     }
 
     SolverParam(const SolverParam &param) : inv_type(param.inv_type),
-      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
@@ -429,12 +434,41 @@ namespace quda {
       Solver *K;
       SolverParam Kparam; // parameters for preconditioner solve
 
+      int nKrylov;//corresponds to m_{max}+1, if nKrylov = 0 , use standard pcg
+      double *pAp;
+  
+      std::vector<ColorSpinorField*> p;  // FCG search vectors
+      std::vector<ColorSpinorField*> Ap; // mat * search vectors
+
+      /**
+       Solver uses lazy allocation: this flag to determine whether we have allocated.
+      */
+      bool init;
+      bool use_ipcg_iters;//which algorithm to use:  (true & K) => ipcg, (false & K) => fcg, !K => regilar CG
+
+      ColorSpinorField *rp;       //! residual vector
+      ColorSpinorField *yp;       //! high precision accumulator
+      ColorSpinorField *tmpp;     //! temporary for mat-vec
+      ColorSpinorField *x_sloppy; //! sloppy solution vector
+      ColorSpinorField *r_sloppy; //! sloppy residual vector
+      ColorSpinorField *r_pre;    //! residual passed to preconditioner
+      ColorSpinorField *p_pre;    //! preconditioner result
+      ColorSpinorField *wp;       //! preconditioner result in sloppy precision
+
     public:
-      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-               SolverParam &param, TimeProfile &profile);
+      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      /**
+        @param K Preconditioner
+      */
+      PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+
       virtual ~PreconCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
+      //optimization methods:
+      void ComputeBeta(double *beta, int begin, int size);
+      void UpdateP(double *beta, int begin, int j, int size);
+      void orthoDir(int mk, int j, int pipeline); 
   };
 
 
@@ -700,9 +734,9 @@ namespace quda {
 
     virtual ~DeflatedSolver() { ; }
 
-    virtual void operator()(ColorSpinorField *out, ColorSpinorField *in) = 0;
+    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
 
-//    virtual void Deflate(ColorSpinorField &out, ColorSpinorField &in) = 0;//extrenal method (not implemented yet)
+//    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
     virtual void StoreRitzVecs(void *host_buffer, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
 
     virtual void CleanResources() = 0;
@@ -728,69 +762,49 @@ namespace quda {
 
   };
 
-  struct DeflationParam;//Forward declaration
-  typedef ColorSpinorField ColorSpinorFieldSet;
+  using ColorSpinorFieldSet = ColorSpinorField;
 
-  class IncEigCG : public DeflatedSolver {
+  //forward declaration
+  class EigCGArgs;
+
+  class IncEigCG : public Solver {
 
   private:
-    DiracMatrix *mat;
-    DiracMatrix *matSloppy;
+    DiracMatrix &mat;
+    DiracMatrix &matSloppy;
+    DiracMatrix &matPrecon;
 
-    DiracMatrix *matCGSloppy;
+    Solver *K;
+    SolverParam Kparam; // parameters for preconditioner solve
 
-    const DiracMatrix *matDefl;
+    ColorSpinorFieldSet *Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
-    QudaPrecision search_space_prec;
-    ColorSpinorFieldSet *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
+    ColorSpinorField *rp;       //! residual vector
+    ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField* p;  // conjugate vector
+    ColorSpinorField* Ap; // mat * conjugate vector
+    ColorSpinorField *tmpp;     //! temporary for mat-vec
+    ColorSpinorField* Az; // mat * conjugate vector from the previous iteration 
+    ColorSpinorField *r_pre;    //! residual passed to preconditioner
+    ColorSpinorField *p_pre;    //! preconditioner result
 
-    SolverParam initCGparam; // parameters for initCG solver
-    TimeProfile *profile;    //time profile for initCG solver
+    EigCGArgs *eigcg_args;
 
-    bool eigcg_alloc;
-    bool use_eigcg;
+    TimeProfile &profile;    //time profile for initCG solver
+
+    bool init;
 
   public:
 
-    IncEigCG(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
-    IncEigCG(SolverParam &param);
+    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
 
+    void RestartVT(const double beta, const double rho);
     //EigCG solver
-    int EigCG(ColorSpinorField &out, ColorSpinorField &in);
-
+    int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver (for eigcg and initcg calls)
-    void operator()(ColorSpinorField *out, ColorSpinorField *in);
-
-    //Compute  u dH^{-1} u^{dagger}b:
-    void DeflateSpinor(ColorSpinorField &out, ColorSpinorField &in, DeflationParam *param, bool set2zero = true);
-    //
-    void DeflateSpinorReduced(ColorSpinorField &out, ColorSpinorField &in, DeflationParam *param, bool set2zero = true);
-
-    //Deflation space management
-    void CreateDeflationSpace(ColorSpinorField &eigcgSpinor, DeflationParam *&param);
-
-    //extend projection matrix:
-    //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
-    //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
-    //extend H-matrix with the components
-    void ExpandDeflationSpace(DeflationParam *param, const int new_nev);
-    //
-    void DeleteDeflationSpace(DeflationParam *&param);
-    //
-    void DeleteEigCGSearchSpace();
-    //
-    void SaveEigCGRitzVecs(DeflationParam *param, bool cleanResources = false);
-    //
-    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
-    //
-    void CleanResources();
-
-    void LoadEigenvectors(DeflationParam *param, int max_nevs, double tol = 1e-3);
-
-    void ReportEigenvalueAccuracy(DeflationParam *param, int nevs_to_print);
-
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
 //forward declaration
@@ -918,7 +932,6 @@ namespace quda {
     void AllocateFlexArnoldiVectors(ColorSpinorField &meta);
 
   };
-
 
 
 } // namespace quda
