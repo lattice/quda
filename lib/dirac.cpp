@@ -10,7 +10,7 @@ namespace quda {
   // they all have the same volume, etc. (used to initialize the various CUDA constants).
 
   Dirac::Dirac(const DiracParam &param) 
-    : gauge(param.gauge), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
+    : gauge(param.gauge), kappa(param.kappa), mass(param.mass), omega(0.0), matpcType(param.matpcType), 
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
       profile("Dirac", false)
   {
@@ -18,7 +18,7 @@ namespace quda {
   }
 
   Dirac::Dirac(const Dirac &dirac) 
-    : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
+    : gauge(dirac.gauge), kappa(dirac.kappa), omega(0.0), matpcType(dirac.matpcType), 
       dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
       profile("Dirac", false)
   {

@@ -69,6 +69,7 @@ namespace quda {
   private:
     const gFloat *gauge0, *gauge1;
     const double a;
+    const double w;
     const int nSrc;
 
   protected:
@@ -85,8 +86,8 @@ namespace quda {
   public:
     StaggeredDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
-			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a), nSrc(in->X(4))
+			const cudaColorSpinorField *x, const double a, const double w, const int dagger)
+      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a), w(w), nSrc(in->X(4))
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
@@ -100,7 +101,7 @@ namespace quda {
       STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 		       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 		       (sFloat*)in->V(), (float*)in->Norm(), 
-		       (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
+		       (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a, w); 
     }
 
     bool advanceBlockDim(TuneParam &param) const
@@ -155,7 +156,7 @@ namespace quda {
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, 
 			   const int dagger, const cudaColorSpinorField *x,
-			   const double &k, const int *commOverride, TimeProfile &profile)
+			   const double &k, const double &w, const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
     inSpinor->allocateGhostBuffer(1);
@@ -170,7 +171,6 @@ namespace quda {
     //experimental for U1 emulation:
     dslashParam.staggered_u1_emulation = gauge.StaggeredU1Emulation() ? 1 : 0;
     dslashParam.staggered_2link_term   = gauge.Staggered2LinkTerm() ? 1 : 0;
-    dslashParam.omega  = gauge.Staggered2LinkTerm() ? gauge.Omega() : 0.0;
     // in the solver for the improved staggered action
 
     for(int i=0;i<4;i++){
@@ -198,14 +198,14 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new StaggeredDslashCuda<double2, double2>
-	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), in, x, k, w, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new StaggeredDslashCuda<float2, float2>
-	(out, (float2*)gauge0, (float2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+	(out, (float2*)gauge0, (float2*)gauge1, gauge.Reconstruct(), in, x, k, w, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
       dslash = new StaggeredDslashCuda<short2, short2>
-	(out, (short2*)gauge0, (short2*)gauge1, gauge.Reconstruct(), in, x, k, dagger);
+	(out, (short2*)gauge0, (short2*)gauge1, gauge.Reconstruct(), in, x, k, w, dagger);
     }
 
     // the parameters passed to dslashCuda must be 4-d volume and 3-d

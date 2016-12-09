@@ -112,7 +112,7 @@ QudaPrecision &cuda_prec_precondition = prec_precondition;
 const bool _2d_u1_emulation = false;
 const bool _2link_term      = true;
 
-const double _2link_omega   = 0.1;
+const double _2link_omega   = 0.1;//0.1;
 
 int latt_dim[QUDA_MAX_DIM] = {0} ; 
 
@@ -186,8 +186,7 @@ void setGaugeParam(QudaGaugeParam &gaugeParam, double tadpole_coeff) {
   gaugeParam.tadpole_coeff = tadpole_coeff;
 
   gaugeParam._2d_u1_emulation = _2d_u1_emulation;
-  gaugeParam._2link_term = _2link_term;
-  gaugeParam.omega = _2link_term ? 0.5*_2link_omega : 0.0;
+  gaugeParam._2link_term      = _2link_term;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
@@ -242,7 +241,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.dslash_type = dslash_type;
 
   //Free field!
-  inv_param.mass = _2link_term ? mass+_2link_omega : mass;
+  inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (4 + inv_param.mass));
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -350,6 +349,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   //Experimental: for 2d U1 field tests
   mg_param._2d_u1_emulation = _2d_u1_emulation;
+  mg_param.stag_2link_scale = _2link_omega;
 
   //Smoothed transfer operators:
   mg_param.alpha = nullptr;
@@ -377,7 +377,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.dslash_type = dslash_type;
 
   //Free field!
-  inv_param.mass = _2link_term ? mass+_2link_omega : mass;
+  inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (4 + inv_param.mass));
 
   inv_param.dagger = QUDA_DAG_NO;

@@ -523,6 +523,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(_2d_u1_emulation, QUDA_BOOLEAN_INVALID);
+  P(stag_2link_scale, INVALID_DOUBLE);
 
 #ifdef INIT_PARAM
   return ret;

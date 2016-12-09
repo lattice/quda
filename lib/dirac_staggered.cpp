@@ -8,6 +8,8 @@ namespace quda {
 #include <dslash_init.cuh>
   }
 
+  static double stag_omega = 0.0;//temporary hack
+
   DiracStaggered::DiracStaggered(const DiracParam &param) : 
     Dirac(param), face1(param.gauge->X(), 4, 6, 1, param.gauge->Precision()), face2(param.gauge->X(), 4, 6, 1, param.gauge->Precision())
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
@@ -68,7 +70,7 @@ namespace quda {
       staggered::setFace(face1, face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
 			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
-			  dagger, 0, 0, commDim, profile);
+			  dagger, 0, 0.0, 0.0, commDim, profile);
     } else {
       errorQuda("Not supported");
     }
@@ -86,7 +88,7 @@ namespace quda {
       staggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+			  &static_cast<const cudaColorSpinorField&>(x), k, stag_omega, commDim, profile);
     } else {
       errorQuda("Not supported");
     }  
@@ -98,10 +100,14 @@ namespace quda {
   void DiracStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double _2m = 2*mass; 
+
     if(dagger == QUDA_DAG_YES) _2m *= -1.0;
+    stag_omega = omega;
 
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), _2m);  
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), _2m);
+
+    stag_omega = 0.0;
 
     //if(dagger == QUDA_DAG_YES) blas::ax(-1.0, out);
   }

@@ -66,7 +66,6 @@ extern "C" {
 
     bool _2d_u1_emulation;  /**< Experimental : whether we want 2d u1 field*/
     bool _2link_term; /**< Experimental : whether we want compute 2-link term in staggered dslash*/
-    double omega; /**< Experimental : scaling factor for 2-link term in staggered dslash*/
 
     double i_mu; /**< Imaginary chemical potential */
 
@@ -405,6 +404,9 @@ extern "C" {
 
     /**< Experimental: smoothed transfer operator (requires emulation!) */
     void* alpha;
+
+    /**< Staggered 2link term parameter */
+    double stag_2link_scale; 
 
   } QudaMultigridParam;
 

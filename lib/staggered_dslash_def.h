@@ -16,9 +16,27 @@
 // set options for current iteration
 
 #if (DD_IMPROVED==1)
+
 #define DD_FNAME improvedStaggeredDslash
+#if (DD_PREC == 0)
+#define DD_PARAM_AXPY const double2 *x, const float *xNorm, const double a, const DslashParam param
+#elif (DD_PREC == 1) 
+#define DD_PARAM_AXPY const float2 *x, const float *xNorm, const float a, const DslashParam param
 #else
+#define DD_PARAM_AXPY const short2 *x, const float *xNorm, const float a, const DslashParam param
+#endif
+
+#else //
+
 #define DD_FNAME staggeredDslash
+#if (DD_PREC == 0)
+#define DD_PARAM_AXPY const double2 *x, const float *xNorm, const double a, const double w, const DslashParam param
+#elif (DD_PREC == 1) 
+#define DD_PARAM_AXPY const float2 *x, const float *xNorm, const float a, const float w, const DslashParam param
+#else
+#define DD_PARAM_AXPY const short2 *x, const float *xNorm, const float a, const float w, const DslashParam param
+#endif
+
 #endif
 
 #if (DD_AXPY==0) // no axpy
@@ -26,14 +44,6 @@
 #else            // axpy
 #define DD_AXPY_F Axpy
 #define DSLASH_AXPY
-#endif
-
-#if (DD_PREC == 0)
-#define DD_PARAM_AXPY const double2 *x, const float *xNorm, const double a, const DslashParam param
-#elif (DD_PREC == 1) 
-#define DD_PARAM_AXPY const float2 *x, const float *xNorm, const float a, const DslashParam param
-#else
-#define DD_PARAM_AXPY const short2 *x, const float *xNorm, const float a, const DslashParam param
 #endif
 
 #if (DD_FAT_RECON==8)

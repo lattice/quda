@@ -37,6 +37,8 @@ namespace quda {
     double mu; // used by twisted mass only
     double epsilon; //2nd tm parameter (used by twisted mass only)
 
+    double omega; //staggered only
+
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2; // used by Wilson-like kernels only
 
@@ -48,7 +50,7 @@ namespace quda {
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0),
+      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0), omega(0.0),
       tmp1(0), tmp2(0)
     {
 
@@ -95,6 +97,8 @@ namespace quda {
     cudaGaugeField *gauge;
     double kappa;
     double mass;
+    double omega;//2-link term factor
+
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
     mutable unsigned long long flops;
@@ -137,11 +141,13 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const = 0;
     void setMass(double mass){ this->mass = mass;}
+    void setOmega(double omega){ this->omega = omega;}
     // Dirac operator factory
     static Dirac* create(const DiracParam &param);
 
     double Kappa() const { return kappa; }
     double Mass() const { return mass; }
+    double Omega() const { return omega; }
 
     void setMatPCType( QudaMatPCType matpctype ) { matpcType = matpctype; }
 
@@ -618,6 +624,7 @@ namespace quda {
   class DiracStaggered : public Dirac {
 
   protected:
+    //double omega; //2-link term factor
     FaceBuffer face1, face2; // multi-gpu communication buffers
 
   public:

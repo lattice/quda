@@ -24,7 +24,6 @@ namespace quda {
     staggeredPhaseApplied(u.StaggeredPhaseApplied()),
     staggered_u1_emulation(u.StaggeredU1Emulation()),
     staggered_2link_term(u.Staggered2LinkTerm()),
-    omega(u.Omega()), 
     i_mu(u.iMu())
       {
 	precision = u.Precision();
@@ -46,7 +45,7 @@ namespace quda {
     order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
     create(param.create), ghostExchange(param.ghostExchange), 
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), staggered_u1_emulation(param.staggered_u1_emulation), staggered_2link_term(param.staggered_2link_term), omega(param.omega), i_mu(param.i_mu)
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), staggered_u1_emulation(param.staggered_u1_emulation), staggered_2link_term(param.staggered_2link_term), i_mu(param.i_mu)
   {
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
       errorQuda("nColor must be 3, not %d for this link type", nColor);

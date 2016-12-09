@@ -2,8 +2,12 @@
 #include <multigrid.h>
 #include <algorithm>
 
-const bool staggered_dslash_emulation =  false;
+const bool staggered_dslash_emulation    = true;
 const bool coarsecoarse_dslash_emulation = true;
+//Some extra parameters:
+const bool single_parity_application = false;
+const bool cg_mdagm_operator         = false;
+const bool fg_mdagm_operator         = false;
 
 namespace quda {
 
@@ -190,10 +194,6 @@ namespace quda {
 
     if((is_staggered && staggered_dslash_emulation) || (!is_staggered && coarsecoarse_dslash_emulation))
     {
-        bool single_parity_application = false;
-        bool cg_mdagm_operator         = false;
-        bool fg_mdagm_operator         = false;
-
         if (!enable_gpu) errorQuda("Cannot apply coarse grid operator on GPU since enable_gpu has not been set");
         const std::vector<ColorSpinorField*> &B = transfer->RawVectors();
         const ColorSpinorField &tmp3 = *B[0];
@@ -242,7 +242,7 @@ namespace quda {
 //#define HERMITIAN
           //Non-hermitian version:
           dirac->M(*tmp6, *tmp5);//WARNING: this may be hermitian, check dirac_staggered.cpp
-          //Hermitian version:
+
 #ifdef HERMITIAN          
           blas::ax(-1.0, tmp6->Odd());
 #endif

@@ -46,7 +46,6 @@ namespace quda {
     /*** Experimental for staggered only! ***/
     bool staggered_u1_emulation;
     bool staggered_2link_term;
-    double omega;
 
     /** Imaginary chemical potential */
     double i_mu;
@@ -73,7 +72,6 @@ namespace quda {
       staggeredPhaseApplied(false),
       staggered_u1_emulation(false),
       staggered_2link_term(false),
-      omega(0.0),
       i_mu(0.0)
 	{
 	  // variables declared in LatticeFieldParam
@@ -96,7 +94,7 @@ namespace quda {
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
       compute_fat_link_max(false), ghostExchange(ghostExchange),
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), staggered_u1_emulation(false), staggered_2link_term(false), omega(0.0),  i_mu(0.0)
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), staggered_u1_emulation(false), staggered_2link_term(false), i_mu(0.0)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -115,7 +113,7 @@ namespace quda {
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
       staggeredPhaseType(param.staggered_phase_type), 
-      staggeredPhaseApplied(param.staggered_phase_applied), staggered_u1_emulation(param._2d_u1_emulation), staggered_2link_term(param._2link_term), omega(param.omega), i_mu(param.i_mu)
+      staggeredPhaseApplied(param.staggered_phase_applied), staggered_u1_emulation(param._2d_u1_emulation), staggered_2link_term(param._2link_term), i_mu(param.i_mu)
 	{
 	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
@@ -180,7 +178,6 @@ namespace quda {
     /*** Experimental for staggered only! ***/
     bool staggered_u1_emulation;
     bool staggered_2link_term;
-    double omega;
  
     /**
        @brief Exchange the buffers across all dimensions in a given direction
@@ -219,10 +216,6 @@ namespace quda {
     /**Experimental! */
     bool StaggeredU1Emulation() const { return staggered_u1_emulation; }
     bool Staggered2LinkTerm() const { return staggered_2link_term; }
-    /**
-       Return the scaling factor for 2-link term
-    */
-    double Omega() const { return omega; }
 
 
     /**
