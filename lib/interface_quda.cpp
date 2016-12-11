@@ -1156,6 +1156,15 @@ void endQuda(void)
 
   if (!initialized) return;
 
+  freeGaugeQuda();
+  freeCloverQuda();
+
+  for (unsigned int i=0; i<solutionResident.size(); i++) {
+    if(solutionResident[i]) delete solutionResident[i];
+  }
+  solutionResident.clear();
+  if(momResident) delete momResident;
+
   LatticeField::freeBuffer(0);
   LatticeField::freeBuffer(1);
   cudaColorSpinorField::freeBuffer(0);
@@ -1165,14 +1174,6 @@ void endQuda(void)
   FaceBuffer::flushPinnedCache();
   LatticeField::flushPinnedCache();
   LatticeField::flushDeviceCache();
-  freeGaugeQuda();
-  freeCloverQuda();
-
-  for (unsigned int i=0; i<solutionResident.size(); i++) {
-    if(solutionResident[i]) delete solutionResident[i];
-  }
-  solutionResident.clear();
-  if(momResident) delete momResident;
 
   blas::end();
 
@@ -1201,6 +1202,7 @@ void endQuda(void)
 
   profileEnd.TPSTOP(QUDA_PROFILE_TOTAL);
   profileInit2End.TPSTOP(QUDA_PROFILE_TOTAL);
+
   // print out the profile information of the lifetime of the library
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     profileInit.Print();
