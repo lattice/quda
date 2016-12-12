@@ -7,11 +7,16 @@
     double _val;
     int    _idx;
 
+    static bool small_values;
+
     SortEvals(double val, int idx) : _val(val), _idx(idx) {};
 
-    static bool Cmp (SortEvals v1, SortEvals v2) { return (v1._val < v2._val);}
+    static bool SelectSmall (SortEvals v1, SortEvals v2) { return (v1._val < v2._val);}
+    static bool SelectLarge (SortEvals v1, SortEvals v2) { return (v1._val > v2._val);}
+
   };
 
+  bool SortEvals::small_values = true;
 
   template<typename Float> void arpack_naupd(int &ido, char &bmat, int &n, char *which, int &nev, Float &tol,  std::complex<Float> *resid, int &ncv, std::complex<Float> *v, int &ldv,
                     int *iparam, int *ipntr, std::complex<Float> *workd, std::complex<Float> *workl, int &lworkl, Float *rwork, int &info, int *fcomm)
@@ -200,8 +205,8 @@ namespace quda{
   {
     printfQuda("\nLoad eigenvectors..\n");
 
-    std::vector<SortEvals> sorted_evals_cntr;
-    sorted_evals_cntr.reserve(nev);
+    std::vector<SortEvals> sorted_evals;
+    sorted_evals.reserve(nev);
 
     ColorSpinorParam csParam(*evecs[0]);
 
@@ -214,22 +219,33 @@ namespace quda{
 
     std::string arpack_which(lanczos_which);
 
-    for(int e = 0; e < nev; e++) 
-    {
-      if     (arpack_which.compare(std::string("SM")))    sorted_evals_cntr.push_back( SortEvals(std::norm(w_d_[e]), e ));
-      else if(arpack_which.compare(std::string("SI")))    sorted_evals_cntr.push_back( SortEvals(w_d_[e].imag(), e ));
-      else if(arpack_which.compare(std::string("SR")))    sorted_evals_cntr.push_back( SortEvals(w_d_[e].real(), e ));
-      else
-          errorQuda("\nSorting option is not supported.\n");
+    if (arpack_which.compare(std::string("SM"))) {
+      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(std::norm(w_d_[e]), e));
+    } else if (arpack_which.compare(std::string("SI"))) {
+      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].imag(), e));
+    } else if (arpack_which.compare(std::string("SR"))) {
+      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].real(), e));
+    } else if (arpack_which.compare(std::string("LM"))) {
+      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(std::norm(w_d_[e]), e));
+      SortEvals::small_values = false;
+    } else if (arpack_which.compare(std::string("LI"))) {
+      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].imag(), e));
+      SortEvals::small_values = false;
+    } else if (arpack_which.compare(std::string("LR"))) {
+      for(int e = 0; e < nev; e++) sorted_evals.push_back( SortEvals(w_d_[e].real(), e));
+      SortEvals::small_values = false;
+    } else {
+      errorQuda("\nSorting option is not supported.\n");
     }
 
-    std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), SortEvals::Cmp);
+    if(SortEvals::small_values) std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectSmall );
+    else                        std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectLarge );
 
     cpuColorSpinorField *cpu_tmp = nullptr;
     int ev_id = 0;
 
     for(std::vector<ColorSpinorField*>::iterator vec = evecs.begin() ; vec != evecs.end(); ++vec) {
-      int sorted_id =  sorted_evals_cntr[ev_id++]._idx;
+      int sorted_id =  sorted_evals[ev_id++]._idx;
 
       printfQuda("%d ,Re= %le, Im= %le\n", sorted_id, w_d_[sorted_id].real(), w_d_[sorted_id].imag());
 
@@ -348,8 +364,8 @@ namespace quda{
  void arpackSolve( std::vector<ColorSpinorField*> &B, void* evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target)
  {
 #ifdef ARPACK_LIB
-   if((nev <= 0) or (nev > B[0]->Length()))      errorQuda("Wrong number of the requested eigenvectors.\n");
-   if(((ncv-nev) < 2) or (ncv > B[0]->Length())) errorQuda("Wrong size of the IRAM work subspace.\n");
+   if((nev <= 0) or (nev > static_cast<int>(B[0]->Length())))      errorQuda("Wrong number of the requested eigenvectors.\n");
+   if(((ncv-nev) < 2) or (ncv > static_cast<int>(B[0]->Length()))) errorQuda("Wrong size of the IRAM work subspace.\n");
    if(arpackPrec == QUDA_DOUBLE_PRECISION) arpack_solve<double>(B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
    else                                    arpack_solve<float> (B, evals, matEigen, matPrec, arpackPrec, tol, nev , ncv, target);
 #else
