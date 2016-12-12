@@ -141,6 +141,7 @@ namespace quda {
 
       // create smoothing operators
       diracParam.dirac = const_cast<Dirac*>(param.matSmooth.Expose());
+      diracParam.type = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? QUDA_COARSEPC_DIRAC : QUDA_COARSE_DIRAC;
       diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
 	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
 	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
@@ -696,8 +697,13 @@ namespace quda {
     solverParam.maxiter = 500;
     solverParam.tol = 5e-6;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    solverParam.delta = 1e-7;
+    //solverParam.delta = 1e-1; // For BICGSTABL, was 1e-7 for BICGSTAB
+    solverParam.delta = 1e-7; 
     solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
+    //solverParam.inv_type = QUDA_BICGSTABL_INVERTER;
+    solverParam.Nkrylov = 4;
+    solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTABL_INVERTER ? 4 : 0); // pipeline != 0 breaks BICGSTAB
+    
     if (param.level == 0) { // this enables half precision on the fine grid only if set
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
       solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
