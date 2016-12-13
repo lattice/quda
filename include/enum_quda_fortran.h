@@ -369,16 +369,6 @@
 #define QUDA_FORWARDS  +1
 #define QUDA_BOTH_DIRS 2
 
-#define QudaComputeFatMethod integer(4)
-#define QUDA_COMPUTE_FAT_STANDARD 0
-#define QUDA_COMPUTE_FAT_EXTENDED_VOLUME 1
-#define QUDA_COMPUTE_FAT_INVALID QUDA_INVALID_ENUM
-
-#define QudaFatLinkFlag integer(4)
-#define QUDA_FAT_PRESERVE_CPU_GAUGE 1
-#define QUDA_FAT_PRESERVE_GPU_GAUGE 2
-#define QUDA_FAT_PRESERVE_COMM_MEM 4
-
 #define QudaFieldGeometry integer(4)
 #define QUDA_SCALAR_GEOMETRY 1
 #define QUDA_VECTOR_GEOMETRY 4

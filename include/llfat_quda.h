@@ -30,19 +30,12 @@ namespace quda {
   } llfat_kernel_param_t;
   
 
-  void llfat_cuda(cudaGaugeField* cudaFatLink, 
-                  cudaGaugeField* cudaLongLink,
-                  cudaGaugeField& cudaSiteLink, 
-		  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
-		  QudaGaugeParam* param, double* act_path_coeff);
-
   void llfat_cuda_ex(cudaGaugeField* cudaFatLink, 
                      cudaGaugeField* cudaLongLink,
                      cudaGaugeField& cudaSiteLink, 
 		     cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 		     QudaGaugeParam* param, double* act_path_coeff);
   
-  void llfat_init_cuda(QudaGaugeParam* param);
   void llfat_init_cuda_ex(QudaGaugeParam* param_ex);
 
   void computeLongLinkCuda(void* outEven, void* outOdd,
@@ -51,15 +44,6 @@ namespace quda {
                            dim3 halfGridDim, llfat_kernel_param_t kparam);           
                 
 
-  void computeGenStapleFieldParityKernel(void* staple_even, void* staple_odd, 
-					 const void* sitelink_even, const void* sitelink_odd,
-					 void* fatlink_even, void* fatlink_odd,			    
-					 const void* mulink_even, const void* mulink_odd, 
-					 int mu, int nu, int save_staple,
-					 double mycoeff,
-					 QudaReconstructType recon, QudaPrecision prec,
-					 dim3 halfGridDim,  llfat_kernel_param_t kparam,
-					 cudaStream_t* stream);
   void computeGenStapleFieldParityKernel_ex(void* staple_even, void* staple_odd, 
 					    const void* sitelink_even, const void* sitelink_odd,
 					    void* fatlink_even, void* fatlink_odd,			    
@@ -68,22 +52,13 @@ namespace quda {
 					    double mycoeff,
 					    QudaReconstructType recon, QudaPrecision prec,
 					    llfat_kernel_param_t kparam);  
-  void siteComputeGenStapleParityKernel(void* staple_even, void* staple_odd, 
-					const void* sitelink_even, const void* sitelink_odd, 
-					void* fatlink_even, void* fatlink_odd,	
-					int mu, int nu,	double mycoeff,
-					QudaReconstructType recon, QudaPrecision prec,
-					dim3 halfGridDim, llfat_kernel_param_t kparam,
-					cudaStream_t* stream); 
+
   void siteComputeGenStapleParityKernel_ex(void* staple_even, void* staple_odd, 
 					   const void* sitelink_even, const void* sitelink_odd, 
 					   void* fatlink_even, void* fatlink_odd,	
 					   int mu, int nu,	double mycoeff,
 					   QudaReconstructType recon, QudaPrecision prec,
 					   llfat_kernel_param_t kparam);
-  void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
-			  cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,			 
-			  QudaGaugeParam* param, double* act_path_coeff);  
   void llfatOneLinkKernel_ex(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLink,
 			     cudaGaugeField& cudaStaple, cudaGaugeField& cudaStaple1,
 			     QudaGaugeParam* param, double* act_path_coeff,
@@ -91,9 +66,8 @@ namespace quda {
 
 
   void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
-			  QudaGaugeParam* qudaGaugeParam, QudaComputeFatMethod method,
-			  cudaGaugeField* cudaFatLink, cudaGaugeField* cudaLongLink, 
-                          TimeProfile& profile);
+			  QudaGaugeParam* qudaGaugeParam, cudaGaugeField* cudaFatLink,
+			  cudaGaugeField* cudaLongLink, TimeProfile& profile);
   
 } // namespace quda
 

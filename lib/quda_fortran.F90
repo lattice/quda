@@ -52,8 +52,6 @@ module quda_fortran
      integer(4) :: mom_ga_pad   ! Used by the gauge and fermion forces
      real(8) :: gauge_gib
 
-     integer(4) :: preserve_gauge ! Used by link fattening
-
      ! Set the staggered phase type of the links
      QudaStaggeredPhase :: staggered_phase_type
      ! Whether the staggered phase has already been applied to the links

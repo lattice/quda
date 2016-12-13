@@ -184,8 +184,8 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      v = LatticeField::allocateDevice(bytes);
-      if (precision == QUDA_HALF_PRECISION) norm = LatticeField::allocateDevice(norm_bytes);
+      v = pool_device_malloc(bytes);
+      if (precision == QUDA_HALF_PRECISION) norm = pool_device_malloc(norm_bytes);
       alloc = true;
     }
 
@@ -458,8 +458,8 @@ namespace quda {
 
   void cudaColorSpinorField::destroy() {
     if (alloc) {
-      LatticeField::freeDevice(v);
-      if (precision == QUDA_HALF_PRECISION) LatticeField::freeDevice(norm);
+      pool_device_free(v);
+      if (precision == QUDA_HALF_PRECISION) pool_device_free(norm);
       alloc = false;
     }
 
@@ -532,7 +532,7 @@ namespace quda {
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
     if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&typeid(src) == typeid(cpuColorSpinorField)) {
-      void *buffer = allocatePinned(bytes + norm_bytes);
+      void *buffer = pool_pinned_malloc(bytes + norm_bytes);
       memset(buffer, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
 
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0, static_cast<char*>(buffer)+bytes, 0);
@@ -540,7 +540,7 @@ namespace quda {
       qudaMemcpy(v, buffer, bytes, cudaMemcpyHostToDevice);
       qudaMemcpy(norm, static_cast<char*>(buffer)+bytes, norm_bytes, cudaMemcpyHostToDevice);
 
-      freePinned(buffer);
+      pool_pinned_free(buffer);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else {
@@ -552,7 +552,7 @@ namespace quda {
 	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
 	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
-	buffer = allocatePinned(src.Bytes()+src.NormBytes());
+	buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
 	memcpy(buffer, src.V(), src.Bytes());
 	memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
 
@@ -563,7 +563,7 @@ namespace quda {
       cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
 
-      if (zeroCopy) freePinned(buffer);
+      if (zeroCopy) pool_pinned_free(buffer);
     }
 
     return;
@@ -573,12 +573,12 @@ namespace quda {
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
     if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&	typeid(dest) == typeid(cpuColorSpinorField)) {
-      void *buffer = allocatePinned(bytes+norm_bytes);
+      void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
       qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
 
       copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 0, buffer, 0, static_cast<char*>(buffer)+bytes);
-      freePinned(buffer);
+      pool_pinned_free(buffer);
     } else if (typeid(dest) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION);
     } else {
@@ -588,7 +588,7 @@ namespace quda {
 	dst = bufferDevice;
 	dstNorm = (char*)bufferDevice+dest.Bytes();
       } else {
-	buffer = allocatePinned(dest.Bytes()+dest.NormBytes());
+	buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
 	cudaHostGetDevicePointer(&dst, buffer, 0);
 	dstNorm = (char*)dst+dest.Bytes();
       }
@@ -602,7 +602,7 @@ namespace quda {
 	memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
       }
 
-      if (zeroCopy) freePinned(buffer);
+      if (zeroCopy) pool_pinned_free(buffer);
     }
 
     return;

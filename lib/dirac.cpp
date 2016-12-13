@@ -217,6 +217,9 @@ namespace quda {
     int steps = 0;
     switch (type)
     {
+      case QUDA_COARSE_DIRAC: // single fused operator
+	steps = 1;
+	break;
       case QUDA_WILSON_DIRAC:
       case QUDA_CLOVER_DIRAC:
       case QUDA_DOMAIN_WALL_DIRAC:
@@ -236,6 +239,7 @@ namespace quda {
       case QUDA_ASQTADPC_DIRAC:
       case QUDA_TWISTED_CLOVERPC_DIRAC:
       case QUDA_TWISTED_MASSPC_DIRAC:
+      case QUDA_COARSEPC_DIRAC:
         steps = 2;
         break;
 	  default:
@@ -244,7 +248,6 @@ namespace quda {
         break;
     }
     
-    // Multiply by 2 if MdagM or MMdag, 1 if M or Mdag. Not sure how to do this.
     return steps; 
   }
 

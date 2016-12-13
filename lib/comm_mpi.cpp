@@ -132,7 +132,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     // called just once.
     MPI_CHECK( MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD) );
 
-    for(int dir=0; dir<2; ++dir){ // forward/backward directions
+    for(int dir=0; dir<2; ++dir){ // backward/forward directions
       for(int dim=0; dim<4; ++dim){
 	int neighbor_rank = comm_neighbor_rank(dir,dim);
 	if(neighbor_rank == rank) continue;
@@ -143,10 +143,11 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	  int canAccessPeer[2];
 	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
 	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+
 	  if(canAccessPeer[0]*canAccessPeer[1]){
 	    peer2peer_enabled[dir][dim] = true;
 	    if (getVerbosity() > QUDA_SILENT)
-	      printf("Peer-to-peer enabled for rank %d gpu=%d with neighbor %d gpu=%d dir=%d, dim=%d\n",
+	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
 		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
 	  }
 	} // on the same node

@@ -229,13 +229,13 @@ namespace quda {
 
     if (typeid(src) == typeid(cudaGaugeField)) {
       if (!src.isNative()) errorQuda("Only native order is supported");
-      void *buffer = allocatePinned(bytes);
+      void *buffer = pool_pinned_malloc(bytes);
       // this copies over both even and odd
       qudaMemcpy(buffer, static_cast<const cudaGaugeField&>(src).Gauge_p(),
 		 bytes, cudaMemcpyDeviceToHost);
 
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
-      freePinned(buffer);
+      pool_pinned_free(buffer);
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge,
