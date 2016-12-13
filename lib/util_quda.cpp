@@ -27,12 +27,22 @@ void setVerbosity(QudaVerbosity verbosity)
 }
 
 
-static QudaTune tune_;
+// default has autotuning enabled but can be overridden with the QUDA_ENABLE_TUNING environment variable
+QudaTune getTuning() {
+  static bool init = false;
+  static QudaTune tune = QUDA_TUNE_YES;
 
-QudaTune getTuning() { return tune_; }
-void setTuning(QudaTune tune)
-{
-  tune_ = tune;
+  if (!init) {
+    char *enable_tuning = getenv("QUDA_ENABLE_TUNING");
+    if (!enable_tuning || strcmp(enable_tuning,"0")!=0) {
+      tune = QUDA_TUNE_YES;
+    } else {
+      tune = QUDA_TUNE_NO;
+    }
+    init = true;
+  }
+
+  return tune;
 }
 
 void setOutputPrefix(const char *prefix)

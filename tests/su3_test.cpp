@@ -15,7 +15,6 @@
 QudaGaugeParam param;
 void *gauge[4], *new_gauge[4];
 
-extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -71,7 +70,6 @@ void init() {
   }
 
   initQuda(device);
-  if (tune) setTuning(QUDA_TUNE_YES);
 
 }
 

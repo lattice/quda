@@ -48,7 +48,6 @@ int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
-extern bool tune;
 extern QudaPrecision prec;
 extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_DOUBLE_PRECISION;
@@ -538,7 +537,6 @@ hisq_force_end()
   static int 
 hisq_force_test(void)
 {
-  if (tune) setTuning(QUDA_TUNE_YES);
   setVerbosity(QUDA_VERBOSE);
 
   hisq_force_init();

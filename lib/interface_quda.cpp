@@ -1992,7 +1992,6 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 {
   QudaInvertParam *param;
   param = eig_param->invert_param;
-  setTuning(param->tune);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
@@ -2159,7 +2158,6 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   if (param->solve_type != QUDA_DIRECT_SOLVE)
     errorQuda("Outer MG solver can only use QUDA_DIRECT_SOLVE at present");
 
-  setTuning(param->tune);
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaMultigridParam(&mg_param);
   mg_param.secs = 0;
@@ -2231,8 +2229,6 @@ void destroyMultigridQuda(void *mg) {
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
-  setTuning(param->tune);
-
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
@@ -2503,7 +2499,6 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
 
   // currently that code is just a copy of invertQuda and cannot work
-  setTuning(param->tune);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
@@ -2868,7 +2863,6 @@ for(int i=0; i < param->num_src; i++) {
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
-  setTuning(param->tune);
 
   profileMulti.TPSTART(QUDA_PROFILE_TOTAL);
   profileMulti.TPSTART(QUDA_PROFILE_INIT);
@@ -3205,7 +3199,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals)
 {
-  setTuning(param->tune);
 
   openMagma();
 

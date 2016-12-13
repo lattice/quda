@@ -37,8 +37,6 @@ extern int device;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
-extern bool tune;
-
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
@@ -83,7 +81,6 @@ static void
 hisq_force_init()
 {
   initQuda(device);
-  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
 
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;
