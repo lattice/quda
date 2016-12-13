@@ -13,58 +13,14 @@ namespace quda {
   size_t LatticeField::bufferPinnedBytes[] = {0};
   size_t LatticeField::bufferPinnedResizeCount = 0;
 
-
   void* LatticeField::bufferDevice = NULL;
   bool LatticeField::bufferDeviceInit = false;
   size_t LatticeField::bufferDeviceBytes = 0;
-
-  // cache of inactive allocations
-  std::multimap<size_t, void *> LatticeField::pinnedCache;
-
-  // sizes of active allocations
-  std::map<void *, size_t> LatticeField::pinnedSize;
-
-  // cache of inactive allocations
-  std::multimap<size_t, void *> LatticeField::deviceCache;
-
-  // sizes of active allocations
-  std::map<void *, size_t> LatticeField::deviceSize;
-
-  static bool pool_init = false;
-
-  // whether to use a memory pool allocator for device memory
-  static bool device_memory_pool = true;
-
-  // whether to use a memory pool allocator for pinned memory
-  static bool pinned_memory_pool = true;
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
       siteSubset(param.siteSubset)
   {
-    if (!pool_init) {
-      // device memory pool
-      char *enable_device_pool = getenv("QUDA_ENABLE_DEVICE_MEMORY_POOL");
-      if (!enable_device_pool || strcmp(enable_device_pool,"0")!=0) {
-	warningQuda("Using device memory pool allocator");
-	device_memory_pool = true;
-      } else {
-	warningQuda("Not using device memory pool allocator");
-	device_memory_pool = false;
-      }
-
-      // pinned memory pool
-      char *enable_pinned_pool = getenv("QUDA_ENABLE_PINNED_MEMORY_POOL");
-      if (!enable_pinned_pool || strcmp(enable_pinned_pool,"0")!=0) {
-	warningQuda("Using pinned memory pool allocator");
-	pinned_memory_pool = true;
-      } else {
-	warningQuda("Not using pinned memory pool allocator");
-	pinned_memory_pool = false;
-      }
-      pool_init = true;
-    }
-
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       volume *= param.x[i];
@@ -89,8 +45,7 @@ namespace quda {
     setTuningString();
   }
 
-  LatticeField::~LatticeField() {
-  }
+  LatticeField::~LatticeField() { }
 
   void LatticeField::setTuningString() {
     char vol_tmp[TuneKey::volume_n];
@@ -193,115 +148,6 @@ namespace quda {
       bufferDeviceInit = false;
     }
   }
-
-  void *LatticeField::allocatePinned(size_t nbytes)
-  {
-    void *ptr = nullptr;
-    if (pinned_memory_pool) {
-      std::multimap<size_t, void *>::iterator it;
-
-      if (pinnedCache.empty()) {
-	ptr = pinned_malloc(nbytes);
-      } else {
-	it = pinnedCache.lower_bound(nbytes);
-	if (it != pinnedCache.end()) { // sufficiently large allocation found
-	  nbytes = it->first;
-	  ptr = it->second;
-	  pinnedCache.erase(it);
-	} else { // sacrifice the smallest cached allocation
-	  it = pinnedCache.begin();
-	  ptr = it->second;
-	  pinnedCache.erase(it);
-	  host_free(ptr);
-	  ptr = pinned_malloc(nbytes);
-	}
-      }
-      pinnedSize[ptr] = nbytes;
-    } else {
-      ptr = pinned_malloc(nbytes);
-    }
-    return ptr;
-  }
-
-  void LatticeField::freePinned(void *ptr)
-  {
-    if (pinned_memory_pool) {
-      if (!pinnedSize.count(ptr)) {
-	errorQuda("Attempt to free invalid pointer");
-      }
-      pinnedCache.insert(std::make_pair(pinnedSize[ptr], ptr));
-      pinnedSize.erase(ptr);
-    } else {
-      host_free(ptr);
-    }
-  }
-
-  void LatticeField::flushPinnedCache()
-  {
-    if (pinned_memory_pool) {
-      std::multimap<size_t, void *>::iterator it;
-      for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
-	void *ptr = it->second;
-	host_free(ptr);
-      }
-      pinnedCache.clear();
-    }
-  }
-
-  void *LatticeField::allocateDevice(size_t nbytes) const
-  {
-    void *ptr = nullptr;
-    if (device_memory_pool) {
-      std::multimap<size_t, void *>::iterator it;
-
-      if (deviceCache.empty()) {
-	ptr = device_malloc(nbytes);
-      } else {
-	it = deviceCache.lower_bound(nbytes);
-	if (it != deviceCache.end()) { // sufficiently large allocation found
-	  nbytes = it->first;
-	  ptr = it->second;
-	  deviceCache.erase(it);
-	} else { // sacrifice the smallest cached allocation
-	  it = deviceCache.begin();
-	  ptr = it->second;
-	  deviceCache.erase(it);
-	  device_free(ptr);
-	  ptr = device_malloc(nbytes);
-	}
-      }
-      deviceSize[ptr] = nbytes;
-    } else {
-      ptr = device_malloc(nbytes);
-    }
-    return ptr;
-  }
-
-  void LatticeField::freeDevice(void *ptr) const
-  {
-    if (device_memory_pool) {
-      if (!deviceSize.count(ptr)) {
-	errorQuda("Attempt to free invalid pointer");
-      }
-      deviceCache.insert(std::make_pair(deviceSize[ptr], ptr));
-      deviceSize.erase(ptr);
-    } else {
-      device_free(ptr);
-    }
-  }
-
-  void LatticeField::flushDeviceCache()
-  {
-    if (device_memory_pool) {
-      std::multimap<size_t, void *>::iterator it;
-      for (it = deviceCache.begin(); it != deviceCache.end(); it++) {
-	void *ptr = it->second;
-	device_free(ptr);
-      }
-      deviceCache.clear();
-    }
-  }
-
 
   // This doesn't really live here, but is fine for the moment
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param)

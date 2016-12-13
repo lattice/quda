@@ -480,6 +480,9 @@ void initQudaMemory()
 #endif
   blas::init();
 
+  // initalize the memory pool allocators
+  pool::init();
+
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
   cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
@@ -1172,10 +1175,11 @@ void endQuda(void)
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
   FaceBuffer::flushPinnedCache();
-  LatticeField::flushPinnedCache();
-  LatticeField::flushDeviceCache();
 
   blas::end();
+
+  pool::flush_pinned();
+  pool::flush_device();
 
   host_free(num_failures_h);
   num_failures_h = NULL;

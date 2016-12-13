@@ -77,8 +77,8 @@ namespace quda {
 
     if (param.direct) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	clover = LatticeField::allocateDevice(bytes);
-	if (precision == QUDA_HALF_PRECISION) norm = LatticeField::allocateDevice(norm_bytes);
+	clover = pool_device_malloc(bytes);
+	if (precision == QUDA_HALF_PRECISION) norm = pool_device_malloc(norm_bytes);
       } else {
 	clover = param.clover;
 	norm = param.norm;
@@ -105,8 +105,8 @@ namespace quda {
 
     if (param.inverse) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	cloverInv = LatticeField::allocateDevice(bytes);
-	if (precision == QUDA_HALF_PRECISION) invNorm = LatticeField::allocateDevice(norm_bytes);
+	cloverInv = pool_device_malloc(bytes);
+	if (precision == QUDA_HALF_PRECISION) invNorm = pool_device_malloc(norm_bytes);
       } else {
 	cloverInv = param.cloverInv;
 	invNorm = param.invNorm;
@@ -235,11 +235,11 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (clover != cloverInv) {
-	if (clover) LatticeField::freeDevice(clover);
-	if (norm) LatticeField::freeDevice(norm);
+	if (clover) pool_device_free(clover);
+	if (norm) pool_device_free(norm);
       }
-      if (cloverInv) LatticeField::freeDevice(cloverInv);
-      if (invNorm) LatticeField::freeDevice(invNorm);
+      if (cloverInv) pool_device_free(cloverInv);
+      if (invNorm) pool_device_free(invNorm);
     }
     
     checkCudaError();
@@ -253,7 +253,7 @@ namespace quda {
       if (src.V(false))	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION);
       if (src.V(true)) copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION);
     } else if (typeid(src) == typeid(cpuCloverField)) {
-      void *packClover = allocatePinned(bytes + norm_bytes);
+      void *packClover = pool_pinned_malloc(bytes + norm_bytes);
       void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
       
       if (src.V(false)) {
@@ -270,7 +270,7 @@ namespace quda {
 	  qudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
 
-      freePinned(packClover);
+      pool_pinned_free(packClover);
     } else {
       errorQuda("Invalid clover field type");
     }
@@ -285,7 +285,7 @@ namespace quda {
 
     // we know we are copying from GPU to CPU here, so for now just
     // assume that reordering is on CPU
-    void *packClover = allocatePinned(bytes + norm_bytes);
+    void *packClover = pool_pinned_malloc(bytes + norm_bytes);
     void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
 
     // first copy over the direct part (if it exists)
@@ -308,7 +308,7 @@ namespace quda {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");
     } 
 
-    freePinned(packClover);
+    pool_pinned_free(packClover);
   }
 
   /**

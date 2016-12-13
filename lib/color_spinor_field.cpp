@@ -426,8 +426,8 @@ namespace quda {
       }
     } else { // FIXME add GPU_COMMS support
       if (total_bytes) {
-	total_send = allocatePinned(total_bytes);
-	total_recv = allocatePinned(total_bytes);
+	total_send = pool_pinned_malloc(total_bytes);
+	total_recv = pool_pinned_malloc(total_bytes);
       }
       size_t offset = 0;
       for (int i=0; i<nDimComms; i++) {
@@ -507,8 +507,8 @@ namespace quda {
       }
 
       if (total_bytes) {
-	freePinned(total_send);
-	freePinned(total_recv);
+	pool_pinned_free(total_send);
+	pool_pinned_free(total_recv);
       }
     }
 

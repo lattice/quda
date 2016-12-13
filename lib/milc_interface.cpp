@@ -149,11 +149,11 @@ void qudaSetLayout(QudaLayout_t input)
 }
 
 void* qudaAllocatePinned(size_t bytes) {
-  return LatticeField::allocatePinned(bytes);
+  return pool_pinned_malloc(bytes);
 }
 
 void qudaFreePinned(void *ptr) {
-  LatticeField::freePinned(ptr);
+  pool_pinned_free(ptr);
 }
 
 void qudaHisqParamsInit(QudaHisqParams_t params)
