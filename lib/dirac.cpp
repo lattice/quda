@@ -210,5 +210,45 @@ namespace quda {
 
     return 0;
   }
+  
+  // Count the number of stencil applications per dslash application.
+  int Dirac::getStencilSteps() const
+  {
+    int steps = 0;
+    switch (type)
+    {
+      case QUDA_COARSE_DIRAC: // single fused operator
+	steps = 1;
+	break;
+      case QUDA_WILSON_DIRAC:
+      case QUDA_CLOVER_DIRAC:
+      case QUDA_DOMAIN_WALL_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+      case QUDA_STAGGERED_DIRAC:
+      case QUDA_ASQTAD_DIRAC:
+      case QUDA_TWISTED_CLOVER_DIRAC:
+      case QUDA_TWISTED_MASS_DIRAC:
+        steps = 2; // For D_{eo} and D_{oe} piece.
+        break;
+      case QUDA_WILSONPC_DIRAC:
+      case QUDA_CLOVERPC_DIRAC:
+      case QUDA_DOMAIN_WALLPC_DIRAC:
+      case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+      case QUDA_STAGGEREDPC_DIRAC:
+      case QUDA_ASQTADPC_DIRAC:
+      case QUDA_TWISTED_CLOVERPC_DIRAC:
+      case QUDA_TWISTED_MASSPC_DIRAC:
+      case QUDA_COARSEPC_DIRAC:
+        steps = 2;
+        break;
+	  default:
+	    errorQuda("Unsupported Dslash type %d.\n", type);
+        steps = 0;
+        break;
+    }
+    
+    return steps; 
+  }
 
 } // namespace quda

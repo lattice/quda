@@ -104,7 +104,10 @@ namespace quda {
     case 3: // three-way pipelining
     case 4: // four-way pipelining
     case 5: // five-way pipelining
-      {
+    case 6: // six-way pipelining
+    case 7: // seven-way pipelining
+    case 8: // eight-way pipelining
+    {
 	const int N = pipeline;
 	for (int i=0; i<k-(N-1); i+=N) {
 	  computeBeta(beta, Ap, i, N, k);

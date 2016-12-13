@@ -8,7 +8,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o	ks_coarse_op.o	\
 	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
 	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o		\
 	gauge_ape.o gauge_stout.o gauge_plaq.o               		\
-	inv_gcr_quda.o inv_mr_quda.o                     		\
+	inv_gcr_quda.o inv_mr_quda.o inv_bicgstabl_quda.o     		\
 	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\
 	interface_quda.o util_quda.o color_spinor_field.o		\
 	color_spinor_util.o cpu_color_spinor_field.o			\
@@ -26,7 +26,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o	ks_coarse_op.o	\
 	dslash_ndeg_twisted_mass.o dslash_twisted_clover.o		\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
-	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
+	blas_quda.o multi_blas_quda.o copy_quda.o \
+	reduce_quda.o multi_reduce_quda.o face_buffer.o		\
 	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
@@ -36,7 +37,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o	ks_coarse_op.o	\
 	copy_color_spinor_hs.o copy_color_spinor_hh.o			\
 	extract_gauge_ghost_extended.o copy_gauge_double.o		\
 	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
-	copy_clover.o staggered_oprod.o clover_trace_quda.o		\
+	copy_clover.o staggered_oprod.o staggered_oprod_new.o 		\
+	clover_trace_quda.o						\
 	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\

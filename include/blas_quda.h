@@ -58,6 +58,8 @@ namespace quda {
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
     void cxpaypbz(ColorSpinorField &, const Complex &b, ColorSpinorField &y, const Complex &c, ColorSpinorField &z);
     void caxpbypzYmbw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, ColorSpinorField &, ColorSpinorField &);
+    void caxpyBzpx(const Complex &, ColorSpinorField &, ColorSpinorField &, const Complex &, ColorSpinorField &);
+    void caxpyBxpz(const Complex &, ColorSpinorField &, ColorSpinorField &, const Complex &, ColorSpinorField &);
 
     Complex cDotProduct(ColorSpinorField &, ColorSpinorField &);
     Complex xpaycDotzy(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z);
@@ -155,6 +157,26 @@ namespace quda {
     */
     void axpyBzpcx(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
 		   const double *b, ColorSpinorField &z, const double *c);
+    
+    /**
+       @brief Compute the vectorized "caxpyBxpz" over the set of
+       ColorSpinorFields, where the second and third vector, y and z, is constant over the
+       batch.  E.g., it computes
+
+       y = a * x + y
+       z = b * x + z
+
+       The dimensions of a, b are the same as the size of x, 
+       with a maximum size of 16.
+
+       @param a[in] Array of coefficients
+       @param b[in] Array of coefficients
+       @param x[in] vector of ColorSpinorFields
+       @param y[in,out] input ColorSpinorField
+       @param z[in,out] input ColorSpinorField
+    */
+    void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
+		   const Complex *b_, ColorSpinorField &z_);
 
     void reDotProduct(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
     void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
