@@ -26,7 +26,7 @@
 extern "C" {
 #endif
 
-#if (defined(MPI_COMMS) || defined(QMP_COMMS))
+#ifdef MULTI_GPU
 
 extern int ARPACK(pcnaupd) (int *fcomm, int *ido, char *bmat, int *n, char *which, int *nev, float *tol,
                          std::complex<float> *resid, int *ncv, std::complex<float> *v, int *ldv,

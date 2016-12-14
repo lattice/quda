@@ -24,24 +24,24 @@
     if(sizeof(Float) == sizeof(float))
     {
        float _tol  = static_cast<float>(tol);
-#if (defined(MPI_COMMS) || defined(QMP_COMMS))
+#ifdef MULTI_GPU
        ARPACK(pcnaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v),
                        &ldv, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl), &lworkl, reinterpret_cast<float*>(rwork), &info);
 #else
        ARPACK(cnaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v),
                        &ldv, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl), &lworkl, reinterpret_cast<float*>(rwork), &info);
-#endif //MPI_COMMS
+#endif //MULTI_GPU
     }
     else
     {
        double _tol = static_cast<double>(tol);
-#if (defined(MPI_COMMS) || defined(QMP_COMMS))
+#ifdef MULTI_GPU
        ARPACK(pznaupd)(fcomm, &ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v),
                        &ldv, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl), &lworkl, reinterpret_cast<double*>(rwork), &info);
 #else
        ARPACK(znaupd)(&ido, &bmat, &n, which, &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v),
                        &ldv, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl), &lworkl, reinterpret_cast<double*>(rwork), &info);
-#endif //MPI_COMMS
+#endif //MULTI_GPU
     }
 #endif //ARPACK_LIB
     return;
@@ -56,7 +56,7 @@
     {   
        float _tol = static_cast<float>(tol);
        std::complex<float> _sigma = static_cast<std::complex<float> >(sigma);
-#if (defined(MPI_COMMS) || defined(QMP_COMMS))
+#ifdef MULTI_GPU
        ARPACK(pcneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<float> *>(evals),
                      reinterpret_cast<std::complex<float> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<float> *>(workev), &bmat, &n, which,
                      &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
@@ -69,13 +69,13 @@
                      &nev, &_tol, reinterpret_cast<std::complex<float> *>(resid), &ncv, reinterpret_cast<std::complex<float> *>(v1),
                      &ldv1, iparam, ipntr, reinterpret_cast<std::complex<float> *>(workd), reinterpret_cast<std::complex<float> *>(workl),
                      &lworkl, reinterpret_cast<float *>(rwork), &info); 
-#endif //MPI_COMMS
+#endif //MULTI_GPU
     }
     else
     {
        double _tol = static_cast<double>(tol);
        std::complex<double> _sigma = static_cast<std::complex<double> >(sigma);
-#if (defined(MPI_COMMS) || defined(QMP_COMMS))
+#ifdef MULTI_GPU
        ARPACK(pzneupd)(fcomm, &comp_evecs, &howmny, select, reinterpret_cast<std::complex<double> *>(evals),
                      reinterpret_cast<std::complex<double> *>(v), &ldv, &_sigma, reinterpret_cast<std::complex<double> *>(workev), &bmat, &n, which,
                      &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
@@ -87,7 +87,7 @@
                      &nev, &_tol, reinterpret_cast<std::complex<double> *>(resid), &ncv, reinterpret_cast<std::complex<double> *>(v1),
                      &ldv1, iparam, ipntr, reinterpret_cast<std::complex<double> *>(workd), reinterpret_cast<std::complex<double> *>(workl),
                      &lworkl, reinterpret_cast<double *>(rwork), &info);
-#endif //MPI_COMMS
+#endif //MULTI_GPU
     }
 #endif //ARPACK_LIB
     return;
@@ -266,7 +266,7 @@ namespace quda{
   void ArpackArgs<Float>::apply( )
   {
     int *fcomm = nullptr;
-#if (defined(MPI_COMMS) || defined(QMP_COMMS))
+#ifdef MULTI_GPU
     MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_WORLD);
     fcomm = static_cast<int*>(&mpi_comm_fort);
 #endif
