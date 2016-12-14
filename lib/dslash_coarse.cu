@@ -675,6 +675,12 @@ namespace quda {
     }
   }
 
+  // this is the Worker pointer that may have issue additional work
+  // while we're waiting on communication to finish
+  namespace dslash {
+    extern Worker* aux_worker;
+  }
+
 #endif // GPU_MULTIGRID
 
   struct DslashCoarseLaunch {
@@ -705,6 +711,8 @@ namespace quda {
       Location(out, inA, inB, Y, X);
 
       inA.exchangeGhost((QudaParity)(1-parity), 0); // last parameter is dummy
+
+      if (dslash::aux_worker) dslash::aux_worker->apply(0);
 
       if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
