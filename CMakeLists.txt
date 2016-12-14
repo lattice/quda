@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
@@ -47,7 +47,8 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA")
+project("QUDA" CXX CUDA)
+set(CMAKE_CUDA_STANDARD 11)
 
 #######################################################################
 # QUDA OPTIONS
@@ -407,7 +408,7 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
 # NVCC FLAGS independet off build type
-set(QUDA_NVCC_FLAGS -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+set(QUDA_NVCC_FLAGS "-arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false")
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
@@ -423,22 +424,22 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 ## define NVCC flags
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
-set(CUDA_NVCC_FLAGS_STRICT ${CUDA_NVCC_FLAGS_DEVEL} CACHE STRING
+set(CMAKE_CUDA_FLAGS_STRICT "${CUDA_NVCC_FLAGS_DEVEL}" CACHE STRING
     "Flags used by the CUDA compiler during strict jenkins builds."
     FORCE )
-set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
+set(CMAKE_CUDA_FLAGS_RELEASE "${QUDA_NVCC_FLAGS} -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG CACHE STRING
+set(CMAKE_CUDA_FLAGS_HOSTDEBUG "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -G CACHE STRING
+set(CMAKE_CUDA_FLAGS_DEVICEDEBUG "${QUDA_NVCC_FLAGS} -G" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
-set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
+set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
@@ -479,10 +480,10 @@ mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
 
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
-mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
-mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
-mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
+mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
+mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_C_FLAGS_STRICT)
