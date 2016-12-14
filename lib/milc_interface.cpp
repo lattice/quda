@@ -624,7 +624,7 @@ static void setInvertParams(const int dim[4],
   }
 
   invertParam->dagger = QUDA_DAG_NO;
-  invertParam->sp_pad = dim[0]*dim[1]*dim[2]/2;
+  invertParam->sp_pad = 0;
   invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   // for the preconditioner
