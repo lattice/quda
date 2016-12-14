@@ -1,5 +1,4 @@
 #include <quda_arpack_interface.h>
-#include <color_spinor_field_order.h>
 
 //using namespace quda ;
 
