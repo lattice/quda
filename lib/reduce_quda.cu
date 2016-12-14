@@ -71,6 +71,7 @@ namespace quda {
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
+    cudaEvent_t* getReduceEvent() { return &reduceEnd; }
 
     void initReduce()
     {
@@ -125,7 +126,6 @@ namespace quda {
 #include <reduce_core.cuh>
 #include <reduce_core.h>
 #include <reduce_mixed_core.h>
-#include <multi_reduce_core.h>
 
     } // namespace reduce
 
@@ -327,7 +327,6 @@ namespace quda {
     }
   }
 
-
     /**
      * Returns the real component of the dot product of a and b and
      * the norm of a
@@ -455,7 +454,6 @@ namespace quda {
 
     /**
        double caxpyXmayNormCuda(float a, float *x, float *y, n){}
-
        First performs the operation y[i] = a*x[i] + y[i]
        Second performs the operator x[i] -= a*z[i]
        Third returns the norm of x
@@ -479,7 +477,6 @@ namespace quda {
 
     /**
        double cabxpyAxNorm(float a, complex b, float *x, float *y, n){}
-
        First performs the operation y[i] += a*b*x[i]
        Second performs x[i] *= a
        Third returns the norm of x
@@ -553,42 +550,8 @@ namespace quda {
       return Complex(cdot.x, cdot.y);
     }
 
-    void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
-      double2* cdot = new double2[x.size()];
-
-      switch(x.size()){
-      case 1:
-        reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
-	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 2:
-        reduce::multiReduceCuda<2,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
-	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 3:
-        reduce::multiReduceCuda<3,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
-	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 4:
-        reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
-	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 5:
-        reduce::multiReduceCuda<5,double2,QudaSumFloat2,Cdot,0,0,0,0,0,false>
-	  (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      default:
-        errorQuda("Unsupported vector size\n");
-        break;
-      }
-
-      for (unsigned int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
-      delete[] cdot;
-    }
-
     /**
        double2 xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int n) {}
-
        First performs the operation y = x + a*y
        Second returns cdot product (z,y)
     */
@@ -611,7 +574,6 @@ namespace quda {
 
     /**
        double caxpyDotzyCuda(float a, float *x, float *y, float *z, n){}
-
        First performs the operation y[i] = a*x[i] + y[i]
        Second returns the dot product (z,y)
     */
@@ -754,7 +716,6 @@ namespace quda {
        This kernel returns (x, x) and (r,r) and also returns the so-called
        heavy quark norm as used by MILC: 1 / N * \sum_i (r, r)_i / (x, x)_i, where
        i is site index and N is the number of sites.
-
        When this kernel is launched, we must enforce that the parameter M
        in the launcher corresponds to the number of FloatN fields used to
        represent the spinor, e.g., M=6 for Wilson and M=3 for staggered.
@@ -835,7 +796,6 @@ namespace quda {
 
     /**
        double3 tripleCGUpdate(V x, V y, V z){}
-
        First performs the operation norm2(x)
        Second performs the operatio norm2(y)
        Third performs the operation dotPropduct(y,z)

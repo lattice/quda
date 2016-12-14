@@ -515,7 +515,66 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class BiCGstabL : public Solver {
 
+  private:
+    DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+
+    /**
+       The size of the Krylov space that BiCGstabL uses.
+     */
+    int nKrylov; // in the language of BiCGstabL, this is L.
+    
+    // Various coefficients and params needed on each iteration.
+    Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L. 
+    Complex *gamma, *gamma_prime, *gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    Complex **tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    double *sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
+    
+    // pointers to fields to avoid multiple creation overhead
+    // full precision fields
+    ColorSpinorField *r_fullp;   //! Full precision residual.
+    ColorSpinorField *yp;        //! Full precision temporary.
+    // sloppy precision fields
+    ColorSpinorField *tempp;     //! Sloppy temporary vector. 
+    std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
+    std::vector<ColorSpinorField*> u; // Search directions.
+    
+    // Saved, preallocated vectors. (may or may not get used depending on precision.)
+    ColorSpinorField *x_sloppy_saved_p; //! Sloppy solution vector.
+    ColorSpinorField *r0_saved_p;       //! Shadow residual, in BiCG language.
+    ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
+    
+    /**
+       Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
+     */
+    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+    
+    /**
+       Internal routines for pipelined Gram-Schmidt. Made to not conflict with GCR's implementation.
+     */
+    void computeTau(Complex **tau, double *sigma, std::vector<ColorSpinorField*> r, int begin, int size, int j);
+    void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
+    void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
+    
+    void updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov);
+    void updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
+                                std::vector<ColorSpinorField*> r, ColorSpinorField& x, int nKrylov);
+    
+    /**
+       Solver uses lazy allocation: this flag determines whether we have allocated or not.
+     */
+    bool init; 
+    
+    std::string solver_name; // holds BiCGstab-l, where 'l' literally equals nKrylov.
+
+  public:
+    BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~BiCGstabL();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
 
   class GCR : public Solver {
 

@@ -100,6 +100,7 @@ namespace quda {
     mutable unsigned long long flops;
     mutable ColorSpinorField *tmp1; // temporary hack
     mutable ColorSpinorField *tmp2; // temporary hack
+    QudaDiracType type; 
 
     bool newTmp(ColorSpinorField **, const ColorSpinorField &) const;
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
@@ -146,6 +147,7 @@ namespace quda {
 
 
     QudaMatPCType getMatPCType() const { return matpcType; }
+    int getStencilSteps() const;
     void Dagger(QudaDagType dag) { dagger = dag; }
 
     /**
@@ -877,6 +879,8 @@ namespace quda {
 
 
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
+    
+    virtual int getStencilSteps() const = 0; 
 
     std::string Type() const { return typeid(*dirac).name(); }
     
@@ -920,6 +924,11 @@ namespace quda {
       if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
+    
+    int getStencilSteps() const
+    {
+      return dirac->getStencilSteps(); 
+    }
   };
 
   class DiracMdagM : public DiracMatrix {
@@ -954,6 +963,12 @@ namespace quda {
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
+    }
+    
+    
+    int getStencilSteps() const
+    {
+      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
   };
 
@@ -991,6 +1006,12 @@ namespace quda {
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }
+    
+    
+    int getStencilSteps() const
+    {
+      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
+    }
   };
 
   class DiracMdag : public DiracMatrix {
@@ -1019,6 +1040,11 @@ namespace quda {
       dirac->Mdag(out, in);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
+    }
+    
+    int getStencilSteps() const
+    {
+      return dirac->getStencilSteps(); 
     }
   };
 
