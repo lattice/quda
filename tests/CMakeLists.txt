@@ -5,7 +5,10 @@ include_directories(.)
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 
-set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} cuda)
+# if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
+FIND_LIBRARY(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
+
+set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LIBRARY})
 
 if(QUDA_QIO)
   LIST(APPEND TEST_LIBS ${QIO_LIB} ${LIME_LIB})

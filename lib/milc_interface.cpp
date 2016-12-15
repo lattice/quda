@@ -608,7 +608,6 @@ static void setInvertParams(const int dim[4],
 
   invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
   invertParam->Ls = 1;
-  invertParam->tune = QUDA_TUNE_YES;
   invertParam->gflops = 0.0;
 
   invertParam->input_location = QUDA_CPU_FIELD_LOCATION;
@@ -625,7 +624,7 @@ static void setInvertParams(const int dim[4],
   }
 
   invertParam->dagger = QUDA_DAG_NO;
-  invertParam->sp_pad = dim[0]*dim[1]*dim[2]/2;
+  invertParam->sp_pad = 0;
   invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   // for the preconditioner
@@ -1386,7 +1385,6 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.preserve_source               = QUDA_PRESERVE_SOURCE_NO;
   invertParam.gamma_basis                   = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invertParam.dirac_order                   = QUDA_DIRAC_ORDER;
-  invertParam.tune                          = QUDA_TUNE_YES;
   invertParam.sp_pad                        = 0;
   invertParam.cl_pad                        = 0;
   invertParam.clover_cpu_prec               = host_precision;

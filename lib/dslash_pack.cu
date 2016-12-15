@@ -100,7 +100,7 @@ namespace quda {
     output << "parity = " << param.parity << std::endl;
     output << "dim = " << param.dim << std::endl;
     output << "face_num = " << param.face_num << std::endl;
-    output << "X = {" << param.X[0] << ","<< param.X[1] << "," << param.X[2] << "," << param.X[3] << "}" << std::endl;
+    output << "X = {" << param.X[0] << ","<< param.X[1] << "," << param.X[2] << "," << param.X[3] << "," << param.X[4] << "}" << std::endl;
     output << "ghostFace = {" << param.ghostFace[0] << ","<< param.ghostFace[1] << "," 
 	   << param.ghostFace[2] << "," << param.ghostFace[3] << "}" << std::endl;
     output << "sp_stride = " << param.sp_stride << std::endl;
@@ -716,7 +716,8 @@ namespace quda {
       param.dim = dim;
       param.face_num = face_num;
       param.parity = parity;
-      for(int d=0; d<QUDA_MAX_DIM; d++) param.X[d] = in->X()[d];
+      for(int d=0; d<in->Ndim(); d++) param.X[d] = in->X()[d];
+      for(int d=in->Ndim(); d<QUDA_MAX_DIM; d++) param.X[d] = 1;
       param.X[0] *= 2;
 
 #ifdef USE_TEXTURE_OBJECTS

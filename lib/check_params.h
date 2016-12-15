@@ -302,8 +302,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
   P(sp_pad, INVALID_INT);
 
-  P(tune, QUDA_TUNE_INVALID);
-
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);
 #else
