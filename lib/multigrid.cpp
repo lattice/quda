@@ -174,9 +174,8 @@ namespace quda {
       // create smoothing operators
       //diracParam.dirac = const_cast<Dirac*>(param.matSmooth.Expose());
       diracParam.dirac =  (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_SOLVE ) ? const_cast<Dirac*>(param.matResidual.Expose()) : const_cast<Dirac*>(param.matSmooth.Expose());
-      diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE || param.mg_global.smoother_solve_type[param.level+1] == QUDA_NORMOP_PC_SOLVE) ?
       diracParam.type = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? QUDA_COARSEPC_DIRAC : QUDA_COARSE_DIRAC;
-      diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
+      diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE || param.mg_global.smoother_solve_type[param.level+1] == QUDA_NORMOP_PC_SOLVE) ?
 	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
 	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
       diracCoarseSmootherSloppy = diracCoarseSmoother;  // for coarse grids these always alias for now (FIXME half precision support for coarse op)

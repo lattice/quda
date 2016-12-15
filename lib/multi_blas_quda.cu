@@ -66,6 +66,101 @@ namespace quda {
 
 
     /**
+       Functor to perform the operation y += a * x  (real-valued)
+    */
+
+    template<int NXZ, typename Float2, typename FloatN>
+    struct multiaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> { 
+      const int NYW;
+      // ignore parameter arrays since we place them in constant memory
+      multiaxpy_(const coeff_array<double> &a, const coeff_array<double> &b,
+		  const coeff_array<double> &c, int NYW) : NYW(NYW) { }
+
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      {
+#ifdef __CUDA_ARCH__
+	Float2 *a = reinterpret_cast<Float2*>(Amatrix_d); // fetch coefficient matrix from constant memory
+        y = a[MAX_MULTI_BLAS_N*j+i].x*x + y;
+#else
+	Float2 *a = reinterpret_cast<Float2*>(Amatrix_h);
+        y = a[NYW*j+i].x*x + y;
+#endif
+      }
+
+      int streams() { return NYW + NXZ*NYW; } //! total number of input and output streams
+      int flops() { return 2*NXZ*NYW; } //! flops per real element
+    };
+
+
+
+    void axpy(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+
+      // mark true since we will copy the "a" matrix into constant memory
+      coeff_array<double> a(a_, true), b, c;
+
+      switch (x.size()) {
+      case 1:
+	multiblasCuda<1,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 2:
+	multiblasCuda<2,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 3:
+	multiblasCuda<3,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 4:
+	multiblasCuda<4,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 5:
+	multiblasCuda<5,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 6:
+	multiblasCuda<6,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 7:
+	multiblasCuda<7,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 8:
+	multiblasCuda<8,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 9:
+	multiblasCuda<9,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 10:
+	multiblasCuda<10,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 11:
+	multiblasCuda<11,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 12:
+	multiblasCuda<12,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 13:
+	multiblasCuda<13,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 14:
+	multiblasCuda<14,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 15:
+	multiblasCuda<15,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      case 16:
+	multiblasCuda<16,multiaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+        break;
+      default:
+	// split the problem in half and recurse
+	const double *a0 = &a_[0];
+	const double *a1 = &a_[x.size()*y.size()/2];
+
+	std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+	std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+
+	axpy(a0, x0, y);
+	axpy(a1, x1, y);
+      }
+    }
+
+    /**
        Functor to perform the operation y += a * x  (complex-valued)
     */
 

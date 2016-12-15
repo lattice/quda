@@ -427,7 +427,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   return;
 }
 
-#define CHECK_PLAQUETTE
+//#define CHECK_PLAQUETTE
 
 void mg_test(int argc, char** argv)
 {
@@ -691,9 +691,9 @@ void mg_test(int argc, char** argv)
     construct_gauge_field(inlink, 1, gauge_param.cpu_prec, &gauge_param);
 
 #ifdef MULTI_GPU
-    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
+//    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
 #else
-    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
+//    QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
 #endif
 
     QudaGaugeParam gParam = newQudaGaugeParam();
