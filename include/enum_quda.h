@@ -409,18 +409,6 @@ extern "C" {
     QUDA_BOTH_DIRS = 2
   } QudaDirection;
   
-  typedef enum QudaComputeFatMethod_s {
-    QUDA_COMPUTE_FAT_STANDARD,
-    QUDA_COMPUTE_FAT_EXTENDED_VOLUME,
-    QUDA_COMPUTE_FAT_INVALID = QUDA_INVALID_ENUM
-  } QudaComputeFatMethod;
-
-  typedef enum QudaFatLinkFlag_s {
-    QUDA_FAT_PRESERVE_CPU_GAUGE = 1,
-    QUDA_FAT_PRESERVE_GPU_GAUGE = 2,
-    QUDA_FAT_PRESERVE_COMM_MEM = 4
-  } QudaFatLinkFlag;
-
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,

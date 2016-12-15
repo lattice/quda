@@ -95,7 +95,7 @@ namespace quda {
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
     } else {
       bytes = (size_t)length*precision;
-      bytes = 2*ALIGNMENT_ADJUST(bytes/2);
+      if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
   }
@@ -176,8 +176,8 @@ namespace quda {
     } else { // FIXME for CUDA field copy back to the CPU
       for (int i=0; i<nDimComms; i++) {
 	if (comm_dim_partitioned(i)) {
-	  send[i] = allocatePinned(bytes[i]);
-	  receive[i] = allocatePinned(bytes[i]);
+	  send[i] = pool_pinned_malloc(bytes[i]);
+	  receive[i] = pool_pinned_malloc(bytes[i]);
 	  qudaMemcpy(send[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToHost);
 	} else {
 	  if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
@@ -215,8 +215,8 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
 	qudaMemcpy(ghost_link[i], receive[i], bytes[i], cudaMemcpyHostToDevice);
-	freePinned(send[i]);
-	freePinned(receive[i]);
+	pool_pinned_free(send[i]);
+	pool_pinned_free(receive[i]);
       }
     }
 

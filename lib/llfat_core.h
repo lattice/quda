@@ -18,11 +18,7 @@
 #if (RECONSTRUCT == 18)
 #define DECLARE_VAR_SIGN 
 #define DECLARE_NEW_X 
-#ifdef MULTI_GPU
 #define DECLARE_X_ARRAY int x[4] = {x1,x2,x3, x4};
-#else
-#define DECLARE_X_ARRAY 
-#endif
 #else //RECONSTRUCT == 12
 #define DECLARE_VAR_SIGN short sign=1
 #define DECLARE_NEW_X short new_x1=x1; short new_x2=x2; short new_x4=x4;
@@ -518,8 +514,6 @@
 #define UPDATE_COOR_LOWER_STAPLE_EX(mydir1, mydir2)
 #endif
 
-#ifdef MULTI_GPU
-
 #define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, n, idx) do {                  \
     switch(mydir){                                                      \
     case 0:                                                             \
@@ -538,8 +532,6 @@
     UPDATE_COOR_PLUS(mydir, n, idx);					\
   }while(0)
 
-
-
 #define LLFAT_COMPUTE_NEW_IDX_MINUS(mydir, idx) do {			\
     switch(mydir){                                                      \
     case 0:                                                             \
@@ -557,7 +549,6 @@
     }                                                                   \
     UPDATE_COOR_MINUS(mydir, idx);					\
   }while(0)
-
 
 #define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {		\
     int local_new_x1=x1;						\
@@ -638,88 +629,10 @@
   }while(0)
 
 
-
-
 #define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2) do { \
     new_mem_idx = Vh+2*(Vsh_x+Vsh_y+Vsh_z+Vsh_t) + mu*Vh_2d_max + ((x[dir2]*Z[dir1] + x[dir1])>>1); \
     UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2);			\
   }while(0)
-
-
-#else
-
-#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, n, idx) do {		\
-    switch(mydir){                                                      \
-    case 0:                                                             \
-      new_mem_idx = ( (x1>=(X1-n))?idx-(X1-n):idx+n)>>1;                    \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2>=(X2-n))?idx-(X2-n)*X1:idx+n*X1)>>1;                \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3>=(X3-n))?idx-(X3-n)*X2X1:idx+n*X2X1)>>1;          \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ( (x4>=(X4-n))?idx-(X4-n)*X3X2X1 : idx+n*X3X2X1)>>1;	\
-      break;                                                            \
-    }                                                                   \
-    UPDATE_COOR_PLUS(mydir, n, idx);					\
-  }while(0)
-
-
-#define LLFAT_COMPUTE_NEW_IDX_MINUS(mydir, idx) do {		\
-    switch(mydir){                                                      \
-    case 0:                                                             \
-      new_mem_idx = ( (x1==0)?idx+X1m1:idx-1) >> 1;                     \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2==0)?idx+X2X1mX1:idx-X1) >> 1;                 \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3==0)?idx+X3X2X1mX2X1:idx-X2X1) >> 1;           \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ( (x4==0)?idx+X4X3X2X1mX3X2X1:idx-X3X2X1) >> 1;	\
-      break;                                                            \
-    }									\
-    UPDATE_COOR_MINUS(mydir, idx);					\
-     }while(0)
-
- 
-#define LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(mydir1, mydir2) do {		\
-    switch(mydir1){                                                     \
-    case 0:                                                             \
-      new_mem_idx = ( (x1==0)?X+X1m1:X-1);                              \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2==0)?X+X2X1mX1:X-X1);                          \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3==0)?X+X3X2X1mX2X1:X-X2X1);                    \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ((x4==0)?X+X4X3X2X1mX3X2X1:X-X3X2X1);		\
-      break;                                                            \
-    }                                                                   \
-    switch(mydir2){                                                     \
-    case 0:                                                             \
-      new_mem_idx = ( (x1==X1m1)?new_mem_idx-X1m1:new_mem_idx+1)>> 1;   \
-      break;                                                            \
-    case 1:                                                             \
-      new_mem_idx = ( (x2==X2m1)?new_mem_idx-X2X1mX1:new_mem_idx+X1) >> 1; \
-      break;                                                            \
-    case 2:                                                             \
-      new_mem_idx = ( (x3==X3m1)?new_mem_idx-X3X2X1mX2X1:new_mem_idx+X2X1) >> 1; \
-      break;                                                            \
-    case 3:                                                             \
-      new_mem_idx = ( (x4==X4m1)?new_mem_idx-X4X3X2X1mX3X2X1:new_mem_idx+X3X2X1) >> 1; \
-      break;								\
-    }                                                                   \
-    UPDATE_COOR_LOWER_STAPLE(mydir1, mydir2);				\
-  }while(0)
-
-#endif
-
 
 #define LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mydir, n, idx) do {               \
     switch(mydir){                                                      \
@@ -791,363 +704,6 @@
   }while(0)
 
 
-
-
-template<int mu, int nu, int odd_bit>
-  __global__ void
-  LLFAT_KERNEL(do_siteComputeGenStapleParity, RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
-							   const FloatN* sitelink_even, const FloatN* sitelink_odd, 
-							   FloatM* fatlink_even, FloatM* fatlink_odd,	
-							   Float mycoeff, llfat_kernel_param_t kparam)
-{
-  __shared__ FloatM sd_data[NUM_FLOATS*BLOCK_DIM];
-  
-  //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
-  FloatM TEMPA5, TEMPA6, TEMPA7, TEMPA8;
-  FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
-  //FloatM STAPLE6, STAPLE7, STAPLE8;
-    
-  int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
-    
-  int z1 = mem_idx / X1h;
-  short x1h = mem_idx - z1*X1h;
-  int z2 = z1 / X2;
-  short x2 = z1 - z2*X2;
-  short x4 = z2 / X3;
-  short x3 = z2 - x4*X3;
-
-  short x1odd = (x2 + x3 + x4 + odd_bit) & 1;
-  short x1 = 2*x1h + x1odd;
-  int X = 2*mem_idx + x1odd;    
-
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_X && x1 != X1m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_X && x1 != 0) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_Y && x2 != X2m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_Y && x2 != 0) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_Z && x3 != X3m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_Z && x3 != 0) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_T && x4 != X4m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_T && x4 != 0) return;
-
-  int new_mem_idx;
-  DECLARE_VAR_SIGN;
-  DECLARE_NEW_X;
-  DECLARE_X_ARRAY;
-  
-  //int x[4] = {x1,x2,x3, x4};
-#ifdef MULTI_GPU
-  int Z[4] ={X1,X2,X3,X4};
-  int spacecon_x = (x4*X3X2+x3*X2+x2)>>1;
-  int spacecon_y = (x4*X3X1+x3*X1+x1)>>1;
-  int spacecon_z = (x4*X2X1+x2*X1+x1)>>1;
-  int spacecon_t = (x3*X2X1+x2*X1+x1)>>1;
-#endif
-
-  /* Upper staple */
-  /* Computes the staple :
-   *                 mu (B)
-   *               +-------+
-   *       nu	   |	   | 
-   *	     (A)   |	   |(C)
-   *		   X	   X
-   *
-   */
-    
-  {
-    /* load matrix A*/
-    LOAD_EVEN_SITE_MATRIX(nu, mem_idx, A);   
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, x1, x2, x3, x4);
-    RECONSTRUCT_SITE_LINK(sign, a);
-
-
-    /* load matrix B*/  
-    LLFAT_COMPUTE_NEW_IDX_PLUS(nu, 1, X);    
-    LOAD_ODD_SITE_MATRIX(mu, new_mem_idx, B);
-    COMPUTE_RECONSTRUCT_SIGN(sign, mu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, b);
-    
-
-    MULT_SU3_NN(a, b, tempa);    
-    
-    /* load matrix C*/
-        
-    LLFAT_COMPUTE_NEW_IDX_PLUS(mu, 1, X);    
-    LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, C);
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, c);
-
-    MULT_SU3_NA(tempa, c, staple);		
-  }
-
-  /***************lower staple****************
-   *
-   *                   X       X
-   *             nu    |       | 
-   *	         (A)   |       | (C)
-   *		       +-------+
-   *                  mu (B)
-   *
-   *********************************************/
-  {
-    /* load matrix A*/
-    LLFAT_COMPUTE_NEW_IDX_MINUS(nu,X);    
-    
-    LOAD_ODD_SITE_MATRIX(nu, (new_mem_idx), A);
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, a);
-    
-    /* load matrix B*/				
-    LOAD_ODD_SITE_MATRIX(mu, (new_mem_idx), B);
-    COMPUTE_RECONSTRUCT_SIGN(sign, mu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, b);
-    
-    MULT_SU3_AN(a, b, tempa);
-    
-    /* load matrix C*/
-    //if(x[nu] == 0 && x[mu] == Z[mu] - 1){
-#ifdef MULTI_GPU
-    if(dimcomm[nu] && dimcomm[mu] && x[nu] == 0 && x[mu] == Z[mu] - 1){
-      int idx = nu*4+mu;
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
-    }else{
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
-    }
-#else
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
-#endif
-
-    LOAD_EVEN_SITE_MATRIX(nu, new_mem_idx, C);
-   
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, c);
-    
-    
-    MULT_SU3_NN(tempa, c, b);		
-    LLFAT_ADD_SU3_MATRIX(b, staple, staple);
-  }
-  
-  if(kparam.kernel_type == LLFAT_INTERIOR_KERNEL){
-    LOAD_EVEN_FAT_MATRIX(mu, mem_idx);
-    SCALAR_MULT_ADD_SU3_MATRIX(fat, staple, mycoeff, fat);
-    WRITE_FAT_MATRIX(fatlink_even,mu,  mem_idx);	
-  }
-  WRITE_STAPLE_MATRIX(staple_even, mem_idx);	
-    
-  return;
-}
-
-template<int mu, int nu, int odd_bit, int save_staple>
-  __global__ void
-  LLFAT_KERNEL(do_computeGenStapleFieldParity,RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
-							   const FloatN* sitelink_even, const FloatN* sitelink_odd,
-							   FloatM* fatlink_even, FloatM* fatlink_odd,			    
-							   const FloatM* mulink_even, const FloatM* mulink_odd, 
-							   Float mycoeff, llfat_kernel_param_t kparam)
-{
-  __shared__ FloatM sd_data[NUM_FLOATS*BLOCK_DIM];
-  //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
-  FloatM  TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
-  FloatM TEMPB0, TEMPB1, TEMPB2, TEMPB3, TEMPB4, TEMPB5, TEMPB6, TEMPB7, TEMPB8;
-  FloatM STAPLE0, STAPLE1, STAPLE2, STAPLE3, STAPLE4, STAPLE5, STAPLE6, STAPLE7, STAPLE8;
-  //FloatM STAPLE6, STAPLE7, STAPLE8;
-    
-  int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
-    
-  int z1 = mem_idx / X1h;
-  int x1h = mem_idx - z1*X1h;
-  int z2 = z1 / X2;
-  int x2 = z1 - z2*X2;
-  int x4 = z2 / X3;
-  int x3 = z2 - x4*X3;
-
-  int x1odd = (x2 + x3 + x4 + odd_bit) & 1;
-  int x1 = 2*x1h + x1odd;
-  int X = 2*mem_idx + x1odd;
-
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_X && x1 != X1m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_X && x1 != 0) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_Y && x2 != X2m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_Y && x2 != 0) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_Z && x3 != X3m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_Z && x3 != 0) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_FWD_T && x4 != X4m1) return;
-  if(kparam.kernel_type == LLFAT_EXTERIOR_KERNEL_BACK_T && x4 != 0) return;
-
-  DECLARE_X_ARRAY;
-#ifdef MULTI_GPU
-  int Z[4] ={X1,X2,X3,X4};  
-  int spacecon_x = (x4*X3X2+x3*X2+x2)>>1;
-  int spacecon_y = (x4*X3X1+x3*X1+x1)>>1;
-  int spacecon_z = (x4*X2X1+x2*X1+x1)>>1;
-  int spacecon_t = (x3*X2X1+x2*X1+x1)>>1;
-#endif
-
-  int new_mem_idx;
-  DECLARE_VAR_SIGN;
-  DECLARE_NEW_X;
-
-  /* Upper staple */
-  /* Computes the staple :
-   *                mu (BB)
-   *               +-------+
-   *       nu	   |	   | 
-   *	     (A)   |	   |(C)
-   *		   X	   X
-   *
-   */
-  {		
-    /* load matrix A*/
-    LOAD_EVEN_SITE_MATRIX(nu, mem_idx, A);
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, x1, x2, x3, x4);
-    RECONSTRUCT_SITE_LINK(sign, a);
-    
-    /* load matrix BB*/
-    LLFAT_COMPUTE_NEW_IDX_PLUS(nu, 1, X);    
-    LOAD_ODD_MULINK_MATRIX(0, new_mem_idx, BB);
-    
-    MULT_SU3_NN(a, bb, tempa);    
-    
-    /* load matrix C*/
-    LLFAT_COMPUTE_NEW_IDX_PLUS(mu, 1, X);    
-    LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, C);
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, c);
-    if (save_staple){
-      MULT_SU3_NA(tempa, c, staple);
-    }else{
-      MULT_SU3_NA(tempa, c, tempb);
-    }
-  }
-  
-  /***************lower staple****************
-   *
-   *                   X       X
-   *             nu    |       | 
-   *	         (A)   |       | (C)
-   *		       +-------+
-   *                  mu (B)
-   *
-   *********************************************/
-    
-
-  {
-    /* load matrix A*/
-    LLFAT_COMPUTE_NEW_IDX_MINUS(nu, X);
-    
-    LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, A);
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, a);
-    
-    /* load matrix B*/
-    LLFAT_COMPUTE_NEW_IDX_MINUS(nu, X);				
-    LOAD_ODD_MULINK_MATRIX(0, new_mem_idx, BB);
-    
-    MULT_SU3_AN(a, bb, tempa);
-    
-    /* load matrix C*/
-    //if(x[nu] == 0 && x[mu] == Z[mu] - 1){
-#ifdef MULTI_GPU
-    if(dimcomm[nu] && dimcomm[mu] && x[nu] == 0 && x[mu] == Z[mu] - 1){
-      int idx = nu*4+mu; 
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE_DIAG(nu, mu, dir1_array[idx], dir2_array[idx]);
-    }else{
-      LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
-    }
-#else
-    LLFAT_COMPUTE_NEW_IDX_LOWER_STAPLE(nu, mu);
-#endif
-
-    LOAD_EVEN_SITE_MATRIX(nu, new_mem_idx, C);
-    COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, 0, new_x4);
-    RECONSTRUCT_SITE_LINK(sign, c);				
-    
-    MULT_SU3_NN(tempa, c, a);	
-    if(save_staple){
-      LLFAT_ADD_SU3_MATRIX(staple, a, staple);
-    }else{
-      LLFAT_ADD_SU3_MATRIX(a, tempb, tempb);
-    }
-  }
-
-  LOAD_EVEN_FAT_MATRIX(mu, mem_idx);
-  if(save_staple){
-    if(kparam.kernel_type == LLFAT_INTERIOR_KERNEL){
-      SCALAR_MULT_ADD_SU3_MATRIX(fat, staple, mycoeff, fat);
-    }
-    WRITE_STAPLE_MATRIX(staple_even, mem_idx);		    
-  }else{
-    if(kparam.kernel_type == LLFAT_INTERIOR_KERNEL){
-      SCALAR_MULT_ADD_SU3_MATRIX(fat, tempb, mycoeff, fat);	
-    }else{
-      //The code should never be here
-      //because it makes no sense to split kernels when no staple is stored
-      //print error?
-    }
-  }
-
-  WRITE_FAT_MATRIX(fatlink_even, mu,  mem_idx);	
-  
-  return;
-}
-
-__global__ void 
-LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const FloatN* sitelink_odd,
-					FloatM* fatlink_even, FloatM* fatlink_odd,
-					Float coeff0, Float coeff5, int threads)
-{
-  const FloatN* my_sitelink;
-  FloatM* my_fatlink;
-  int sid = blockIdx.x*blockDim.x + threadIdx.x;
-
-  if(sid >= threads) return;
-
-  int mem_idx = sid;
-
-#if (RECONSTRUCT != 18)
-  int odd_bit= 0;
-#endif
-
-  my_sitelink = sitelink_even;
-  my_fatlink = fatlink_even;
-  if (mem_idx >= Vh){
-#if (RECONSTRUCT != 18)
-    odd_bit=1;
-#endif
-    mem_idx = mem_idx - Vh;
-    my_sitelink = sitelink_odd;
-    my_fatlink = fatlink_odd;
-  }
-   
-#if (RECONSTRUCT != 18)
-  int z1 = mem_idx / X1h;
-  int x1h = mem_idx - z1*X1h;
-  int z2 = z1 / X2;
-  int x2 = z1 - z2*X2;
-  int x4 = z2 / X3;
-  int x3 = z2 - x4*X3;
-  int x1odd = (x2 + x3 + x4 + odd_bit) & 1;
-  int x1 = 2*x1h + x1odd; 
-  DECLARE_VAR_SIGN;
-#endif
-
-  for(int dir=0;dir < 4; dir++){
-    LOAD_SITE_MATRIX(my_sitelink, dir, mem_idx, A);
-    COMPUTE_RECONSTRUCT_SIGN(sign, dir, x1, x2, x3, x4);
-    RECONSTRUCT_SITE_LINK(sign, a);
-
-    LOAD_FAT_MATRIX(my_fatlink, dir, mem_idx);
-	
-    SCALAR_MULT_SU3_MATRIX((coeff0 - 6.0*coeff5), a, fat); 
-    
-    WRITE_FAT_MATRIX(my_fatlink,dir, mem_idx);	
-  }
-    
-  return;
-}
-
-
-
-
 template<int mu, int nu, int odd_bit>
   __global__ void
   LLFAT_KERNEL_EX(do_siteComputeGenStapleParity, RECONSTRUCT)(FloatM* staple_even, FloatM* staple_odd, 
@@ -1155,7 +711,6 @@ template<int mu, int nu, int odd_bit>
 							      FloatM* fatlink_even, FloatM* fatlink_odd,	
 							      Float mycoeff, llfat_kernel_param_t kparam)
 {
-#if 1
   extern __shared__ FloatM sd_data[]; //sd_data is a macro name defined in llfat_quda.cu
 
   
@@ -1275,8 +830,6 @@ template<int mu, int nu, int odd_bit>
   }
   WRITE_STAPLE_MATRIX(staple_even, mem_idx);	
 
-#endif
-    
   return;
 }
 
@@ -1288,7 +841,6 @@ template<int mu, int nu, int odd_bit, int save_staple>
 							      const FloatM* mulink_even, const FloatM* mulink_odd, 
 							      Float mycoeff, llfat_kernel_param_t kparam)
 {
-#if 1
   //__shared__ FloatM sd_data[NUM_FLOATS*64];
   extern __shared__ FloatM sd_data[]; //sd_data is a macro name defined in llfat_quda.cu
   //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
@@ -1397,7 +949,6 @@ template<int mu, int nu, int odd_bit, int save_staple>
   if(save_staple){
     WRITE_STAPLE_MATRIX(staple_even, mem_idx);		    
   }
-#endif
   
   return;
 }
@@ -1408,7 +959,6 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const Fl
 					   FloatM* fatlink_even, FloatM* fatlink_odd,
 					   Float coeff0, Float coeff5, llfat_kernel_param_t kparam)
 {
-#if 1
 
   const FloatN* my_sitelink;
   FloatM* my_fatlink;
@@ -1456,7 +1006,6 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const Fl
     
     WRITE_FAT_MATRIX(my_fatlink,dir, idx);	 
   }
-#endif
     
   return;
 }
@@ -1483,15 +1032,11 @@ __global__ void LLFAT_KERNEL(computeLongLinkParity,RECONSTRUCT)
   short x1odd = (x2 + x3 + x4 + odd_bit) & 1;
   short x1 = 2*x1h + x1odd;
 
-#ifdef MULTI_GPU
   x1 += 2;  
   x2 += 2;  
   x3 += 2;  
   x4 += 2;
   int X = x4*E3E2E1 + x3*E2E1 + x2*E1 + x1;
-#else 
-  int X = x4*X3X2X1 + x3*X2X1 + x2*X1 + x1;
-#endif
   mem_idx = X/2;
 
   int new_mem_idx;
@@ -1502,33 +1047,17 @@ __global__ void LLFAT_KERNEL(computeLongLinkParity,RECONSTRUCT)
 
   for(int dir=0; dir<4; ++dir){
     LOAD_EVEN_SITE_MATRIX(dir, mem_idx, A);
-#ifdef MULTI_GPU
     COMPUTE_RECONSTRUCT_SIGN(sign, dir, x1-2, x2-2, x3-2, x4-2);
-#else
-    COMPUTE_RECONSTRUCT_SIGN(sign, dir, x1, x2, x3, x4);
-#endif
     RECONSTRUCT_SITE_LINK(sign, a);
 
-#ifdef MULTI_GPU
     LLFAT_COMPUTE_NEW_IDX_PLUS_EX(dir, 1, X);
     LOAD_ODD_SITE_MATRIX(dir, new_mem_idx, B);
     COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1-2, new_x2-2, 0, new_x4-2);
-#else
-    LLFAT_COMPUTE_NEW_IDX_PLUS(dir, 1, X);
-    LOAD_ODD_SITE_MATRIX(dir, new_mem_idx, B);
-    COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1, new_x2, 0, new_x4);
-#endif
     RECONSTRUCT_SITE_LINK(sign, b);
 
-#ifdef MULTI_GPU
     LLFAT_COMPUTE_NEW_IDX_PLUS_EX(dir, 2, X);
     LOAD_EVEN_SITE_MATRIX(dir, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1-2, new_x2-2, 0, new_x4-2);
-#else
-    LLFAT_COMPUTE_NEW_IDX_PLUS(dir, 2, X);
-    LOAD_EVEN_SITE_MATRIX(dir, new_mem_idx, C);
-    COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1, new_x2, 0, new_x4);
-#endif
     RECONSTRUCT_SITE_LINK(sign, c);
 
     SCALAR_MULT_SU3_MATRIX(coeff, a, f); 

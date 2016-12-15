@@ -190,7 +190,8 @@ namespace quda {
     /**
        Default constructor
      */
-    SolverParam() : verbosity_precondition(QUDA_SILENT), compute_true_res(true) { ; }
+  SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
+    verbosity_precondition(QUDA_SILENT), compute_true_res(true) { ; }
 
     /**
        Constructor that matches the initial values to that of the
@@ -199,8 +200,9 @@ namespace quda {
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess), compute_null_vector(param.compute_null_vector),
-      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
+      use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),

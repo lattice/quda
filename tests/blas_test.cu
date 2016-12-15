@@ -17,7 +17,6 @@
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern int nvec;
-extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -26,7 +25,6 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern int niter;
 
-extern bool tune;
 extern bool verify_results;
 extern int Nsrc;
 extern int Msrc;
@@ -927,8 +925,6 @@ int main(int argc, char** argv)
   display_test_info();
   initQuda(device);
 
-  // enable the tuning
-  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
   setVerbosity(QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {

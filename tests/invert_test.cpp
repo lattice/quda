@@ -33,7 +33,6 @@ extern QudaDslashType dslash_type;
 // Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
 
-extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -263,8 +262,6 @@ int main(int argc, char **argv)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
-
   gauge_param.ga_pad = 0; // 24*24*24/2;
   inv_param.sp_pad = 0; // 24*24*24/2;
   inv_param.cl_pad = 0; // 24*24*24/2;
@@ -375,8 +372,6 @@ int main(int argc, char **argv)
 
   // initialize the QUDA library
   initQuda(device);
-
-  setTuning(QUDA_TUNE_YES);
 
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);

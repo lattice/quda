@@ -59,8 +59,6 @@ extern "C" {
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
     double gaugeGiB;  /**< The storage used by the gauge fields */
 
-    int preserve_gauge; /**< Used by link fattening */
-
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
 
@@ -757,10 +755,10 @@ extern "C" {
   void set_dim(int *);
   void pack_ghost(void **cpuLink, void **cpuGhost, int nFace,
       QudaPrecision precision);
-  void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param);
+  void setFatLinkPadding(QudaGaugeParam* param);
 
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
-                         double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method);
+                         double *path_coeff, QudaGaugeParam *param);
 
 
 
