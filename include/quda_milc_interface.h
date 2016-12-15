@@ -89,6 +89,19 @@ extern "C" {
   void qudaFinalize();
 
   /**
+   * Allocate pinned memory suitable for CPU-GPU transfers
+   * @param bytes The size of the requested allocation
+   * @return Pointer to allocated memory
+  */
+  void* qudaAllocatePinned(size_t bytes);
+
+  /**
+   * Free pinned memory
+   * @param ptr Pointer to memory to be free
+   */
+  void qudaFreePinned(void *ptr);
+  
+  /**
    * Set the algorithms to use for HISQ fermion calculations, e.g.,
    * SVD parameters for reunitarization.
    *

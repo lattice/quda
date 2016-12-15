@@ -46,10 +46,10 @@ namespace quda {
     length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
     bytes = (size_t)length*precision;
-    bytes = 2*ALIGNMENT_ADJUST(bytes/2);
+    if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
-      norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
+      if (isNative()) norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
 //for twisted mass only:
     twisted = false;//param.twisted;
@@ -77,8 +77,8 @@ namespace quda {
 
     if (param.direct) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	clover = device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
+	clover = pool_device_malloc(bytes);
+	if (precision == QUDA_HALF_PRECISION) norm = pool_device_malloc(norm_bytes);
       } else {
 	clover = param.clover;
 	norm = param.norm;
@@ -105,8 +105,8 @@ namespace quda {
 
     if (param.inverse) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	cloverInv = device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(norm_bytes);
+	cloverInv = pool_device_malloc(bytes);
+	if (precision == QUDA_HALF_PRECISION) invNorm = pool_device_malloc(norm_bytes);
       } else {
 	cloverInv = param.cloverInv;
 	invNorm = param.invNorm;
@@ -235,11 +235,11 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (clover != cloverInv) {
-	if (clover) device_free(clover);
-	if (norm) device_free(norm);
+	if (clover) pool_device_free(clover);
+	if (norm) pool_device_free(norm);
       }
-      if (cloverInv) device_free(cloverInv);
-      if (invNorm) device_free(invNorm);
+      if (cloverInv) pool_device_free(cloverInv);
+      if (invNorm) pool_device_free(invNorm);
     }
     
     checkCudaError();
@@ -253,7 +253,7 @@ namespace quda {
       if (src.V(false))	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION);
       if (src.V(true)) copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION);
     } else if (typeid(src) == typeid(cpuCloverField)) {
-      void *packClover = allocatePinned(bytes + norm_bytes);
+      void *packClover = pool_pinned_malloc(bytes + norm_bytes);
       void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
       
       if (src.V(false)) {
@@ -270,7 +270,7 @@ namespace quda {
 	  qudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
 
-      freePinned(packClover);
+      pool_pinned_free(packClover);
     } else {
       errorQuda("Invalid clover field type");
     }
@@ -285,7 +285,7 @@ namespace quda {
 
     // we know we are copying from GPU to CPU here, so for now just
     // assume that reordering is on CPU
-    void *packClover = allocatePinned(bytes + norm_bytes);
+    void *packClover = pool_pinned_malloc(bytes + norm_bytes);
     void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
 
     // first copy over the direct part (if it exists)
@@ -308,7 +308,7 @@ namespace quda {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");
     } 
 
-    freePinned(packClover);
+    pool_pinned_free(packClover);
   }
 
   /**

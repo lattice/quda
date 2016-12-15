@@ -39,7 +39,7 @@ namespace quda {
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      gauge = device_malloc(bytes);
+      gauge = pool_device_malloc(bytes);
       if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
     } else {
       gauge = param.gauge;
@@ -48,7 +48,7 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         size_t nbytes = nFace * surface[i] * nInternal * precision;
-        ghost[i] = nbytes ? device_malloc(nbytes) : NULL;
+        ghost[i] = nbytes ? pool_device_malloc(nbytes) : NULL;
       }        
     }
 
@@ -144,12 +144,12 @@ namespace quda {
 #endif
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if (gauge) device_free(gauge);
+      if (gauge) pool_device_free(gauge);
     }
 
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
-        if (ghost[i]) device_free(ghost[i]);
+        if (ghost[i]) pool_device_free(ghost[i]);
       }
     }
 
@@ -168,8 +168,8 @@ namespace quda {
     void *ghost_[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
-      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
-      send[d] = device_malloc(nFace*surface[d]*nInternal*precision);
+      ghost_[d] = isNative() ? pool_device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
+      send[d] = pool_device_malloc(nFace*surface[d]*nInternal*precision);
     }
 
     // get the links into contiguous buffers
@@ -178,12 +178,12 @@ namespace quda {
     // communicate between nodes
     exchange(ghost_, send, QUDA_FORWARDS);
 
-    for (int d=0; d<nDim; d++) device_free(send[d]);
+    for (int d=0; d<nDim; d++) pool_device_free(send[d]);
 
     if (isNative()) {
       // copy from ghost into the padded region in gauge
       copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost_, 1);
-      for (int d=0; d<nDim; d++) device_free(ghost_[d]);
+      for (int d=0; d<nDim; d++) pool_device_free(ghost_[d]);
     }
   }
 
@@ -201,8 +201,8 @@ namespace quda {
     void *ghost_[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
-      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
-      recv[d] = device_malloc(nFace*surface[d]*nInternal*precision);
+      ghost_[d] = isNative() ? pool_device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
+      recv[d] = pool_device_malloc(nFace*surface[d]*nInternal*precision);
     }
 
     if (isNative()) {
@@ -217,8 +217,8 @@ namespace quda {
     extractGaugeGhost(*this, recv, false);
 
     for (int d=0; d<nDim; d++) {
-      device_free(recv[d]);
-      if (isNative()) device_free(ghost_[d]);
+      pool_device_free(recv[d]);
+      if (isNative()) pool_device_free(ghost_[d]);
     }
   }
 
@@ -234,8 +234,8 @@ namespace quda {
       if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
       // store both parities and directions in each
       bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-      send_d[d] = device_malloc(2 * bytes[d]);
-      recv_d[d] = device_malloc(2 * bytes[d]);
+      send_d[d] = pool_device_malloc(2 * bytes[d]);
+      recv_d[d] = pool_device_malloc(2 * bytes[d]);
     }
 
 #ifndef GPU_COMMS
@@ -246,7 +246,7 @@ namespace quda {
       if (!commDimPartitioned(d)) continue;
       total_bytes += 4*bytes[d]; // (2 from send/recv) x (2 from fwd/back)
     }
-    void *buffer = total_bytes > 0 ? allocatePinned(total_bytes) : nullptr;
+    void *buffer = total_bytes > 0 ? pool_pinned_malloc(total_bytes) : nullptr;
 
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
@@ -338,7 +338,7 @@ namespace quda {
     }
 
 #ifndef GPU_COMMS
-    if (total_bytes > 0) freePinned(buffer);
+    if (total_bytes > 0) pool_pinned_free(buffer);
 #endif
 
     for (int d=0; d<nDim; d++) {
@@ -351,8 +351,8 @@ namespace quda {
 	comm_free(mh_recv_fwd[d]);
       }
 
-      device_free(send_d[d]);
-      device_free(recv_d[d]);
+      pool_device_free(send_d[d]);
+      pool_device_free(recv_d[d]);
     }
 
   }
@@ -424,13 +424,13 @@ namespace quda {
           static_cast<const cudaGaugeField&>(src).gauge);
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
-	void *buffer = allocatePinned(bytes);
+	void *buffer = pool_pinned_malloc(bytes);
 	// copy field and ghost zone into buffer
 	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
 
 	// this copies over both even and odd
 	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
-	freePinned(buffer);
+	pool_pinned_free(buffer);
       } else { // else on the GPU
 	void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
 	size_t ghost_bytes[4];
@@ -499,10 +499,10 @@ namespace quda {
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
 
-      void *buffer = allocatePinned(bytes);
+      void *buffer = pool_pinned_malloc(bytes);
       qudaMemcpy(buffer, gauge, bytes, cudaMemcpyDeviceToHost);
       copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, buffer);
-      freePinned(buffer);
+      pool_pinned_free(buffer);
 
     } else {
       errorQuda("Invalid pack location %d", pack_location);
