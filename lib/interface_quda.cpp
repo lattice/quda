@@ -2202,6 +2202,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   if(mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR && mg_param.eigensolver_precision == param->cuda_prec)
   {
     DiracParam diracEigenParam;
+    diracEigenParam.type = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE)) ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
     setDiracParam(diracEigenParam, param, mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? fine_grid_pc_solve : !fine_grid_pc_solve);
     dEigen   = Dirac::create(diracEigenParam);
     mEigen   = mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? static_cast<DiracMatrix*>( new DiracMdagM(*dEigen) ) : static_cast<DiracMatrix*>( new DiracM(*dEigen) );
@@ -2213,6 +2214,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
     else
     {
       DiracParam diracEigenSloppyParam;
+      diracEigenSloppyParam.type = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE)) ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
       setDiracSloppyParam(diracEigenParam, param, mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? fine_grid_pc_solve : !fine_grid_pc_solve);
       dEigenSloppy   = Dirac::create(diracEigenSloppyParam);
       mEigenSloppy   = mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? static_cast<DiracMatrix*>( new DiracMdagM(*dEigenSloppy) ) : static_cast<DiracMatrix*>(  new DiracM(*dEigenSloppy) );
