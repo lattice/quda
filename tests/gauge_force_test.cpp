@@ -28,7 +28,6 @@ extern int ydim;
 extern int zdim;
 extern int tdim;
 extern void usage(char** argv);
-extern bool tune;
 
 int attempts = 1;
 
@@ -517,9 +516,8 @@ gauge_force_test(void)
     }
   }
 
-  if (tune) {
+  {
     printfQuda("Tuning...\n");
-    setTuning(QUDA_TUNE_YES);
     computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
 			  loop_coeff_d, num_paths, max_length, eb3,
 			  &qudaGaugeParam);

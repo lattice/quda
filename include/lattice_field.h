@@ -168,30 +168,6 @@ namespace quda {
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
 
-    /** Cache of inactive pinned-memory allocations.  We cache pinned
-    memory allocations so that fields can reuse these with minimal
-    overhead.*/
-    static std::multimap<size_t, void *> pinnedCache;
-
-    /** Sizes of active pinned-memory allocations.  For convenience,
-     we keep track of the sizes of active allocations (i.e., those not
-     in the cache). */
-    static std::map<void *, size_t> pinnedSize;
-
-    /**
-       Allocate pinned-memory.  If free pre-existing allocation exists
-       reuse this.
-       @param bytes Size of allocation
-       @return Pointer to allocated memory
-     */
-    void *allocatePinned(size_t nbytes) const;
-
-    /**
-       Virtual free of pinned-memory allocation.
-       @param ptr Pointer to be (virtually) freed
-     */
-    void freePinned(void *ptr) const;
-
   public:
 
     /**
@@ -205,15 +181,10 @@ namespace quda {
     */
     virtual ~LatticeField();
     
-    /** 
-	Free the pinned-memory buffer 
+    /**
+       Free the pinned-memory buffer
     */
     static void freeBuffer(int index=0);
-
-    /**
-       Free all outstanding pinned-memory allocations.
-     */
-    static void flushPinnedCache();
 
     /**
        @return The dimension of the lattice 

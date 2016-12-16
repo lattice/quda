@@ -148,6 +148,13 @@ void qudaSetLayout(QudaLayout_t input)
   initQuda(device);
 }
 
+void* qudaAllocatePinned(size_t bytes) {
+  return pool_pinned_malloc(bytes);
+}
+
+void qudaFreePinned(void *ptr) {
+  pool_pinned_free(ptr);
+}
 
 void qudaHisqParamsInit(QudaHisqParams_t params)
 {
@@ -222,17 +229,11 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 {
   qudamilc_called<true>(__func__);
 
-#ifdef MULTI_GPU
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
-#else
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
-#endif
-
   QudaGaugeParam param = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
-  computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
+  computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
@@ -249,17 +250,12 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 			    const double act_path_coeff[6], void* inlink, void* fatlink, void* ulink)
 {
   qudamilc_called<true>(__func__);
-#ifdef MULTI_GPU
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
-#else
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
-#endif
 
   QudaGaugeParam param = newMILCGaugeParam(localDim,
 					   (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 					   QUDA_GENERAL_LINKS);
 
-  computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param, method);
+  computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
@@ -612,7 +608,6 @@ static void setInvertParams(const int dim[4],
 
   invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
   invertParam->Ls = 1;
-  invertParam->tune = QUDA_TUNE_YES;
   invertParam->gflops = 0.0;
 
   invertParam->input_location = QUDA_CPU_FIELD_LOCATION;
@@ -629,7 +624,7 @@ static void setInvertParams(const int dim[4],
   }
 
   invertParam->dagger = QUDA_DAG_NO;
-  invertParam->sp_pad = dim[0]*dim[1]*dim[2]/2;
+  invertParam->sp_pad = 0;
   invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   // for the preconditioner
@@ -831,6 +826,20 @@ void qudaMultishiftInvert(int external_precision,
     invalidateGaugeQuda();
   }
 
+  // set the solver
+  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
+  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_NO;
+  } else if (strcmp(quda_reconstruct,"13")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_13;
+  } else if (strcmp(quda_reconstruct,"9")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_9;
+  } else {
+    errorQuda("reconstruct request %s not supported", quda_reconstruct);
+  }
+
+
   if(invalidate_quda_gauge || !create_quda_gauge ){
     const int fat_pad  = getFatLinkPadding(localDim);
     gaugeParam.type = QUDA_GENERAL_LINKS;
@@ -841,7 +850,7 @@ void qudaMultishiftInvert(int external_precision,
     const int long_pad = 3*fat_pad;
     gaugeParam.type = QUDA_THREE_LINKS;
     gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     invalidate_quda_gauge = false;
   }
@@ -1375,7 +1384,6 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.preserve_source               = QUDA_PRESERVE_SOURCE_NO;
   invertParam.gamma_basis                   = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invertParam.dirac_order                   = QUDA_DIRAC_ORDER;
-  invertParam.tune                          = QUDA_TUNE_YES;
   invertParam.sp_pad                        = 0;
   invertParam.cl_pad                        = 0;
   invertParam.clover_cpu_prec               = host_precision;

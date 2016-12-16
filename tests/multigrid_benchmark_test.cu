@@ -17,7 +17,6 @@
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern int nvec;
-extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -28,7 +27,6 @@ extern int niter;
 
 extern int Nsrc; // number of spinors to apply to simultaneously
 
-extern bool tune;
 extern bool verify_results;
 
 extern int test_type;
@@ -230,7 +228,6 @@ int main(int argc, char** argv)
   initQuda(device);
 
   // enable the tuning
-  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
   setVerbosity(QUDA_SUMMARIZE);
 
   Nspin = 2;
