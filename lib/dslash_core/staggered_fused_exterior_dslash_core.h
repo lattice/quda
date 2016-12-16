@@ -5,223 +5,68 @@
 
 // input spinor
 #if (DD_PREC==0)
+
+#define gaugeFloat double
+#define gaugeFloat2 double2
 #define spinorFloat double
 #define spinorFloat2 double2
-/*
-   double2 I0, I1, I2;
-   */
-
-#define i00_re I0.x
-#define i00_im I0.y
-#define i01_re I1.x
-#define i01_im I1.y
-#define i02_re I2.x
-#define i02_im I2.y
-
-#define t00_re T0.x
-#define t00_im T0.y
-#define t01_re T1.x
-#define t01_im T1.y
-#define t02_re T2.x
-#define t02_im T2.y
-
 #define time_boundary t_boundary
 
 #else
 
+#define gaugeFloat float
+#define gaugeFloat2 float2
 #define spinorFloat float
 #define spinorFloat2 float2
-//float2 I0, I1, I2;
-
-
-
-#define i00_re I0.x
-#define i00_im I0.y
-#define i01_re I1.x
-#define i01_im I1.y
-#define i02_re I2.x
-#define i02_im I2.y
-
-#define t00_re T0.x
-#define t00_im T0.y
-#define t01_re T1.x
-#define t01_im T1.y
-#define t02_re T2.x
-#define t02_im T2.y
-
 #define time_boundary t_boundary_f
 
 #endif
 
+#define o00_re O[0].x
+#define o00_im O[0].y
+#define o01_re O[1].x
+#define o01_im O[1].y
+#define o02_re O[2].x
+#define o02_im O[2].y
+
 // gauge link
-#if (DD_PREC==0)
+#define fat00_re FAT[0].x
+#define fat00_im FAT[0].y
+#define fat01_re FAT[1].x
+#define fat01_im FAT[1].y
+#define fat02_re FAT[2].x
+#define fat02_im FAT[2].y
+#define fat10_re FAT[3].x
+#define fat10_im FAT[3].y
+#define fat11_re FAT[4].x
+#define fat11_im FAT[4].y
+#define fat12_re FAT[5].x
+#define fat12_im FAT[5].y
+#define fat20_re FAT[6].x
+#define fat20_im FAT[6].y
+#define fat21_re FAT[7].x
+#define fat21_im FAT[7].y
+#define fat22_re FAT[8].x
+#define fat22_im FAT[8].y
 
-#define fat00_re FAT0.x
-#define fat00_im FAT0.y
-#define fat01_re FAT1.x
-#define fat01_im FAT1.y
-#define fat02_re FAT2.x
-#define fat02_im FAT2.y
-#define fat10_re FAT3.x
-#define fat10_im FAT3.y
-#define fat11_re FAT4.x
-#define fat11_im FAT4.y
-#define fat12_re FAT5.x
-#define fat12_im FAT5.y
-#define fat20_re FAT6.x
-#define fat20_im FAT6.y
-#define fat21_re FAT7.x
-#define fat21_im FAT7.y
-#define fat22_re FAT8.x
-#define fat22_im FAT8.y
-
-#define long00_re LONG0.x
-#define long00_im LONG0.y
-#define long01_re LONG1.x
-#define long01_im LONG1.y
-#define long02_re LONG2.x
-#define long02_im LONG2.y
-#define long10_re LONG3.x
-#define long10_im LONG3.y
-#define long11_re LONG4.x
-#define long11_im LONG4.y
-#define long12_re LONG5.x
-#define long12_im LONG5.y
-#define long20_re LONG6.x
-#define long20_im LONG6.y
-#define long21_re LONG7.x
-#define long21_im LONG7.y
-#define long22_re LONG8.x
-#define long22_im LONG8.y
-
-#else
-
-#if (DD_FAT_RECON == 18) //18 (no) reconstruct
-#define fat00_re FAT0.x
-#define fat00_im FAT0.y
-#define fat01_re FAT1.x
-#define fat01_im FAT1.y
-#define fat02_re FAT2.x
-#define fat02_im FAT2.y
-#define fat10_re FAT3.x
-#define fat10_im FAT3.y
-#define fat11_re FAT4.x
-#define fat11_im FAT4.y
-#define fat12_re FAT5.x
-#define fat12_im FAT5.y
-#define fat20_re FAT6.x
-#define fat20_im FAT6.y
-#define fat21_re FAT7.x
-#define fat21_im FAT7.y
-#define fat22_re FAT8.x
-#define fat22_im FAT8.y
-#else
-#define fat00_re FAT0.x
-#define fat00_im FAT0.y
-#define fat01_re FAT0.z
-#define fat01_im FAT0.w
-#define fat02_re FAT1.x
-#define fat02_im FAT1.y
-#define fat10_re FAT1.z
-#define fat10_im FAT1.w
-#define fat11_re FAT2.x
-#define fat11_im FAT2.y
-#define fat12_re FAT2.z
-#define fat12_im FAT2.w
-#define fat20_re FAT3.x
-#define fat20_im FAT3.y
-#define fat21_re FAT3.z
-#define fat21_im FAT3.w
-#define fat22_re FAT4.x
-#define fat22_im FAT4.y
-#endif // DD_FAT_RECON
-
-#if (DD_LONG_RECON == 18) //18 (no) reconstruct
-#define long00_re LONG0.x
-#define long00_im LONG0.y
-#define long01_re LONG1.x
-#define long01_im LONG1.y
-#define long02_re LONG2.x
-#define long02_im LONG2.y
-#define long10_re LONG3.x
-#define long10_im LONG3.y
-#define long11_re LONG4.x
-#define long11_im LONG4.y
-#define long12_re LONG5.x
-#define long12_im LONG5.y
-#define long20_re LONG6.x
-#define long20_im LONG6.y
-#define long21_re LONG7.x
-#define long21_im LONG7.y
-#define long22_re LONG8.x
-#define long22_im LONG8.y
-#else
-#define long00_re LONG0.x
-#define long00_im LONG0.y
-#define long01_re LONG0.z
-#define long01_im LONG0.w
-#define long02_re LONG1.x
-#define long02_im LONG1.y
-#define long10_re LONG1.z
-#define long10_im LONG1.w
-#define long11_re LONG2.x
-#define long11_im LONG2.y
-#define long12_re LONG2.z
-#define long12_im LONG2.w
-#define long20_re LONG3.x
-#define long20_im LONG3.y
-#define long21_re LONG3.z
-#define long21_im LONG3.w
-#define long22_re LONG4.x
-#define long22_im LONG4.y
-#endif
-
-#endif
-
-// conjugated gauge link
-#define fatT00_re (+fat00_re)
-#define fatT00_im (-fat00_im)
-#define fatT01_re (+fat10_re)
-#define fatT01_im (-fat10_im)
-#define fatT02_re (+fat20_re)
-#define fatT02_im (-fat20_im)
-#define fatT10_re (+fat01_re)
-#define fatT10_im (-fat01_im)
-#define fatT11_re (+fat11_re)
-#define fatT11_im (-fat11_im)
-#define fatT12_re (+fat21_re)
-#define fatT12_im (-fat21_im)
-#define fatT20_re (+fat02_re)
-#define fatT20_im (-fat02_im)
-#define fatT21_re (+fat12_re)
-#define fatT21_im (-fat12_im)
-#define fatT22_re (+fat22_re)
-#define fatT22_im (-fat22_im)
-
-#define longT00_re (+long00_re)
-#define longT00_im (-long00_im)
-#define longT01_re (+long10_re)
-#define longT01_im (-long10_im)
-#define longT02_re (+long20_re)
-#define longT02_im (-long20_im)
-#define longT10_re (+long01_re)
-#define longT10_im (-long01_im)
-#define longT11_re (+long11_re)
-#define longT11_im (-long11_im)
-#define longT12_re (+long21_re)
-#define longT12_im (-long21_im)
-#define longT20_re (+long02_re)
-#define longT20_im (-long02_im)
-#define longT21_re (+long12_re)
-#define longT21_im (-long12_im)
-#define longT22_re (+long22_re)
-#define longT22_im (-long22_im)
-
-#if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
-#define VOLATILE
-#else // Open64 compiler
-#define VOLATILE volatile
-#endif
+#define long00_re LONG[0].x
+#define long00_im LONG[0].y
+#define long01_re LONG[1].x
+#define long01_im LONG[1].y
+#define long02_re LONG[2].x
+#define long02_im LONG[2].y
+#define long10_re LONG[3].x
+#define long10_im LONG[3].y
+#define long11_re LONG[4].x
+#define long11_im LONG[4].y
+#define long12_re LONG[5].x
+#define long12_im LONG[5].y
+#define long20_re LONG[6].x
+#define long20_im LONG[6].y
+#define long21_re LONG[7].x
+#define long21_im LONG[7].y
+#define long22_re LONG[8].x
+#define long22_im LONG[8].y
 
 #ifdef PARALLEL_DIR
 
@@ -234,100 +79,46 @@ extern __shared__ spinorFloat s_data[];
 #define SHARED_STRIDE 32 // to avoid bank conflicts on Fermi+
 #endif
 
-VOLATILE spinorFloat *s = s_data + 
+spinorFloat *s = s_data + 
   SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*((threadIdx.x+blockDim.x*threadIdx.y)/SHARED_STRIDE)
   + ((threadIdx.x+blockDim.x*threadIdx.y) % SHARED_STRIDE);
 
 #endif // PARALLEL_DIR
 
 
+complex<spinorFloat> I[3];
+#if (DD_IMPROVED==1)
+complex<spinorFloat> T[3];
+#endif
+
+complex<gaugeFloat> FAT[9];
+#if (DD_IMPROVED==1)
+complex<gaugeFloat> LONG[9];
+#endif
+
 // output spinor
-spinorFloat o00_re;
-spinorFloat o00_im;
-spinorFloat o01_re;
-spinorFloat o01_im;
-spinorFloat o02_re;
-spinorFloat o02_im;
+complex<spinorFloat> O[3];
 
 #include "read_gauge.h"
 #include "io_spinor.h"
 
-#define MAT_MUL_V(VOUT, M, V)                   \
-    spinorFloat VOUT##0_re = M##00_re * V##00_re; \
-  VOUT##0_re -= M##00_im * V##00_im;            \
-  VOUT##0_re += M##01_re * V##01_re;            \
-  VOUT##0_re -= M##01_im * V##01_im;            \
-  VOUT##0_re += M##02_re * V##02_re;            \
-  VOUT##0_re -= M##02_im * V##02_im;            \
-  spinorFloat VOUT##0_im = M##00_re * V##00_im; \
-  VOUT##0_im += M##00_im * V##00_re;            \
-  VOUT##0_im += M##01_re * V##01_im;            \
-  VOUT##0_im += M##01_im * V##01_re;            \
-  VOUT##0_im += M##02_re * V##02_im;            \
-  VOUT##0_im += M##02_im * V##02_re;            \
-  spinorFloat VOUT##1_re = M##10_re * V##00_re; \
-  VOUT##1_re -= M##10_im * V##00_im;            \
-  VOUT##1_re += M##11_re * V##01_re;            \
-  VOUT##1_re -= M##11_im * V##01_im;            \
-  VOUT##1_re += M##12_re * V##02_re;            \
-  VOUT##1_re -= M##12_im * V##02_im;            \
-  spinorFloat VOUT##1_im = M##10_re * V##00_im; \
-  VOUT##1_im += M##10_im * V##00_re;            \
-  VOUT##1_im += M##11_re * V##01_im;            \
-  VOUT##1_im += M##11_im * V##01_re;            \
-  VOUT##1_im += M##12_re * V##02_im;            \
-  VOUT##1_im += M##12_im * V##02_re;            \
-  spinorFloat VOUT##2_re = M##20_re * V##00_re; \
-  VOUT##2_re -= M##20_im * V##00_im;            \
-  VOUT##2_re += M##21_re * V##01_re;            \
-  VOUT##2_re -= M##21_im * V##01_im;            \
-  VOUT##2_re += M##22_re * V##02_re;            \
-  VOUT##2_re -= M##22_im * V##02_im;            \
-  spinorFloat VOUT##2_im = M##20_re * V##00_im; \
-  VOUT##2_im += M##20_im * V##00_re;            \
-  VOUT##2_im += M##21_re * V##01_im;            \
-  VOUT##2_im += M##21_im * V##01_re;            \
-  VOUT##2_im += M##22_re * V##02_im;            \
-  VOUT##2_im += M##22_im * V##02_re;
+#define MAT_MUL_V(VOUT, M, V)			\
+  complex<spinorFloat> VOUT[6];			\
+  for (int i=0; i<3; i++) {			\
+    VOUT[i] = M[i*3+0]*V[0];			\
+    for (int j=1; j<3; j++) {			\
+      VOUT[i] += M[i*3+j]*V[j];			\
+    }						\
+  }
 
-#define ADJ_MAT_MUL_V(VOUT, M, V)               \
-    spinorFloat VOUT##0_re = M##00_re * V##00_re; \
-  VOUT##0_re += M##00_im * V##00_im;            \
-  VOUT##0_re += M##10_re * V##01_re;            \
-  VOUT##0_re += M##10_im * V##01_im;            \
-  VOUT##0_re += M##20_re * V##02_re;            \
-  VOUT##0_re += M##20_im * V##02_im;            \
-  spinorFloat VOUT##0_im = M##00_re * V##00_im; \
-  VOUT##0_im -= M##00_im * V##00_re;            \
-  VOUT##0_im += M##10_re * V##01_im;            \
-  VOUT##0_im -= M##10_im * V##01_re;            \
-  VOUT##0_im += M##20_re * V##02_im;            \
-  VOUT##0_im -= M##20_im * V##02_re;            \
-  spinorFloat VOUT##1_re = M##01_re * V##00_re; \
-  VOUT##1_re += M##01_im * V##00_im;            \
-  VOUT##1_re += M##11_re * V##01_re;            \
-  VOUT##1_re += M##11_im * V##01_im;            \
-  VOUT##1_re += M##21_re * V##02_re;            \
-  VOUT##1_re += M##21_im * V##02_im;            \
-  spinorFloat VOUT##1_im = M##01_re * V##00_im; \
-  VOUT##1_im -= M##01_im * V##00_re;            \
-  VOUT##1_im += M##11_re * V##01_im;            \
-  VOUT##1_im -= M##11_im * V##01_re;            \
-  VOUT##1_im += M##21_re * V##02_im;            \
-  VOUT##1_im -= M##21_im * V##02_re;            \
-  spinorFloat VOUT##2_re = M##02_re * V##00_re; \
-  VOUT##2_re += M##02_im * V##00_im;            \
-  VOUT##2_re += M##12_re * V##01_re;            \
-  VOUT##2_re += M##12_im * V##01_im;            \
-  VOUT##2_re += M##22_re * V##02_re;            \
-  VOUT##2_re += M##22_im * V##02_im;            \
-  spinorFloat VOUT##2_im = M##02_re * V##00_im; \
-  VOUT##2_im -= M##02_im * V##00_re;            \
-  VOUT##2_im += M##12_re * V##01_im;            \
-  VOUT##2_im -= M##12_im * V##01_re;            \
-  VOUT##2_im += M##22_re * V##02_im;            \
-  VOUT##2_im -= M##22_im * V##02_re;
-
+#define ADJ_MAT_MUL_V(VOUT, M, V)		\
+  complex<spinorFloat> VOUT[6];			\
+  for (int i=0; i<3; i++) {			\
+    VOUT[i] = conj(M[0*3+i])*V[0];		\
+    for (int j=1; j<3; j++) {			\
+      VOUT[i] += conj(M[j*3+i])*V[j];		\
+    }						\
+  }
 
 #if (DD_IMPROVED==1)
 #define NFACE 3
@@ -387,16 +178,8 @@ int full_idx=0;
   int half_idx = full_idx>>1;
 
 
+  for (int i=0; i<3; i++) O[i] = static_cast<spinorFloat>(0.0);
 
-#if (DD_PREC == 0) // double precision
-  o00_re = o00_im = 0.0;
-  o01_re = o01_im = 0.0;
-  o02_re = o02_im = 0.0;
-#else 
-  o00_re = o00_im = 0.f;
-  o01_re = o01_im = 0.f;
-  o02_re = o02_im = 0.f;
-#endif
 #if(DD_FAT_RECON == 13 || DD_FAT_RECON == 9)
 int fat_sign = 1;
 #endif
@@ -442,13 +225,8 @@ if (threadId.z & 1)
 #endif
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(0, fat, ga_idx, fat_sign);
-    MAT_MUL_V(A, fat, i);    
-    o00_re += A0_re;
-    o00_im += A0_im;
-    o01_re += A1_re;
-    o01_im += A1_im;
-    o02_re += A2_re;
-    o02_im += A2_im;
+    MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] += A[i];
   }
 
 #if (DD_IMPROVED==1)
@@ -473,17 +251,11 @@ if (threadId.z & 1)
     norm_idx3 = param.ghostNormOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-3))*ghostFace[0] + space_con;
 #endif	
 #endif
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(0, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);        
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;  
+    MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] += B[i];
   }
 
 #endif
@@ -532,13 +304,8 @@ if (!(threadIdx.z & 1))
 #endif
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, ga_idx, fat_sign);
-    ADJ_MAT_MUL_V(A, fat, i);       
-    o00_re -= A0_re;
-    o00_im -= A0_im;
-    o01_re -= A1_re;
-    o01_im -= A1_im;
-    o02_re -= A2_re;
-    o02_im -= A2_im;
+    ADJ_MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] -= A[i];
   }
 
 #if (DD_IMPROVED==1)
@@ -570,16 +337,10 @@ if (!(threadIdx.z & 1))
 #endif
 #endif
 
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);  
     RECONSTRUCT_LONG_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;  
+    ADJ_MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] -= B[i];
   }
 #endif
 
@@ -622,13 +383,8 @@ if (threadId.z & 1)
 #endif 
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(2, fat, ga_idx, fat_sign);
-    MAT_MUL_V(A, fat, i);
-    o00_re += A0_re;
-    o00_im += A0_im;
-    o01_re += A1_re;
-    o01_im += A1_im;
-    o02_re += A2_re;
-    o02_im += A2_im;
+    MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] += A[i];
   }
 
 #if (DD_IMPROVED==1)
@@ -653,17 +409,11 @@ if (threadId.z & 1)
     norm_idx3 = param.ghostNormOffset[1][1] + src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1] + space_con;
 #endif		    
 #endif    
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(2, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);            
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;  
+    MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] += B[i];
   }
 #endif
 }
@@ -711,13 +461,8 @@ if (!(threadIdx.z & 1))
 #endif
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, ga_idx, fat_sign);
-    ADJ_MAT_MUL_V(A, fat, i);
-    o00_re -= A0_re;
-    o00_im -= A0_im;
-    o01_re -= A1_re;
-    o01_im -= A1_im;
-    o02_re -= A2_re;
-    o02_im -= A2_im;
+    ADJ_MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] -= A[i];
   }
 
 #if (DD_IMPROVED==1)
@@ -748,17 +493,11 @@ if (!(threadIdx.z & 1))
     norm_idx3 = param.ghostNormOffset[1][0] + src_idx*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
 #endif
 #endif
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;  
+    ADJ_MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] -= B[i];
   }    
 #endif
 
@@ -802,13 +541,8 @@ if (threadId.z & 1)
 #endif
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(4, fat, ga_idx, fat_sign);
-    MAT_MUL_V(A, fat, i);	 
-    o00_re += A0_re;
-    o00_im += A0_im;
-    o01_re += A1_re;
-    o01_im += A1_im;
-    o02_re += A2_re;
-    o02_im += A2_im;
+    MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] += A[i];
   }
 
 #if (DD_IMPROVED==1)
@@ -833,17 +567,11 @@ if (threadId.z & 1)
     norm_idx3 = param.ghostNormOffset[2][1] + src_idx*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2] + space_con;
 #endif
 #endif
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(4, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);        
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;      
+    MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] += B[i];
   }
 #endif
 
@@ -893,13 +621,8 @@ if (!(threadIdx.z & 1))
 #endif
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, ga_idx, fat_sign);
-    ADJ_MAT_MUL_V(A, fat, i);
-    o00_re -= A0_re;
-    o00_im -= A0_im;
-    o01_re -= A1_re;
-    o01_im -= A1_im;
-    o02_re -= A2_re;
-    o02_im -= A2_im;
+    ADJ_MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] -= A[i];
   }
 
 #if (DD_IMPROVED==1)
@@ -930,17 +653,11 @@ if (!(threadIdx.z & 1))
     norm_idx3 = param.ghostNormOffset[2][0] + src_idx*NFACE*ghostFace[2] + y[2]*ghostFace[2] + space_con;
 #endif			    
 #endif
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    	    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;    
+    ADJ_MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] -= B[i];
   }
 #endif
 
@@ -983,13 +700,8 @@ if (threadId.z & 1)
 #endif
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);    
     RECONSTRUCT_FAT_GAUGE_MATRIX(6, fat, ga_idx, fat_sign);
-    MAT_MUL_V(A, fat, i);
-    o00_re += A0_re;
-    o00_im += A0_im;
-    o01_re += A1_re;
-    o01_im += A1_im;
-    o02_re += A2_re;
-    o02_im += A2_im;
+    MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] += A[i];
   }
 
 
@@ -1016,17 +728,11 @@ if (threadId.z & 1)
 #endif
 #endif
 
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3); 
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(6, long, ga_idx, long_sign);
-    MAT_MUL_V(B, long, t);    
-    o00_re += B0_re;
-    o00_im += B0_im;
-    o01_re += B1_re;
-    o01_im += B1_im;
-    o02_re += B2_re;
-    o02_im += B2_im;      
+    MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] += B[i];
   }
 #endif
 }
@@ -1071,13 +777,8 @@ if (!(threadIdx.z & 1))
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     READ_1ST_NBR_SPINOR( GHOSTSPINORTEX, nbr_idx1, stride1);
     RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, ga_idx, fat_sign);
-    ADJ_MAT_MUL_V(A, fat, i);
-    o00_re -= A0_re;
-    o00_im -= A0_im;
-    o01_re -= A1_re;
-    o01_im -= A1_im;
-    o02_re -= A2_re;
-    o02_im -= A2_im;
+    ADJ_MAT_MUL_V(A, FAT, I);
+    for (int i=0; i<3; i++) O[i] -= A[i];
   }
 
 #if (DD_IMPROVED==1)
@@ -1105,17 +806,11 @@ if (!(threadIdx.z & 1))
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);
 
-    spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, GHOSTSPINORTEX, nbr_idx3, stride3);       
 
     RECONSTRUCT_LONG_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, long_sign);
-    ADJ_MAT_MUL_V(B, long, t);    
-    o00_re -= B0_re;
-    o00_im -= B0_im;
-    o01_re -= B1_re;
-    o01_im -= B1_im;
-    o02_re -= B2_re;
-    o02_im -= B2_im;
+    ADJ_MAT_MUL_V(B, LONG, T);
+    for (int i=0; i<3; i++) O[i] -= B[i];
   }        
 #endif
 
@@ -1124,31 +819,16 @@ if (!(threadIdx.z & 1))
 
 #if (DD_DAG == 1)
 {
-  o00_re = - o00_re;
-  o00_im = - o00_im;
-  o01_re = - o01_re;
-  o01_im = - o01_im;
-  o02_re = - o02_re;
-  o02_im = - o02_im;
+  for (int i=0; i<3; i++) O[i] = -O[i];
 }
 #endif
 
 #ifdef DSLASH_AXPY
 #ifdef MULTI_GPU
-  o00_re = -o00_re;
-  o00_im = -o00_im;
-  o01_re = -o01_re;
-  o01_im = -o01_im;
-  o02_re = -o02_re;
-  o02_im = -o02_im;
+for (int i=0; i<3; i++) O[i] = -O[i];
 #else
 READ_ACCUM(ACCUMTEX, half_idx+src_idx*Vh);
-o00_re = -o00_re + a*accum0.x;
-o00_im = -o00_im + a*accum0.y;
-o01_re = -o01_re + a*accum1.x;
-o01_im = -o01_im + a*accum1.y;
-o02_re = -o02_re + a*accum2.x;
-o02_im = -o02_im + a*accum2.y;
+for (int i=0; i<3; i++) O[i]  = -O[i] + a*T[i];
 #endif //MULTI_GPU
 #endif // DSLASH_AXPY
 
@@ -1165,31 +845,11 @@ if (active){
 // undefine to prevent warning when precision is changed
 #undef time_boundary
 
+#undef gaugeFloat
+#undef gaugeFloat2
 #undef spinorFloat
 #undef spinorFloat2
 #undef SHARED_STRIDE
-
-#undef g00_re
-#undef g00_im
-#undef g01_re
-#undef g01_im
-#undef g02_re
-#undef g02_im
-#undef g10_re
-#undef g10_im
-#undef g11_re
-#undef g11_im
-#undef g12_re
-#undef g12_im
-#undef g20_re
-#undef g20_im
-#undef g21_re
-#undef g21_im
-#undef g22_re
-#undef g22_im
-
-#undef fat_re
-#undef fat_im
 
 #undef fat00_re
 #undef fat00_im
@@ -1232,20 +892,6 @@ if (active){
 #undef long_re
 #undef long_im
 
-#undef i00_re
-#undef i00_im
-#undef i01_re
-#undef i01_im
-#undef i02_re
-#undef i02_im
-
-#undef t00_re
-#undef t00_im
-#undef t01_re
-#undef t01_im
-#undef t02_re
-#undef t02_im
-
 #undef SHARED_FLOATS_PER_THREAD
 #undef kernel_type
 
@@ -1257,5 +903,3 @@ if (active){
 #undef o02_im
 
 #undef NFACE
-
-#undef VOLATILE

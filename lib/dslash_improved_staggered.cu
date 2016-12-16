@@ -30,7 +30,7 @@
 #include <sys/time.h>
 #include <blas_quda.h>
 #include <face_quda.h>
-
+#include <complex_quda.h>
 #include <inline_ptx.h>
 
 namespace quda {
@@ -68,6 +68,7 @@ namespace quda {
 
   private:
     const unsigned int nSrc;
+    const unsigned int max_register_block = 1;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -134,10 +135,24 @@ namespace quda {
 	return true;
       } else {
         param.aux.x = 1;
-	return false;
+
+	if (param.aux.y < max_register_block) {
+	  param.aux.y++;
+	  return true;
+	} else {
+	  param.aux.y = 1;
+	  return false;
+	}
+
       }
 #else
-      return false;
+      if (param.aux.y < max_register_block) {
+	param.aux.y++;
+	return true;
+      } else {
+	param.aux.y = 1;
+	return false;
+      }
 #endif
     }
 
@@ -147,6 +162,7 @@ namespace quda {
       param.block.y = 1;
       param.grid.y = nSrc;
       param.aux.x = 1;
+      param.aux.y = 1;
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
