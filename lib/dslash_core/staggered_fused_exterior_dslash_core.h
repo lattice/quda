@@ -22,13 +22,6 @@
 
 #endif
 
-#define o00_re O[0].x
-#define o00_im O[0].y
-#define o01_re O[1].x
-#define o01_im O[1].y
-#define o02_re O[2].x
-#define o02_im O[2].y
-
 // gauge link
 #define fat00_re FAT[0].x
 #define fat00_im FAT[0].y
@@ -835,7 +828,7 @@ for (int i=0; i<3; i++) O[i]  = -O[i] + a*T[i];
 #ifdef MULTI_GPU
 if (active){
   READ_AND_SUM_SPINOR(INTERTEX, half_idx+src_idx*Vh);
-  WRITE_SPINOR(param.out, half_idx+src_idx*Vh, param.sp_stride);
+  WRITE_SPINOR(param.out, O, half_idx+src_idx*Vh, param.sp_stride);
 }
 #endif
 
@@ -894,12 +887,5 @@ if (active){
 
 #undef SHARED_FLOATS_PER_THREAD
 #undef kernel_type
-
-#undef o00_re
-#undef o00_im
-#undef o01_re
-#undef o01_im
-#undef o02_re
-#undef o02_im
 
 #undef NFACE

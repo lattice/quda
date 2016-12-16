@@ -23,13 +23,6 @@
 
 #endif
 
-#define o00_re O[0].x
-#define o00_im O[0].y
-#define o01_re O[1].x
-#define o01_im O[1].y
-#define o02_re O[2].x
-#define o02_im O[2].y
-
 // gauge links
 #define fat00_re FAT[0].x
 #define fat00_im FAT[0].y
@@ -962,7 +955,7 @@ if (kernel_type != INTERIOR_KERNEL){
 
 
 // write spinor field back to device memory
-WRITE_SPINOR(param.out, sid + src_idx*Vh, param.sp_stride);
+ WRITE_SPINOR(param.out, O, sid + src_idx*Vh, param.sp_stride);
   }
 
 // undefine to prevent warning when precision is changed
@@ -1017,12 +1010,5 @@ WRITE_SPINOR(param.out, sid + src_idx*Vh, param.sp_stride);
 
 #undef SHARED_FLOATS_PER_THREAD
 #undef kernel_type
-
-#undef o00_re
-#undef o00_im
-#undef o01_re
-#undef o01_im
-#undef o02_re
-#undef o02_im
 
 #undef NFACE
