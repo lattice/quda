@@ -106,7 +106,16 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dslashParam.swizzle = tp.aux.x;
-      IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      switch(tp.aux.y) {
+      case 1:
+	{
+	  constexpr int register_block_size = 1;
+	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      default:
+	errorQuda("Register blocking factor %d not supported", tp.aux.y);
+      }
     }
 
     bool advanceBlockDim(TuneParam &param) const
@@ -146,13 +155,14 @@ namespace quda {
 
       }
 #else
-      if (param.aux.y < max_register_block) {
-	param.aux.y++;
-	return true;
-      } else {
-	param.aux.y = 1;
-	return false;
+      for (unsigned int register_block=param.aux.y+1; register_block < max_register_block; param.aux.y++) {
+	if (nSrc % register_block == 0) { // register block size must be a divisor of 5-th dimention
+	  param.aux.y = register_block;
+	  return true;
+	}
       }
+      param.aux.y = 1;
+      return false;
 #endif
     }
 
