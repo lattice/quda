@@ -408,7 +408,8 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
 # NVCC FLAGS independet off build type
-set(QUDA_NVCC_FLAGS "-arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false")
+set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
+set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler")
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
@@ -431,7 +432,7 @@ set(CMAKE_CUDA_FLAGS_STRICT "${CUDA_NVCC_FLAGS_DEVEL}" CACHE STRING
     "Flags used by the CUDA compiler during strict jenkins builds."
     FORCE )
 set(CMAKE_CUDA_FLAGS_RELEASE "${QUDA_NVCC_FLAGS} -O3 -w" CACHE STRING
-    "Flags used by the C++ compiler during release builds."
+    "Flags used by the CUDA compiler during release builds."
     FORCE )
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
