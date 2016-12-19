@@ -68,7 +68,7 @@ namespace quda {
 
   private:
     const unsigned int nSrc;
-    const unsigned int max_register_block = 1;
+    const unsigned int max_register_block = 6;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -98,12 +98,42 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
       dslashParam.swizzle = tp.aux.x;
       switch(tp.aux.y) {
       case 1:
 	{
 	  constexpr int register_block_size = 1;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 2:
+	{
+	  constexpr int register_block_size = 2;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 3:
+	{
+	  constexpr int register_block_size = 3;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 4:
+	{
+	  constexpr int register_block_size = 4;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 5:
+	{
+	  constexpr int register_block_size = 5;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 6:
+	{
+	  constexpr int register_block_size = 6;
 	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	  break;
 	}
@@ -149,7 +179,7 @@ namespace quda {
 
       }
 #else
-      for (unsigned int register_block=param.aux.y+1; register_block < max_register_block; param.aux.y++) {
+      for (unsigned int register_block=param.aux.y+1; register_block <= max_register_block && register_block <= nSrc; register_block++) {
 	if (nSrc % register_block == 0) { // register block size must be a divisor of 5-th dimention
 	  param.aux.y = register_block;
 	  return true;
