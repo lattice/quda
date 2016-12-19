@@ -1016,26 +1016,26 @@ namespace quda {
       //      where       fj = fj(c0,c1), j=0,1,2.
       
       //[17]
-      c0_max = 2*powf(c1*inv3,1.5);
+      c0_max = 2*pow(c1*inv3,1.5);
       
       //[25]
-      theta  = acosf(c0/c0_max);
+      theta  = acos(c0/c0_max);
       
       //[23]
-      u_p = sqrtf(c1*inv3)*cosf(theta*inv3);
+      u_p = sqrt(c1*inv3)*cos(theta*inv3);
       
       //[24]
-      w_p = sqrtf(c1)*sinf(theta*inv3);
+      w_p = sqrt(c1)*sin(theta*inv3);
       
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
       undMatType u_sq = u_p*u_p;
       undMatType w_sq = w_p*w_p;
       undMatType denom_inv = 1.0/(9*u_sq - w_sq);
-      undMatType exp_iu_re = cosf(u_p);
-      undMatType exp_iu_im = sinf(u_p);
+      undMatType exp_iu_re = cos(u_p);
+      undMatType exp_iu_im = sin(u_p);
       undMatType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
       undMatType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
-      undMatType cos_w = cosf(w_p);
+      undMatType cos_w = cos(w_p);
       undMatType sinc_w;
       undMatType hj_re = 0.0;
       undMatType hj_im = 0.0;
@@ -1045,7 +1045,7 @@ namespace quda {
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
 	sinc_w = 1.0 - 1.0/6.0*w_sq*(1 - 0.05*w_sq*(1 - (1.0/42.0)*w_sq*(1 - (1.0/72.0)*w_sq)));
       }
-      else sinc_w = sinf(w_p)/w_p;
+      else sinc_w = sin(w_p)/w_p;
       
     
       //[34] Test for c0 < 0.
