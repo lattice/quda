@@ -192,9 +192,9 @@ namespace quda {
 	Q = i_2 * Q;
 	//Q is now defined.
 
+#ifdef HOST_DEBUG
 	//Test for Tracless:
 	//reuse OmegaDiffTr
-	/*
 	OmegaDiffTr = getTrace(Q);
 	double error;
 	error = OmegaDiffTr.real();
@@ -208,21 +208,23 @@ namespace quda {
 	OmegaDiffTr = getTrace(Q_diff);
 	error = OmegaDiffTr.real();
 	printf("Herm test %d %d %.15e\n", idx, dir, error);
-	*/
+#endif HOST_DEBUG
 
 	exponentiate_iQ(Q,&exp_iQ);
-	/*
+
+#ifdef HOST_DEBUG
 	//Test for expiQ unitarity:
 	error = ErrorSU3(exp_iQ);	
 	printf("expiQ test %d %d %.15e\n", idx, dir, error);
-	*/
+#endif HOST_DEBUG
 
 	U = exp_iQ * U;
-	/*
+#ifdef HOST_DEBUG
 	//Test for expiQ*U unitarity:
 	error = ErrorSU3(U);	
 	printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
-	*/
+#endif HOST_DEBUG
+
         arg.dest.save((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity); 
     }
   }

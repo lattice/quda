@@ -992,12 +992,13 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
-      float inv3 = 1.0/3.0;
-      
-      float c0, c1, c0_max, Tr_re;
-      float f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
-      float theta;
-      float u_p, w_p;  //u, w parameters.
+      typedef decltype(Q(0,0).x) undMatType;
+
+      undMatType inv3 = 1.0/3.0;      
+      undMatType c0, c1, c0_max, Tr_re;
+      undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
+      undMatType theta;
+      undMatTypeu_p, w_p;  //u, w parameters.
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
@@ -1027,17 +1028,17 @@ namespace quda {
       w_p = sqrtf(c1)*sinf(theta*inv3);
       
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      float u_sq = u_p*u_p;
-      float w_sq = w_p*w_p;
-      float denom = 9*u_sq - w_sq;
-      float exp_iu_re = cosf(u_p);
-      float exp_iu_im = sinf(u_p);
-      float exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
-      float exp_2iu_im = 2*exp_iu_re*exp_iu_im;
-      float cos_w = cosf(w_p);
-      float sinc_w;
-      float hj_re = 0.0;
-      float hj_im = 0.0;
+      undMatType u_sq = u_p*u_p;
+      undMatType w_sq = w_p*w_p;
+      undMatType denom_inv = 1.0/(9*u_sq - w_sq);
+      undMatType exp_iu_re = cosf(u_p);
+      undMatType exp_iu_im = sinf(u_p);
+      undMatType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
+      undMatType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
+      undMatType cos_w = cosf(w_p);
+      undMatType sinc_w;
+      undMatType hj_re = 0.0;
+      undMatType hj_im = 0.0;
   
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {      
@@ -1059,20 +1060,20 @@ namespace quda {
       //[30] f0
       hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
       hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
-      f0_re = (hj_re/denom);
-      f0_im = (hj_im/denom);
+      f0_re = hj_re*denom_inv;
+      f0_im = hj_im*denom_inv;
       
       //[31] f1
       hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
       hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
-      f1_re = (hj_re/denom);
-      f1_im = (hj_im/denom);
+      f1_re = hj_re*denom_inv;
+      f1_im = hj_im*denom_inv;
       
       //[32] f2
       hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
       hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;  
-      f2_re = (hj_re/denom);
-      f2_im = (hj_im/denom);
+      f2_re = hj_re*denom_inv;
+      f2_im = hj_im*denom_inv;
       
       //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
       if (parity == 1) {
