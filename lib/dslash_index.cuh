@@ -875,7 +875,7 @@ static inline __device__ void faceIndexFromCoords(int &face_idx, I * const x, in
    @param[in] swizzle Swizzle factor to be applied
    @return Swizzled block index
 */
-//#define SWIZZLE
+#define SWIZZLE
 
   template <typename T>
   __device__ inline int block_idx(const T &swizzle) {

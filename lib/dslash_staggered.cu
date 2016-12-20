@@ -154,19 +154,9 @@ namespace quda {
       if (param.aux.x < 2*deviceProp.multiProcessorCount) {
         param.aux.x++;
 	return true;
-      } else {
-        param.aux.x = 1;
-
-	if (param.aux.y < max_register_block) {
-	  param.aux.y++;
-	  return true;
-	} else {
-	  param.aux.y = 1;
-	  return false;
-	}
-
       }
-#else
+#endif
+      param.aux.x = 1;
       for (unsigned int register_block=param.aux.y+1; register_block <= max_register_block && register_block <= nSrc; register_block++) {
 	if (nSrc % register_block == 0) { // register block size must be a divisor of 5-th dimention
 	  param.aux.y = register_block;
@@ -175,7 +165,6 @@ namespace quda {
       }
       param.aux.y = 1;
       return false;
-#endif
     }
 
     void initTuneParam(TuneParam &param) const
