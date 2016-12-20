@@ -1,5 +1,8 @@
 # basic setup for cmake
 cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
+
+message(AUTHOR_WARN "You are using a branch with an experimental CMake build system using native cuda support. DO NOT USE THIS FOR PRODUCTION !")
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
