@@ -966,11 +966,9 @@ namespace quda {
       double error;
       
       //error = ||U^dagger U - I||_L2
-      for(int i=0; i<3; ++i) {
-	for(int j=0; j<3; ++j) {
+      for(int i=0; i<3; ++i) 
+	for(int j=0; j<3; ++j) 
 	  error += (i==j) ? norm(identity_comp(i,j)-1.0) : norm(identity_comp(i,j));
-	}
-      }
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
