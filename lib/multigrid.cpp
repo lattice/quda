@@ -413,7 +413,7 @@ namespace quda {
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
     
-#if 1
+#ifdef ARPACK_LIB
     printfQuda("\n");
     printfQuda("Check eigenvector overlap for level %d\n", param.level );
 
@@ -466,6 +466,8 @@ namespace quda {
     else                                         delete static_cast<std::complex<float>* > (evalsBuffer);
  
     free(which);
+#else
+    warningQuda("\nThis test requires ARPACK.\n");
 #endif
 
     delete tmp1;
