@@ -68,7 +68,7 @@ namespace quda {
 
   private:
     const unsigned int nSrc;
-    const unsigned int max_register_block = 6;
+    const unsigned int max_register_block = 4;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -98,7 +98,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dslashParam.swizzle = tp.aux.x;
       switch(tp.aux.y) {
       case 1:
@@ -122,18 +122,6 @@ namespace quda {
       case 4:
 	{
 	  constexpr int register_block_size = 4;
-	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-      case 5:
-	{
-	  constexpr int register_block_size = 5;
-	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-      case 6:
-	{
-	  constexpr int register_block_size = 6;
 	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	  break;
 	}

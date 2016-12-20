@@ -68,7 +68,7 @@ namespace quda {
 
   private:
     const unsigned int nSrc;
-    const unsigned int max_register_block = 6;
+    const unsigned int max_register_block = 4;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -128,18 +128,6 @@ namespace quda {
       case 4:
 	{
 	  constexpr int register_block_size = 4;
-	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-      case 5:
-	{
-	  constexpr int register_block_size = 5;
-	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-	  break;
-	}
-      case 6:
-	{
-	  constexpr int register_block_size = 6;
 	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	  break;
 	}
