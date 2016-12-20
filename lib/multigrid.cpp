@@ -2,6 +2,8 @@
 #include <qio_field.h>
 #include <string.h>
 
+#include <quda_arpack_interface.h>
+
 namespace quda {  
 
   using namespace blas;
@@ -411,6 +413,63 @@ namespace quda {
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
     
+#ifdef ARPACK_LIB
+    printfQuda("\n");
+    printfQuda("Check eigenvector overlap for level %d\n", param.level );
+
+    int nmodes = 128;
+    int ncv    = 256;
+    double arpack_tol = 1e-7;
+    char *which = (char*)malloc(256*sizeof(char));
+    sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
+
+    ColorSpinorParam cpuParam(*param.B[0]);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) { 
+      cpuParam.x[0] /= 2; 
+      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
+    }
+
+    std::vector<ColorSpinorField*> evecsBuffer;
+    evecsBuffer.reserve(nmodes);
+
+    for (int i = 0; i < nmodes; i++) evecsBuffer.push_back( new cpuColorSpinorField(cpuParam) );
+
+    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
+    QudaPrecision arpPrecision = QUDA_DOUBLE_PRECISION;//precision used in ARPACK routines, may not coincide with matvec precision
+    
+    void *evalsBuffer =  arpPrecision == QUDA_DOUBLE_PRECISION ? static_cast<void*>(new std::complex<double>[nmodes+1]) : static_cast<void*>( new std::complex<float>[nmodes+1]);
+    //
+    arpackSolve( evecsBuffer, evalsBuffer, param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
+
+    for (int i=0; i<nmodes; i++) {
+      // as well as copying to the correct location this also changes basis if necessary
+      *tmp1 = *evecsBuffer[i]; 
+
+      transfer->R(*r_coarse, *tmp1);
+      transfer->P(*tmp2, *r_coarse);
+
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+
+      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
+      printfQuda("L2 relative deviation = %e\n", deviation);
+    }
+
+    for (unsigned int i = 0; i < evecsBuffer.size(); i++) delete evecsBuffer[i];
+
+    if( arpPrecision == QUDA_DOUBLE_PRECISION )  delete static_cast<std::complex<double>* >(evalsBuffer);
+    else                                         delete static_cast<std::complex<float>* > (evalsBuffer);
+ 
+    free(which);
+#else
+    warningQuda("\nThis test requires ARPACK.\n");
+#endif
+
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
@@ -556,8 +615,12 @@ namespace quda {
     }
 
     if (strcmp(vec_infile.c_str(),"")!=0) {
+#ifdef HAVE_QIO
       read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+#else
+      errorQuda("\nQIO library was not built.\n");      
+#endif
     } else {
       printfQuda("Using %d constant nullvectors\n", Nvec);
       //errorQuda("No nullspace file defined");
@@ -593,6 +656,7 @@ namespace quda {
   }
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
+#ifdef HAVE_QIO
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     std::string vec_outfile(param.mg_global.vec_outfile);
@@ -620,6 +684,9 @@ namespace quda {
 
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
+#else
+    errorQuda("\nQIO library was not built.\n");      
+#endif
   }
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {

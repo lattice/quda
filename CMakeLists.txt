@@ -92,6 +92,8 @@ set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dsl
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
 
+#ARPACK
+set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
 
 # Interface options
 set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
@@ -107,6 +109,7 @@ set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
 # Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
+set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
@@ -212,7 +215,32 @@ if(QUDA_MAGMA)
   include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
   message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
+  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
 endif(QUDA_MAGMA)
+
+# This selects arpack or parpack for Multi GPU
+if(QUDA_ARPACK)
+  add_definitions(-DARPACK_LIB)
+  find_package(PkgConfig REQUIRED)
+  if(QUDA_QMP OR QUDA_MPI)
+    pkg_check_modules(PARPACK QUIET parpack)
+    if(NOT PARPACK_FOUND OR QUDA_ARPACK_HOME)
+      find_library(PARPACK parpack PATH ${QUDA_ARPACK_HOME})
+    else()
+      find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
+    endif()
+  set(PARPACK_OR_ARPACK ${PARPACK})
+  else()
+    pkg_check_modules(ARPACK QUIET arpack)
+    if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
+      find_library(ARPACK arpack PATH ${QUDA_ARPACK_HOME})
+    else()
+      find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
+    endif()
+  set(PARPACK_OR_ARPACK ${ARPACK})
+  endif()
+endif(QUDA_ARPACK)
+
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
