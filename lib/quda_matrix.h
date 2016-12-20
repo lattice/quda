@@ -968,14 +968,7 @@ namespace quda {
       //error = ||U^dagger U - I||_L2
       for(int i=0; i<3; ++i) {
 	for(int j=0; j<3; ++j) {
-	  if (i==j) {
-	    error += (identity_comp(i,j).x-1.0)*(identity_comp(i,j).x-1.0);
-	    error += (identity_comp(i,j).y)*(identity_comp(i,j).y);
-	  }
-	  else {
-	    error += (identity_comp(i,j).x)*(identity_comp(i,j).x);
-	    error += (identity_comp(i,j).y)*(identity_comp(i,j).y);
-	  }
+	  error += (i==j) ? norm(identity_comp(i,j)-1.0) : norm(identity_comp(i,j));
 	}
       }
       //error is L2 norm, should be (very close) to zero.
@@ -1043,7 +1036,7 @@ namespace quda {
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {      
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
-	sinc_w = 1.0 - 1.0/6.0*w_sq*(1 - 0.05*w_sq*(1 - (1.0/42.0)*w_sq*(1 - (1.0/72.0)*w_sq)));
+	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
       
