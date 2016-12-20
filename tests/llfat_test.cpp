@@ -65,12 +65,7 @@ llfat_test(int test)
   qudaGaugeParam.gauge_order = gauge_order;
   qudaGaugeParam.type=QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
-  /*
-     qudaGaugeParam.flag = QUDA_FAT_PRESERVE_CPU_GAUGE
-     | QUDA_FAT_PRESERVE_GPU_GAUGE
-     | QUDA_FAT_PRESERVE_COMM_MEM;
-     */
-  qudaGaugeParam.preserve_gauge =0;
+
   void* fatlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
   void* longlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
 
@@ -161,14 +156,13 @@ llfat_test(int test)
   //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
 
-  QudaComputeFatMethod method = (test) ? QUDA_COMPUTE_FAT_EXTENDED_VOLUME : QUDA_COMPUTE_FAT_STANDARD;
   void* longlink_ptr = longlink;
 #ifdef MULTI_GPU
   if(!test) longlink_ptr = NULL; // Have to have an extended volume for the long-link calculation
 #endif
 
   gettimeofday(&t0, NULL);
-  computeKSLinkQuda(fatlink, longlink_ptr, NULL, milc_sitelink, act_path_coeff, &qudaGaugeParam, method);
+  computeKSLinkQuda(fatlink, longlink_ptr, NULL, milc_sitelink, act_path_coeff, &qudaGaugeParam);
   gettimeofday(&t1, NULL);
 
   double secs = TDIFF(t0,t1);
@@ -379,9 +373,6 @@ display_test_info(int test)
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1>                             # Test method\n");
-  printfQuda("                                                0: standard method\n");
-  printfQuda("                                                1: extended volume method\n");
   printfQuda("    --gauge-order <qdp/milc>		   # ordering of the input gauge-field\n");
   return ;
 }

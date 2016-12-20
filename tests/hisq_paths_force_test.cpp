@@ -48,7 +48,6 @@ int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
 
-extern bool tune;
 extern QudaPrecision prec;
 extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_DOUBLE_PRECISION;
@@ -389,6 +388,7 @@ hisq_force_init()
   gParam.pad = 0;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_MILC_GAUGE_ORDER;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuMom = new cpuGaugeField(gParam);
@@ -537,7 +537,6 @@ hisq_force_end()
   static int 
 hisq_force_test(void)
 {
-  if (tune) setTuning(QUDA_TUNE_YES);
   setVerbosity(QUDA_VERBOSE);
 
   hisq_force_init();
