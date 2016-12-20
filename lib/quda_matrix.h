@@ -989,7 +989,7 @@ namespace quda {
       undMatType c0, c1, c0_max, Tr_re;
       undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
       undMatType theta;
-      undMatTypeu_p, w_p;  //u, w parameters.
+      undMatType u_p, w_p;  //u, w parameters.
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
