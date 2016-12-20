@@ -412,7 +412,7 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # NVCC FLAGS independet off build type
 set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
-set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler")
+set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)

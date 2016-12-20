@@ -5,10 +5,7 @@ include_directories(.)
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 
-# if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
-FIND_LIBRARY(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
-
-set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LIBRARY})
+set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
   LIST(APPEND TEST_LIBS ${QIO_LIB} ${LIME_LIB})
@@ -42,6 +39,7 @@ ENDMACRO()
 if(${QUDA_DIRAC_WILSON} OR ${QUDA_DIRAC_CLOVER} OR ${QUDA_DIRAC_TWISTED_MASS} OR ${QUDA_DIRAC_TWISTED_CLOVER} OR ${QUDA_DIRAC_DOMAIN_WALL})
   add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
+  set_target_properties(dslash_test PROPERTIES LINKER_LANGUAGE CUDA)
   QUDA_CHECKBUILDTEST(dslash_test QUDA_BUILD_ALL_TESTS)
 
   add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
@@ -64,10 +62,12 @@ QUDA_CHECKBUILDTEST(deflation_test QUDA_BUILD_ALL_TESTS)
 if(${QUDA_DIRAC_STAGGERED})
   add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
+  set_target_properties(staggered_dslash_test PROPERTIES LINKER_LANGUAGE CUDA)
   QUDA_CHECKBUILDTEST(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
 
   add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
+  set_target_properties(staggered_invert_test PROPERTIES LINKER_LANGUAGE CUDA)
   QUDA_CHECKBUILDTEST(staggered_invert_test QUDA_BUILD_ALL_TESTS)
 
   if(${QUDA_BLOCKSOLVER})
