@@ -963,7 +963,7 @@ namespace quda {
     double ErrorSU3(const Matrix<Cmplx,3>& matrix)
     {
       const Matrix<Cmplx,3> identity_comp = conj(matrix)*matrix;
-      double error;
+      double error = 0.0;
       
       //error = ||U^dagger U - I||_L2
       for(int i=0; i<3; ++i) 
