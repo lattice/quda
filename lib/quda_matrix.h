@@ -935,7 +935,7 @@ namespace quda {
 
   template<class Cmplx>
   __device__ __host__
-  bool isUnitary(const Matrix<Cmplx,3>& matrix, double max_error)
+    bool isUnitary(const Matrix<Cmplx,3>& matrix, double max_error)
   {
     const Matrix<Cmplx,3> identity = conj(matrix)*matrix;
 
@@ -958,9 +958,24 @@ namespace quda {
     return true;
   }
 
+  template<class Cmplx>
+  __device__ __host__
+    double ErrorSU3(const Matrix<Cmplx,3>& matrix)
+    {
+      const Matrix<Cmplx,3> identity_comp = conj(matrix)*matrix;
+      double error = 0.0;
+      
+      //error = ||U^dagger U - I||_L2
+      for(int i=0; i<3; ++i) 
+	for(int j=0; j<3; ++j) 
+	  error += (i==j) ? norm(identity_comp(i,j)-1.0) : norm(identity_comp(i,j));
+      //error is L2 norm, should be (very close) to zero.
+      return error;
+    }
+  
   template<class T> 
     __device__  __host__ inline
-    void exponentiate_iQ(const Matrix<T,3>& M, Matrix<T,3>* exp_iM)
+    void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
       // This algorithm is outlined in
@@ -968,35 +983,34 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
-      double inv3 = 1.0/3.0;
-      
-      double c0, c1, c0_max;
-      double2 Tr, f0, f1, f2;
-      double theta;
-      double u_p, w_p;  //u, w parameters.
-      Matrix<T,3> temp1, temp2;
-      
+      typedef decltype(Q(0,0).x) undMatType;
+
+      undMatType inv3 = 1.0/3.0;      
+      undMatType c0, c1, c0_max, Tr_re;
+      undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
+      undMatType theta;
+      undMatType u_p, w_p;  //u, w parameters.
+      Matrix<T,3> temp1;
+      Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
-      const T & det_M = getDeterminant(M);
-      c0 = det_M.x;      
+      const T & det_Q = getDeterminant(Q);
+      c0 = det_Q.x;
       //[15] c1 = 1/2Tr(Q^2)
       // Q = Q^dag => Tr(Q^2) = Tr(QQ^dag) = sum_ab [Q_ab * Q_ab^*]
-      temp1 = M;
-      temp1 = temp1 * M;
-      Tr.x = getTrace(temp1).x;
-      Tr.y = getTrace(temp1).y;
-      Tr  = 0.5 * Tr;
-      c1 = Tr.x;
+      temp1 = Q;
+      temp1 = temp1 * Q;
+      Tr_re = getTrace(temp1).x;
+      c1 = 0.5*Tr_re;
       
       //We now have the coeffiecients c0 and c1.
       //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
       //      where       fj = fj(c0,c1), j=0,1,2.
       
       //[17]
-      c0_max  = 2*pow(c1*inv3,1.5);
+      c0_max = 2*pow(c1*inv3,1.5);
       
       //[25]
-      theta   = acos(c0/c0_max);
+      theta  = acos(c0/c0_max);
       
       //[23]
       u_p = sqrt(c1*inv3)*cos(theta*inv3);
@@ -1005,22 +1019,22 @@ namespace quda {
       w_p = sqrt(c1)*sin(theta*inv3);
       
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      double u_sq = u_p*u_p;
-      double w_sq = w_p*w_p;
-      double denom = 9*u_sq - w_sq;
-      double exp_iu_re = cos(u_p);
-      double exp_iu_im = sin(u_p);
-      double exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
-      double exp_2iu_im = 2*exp_iu_re*exp_iu_im;
-      double cos_w = cos(w_p);
-      double sinc_w;
-      double hj_re = 0.0;
-      double hj_im = 0.0;
+      undMatType u_sq = u_p*u_p;
+      undMatType w_sq = w_p*w_p;
+      undMatType denom_inv = 1.0/(9*u_sq - w_sq);
+      undMatType exp_iu_re = cos(u_p);
+      undMatType exp_iu_im = sin(u_p);
+      undMatType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
+      undMatType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
+      undMatType cos_w = cos(w_p);
+      undMatType sinc_w;
+      undMatType hj_re = 0.0;
+      undMatType hj_im = 0.0;
   
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {      
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
-	sinc_w = 1.0-1.0/6.0*w_sq*(1-0.05*w_sq*(1-1.0/42.0*w_sq*(1-1.0/72.0*w_sq)));
+	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
       
@@ -1037,62 +1051,59 @@ namespace quda {
       //[30] f0
       hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
       hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
-      f0.x = (hj_re/denom);
-      f0.y = (hj_im/denom);
+      f0_re = hj_re*denom_inv;
+      f0_im = hj_im*denom_inv;
       
       //[31] f1
       hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
       hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
-      f1.x = (hj_re/denom);
-      f1.y = (hj_im/denom);
+      f1_re = hj_re*denom_inv;
+      f1_im = hj_im*denom_inv;
       
       //[32] f2
       hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
       hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;  
-      f2.x = (hj_re/denom);
-      f2.y = (hj_im/denom);
+      f2_re = hj_re*denom_inv;
+      f2_im = hj_im*denom_inv;
       
       //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
       if (parity == 1) {
-	f0.y *= -1.0; 
-	f1.x *= -1.0;
-	f2.y *= -1.0;
+	f0_im *= -1.0; 
+	f1_re *= -1.0;
+	f2_im *= -1.0;
       }
       
       T f0_c;
       T f1_c;
       T f2_c;
       
-      f0_c.x = f0.x;
-      f0_c.y = f0.y;
+      f0_c.x = f0_re;
+      f0_c.y = f0_im;
       
-      f1_c.x = f1.x;  
-      f1_c.y = f1.y;  
+      f1_c.x = f1_re;  
+      f1_c.y = f1_im;  
       
-      f2_c.x = f2.y;
-      f2_c.y = f2.y;
+      f2_c.x = f2_re;
+      f2_c.y = f2_im;
 
       //[19] Construct exp{iQ}
-      setZero(exp_iM);
-      Matrix<T,3> Unm;
-      setIdentity(&Unm);
+      setZero(exp_iQ);
+      Matrix<T,3> UnitM;
+      setIdentity(&UnitM);
       // +f0*I
-      Unm = f0_c * Unm;
-      *exp_iM += Unm;
+      temp1 = f0_c * UnitM;
+      *exp_iQ = temp1;
       
       // +f1*Q
-      temp1 = M;
-      temp1 = f1_c * temp1; 
-      *exp_iM += temp1;
+      temp1 = f1_c * Q;
+      *exp_iQ += temp1;
 
-      // +f2Q^2
-      temp1 = M;
-      temp1 *= M;
-      setIdentity(&temp2);
-      temp2 = f2_c * temp2;
-      temp2 *= temp1;
-      *exp_iM += temp2;
+      // +f2*Q^2
+      temp1 = Q * Q;
+      temp2 = f2_c * temp1;
+      *exp_iQ += temp2;
 
+      //exp(iQ) is now defined.
       return;
     }
 

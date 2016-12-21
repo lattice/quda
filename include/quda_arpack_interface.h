@@ -14,65 +14,19 @@
 #include <mpi.h>
 #endif
 
+//#ifdef PRIMME_LIB
+//#include "primme.h"
+//#endif
 
-namespace quda{
+#ifdef ARPACK_LIB
 
-   class ArpackArgs{
-
-    private:
-      //main setup:
-      /**Problem matrix **/
-      DiracMatrix &matEigen;
-
-      /**Matrix vector precision (may not coincide with arpack IRA routines precision) **/
-      QudaPrecision mat_precision;
-
-      /**precision of IRA routines**/
-      bool use_full_prec_arpack;
-
-      /**spectrum info**/
-      int nev;//number of eigenvecs to be comupted
-      int ncv;//search subspace dimension (note that 1 <= NCV-NEV and NCV <= N) 
-
-      char *lanczos_which;// ARPACK which="{S,L}{R,I,M}
-
-      /**general arpack library parameters**/	
-      double tol;
-      int   info;
-
-      //experimental: for tests only!
-      //supported oprtions: 2d fields -> 1 (U(1)), 4d fields -> 2 (SU(2))      
-      int reducedColors;
-
-      //experimental: 2d or 4d fields?
-      bool _2d_field;
-
-    public:
-
-      ArpackArgs(DiracMatrix &matEigen, QudaPrecision prec, int nev, int ncv, char *which) : matEigen(matEigen), mat_precision(prec), 
-            use_full_prec_arpack(true), nev(nev), ncv(ncv), lanczos_which(which), tol(1e-6), info(0), reducedColors(3), _2d_field(false) { };       
-
-      virtual ~ArpackArgs() { };
-
-      //Extra setup:
-      void Set2D() {_2d_field = true; } 
-
-      void SetReducedColors(int c) { reducedColors = c;}
-
-      void SetTol(double _tol) {tol = _tol;};
-      //Main IRA algorithm driver:
-      void operator()(std::vector<ColorSpinorField*> &B, std::complex<double> *evals);     
-
-   };
-
-}//endof namespace quda 
 #define ARPACK(s) s ## _
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if (defined(MPI_COMMS) || defined(QMP_COMMS))
+#ifdef MULTI_GPU
 
 extern int ARPACK(pcnaupd) (int *fcomm, int *ido, char *bmat, int *n, char *which, int *nev, float *tol,
                          std::complex<float> *resid, int *ncv, std::complex<float> *v, int *ldv,
@@ -131,4 +85,36 @@ extern int ARPACK(zneupd) (int *comp_evecs, char *howmany, int *select, std::com
 #ifdef __cplusplus
 }
 #endif
+
+#endif //ARPACK_LIB
+
+namespace quda{
+
+ /**
+ *  Interface function to the external ARPACK library. This function utilizes ARPACK implemntation 
+ *  of the Implicitly Restarted Arnoldi Method to compute a number of eigenvectors/eigenvalues with 
+ *  user specified features such as those with small real part, small magnitude etc. Parallel version
+ *  is also supported.
+ *  @param[in/out] B           Container of eigenvectors
+ *  @param[in/out] evals       A pointer to eigenvalue array.
+ *  @param[in]     matEigen    Any QUDA implementation of the matrix-vector operation
+ *  @param[in]     matPrec     Precision of the matrix-vector operation
+ *  @param[in]     arpackPrec  Precision of IRAM procedures. 
+ *  @param[in]     tol         tolerance for computing eigenvalues with ARPACK
+ *  @param[in]     nev         number of eigenvectors 
+ *  @param[in]     ncv         size of the subspace used by IRAM. ncv must satisfy the two
+ *                             inequalities 2 <= ncv-nev and ncv <= *B[0].Length()
+ *  @param[in]     target      eigenvector selection criteria:  
+ *                             'LM' -> want the nev eigenvalues of largest magnitude.
+ *                             'SM' -> want the nev eigenvalues of smallest magnitude.
+ *                             'LR' -> want the nev eigenvalues of largest real part.
+ *                             'SR' -> want the nev eigenvalues of smallest real part.
+ *                             'LI' -> want the nev eigenvalues of largest imaginary part.
+ *                             'SI' -> want the nev eigenvalues of smallest imaginary part.                       
+ **/
+
+  void arpackSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision arpackPrec, double tol, int nev, int ncv, char *target );
+//  void primmeSolve( std::vector<ColorSpinorField*> &B, void *evals, DiracMatrix &matEigen, QudaPrecision matPrec, QudaPrecision primmePrec, double tol, int nev, int ncv, char *target);
+
+}//endof namespace quda 
 

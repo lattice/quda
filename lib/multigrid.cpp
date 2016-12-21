@@ -486,24 +486,42 @@ namespace quda {
 
     for (int i = 0; i < nmodes; i++) evecsBuffer.push_back( new cpuColorSpinorField(cpuParam) );
     
-    Complex *evalsBuffer = new Complex[nmodes+1];
-    //
-    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
-    ArpackArgs args(param.matResidual, matPrecision, nmodes, ncv, which);    
-    if(param.mg_global._2d_u1_emulation) 
-    {
-      args.Set2D();
-      args.SetReducedColors(1);
-      args.SetTol(1e-7);
+#ifdef ARPACK_LIB
+    printfQuda("\n");
+    printfQuda("Check eigenvector overlap for level %d\n", param.level );
+
+    int nmodes = 128;
+    int ncv    = 256;
+    double arpack_tol = 1e-7;
+    char *which = (char*)malloc(256*sizeof(char));
+    sprintf(which, "SM");/* ARPACK which="{S,L}{R,I,M}" */
+
+    ColorSpinorParam cpuParam(*param.B[0]);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+    cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) { 
+      cpuParam.x[0] /= 2; 
+      cpuParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
     }
+
+    std::vector<ColorSpinorField*> evecsBuffer;
+    evecsBuffer.reserve(nmodes);
+
+    for (int i = 0; i < nmodes; i++) evecsBuffer.push_back( new cpuColorSpinorField(cpuParam) );
+
+    QudaPrecision matPrecision = QUDA_SINGLE_PRECISION;//manually ajusted?
+    QudaPrecision arpPrecision = QUDA_DOUBLE_PRECISION;//precision used in ARPACK routines, may not coincide with matvec precision
+    
+    void *evalsBuffer =  arpPrecision == QUDA_DOUBLE_PRECISION ? static_cast<void*>(new std::complex<double>[nmodes+1]) : static_cast<void*>( new std::complex<float>[nmodes+1]);
     //
-    args(evecsBuffer, evalsBuffer);
+    arpackSolve( evecsBuffer, evalsBuffer, param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
 
     for (int i=0; i<nmodes; i++) {
       // as well as copying to the correct location this also changes basis if necessary
-      printfQuda("\nNorm : %le\n", blas::norm2(*evecsBuffer[i]));
-      *tmp5 = *evecsBuffer[i]; 
-      *tmp1 = *tmp5;
+      *tmp1 = *evecsBuffer[i]; 
 
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
@@ -516,9 +534,13 @@ namespace quda {
     }
 
     for (unsigned int i = 0; i < evecsBuffer.size(); i++) delete evecsBuffer[i];
-    delete [] evalsBuffer;
 
+    if( arpPrecision == QUDA_DOUBLE_PRECISION )  delete static_cast<std::complex<double>* >(evalsBuffer);
+    else                                         delete static_cast<std::complex<float>* > (evalsBuffer);
+ 
     free(which);
+#else
+    warningQuda("\nThis test requires ARPACK.\n");
 #endif
 
     delete tmp1;
@@ -691,19 +713,13 @@ namespace quda {
 	printfQuda("Could not allocate V[%d]\n", i);
       }
     }
-    
-    if (strcmp(vec_infile,"")!=0) {
-#if 1
-      read_spinor_field(vec_infile, &V[0], B[0]->Precision(), B[0]->X(), 
+
+    if (strcmp(vec_infile.c_str(),"")!=0) {
+#ifdef HAVE_QIO
+      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
-#else 
-      for (int i=0; i<Nvec; i++) {
-	char filename[256];
-	sprintf(filename, "%s.%d", vec_infile, i);
-	printfQuda("Reading vector %d from file %s\n", i, filename);
-	read_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(), 
-			  B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
-      }
+#else
+      errorQuda("\nQIO library was not built.\n");      
 #endif
     } else {
       printfQuda("Using %d constant nullvectors\n", Nvec);
@@ -740,6 +756,7 @@ namespace quda {
   }
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
+#ifdef HAVE_QIO
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     const char *vec_outfile = param.mg_global.vec_outfile;
@@ -775,6 +792,9 @@ namespace quda {
 
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
+#else
+    errorQuda("\nQIO library was not built.\n");      
+#endif
   }
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {
