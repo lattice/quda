@@ -36,16 +36,103 @@ namespace quda {
     using namespace Eigen;
     using namespace std;
 
+    using DynamicStride   = Stride<Dynamic, Dynamic>;
 
-    static GMResDRDeflationParam *defl_param = 0;
+    using DenseMatrix     = MatrixXcd;
+    using VectorSet       = MatrixXcd;
+    using Vector          = VectorXcd;
 
     struct SortedEvals{
 
-      double nrm;
-      int    idx;
+      double _val;
+      int    _idx;
 
-      SortedEvals(double val, int idx) : nrm(val), idx(idx) {};
+      SortedEvals(double val, int idx) : _val(val), _idx(idx) {};
+      static bool SelectSmall (SortEvals v1, SortEvals v2) { return (v1._val < v2._val);}
     };
+
+    class GMResDRArgs{
+
+      public:
+
+       VectorSet   ritzVecs;//array of sorted harmonic eigenvectors: (nev+1) length      
+       DenseMatrix H;//Hessenberg matrix
+       Vector      eta;
+       //Vector      *c;//  c = &ritzVecs[(m+1)*k] => ritzVecs.col(k)
+      
+       int m;
+       int k;
+
+       int restarts;
+
+       GMResDRArgs(int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)), 
+       eta(m), m(m), k(nev), restarts(0) 
+       { }
+
+       //inline Complex& Hess(int row, int col) {return H[col*(m+1)+row];}
+       //inline Complex& const Hess(int row, int col) const {return H[col*(m+1)+row];}
+
+       void ComputeHarmonicRitz();
+
+       inline void AddShortResidual() { ritzVecs.col(k) -= H * eta;}
+       inline void ResetArgs() { 
+         H.setZero();  
+         eta.setZero();  
+         ritzVecs.setZero(); 
+       }
+
+       ~GMResDRArgs(){ }
+   };
+
+   void GMResDRArgs::ComputeHarmonicRitz()
+   {
+     //1. initialize Eigen objects:
+     DenseMatrix cH = H.block(0, 0, m, m).adjoint();
+     DenseMatrix Gk = H.block(0, 0, m, m);
+     //
+     VectorSet  harVecs = MatrixXcd::Zero(m,m);
+     Vector     harVals = VectorXcd::Zero(m);
+
+     //2. construct H + beta*H^{-H} e_m*e_m^{T}
+     //2.a need to solve H^{H}y = beta e_m;
+     Vector em = VectorXcd::Zero(m);//in fact, em^{T}=(0,....,1)
+     //2.b construct beta*em
+     em(m-1) = norm( H(m, m-1) );//in fact, we construct beta*em
+     //2.c Compute y = H^{-H} beta*e_m:   
+#ifdef USE_MAGMA 
+     cudaHostRegister(static_cast<void *>(cH.data()), m*m*sizeof(Complex), cudaHostRegisterDefault);
+     magma_Xgesv(static_cast<void*>(em.data()), m, m, static_cast<void*>(cH.data()), m, sizeof(Complex));
+     cudaHostUnregister(cH.data());
+#else
+//     RowVectorXcd sol = _cH.fullPivLu().solve(em);
+//or
+//     RowVectorXcd sol = _cH.colPivHouseholderQr().solve(_em);
+//     em = sol;     
+#endif
+//     em.applyOnTheLeft(_Gk);
+     //2.d Adjust last column with ((H^{-H}*beta*em)=em, em^{T}=[0,....,1]):
+     Gk.col(m-1) += em;
+
+     //3.  Compute harmonic eigenpairs:
+#ifdef USE_MAGMA 
+     cudaHostRegister(static_cast<void *>(Gk.data()), m*m*sizeof(Complex), cudaHostRegisterDefault);
+     magma_Xgesv(static_cast<void*>(Gk.data()), m, m, static_cast<void*>(harVecs.data()), static_cast<void*>(harVals.data()), m, sizeof(Complex));//check it!
+     cudaHostUnregister(Gk.data());
+#else
+     //
+#endif
+     //4. do sort:
+     std::vector<SortEvals> sorted_evals(m);
+
+     for(int e = 0; e < m; e++) sorted_evals.push_back( SortEvals( abs(harVals[e]), e ));
+     //
+     std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortEvals::SelectSmall);
+
+     //5. Copy sorted eigenvectors:
+     for(int e = 0; e < k; e++) memcpy(ritzVecs.col((m+1)*e).data(), harVecs.col((m+1)*( sorted_evals[e].idx)).data(), (m)*sizeof(Complex));
+
+     return;
+   }
 
     // set the required parameters for the inner solver
     void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
@@ -72,128 +159,12 @@ namespace quda {
       else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
     }
 
-    class GMResDRArgs{
-
-      private:
-
-       Complex *ritzVecs;//array of sorted harmonic eigenvectors: (nev+1) length
-
-      public:
-      
-       Complex *H;//Hessenberg matrix
-       Complex *c;//
-       Complex *eta;
-      
-       int m;
-       int k;
-
-       GMResDRArgs( ) { };
-
-       GMResDRArgs(int m, int nev) ritzVecs(0), m(m), k(nev)
-       {
-         if(nev == 0 || nev > m) errorQuda("\nError: incorrect deflation size.\n");
-
-         H   = new Complex[(m+1)*m];//Hessenberg matrix
-         eta = new Complex[m];
-         ritzVecs  = new Complex[(m+1)*(k+1)];//
-
-         c = &ritzVecs[(m+1)*k];
-       }
-
-       inline Complex& Hess(int row, int col) {return H[col*(m+1)+row];}
-       inline Complex& const Hess(int row, int col) const {return H[col*(m+1)+row];}
-
-       void ComputeHarmonicRitz();
-       void AddShortResidual();
-
-       void ResetData()
-       {
-         std::memset(H, 0, (m+1)*m*sizeof(Complex) );
-         std::memset(eta, 0, m*sizeof(Complex) );
-         std::memset(ritzVecs, 0, (m+1)*(k+1)*sizeof(Complex) );
-       }
-
-       ~GMResDRArgs()
-       {
-         delete[] eta;
-         delete[] H;
-
-         delete[] ritzVecs;
-       }
-   };
-
- void GMResDRArgs::ComputeHarmonicRitz()
- {
-   //1. initialize Eigen objects:
-   Map<MatrixXcd, Unaligned, Stride<Dynamic, Dynamic> > _H(H, m, m, Stride(m+1, 1));
-
-   MatrixXcd _cH(_H.adjoint());
-   MatrixXcd _Gk(_H);
-
-   MatrixXcd  _ritzVecs = MatrixXcd::Zero((m+1)*m);
-   VectorXcd  _ritzVals = VectorXcd::Zero(m);
-
-   //2. construct H + beta*H^{-H} e_m*e_m^{T}
-   //2.a need to solve H^{H}y = beta e_m;
-   VectorXcd _em = VectorXcd::Zero(m);//in fact, em^{T}=(0,....,1)
-   //2.b construct beta*em
-   _em(m-1) = norm( Hess(m, m-1) );//in fact, we construct beta*em
-   //2.c Compute y = H^{-H} beta*e_m:   
-#ifdef USE_MAGMA 
-   magma_Xgesv(static_cast<void*>(_em.data()), m, m, static_cast<void*>(_cH.data()), m, sizeof(Complex));
-#else
-//   RowVectorXcd sol = _cH.fullPivLu().solve(em);
-//   RowVectorXcd _sol = _cH.colPivHouseholderQr().solve(_em);
-//   _em = _sol;     
-#endif
-//   _em.applyOnTheLeft(_Gk);
-   //2.d Adjust last column with ((H^{-H}*beta*em)=em, em^{T}=[0,....,1]):
-   _Gk.col(m-1) += em;
-
-   //3.  Compute harmonic eigenpairs:
-#ifdef USE_MAGMA 
-   magma_Xgesv(static_cast<void*>(_Gk.data()), m, (m+1), static_cast<void*>(_ritzVecs.data()), static_cast<void*>(_ritzVals.data()), (m+1), sizeof(Complex));//check it!
-#else
-   //
-#endif
-   //4. do sort:
-   std::vector<SortedEvals> sorted_evals(m);
-
-   for(int e = 0; e < m; e++) sorted_evals.push_back( SortEvals( abs(_ritzVals[e]), e ));
-   //
-   std::stable_sort(sorted_evals.begin(), sorted_evals.end(),  [](SortedEvals &v1, SortedEvals &v2) { return (v1.nrm < v2.nrm);});
-
-   //5. Copy sorted eigenvectors:
-   for(int e = 0; e < k; e++) memcpy(&ritzVecs[(m+1)*e], _ritzVecs.col((m+1)*( sorted_evals[e].idx)).data(), (m+1)*sizeof(Complex));
-//   std::for_each(sorted_evals.begin(), sorted_evals.end(), std::memcpy(&ritzVecs[(m+1)*e], _ritzVecs.col((m+1)*( sorted_evals[e].idx)).data(), (m+1)*sizeof(Complex)));
-
-   return;
- }
-
- void GMResDRArgs::AddShortResidual()
- {
-   Map<MatrixXcd, Unaligned> _H(H, m+1, m);
-   Map<VectorXcd, Unaligned> _eta(eta, m);
-
-   Map<VectorXcd, Unaligned> _Gkp1(&ritzVecs[(m+1)*k], (m+1));
-
-   _Gkp1 -= (_H*_eta);
-
-   return;
- }
-
-
-
  GMResDR::GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile *profile) :
     DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), matPrecon(matPrecon), K(nullptr), gmres_space_prec(QUDA_INVALID_PRECISION),
     Vm(nullptr), Zm(nullptr), profile(profile), args(nullptr), gmres_alloc(false)
  {
      //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMResDR is not currently supported.\n");
      //
-     gmres_space_prec = param.precision_sloppy;//We don't allow half precision, do we?
-
-     args = new GMResDRArgs(param.m, param.nev);//use_deflated_cycles flag is true by default
-
      fillInnerSolveParam(Kparam, param);
 
      if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
@@ -214,16 +185,7 @@ namespace quda {
 
  GMResDR::GMResDR(DiracMatrix *mat, Solver &K, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile *profile) :
     DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), matPrecon(matPrecon), K(&K), gmres_space_prec(QUDA_INVALID_PRECISION),  init(false)
-    Vm(nullptr), Zm(nullptr), profile(profile), args(nullptr)
- {
-     //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMResDR is not currently supported.\n");
-     //
-     gmres_space_prec = param.precision_sloppy;//We don't allow half precision, do we?
-
-     args = new GMResDRArgs(param.m, param.nev);//use_deflated_cycles flag is true by default
-
-     return;
- }
+    Vm(nullptr), Zm(nullptr), profile(profile), args(nullptr) { }
 
  GMResDR::GMResDR(SolverParam &param) :
     DeflatedSolver(param, nullptr), mat(nullptr), matSloppy(nullptr), matDefl(nullptr), matPrecon(nullptr), gmres_space_prec(QUDA_INVALID_PRECISION),
@@ -232,8 +194,6 @@ namespace quda {
 
  GMResDR::~GMResDR() {
     profile->TPSTART(QUDA_PROFILE_FREE);
-
-    if(args) delete args;
 
     if(init)
     {
@@ -257,6 +217,8 @@ namespace quda {
       delete tmp1_p;
       delete yp;
       delete rp;
+
+      delete gmresdr_args;
     }
 
    profile->TPSTOP(QUDA_PROFILE_FREE);
@@ -266,36 +228,29 @@ namespace quda {
  {
    GMResDRArgs &args = *gmresdr_args;
 
-   Map<MatrixXcd, Unaligned> _H(_args.H, (args.m+1), args.m);
-   Map<VectorXcd, Unaligned> _eta(args.eta, args.m);
-   Map<VectorXcd, Unaligned> _c(args.c, args.m+1);
+   void *c = static_cast<void*>(args.ritzVecs.col(args.k).data());
 
 #ifdef USE_MAGMA
-   if(do_gels) magma_gels(static_cast<void*>(_H.data()), static_cast<void*>(_c.data()), static_cast<void*>(_eta.data()), (args.m+1), args.m, (args.m+1));
+   cudaHostRegister(static_cast<void *>(args.H.data()), (args.m+1)*args.m*sizeof(Complex), cudaHostRegisterDefault)
+   if(do_gels) magma_gels(static_cast<void*>(args.H.data()), c, static_cast<void*>(args.eta.data()), (args.m+1), args.m, (args.m+1));
+   cudaHostUnregister(args.H.data());
 #else
    //
 #endif
-   //compute x = x0+Wm*lsqSol, where Wm is Vm or Zm (if preconditioned)
-   std::vector<ColorSpinorField*> _Zm(args.m), _x(args.m), _Vm(args.m+1), _r(args.m+1);
-   for(int i = 0; i < args.m; i++)
-   {
-     _Zm.push_back(&Zm->Component(i));
-     _Vm.push_back(&Vm->Component(i));
-     _x.push_back(&x);
-     _r.push_back(&r);
-   }
+   //compute x = x0+Wm*lsqSol, where Wm is Vm or Zm (if preconditioned):
+   std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().end());
+   std::vector<ColorSpinorField*> V_(Vm->Components().begin(),Vm->Components().end());
 
-   _Vm.push_back(&Vm->Component(args.m));
-   _r.push_back(&r);
+   std::vector<ColorSpinorField*> x_(&x), r_(&r);
 
-   blas::caxpy(args.eta, _Zm, _x);
+   blas::caxpy( static_cast<Complex*>(args.eta.data()), Z_, x_);
 
    Complex Heta = new Complex[args.m+1]; 
-   Map<VectorXcd, Unaligned> __Heta(Heta, args.m+1);
+   Map<VectorXcd, Unaligned> Heta_(Heta, args.m+1);
  
-   _Heta -= (_H*_eta);
+   Heta_ -= (args.H*args.eta);
 
-   blas::caxpy(__Heta, _Vm, _r);
+   blas::caxpy(Heta,V_,r_);
 
    delete[] Heta;
 
@@ -309,19 +264,19 @@ namespace quda {
    args.ComputeHarmonicRitz(); 
    args.AddShortResidual();
 
-   Map<MatrixXcd, Unaligned> _H   (_args.H, (args.m+1), args.m);
-   Map<MatrixXcd, Unaligned> _Gkp1(_args.ritzVecs, (args.m+1), (args.k+1));
+   //Map<MatrixXcd, Unaligned> _H   (_args.H, (args.m+1), args.m);
+   //Map<MatrixXcd, Unaligned> _Gkp1(_args.ritzVecs, (args.m+1), (args.k+1));
 
    //1. QR of the eigenvctor matrix:
-   MatrixXcd _Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
+   DenseMatrix Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
   
-   HouseholderQR<MatrixXcd> _qr(_Gkp1);
-   _Qkp1.applyOnTheLeft( _qr.householderQ());
+   HouseholderQR<MatrixXcd> qr(args.ritzVecs);
+   Qkp1.applyOnTheLeft( qr.householderQ());
 
    //2. Update H:
-   MatrixXcd _Res = _Qkp1.adjoint()*_H*_Qkp1.topLeftCorner(args.m, args.k);
-   _H.setZero();
-   _H.topLeftCorner(args.k+1, args.k) = _Res;
+   DenseMatrix Res = Qkp1.adjoint()*args.H*Qkp1.topLeftCorner(args.m, args.k);
+   H.setZero();
+   H.topLeftCorner(args.k+1, args.k) = Res;
 
    //2. Update Vm+1 : Vk+1 = Vm+1 Qk+1
 
@@ -335,10 +290,13 @@ namespace quda {
 
    ColorSpinorFieldSet Vkp1 = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
 
-   std::vector<ColorSpinorField*> _Vm(Vm->CompositeDim());
-   for(int i = 0; i < Vm->CompositeDim(); i++) _Vm.push_back(&Vm->Component(i)); 
+   std::vector<ColorSpinorField*> V(Vm->Components().begin(), Vm->Components().end());
 
-   for(int i = 0; i < (args.k+1); i++) blas::caxpy(_Qkp1.col(i).data(), _Vm , Vkp1->Component(i));//use mixed multiblas here
+   for(int i = 0; i < (args.k+1); i++) 
+   {
+     std::vector<ColorSpinorField*> Vi(Vkp1->Components().begin()+i,Vkp1->Components().begin()+i+1);
+     blas::caxpy(static_cast<Complex*>(Qkp1.col(i).data()), V , Vi);//use mixed multiblas here
+   }
 
    for(int i = 0; i < (args.m+1); i++)  
    {
@@ -353,12 +311,15 @@ namespace quda {
    //3. Zk = Zm Qk
    if( Zm->V() &&  Zm->V() != Vm->V() )
    {
-     MatixXcd _Qk = _Qkp1.topLeftCorner(args.m,args.k);
+     DenseMatrix Qk = Qkp1.topLeftCorner(args.m,args.k);
 
-     std::vector<ColorSpinorField*> _Zm(Zm->CompositeDim());
-     for(int i = 0; i < Zm->CompositeDim(); i++) _Zm.push_back(&Zm->Component(i)); 
+     std::vector<ColorSpinorField*> Z(Zm->Components().begin(), Zm->Components().end());
 
-     blas::caxpy(Qk.col(i).data(), _Zm , Vkp1->Component(i) ); 
+     for(int i = 0; i < args.k; i++) 
+     {
+       std::vector<ColorSpinorField*> Vi(Vkp1->Components().begin()+i,Vkp1->Components().begin()+i+1);
+       blas::caxpy(static_cast<Complex*>(Qkp1.col(i).data()), Z , Vi);//use mixed multiblas here
+     }
 
      for(int i = 0; i < (args.m); i++)  
      {
@@ -423,38 +384,38 @@ namespace quda {
      //
      for(int i = (start_idx+1); i <= j; i++)
      {
-        args.Hess(i, j) = cDotProduct(Vm->Component(i), Vm->Component(j+1));//
+        args.H(i, j) = cDotProduct(Vm->Component(i), Vm->Component(j+1));//
         //
-        caxpy(-args.Hess(i, j), Vm->Component(i), Vm->Component(j+1));
+        caxpy(-args.H(i, j), Vm->Component(i), Vm->Component(j+1));
 
         if(do_givens)  //lets do Givens rotations:
         {
-           if(i > 0) givensH[args->ldm*j+(i-1)] = conj(Cn[i-1])*h0 + Sn[i-1]*args.Hess(i,j);
+           if(i > 0) givensH[args->ldm*j+(i-1)] = conj(Cn[i-1])*h0 + Sn[i-1]*args.H(i,j);
            //
-           h0 = (i == 0) ?  args.Hess(0,j) : -Sn[i-1]*h0 + Cn[i-1]*args.Hess(i,j); 
+           h0 = (i == 0) ?  args.H(0,j) : -Sn[i-1]*h0 + Cn[i-1]*args.H(i,j); 
         }
      }
      //6. Compute h(j+1,j):
-     args.Hess(j+1, j) = Complex(sqrt(norm2(*Vm->Component(j+1))), 0.0);
+     args.H(j+1, j) = Complex(sqrt(norm2(*Vm->Component(j+1))), 0.0);
      //7. Scale the last arnoldi vector:
-     blas::ax( 1.0 / args.Hess(j+1, j).real(), Vm->Component(j+1));
+     blas::ax( 1.0 / args.H(j+1, j).real(), Vm->Component(j+1));
      //
      if(do_givens)
      {
-       double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.Hess(j+1,j)));
+       double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
        //8. Update Givens coefficients:
        cn[j] = h0 * inv_denom;
        //
-       sn[j] = args.Hess(j+1,j).real() * inv_denom;
+       sn[j] = args.H(j+1,j).real() * inv_denom;
        //9. Compute diagonal element in G:
-       givensH[j*args->ldm+j] = conj(Cn[j])*h0 + Sn[j]*args.Hess(j+1,j);
+       givensH[j*args->ldm+j] = conj(Cn[j])*h0 + Sn[j]*args.H(j+1,j);
       
-       //10. Compute iter residual:
-       args.c[j+1] = -Sn[j]*args.c[j];
+       //10. Compute iter residual:???
+       args.ritzVecs.col(args.k).data()[j+1] = -Sn[j]*args.ritzVecs.col(args.k).data()[j];
        //
-       args.c[j] *= conj(Cn[j]);
+       args.ritzVecs.col(args.k).data()[j] *= conj(Cn[j]);
        //
-       r2 = norm(args.c[j+1]);//stopping criterio
+       r2 = norm(args.ritzVecs.col(args.k).data()[j+1]);//stopping criterio
      }
 
      j += 1;
@@ -464,10 +425,8 @@ namespace quda {
    //11.a Solve LSQR problem:
    if(do_givens)
    {
-     Map<MatrixXcd, Unaligned, Stride<args.m+1,1>> _givensH(givensH,args.m,args.m);//extract triangular part
-     Map<VectorXcd, Unaligned> _eta(args.eta,args.m);
-
-     _givensH.triangularView<Upper>().solveInPlace<OnTheLeft>(_eta);
+     Map<MatrixXcd, Unaligned, DynamicStride> _givensH(givensH,args.m,args.m, DynamicStride<args.m+1,1>);//extract triangular part
+     _givensH.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
 
      delete[] givensH;
      delete[] cn;
@@ -475,14 +434,16 @@ namespace quda {
 
    }  else {
      //express old residual in terms of new basis:
-     std::vector<ColorSpinorField*> _Vkp1(args.k+1), _r(args.k+1);
+     std::vector<ColorSpinorField*> V_, r_;
+     V_.reserve(args.k+1);
+     r_.reserve(args.k+1);
      for(int i = 0; i < args.k+1; i++)
      {
-       _Vkp1.push_back(&Vm->Component(i));
-       _r.push_back(r_sloppy);
+       V_.push_back(&Vm->Component(i));
+       r_.push_back(r_sloppy);
      }
 
-     blas::cDotProduct( args.c, _Vkp1, _r );
+     blas::cDotProduct( static_cast<Complex*>(args.ritzVecs.col(args.k).data()), V_, r_ );
 
    }
 
@@ -497,9 +458,9 @@ namespace quda {
 
     const double tol_threshold = 6.0; 
 
-    GMResDRArgs &args = *gmresdr_args;
-
     if (!init) {
+
+      gmresdr_args = new GMResDRArgs(param.m, param.nev);
 
       ColorSpinorParam csParam(*in);//create spinor parameters
 
@@ -541,6 +502,9 @@ namespace quda {
       Zm = K ? ColorSpinorFieldSet::Create(csParam) : Vm;
 
     }
+
+
+    GMResDRArgs &args = *gmresdr_args;
 
     ColorSpinorField &r   = *rp;
     ColorSpinorField &x   = *out;
