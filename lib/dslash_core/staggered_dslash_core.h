@@ -444,7 +444,7 @@ if (threadId.z & 1)
 
   int ga_idx = sid; 
 
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] < (X[0]-1)) )|| (kernel_type == EXTERIOR_KERNEL_X && y[0] >= (X[0]-1) ))
 #endif
   {
@@ -483,7 +483,7 @@ if (threadId.z & 1)
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	   
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
     if ( (kernel_type == EXTERIOR_KERNEL_X)){
       int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;	
       nbr_idx1 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0]+ space_con;
@@ -543,7 +543,7 @@ if (threadId.z & 1)
     }
   }
 
-#if (DD_IMPROVED==10)
+#if (DD_IMPROVED==1)
 #ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] < (X[0]-3)) )|| (kernel_type == EXTERIOR_KERNEL_X && y[0] >= (X[0]-3)))
 #endif
@@ -585,8 +585,6 @@ if (threadId.z & 1)
 
  } // direction: +X
 
-#if 1 //DEBUG
-
 #ifdef PARALLEL_DIR
 if (!(threadIdx.z & 1))
 #endif // PARALLEL_DIR
@@ -600,7 +598,7 @@ if (!(threadIdx.z & 1))
 #endif
   int dir =1;
 
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
   int space_con = ((y[3]*X[2] + y[2])*X[1] + y[1]) >>1;
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] >= 1)) || (kernel_type == EXTERIOR_KERNEL_X && y[0] < 1))
 #endif
@@ -637,7 +635,7 @@ if (!(threadIdx.z & 1))
 #endif
     int sp_idx_1st_nbr = ((y[0]==0) ? full_idx+(X[0]-1) : full_idx-1) >> 1;
     int fat_idx = sp_idx_1st_nbr;
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
     if ((y[0] -1) < 0){
       fat_idx = half_volume + space_con;
     }
@@ -647,7 +645,7 @@ if (!(threadIdx.z & 1))
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
     if (kernel_type == EXTERIOR_KERNEL_X){
       nbr_idx1 = param.ghostOffset[0][0] +  src_idx*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0]+ space_con;
       stride1 = NFACE*ghostFace[0]*param.Ls;
@@ -706,7 +704,7 @@ if (!(threadIdx.z & 1))
     }
   }
 
-#if (DD_IMPROVED==10)
+#if (DD_IMPROVED==1)
 
 #ifdef MULTI_GPU    
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] >= 3)) || (kernel_type == EXTERIOR_KERNEL_X && y[0] < 3))
@@ -768,7 +766,7 @@ if (threadIdx.z & 1)
   int dir = 2;
   int ga_idx = sid;
 
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
   int space_con = ((y[3]*X[2]+y[2])*X[0]+y[0])/2;
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] < (X[1]-1)))|| (kernel_type == EXTERIOR_KERNEL_Y && y[1] >= (X[1]-1)))
 #endif
@@ -808,7 +806,7 @@ if (threadIdx.z & 1)
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
     if (kernel_type == EXTERIOR_KERNEL_Y){	    
       nbr_idx1 = param.ghostOffset[1][1] +  src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1]+ space_con;
       stride1 = NFACE*ghostFace[1]*param.Ls;
@@ -867,7 +865,7 @@ if (threadIdx.z & 1)
     }
   }
 
-#if (DD_IMPROVED==10)
+#if (DD_IMPROVED==1)
 
 #ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] < (X[1]-3)))|| (kernel_type == EXTERIOR_KERNEL_Y && y[1] >= (X[1]-3)))    
@@ -922,7 +920,7 @@ if (!(threadIdx.z & 1))
 #endif
 
   int dir=3;
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
   int space_con = (y[3]*X[2]*X[0] + y[2]*X[0] + y[0]) >>1;    
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] >= 1)) || (kernel_type == EXTERIOR_KERNEL_Y && y[1] < 1))
 #endif
@@ -959,7 +957,7 @@ if (!(threadIdx.z & 1))
 #endif
     int sp_idx_1st_nbr = ((y[1]==0)    ? full_idx+(X1X0-X[0]) : full_idx-X[0]) >> 1;
     int fat_idx=sp_idx_1st_nbr;
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
     if ((y[1] -1) < 0){
       fat_idx = half_volume + space_con;
     }    
@@ -969,7 +967,7 @@ if (!(threadIdx.z & 1))
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
     if (kernel_type == EXTERIOR_KERNEL_Y){
       nbr_idx1 = param.ghostOffset[1][0] + src_idx*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1]+ space_con;
       stride1 = NFACE*ghostFace[1]*param.Ls;
@@ -1028,7 +1026,7 @@ if (!(threadIdx.z & 1))
     }
   }
 
-#if (DD_IMPROVED==10)
+#if (DD_IMPROVED==1)
 
 #ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] >= 3)) || (kernel_type == EXTERIOR_KERNEL_Y && y[1] < 3))
@@ -1107,7 +1105,7 @@ if (threadIdx.z & 1) {
 #endif
 
 #ifdef DSLASH_AXPY
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
   READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
   o00_re = -o00_re + a*accum0.x;
@@ -1135,7 +1133,7 @@ o02_im = 0.0;
 #endif //MULTI_GPU
 #endif // DSLASH_AXPY
 
-#ifndef MULTI_GPU
+#ifdef MULTI_GPU
 //if (kernel_type == EXTERIOR_KERNEL_T){
 if (kernel_type != INTERIOR_KERNEL){
   READ_AND_SUM_SPINOR(INTERTEX, sid + src_idx*Vh);
@@ -1806,8 +1804,6 @@ if (!(threadIdx.z & 1))
 #endif
 }
 
-
-#endif //DEBUG
 
 #ifdef PARALLEL_DIR
 __syncthreads();
