@@ -88,7 +88,7 @@ namespace quda {
       staggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			  &static_cast<const cudaColorSpinorField&>(x), k, stag_omega, commDim, profile);
+			  &static_cast<const cudaColorSpinorField&>(x), (k + 2*stag_omega), stag_omega, commDim, profile);
     } else {
       errorQuda("Not supported");
     }  

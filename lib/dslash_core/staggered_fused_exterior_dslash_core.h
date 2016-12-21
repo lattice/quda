@@ -507,12 +507,12 @@ if (threadId.z & 1)
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         MAT_MUL_V(A, fat, l);        
-        o00_re -= (omega*A0_re);
-        o00_im -= (omega*A0_im);
-        o01_re -= (omega*A1_re);
-        o01_im -= (omega*A1_im);
-        o02_re -= (omega*A2_re);
-        o02_im -= (omega*A2_im);
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
       }
     }
 #endif
@@ -600,12 +600,12 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
@@ -642,12 +642,12 @@ if (!(threadIdx.z & 1))
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         ADJ_MAT_MUL_V(A, fat, l);        
-        o00_re += (omega*A0_re);
-        o00_im += (omega*A0_im);
-        o01_re += (omega*A1_re);
-        o01_im += (omega*A1_im);
-        o02_re += (omega*A2_re);
-        o02_im += (omega*A2_im);
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
       }
     }
 #endif
@@ -775,12 +775,12 @@ if (threadId.z & 1)
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         MAT_MUL_V(A, fat, l);        
-        o00_re -= (omega*A0_re);
-        o00_im -= (omega*A0_im);
-        o01_re -= (omega*A1_re);
-        o01_im -= (omega*A1_im);
-        o02_re -= (omega*A2_re);
-        o02_im -= (omega*A2_im);
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
       }
     }
 #endif
@@ -864,12 +864,12 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
@@ -907,12 +907,12 @@ if (!(threadIdx.z & 1))
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         ADJ_MAT_MUL_V(A, fat, l);        
-        o00_re += (omega*A0_re);
-        o00_im += (omega*A0_im);
-        o01_re += (omega*A1_re);
-        o01_im += (omega*A1_im);
-        o02_re += (omega*A2_re);
-        o02_im += (omega*A2_im);
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
       }
     }
 #endif
@@ -1082,12 +1082,12 @@ if (threadId.z & 1)
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         MAT_MUL_V(A, fat, l);        
-        o00_re -= (omega*A0_re);
-        o00_im -= (omega*A0_im);
-        o01_re -= (omega*A1_re);
-        o01_im -= (omega*A1_im);
-        o02_re -= (omega*A2_re);
-        o02_im -= (omega*A2_im);
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
       }
     }
 #endif
@@ -1173,12 +1173,12 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
@@ -1216,12 +1216,12 @@ if (!(threadIdx.z & 1))
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         ADJ_MAT_MUL_V(A, fat, l);        
-        o00_re += (omega*A0_re);
-        o00_im += (omega*A0_im);
-        o01_re += (omega*A1_re);
-        o01_im += (omega*A1_im);
-        o02_re += (omega*A2_re);
-        o02_im += (omega*A2_im);
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
       }
     }
 #endif
@@ -1349,12 +1349,12 @@ if (threadId.z & 1)
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         MAT_MUL_V(A, fat, l);        
-        o00_re -= (omega*A0_re);
-        o00_im -= (omega*A0_im);
-        o01_re -= (omega*A1_re);
-        o01_im -= (omega*A1_im);
-        o02_re -= (omega*A2_re);
-        o02_im -= (omega*A2_im);
+        o00_re += (omega*A0_re);
+        o00_im += (omega*A0_im);
+        o01_re += (omega*A1_re);
+        o01_im += (omega*A1_im);
+        o02_re += (omega*A2_re);
+        o02_im += (omega*A2_im);
       }
     }
 #endif
@@ -1440,12 +1440,12 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
@@ -1480,12 +1480,12 @@ if (!(threadIdx.z & 1))
     {
       if( param.staggered_2link_term  && omega != 0.0) {
         ADJ_MAT_MUL_V(A, fat, l);        
-        o00_re += (omega*A0_re);
-        o00_im += (omega*A0_im);
-        o01_re += (omega*A1_re);
-        o01_im += (omega*A1_im);
-        o02_re += (omega*A2_re);
-        o02_im += (omega*A2_im);
+        o00_re -= (omega*A0_re);
+        o00_im -= (omega*A0_im);
+        o01_re -= (omega*A1_re);
+        o01_im -= (omega*A1_im);
+        o02_re -= (omega*A2_re);
+        o02_im -= (omega*A2_im);
       }
     }
 #endif

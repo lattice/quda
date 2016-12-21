@@ -444,7 +444,7 @@ if (threadId.z & 1)
 
   int ga_idx = sid; 
 
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] < (X[0]-1)) )|| (kernel_type == EXTERIOR_KERNEL_X && y[0] >= (X[0]-1) ))
 #endif
   {
@@ -483,7 +483,7 @@ if (threadId.z & 1)
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	   
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
     if ( (kernel_type == EXTERIOR_KERNEL_X)){
       int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;	
       nbr_idx1 = param.ghostOffset[0][1] + src_idx*NFACE*ghostFace[0] + (y[0]-(X[0]-1))*ghostFace[0]+ space_con;
@@ -505,12 +505,12 @@ if (threadId.z & 1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
@@ -531,19 +531,19 @@ if (threadId.z & 1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
     }
   }
 
-#if (DD_IMPROVED==1)
+#if (DD_IMPROVED==10)
 #ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] < (X[0]-3)) )|| (kernel_type == EXTERIOR_KERNEL_X && y[0] >= (X[0]-3)))
 #endif
@@ -600,7 +600,7 @@ if (!(threadIdx.z & 1))
 #endif
   int dir =1;
 
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
   int space_con = ((y[3]*X[2] + y[2])*X[1] + y[1]) >>1;
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] >= 1)) || (kernel_type == EXTERIOR_KERNEL_X && y[0] < 1))
 #endif
@@ -626,18 +626,18 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
     int sp_idx_1st_nbr = ((y[0]==0) ? full_idx+(X[0]-1) : full_idx-1) >> 1;
     int fat_idx = sp_idx_1st_nbr;
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
     if ((y[0] -1) < 0){
       fat_idx = half_volume + space_con;
     }
@@ -647,7 +647,7 @@ if (!(threadIdx.z & 1))
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
     if (kernel_type == EXTERIOR_KERNEL_X){
       nbr_idx1 = param.ghostOffset[0][0] +  src_idx*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0]+ space_con;
       stride1 = NFACE*ghostFace[0]*param.Ls;
@@ -668,12 +668,12 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
@@ -694,19 +694,19 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
     }
   }
 
-#if (DD_IMPROVED==1)
+#if (DD_IMPROVED==10)
 
 #ifdef MULTI_GPU    
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] >= 3)) || (kernel_type == EXTERIOR_KERNEL_X && y[0] < 3))
@@ -768,7 +768,7 @@ if (threadIdx.z & 1)
   int dir = 2;
   int ga_idx = sid;
 
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
   int space_con = ((y[3]*X[2]+y[2])*X[0]+y[0])/2;
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] < (X[1]-1)))|| (kernel_type == EXTERIOR_KERNEL_Y && y[1] >= (X[1]-1)))
 #endif
@@ -808,7 +808,7 @@ if (threadIdx.z & 1)
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
     if (kernel_type == EXTERIOR_KERNEL_Y){	    
       nbr_idx1 = param.ghostOffset[1][1] +  src_idx*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1]+ space_con;
       stride1 = NFACE*ghostFace[1]*param.Ls;
@@ -829,12 +829,12 @@ if (threadIdx.z & 1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
@@ -855,19 +855,19 @@ if (threadIdx.z & 1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
     }
   }
 
-#if (DD_IMPROVED==1)
+#if (DD_IMPROVED==10)
 
 #ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] < (X[1]-3)))|| (kernel_type == EXTERIOR_KERNEL_Y && y[1] >= (X[1]-3)))    
@@ -922,7 +922,7 @@ if (!(threadIdx.z & 1))
 #endif
 
   int dir=3;
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
   int space_con = (y[3]*X[2]*X[0] + y[2]*X[0] + y[0]) >>1;    
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] >= 1)) || (kernel_type == EXTERIOR_KERNEL_Y && y[1] < 1))
 #endif
@@ -948,18 +948,18 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
     int sp_idx_1st_nbr = ((y[1]==0)    ? full_idx+(X1X0-X[0]) : full_idx-X[0]) >> 1;
     int fat_idx=sp_idx_1st_nbr;
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
     if ((y[1] -1) < 0){
       fat_idx = half_volume + space_con;
     }    
@@ -969,7 +969,7 @@ if (!(threadIdx.z & 1))
 #if (DD_PREC == 2) //half precision
     int norm_idx1 = nbr_idx1;
 #endif	 
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
     if (kernel_type == EXTERIOR_KERNEL_Y){
       nbr_idx1 = param.ghostOffset[1][0] + src_idx*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1]+ space_con;
       stride1 = NFACE*ghostFace[1]*param.Ls;
@@ -990,12 +990,12 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
@@ -1016,19 +1016,19 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
     }
   }
 
-#if (DD_IMPROVED==1)
+#if (DD_IMPROVED==10)
 
 #ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] >= 3)) || (kernel_type == EXTERIOR_KERNEL_Y && y[1] < 3))
@@ -1107,7 +1107,7 @@ if (threadIdx.z & 1) {
 #endif
 
 #ifdef DSLASH_AXPY
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
   READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
   o00_re = -o00_re + a*accum0.x;
@@ -1135,7 +1135,7 @@ o02_im = 0.0;
 #endif //MULTI_GPU
 #endif // DSLASH_AXPY
 
-#ifdef MULTI_GPU
+#ifndef MULTI_GPU
 //if (kernel_type == EXTERIOR_KERNEL_T){
 if (kernel_type != INTERIOR_KERNEL){
   READ_AND_SUM_SPINOR(INTERTEX, sid + src_idx*Vh);
@@ -1227,12 +1227,12 @@ if (threadIdx.z&1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
@@ -1253,12 +1253,12 @@ if (threadIdx.z&1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
@@ -1348,12 +1348,12 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
@@ -1390,12 +1390,12 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
@@ -1416,12 +1416,12 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
@@ -1550,12 +1550,12 @@ if (threadIdx.z & 1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
@@ -1576,12 +1576,12 @@ if (threadIdx.z & 1)
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           MAT_MUL_V(A, fat, l);        
-          o00_re -= (omega*A0_re);
-          o00_im -= (omega*A0_im);
-          o01_re -= (omega*A1_re);
-          o01_im -= (omega*A1_im);
-          o02_re -= (omega*A2_re);
-          o02_im -= (omega*A2_im);
+          o00_re += (omega*A0_re);
+          o00_im += (omega*A0_im);
+          o01_re += (omega*A1_re);
+          o01_im += (omega*A1_im);
+          o02_re += (omega*A2_re);
+          o02_im += (omega*A2_im);
         }
       }
 #endif
@@ -1669,12 +1669,12 @@ if (!(threadIdx.z & 1))
         RECONSTRUCT_FAT_GAUGE_MATRIX(dir, fat, fat_idx2, fat_sign);
         ADJ_MAT_MUL_V(C, fat, t);        
 
-        l00_re = -C0_re;
-        l00_im = -C0_im;
-        l01_re = -C1_re;
-        l01_im = -C1_im;
-        l02_re = -C2_re;
-        l02_im = -C2_im;
+        l00_re = C0_re;
+        l00_im = C0_im;
+        l01_re = C1_re;
+        l01_im = C1_im;
+        l02_re = C2_re;
+        l02_im = C2_im;
       }
     }
 #endif
@@ -1710,12 +1710,12 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
@@ -1737,12 +1737,12 @@ if (!(threadIdx.z & 1))
       {
         if( param.staggered_2link_term  && omega != 0.0) {
           ADJ_MAT_MUL_V(A, fat, l);        
-          o00_re += (omega*A0_re);
-          o00_im += (omega*A0_im);
-          o01_re += (omega*A1_re);
-          o01_im += (omega*A1_im);
-          o02_re += (omega*A2_re);
-          o02_im += (omega*A2_im);
+          o00_re -= (omega*A0_re);
+          o00_im -= (omega*A0_im);
+          o01_re -= (omega*A1_re);
+          o01_im -= (omega*A1_im);
+          o02_re -= (omega*A2_re);
+          o02_im -= (omega*A2_im);
         }
       }
 #endif
