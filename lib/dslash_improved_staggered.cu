@@ -138,18 +138,21 @@ namespace quda {
 
     bool advanceBlockDim(TuneParam &param) const
     {
+      // note here we assume that the register block size is constant
+      // (auxiliary dimension is advanced slower than block/grid dimensions)
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-      // first try to advance block.y (number of right-hand sides per block)
-      if (param.block.y < nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
+      const unsigned int y_length = nSrc / param.aux.y; // y-thread dimension is nSrc / register block size
+      // first try to advance block.y
+      if (param.block.y < y_length && param.block.y < deviceProp.maxThreadsDim[1] &&
 	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
 	  (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
 	param.block.y++;
-	param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
+	param.grid.y = (y_length + param.block.y - 1) / param.block.y;
 	return true;
-      } else {
+      } else { // if can't advance, reset and advance block.x
 	bool rtn = DslashCuda::advanceBlockDim(param);
 	param.block.y = 1;
-	param.grid.y = nSrc;
+	param.grid.y = y_length;
 	return rtn;
       }
     }
