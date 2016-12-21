@@ -119,6 +119,7 @@ set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on 
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 
+
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
@@ -135,6 +136,7 @@ set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
+set(QUDA_SWIZZLE OFF CACHE BOOL "use swizzle optimization for Dslash")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -155,6 +157,7 @@ mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_MULTIGRID)
+mark_as_advanced(QUDA_SWIZZLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -218,6 +221,10 @@ endif(QUDA_MAGMA)
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
+endif()
+
+if(QUDA_SWIZZLE)
+  add_definitions(-DSWIZZLE)
 endif()
 
 if (QUDA_MULTIGRID)
