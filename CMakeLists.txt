@@ -184,6 +184,10 @@ else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
+if(QUDA_MPI AND QUDA_QMP)
+  message(WARNING "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+endif()
+
 if(QUDA_MPI)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
