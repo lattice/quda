@@ -177,20 +177,20 @@ find_package(Threads REQUIRED)
 # do all the build definitions
 #
 
-if(${QUDA_MPI} OR ${QUDA_QMP})
+if(QUDA_MPI OR QUDA_QMP)
   add_definitions(-DMULTI_GPU)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
-if(${QUDA_MPI})
+if(QUDA_MPI)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 endif()
 
-if (${QUDA_QMP})
+if(QUDA_QMP)
   add_definitions(-DQMP_COMMS)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -200,7 +200,7 @@ if (${QUDA_QMP})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
-if (${QUDA_QIO})
+if(QUDA_QIO)
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
