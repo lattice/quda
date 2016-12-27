@@ -58,7 +58,7 @@ namespace quda {
        int restarts;
        double global_stop;
 
-       EigCG2Args(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),  
+       EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),  
        m(m), k(k), restarts(0), global_stop(0.0) { 
 #ifdef DEBUG_EIGCG
          cudaHostRegister(static_cast<void *>(Tm.data()),       m*m*sizeof(Complex),        cudaHostRegisterDefault);
@@ -68,7 +68,7 @@ namespace quda {
 #endif       
        }
 
-       ~EigCG2Args() { 
+       ~EigCGArgs() { 
 #ifdef DEBUG_EIGCG
          cudaHostUnregister(Tm.data());
          cudaHostUnregister(ritzVecs.data());
@@ -262,7 +262,7 @@ namespace quda {
 
   void IncEigCG::RestartVT(const double beta, const double rho)
   {
-    EigCG2Args &args = *eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     args.ComputeRitz();
 
@@ -348,7 +348,7 @@ namespace quda {
 
     ColorSpinorParam csParam(x);
     if (!init) {
-      eigcg_args = new EigCG2Args(param.m, param.nev);//need only deflation meta structure
+      eigcg_args = new EigCGArgs(param.m, param.nev);//need only deflation meta structure
 
       csParam.create = QUDA_COPY_FIELD_CREATE;
       rp = ColorSpinorField::Create(b, csParam);
@@ -381,7 +381,7 @@ namespace quda {
 
     double local_stop = b2*1e-11;
 
-    EigCG2Args &args = *eigcg_args;
+    EigCGArgs &args = *eigcg_args;
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;

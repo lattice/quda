@@ -869,19 +869,16 @@ namespace quda {
 //forward declaration
  class GMResDRArgs;
 
- class GMResDR : public DeflatedSolver {
+ class GMResDR : public Solver {
 
   private:
 
-    DiracMatrix *mat;
-    DiracMatrix *matSloppy;
-    DiracMatrix *matDefl;
-    DiracMatrix *matPrecon;
+    DiracMatrix &mat;
+    DiracMatrix &matSloppy;
+    DiracMatrix &matPrecon;
 
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
-
-    QudaPrecision gmres_space_prec;
 
     ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
     ColorSpinorFieldSet *Zm;//arnoldi basis vectors, size (m+1)
@@ -894,30 +891,25 @@ namespace quda {
     ColorSpinorField *r_pre;    //! residual passed to preconditioner
     ColorSpinorField *p_pre;    //! preconditioner result
 
-    TimeProfile *profile;    //time profile for initCG solver
+    TimeProfile &profile;    //time profile for initCG solver
 
-    GMResDRArgs *args;
+    GMResDRArgs *gmresdr_args;
 
-    bool gmres_alloc;
+    bool init;
 
   public:
 
-    GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile *profile);
-    GMResDR(DiracMatrix *mat, Solver &K, DiracMatrix *matSloppy, DiracMatrix *matDefl, DiracMatrix *matPrecon, SolverParam &param, TimeProfile &profile);
-    GMResDR(SolverParam &param);
+    GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    GMResDR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~GMResDR();
 
     //GMRES-DR solver
     void operator()(ColorSpinorField *out, ColorSpinorField *in);
-
-    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
-    //
-    void CleanResources();
     //
     //void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method
-    void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
+    void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, const double tol_threshold);
     //
     //void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
@@ -929,7 +921,7 @@ namespace quda {
 
   };
 
-
+#if 0
 //forward declaration
  struct FGCRODRDeflationParam;
  class FGCRODRDRArgs;
@@ -991,7 +983,7 @@ namespace quda {
     void AllocateFlexArnoldiVectors(ColorSpinorField &meta);
 
   };
-
+#endif
 
 } // namespace quda
 
