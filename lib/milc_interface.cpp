@@ -1123,7 +1123,7 @@ void qudaEigCGInvert(int external_precision,
 {
   static const QudaVerbosity verbosity = QUDA_VERBOSE; //getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
-
+#if 0
   if(target_fermilab_residual == 0 && target_residual == 0){
     errorQuda("qudaEigCGInvert: requesting zero residual\n");
     exit(1);
@@ -1217,7 +1217,7 @@ void qudaEigCGInvert(int external_precision,
     //
     freeGaugeQuda();
   }
-
+#endif
   qudamilc_called<false>(__func__, verbosity);
 
   return;
@@ -1551,7 +1551,7 @@ void qudaEigCGCloverInvert(int external_precision,
     //device_precision_sloppy = QUDA_HALF_PRECISION;
     errorQuda("Sloppy half is not supported for eigCG solver\n");
   }
-
+#if 0
   // if doing a pure double-precision multi-shift solve don't use reliable updates
   double reliable_delta = (inv_args.mixed_precision == 1 || quda_precision == 1) ? 1e-1 : 0.0;
   QudaInvertParam invertParam = newQudaInvertParam();
@@ -1631,7 +1631,7 @@ void qudaEigCGCloverInvert(int external_precision,
     //
     qudaFreeCloverField();
   }
-
+#endif
   return;
 } // qudaEigCGCloverInvert
 

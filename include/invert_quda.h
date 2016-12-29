@@ -775,52 +775,6 @@ namespace quda {
 		    std::vector<ColorSpinorField*> q, int N);
   };
 
-  class DeflatedSolver {
-
-  protected:
-    SolverParam &param;
-    TimeProfile *profile;
-
-    //WARNING: eigcg_precision may not coinside with param.precision and param.precision_sloppy (both used for the initCG).
-    //
-    QudaPrecision eigcg_precision;//may be double or single.
-
-  public:
-    DeflatedSolver(SolverParam &param, TimeProfile *profile) : param(param), profile(profile)
-    {
-       eigcg_precision = param.precision_sloppy;//for mixed presicion use param.precision_sloppy
-    }
-
-    virtual ~DeflatedSolver() { ; }
-
-    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
-
-//    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
-    virtual void StoreRitzVecs(void *host_buffer, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
-
-    virtual void CleanResources() = 0;
-
-    // solver factory
-    static DeflatedSolver* create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile);
-
-    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
-		     const double &hq_tol);
-
-    /**
-       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
-     */
-    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
-
-    /**
-	Prints out the summary of the solver convergence (requires a
-	versbosity of QUDA_SUMMARIZE).  Assumes
-	SolverParam.true_res and SolverParam.true_res_hq has
-	been set
-    */
-    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
-
-  };
-
   using ColorSpinorFieldSet = ColorSpinorField;
 
   //forward declaration
@@ -905,7 +859,7 @@ namespace quda {
     virtual ~GMResDR();
 
     //GMRES-DR solver
-    void operator()(ColorSpinorField *out, ColorSpinorField *in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
     //
     //void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method

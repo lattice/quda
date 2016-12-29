@@ -76,6 +76,21 @@ namespace quda {
       report("BICGSTABL");
       solver = new BiCGstabL(mat, matSloppy, param, profile);
       break;
+    case QUDA_EIGCG_INVERTER:
+      report("EIGCG");
+      solver = new IncEigCG(mat, matSloppy, matPrecon, param, profile);
+      break;
+    case QUDA_GMRESDR_INVERTER:
+      report("GMRESDR");
+      if (param.preconditioner) {
+	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
+	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
+	param.precision_precondition = param.precision_sloppy;
+	solver = new GMResDR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
+      } else {
+	solver = new GMResDR(mat, matSloppy, matPrecon, param, profile);
+      }
+      break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }
@@ -176,84 +191,5 @@ namespace quda {
 
     }
   }
-
-  // Deflated solver factory
-  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matSloppy2, DiracMatrix *matDeflate, TimeProfile *profile)
-  {
-    DeflatedSolver* solver=0;
-
-    if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
-      report("Incremental EIGCG");
-      if(profile != nullptr)
-        solver = new IncEigCG(mat, matSloppy, matSloppy2, matDeflate, param, profile);
-      else
-        solver = new IncEigCG(param);//hack to clean deflation resources
-    }else if (param.inv_type == QUDA_GMRESDR_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ){
-      report("GMRESDR");
-
-      if (param.preconditioner && param.maxiter == 11) { // FIXME - dirty hack
-	MG *mg = static_cast<MG*>(param.preconditioner);
-	solver = new GMResDR(mat, *(mg), matSloppy, matDeflate, matSloppy2, param, profile);
-      } else if (param.preconditioner) {
-	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
-	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
-	param.precision_precondition = param.precision_sloppy;
-	solver = new GMResDR(mat, *(mg->mg), matSloppy, matDeflate, matSloppy2, param, profile);
-      } else {
-        if(profile != nullptr)
-          solver = new GMResDR(mat, matSloppy, matDeflate, matSloppy2, param, profile);
-        else
-          solver = new GMResDR(param);
-      }
-
-    }else{
-      errorQuda("Invalid solver type");
-    }
-
-    return solver;
-  }
-
-  bool DeflatedSolver::convergence(const double &r2, const double &hq2, const double &r2_tol,
-			   const double &hq_tol) {
-    //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
-
-    // check the heavy quark residual norm if necessary
-    if ( (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) && (hq2 > hq_tol) )
-      return false;
-
-    // check the L2 relative residual norm if necessary
-    if ( (param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) && (r2 > r2_tol) )
-      return false;
-
-    return true;
-  }
-
-  void DeflatedSolver::PrintStats(const char* name, int k, const double &r2,
-			  const double &b2, const double &hq2) {
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n",
-		   name, k, r2, sqrt(r2/b2), hq2);
-      } else {
-	printfQuda("%s: %d iterations, <r,r> = %e, |r|/|b| = %e\n",
-		   name, k, r2, sqrt(r2/b2));
-      }
-    }
-
-    if (std::isnan(r2)) errorQuda("Solver appears to have diverged");
-  }
-
-  void DeflatedSolver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n", name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);
-      } else {
-	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e\n",
-		   name, k, sqrt(r2/b2), param.true_res);
-      }
-
-    }
-  }
-
 
 } // namespace quda

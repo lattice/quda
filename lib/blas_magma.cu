@@ -249,7 +249,7 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
     return;
   }
 
-  template<typename  magmaFloat> void magma_gels(void *Mat, void *c, void *y, int rows, int cols, int ldm) 
+  template<typename  magmaFloat> void magma_gels(void *Mat, void *c, int rows, int cols, int ldm) 
   {
     cudaPointerAttributes ptr_attr;
     if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_gels, a pointer was not allocated in, mapped by or registered with current CUDA context.\n"); 
@@ -404,11 +404,11 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
   }
 
 
-  void magma_Xgels(void *Mat, void *c, void *y, int rows, int cols, int ldm, const int prec)
+  void magma_Xgels(void *Mat, void *c, int rows, int cols, int ldm, const int prec)
   {
 #ifdef MAGMA_LIB
-    if      (prec == sizeof(std::complex< double >)) magma_gels<magmaDoubleComplex>(Mat, c, y, rows, cols, ldm);
-    else if (prec == sizeof(std::complex< float  >)) magma_gels<magmaFloatComplex >(Mat, c, y, rows, cols, ldm);
+    if      (prec == sizeof(std::complex< double >)) magma_gels<magmaDoubleComplex>(Mat, c, rows, cols, ldm);
+    else if (prec == sizeof(std::complex< float  >)) magma_gels<magmaFloatComplex >(Mat, c, rows, cols, ldm);
     else errorQuda("\nPrecision is not supported.\n");
 #endif
     return;

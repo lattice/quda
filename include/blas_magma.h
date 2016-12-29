@@ -120,7 +120,7 @@
 
   void magma_Xgeev(void *Mat, const int m, const int ldm, void *vr, void *evalues, const int ldv, const int prec);
 
-  void magma_Xgels(void *Mat, void *c, void *y, int rows, int cols, int ldm, const int prec);
+  void magma_Xgels(void *Mat, void *c, int rows, int cols, int ldm, const int prec);
 
   void magma_Xheev(void *Mat, const int m, const int ldm, void *evalues, const int prec);
 

@@ -58,30 +58,34 @@ namespace quda {
        VectorSet   ritzVecs;//array of sorted harmonic eigenvectors: (nev+1) length      
        DenseMatrix H;//Hessenberg matrix
        Vector      eta;
-       //Vector      *c;//  c = &ritzVecs[(m+1)*k] => ritzVecs.col(k)
       
        int m;
        int k;
 
        int restarts;
 
-       GMResDRArgs(int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)), 
-       eta(m), m(m), k(nev), restarts(0) { }
+       Complex      *c;//  c = &ritzVecs[(m+1)*k] => ritzVecs.col(k)
 
-       //inline Complex& Hess(int row, int col) {return H[col*(m+1)+row];}
-       //inline Complex& const Hess(int row, int col) const {return H[col*(m+1)+row];}
+       GMResDRArgs(int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)), 
+       eta(Vector::Zero(m)), m(m), k(nev), restarts(0) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
 
        void ComputeHarmonicRitz();
 
-       inline void AddShortResidual() { ritzVecs.col(k) -= H * eta;}
+       inline void AddShortResidual() { 
+          Map<VectorXcd, Unaligned> c_(c, m+1);
+          c_ -= H * eta;
+       }
+
        inline void ResetArgs() { 
+         ritzVecs.setZero();
          H.setZero();  
          eta.setZero();  
-         ritzVecs.setZero(); 
        }
 
        ~GMResDRArgs(){ }
    };
+
+#define USE_MAGMA
 
    void GMResDRArgs::ComputeHarmonicRitz()
    {
@@ -89,7 +93,7 @@ namespace quda {
      DenseMatrix cH = H.block(0, 0, m, m).adjoint();
      DenseMatrix Gk = H.block(0, 0, m, m);
      //
-     VectorSet  harVecs = MatrixXcd::Zero(m,m);
+     VectorSet  harVecs = MatrixXcd::Zero(m, m);
      Vector     harVals = VectorXcd::Zero(m);
 
      //2. construct H + beta*H^{-H} e_m*e_m^{T}
@@ -115,7 +119,7 @@ namespace quda {
      //3.  Compute harmonic eigenpairs:
 #ifdef USE_MAGMA 
      cudaHostRegister(static_cast<void *>(Gk.data()), m*m*sizeof(Complex), cudaHostRegisterDefault);
-     magma_Xgesv(static_cast<void*>(Gk.data()), m, m, static_cast<void*>(harVecs.data()), static_cast<void*>(harVals.data()), m, sizeof(Complex));//check it!
+     magma_Xgeev(static_cast<void*>(Gk.data()), m, m, static_cast<void*>(harVecs.data()), static_cast<void*>(harVals.data()), m, sizeof(Complex));//check it!
      cudaHostUnregister(Gk.data());
 #else
      //
@@ -220,17 +224,18 @@ namespace quda {
    profile.TPSTOP(QUDA_PROFILE_FREE);
  }
 
- void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels = true)
+ void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
  {
    GMResDRArgs &args = *gmresdr_args;
 
 #ifdef USE_MAGMA
-   void *c = static_cast<void*>(args.ritzVecs.col(args.k).data());
-   cudaHostRegister(static_cast<void *>(args.H.data()), (args.m+1)*args.m*sizeof(Complex), cudaHostRegisterDefault)
-   if(do_gels) magma_gels(static_cast<void*>(args.H.data()), c, static_cast<void*>(args.eta.data()), (args.m+1), args.m, (args.m+1));
-   cudaHostUnregister(args.H.data());
+   if(do_gels) {
+     cudaHostRegister(static_cast<void *>(args.H.data()), (args.m+1)*args.m*sizeof(Complex), cudaHostRegisterDefault);
+     magma_Xgels(static_cast<void*>(args.H.data()), static_cast<void*>(args.eta.data()), args.m+1, args.m, args.m+1, sizeof(Complex));
+     cudaHostUnregister(args.H.data());
+   }
 #else
-   //
+   //not implemented.
 #endif
    //compute x = x0+Wm*lsqSol, where Wm is Vm or Zm (if preconditioned):
    std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().end());
@@ -239,16 +244,12 @@ namespace quda {
    std::vector<ColorSpinorField*> x_, r_;
    x_.push_back(x), r_.push_back(r);
 
-   blas::caxpy( static_cast<Complex*>(args.eta.data()), Z_, x_);
+   blas::caxpy( static_cast<Complex*> ( args.eta.data()), Z_, x_);
 
-   Complex *Heta = new Complex[args.m+1]; 
-   Map<VectorXcd, Unaligned> Heta_(Heta, args.m+1);
- 
-   Heta_ -= (args.H*args.eta);
+   VectorXcd Heta = VectorXcd::Zero(args.m+1); 
+   Heta = (args.H * args.eta);
 
-   blas::caxpy(Heta,V_,r_);
-
-   delete[] Heta;
+   blas::caxpy(static_cast<Complex*>(Heta.data()), V_, r_);
 
    return;
  }
@@ -341,55 +342,57 @@ namespace quda {
    return;
  }
 
- int GMResDR::RunFlexArnoldiProcess(const int start_idx, const bool do_givens = false)
+ int GMResDR::RunFlexArnoldiProcess(const int start_idx, bool do_givens = false)
  {
    GMResDRArgs &args = *gmresdr_args;
    ColorSpinorField &tmp = *tmpp;
 
-   Complex *givensH = nullptr; 
+   Complex *givensH = nullptr;
    Complex *cn      = nullptr;
    double  *sn      = nullptr;
 
    if(do_givens)
    {
-     if (start_idx != 0) errorQuda("\nStart index must be zero.\n"); 
-
-     givensH = new Complex[(args.m+1)*args.m];//Keep Givens matrix
-     //Givens coefficients:
-     cn = new Complex[args.m];
-     sn = new double [args.m];
+     if (start_idx != 0) 
+       do_givens = false; 
+     else {
+       givensH = new Complex[(args.m+1)*args.m];
+       //Givens coefficients:
+       cn = new Complex[args.m];
+       sn = new double [args.m];
+     }
    }
 
    int j = start_idx;
 
-   while( j < args.m ) //we allow full cycle
+   while( j < args.m ) //run full cycle
    {
      if(K) {
-       ColorSpinorField &rPre = (param.precision_precondition != param.precision_sloppy) ? *r_pre : Vm->Component(j);
-       ColorSpinorField &pPre = (param.precision_precondition != param.precision_sloppy) ? *p_pre : Zm->Component(j);
-
-       if( param.precision_precondition != param.precision_sloppy ) copy(rPre, Vm->Component(j));
-
-       (*K)( pPre ,rPre );
-
-       if( param.precision_precondition != param.precision_sloppy ) copy(Zm->Component(j), pPre);
+       ColorSpinorField &inPre  = (param.precision_precondition != param.precision_sloppy) ? *r_pre : Vm->Component(j);
+       ColorSpinorField &outPre = (param.precision_precondition != param.precision_sloppy) ? *p_pre : Zm->Component(j);
+       //aliases hadled automatically.
+       inPre = Vm->Component(j);
+       (*K)( outPre ,inPre );
+       Zm->Component(j) = outPre;
      }
 
      matSloppy(Vm->Component(j+1), Zm->Component(j), tmp);
-     //
+     
      Complex h0(0.0, 0.0);
-     //
-     for(int i = (start_idx+1); i <= j; i++)
+     
+     for(int i = start_idx; i <= j; i++)
      {
         args.H(i, j) = cDotProduct(Vm->Component(i), Vm->Component(j+1));//
-        //
+
         caxpy(-args.H(i, j), Vm->Component(i), Vm->Component(j+1));
 
-        if(do_givens)  //lets do Givens rotations:
-        {
-           if(i > 0) givensH[args.m*j+(i-1)] = conj(cn[i-1])*h0 + sn[i-1]*args.H(i,j);
-           //
-           h0 = (i == 0) ?  args.H(0,j) : -sn[i-1]*h0 + cn[i-1]*args.H(i,j); 
+        if(do_givens) {
+           if( i == 0 ) { //initialize h0:
+             h0 = args.H(0,j);
+           } else { //do givens for i > 0:
+             givensH[args.m*j+(i-1)] = conj(cn[i-1])*h0 + sn[i-1]*args.H(i,j);
+             h0 = -sn[i-1]*h0 + cn[i-1]*args.H(i,j); 
+           }
         }
      }
      //6. Compute h(j+1,j):
@@ -407,29 +410,29 @@ namespace quda {
        //9. Compute diagonal element in G:
        givensH[j*args.m+j] = conj(cn[j])*h0 + sn[j]*args.H(j+1,j);
       
-       //10. Compute iter residual:???
-       args.ritzVecs.col(args.k).data()[j+1] = -sn[j]*args.ritzVecs.col(args.k).data()[j];
-       //
-       args.ritzVecs.col(args.k).data()[j] *= conj(cn[j]);
+       //10. Compute iter residual:
+       args.c[j+1] = -sn[j]*args.c[j];
+       args.c[j]  *= conj(cn[j]);
      }
 
      j += 1;
    }//end of main loop.
 
    //11 Update solution:
-   //11.a Solve LSQR problem:
+   //11.a Solve least squares:
+
    if(do_givens)
    {
-     Map<MatrixXcd, Unaligned, DynamicStride> _givensH(givensH,args.m,args.m, DynamicStride(args.m+1,1));//extract triangular part
-     _givensH.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
+     Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH, args.m, args.m, DynamicStride(args.m+1,1) );//extract triangular part
+     Map<VectorXcd, Unaligned> c_(args.c, args.m);//segment(0, m)
+     args.eta = c_;
+     givensH_.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
 
      delete[] givensH;
      delete[] cn;
      delete[] sn;
 
-   }  else {
-     Vector s = VectorXcd::Zero(args.k+1);
-    
+   } else {
      const int cdot_pipeline_length  = 5;
      int offset = 0;
    
@@ -447,13 +450,13 @@ namespace quda {
           r_.push_back(static_cast<cudaColorSpinorField*>(r_sloppy));
         }
         //Warning! this won't work with arbitrary (big) param.cur_dim. That's why pipelining is needed.
-        blas::cDotProduct(&(static_cast<Complex *>(s.data())[offset]), v_, r_);//<i, b>
+        blas::cDotProduct(&args.c[offset], v_, r_);//<i, b>
         //
         offset += cdot_pipeline_length; 
 
      } while (offset < (args.k+1));
-
-     args.ritzVecs.col(args.k).segment(0, args.k+1) = s;
+     Map<VectorXcd, Unaligned> c_(args.c, args.m);//segment(0, m)
+     args.eta = c_;
    }
 
    UpdateSolution(x_sloppy, r_sloppy, !do_givens);
@@ -461,22 +464,22 @@ namespace quda {
    return j;
  }
 
- void GMResDR::operator()(ColorSpinorField *out, ColorSpinorField *in)
+ void GMResDR::operator()(ColorSpinorField &out, ColorSpinorField &in)
  {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     const double tol_threshold = 6.0; 
 
-    ColorSpinorField &x   = *out;
+    ColorSpinorField &x   = out;
 
     if (!init) {
 
       gmresdr_args = new GMResDRArgs(param.m, param.nev);
 
-      ColorSpinorParam csParam(*in);//create spinor parameters
+      ColorSpinorParam csParam(in);//create spinor parameters
 
-      yp = ColorSpinorField::Create(*in); //high precision accumulation field
-      rp = ColorSpinorField::Create(*in); //high precision residual
+      yp = ColorSpinorField::Create(in); //high precision accumulation field
+      rp = ColorSpinorField::Create(in); //high precision residual
       
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
@@ -528,20 +531,21 @@ namespace quda {
     int tot_iters = 0;
 
     //1. Compute initial residual:
-    double normb = norm2(*in);
+    double normb = norm2( in );
     double stop  = param.tol*param.tol* normb;	/* Relative to b tolerance */
 
-    mat(r, *out, y);
+    mat(r, out, y);
     //
-    double r2 = xmyNorm(*in, r);//compute residual
+    double r2 = xmyNorm(in, r);//compute residual
     double b2 = r2;
+    args.c[0] = Complex(sqrt(r2), 0.0);
 
     printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
     //2. Compute the first Arnoldi vector:
     if(param.precision_sloppy != param.precision) blas::copy(rSloppy, r);
 
-    blas::ax(1.0 / sqrt(r2), r); //???  
-    blas::copy(Vm->Component(0), r);
+    blas::ax(1.0 / args.c[0].real(), r);   
+    Vm->Component(0) = r;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -555,8 +559,7 @@ namespace quda {
    /************************Run Flex Arnoldi cycles*****************************/
    int restart_idx = 0, j = 0;
 
-   bool run_deflated_cycles = true; //deflated or projected cycles?
-   bool do_givens  = true;
+   bool do_givens           = true; //do Givens transforms for the initial cycle
 
    while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
    {
@@ -568,27 +571,22 @@ namespace quda {
      //Update residual for the next cycle:
      if (param.precision_sloppy != param.precision)
      {
-       blas::copy(y, xSloppy);
+       y = xSloppy;
        blas::xpy(y, x);
        blas::zero(xSloppy);
      }
 
      mat(r, x, y);
      //
-     double ext_r2 = xmyNorm(*in, r);//compute full precision residual
-
-     if(run_deflated_cycles && ((param.precision_sloppy != param.precision) && ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold)))
-     {
-       run_deflated_cycles = false;
-     }
+     double ext_r2 = xmyNorm(in, r);//compute full precision residual
 
      //printfQuda("\nDone for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
      //
      PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
 
-     if(param.precision_sloppy != param.precision) blas::copy(rSloppy, r);
+     if(param.precision_sloppy != param.precision) rSloppy = r;
 
-     if( run_deflated_cycles ) {
+     if( !((param.precision_sloppy != param.precision) && ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold)) ) {
 
        RestartVZH();
        j = args.k;
@@ -596,8 +594,9 @@ namespace quda {
      } else {
 
        args.ResetArgs();
-       blas::ax(1.0 / sqrt(r2), r); //???  
-       blas::copy(Vm->Component(0), r);
+       args.c[0] = Complex(sqrt(ext_r2), 0.0);
+       blas::ax(1.0 / args.c[0].real(), r); 
+       Vm->Component(0) = r;
 
        j = 0; 
      }
@@ -618,7 +617,7 @@ namespace quda {
    mat(r, x, y);
    //matSloppy(r, x, tmp, tmp2);
 
-   param.true_res = sqrt(xmyNorm(*in, r) / b2);
+   param.true_res = sqrt(xmyNorm(in, r) / b2);
 
    PrintSummary("FGMResDR:", tot_iters, r2, b2);
 

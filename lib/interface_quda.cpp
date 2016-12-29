@@ -3278,7 +3278,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-
+#if 0
 void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals)
 {
   setTuning(param->tune);
@@ -3537,6 +3537,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+
 void destroyDeflationQuda(QudaInvertParam *param, const int *X,  void *_h_u, double *inv_eigenvals)
 {
    SolverParam solverParam(*param);
@@ -3557,7 +3558,7 @@ void destroyDeflationQuda(QudaInvertParam *param, const int *X,  void *_h_u, dou
 
    return;
 }
-
+#endif
 
 #ifdef GPU_FATLINK
 /*   @method
