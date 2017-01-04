@@ -19,6 +19,12 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
 			     void** ghost_longlink, cpuColorSpinorField* in, int oddBit, int daggerBit,
 			     QudaPrecision sPrecision, QudaPrecision gPrecision);  
 
+void staggered_2link(void *res, void **fatlink, double omega, void *inEven, void *inOdd, int oddBit, int daggerBit,
+		      QudaPrecision sPrecision, QudaPrecision gPrecision);
+
+void matomega(void *out, void **fatlink, void** longlink, void *in, double mass, double omega,
+              int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision); 
+
 void mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int daggerBit,
 	 QudaPrecision sPrecision, QudaPrecision gPrecision);
 

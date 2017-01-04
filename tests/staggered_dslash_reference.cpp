@@ -18,7 +18,8 @@ extern void *memset(void *s, int c, size_t n);
 
 #include <dslash_util.h>
 
-#define _2D_EMULATION
+//#define _2D_EMULATION
+//#define _2LINK_DEBUG
 
 //
 // dslashReference()
@@ -42,6 +43,98 @@ void display_link_internal(Float* link)
   }
   printf("\n");
   return;
+}
+
+template <typename sFloat, typename gFloat>
+void twolinkReference(sFloat *res, gFloat **fatlink, double omega, sFloat *inEven, sFloat *inOdd, 
+		     int oddBit, int daggerBit) 
+{
+  sFloat kappa = (daggerBit) ? -0.25*omega : +0.25*omega; //will use -1/4 factor!
+#ifdef _2D_EMULATION
+  warningQuda("\nUsing 2D emulation.\n");
+#endif
+  const int nSrc = Ls; // Ls should already be set
+
+  //for (int i=0; i<Vh*mySpinorSiteSize*nSrc; i++) res[i] = 0.0;//already has regular terms!
+  
+  gFloat *fatlinkEven[4], *fatlinkOdd[4];
+  
+  for (int dir = 0; dir < 4; dir++) {  
+    fatlinkEven[dir] = fatlink[dir];
+    fatlinkOdd[dir] = fatlink[dir] + Vh*gaugeSiteSize;
+  }
+
+  for (int xs=0; xs<nSrc; xs++) {
+
+    for (int i = 0; i < Vh; i++) {
+      int sid = i + xs*Vh;
+      int offset = mySpinorSiteSize*sid;
+#ifdef _2D_EMULATION
+      for (int dir = 0; dir < 2; dir++) {
+#else
+      for (int dir = 0; dir < 8; dir++) {
+#endif
+	gFloat* fatlnk = gaugeLink(i, dir, oddBit, fatlinkEven, fatlinkOdd, 1);
+	gFloat* _2lnk = stagg2Link(i, dir, oddBit, fatlinkEven, fatlinkOdd);
+
+	sFloat *secnd_neighbor_spinor = spinorNeighbor_5d<QUDA_4D_PC>(sid, dir, oddBit, (oddBit ? inOdd : inEven), 2, mySpinorSiteSize);
+
+	sFloat first_neighbor_spinor[mySpinorSiteSize];
+	sFloat gaugedSpinor[mySpinorSiteSize];
+        for (int i=0; i<mySpinorSiteSize; i++) first_neighbor_spinor[i] = 0.0;
+
+	if (dir % 2 == 0){
+	  su3Mul(first_neighbor_spinor, _2lnk, secnd_neighbor_spinor);
+	  su3Mul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+	  axpy(-kappa, gaugedSpinor, &res[offset], mySpinorSiteSize);
+	} else {
+          su3Tmul(first_neighbor_spinor, _2lnk, secnd_neighbor_spinor);
+	  su3Tmul(gaugedSpinor, fatlnk, first_neighbor_spinor);
+	  axpy(+kappa, gaugedSpinor, &res[offset], mySpinorSiteSize);
+	}
+      }
+
+      //if (daggerBit) negx(&res[offset], mySpinorSiteSize);
+//Apply 
+    } // 4-d volume
+  } // right-hand-side
+  
+}
+
+
+
+void staggered_2link(void *res, void **fatlink, double omega, void *inEven, void *inOdd, int oddBit, int daggerBit,
+		      QudaPrecision sPrecision, QudaPrecision gPrecision) {
+    
+  if (sPrecision == QUDA_DOUBLE_PRECISION) {
+    if (gPrecision == QUDA_DOUBLE_PRECISION){
+      twolinkReference((double*)res, (double**)fatlink, omega, (double*)inEven, (double*)inOdd, oddBit, daggerBit);
+    }else{
+      twolinkReference((double*)res, (float**)fatlink, omega, (double*)inEven, (double*)inOdd, oddBit, daggerBit);
+    }
+  }
+  else{
+    if (gPrecision == QUDA_DOUBLE_PRECISION){
+      twolinkReference((float*)res, (double**)fatlink, omega, (float*)inEven, (float*)inOdd, oddBit, daggerBit);
+    }else{
+      twolinkReference((float*)res, (float**)fatlink, omega, (float*)inEven, (float*)inOdd, oddBit, daggerBit);
+    }
+  }
+}
+
+template <typename sFloat, typename gFloat>
+void MatOmega(sFloat *out, gFloat **fatlink, double omega, sFloat *in, int daggerBit) 
+{
+  sFloat *inEven = in;
+  sFloat *inOdd  = in + Vh*mySpinorSiteSize;
+  sFloat *outEven = out;
+  sFloat *outOdd  = out + Vh*mySpinorSiteSize;
+    
+  // full dslash operator
+  twolinkReference(outOdd, fatlink, omega, inEven, inOdd, 1, daggerBit);
+  twolinkReference(outEven, fatlink, omega, inEven, inOdd, 0, daggerBit);
+
+  return; 
 }
 
 
@@ -72,7 +165,7 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat** longlink, sFloat *s
       int sid = i + xs*Vh;
       int offset = mySpinorSiteSize*sid;
 #ifdef _2D_EMULATION
-      for (int dir = 0; dir < 4; dir++) {
+      for (int dir = 0; dir < 2; dir++) {
 #else
       for (int dir = 0; dir < 8; dir++) {
 #endif
@@ -125,11 +218,8 @@ void staggered_dslash(void *res, void **fatlink, void** longlink, void *spinorFi
   }
 }
 
-
-
-
 template <typename sFloat, typename gFloat>
-void Mat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat kappa, int daggerBit) 
+void Mat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, int daggerBit) 
 {
   sFloat *inEven = in;
   sFloat *inOdd  = in + Vh*mySpinorSiteSize;
@@ -139,30 +229,74 @@ void Mat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat ka
   // full dslash operator
   dslashReference(outOdd, fatlink, longlink, inEven, 1, daggerBit);
   dslashReference(outEven, fatlink, longlink, inOdd, 0, daggerBit);
-    }
 
+  return; 
+}
 
-void 
-mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int dagger_bit,
-    QudaPrecision sPrecision, QudaPrecision gPrecision) 
+void matomega(void *out, void **fatlink, void** longlink, void *in, double mass, double omega,
+              int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision) 
 {
-    
+  double kappa = 0.5;    
+
   if (sPrecision == QUDA_DOUBLE_PRECISION){
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      Mat((double*)out, (double**)fatlink, (double**)longlink, (double*)in, (double)kappa, dagger_bit);
+      Mat((double*)out, (double**)fatlink, (double**)longlink, (double*)in,  dagger_bit);
     }else {
-      Mat((double*)out, (float**)fatlink, (float**)longlink, (double*)in, (double)kappa, dagger_bit);
+      Mat((double*)out, (float**)fatlink, (float**)longlink, (double*)in, dagger_bit);
     }
   }else{
     if (gPrecision == QUDA_DOUBLE_PRECISION){ 
-      Mat((float*)out, (double**)fatlink, (double**)longlink, (float*)in, (float)kappa, dagger_bit);
+      Mat((float*)out, (double**)fatlink, (double**)longlink, (float*)in, dagger_bit);
     }else {
-      Mat((float*)out, (float**)fatlink, (float**)longlink, (float*)in, (float)kappa, dagger_bit);
+      Mat((float*)out, (float**)fatlink, (float**)longlink, (float*)in, dagger_bit);
+    }
+  }
+
+  // apply the kappa term
+  ax(-kappa, out, V*mySpinorSiteSize, sPrecision);
+  // add 2-link term:
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+      MatOmega((double*)out, (double**)fatlink, omega, (double*)in,  dagger_bit);
+    }else {
+      MatOmega((double*)out, (float**)fatlink, omega, (double*)in, dagger_bit);
+    }
+  }else{
+    if (gPrecision == QUDA_DOUBLE_PRECISION){ 
+      MatOmega((float*)out, (double**)fatlink, omega, (float*)in, dagger_bit);
+    }else {
+      MatOmega((float*)out, (float**)fatlink, omega, (float*)in, dagger_bit);
+    }
+  }
+  // lastly apply the mass term:
+  axpy(mass+omega, in, out, V*mySpinorSiteSize, sPrecision);
+  // lastly apply the kappa term
+  //axpby(mass+omega, in, -kappa, out, V*mySpinorSiteSize, sPrecision);
+  //
+}
+
+void mat(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,
+    QudaPrecision sPrecision, QudaPrecision gPrecision) 
+{
+  double kappa = 0.5;    
+
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+      Mat((double*)out, (double**)fatlink, (double**)longlink, (double*)in,  dagger_bit);
+    }else {
+      Mat((double*)out, (float**)fatlink, (float**)longlink, (double*)in, dagger_bit);
+    }
+  }else{
+    if (gPrecision == QUDA_DOUBLE_PRECISION){ 
+      Mat((float*)out, (double**)fatlink, (double**)longlink, (float*)in, dagger_bit);
+    }else {
+      Mat((float*)out, (float**)fatlink, (float**)longlink, (float*)in, dagger_bit);
     }
   }
 
   // lastly apply the kappa term
-  xpay(in, -kappa, out, V*mySpinorSiteSize, sPrecision);
+  axpby(mass, in, -kappa, out, V*mySpinorSiteSize, sPrecision);
+  //
 }
 
 

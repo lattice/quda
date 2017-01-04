@@ -61,7 +61,16 @@ void xpay(void *x, double a, void *y, int length, QudaPrecision precision) {
   else xpay((float*)x, (float)a, (float*)y, length);
 }
 
+// performs the operation y[i] = a*x[i] + b*y[i]
+template <typename Float>
+static inline void axpby(Float a, Float *x, Float b, Float *y, int len) {
+  for (int i=0; i<len; i++) y[i] = a*x[i] + b*y[i];
+}
 
+void axpby(double a, void *x, double b, void *y, int length, QudaPrecision precision) {
+  if (precision == QUDA_DOUBLE_PRECISION) axpby(a, (double*)x, b, (double*)y, length);
+  else axpby((float)a, (float*)x, (float)b, (float*)y, length);
+}
 
 /*
 

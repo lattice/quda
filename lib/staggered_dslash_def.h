@@ -948,8 +948,9 @@ __global__ void	DD_FUNC(DD_FNAME, DD_FAT_RECON_F, DD_LONG_RECON_F, DD_AXPY_F)<EX
 
 #else // naive staggered kernel
 
-#undef READ_LONG_MATRIX
-#define READ_LONG_MATRIX(gauge, dir, idx, stride)
+//We need this for 2-link term...
+//#undef READ_LONG_MATRIX
+//#define READ_LONG_MATRIX(gauge, dir, idx, stride)
 
 #undef READ_LONG_PHASE
 #define READ_LONG_PHASE(phase, dir, idx, stride)

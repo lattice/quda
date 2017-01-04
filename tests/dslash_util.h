@@ -124,6 +124,26 @@ static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Fl
 }
 
 template <typename Float>
+static inline Float *stagg2Link(int i, int dir, int oddBit, Float **gaugeEven, Float **gaugeOdd) {
+  Float **gaugeField;
+  gaugeField = (dir % 2 == 0) ?  ( oddBit ? gaugeEven : gaugeOdd) : ( oddBit ? gaugeOdd : gaugeEven);
+  int j;
+  switch (dir) {
+    case 0: j = neighborIndex(i, oddBit, 0, 0, 0, +1); break;
+    case 1: j = neighborIndex(i, oddBit, 0, 0, 0, -2); break;
+    case 2: j = neighborIndex(i, oddBit, 0, 0, +1, 0); break;
+    case 3: j = neighborIndex(i, oddBit, 0, 0, -2, 0); break;
+    case 4: j = neighborIndex(i, oddBit, 0, +1, 0, 0); break;
+    case 5: j = neighborIndex(i, oddBit, 0, -2, 0, 0); break;
+    case 6: j = neighborIndex(i, oddBit, +1, 0, 0, 0); break;
+    case 7: j = neighborIndex(i, oddBit, -2, 0, 0, 0); break;
+    default: j = -1; break;
+  }
+  
+  return &gaugeField[dir/2][j*(3*3*2)];
+}
+
+template <typename Float>
 static inline Float *spinorNeighbor(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance) 
 {
   int j;
