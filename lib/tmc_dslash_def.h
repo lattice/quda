@@ -55,6 +55,14 @@
 #define DD_XPAY_F Xpay
 #endif
 
+#if (DD_PREC == 0)
+#define DD_PREC_F D
+#elif (DD_PREC == 1)
+#define DD_PREC_F S
+#else
+#define DD_PREC_F H
+#endif
+
 #if (DD_TWIST==0) // twisted input 
 #define DD_NAME_F twistedCloverInvDslash
 #define CLOVER_TWIST_INV_DSLASH
@@ -64,11 +72,10 @@
 //!
 
 #if (DD_PREC == 0)
-	#define DD_PARAMCLOVER const double2 *clover, const float *null2, const double2 *cloverInv, const float *null3
 	#if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
-		#define TMCLOVERTEX clover
+#define TMCLOVERTEX (param.clover)
 		#ifndef DYNAMIC_CLOVER
-			#define TM_INV_CLOVERTEX cloverInv
+#define TM_INV_CLOVERTEX (param.cloverInv)
 		#endif
 		#define READ_CLOVER READ_CLOVER_DOUBLE_STR
 		#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_STR
@@ -89,11 +96,10 @@
 	#endif
 	#define CLOVER_DOUBLE
 #elif (DD_PREC == 1)
-	#define DD_PARAMCLOVER const float4 *clover, const float *null2, const float4 *cloverInv,  const float *null3
 	#ifdef DIRECT_ACCESS_CLOVER
-		#define TMCLOVERTEX clover
+#define TMCLOVERTEX (param.clover)
 		#ifndef DYNAMIC_CLOVER
-			#define TM_INV_CLOVERTEX cloverInv
+#define TM_INV_CLOVERTEX (param.cloverInv)
 		#endif
 		#define READ_CLOVER READ_CLOVER_SINGLE
 		#define ASSN_CLOVER ASSN_CLOVER_SINGLE
@@ -113,11 +119,10 @@
 		#define ASSN_CLOVER ASSN_CLOVER_SINGLE_TEX
 	#endif
 #else             // half-precision fields
-	#define DD_PARAMCLOVER const short4 *clover, const float *cNorm, const short4 *cloverInv, const float *cNrm2
 	#ifdef DIRECT_ACCESS_CLOVER
-		#define TMCLOVERTEX clover
+		#define TMCLOVERTEX param.clover
 		#ifndef DYNAMIC_CLOVER
-			#define TM_INV_CLOVERTEX cloverInv
+			#define TM_INV_CLOVERTEX param.cloverInv
 		#endif
 		#define READ_CLOVER READ_CLOVER_HALF
 		#define ASSN_CLOVER ASSN_CLOVER_HALF
@@ -144,19 +149,10 @@
 #endif		//End clover defs
 
 
-#if (DD_PREC == 0)
-#define DD_PARAM4 const double a, const double b, const double2 *x, const float *xNorm, const DslashParam param
-#elif (DD_PREC == 1) 
-#define DD_PARAM4 const float a,  const float  b, const float4 *x,  const float *xNorm, const DslashParam param
-#else
-#define DD_PARAM4 const float a,  const float  b, const short4 *x,  const float *xNorm, const DslashParam param
-#endif
-
 #if (DD_RECON==0) // reconstruct from 8 reals
 #define DD_RECON_F 8
 
 #if (DD_PREC==0)
-#define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_DOUBLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_DOUBLE2
@@ -165,7 +161,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #elif (DD_PREC==1)
-#define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_FLOAT4
@@ -174,7 +169,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #else
-#define DD_PARAM2 const short4 *gauge0, const short4* gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_8_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_8_SHORT4
@@ -192,10 +186,8 @@
 #else
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_DOUBLE2_TEX
 #endif // DIRECT_ACCESS_LINK
-#define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 
 #elif (DD_PREC==1)
-#define DD_PARAM2 const float4 *gauge0, const float4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_FLOAT4
@@ -204,7 +196,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #else
-#define DD_PARAM2 const short4 *gauge0, const short4 *gauge1
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_12_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_12_SHORT4
@@ -222,10 +213,8 @@
 #else
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_DOUBLE2_TEX
 #endif // DIRECT_ACCESS_LINK
-#define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
 
 #elif (DD_PREC==1)
-#define DD_PARAM2 const float4 *gauge0, const float4 *gauge1 // FIXME for direct reading, really float2
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_FLOAT2
@@ -234,7 +223,6 @@
 #endif // DIRECT_ACCESS_LINK
 
 #else
-#define DD_PARAM2 const short4 *gauge0, const short4 *gauge1 // FIXME for direct reading, really short2
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_MATRIX_18_SINGLE
 #ifdef DIRECT_ACCESS_LINK
 #define READ_GAUGE_MATRIX READ_GAUGE_MATRIX_18_SHORT2
@@ -250,8 +238,8 @@
 
 // double-precision gauge field
 #if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
-#define GAUGE0TEX gauge0
-#define GAUGE1TEX gauge1
+#define GAUGE0TEX param.gauge0
+#define GAUGE1TEX param.gauge1
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define GAUGE0TEX param.gauge0Tex
@@ -265,13 +253,11 @@
 #define GAUGE_FLOAT2
 
 // double-precision spinor fields
-#define DD_PARAM1 double2* out, float *null1
-#define DD_PARAM3 const double2* in, const float *null4
 #if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 #define READ_SPINOR READ_SPINOR_DOUBLE
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
@@ -286,7 +272,7 @@
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -299,7 +285,7 @@
 #define SPINOR_DOUBLE
 #if (DD_XPAY!=0)
 #if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -320,8 +306,8 @@
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
-#define GAUGE0TEX gauge0
-#define GAUGE1TEX gauge1
+#define GAUGE0TEX param.gauge0
+#define GAUGE1TEX param.gauge1
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define GAUGE0TEX param.gauge0Tex
@@ -339,13 +325,11 @@
 
 
 // single-precision spinor fields
-#define DD_PARAM1 float4* out, float *null1
-#define DD_PARAM3 const float4* in, const float *null4
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
@@ -360,7 +344,7 @@
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -372,7 +356,7 @@
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
 #if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_SINGLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -392,8 +376,8 @@
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
-#define GAUGE0TEX gauge0
-#define GAUGE1TEX gauge1
+#define GAUGE0TEX param.gauge0
+#define GAUGE1TEX param.gauge1
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define GAUGE0TEX param.gauge0Tex
@@ -415,7 +399,7 @@
 #define READ_SPINOR READ_SPINOR_HALF
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
@@ -430,7 +414,7 @@
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
-#define INTERTEX out
+#define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF_TEX
 #ifdef USE_TEXTURE_OBJECTS
@@ -439,13 +423,11 @@
 #define INTERTEX interTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
-#define DD_PARAM1 short4* out, float *outNorm
-#define DD_PARAM3 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
 //!0513
 #if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
-#define ACCUMTEX x
+#define ACCUMTEX param.x
 #define READ_ACCUM READ_ACCUM_HALF
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -462,13 +444,12 @@
 
 #endif
 
-#define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
-#define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
+#define DD_CONCAT(n,p,r,d,x) n ## p ## r ## d ## x ## Kernel
+#define DD_FUNC(n,p,r,d,x) DD_CONCAT(n,p,r,d,x)
 
 // define the kernel
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-(DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -494,8 +475,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef MULTI_GPU
 template <>
-__global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -532,8 +513,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #define DD_NAME_F twistedCloverDslashTwist
   
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -561,8 +541,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef MULTI_GPU
 template <>
-__global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -602,8 +582,8 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #define DD_NAME_F twistedCloverDslashTwist
   
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+(DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -618,15 +598,11 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 // clean up
 
+#undef DD_PREC_F
 #undef DD_NAME_F
 #undef DD_RECON_F
 #undef DD_DAG_F
 #undef DD_XPAY_F
-#undef DD_PARAM1
-#undef DD_PARAM2
-#undef DD_PARAMCLOVER
-#undef DD_PARAM3
-#undef DD_PARAM4
 #undef DD_CONCAT
 #undef DD_FUNC
 

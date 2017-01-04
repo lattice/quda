@@ -43,84 +43,93 @@ namespace quda
      This macros try to mimic dslash definitions, because of the similarities between the covariant derivative and the dslash
   */
 
-  #define MORE_GENERIC_COVDEV(FUNC, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
-    if		(reconstruct == QUDA_RECONSTRUCT_NO) {			\
+#define EVEN_MORE_GENERIC_COVDEV(FUNC, FLOAT, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param) \
+  if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
       switch	(dir) {							\
       case 0:								\
-        FUNC ## 018 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 018 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 1:								\
-        FUNC ## 118 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 118 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 2:								\
-        FUNC ## 218 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 218 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 3:								\
-        FUNC ## 318 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 318 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       }									\
     } else if	(reconstruct == QUDA_RECONSTRUCT_12) {			\
       switch	(dir) {							\
       case 0:								\
-        FUNC ## 012 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 012 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 1:								\
-        FUNC ## 112 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 112 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 2:								\
-        FUNC ## 212 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 212 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 3:								\
-        FUNC ## 312 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 312 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       }									\
     } else if	(reconstruct == QUDA_RECONSTRUCT_8) {			\
       switch	(dir) {							\
       case 0:								\
-        FUNC ## 08 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 08 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 1:								\
-        FUNC ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 18 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 2:								\
-        FUNC ## 28 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 28 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       case 3:								\
-        FUNC ## 38 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+        FUNC ## 38 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
         break;								\
       }									\
     }
 
-  #define GENERIC_COVDEV(FUNC, dir, DAG, gridDim, blockDim, shared, stream, param,  ...) \
+#define MORE_GENERIC_COVDEV(FUNC, dir, DAG, kernel_type, gridDim, blockDim, shared, stream,param) \
+  if (typeid(Float) == typeid(double)) {				\
+    EVEN_MORE_GENERIC_COVDEV(FUNC, D, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param) \
+  } else if (typeid(Float) == typeid(float)) { \
+    EVEN_MORE_GENERIC_COVDEV(FUNC, S, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param) \
+  } else {								\
+    errorQuda("Undefined precision type");				\
+  }
+
+#define GENERIC_COVDEV(FUNC, dir, DAG, gridDim, blockDim, shared, stream, param) \
     switch(param.kernel_type) {						\
       case INTERIOR_KERNEL:							\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, INTERIOR_KERNEL,   gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        MORE_GENERIC_COVDEV(FUNC, dir, DAG, INTERIOR_KERNEL,   gridDim, blockDim, shared, stream, param) \
         break;									\
       case EXTERIOR_KERNEL_X:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_X, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_X, gridDim, blockDim, shared, stream, param) \
         break;									\
       case EXTERIOR_KERNEL_Y:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_Y, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_Y, gridDim, blockDim, shared, stream, param) \
         break;									\
       case EXTERIOR_KERNEL_Z:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_Z, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_Z, gridDim, blockDim, shared, stream, param) \
         break;									\
       case EXTERIOR_KERNEL_T:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param) \
 	break;							        \
       default:								\
         errorQuda("Unsupported kernel_type %d", param.kernel_type);	\
     }
 
-  #define COVDEV(FUNC, mu, gridDim, blockDim, shared, stream, param, ...)	\
+#define COVDEV(FUNC, mu, gridDim, blockDim, shared, stream, param)	\
     if (mu < 4) {								\
-      GENERIC_COVDEV(FUNC, mu, , gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      GENERIC_COVDEV(FUNC, mu, , gridDim, blockDim, shared, stream, param) \
     } else {								\
       int nMu = mu - 4;							\
-      GENERIC_COVDEV(FUNC, nMu, Dagger, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      GENERIC_COVDEV(FUNC, nMu, Dagger, gridDim, blockDim, shared, stream, param) \
     }
 
-  #define PROFILE(f, profile, idx)		\
+#define PROFILE(f, profile, idx)		\
     profile.TPSTART(idx);			\
     f;						\
     profile.TPSTOP(idx);
@@ -543,6 +552,13 @@ namespace quda
           dslashParam.commDim[i] = 0;
         }
 
+	dslashParam.out = (void*)out->V();
+	dslashParam.outNorm = (float*)out->Norm();
+	dslashParam.in = (void*)in->V();
+	dslashParam.inNorm = (float*)in->Norm();
+	dslashParam.gauge0 = (void*)gauge0;
+	dslashParam.gauge1 = (void*)gauge1;
+
         if(dslashParam.kernel_type != INTERIOR_KERNEL) {
           #ifdef MULTI_GPU
             dslashParam.threads = ghostVolume;
@@ -552,12 +568,12 @@ namespace quda
             // Maybe I should rebind the spinors for the INTERIOR kernels after this???
 
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-            COVDEV(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (Float2*)out->V(), (Float2*)gauge0, (Float2*)gauge1, (Float2*)in->V());
+            COVDEV(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           #endif
         } else {
           dslashParam.threads = in->Volume();
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          COVDEV(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (Float2*)out->V(), (Float2*)gauge0, (Float2*)gauge1, (Float2*)in->V());
+          COVDEV(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
         }
       }
 

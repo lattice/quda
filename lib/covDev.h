@@ -17,19 +17,19 @@
 
 // set options for current iteration
 
-#if (DD_PREC == 0)
-	#define DD_PARAM2 const double2 *gauge0, const double2 *gauge1
-#else 
-	#define DD_PARAM2 const float4  *gauge0, const float4  *gauge1
-#endif
-
 #if (DD_DAG==0) // no dagger
 	#define DD_DAG_F
 #else           // dagger
 	#define DD_DAG_F Dagger
 #endif
 
-#define DD_PARAM4 const DslashParam param
+#if (DD_PREC == 0)
+#define DD_PREC_F D
+#elif (DD_PREC == 1)
+#define DD_PREC_F S
+#else
+#define DD_PREC_F H
+#endif
 
 
 #if (DD_RECON==0) // reconstruct from 8 reals
@@ -102,8 +102,8 @@
 
 	// double-precision gauge field
 	#if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
-		#define GAUGE0TEX gauge0
-		#define GAUGE1TEX gauge1
+		#define GAUGE0TEX param.gauge0
+		#define GAUGE1TEX param.gauge1
 	#else
 		#ifdef USE_TEXTURE_OBJECTS
 			#define GAUGE0TEX param.gauge0Tex
@@ -117,9 +117,6 @@
 	#define GAUGE_FLOAT2
 
 	// double-precision spinor fields
-	#define DD_PARAM1 double2* out
-	#define DD_PARAM3 const double2* in
-
 	#if (defined DIRECT_ACCESS_WILSON_SPINOR) || (defined FERMI_NO_DBLE_TEX)
 		#define READ_SPINOR READ_SPINOR_DOUBLE
 		#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
@@ -162,8 +159,8 @@
 
 	// single-precision gauge field
 	#ifdef DIRECT_ACCESS_LINK
-		#define GAUGE0TEX gauge0
-		#define GAUGE1TEX gauge1
+		#define GAUGE0TEX param.gauge0
+		#define GAUGE1TEX param.gauge1
 	#else
 		#ifdef USE_TEXTURE_OBJECTS
 			#define GAUGE0TEX param.gauge0Tex
@@ -181,9 +178,6 @@
 
 
 	// single-precision spinor fields
-	#define DD_PARAM1 float4* out
-	#define DD_PARAM3 const float4* in
-
 	#ifdef DIRECT_ACCESS_WILSON_SPINOR
 		#define READ_SPINOR READ_SPINOR_SINGLE
 		#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
@@ -219,13 +213,13 @@
 	#define SPINOR_HOP 6
 #endif
 
-	#define DD_CONCAT(n,r,d) n ## r ## d ## Kernel
-	#define DD_FUNC(n,r,d) DD_CONCAT(n,r,d)
+#define DD_CONCAT(n,p,r,d) n ## r ## d ## p ## Kernel
+#define DD_FUNC(n,p,r,d) DD_CONCAT(n,p,r,d)
 
 	// define the kernels
 	#define DD_NAME_F covDevM0
 	template <KernelType kernel_type>
-	__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F)	(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4)
+	__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F)	(const DslashParam param)
 	{
 		#if DD_DAG
 			#include "covDev_mu0_dagger_core.h"
@@ -237,7 +231,7 @@
 	#undef DD_NAME_F
 	#define DD_NAME_F covDevM1
 	template <KernelType kernel_type>
-	__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F)	(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4)
+	__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F)	(const DslashParam param)
 	{
 		#if DD_DAG
 			#include "covDev_mu1_dagger_core.h"
@@ -249,7 +243,7 @@
 	#undef DD_NAME_F
 	#define DD_NAME_F covDevM2
 	template <KernelType kernel_type>
-	__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F)	(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4)
+	__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F)	(const DslashParam param)
 	{
 		#if DD_DAG
 			#include "covDev_mu2_dagger_core.h"
@@ -261,7 +255,7 @@
 	#undef DD_NAME_F
 	#define DD_NAME_F covDevM3
 	template <KernelType kernel_type>
-	__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F)	(DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4)
+	__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F)	(const DslashParam param)
 	{
 		#if DD_DAG
 			#include "covDev_mu3_dagger_core.h"
@@ -274,13 +268,10 @@
 
 // clean up
 
+#undef DD_PREC_F
 #undef DD_NAME_F
 #undef DD_RECON_F
 #undef DD_DAG_F
-#undef DD_PARAM1
-#undef DD_PARAM2
-#undef DD_PARAM3
-#undef DD_PARAM4
 #undef DD_CONCAT
 #undef DD_FUNC
 

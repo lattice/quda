@@ -38,7 +38,8 @@
 #define QUDA_CPS_WILSON_GAUGE_ORDER 7 //expect *gauge even-odd spacetime column-row color
 #define QUDA_MILC_GAUGE_ORDER 8 //expect *gauge even-odd mu spacetime row-column order
 #define QUDA_BQCD_GAUGE_ORDER 9 //expect *gauge mu even-odd spacetime+halos row-column order
-#define QUDA_TIFR_GAUGE_ORDER 10 
+#define QUDA_TIFR_GAUGE_ORDER 10
+#define QUDA_TIFR_PADDED_GAUGE_ORDER 11
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -87,7 +88,11 @@
 #define QUDA_GPU_COMMS_DSLASH 3
 #define QUDA_FUSED_DSLASH 4
 #define QUDA_FUSED_GPU_COMMS_DSLASH 5
-#define QUDA_DSLASH_NC 6
+#define QUDA_DSLASH_ASYNC 6
+#define QUDA_FUSED_DSLASH_ASYNC 7
+#define QUDA_ZERO_COPY_DSLASH 8
+#define QUDA_FUSED_ZERO_COPY_DSLASH 9
+#define QUDA_DSLASH_NC 10
 
 #define QudaInverterType integer(4)
 #define QUDA_CG_INVERTER 0
@@ -191,12 +196,13 @@
 #define QUDA_PRESERVE_SOURCE_INVALID QUDA_INVALID_ENUM
 
 #define QudaDiracFieldOrder integer(4)
-#define QUDA_INTERNAL_DIRAC_ORDER 0  // internal dirac order used by QUDA varies depending on precision and dslash type
-#define QUDA_DIRAC_ORDER 1           
-#define QUDA_QDP_DIRAC_ORDER 2       // even-odd spin inside color
-#define QUDA_QDPJIT_DIRAC_ORDER 3       // even-odd spin inside color
-#define QUDA_CPS_WILSON_DIRAC_ORDER 4// odd-even color inside spin
-#define QUDA_LEX_DIRAC_ORDER 5       // lexicographical order color inside spin
+#define QUDA_INTERNAL_DIRAC_ORDER 0    // internal dirac order used by QUDA varies depending on precision and dslash type
+#define QUDA_DIRAC_ORDER 1
+#define QUDA_QDP_DIRAC_ORDER 2         // even-odd spin inside color
+#define QUDA_QDPJIT_DIRAC_ORDER 3      // even-odd, complex-color-spin-spacetime
+#define QUDA_CPS_WILSON_DIRAC_ORDER 4  // odd-even color inside spin
+#define QUDA_LEX_DIRAC_ORDER 5         // lexicographical order color inside spin
+#define QUDA_TIFR_PADDED_DIRAC_ORDER 6
 #define QUDA_INVALID_DIRAC_ORDER QUDA_INVALID_ENUM
 
 #define QudaCloverFieldOrder integer(4)
@@ -284,6 +290,7 @@
 #define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 6 // QLA ordering (spin inside color)
 #define QUDA_QDPJIT_FIELD_ORDER 7 // QDP field ordering (complex-color-spin-spacetime)
 #define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 8 // QOP domain-wall ordering
+#define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 9 // TIFR RHMC ordering
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)

@@ -3376,6 +3376,13 @@ if (!incomplete)
   
 #ifdef DSLASH_TWIST
   {
+#ifdef SPINOR_DOUBLE
+    const spinorFloat a = param.a;
+    const spinorFloat b = param.b;
+#else
+    const spinorFloat a = param.a_f;
+    const spinorFloat b = param.b_f;
+#endif
     //Perform twist rotation first:
     //(1 - i*a*gamma_5 * tau_3 + b * tau_1)
     volatile spinorFloat x1_re, x1_im, y1_re, y1_im;
@@ -3570,6 +3577,13 @@ if (!incomplete)
   }
 #endif
   
+#if !defined(DSLASH_XPAY) || defined(DSLASH_TWIST)
+#ifdef SPINOR_DOUBLE
+  const spinorFloat c = param.c;
+#else
+  const spinorFloat c = param.c_f;
+#endif
+#endif
 #ifndef DSLASH_XPAY
   o1_00_re *= c;
   o1_00_im *= c;
@@ -3870,6 +3884,13 @@ if (!incomplete)
   {
     READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, param.fl_stride)
   
+#ifdef SPINOR_DOUBLE
+  const spinorFloat a = param.a;
+  const spinorFloat b = param.b;
+#else
+  const spinorFloat a = param.a_f;
+  const spinorFloat b = param.b_f;
+#endif
     //Perform twist rotation:
   //(1 - i*a*gamma_5 * tau_3 + b * tau_1)
     volatile spinorFloat x1_re, x1_im, y1_re, y1_im;
@@ -4061,6 +4082,11 @@ if (!incomplete)
   acc2_12_re = x2_re;  acc2_12_im = x2_im;
   acc2_32_re = y2_re;  acc2_32_im = y2_im;
   
+#ifdef SPINOR_DOUBLE
+  const spinorFloat k = param.d;
+#else
+  const spinorFloat k = param.d_f;
+#endif
     o1_00_re = k*o1_00_re + acc1_00_re;
     o1_00_im = k*o1_00_im + acc1_00_im;
     o1_01_re = k*o1_01_re + acc1_01_re;

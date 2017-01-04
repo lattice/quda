@@ -320,10 +320,7 @@ namespace quda {
     const unsigned int vector_length;
 
   public:
-    TunableVectorY(unsigned int vector_length) : vector_length(vector_length)
-    {
-
-    };
+    TunableVectorY(unsigned int vector_length) : vector_length(vector_length) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -365,6 +362,56 @@ namespace quda {
       param.grid.y = vector_length;
     }
 
+  };
+
+  class TunableVectorYZ : public TunableVectorY {
+
+    const unsigned vector_length_z;
+
+  public:
+    TunableVectorYZ(unsigned int vector_length_y, unsigned int vector_length_z)
+      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z) { }
+
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      dim3 block = param.block;
+      dim3 grid = param.grid;
+      bool ret = TunableVectorY::advanceBlockDim(param);
+      param.block.z = block.z;
+      param.grid.z = grid.z;
+
+      if (ret) { // we advanced the block.y / block.x so we're done
+	return true;
+      } else { // block.x/block.y (spacetime) was reset
+
+	// we can advance spin/block-color since this is valid
+	if (param.block.z < vector_length_z) {
+	  param.block.z++;
+
+	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
+	  return true;
+	} else { // we have run off the end so let's reset
+	  param.block.z = 1;
+	  param.grid.z = vector_length_z;
+	  return false;
+	}
+      }
+    }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      TunableVectorY::initTuneParam(param);
+      param.block.z = 1;
+      param.grid.z = vector_length_z;
+    }
+
+    /** sets default values for when tuning is disabled */
+    void defaultTuneParam(TuneParam &param) const
+    {
+      TunableVectorY::defaultTuneParam(param);
+      param.block.z = 1;
+      param.grid.z = vector_length_z;
+    }
   };
 
   void loadTuneCache();

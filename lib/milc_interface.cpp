@@ -634,6 +634,7 @@ static void setInvertParams(const int dim[4],
   invertParam->verbosity_precondition = QUDA_SILENT;
   invertParam->cuda_prec_precondition = cuda_prec_precondition;
 
+  invertParam->compute_action = 0;
 
   return;
 }
@@ -1391,6 +1392,8 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.clover_cuda_prec_sloppy       = device_precision_sloppy;
   invertParam.clover_cuda_prec_precondition = device_precision_sloppy;
   invertParam.clover_order                  = QUDA_PACKED_CLOVER_ORDER;
+
+  invertParam.compute_action = 0;
 }
 
 
@@ -1485,11 +1488,12 @@ void qudaCloverInvert(int external_precision,
     exit(1);
   }
 
-  qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
+  if (link) qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
-//  double clover_coeff = 0.0;
-  qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
-      QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+  if (clover || cloverInverse) {
+    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
+			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+  }
 
   double reliable_delta = 1e-1;
 
@@ -1506,17 +1510,18 @@ void qudaCloverInvert(int external_precision,
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
-  invertParam.solve_type         = QUDA_DIRECT_PC_SOLVE;
-  invertParam.inv_type           = QUDA_BICGSTAB_INVERTER;
+  invertParam.inv_type           = inv_args.solver_type == QUDA_CG_INVERTER ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
+  invertParam.solve_type         = invertParam.inv_type == QUDA_CG_INVERTER ? QUDA_NORMOP_PC_SOLVE : QUDA_DIRECT_PC_SOLVE;
   invertParam.matpc_type         = QUDA_MATPC_ODD_ODD;
 
   invertQuda(solution, source, &invertParam);
+
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  qudaFreeGaugeField();
-  qudaFreeCloverField();
+  if (clover || cloverInverse) qudaFreeCloverField();
+  if (link) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
   return;
 } // qudaCloverInvert
@@ -1674,7 +1679,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   // if doing a pure double-precision multi-shift solve don't use reliable updates
   const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
                                      ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
-  double reliable_delta = (use_mixed_precision) ? 1e-1 : 0.0;
+  double reliable_delta = (use_mixed_precision) ? 1e-2 : 0.0;
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
   invertParam.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
@@ -1696,8 +1701,28 @@ void qudaCloverMultishiftInvert(int external_precision,
   invertParam.verbosity_precondition = QUDA_SILENT;
 
   invertParam.make_resident_solution = inv_args.make_resident_solution;
+  invertParam.compute_true_res = 0;
 
   if (num_offsets==1 && offset[0] == 0) {
+    // set the solver
+    char *quda_solver = getenv("QUDA_MILC_CLOVER_SOLVER");
+
+    // default is chronological CG
+    if (!quda_solver || strcmp(quda_solver,"CHRONO_CG_SOLVER")==0) {
+      // use CG with chronological forecasting
+      invertParam.use_resident_chrono = 1;
+      invertParam.make_resident_chrono = 1;
+      invertParam.max_chrono_dim = 10;
+    } else if (strcmp(quda_solver,"BICGSTAB_SOLVER")==0){
+      // use two-step BiCGStab
+      invertParam.inv_type = QUDA_BICGSTAB_INVERTER;
+      invertParam.solve_type = QUDA_DIRECT_PC_SOLVE;
+    } else if (strcmp(quda_solver,"CG_SOLVER")==0){
+      // regular CG
+      invertParam.use_resident_chrono = 0;
+      invertParam.make_resident_chrono = 0;
+    }
+
     invertQuda(solutionArray[0], source, &invertParam);
     *final_residual = invertParam.true_res;
   } else {

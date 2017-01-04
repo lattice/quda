@@ -137,6 +137,7 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
+set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -154,6 +155,7 @@ mark_as_advanced(QUDA_GPU_COMMS)
 mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
+mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_MULTIGRID)
 
@@ -259,6 +261,12 @@ if(QUDA_BLOCKSOLVER)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
   set(QUDA_NVTX ON)
+endif()
+
+if(QUDA_EIGEN)
+  add_definitions(-DEIGEN)
+  find_package(Eigen REQUIRED)
+  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_POSIX_THREADS)

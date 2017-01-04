@@ -1,6 +1,13 @@
 #ifndef _TMC_GAMMA_CORE_H
 #define _TMC_GAMMA_CORE_H
 
+template<typename T>
+__global__ void twistCloverGamma5Kernel(DslashParam param) { }
+
+template<typename T>
+__global__ void twistCloverGamma5InvKernel(DslashParam param) { }
+
+
 //action of the operator b*(1 + i*a*gamma5)
 //used also macros from io_spinor.h
 /*
@@ -611,26 +618,26 @@ __device__ double2 operator*(const double &x, const double2 &y)
 #define spinorFloat double
 
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
-	#define TMCLOVERTEX clover
-	#define TM_INV_CLOVERTEX cloverInv
-	#define READ_CLOVER READ_CLOVER_DOUBLE_STR
-	#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_STR
+#define TMCLOVERTEX ((double2*)param.clover)
+#define TM_INV_CLOVERTEX ((double2*)param.cloverInv)
+#define READ_CLOVER READ_CLOVER_DOUBLE_STR
+#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_STR
 #else
-	#ifdef USE_TEXTURE_OBJECTS
-		#define TMCLOVERTEX (param.cloverTex)
-		#define TM_INV_CLOVERTEX (param.cloverInvTex)
-	#else
-		#define TMCLOVERTEX cloverTexDouble
-		#define TM_INV_CLOVERTEX cloverInvTexDouble
-	#endif
-	#define READ_CLOVER READ_CLOVER_DOUBLE_TEX
-	#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define TMCLOVERTEX (param.cloverTex)
+#define TM_INV_CLOVERTEX (param.cloverInvTex)
+#else
+#define TMCLOVERTEX cloverTexDouble
+#define TM_INV_CLOVERTEX cloverInvTexDouble
+#endif
+#define READ_CLOVER READ_CLOVER_DOUBLE_TEX
+#define ASSN_CLOVER ASSN_CLOVER_DOUBLE_TEX
 #endif
 
 #define CLOVER_DOUBLE
 
-__global__ void twistCloverGamma5Kernel(double2 *spinor, float *null, double a, const double2 *in, const float *null2, DslashParam param,
-					 const double2 *clover, const float *cNorm, const double2 *cloverInv, const float *cNrm2)
+template<>
+__global__ void twistCloverGamma5Kernel<double2>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -668,8 +675,9 @@ __global__ void twistCloverGamma5Kernel(double2 *spinor, float *null, double a, 
    double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17;
 
    //apply (Clover + i*a*gamma_5) to the input spinor
-   APPLY_CLOVER_TWIST(cd, a, S);
-      
+   APPLY_CLOVER_TWIST(cd, param.a, S);
+
+   double2 *spinor = (double2*)param.out;
    spinor[sid + 0  * param.sp_stride] = I0;   
    spinor[sid + 1  * param.sp_stride] = I1;   
    spinor[sid + 2  * param.sp_stride] = I2;   
@@ -686,8 +694,8 @@ __global__ void twistCloverGamma5Kernel(double2 *spinor, float *null, double a, 
 #endif
 }
 
-__global__ void twistCloverGamma5InvKernel(double2 *spinor, float *null, double a, const double2 *in, const float *null2, DslashParam param,
-					   const double2 *clover, const float *cNorm, const double2 *cloverInv, const float *cNrm2)
+template<>
+__global__ void twistCloverGamma5InvKernel<double2>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -726,11 +734,12 @@ __global__ void twistCloverGamma5InvKernel(double2 *spinor, float *null, double 
 
    //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
 #ifndef DYNAMIC_CLOVER
-   APPLY_CLOVER_TWIST_INV(cd, cdinv, a, S);
+   APPLY_CLOVER_TWIST_INV(cd, cdinv, param.a, S);
 #else
-   APPLY_CLOVER_TWIST_DYN_INV(cd, a, S);
+   APPLY_CLOVER_TWIST_DYN_INV(cd, param.a, S);
 #endif
-      
+
+   double2 *spinor = (double2*)param.out;
    spinor[sid + 0  * param.sp_stride] = I0;   
    spinor[sid + 1  * param.sp_stride] = I1;   
    spinor[sid + 2  * param.sp_stride] = I2;   
@@ -814,24 +823,24 @@ __global__ void twistCloverGamma5InvKernel(double2 *spinor, float *null, double 
 #define spinorFloat float
 
 #ifdef DIRECT_ACCESS_CLOVER
-	#define TMCLOVERTEX clover
-	#define TM_INV_CLOVERTEX cloverInv
-	#define READ_CLOVER READ_CLOVER_SINGLE
-	#define ASSN_CLOVER ASSN_CLOVER_SINGLE
+#define TMCLOVERTEX ((float4*)(param.clover))
+#define TM_INV_CLOVERTEX ((float4*)(param.cloverInv))
+#define READ_CLOVER READ_CLOVER_SINGLE
+#define ASSN_CLOVER ASSN_CLOVER_SINGLE
 #else
-	#ifdef USE_TEXTURE_OBJECTS
-		#define TMCLOVERTEX (param.cloverTex)
-		#define TM_INV_CLOVERTEX (param.cloverInvTex)
-	#else
-		#define TMCLOVERTEX cloverTexSingle
-		#define TM_INV_CLOVERTEX cloverInvTexSingle
-	#endif
-	#define READ_CLOVER READ_CLOVER_SINGLE_TEX
-	#define ASSN_CLOVER ASSN_CLOVER_SINGLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define TMCLOVERTEX (param.cloverTex)
+#define TM_INV_CLOVERTEX (param.cloverInvTex)
+#else
+#define TMCLOVERTEX cloverTexSingle
+#define TM_INV_CLOVERTEX cloverInvTexSingle
+#endif
+#define READ_CLOVER READ_CLOVER_SINGLE_TEX
+#define ASSN_CLOVER ASSN_CLOVER_SINGLE_TEX
 #endif
 
-__global__ void twistCloverGamma5Kernel(float4 *spinor, float *null, float a, const float4 *in, const float *null2, DslashParam param,
-					const float4 *clover, const float *cNorm, const float4 *cloverInv, const float *cNrm2)
+template<>
+__global__ void twistCloverGamma5Kernel<float4>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -847,8 +856,9 @@ __global__ void twistCloverGamma5Kernel(float4 *spinor, float *null, float a, co
    float4 C0, C1, C2, C3, C4, C5, C6, C7, C8;
 
    //apply (Clover + i*a*gamma_5) to the input spinor
-   APPLY_CLOVER_TWIST(c, a, S);
-   
+   APPLY_CLOVER_TWIST(c, param.a, S);
+
+   float4* spinor = (float4*)param.out;
    spinor[sid + 0  * param.sp_stride] = I0;   
    spinor[sid + 1  * param.sp_stride] = I1;   
    spinor[sid + 2  * param.sp_stride] = I2;   
@@ -859,8 +869,8 @@ __global__ void twistCloverGamma5Kernel(float4 *spinor, float *null, float a, co
 #endif 
 }
 
-__global__ void twistCloverGamma5InvKernel(float4 *spinor, float *null, float a, const float4 *in, const float *null2, DslashParam param,
-					   const float4 *clover, const float *cNorm, const float4 *cloverInv, const float *cNrm2)
+template<>
+__global__ void twistCloverGamma5InvKernel<float4>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -877,11 +887,12 @@ __global__ void twistCloverGamma5InvKernel(float4 *spinor, float *null, float a,
 
    //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
 #ifndef DYNAMIC_CLOVER
-   APPLY_CLOVER_TWIST_INV(c, cinv, a, S);
+   APPLY_CLOVER_TWIST_INV(c, cinv, param.a, S);
 #else
-   APPLY_CLOVER_TWIST_DYN_INV(c, a, S);
+   APPLY_CLOVER_TWIST_DYN_INV(c, param.a, S);
 #endif
    
+   float4 *spinor = (float4*)param.out;
    spinor[sid + 0  * param.sp_stride] = I0;   
    spinor[sid + 1  * param.sp_stride] = I1;   
    spinor[sid + 2  * param.sp_stride] = I2;   
@@ -908,27 +919,30 @@ __global__ void twistCloverGamma5InvKernel(float4 *spinor, float *null, float a,
 #endif
 
 #ifdef DIRECT_ACCESS_CLOVER
-	#define CLOVERTEX clover
-	#define READ_CLOVER READ_CLOVER_HALF
-	#define ASSN_CLOVER ASSN_CLOVER_HALF
+#define TMCLOVERTEX ((short4*)(param.clover))
+#define TMCLOVERTEXNORM param.cloverNorm
+#define TM_INV_CLOVERTEX ((short4*)(param.cloverInv))
+#define TM_INV_CLOVERTEXNORM (param.cloverInvNorm)
+#define READ_CLOVER READ_CLOVER_HALF
+#define ASSN_CLOVER ASSN_CLOVER_HALF
 #else
-	#ifdef USE_TEXTURE_OBJECTS
-		#define TMCLOVERTEX (param.cloverTex)
-		#define TMCLOVERTEXNORM (param.cloverNormTex)
-		#define TM_INV_CLOVERTEX (param.cloverInvTex)
-		#define TM_INV_CLOVERTEXNORM (param.cloverInvNormTex)
-	#else
-		#define TMCLOVERTEX cloverTexHalf
-		#define TMCLOVERTEXNORM cloverTexNorm
-		#define TM_INV_CLOVERTEX cloverInvTexHalf
-		#define TM_INV_CLOVERTEXNORM cloverInvTexNorm
-	#endif
-	#define READ_CLOVER READ_CLOVER_HALF_TEX
-	#define ASSN_CLOVER ASSN_CLOVER_HALF_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define TMCLOVERTEX (param.cloverTex)
+#define TMCLOVERTEXNORM (param.cloverNormTex)
+#define TM_INV_CLOVERTEX (param.cloverInvTex)
+#define TM_INV_CLOVERTEXNORM (param.cloverInvNormTex)
+#else
+#define TMCLOVERTEX cloverTexHalf
+#define TMCLOVERTEXNORM cloverTexNorm
+#define TM_INV_CLOVERTEX cloverInvTexHalf
+#define TM_INV_CLOVERTEXNORM cloverInvTexNorm
+#endif
+#define READ_CLOVER READ_CLOVER_HALF_TEX
+#define ASSN_CLOVER ASSN_CLOVER_HALF_TEX
 #endif
 
-__global__ void twistCloverGamma5Kernel(short4* spinor, float *spinorNorm, float a, const short4 *in, const float *inNorm, DslashParam param,
-					const short4 *clover, const float *cNorm, const short4 *cloverInv, const float *cNrm2)
+template<>
+__global__ void twistCloverGamma5Kernel<short4>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -954,7 +968,7 @@ __global__ void twistCloverGamma5Kernel(short4* spinor, float *spinorNorm, float
    float K;
 
    //apply (Clover + i*a*gamma_5) to the input spinor
-   APPLY_CLOVER_TWIST(c, a, S);
+   APPLY_CLOVER_TWIST(c, param.a_f, S);
    
    float k0  = fmaxf(fabsf(I0.x), fabsf(I0.y));			
    float k1  = fmaxf(fabsf(I0.z), fabsf(I0.w));			
@@ -979,7 +993,7 @@ __global__ void twistCloverGamma5Kernel(short4* spinor, float *spinorNorm, float
    k2 = fmaxf(k4, k5);							
    k0 = fmaxf(k0, k1);							
    k0 = fmaxf(k0, k2);							
-   spinorNorm[sid] = k0;								
+   param.outNorm[sid] = k0;								
    float scale = __fdividef(MAX_SHORT, k0);
    
    I0 = scale * I0; 	
@@ -989,6 +1003,7 @@ __global__ void twistCloverGamma5Kernel(short4* spinor, float *spinorNorm, float
    I4 = scale * I4;
    I5 = scale * I5;
    
+   short4 *spinor = (short4*)param.out;
    spinor[sid+0*(param.sp_stride)] = make_short4((short)I0.x, (short)I0.y, (short)I0.z, (short)I0.w); 
    spinor[sid+1*(param.sp_stride)] = make_short4((short)I1.x, (short)I1.y, (short)I1.z, (short)I1.w); 
    spinor[sid+2*(param.sp_stride)] = make_short4((short)I2.x, (short)I2.y, (short)I2.z, (short)I2.w); 
@@ -999,8 +1014,8 @@ __global__ void twistCloverGamma5Kernel(short4* spinor, float *spinorNorm, float
 #endif 
 }
 
-__global__ void twistCloverGamma5InvKernel(short4* spinor, float *spinorNorm, float a, const short4 *in, const float *inNorm, DslashParam param,
-					   const short4 *clover, const float *cNorm, const short4 *cloverInv, const float *cNrm2)
+template<>
+__global__ void twistCloverGamma5InvKernel<short4>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -1027,9 +1042,9 @@ __global__ void twistCloverGamma5InvKernel(short4* spinor, float *spinorNorm, fl
 
    //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
 #ifndef DYNAMIC_CLOVER
-   APPLY_CLOVER_TWIST_INV(c, cinv, a, S);
+   APPLY_CLOVER_TWIST_INV(c, cinv, param.a_f, S);
 #else
-   APPLY_CLOVER_TWIST_DYN_INV(c, a, S);
+   APPLY_CLOVER_TWIST_DYN_INV(c, param.a_f, S);
 #endif
    
    float k0  = fmaxf(fabsf(I0.x), fabsf(I0.y));			
@@ -1055,7 +1070,7 @@ __global__ void twistCloverGamma5InvKernel(short4* spinor, float *spinorNorm, fl
    k2 = fmaxf(k4, k5);							
    k0 = fmaxf(k0, k1);							
    k0 = fmaxf(k0, k2);							
-   spinorNorm[sid] = k0;								
+   param.outNorm[sid] = k0;							
    float scale = __fdividef(MAX_SHORT, k0);
    
    I0 = scale * I0; 	
@@ -1065,6 +1080,7 @@ __global__ void twistCloverGamma5InvKernel(short4* spinor, float *spinorNorm, fl
    I4 = scale * I4;
    I5 = scale * I5;
    
+   short4 *spinor = (short4*)param.out;
    spinor[sid+0*(param.sp_stride)] = make_short4((short)I0.x, (short)I0.y, (short)I0.z, (short)I0.w); 
    spinor[sid+1*(param.sp_stride)] = make_short4((short)I1.x, (short)I1.y, (short)I1.z, (short)I1.w); 
    spinor[sid+2*(param.sp_stride)] = make_short4((short)I2.x, (short)I2.y, (short)I2.z, (short)I2.w); 

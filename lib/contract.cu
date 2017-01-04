@@ -1,6 +1,10 @@
 namespace quda {
 #ifdef GPU_CONTRACT
 
+#ifdef READ_SPINOR_SINGLE
+#undef READ_SPINOR_SINGLE
+#endif
+
 #include "contract_core.h"
 #include "contract_core_plus.h"
 #include "contract_core_minus.h"

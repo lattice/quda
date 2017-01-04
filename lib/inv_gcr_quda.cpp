@@ -38,7 +38,7 @@ namespace quda {
     inner.secs = 0;
 
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
-    inner.is_preconditioner = true; // tell inner solver it is a preconditionis_re
+    inner.is_preconditioner = true; // tell inner solver it is a preconditioner
 
     inner.global_reduction = false;
 
@@ -107,7 +107,7 @@ namespace quda {
     case 6: // six-way pipelining
     case 7: // seven-way pipelining
     case 8: // eight-way pipelining
-    {
+      {
 	const int N = pipeline;
 	for (int i=0; i<k-(N-1); i+=N) {
 	  computeBeta(beta, Ap, i, N, k);

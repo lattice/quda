@@ -86,6 +86,17 @@ namespace quda {
       b = mu;
       c = epsilon;
       d = k;
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.a = kappa;
+      dslashParam.a_f = kappa;
+      dslashParam.b = mu;
+      dslashParam.b_f = mu;
+      dslashParam.c = epsilon;
+      dslashParam.c_f = epsilon;
+      dslashParam.d = k;
+      dslashParam.d_f = k;
+
       if (dslashType != QUDA_NONDEG_DSLASH) errorQuda("Invalid dslashType for non-degenerate twisted-mass Dslash");
       dslashParam.fl_stride = in->VolumeCB()/2;
     }
@@ -107,9 +118,7 @@ namespace quda {
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      NDEG_TM_DSLASH(twistedNdegMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-		     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-		     (sFloat*)in->V(), (float*)in->Norm(), a, b, c, d, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
+      NDEG_TM_DSLASH(twistedNdegMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 
     long long flops() const {
