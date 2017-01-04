@@ -964,11 +964,21 @@ namespace quda {
     {
       const Matrix<Cmplx,3> identity_comp = conj(matrix)*matrix;
       double error = 0.0;
+      Cmplx temp(0,0);
+      int i=0;
+      int j=0;
       
       //error = ||U^dagger U - I||_L2
-      for(int i=0; i<3; ++i) 
-	for(int j=0; j<3; ++j) 
-	  error += (i==j) ? norm(identity_comp(i,j)-1.0) : norm(identity_comp(i,j));
+      for(i=0; i<3; ++i) 
+	for(j=0; j<3; ++j) 
+	  if(i==j) {
+	    temp = identity_comp(i,j);
+	    temp -= 1.0;
+	    error += norm(temp);
+	  }
+	  else {
+	    error += norm(identity_comp(i,j));
+	  }
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
