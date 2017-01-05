@@ -18,7 +18,7 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 (default: sm_35)]),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60 (default: sm_35)]),
  [ gpu_arch=${enableval} ],
  [ gpu_arch="sm_35" ]
 )
@@ -297,6 +297,19 @@ AC_ARG_ENABLE(magma-vars,
   [ build_magma_vars="no" ]
 )
 
+AC_ARG_ENABLE(arpack,
+  AC_HELP_STRING([--enable-arpack], [ Build with ARPACK (requires pkg-config to detect arpack)]),
+  [ build_arpack=${enableval}],
+  [ build_arpack="no" ]
+)
+
+AC_ARG_ENABLE(arpack-vars,
+ AC_HELP_STRING([--enable-arpack-vars], [ Build with ARPACK using env vars: ARPACK_INC and ARPACK_LIB ]),
+  [ build_arpack_vars=${enableval}],
+  [ build_arpack_vars="no" ]
+)
+
+
 AC_ARG_VAR(NVCCFLAGS, [ Extra flags for NVCC ])
 AC_MSG_NOTICE([User supplied NVCCFLAGS: ${NVCCFLAGS} ])
 if test "X${build_qdpjit}X" = "XyesX" ; then
@@ -352,9 +365,9 @@ esac
 
 dnl CPU Arch
 case ${gpu_arch} in
-sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
+sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60) ;;
 *)
-  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 ])
+  AC_MSG_ERROR([ GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60 ])
   ;;
 esac
 
@@ -860,6 +873,13 @@ AC_SUBST( BUILD_MAGMA, [${build_magma}])
 
 AC_MSG_NOTICE([Setting BUILD_MAGMA_VARS = ${build_magma_vars}])
 AC_SUBST( BUILD_MAGMA_VARS, [${build_magma_vars}])
+
+AC_MSG_NOTICE([Setting BUILD_ARPACK = ${build_arpack}])
+AC_SUBST( BUILD_ARPACK, [${build_arpack}])
+
+AC_MSG_NOTICE([Setting BUILD_ARPACK_VARS = ${build_arpack_vars}])
+AC_SUBST( BUILD_ARPACK_VARS, [${build_arpack_vars}])
+
 
 if test "X${force_ac}X" = "XnoX";
   then

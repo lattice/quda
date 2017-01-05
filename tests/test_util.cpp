@@ -1576,7 +1576,6 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
-bool tune = true;
 int niter = 100;
 int gcrNkrylov = 10;
 int pipeline = 0; 
@@ -1670,7 +1669,6 @@ void usage(char** argv )
   printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
-  printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
@@ -1972,25 +1970,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-
-  if( strcmp(argv[i], "--tune") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-
-    if (strcmp(argv[i+1], "true") == 0){
-      tune = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      tune = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid tuning type\n");	
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
 
   if( strcmp(argv[i], "--multishift") == 0){
     if (i+1 >= argc){

@@ -36,6 +36,7 @@ extern "C" {
     QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
     QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
     QUDA_TIFR_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime, column-row order
+    QUDA_TIFR_PADDED_GAUGE_ORDER, // expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order
     QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
   } QudaGaugeFieldOrder;
 
@@ -92,6 +93,10 @@ extern "C" {
     QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_DSLASH,
     QUDA_FUSED_GPU_COMMS_DSLASH,
+    QUDA_DSLASH_ASYNC,
+    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_ZERO_COPY_DSLASH,
+    QUDA_FUSED_ZERO_COPY_DSLASH,
     QUDA_DSLASH_NC
   } QudaDslashPolicy;
 
@@ -214,6 +219,7 @@ extern "C" {
     QUDA_QDPJIT_DIRAC_ORDER,     // even-odd, complex-color-spin-spacetime
     QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
     QUDA_LEX_DIRAC_ORDER,        // lexicographical order, color inside spin
+    QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
     QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
   } QudaDiracFieldOrder;  
 
@@ -315,6 +321,7 @@ extern "C" {
     QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
     QUDA_QDPJIT_FIELD_ORDER, // QDP field ordering (complex-color-spin-spacetime)
     QUDA_QOP_DOMAIN_WALL_FIELD_ORDER, // QOP domain-wall ordering
+    QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;
   
@@ -409,18 +416,6 @@ extern "C" {
     QUDA_BOTH_DIRS = 2
   } QudaDirection;
   
-  typedef enum QudaComputeFatMethod_s {
-    QUDA_COMPUTE_FAT_STANDARD,
-    QUDA_COMPUTE_FAT_EXTENDED_VOLUME,
-    QUDA_COMPUTE_FAT_INVALID = QUDA_INVALID_ENUM
-  } QudaComputeFatMethod;
-
-  typedef enum QudaFatLinkFlag_s {
-    QUDA_FAT_PRESERVE_CPU_GAUGE = 1,
-    QUDA_FAT_PRESERVE_GPU_GAUGE = 2,
-    QUDA_FAT_PRESERVE_COMM_MEM = 4
-  } QudaFatLinkFlag;
-
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,

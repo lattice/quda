@@ -87,12 +87,23 @@ namespace quda {
 	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
-      dslashParam.cl_stride = cl_stride;
-      dslashParam.fl_stride = in->VolumeCB();
       a = kappa;
       b = mu;
       c = epsilon;
       d = k;
+
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.a = kappa;
+      dslashParam.a_f = kappa;
+      dslashParam.b = mu;
+      dslashParam.b_f = mu;
+      dslashParam.cl_stride = cl_stride;
+      dslashParam.fl_stride = in->VolumeCB();
+      dslashParam.clover = (void*)clover;
+      dslashParam.cloverNorm = (float*)cNorm;
+      dslashParam.cloverInv = (void*)cloverInv;
+      dslashParam.cloverInvNorm = (float*)cNrm2;
 
       switch(dslashType){
       case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
@@ -191,19 +202,13 @@ namespace quda {
 
       switch(dslashType){
       case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
-	DSLASH(twistedCloverInvDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cNorm, cloverInv, cNrm2,
-	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
+	DSLASH(twistedCloverInvDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       case QUDA_DEG_DSLASH_CLOVER_TWIST_INV:
-	DSLASH(twistedCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cNorm, cloverInv, cNrm2,
-	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
+	DSLASH(twistedCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       case QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY:
-	DSLASH(twistedCloverDslashTwist, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cNorm, cloverInv, cNrm2,
-	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)x->V(), (float*)x->Norm());
+	DSLASH(twistedCloverDslashTwist, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       default:
 	errorQuda("Invalid twisted clover dslash type");

@@ -214,6 +214,14 @@ namespace quda {
       for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, csParam);
     }
 
+    // FIXME - hack from hell since static ghosts seem to be broken
+    static int hack = 0;
+    if (hack==0 && reliable) {
+      mat(*y[3], *y[2], *y[1], *y[0]);
+      for (int i=0; i<4; i++) blas::zero(*y[i]);
+      hack = 1;
+    }
+
     csParam.setPrecision(param.precision_sloppy);
   
     cudaColorSpinorField *r_sloppy;
@@ -263,10 +271,14 @@ namespace quda {
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
     double r2[QUDA_MAX_MULTI_SHIFT];
+    int iter[QUDA_MAX_MULTI_SHIFT+1];     // record how many iterations for each shift
     for (int i=0; i<num_offset; i++) {
       r2[i] = b2;
       stop[i] = Solver::stopping(param.tol_offset[i], b2, param.residual_type);
+      iter[i] = 0;
     }
+    // this initial condition ensures that the heaviest shift can be removed
+    iter[num_offset] = 1;
 
     double r2_old;
     double pAp;
@@ -310,7 +322,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
-    while (r2[0] > stop[0] &&  k < param.maxiter) {
+    while ( !convergence(r2, stop, num_offset_now) &&  k < param.maxiter) {
 
       if (aux_update) dslash::aux_worker = &shift_update;
       matSloppy(*Ap, *p[0], tmp1, tmp2);
@@ -420,15 +432,17 @@ namespace quda {
 
       // now we can check if any of the shifts have converged and remove them
       int converged = 0;
-      for (int j=1; j<num_offset_now; j++) {
-        if (zeta[j] == 0.0) {
+      for (int j=num_offset_now-1; j>=1; j--) {
+        if (zeta[j] == 0.0 && r2[j+1] < stop[j+1]) {
           converged++;
           if (getVerbosity() >= QUDA_VERBOSE)
               printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
         } else {
 	  r2[j] = zeta[j] * zeta[j] * r2[0];
-	  if (r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) {
+	  // only remove if shift above has converged
+	  if ((r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) && iter[j+1] ) {
 	    converged++;
+	    iter[j] = k+1;
 	    if (getVerbosity() >= QUDA_VERBOSE)
 	      printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
           }
@@ -438,13 +452,15 @@ namespace quda {
 
       // this ensure we do the update on any shifted systems that
       // happen to converge when the un-shifted system converges
-      if ( (r2[0] <= stop[0] ||  k == param.maxiter) && aux_update == true) {
+      if ( (convergence(r2, stop, num_offset_now) ||  k == param.maxiter) && aux_update == true) {
 	if (getVerbosity() >= QUDA_VERBOSE) 
 	  printfQuda("Convergence of unshifted system so trigger shiftUpdate\n");
 	
 	// set worker to do all updates at once
 	shift_update.updateNupdate(1);
 	shift_update.apply(0);
+
+	for (int j=0; j<num_offset_now; j++) iter[j] = k+1;
       }
       
       k++;
@@ -472,35 +488,46 @@ namespace quda {
     param.gflops = gflops;
     param.iter += k;
 
-    // only allocate temporaries if necessary
-    csParam.setPrecision(param.precision);
-    ColorSpinorField *tmp4_p = reliable ? y[0] : tmp1.Precision() == x[0]->Precision() ? &tmp1 : ColorSpinorField::Create(csParam);
-    ColorSpinorField *tmp5_p = mat.isStaggered() ? tmp4_p :
-      reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
+    if (param.compute_true_res) {
+      // only allocate temporaries if necessary
+      csParam.setPrecision(param.precision);
+      ColorSpinorField *tmp4_p = reliable ? y[0] : tmp1.Precision() == x[0]->Precision() ? &tmp1 : ColorSpinorField::Create(csParam);
+      ColorSpinorField *tmp5_p = mat.isStaggered() ? tmp4_p :
+	reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
 
-    for(int i=0; i < num_offset; i++) { 
-      mat(*r, *x[i], *tmp4_p, *tmp5_p);
-      if (r->Nspin()==4) {
-	blas::axpy(offset[i], *x[i], *r); // Offset it.
-      } else if (i!=0) {
-	blas::axpy(offset[i]-offset[0], *x[i], *r); // Offset it.
+      for(int i=0; i < num_offset; i++) {
+	mat(*r, *x[i], *tmp4_p, *tmp5_p);
+	if (r->Nspin()==4) {
+	  blas::axpy(offset[i], *x[i], *r); // Offset it.
+	} else if (i!=0) {
+	  blas::axpy(offset[i]-offset[0], *x[i], *r); // Offset it.
+	}
+	double true_res = blas::xmyNorm(b, *r);
+	param.true_res_offset[i] = sqrt(true_res/b2);
+	param.iter_res_offset[i] = sqrt(r2[i]/b2);
+	param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
       }
-      double true_res = blas::xmyNorm(b, *r);
-      param.true_res_offset[i] = sqrt(true_res/b2);
-      param.iter_res_offset[i] = sqrt(r2[i]/b2);
-      param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
-    }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE){
-      printfQuda("MultiShift CG: Converged after %d iterations\n", k);
-      for(int i=0; i < num_offset; i++) { 
-	printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n", 
-		   i, param.iter_res_offset[i], param.true_res_offset[i]);
+      if (getVerbosity() >= QUDA_SUMMARIZE){
+	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+	for(int i=0; i < num_offset; i++) {
+	  printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n",
+		     i, iter[i], param.iter_res_offset[i], param.true_res_offset[i]);
+	}
+      }
+
+      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && tmp5_p != y[1]) delete tmp5_p;
+      if (tmp4_p != &tmp1 && tmp4_p != y[0]) delete tmp4_p;
+    } else {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
+	for(int i=0; i < num_offset; i++) {
+	  param.iter_res_offset[i] = sqrt(r2[i]/b2);
+	  printfQuda(" shift=%d, %d iterations, relative residual: iterated = %e\n",
+		     i, iter[i], param.iter_res_offset[i]);
+	}
       }
     }
-
-    if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && tmp5_p != y[1]) delete tmp5_p;
-    if (tmp4_p != &tmp1 && tmp4_p != y[0]) delete tmp4_p;
 
     // reset the flops counters
     blas::flops = 0;

@@ -1990,21 +1990,21 @@ if(kernel_type == INTERIOR_KERNEL)
     }
     else
     {
-   o00_re += -mferm*(+i00_re-i20_re);   o00_im += -mferm*(+i00_im-i20_im);
-   o01_re += -mferm*(+i01_re-i21_re);   o01_im += -mferm*(+i01_im-i21_im);
-   o02_re += -mferm*(+i02_re-i22_re);   o02_im += -mferm*(+i02_im-i22_im);
+   o00_re += -param.mferm*(+i00_re-i20_re);   o00_im += -param.mferm*(+i00_im-i20_im);
+   o01_re += -param.mferm*(+i01_re-i21_re);   o01_im += -param.mferm*(+i01_im-i21_im);
+   o02_re += -param.mferm*(+i02_re-i22_re);   o02_im += -param.mferm*(+i02_im-i22_im);
 
-   o10_re += -mferm*(+i10_re-i30_re);   o10_im += -mferm*(+i10_im-i30_im);
-   o11_re += -mferm*(+i11_re-i31_re);   o11_im += -mferm*(+i11_im-i31_im);
-   o12_re += -mferm*(+i12_re-i32_re);   o12_im += -mferm*(+i12_im-i32_im);
+   o10_re += -param.mferm*(+i10_re-i30_re);   o10_im += -param.mferm*(+i10_im-i30_im);
+   o11_re += -param.mferm*(+i11_re-i31_re);   o11_im += -param.mferm*(+i11_im-i31_im);
+   o12_re += -param.mferm*(+i12_re-i32_re);   o12_im += -param.mferm*(+i12_im-i32_im);
 
-   o20_re += -mferm*(-i00_re+i20_re);   o20_im += -mferm*(-i00_im+i20_im);
-   o21_re += -mferm*(-i01_re+i21_re);   o21_im += -mferm*(-i01_im+i21_im);
-   o22_re += -mferm*(-i02_re+i22_re);   o22_im += -mferm*(-i02_im+i22_im);
+   o20_re += -param.mferm*(-i00_re+i20_re);   o20_im += -param.mferm*(-i00_im+i20_im);
+   o21_re += -param.mferm*(-i01_re+i21_re);   o21_im += -param.mferm*(-i01_im+i21_im);
+   o22_re += -param.mferm*(-i02_re+i22_re);   o22_im += -param.mferm*(-i02_im+i22_im);
 
-   o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
-   o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
-   o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
+   o30_re += -param.mferm*(-i10_re+i30_re);   o30_im += -param.mferm*(-i10_im+i30_im);
+   o31_re += -param.mferm*(-i11_re+i31_re);   o31_im += -param.mferm*(-i11_im+i31_im);
+   o32_re += -param.mferm*(-i12_re+i32_re);   o32_im += -param.mferm*(-i12_im+i32_im);
     } // end if ( coord[4]!= param.Ls-1 )
   } // end P_L
 
@@ -2035,21 +2035,21 @@ if(kernel_type == INTERIOR_KERNEL)
     }
     else
     {
-   o00_re += -mferm*(+i00_re+i20_re);   o00_im += -mferm*(+i00_im+i20_im);
-   o01_re += -mferm*(+i01_re+i21_re);   o01_im += -mferm*(+i01_im+i21_im);
-   o02_re += -mferm*(+i02_re+i22_re);   o02_im += -mferm*(+i02_im+i22_im);
+   o00_re += -param.mferm*(+i00_re+i20_re);   o00_im += -param.mferm*(+i00_im+i20_im);
+   o01_re += -param.mferm*(+i01_re+i21_re);   o01_im += -param.mferm*(+i01_im+i21_im);
+   o02_re += -param.mferm*(+i02_re+i22_re);   o02_im += -param.mferm*(+i02_im+i22_im);
 
-   o10_re += -mferm*(+i10_re+i30_re);   o10_im += -mferm*(+i10_im+i30_im);
-   o11_re += -mferm*(+i11_re+i31_re);   o11_im += -mferm*(+i11_im+i31_im);
-   o12_re += -mferm*(+i12_re+i32_re);   o12_im += -mferm*(+i12_im+i32_im);
+   o10_re += -param.mferm*(+i10_re+i30_re);   o10_im += -param.mferm*(+i10_im+i30_im);
+   o11_re += -param.mferm*(+i11_re+i31_re);   o11_im += -param.mferm*(+i11_im+i31_im);
+   o12_re += -param.mferm*(+i12_re+i32_re);   o12_im += -param.mferm*(+i12_im+i32_im);
 
-   o20_re += -mferm*(+i00_re+i20_re);   o20_im += -mferm*(+i00_im+i20_im);
-   o21_re += -mferm*(+i01_re+i21_re);   o21_im += -mferm*(+i01_im+i21_im);
-   o22_re += -mferm*(+i02_re+i22_re);   o22_im += -mferm*(+i02_im+i22_im);
+   o20_re += -param.mferm*(+i00_re+i20_re);   o20_im += -param.mferm*(+i00_im+i20_im);
+   o21_re += -param.mferm*(+i01_re+i21_re);   o21_im += -param.mferm*(+i01_im+i21_im);
+   o22_re += -param.mferm*(+i02_re+i22_re);   o22_im += -param.mferm*(+i02_im+i22_im);
 
-   o30_re += -mferm*(+i10_re+i30_re);   o30_im += -mferm*(+i10_im+i30_im);
-   o31_re += -mferm*(+i11_re+i31_re);   o31_im += -mferm*(+i11_im+i31_im);
-   o32_re += -mferm*(+i12_re+i32_re);   o32_im += -mferm*(+i12_im+i32_im);
+   o30_re += -param.mferm*(+i10_re+i30_re);   o30_im += -param.mferm*(+i10_im+i30_im);
+   o31_re += -param.mferm*(+i11_re+i31_re);   o31_im += -param.mferm*(+i11_im+i31_im);
+   o32_re += -param.mferm*(+i12_re+i32_re);   o32_im += -param.mferm*(+i12_im+i32_im);
     } // end if ( coord[4] != 0 )
   } // end P_R
 } // end 5th dimension
@@ -2061,8 +2061,11 @@ if (kernel_type == INTERIOR_KERNEL)
 {
 #ifdef DSLASH_XPAY
   READ_ACCUM(ACCUMTEX, param.sp_stride)
-  VOLATILE spinorFloat a_inv = 1.0/a;
-
+#ifdef SPINOR_DOUBLE
+spinorFloat a_inv = param.a_inv;
+#else
+spinorFloat a_inv = param.a_inv_f;
+#endif
 #ifdef SPINOR_DOUBLE
  o00_re = o00_re + a_inv*accum0.x;
  o00_im = o00_im + a_inv*accum0.y;
@@ -2138,6 +2141,11 @@ if (!incomplete)
 {
 
 #ifdef DSLASH_XPAY
+#ifdef SPINOR_DOUBLE
+ spinorFloat a = param.a;
+#else
+ spinorFloat a = param.a_f;
+#endif
 #ifdef SPINOR_DOUBLE
   o00_re = a*o00_re;
   o00_im = a*o00_im;

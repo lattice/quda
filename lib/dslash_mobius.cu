@@ -62,9 +62,6 @@ namespace quda {
   class MDWFDslashPCCuda : public DslashCuda {
 
   private:
-    const gFloat *gauge0, *gauge1;
-    const double mferm, a; 
-    double *b5, *c5;
     const int DS_type;
 
     bool checkGrid(TuneParam &param) const {
@@ -126,10 +123,15 @@ namespace quda {
 		     const QudaReconstructType reconstruct, const cudaColorSpinorField *in, 
 		     const cudaColorSpinorField *x, const double mferm, 
 		     const double a, const int dagger, const int DS_type)
-      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), 
-	mferm(mferm), a(a), DS_type(DS_type)
+      : DslashCuda(out, in, x, reconstruct, dagger), DS_type(DS_type)
     { 
       bindSpinorTex<sFloat>(in, out, x);
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.a = a;
+      dslashParam.a_f = a;
+      dslashParam.mferm = mferm;
+      dslashParam.mferm_f = mferm;
     }
     virtual ~MDWFDslashPCCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
@@ -180,24 +182,16 @@ namespace quda {
       
       switch(DS_type){
       case 0:
-	DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
+	DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       case 1:
-	DSLASH(MDWFDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
+	DSLASH(MDWFDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       case 2:
-	DSLASH(MDWFDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
+	DSLASH(MDWFDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       case 3:
-	DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-	       (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, 0);
+	DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       default:
 	errorQuda("invalid Dslash type");

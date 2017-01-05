@@ -39,7 +39,6 @@ void** ghost_fatlink, **ghost_longlink;
 #endif
 
 extern int device;
-extern bool tune;
 extern int niter;
 extern int Nsrc; // number of spinors to apply to simultaneously
 
@@ -177,7 +176,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   inv_param->dslash_type = dslash_type;
 
-  inv_param->tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 

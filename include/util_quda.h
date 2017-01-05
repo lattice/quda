@@ -7,12 +7,11 @@
 #include <comm_quda.h>
 #include <tune_key.h>
 
-QudaTune getTuning();
-
 /**
-   @param tune Sets the whether to tune the cuda kernels or not
-*/
-void setTuning(QudaTune tune);
+   @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
+   @return If autotuning is enabled
+ */
+QudaTune getTuning();
 
 QudaVerbosity getVerbosity();
 char *getOutputPrefix();

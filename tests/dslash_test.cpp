@@ -55,8 +55,6 @@ extern QudaDslashType dslash_type;
 extern QudaTwistFlavorType twist_flavor;
 extern QudaMatPCType matpc_type;
 
-extern bool tune;
-
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -323,11 +321,6 @@ void init(int argc, char **argv) {
   printfQuda("done.\n"); fflush(stdout);
   
   initQuda(device);
-
-  if (tune) {
-    setTuning(QUDA_TUNE_YES);
-    printfQuda("Tuning...\n");
-  }
 
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
@@ -750,7 +743,7 @@ void dslashRef() {
       }
       break;
     case 4:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {      
+      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {
 	tm_mat(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	     dagger, inv_param.cpu_prec, gauge_param);
 	tm_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
@@ -952,7 +945,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   // return code for google test
   int test_rc = 0;
-  for (int i =1;i < argc; i++){    
+  for (int i =1;i < argc; i++) {
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }  
@@ -975,8 +968,9 @@ int main(int argc, char **argv)
   dslashRef();
   for (int i=0; i<attempts; i++) {
 
-    if (tune) { // warm-up run
-      dslashCUDA(1);
+    {
+      printfQuda("Tuning...\n");
+      dslashCUDA(1); // warm-up run
     }
     printfQuda("Executing %d kernel loops...\n", niter);
     if (!transfer) dirac->Flops();

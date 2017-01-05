@@ -148,6 +148,13 @@ void qudaSetLayout(QudaLayout_t input)
   initQuda(device);
 }
 
+void* qudaAllocatePinned(size_t bytes) {
+  return pool_pinned_malloc(bytes);
+}
+
+void qudaFreePinned(void *ptr) {
+  pool_pinned_free(ptr);
+}
 
 void qudaHisqParamsInit(QudaHisqParams_t params)
 {
@@ -222,17 +229,11 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 {
   qudamilc_called<true>(__func__);
 
-#ifdef MULTI_GPU
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
-#else
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
-#endif
-
   QudaGaugeParam param = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
-  computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
+  computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
@@ -249,17 +250,12 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 			    const double act_path_coeff[6], void* inlink, void* fatlink, void* ulink)
 {
   qudamilc_called<true>(__func__);
-#ifdef MULTI_GPU
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
-#else
-  QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
-#endif
 
   QudaGaugeParam param = newMILCGaugeParam(localDim,
 					   (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 					   QUDA_GENERAL_LINKS);
 
-  computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param, method);
+  computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
   // requires loadGaugeQuda to be called in subequent solver
@@ -612,7 +608,6 @@ static void setInvertParams(const int dim[4],
 
   invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
   invertParam->Ls = 1;
-  invertParam->tune = QUDA_TUNE_YES;
   invertParam->gflops = 0.0;
 
   invertParam->input_location = QUDA_CPU_FIELD_LOCATION;
@@ -629,7 +624,7 @@ static void setInvertParams(const int dim[4],
   }
 
   invertParam->dagger = QUDA_DAG_NO;
-  invertParam->sp_pad = dim[0]*dim[1]*dim[2]/2;
+  invertParam->sp_pad = 0;
   invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   // for the preconditioner
@@ -639,6 +634,7 @@ static void setInvertParams(const int dim[4],
   invertParam->verbosity_precondition = QUDA_SILENT;
   invertParam->cuda_prec_precondition = cuda_prec_precondition;
 
+  invertParam->compute_action = 0;
 
   return;
 }
@@ -831,6 +827,20 @@ void qudaMultishiftInvert(int external_precision,
     invalidateGaugeQuda();
   }
 
+  // set the solver
+  char *quda_reconstruct = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+  QudaReconstructType long_reconstruct = QUDA_RECONSTRUCT_INVALID;
+  if (!quda_reconstruct || strcmp(quda_reconstruct,"18")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_NO;
+  } else if (strcmp(quda_reconstruct,"13")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_13;
+  } else if (strcmp(quda_reconstruct,"9")==0) {
+    long_reconstruct = QUDA_RECONSTRUCT_9;
+  } else {
+    errorQuda("reconstruct request %s not supported", quda_reconstruct);
+  }
+
+
   if(invalidate_quda_gauge || !create_quda_gauge ){
     const int fat_pad  = getFatLinkPadding(localDim);
     gaugeParam.type = QUDA_GENERAL_LINKS;
@@ -841,7 +851,7 @@ void qudaMultishiftInvert(int external_precision,
     const int long_pad = 3*fat_pad;
     gaugeParam.type = QUDA_THREE_LINKS;
     gaugeParam.ga_pad = long_pad;
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = long_reconstruct;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
     invalidate_quda_gauge = false;
   }
@@ -1375,7 +1385,6 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.preserve_source               = QUDA_PRESERVE_SOURCE_NO;
   invertParam.gamma_basis                   = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invertParam.dirac_order                   = QUDA_DIRAC_ORDER;
-  invertParam.tune                          = QUDA_TUNE_YES;
   invertParam.sp_pad                        = 0;
   invertParam.cl_pad                        = 0;
   invertParam.clover_cpu_prec               = host_precision;
@@ -1383,6 +1392,8 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.clover_cuda_prec_sloppy       = device_precision_sloppy;
   invertParam.clover_cuda_prec_precondition = device_precision_sloppy;
   invertParam.clover_order                  = QUDA_PACKED_CLOVER_ORDER;
+
+  invertParam.compute_action = 0;
 }
 
 
@@ -1477,11 +1488,12 @@ void qudaCloverInvert(int external_precision,
     exit(1);
   }
 
-  qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
+  if (link) qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
-//  double clover_coeff = 0.0;
-  qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
-      QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+  if (clover || cloverInverse) {
+    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
+			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+  }
 
   double reliable_delta = 1e-1;
 
@@ -1498,17 +1510,18 @@ void qudaCloverInvert(int external_precision,
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
-  invertParam.solve_type         = QUDA_DIRECT_PC_SOLVE;
-  invertParam.inv_type           = QUDA_BICGSTAB_INVERTER;
+  invertParam.inv_type           = inv_args.solver_type == QUDA_CG_INVERTER ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
+  invertParam.solve_type         = invertParam.inv_type == QUDA_CG_INVERTER ? QUDA_NORMOP_PC_SOLVE : QUDA_DIRECT_PC_SOLVE;
   invertParam.matpc_type         = QUDA_MATPC_ODD_ODD;
 
   invertQuda(solution, source, &invertParam);
+
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  qudaFreeGaugeField();
-  qudaFreeCloverField();
+  if (clover || cloverInverse) qudaFreeCloverField();
+  if (link) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
   return;
 } // qudaCloverInvert
@@ -1666,7 +1679,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   // if doing a pure double-precision multi-shift solve don't use reliable updates
   const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
                                      ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
-  double reliable_delta = (use_mixed_precision) ? 1e-1 : 0.0;
+  double reliable_delta = (use_mixed_precision) ? 1e-2 : 0.0;
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
   invertParam.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
@@ -1688,8 +1701,28 @@ void qudaCloverMultishiftInvert(int external_precision,
   invertParam.verbosity_precondition = QUDA_SILENT;
 
   invertParam.make_resident_solution = inv_args.make_resident_solution;
+  invertParam.compute_true_res = 0;
 
   if (num_offsets==1 && offset[0] == 0) {
+    // set the solver
+    char *quda_solver = getenv("QUDA_MILC_CLOVER_SOLVER");
+
+    // default is chronological CG
+    if (!quda_solver || strcmp(quda_solver,"CHRONO_CG_SOLVER")==0) {
+      // use CG with chronological forecasting
+      invertParam.use_resident_chrono = 1;
+      invertParam.make_resident_chrono = 1;
+      invertParam.max_chrono_dim = 10;
+    } else if (strcmp(quda_solver,"BICGSTAB_SOLVER")==0){
+      // use two-step BiCGStab
+      invertParam.inv_type = QUDA_BICGSTAB_INVERTER;
+      invertParam.solve_type = QUDA_DIRECT_PC_SOLVE;
+    } else if (strcmp(quda_solver,"CG_SOLVER")==0){
+      // regular CG
+      invertParam.use_resident_chrono = 0;
+      invertParam.make_resident_chrono = 0;
+    }
+
     invertQuda(solutionArray[0], source, &invertParam);
     *final_residual = invertParam.true_res;
   } else {

@@ -40,6 +40,9 @@
 #define m5 m5_d
 #define mdwf_b5 mdwf_b5_d
 #define mdwf_c5 mdwf_c5_d
+#define mferm param.mferm
+#define a param.a
+#define b param.b
 #else
 #define spinorFloat float
 #define i00_re I0.x
@@ -69,6 +72,9 @@
 #define m5 m5_f
 #define mdwf_b5 mdwf_b5_f
 #define mdwf_c5 mdwf_c5_f
+#define mferm param.mferm_f
+#define a param.a_f
+#define b param.b_f
 #endif // SPINOR_DOUBLE
 
 // gauge link
@@ -1732,6 +1738,9 @@ WRITE_SPINOR(param.sp_stride);
 #undef m5
 #undef mdwf_b5
 #undef mdwf_c5
+#undef mferm
+#undef a
+#undef b
 #undef spinorFloat
 #undef SHARED_STRIDE
 

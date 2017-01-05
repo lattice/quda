@@ -347,10 +347,12 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
-    // compute the true residuals
-    mat(r, x, y, tmp3);
-    param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    if (param.compute_true_res) {
+      // compute the true residuals
+      mat(r, x, y, tmp3);
+      param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    }
 
     PrintSummary("CG", k, r2, b2);
 

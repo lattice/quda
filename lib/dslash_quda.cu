@@ -98,10 +98,14 @@ namespace quda {
     cudaEvent_t dslashStart;
     cudaEvent_t dslashEnd;
 
-
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
+
+#if CUDA_VERSION >= 8000
+    cuuint32_t *commsEnd_h;
+    CUdeviceptr commsEnd_d[Nstream];
+#endif
   }
 
   void createDslashEvents()
@@ -123,6 +127,14 @@ namespace quda {
 
     aux_worker = NULL;
 
+#if CUDA_VERSION >= 8000
+    commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));
+    for (int i=0; i<Nstream; i++) {
+      cudaHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
+      commsEnd_h[i] = 0;
+    }
+#endif
+
     checkCudaError();
   }
 
@@ -130,6 +142,12 @@ namespace quda {
   void destroyDslashEvents()
   {
     using namespace dslash;
+
+#if CUDA_VERSION >= 8000
+    host_free(commsEnd_h);
+    commsEnd_h = 0;
+#endif
+
     for (int i=0; i<Nstream; i++) {
       cudaEventDestroy(packEnd[i]);
       cudaEventDestroy(gatherStart[i]);
@@ -171,7 +189,15 @@ namespace quda {
     
   public:
     Gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in) :
-      out(out), in(in) { bindSpinorTex<sFloat>(in, out); strcpy(aux,"gamma5");}
+      out(out), in(in) {
+      bindSpinorTex<sFloat>(in, out);
+      dslashParam.out = out->V();
+      dslashParam.outNorm = (float*)out->Norm();
+      dslashParam.in = (void*)in->V();
+      dslashParam.inNorm = (float*)in->Norm();
+      dslashParam.sp_stride = in->Stride();
+      strcpy(aux,"gamma5");
+    }
     
     virtual ~Gamma5Cuda() { unbindSpinorTex<sFloat>(in, out); }
     
@@ -183,7 +209,13 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      gamma5Kernel<<<tp.grid, tp.block, tp.shared_bytes>>> ((sFloat*)out->V(), (float*)out->Norm(), (sFloat*)in->V(), (float*)in->Norm(), dslashParam, in->Stride());
+      if (in->Precision() == QUDA_DOUBLE_PRECISION) {
+	gamma5DKernel<<<tp.grid, tp.block, tp.shared_bytes>>> (dslashParam);
+      } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+	gamma5SKernel<<<tp.grid, tp.block, tp.shared_bytes>>> (dslashParam);
+      } else {
+	errorQuda("Undefined for precision %d", in->Precision());
+      }
     }
     
     void preTune()
@@ -265,6 +297,14 @@ class CloverCuda : public Tunable {
       : out(out), clover(clover), cloverNorm(cloverNorm), in(in)
     {
       bindSpinorTex<sFloat>(in);
+
+      dslashParam.out = (void*)out->V();
+      dslashParam.outNorm = (float*)out->Norm();
+      dslashParam.in = (void*)in->V();
+      dslashParam.inNorm = (float*)in->Norm();
+      dslashParam.clover = (void*)clover;
+      dslashParam.cloverNorm = (float*)cloverNorm;
+
       dslashParam.sp_stride = in->Stride();
 #ifdef GPU_CLOVER_DIRAC
       dslashParam.cl_stride = cl_stride;
@@ -275,9 +315,13 @@ class CloverCuda : public Tunable {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      cloverKernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>
-        ((sFloat*)out->V(), (float*)out->Norm(), clover, cloverNorm, 
-         (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
+      if (typeid(sFloat)==typeid(double2)) {
+	cloverDKernel <<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+      } else if (typeid(sFloat)==typeid(float4)) {
+	cloverSKernel <<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+      } else {
+	cloverHKernel <<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+      }
     }
     virtual TuneKey tuneKey() const { return TuneKey(in->VolString(), typeid(*this).name()); }
 
@@ -348,9 +392,6 @@ class TwistGamma5Cuda : public Tunable {
   private:
     cudaColorSpinorField *out;
     const cudaColorSpinorField *in;
-    double a;
-    double b;
-    double c;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -365,23 +406,29 @@ class TwistGamma5Cuda : public Tunable {
       out(out), in(in) 
   {
     bindSpinorTex<sFloat>(in);
+    dslashParam.out = (void*)out->V();
+    dslashParam.outNorm = (float*)out->Norm();
+    dslashParam.in = (void*)in->V();
+    dslashParam.inNorm = (float*)in->Norm();
     dslashParam.sp_stride = in->Stride();
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
-      setTwistParam(a, b, kappa, mu, dagger, twist);
+      setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, twist);
+      dslashParam.c = 0.0;
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
       dslashParam.fl_stride = in->VolumeCB();
 #endif
     } else {//twist doublet
-      a = kappa, b = mu, c = epsilon;
+      dslashParam.a = kappa, dslashParam.b = mu, dslashParam.c = epsilon;
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
       dslashParam.fl_stride = in->VolumeCB()/2;
 #endif
-    } 
+    }
+    dslashParam.a_f = dslashParam.a;
+    dslashParam.b_f = dslashParam.b;
+    dslashParam.c_f = dslashParam.c;
   }
 
-    virtual ~TwistGamma5Cuda() {
-      unbindSpinorTex<sFloat>(in);    
-    }
+    virtual ~TwistGamma5Cuda() { unbindSpinorTex<sFloat>(in); }
 
     TuneKey tuneKey() const { return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString()); }
 
@@ -391,13 +438,9 @@ class TwistGamma5Cuda : public Tunable {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
-        twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>> 
-          ((sFloat*)out->V(), (float*)out->Norm(), a, b, 
-           (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
+        twistGamma5Kernel<sFloat,false><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
       } else {
-        twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>
-          ((sFloat*)out->V(), (float*)out->Norm(), a, b, c, 
-           (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
+        twistGamma5Kernel<sFloat,true><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
       }
 #endif
     }
@@ -467,9 +510,6 @@ class TwistCloverGamma5Cuda : public Tunable {
     QudaTwistGamma5Type twist;
     cudaColorSpinorField *out;
     const cudaColorSpinorField *in;
-    double a;
-    double b;
-    double c;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -483,30 +523,35 @@ class TwistCloverGamma5Cuda : public Tunable {
         double kappa, double mu, double epsilon, const int dagger, QudaTwistGamma5Type tw,
 			  cFloat *clov, const float *cN, cFloat *clovInv, const float *cN2, int cl_stride) :
       clover(clov), cNorm(cN), cloverInv(clovInv), cNrm2(cN2), twist(tw), out(out), in(in)
-  {
-    bindSpinorTex<sFloat>(in);
-    dslashParam.sp_stride = in->Stride();
+    {
+      bindSpinorTex<sFloat>(in);
+      dslashParam.out = (void*)out->V();
+      dslashParam.outNorm = (float*)out->Norm();
+      dslashParam.in = (void*)in->V();
+      dslashParam.inNorm = (float*)in->Norm();
+      dslashParam.clover = (void*)clov;
+      dslashParam.cloverNorm = (float*)cN;
+      dslashParam.clover = (void*)clovInv;
+      dslashParam.cloverNorm = (float*)cN2;
+      dslashParam.sp_stride = in->Stride();
 #ifdef GPU_TWISTED_CLOVER_DIRAC
-    dslashParam.cl_stride = cl_stride;
-    dslashParam.fl_stride = in->VolumeCB();
+      dslashParam.cl_stride = cl_stride;
+      dslashParam.fl_stride = in->VolumeCB();
 #endif
 
-    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
-      setTwistParam(a, b, kappa, mu, dagger, tw);
-    else{//twist doublet
-      errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
-    } 
+      if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
+	setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, tw);
+      } else {//twist doublet
+	errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
+      }
+      dslashParam.a_f = dslashParam.a;
+      dslashParam.b_f = dslashParam.b;
 
-    strcpy(aux_string,in->AuxString());
-    if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-      strcat(aux_string,",direct");
-    } else {
-      strcat(aux_string,",inverse");
+      strcpy(aux_string,in->AuxString());
+      strcat(aux_string, twist == QUDA_TWIST_GAMMA5_DIRECT ? ",direct" : ",inverse");
     }
-  }
-    virtual ~TwistCloverGamma5Cuda() {
-      unbindSpinorTex<sFloat>(in);    
-    }
+
+    virtual ~TwistCloverGamma5Cuda() { unbindSpinorTex<sFloat>(in); }
 
     TuneKey tuneKey() const {
       return TuneKey(in->VolString(), typeid(*this).name(), aux_string);
@@ -519,15 +564,9 @@ class TwistCloverGamma5Cuda : public Tunable {
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)
         if (twist == QUDA_TWIST_GAMMA5_DIRECT)
-          twistCloverGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>> 
-            ((sFloat*)out->V(), (float*)out->Norm(), a, 
-             (sFloat*)in->V(), (float*)in->Norm(), dslashParam,
-             clover, cNorm, cloverInv, cNrm2);
+          twistCloverGamma5Kernel<sFloat><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
         else if (twist == QUDA_TWIST_GAMMA5_INVERSE)
-          twistCloverGamma5InvKernel<<<gridDim, tp.block, tp.shared_bytes, stream>>> 
-            ((sFloat*)out->V(), (float*)out->Norm(), a, 
-             (sFloat*)in->V(), (float*)in->Norm(), dslashParam,
-             clover, cNorm, cloverInv, cNrm2);
+          twistCloverGamma5InvKernel<sFloat><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
       } else {
         errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
       }

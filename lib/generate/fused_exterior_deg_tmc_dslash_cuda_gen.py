@@ -875,7 +875,23 @@ def input_spinor(s,c,z):
 
 def clover_twisted_xpay():
     str = ""
+    if dagger:
+        str += "#if !defined(CLOVER_TWIST_INV_DSLASH)\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "spinorFloat a = param.a;\n"
+    str += "#else\n"
+    str += "spinorFloat a = param.a_f;\n"
+    str += "#endif\n"
+    if dagger:
+        str += "#endif\n"
     str += "#ifdef DSLASH_XPAY\n"
+
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "spinorFloat b = param.b;\n"
+    str += "#else\n"
+    str += "spinorFloat b = param.b_f;\n"
+    str += "#endif\n"
+
     str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
     if not dagger:
 	str += "#ifndef CLOVER_TWIST_XPAY\n"

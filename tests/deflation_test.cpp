@@ -29,7 +29,6 @@
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
-extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -250,8 +249,6 @@ int main(int argc, char **argv)
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 
   gauge_param.ga_pad = 0;//24*24*24/2;
   inv_param.sp_pad = 0;//24*24*24/2;

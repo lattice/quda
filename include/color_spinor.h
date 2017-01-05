@@ -28,19 +28,19 @@ namespace quda {
     static const int Ns = 4;
     complex<Float> data[Nc*4];
 
-    __device__ __host__ ColorSpinor<Float, Nc, 4>() {
+    __device__ __host__ inline ColorSpinor<Float, Nc, 4>() {
       for (int i=0; i<Nc*Ns; i++) {
 	data[i] = 0;
       }      
     }
 
-    __device__ __host__ ColorSpinor<Float, Nc, 4>(const ColorSpinor<Float, Nc, 4> &a) {
+    __device__ __host__ inline ColorSpinor<Float, Nc, 4>(const ColorSpinor<Float, Nc, 4> &a) {
       for (int i=0; i<Nc*Ns; i++) {
 	data[i] = a.data[i];
       }      
     }
 
-    __device__ __host__ ColorSpinor<Float, Nc, 4>& operator=(const ColorSpinor<Float, Nc, 4> &a) {
+    __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator=(const ColorSpinor<Float, Nc, 4> &a) {
       if (this != &a) {
 	for (int i=0; i<Nc*Ns; i++) {
 	  data[i] = a.data[i];
@@ -55,7 +55,7 @@ namespace quda {
 	@param sign Positive or negative projector
 	@return The spin-projected Spinor
     */
-    __device__ __host__ ColorSpinor<Float,Nc,2> project(int dim, int sign) {
+    __device__ __host__ inline ColorSpinor<Float,Nc,2> project(int dim, int sign) {
       ColorSpinor<Float,Nc,2> proj;
       complex<Float> j(0.0,1.0);
       
@@ -164,7 +164,7 @@ namespace quda {
 		    -i  0  0  0
 		     0  i  0  0
     */
-    __device__ __host__ ColorSpinor<Float,Nc,4> sigma(int mu, int nu) {
+    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) {
       ColorSpinor<Float,Nc,4> a;
       ColorSpinor<Float,Nc,4> &b = *this;
       complex<Float> j(0.0,1.0);
@@ -294,7 +294,7 @@ namespace quda {
        @paran c Color index
        @return Complex number at this spin and color index
      */
-    __device__ __host__ complex<Float>& operator()(int s, int c) { return data[s*Nc + c]; }
+    __device__ __host__ inline complex<Float>& operator()(int s, int c) { return data[s*Nc + c]; }
 
     /**
        Accessor functor
@@ -302,7 +302,7 @@ namespace quda {
        @paran c Color index
        @return Complex number at this spin and color index
      */
-    __device__ __host__ const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
+    __device__ __host__ inline const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
 
     __device__ __host__ void print() {
       for (int s=0; s<4; s++) {
@@ -322,20 +322,20 @@ namespace quda {
     static const int Ns = 2;
     complex<Float> data[Nc*2];
     
-    __device__ __host__ ColorSpinor<Float, Nc, 2>() {
+    __device__ __host__ inline ColorSpinor<Float, Nc, 2>() {
       for (int i=0; i<Nc*Ns; i++) {
 	data[i] = 0;
       }      
     }
 
-    __device__ __host__ ColorSpinor<Float, Nc, 2>(const ColorSpinor<Float, Nc, 2> &a) {
+    __device__ __host__ inline ColorSpinor<Float, Nc, 2>(const ColorSpinor<Float, Nc, 2> &a) {
       for (int i=0; i<Nc*Ns; i++) {
 	data[i] = a.data[i];
       }      
     }
 
 
-    __device__ __host__ ColorSpinor<Float, Nc, 2>& operator=(const ColorSpinor<Float, Nc, 2> &a) {
+    __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator=(const ColorSpinor<Float, Nc, 2> &a) {
       if (this != &a) {
 	for (int i=0; i<Nc*Ns; i++) {
 	  data[i] = a.data[i];
@@ -350,7 +350,7 @@ namespace quda {
 	@param sign Positive or negative projector
 	@return The spin-reconstructed Spinor
     */
-      __device__ __host__ ColorSpinor<Float,Nc,4> reconstruct(int dim, int sign) {
+      __device__ __host__ inline ColorSpinor<Float,Nc,4> reconstruct(int dim, int sign) {
       ColorSpinor<Float,Nc,4> recon;
       complex<Float> j(0.0,1.0);
       
@@ -445,7 +445,7 @@ namespace quda {
        @paran c Color index
        @return Complex number at this spin and color index
      */
-    __device__ __host__ complex<Float>& operator()(int s, int c) { return data[s*Nc + c]; }
+    __device__ __host__ inline complex<Float>& operator()(int s, int c) { return data[s*Nc + c]; }
 
     /**
        Accessor functor
@@ -453,7 +453,7 @@ namespace quda {
        @paran c Color index
        @return Complex number at this spin and color index
      */
-    __device__ __host__ const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
+    __device__ __host__ inline const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
 
     __device__ __host__ void print() {
       for (int s=0; s<2; s++) {
@@ -472,22 +472,30 @@ namespace quda {
      @param b Right-hand side ColorSpinor
      @return The spin traced matrix
   */
-  template<typename Float, int Nc, int Ns> __device__ __host__
+  template<typename Float, int Nc, int Ns> __device__ __host__ inline
     Matrix<complex<Float>,Nc> outerProdSpinTrace(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b) {
 
     Matrix<complex<Float>,Nc> out;
+
+    // outer product over color
+#pragma unroll
     for (int i=0; i<Nc; i++) {
+#pragma unroll
       for(int j=0; j<Nc; j++) {
-	out(i,j) = make_double2(0.0, 0.0);
-      }
-    }
-    
-    // trace over spin
-    for (int s=0; s<Ns; s++) {
-      // outer product over color
-      for (int i=0; i<Nc; i++) {
-	for(int j=0; j<Nc; j++) {
-	  out(j,i) += a(s,j) * conj(b(s,i));
+	// trace over spin (manual unroll for perf)
+	out(j,i).real(                   a(0,j).real() * b(0,i).real() );
+	out(j,i).real( out(j,i).real() + a(0,j).imag() * b(0,i).imag() );
+	out(j,i).imag(                   a(0,j).imag() * b(0,i).real() );
+	out(j,i).imag( out(j,i).imag() - a(0,j).real() * b(0,i).imag() );
+	//out(j,i) = a(0,j) * conj(b(0,i));
+
+#pragma unroll
+	for (int s=1; s<Ns; s++) {
+	  out(j,i).real( out(j,i).real() + a(s,j).real() * b(s,i).real() );
+	  out(j,i).real( out(j,i).real() + a(s,j).imag() * b(s,i).imag() );
+	  out(j,i).imag( out(j,i).imag() + a(s,j).imag() * b(s,i).real() );
+	  out(j,i).imag( out(j,i).imag() - a(s,j).real() * b(s,i).imag() );
+	  // out(j,i) += a(s,j) * conj(b(s,i));
 	}
       }
     }
