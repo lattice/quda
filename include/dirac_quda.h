@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
-#include <clover_field.h>
+//#include <clover_field.h>
 #include <dslash_quda.h>
 #include <face_quda.h>
 #include <blas_quda.h>
@@ -32,7 +32,7 @@ namespace quda {
     cudaGaugeField *gauge;
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
-    cudaCloverField *clover;
+//    cudaCloverField *clover;
   
     double mu; // used by twisted mass only
     double epsilon; //2nd tm parameter (used by twisted mass only)
@@ -48,8 +48,8 @@ namespace quda {
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0),
-      tmp1(0), tmp2(0)
+      dagger(QUDA_DAG_INVALID), gauge(0), mu(0.0), epsilon(0.0),
+      tmp1(0), tmp2(0) //,clover(0)
     {
 
     }

@@ -26,12 +26,13 @@ namespace quda {
       report("CG");
       solver = new CG(mat, matSloppy, param, profile);
       break;
-    case QUDA_BICGSTAB_INVERTER:
-      report("BiCGstab");
-      solver = new BiCGstab(mat, matSloppy, matPrecon, param, profile);
-      break;
+//    case QUDA_BICGSTAB_INVERTER:
+//      report("BiCGstab");
+//      solver = new BiCGstab(mat, matSloppy, matPrecon, param, profile);
+//      break;
     case QUDA_GCR_INVERTER:
       report("GCR");
+/*
       if (param.preconditioner && param.maxiter == 11) { // FIXME - dirty hack
 	MG *mg = static_cast<MG*>(param.preconditioner);
 	solver = new GCR(mat, *(mg), matSloppy, matPrecon, param, profile);
@@ -41,40 +42,13 @@ namespace quda {
 	param.precision_precondition = param.precision_sloppy;
 	solver = new GCR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
       } else {
+*/
 	solver = new GCR(mat, matSloppy, matPrecon, param, profile);
-      }
+//      }
       break;
     case QUDA_MR_INVERTER:
       report("MR");
       solver = new MR(mat, matSloppy, param, profile);
-      break;
-    case QUDA_SD_INVERTER:
-      report("SD");
-      solver = new SD(mat, param, profile);
-      break;
-    case QUDA_XSD_INVERTER:
-#ifdef MULTI_GPU
-      report("XSD");
-      solver = new XSD(mat, param, profile);
-#else
-      errorQuda("Extended Steepest Descent is multi-gpu only");
-#endif
-      break;
-    case QUDA_PCG_INVERTER:
-      report("PCG");
-      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
-      break;
-    case QUDA_MPCG_INVERTER:
-      report("MPCG");
-      solver = new MPCG(mat, param, profile);
-      break;
-    case QUDA_MPBICGSTAB_INVERTER:
-      report("MPBICGSTAB");
-      solver = new MPBiCGstab(mat, param, profile);
-      break;
-    case QUDA_BICGSTABL_INVERTER:
-      report("BICGSTABL");
-      solver = new BiCGstabL(mat, matSloppy, param, profile);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
@@ -197,72 +171,5 @@ namespace quda {
 
     return true;
   }
-
-  // Deflated solver factory
-  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile)
-  {
-    DeflatedSolver* solver=0;
-
-    if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
-      report("Incremental EIGCG");
-      if(profile != NULL)
-        solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
-      else
-        solver = new IncEigCG(param);//hack to clean deflation resources
-    }else if (param.inv_type == QUDA_GMRESDR_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ){
-      report("GMRESDR");
-      if(profile != NULL)
-        solver = new GMResDR(mat, matSloppy, matDeflate, param, profile);
-      else
-        solver = new GMResDR(param);
-    }else{
-      errorQuda("Invalid solver type");
-    }
-
-    return solver;
-  }
-
-  bool DeflatedSolver::convergence(const double &r2, const double &hq2, const double &r2_tol,
-			   const double &hq_tol) {
-    //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
-
-    // check the heavy quark residual norm if necessary
-    if ( (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) && (hq2 > hq_tol) )
-      return false;
-
-    // check the L2 relative residual norm if necessary
-    if ( (param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) && (r2 > r2_tol) )
-      return false;
-
-    return true;
-  }
-
-  void DeflatedSolver::PrintStats(const char* name, int k, const double &r2,
-			  const double &b2, const double &hq2) {
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n",
-		   name, k, r2, sqrt(r2/b2), hq2);
-      } else {
-	printfQuda("%s: %d iterations, <r,r> = %e, |r|/|b| = %e\n",
-		   name, k, r2, sqrt(r2/b2));
-      }
-    }
-
-    if (std::isnan(r2)) errorQuda("Solver appears to have diverged");
-  }
-
-  void DeflatedSolver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n", name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);
-      } else {
-	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e\n",
-		   name, k, sqrt(r2/b2), param.true_res);
-      }
-
-    }
-  }
-
 
 } // namespace quda

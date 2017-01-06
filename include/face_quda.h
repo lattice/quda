@@ -92,13 +92,13 @@ namespace quda {
 	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0);
 
     void pack(quda::cudaColorSpinorField &in, int dim, int dir, int parity, int dagger, 
-	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
+	      cudaStream_t *stream, bool zeroCopyPack=false);
 
     void pack(quda::cudaColorSpinorField &in, int dir, int parity, int dagger, 
-              cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
+              cudaStream_t *stream, bool zeroCopyPack=false);
 
     void pack(quda::cudaColorSpinorField &in, int parity, int dagger, 
-	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
+	      cudaStream_t *stream, bool zeroCopyPack=false);
 
 
     void gather(quda::cudaColorSpinorField &in, int dagger, int dir, int streamIdx);

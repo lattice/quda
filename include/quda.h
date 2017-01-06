@@ -98,11 +98,6 @@ extern "C" {
     double b_5[QUDA_MAX_DWF_LS];  /**< MDWF coefficients */
     double c_5[QUDA_MAX_DWF_LS];  /**< will be used only for the mobius type of Fermion */
 
-    double mu;    /**< Twisted mass parameter */
-    double epsilon; /**< Twisted mass parameter */
-
-    QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
-
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
     double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
@@ -188,18 +183,18 @@ extern "C" {
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
     QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
 
-    QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
+//    QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
-    double clover_coeff;                   /**< Coefficient of the clover term */
+//    double clover_coeff;                   /**< Coefficient of the clover term */
 
-    int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
-    double trlogA[2];                      /**< The trace log of the clover term (even/odd computed separately) */
+//    int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
+//    double trlogA[2];                      /**< The trace log of the clover term (even/odd computed separately) */
 
-    int compute_clover;                    /**< Whether to compute the clover field */
-    int compute_clover_inverse;            /**< Whether to compute the clover inverse field */
-    int return_clover;                     /**< Whether to copy back the clover matrix field */
-    int return_clover_inverse;             /**< Whether to copy back the inverted clover matrix field */
+//    int compute_clover;                    /**< Whether to compute the clover field */
+//    int compute_clover_inverse;            /**< Whether to compute the clover inverse field */
+//    int return_clover;                     /**< Whether to copy back the clover matrix field */
+//    int return_clover_inverse;             /**< Whether to copy back the inverted clover matrix field */
 
     QudaVerbosity verbosity;               /**< The verbosity setting to use in the solver */
 

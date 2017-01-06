@@ -758,7 +758,7 @@ namespace quda {
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
                                        const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
-				       void *buffer, bool zero_copy, double a, double b)
+				       void *buffer, bool zero_copy)
   {
 #ifdef MULTI_GPU
     int face_num;
@@ -770,7 +770,7 @@ namespace quda {
       face_num = 2;
     }
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
-    packFace(packBuffer, *this, zero_copy, nFace, dagger, parity, dim, face_num, *stream, a, b);
+    packFace(packBuffer, *this, zero_copy, nFace, dagger, parity, dim, face_num, *stream);
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
@@ -786,7 +786,7 @@ namespace quda {
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
     int Npad = Nint / Nvec; // number Nvec buffers we have
     
-    if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
 
@@ -797,7 +797,7 @@ namespace quda {
 
       cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream);
 
-    } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) { // do multiple cudaMemcpys
+    } else  { // do multiple cudaMemcpys
 
       const int x4 = nDim==5 ? x[4] : 1;
       const int Nt_minus1_offset = (volumeCB - nFace*ghostFace[3])/x4; // N_t -1 = Vh-Vsh
@@ -835,50 +835,6 @@ namespace quda {
 	  void *src = (char*)norm + norm_offset + s*(volumeCB/x4)*sizeof(float);
 	  cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
 	}
-      }
-    }else{
-      int flavorVolume = volume / 2;
-      int flavorTFace  = ghostFace[3] / 2;
-      int flavor1_Nt_minus1_offset = (flavorVolume - flavorTFace);
-      int flavor2_Nt_minus1_offset = (volume - flavorTFace);
-      int flavor1_offset = 0;
-      int flavor2_offset = 0;
-      // !dagger: send lower components backwards, send upper components forwards
-      // dagger: send upper components backwards, send lower components forwards
-      bool upper = dagger ? true : false; // Fwd is !Back
-      if (dir == QUDA_FORWARDS) upper = !upper;
-      int lower_spin_offset = Npad*stride;//ndeg tm: stride=2*flavor_volume+pad
-      if (upper) {
-        flavor1_offset = (dir == QUDA_BACKWARDS ? 0 : flavor1_Nt_minus1_offset);
-        flavor2_offset = (dir == QUDA_BACKWARDS ? flavorVolume : flavor2_Nt_minus1_offset);
-      }else{
-        flavor1_offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : flavor1_Nt_minus1_offset);
-        flavor2_offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? flavorVolume : flavor2_Nt_minus1_offset);
-      }
-
-      // QUDA Memcpy NPad's worth.
-      //  -- Dest will point to the right beginning PAD.
-      //  -- Each Pad has size Nvec*Vsh Floats.
-      //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
-
-      void *dst = (char*)ghost_spinor;
-      void *src = (char*)v + flavor1_offset*Nvec*precision;
-      size_t len = flavorTFace*Nvec*precision;
-      size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
-      size_t dpitch = 2*len;
-      cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
-      dst = (char*)ghost_spinor+len;
-      src = (char*)v + flavor2_offset*Nvec*precision;
-      cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
-
-      if (precision == QUDA_HALF_PRECISION) {
-        int Nt_minus1_offset = (flavorVolume - flavorTFace);
-        int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
-	void *dst = (char*)ghost_spinor + Nint*ghostFace[3]*precision;
-	void *src = (char*)norm + norm_offset;
-        size_t dpitch = flavorTFace*sizeof(float);
-        size_t spitch = flavorVolume*sizeof(float);
-	cudaMemcpy2DAsync(dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToHost, *stream);
       }
     }
 #else
@@ -1117,7 +1073,7 @@ namespace quda {
 #ifdef GPU_COMMS
 	  size_t nbytes_Nface = surfaceCB[i]*Ndof*precision*(j+1);
 	  size_t nbytes_Nface_norm = surfaceCB[i]*(j+1)*sizeof(float);
-	  if (i != 3 || getKernelPackT() || getTwistPack()) {
+	  if (i != 3 || getKernelPackT()) {
 #else 
 	    size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 #endif
@@ -1137,9 +1093,6 @@ namespace quda {
 		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i];
 	      }
 	    }
-
-	  } else if (this->TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
-	    errorQuda("GPU_COMMS for non-degenerate doublet only supported with time-dimension kernel packing enabled.");
 	  } else {
 	    /* 
 	       use a strided communicator, here we can't really use
@@ -1504,7 +1457,7 @@ namespace quda {
 
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
-				  bool zero_copy, double a, double b) {
+				  bool zero_copy) {
 
     createComms(nFace); // must call this first
 
@@ -1513,23 +1466,23 @@ namespace quda {
     const int dim=-1; // pack all partitioned dimensions
  
     if (zero_copy) {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d[bufferIndex], true, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d[bufferIndex], true);
     } else {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[Nstream-1], 0, false, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[Nstream-1], 0, false);
     }
   }
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx, 
-				  bool zeroCopyPack, double a, double b) {
+				  bool zeroCopyPack) {
 
     createComms(nFace); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
  
     if (zeroCopyPack) {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d[bufferIndex], true, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d[bufferIndex], true);
     } else {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], 0, false, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], 0, false);
     }
   }
 
@@ -1625,7 +1578,7 @@ namespace quda {
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy to forward processor
 
-      } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) {
+      } else {
 
 	const int x4 = nDim==5 ? x[4] : 1;
 	const int Nt_minus_offset = (volumeCB - nFace*ghostFace[3])/x4;
@@ -1663,47 +1616,6 @@ namespace quda {
 	    void *src = static_cast<char*>(norm) + norm_offset + s*(volumeCB/x4)*sizeof(float);
 	    cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
 	  }
-	}
-      } else { // twisted doublet
-	int flavorVolume = volume / 2;
-	int flavorTFace  = ghostFace[3] / 2;
-	int flavor1_Nt_minus1_offset = (flavorVolume - flavorTFace);
-	int flavor2_Nt_minus1_offset = (volume - flavorTFace);
-	int flavor1_offset = 0;
-	int flavor2_offset = 0;
-	// !dagger: send lower components backwards, send upper components forwards
-	// dagger: send upper components backwards, send lower components forwards
-	bool upper = dagger ? true : false; // Fwd is !Back
-	if (dir == 1) upper = !upper;
-	int lower_spin_offset = Npad*stride;//ndeg tm: stride=2*flavor_volume+pad
-	if (upper) {
-	  flavor1_offset = (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
-	  flavor2_offset = (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
-	}else{
-	  flavor1_offset = lower_spin_offset + (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
-	  flavor2_offset = lower_spin_offset + (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
-	}
-
-	// QUDA Memcpy NPad's worth.
-	//  -- Dest will point to the right beginning PAD.
-	//  -- Each Pad has size Nvec*Vsh Floats.
-	//  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
-
-	void *src = static_cast<char*>(v) + flavor1_offset*Nvec*precision;
-	size_t len = flavorTFace*Nvec*precision;
-	size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
-	size_t dpitch = 2*len;
-	cudaMemcpy2DAsync(ghost_dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
-
-	src = static_cast<char*>(v) + flavor2_offset*Nvec*precision;
-	cudaMemcpy2DAsync(static_cast<char*>(ghost_dst)+len, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
-
-	if (precision == QUDA_HALF_PRECISION) {
-	  int norm_offset = (dir == 0) ? 0 : flavor1_Nt_minus1_offset*sizeof(float);
-	  void *src = static_cast<char*>(norm) + norm_offset;
-	  size_t dpitch = flavorTFace*sizeof(float);
-	  size_t spitch = flavorVolume*sizeof(float);
-	  cudaMemcpy2DAsync(ghost_norm_dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToDevice, *copy_stream);
 	}
       }
 
@@ -1950,7 +1862,6 @@ namespace quda {
 
         param.nColor = nColor;
         param.nSpin = nSpin;
-        param.twistFlavor = twistFlavor;
         param.precision = precision;
         param.nDim = nDim;
         param.pad = pad;

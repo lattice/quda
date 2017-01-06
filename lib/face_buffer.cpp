@@ -203,7 +203,7 @@ void FaceBuffer::flushPinnedCache()
 
 
 void FaceBuffer::pack(cudaColorSpinorField &in, int dim, int dir,  int parity, int dagger, 
-		      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
+		      cudaStream_t *stream_p, bool zeroCopyPack)
 {
   in.allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
   stream = stream_p;
@@ -211,9 +211,9 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int dim, int dir,  int parity, i
   if (zeroCopyPack) {
     void *my_face_d;
     cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
-    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[0], my_face_d, a, b);
+    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[0], my_face_d);
   } else {
-    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[Nstream-1], 0, a, b);
+    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[Nstream-1], 0);
   }
 }
 
@@ -231,18 +231,18 @@ void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir, int strea
 }
 
 void FaceBuffer::pack(cudaColorSpinorField &in, int dir, int parity, int dagger, 
-                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
+                      cudaStream_t *stream_p, bool zeroCopyPack)
 {
   const int dim = -1;
-  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack);
 }
 
 void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, 
-                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
+                      cudaStream_t *stream_p, bool zeroCopyPack)
 {
   const int dim = -1; // pack all partitioned space-time dimensions
   const int dir = 2; // pack both forward and backwards directions
-  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack);
 
 }
 

@@ -153,5 +153,3 @@ namespace quda {
   using namespace dslash_aux;
 
 } // namespace quda
-
-#include "contract.cu"

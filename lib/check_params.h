@@ -182,28 +182,20 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(kappa, INVALID_DOUBLE);
   P(m5, INVALID_DOUBLE);
   P(Ls, INVALID_INT);
-  P(mu, INVALID_DOUBLE);
-  P(twist_flavor, QUDA_TWIST_INVALID);
 #else
   // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || 
       param->dslash_type == QUDA_ASQTAD_DSLASH || 
       param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     P(mass, INVALID_DOUBLE);
   } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
   }
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
-  }
-  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-    P(mu, INVALID_DOUBLE);
-    P(twist_flavor, QUDA_TWIST_INVALID);
   }
 #endif
 
@@ -284,11 +276,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(input_location, QUDA_CPU_FIELD_LOCATION);
   P(output_location, QUDA_CPU_FIELD_LOCATION);
-  P(clover_location, QUDA_CPU_FIELD_LOCATION);
 #else
   P(input_location, QUDA_INVALID_FIELD_LOCATION);
   P(output_location, QUDA_INVALID_FIELD_LOCATION);
-  P(clover_location, QUDA_INVALID_FIELD_LOCATION);
 #endif
 
 #if defined INIT_PARAM
@@ -304,10 +294,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);
-#else
-  if(param->inv_type == QUDA_MPCG_INVERTER || param->inv_type == QUDA_MPBICGSTAB_INVERTER){
-    P(Nsteps, INVALID_INT);
-  }
 #endif
 
 #if defined INIT_PARAM
@@ -329,8 +315,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(schwarz_type, QUDA_ADDITIVE_SCHWARZ); // defaults match previous interface behaviour
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
-  if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || 
-      param->inv_type_precondition == QUDA_CG_INVERTER || 
+  if (param->inv_type_precondition == QUDA_CG_INVERTER || 
       param->inv_type_precondition == QUDA_MR_INVERTER) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
@@ -353,51 +338,16 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(omega, INVALID_DOUBLE);
 #endif
 
-#ifndef INIT_PARAM
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
-      param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-#endif
-    P(clover_cpu_prec, QUDA_INVALID_PRECISION);
-    P(clover_cuda_prec, QUDA_INVALID_PRECISION);
-    P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
-#if defined INIT_PARAM
-    P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
-    P(compute_clover_trlog, 0);
-    P(compute_clover, 0);
-    P(compute_clover_inverse, 0);
-    P(return_clover, 0);
-    P(return_clover_inverse, 0);
-#else
-    if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
-      param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
-    P(compute_clover_trlog, QUDA_INVALID_PRECISION);
-    P(compute_clover, QUDA_INVALID_PRECISION);
-    P(compute_clover_inverse, QUDA_INVALID_PRECISION);
-    P(return_clover, QUDA_INVALID_PRECISION);
-    P(return_clover_inverse, QUDA_INVALID_PRECISION);
-#endif
-    P(clover_order, QUDA_INVALID_CLOVER_ORDER);
-    P(cl_pad, INVALID_INT);
-
-    P(clover_coeff, INVALID_DOUBLE);
-#ifndef INIT_PARAM
-  }
-#endif
-
   P(verbosity, QUDA_INVALID_VERBOSITY);
 
 #ifdef INIT_PARAM
   P(iter, 0);
   P(spinorGiB, 0.0);
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)
-    P(cloverGiB, 0.0);
   P(gflops, 0.0);
   P(secs, 0.0);
 #elif defined(PRINT_PARAM)
   P(iter, INVALID_INT);
   P(spinorGiB, INVALID_DOUBLE);
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)
-    P(cloverGiB, INVALID_DOUBLE);
   P(gflops, INVALID_DOUBLE);
   P(secs, INVALID_DOUBLE);
 #endif

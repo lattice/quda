@@ -3,7 +3,7 @@
 #include <lattice_field.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
-#include <clover_field.h>
+//#include <clover_field.h>
 #include <face_quda.h>
 
 namespace quda {
@@ -72,12 +72,10 @@ namespace quda {
 
   QudaFieldLocation LatticeField::Location() const { 
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-    if (typeid(*this)==typeid(cudaCloverField) || 
-	typeid(*this)==typeid(cudaColorSpinorField) ||
+    if (typeid(*this)==typeid(cudaColorSpinorField) || 
 	typeid(*this)==typeid(cudaGaugeField)) {
       location = QUDA_CUDA_FIELD_LOCATION; 
-    } else if (typeid(*this)==typeid(cpuCloverField) || 
-	       typeid(*this)==typeid(cpuColorSpinorField) ||
+    } else if (typeid(*this)==typeid(cpuColorSpinorField) || 
 	       typeid(*this)==typeid(cpuGaugeField)) {
       location = QUDA_CPU_FIELD_LOCATION;
       location = QUDA_CPU_FIELD_LOCATION;
@@ -104,10 +102,6 @@ namespace quda {
       const GaugeField &gField = static_cast<const GaugeField&>(*this);
       if (gField.Order() == 2 || gField.Order() == 4)
 	return static_cast<int>(gField.Order());
-    } else if (typeid(*this) == typeid(const cudaCloverField)) { 
-      const CloverField &cField = static_cast<const CloverField&>(*this);
-      if (cField.Order() == 2 || cField.Order() == 4)
-	return static_cast<int>(cField.Order());
     }
 
     errorQuda("Unsupported field type");

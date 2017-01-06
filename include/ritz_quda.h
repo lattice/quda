@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
-#include <clover_field.h>
+//#include <clover_field.h>
 #include <dslash_quda.h>
 #include <face_quda.h>
 #include <blas_quda.h>

@@ -22,7 +22,7 @@ namespace quda {
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
-    create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor,
+    create(param.nDim, param.x, param.nColor, param.nSpin,
 	   param.precision, param.pad, param.siteSubset, param.siteOrder,
 	   param.fieldOrder, param.gammaBasis, param.PCtype);
   }
@@ -34,7 +34,7 @@ namespace quda {
       bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
-    create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor,
+    create(field.nDim, field.x, field.nColor, field.nSpin,
 	   field.precision, field.pad, field.siteSubset, field.siteOrder,
 	   field.fieldOrder, field.gammaBasis, field.PCtype);
   }
@@ -124,7 +124,7 @@ namespace quda {
 
   } // createGhostZone
 
-  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
+  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns,
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset,
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
 				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
@@ -139,7 +139,6 @@ namespace quda {
     nDim = Ndim;
     nColor = Nc;
     nSpin = Ns;
-    twistFlavor = Twistflavor;
 
     PCtype = DWFPC;
 
@@ -150,9 +149,6 @@ namespace quda {
       volume *= x[d];
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
-
-   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
-     errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
 
     pad = Pad;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -227,12 +223,6 @@ namespace quda {
     char aux_tmp[aux_string_n];
     check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d", volume, stride, precision);
     if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
-
-    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
-      strcpy(aux_tmp, aux_string);
-      check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
-      if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
-    }
   }
 
   void ColorSpinorField::destroy() {
@@ -254,7 +244,7 @@ namespace quda {
         //this->composite_descr.id           = 0;
       }
 
-      create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor,
+      create(src.nDim, src.x, src.nColor, src.nSpin,
 	     src.precision, src.pad, src.siteSubset,
 	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);
     }
@@ -266,7 +256,6 @@ namespace quda {
 
     if (param.nColor != 0) nColor = param.nColor;
     if (param.nSpin != 0) nSpin = param.nSpin;
-    if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
     if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
 
@@ -284,9 +273,6 @@ namespace quda {
       volume *= x[d];
     }
     volumeCB = param.siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
-
-    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
-      errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
 
     if (param.pad != 0) pad = param.pad;
 
@@ -359,7 +345,6 @@ namespace quda {
     param.location = Location();
     param.nColor = nColor;
     param.nSpin = nSpin;
-    param.twistFlavor = twistFlavor;
     param.precision = precision;
     param.nDim = nDim;
 
@@ -547,10 +532,6 @@ namespace quda {
 
     if (a.Nspin() != b.Nspin()) {
       errorQuda("checkSpinor: spins do not match: %d %d", a.Nspin(), b.Nspin());
-    }
-
-    if (a.TwistFlavor() != b.TwistFlavor()) {
-      errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
     }
   }
 
@@ -787,7 +768,6 @@ namespace quda {
     out << "typedid = " << typeid(a).name() << std::endl;
     out << "nColor = " << a.nColor << std::endl;
     out << "nSpin = " << a.nSpin << std::endl;
-    out << "twistFlavor = " << a.twistFlavor << std::endl;
     out << "nDim = " << a.nDim << std::endl;
     for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
     out << "volume = " << a.volume << std::endl;

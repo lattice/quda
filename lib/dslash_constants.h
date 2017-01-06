@@ -39,12 +39,6 @@ enum KernelType {
     int ghostNormOffset[QUDA_MAX_DIM+1][2];
     int sp_stride; // spinor stride
 
-#ifdef GPU_CLOVER_DIRAC
-    int cl_stride; // clover stride
-#endif
-#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-    int fl_stride; // twisted-mass flavor stride
-#endif
 #ifdef GPU_STAGGERED_DIRAC
     int gauge_stride;
     int long_gauge_stride;
@@ -94,12 +88,6 @@ enum KernelType {
     void *longPhase0;
     void *longPhase1;
 
-    void *clover;
-    float *cloverNorm;
-
-    void *cloverInv;
-    float *cloverInvNorm;
-
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
@@ -115,10 +103,6 @@ enum KernelType {
     cudaTextureObject_t longGauge1Tex;
     cudaTextureObject_t longPhase0Tex;
     cudaTextureObject_t longPhase1Tex;
-    cudaTextureObject_t cloverTex;
-    cudaTextureObject_t cloverNormTex;
-    cudaTextureObject_t cloverInvTex;
-    cudaTextureObject_t cloverInvNormTex;
 #endif
 
     void print() {
@@ -140,21 +124,10 @@ enum KernelType {
                                                                                  ghostNormOffset[3][0], ghostNormOffset[3][1]);
       printfQuda("kernel_type = %d\n", kernel_type);
       printfQuda("sp_stride = %d\n", sp_stride);
-#ifdef GPU_CLOVER_DIRAC
-      printfQuda("cl_stride = %d\n", cl_stride);
-#endif
     }
   };
 
   static DslashParam dslashParam;
-
-
-
-#ifdef MULTI_GPU
-  static double twist_a = 0.0;
-  static double twist_b = 0.0;
-#endif
-
 
 #define MAX(a,b) ((a)>(b) ? (a):(b))
 
@@ -586,17 +559,3 @@ void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {
   initDslashConstants(profile);
 }
 
-void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
-		   const int dagger, const QudaTwistGamma5Type twist) {
-  if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-    a = 2.0 * kappa * mu;
-    b = 1.0;
-  } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-    a = -2.0 * kappa * mu;
-    b = 1.0 / (1.0 + a*a);
-  } else {
-    errorQuda("Twist type %d not defined\n", twist);
-  }
-  if (dagger) a *= -1.0;
-
-}

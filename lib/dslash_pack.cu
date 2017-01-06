@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include <color_spinor_field.h>
-#include <clover_field.h>	// Do we need this now?
+//#include <clover_field.h>	// Do we need this now?
 
 // these control the Wilson-type actions
 #ifdef GPU_WILSON_DIRAC
@@ -481,200 +481,6 @@ namespace quda {
 
 #endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
 
-
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_TWISTED_MASS_DIRAC)
-
-
-#endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
-
-
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_TWISTED_MASS_DIRAC)
-
-  // double precision
-
-#endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
-
-
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_TWISTED_MASS_DIRAC)
-
-  // double precision
-#if (defined DIRECT_ACCESS_WILSON_PACK_SPINOR) || (defined FERMI_NO_DBLE_TEX)
-#define READ_SPINOR READ_SPINOR_DOUBLE
-#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP
-#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN
-#define SPINORTEX in
-#else
-#define READ_SPINOR READ_SPINOR_DOUBLE_TEX
-#define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
-#define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
-#ifdef USE_TEXTURE_OBJECTS
-#define SPINORTEX param.inTex
-#else
-#define SPINORTEX spinorTexDouble
-#endif
-#endif
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_DOUBLE2
-#define SPINOR_DOUBLE
-  template <int dim, int dagger, int face_num>
-    static inline __device__ void packTwistedFaceWilsonCore(double2 *out, float *outNorm, const double2 *in, 
-							    const float *inNorm, double a, double b, const int &idx, 
-							    const int &face_idx, const int &face_volume, 
-							    PackParam<double2> &param)
-  {
-    if (dagger) {
-#include "wilson_pack_twisted_face_dagger_core.h"
-    } else {
-#include "wilson_pack_twisted_face_core.h"
-    }
-  }
-#undef READ_SPINOR
-#undef READ_SPINOR_UP
-#undef READ_SPINOR_DOWN
-#undef SPINORTEX
-#undef WRITE_HALF_SPINOR
-#undef SPINOR_DOUBLE
-
-
-  // single precision
-#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
-#define READ_SPINOR READ_SPINOR_SINGLE
-#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP
-#define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN
-#define SPINORTEX in
-#else
-#define READ_SPINOR READ_SPINOR_SINGLE_TEX
-#define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
-#define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
-#ifdef USE_TEXTURE_OBJECTS
-#define SPINORTEX param.inTex
-#else
-#define SPINORTEX spinorTexSingle
-#endif
-#endif
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
-  template <int dim, int dagger, int face_num>
-    static inline __device__ void packTwistedFaceWilsonCore(float4 *out, float *outNorm, const float4 *in, const float *inNorm, float a, float b,
-							    const int &idx, const int &face_idx, 
-							    const int &face_volume, 
-							    const PackParam<float4> &param)
-  {
-    if (dagger) {
-#include "wilson_pack_twisted_face_dagger_core.h"
-    } else {
-#include "wilson_pack_twisted_face_core.h"
-    }
-  }
-#undef READ_SPINOR
-#undef READ_SPINOR_UP
-#undef READ_SPINOR_DOWN
-#undef SPINORTEX
-#undef WRITE_HALF_SPINOR
-
-
-  // half precision
-#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
-#define READ_SPINOR READ_SPINOR_HALF
-#define READ_SPINOR_UP READ_SPINOR_HALF_UP
-#define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN
-#define SPINORTEX in
-#else
-#define READ_SPINOR READ_SPINOR_HALF_TEX
-#define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
-#define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
-#ifdef USE_TEXTURE_OBJECTS
-#define SPINORTEX param.inTex
-#else
-#define SPINORTEX spinorTexHalf
-#endif
-#endif
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_SHORT4
-  template <int dim, int dagger, int face_num>
-    static inline __device__ void packTwistedFaceWilsonCore(short4 *out, float *outNorm, const short4 *in, const float *inNorm, float a, float b,
-							    const int &idx, const int &face_idx, 
-							    const int &face_volume, 
-							    const PackParam<short4> &param)
-  {
-    if (dagger) {
-#include "wilson_pack_twisted_face_dagger_core.h"
-    } else {
-#include "wilson_pack_twisted_face_core.h"
-    }
-  }
-#undef READ_SPINOR
-#undef READ_SPINOR_UP
-#undef READ_SPINOR_DOWN
-#undef SPINORTEX
-#undef WRITE_HALF_SPINOR
-
-  template <int dagger, typename FloatN, typename Float>
-    __global__ void packTwistedFaceWilsonKernel(Float a, Float b, PackParam<FloatN> param)
-  {
-    const int nFace = 1; // 1 face for Wilson
-
-    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
-    if (face_idx >= param.threads) return;
-
-    // determine which dimension we are packing
-    const int dim = dimFromFaceIndex(face_idx, param);
-
-    // compute where the output is located
-    // compute an index into the local volume from the index into the face
-    // read spinor, spin-project, and write half spinor to face
-    if (dim == 0) {
-      // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-      const int face_num = (face_idx >= nFace*param.ghostFace[0]) ? 1 : 0;
-      face_idx -= face_num*nFace*param.ghostFace[0];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,0,nFace,0>(face_idx,param);
-	packTwistedFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
-					      param.inNorm, a, b, idx, face_idx, param.ghostFace[0], param);
-      } else {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,0,nFace,1>(face_idx,param);
-	packTwistedFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
-					      param.inNorm, a, b, idx, face_idx, param.ghostFace[0], param);
-      }
-    } else if (dim == 1) {
-      const int face_num = (face_idx >= nFace*param.ghostFace[1]) ? 1 : 0;
-      face_idx -= face_num*nFace*param.ghostFace[1];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,1,nFace,0>(face_idx,param);
-	packTwistedFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
-					       param.inNorm, a, b, idx, face_idx, param.ghostFace[1], param);
-      } else {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,1,nFace,1>(face_idx,param);
-	packTwistedFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
-					       param.inNorm, a, b, idx, face_idx, param.ghostFace[1], param);
-      }
-    } else if (dim == 2) {
-      const int face_num = (face_idx >= nFace*param.ghostFace[2]) ? 1 : 0;
-      face_idx -= face_num*nFace*param.ghostFace[2];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,2,nFace,0>(face_idx,param);
-	packTwistedFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
-					       param.inNorm, a, b, idx, face_idx, param.ghostFace[2], param);
-      } else {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,2,nFace,1>(face_idx,param);
-	packTwistedFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
-					       param.inNorm, a, b, idx, face_idx, param.ghostFace[2], param);
-      }
-    } else {
-      const int face_num = (face_idx >= nFace*param.ghostFace[3]) ? 1 : 0;
-      face_idx -= face_num*nFace*param.ghostFace[3];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,3,nFace,0>(face_idx,param);
-	packTwistedFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
-					       param.inNorm, a, b,idx, face_idx, param.ghostFace[3], param);
-      } else {
-	const int idx = indexFromFaceIndex<4,QUDA_4D_PC,3,nFace,1>(face_idx,param);
-	packTwistedFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
-					       param.inNorm, a, b, idx, face_idx, param.ghostFace[3], param);
-      }
-    }
-
-  }
-
-#endif // GPU_TWISTED_MASS_DIRAC
-
   template <typename FloatN, typename Float>
     class PackFace : public Tunable {
 
@@ -694,11 +500,11 @@ namespace quda {
       if(dim < 0){ // if dim is negative, pack all dimensions
         for (int i=0; i<4; i++) {
           if (!commDim[i]) continue;
-          if ((i==3 && !(getKernelPackT() || getTwistPack()))) continue; 
+          if (i==3 && !(getKernelPackT())) continue; 
           threads += 2*nFace*in->GhostFace()[i]; // 2 for forwards and backwards faces
         }
       }else{ // pack only in dim dimension
-        if(commDim[dim] && dim!=3 || (getKernelPackT() || getTwistPack())){
+        if(commDim[dim] && dim!=3 || getKernelPackT()){
           threads = nFace*in->GhostFace()[dim];
           if(face_num==2) threads *= 2; // sending data forwards and backwards
         }
@@ -807,7 +613,7 @@ namespace quda {
       comm[3] = (commDim[3] ? '1' : '0');
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
-      if (getKernelPackT() || getTwistPack()) { strcat(aux,",kernelPackT"); }
+      if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
       switch (nFace) {
       case 1:
 	strcat(aux,",nFace=1");
@@ -927,69 +733,6 @@ namespace quda {
     case QUDA_HALF_PRECISION:
       {
         PackFaceWilson<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity);
-        pack.apply(stream);
-      }
-      break;
-    default:
-      errorQuda("Precision %d not supported", in.Precision());
-    }
-  }
-
-  template <typename FloatN, typename Float>
-    class PackFaceTwisted : public PackFace<FloatN, Float> {
-
-  private:
-
-    int inputPerSite() const { return 24; } // input is full spinor
-    int outputPerSite() const { return 12; } // output is spin projected
-    Float a;
-    Float b;
-
-  public:
-    PackFaceTwisted(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
-		    const int dagger, const int parity, Float a, Float b)
-    : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, 1), a(a), b(b) { }
-    virtual ~PackFaceTwisted() { }
-
-    void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-#ifdef GPU_TWISTED_MASS_DIRAC
-      static PackParam<FloatN> param;
-      this->prepareParam(param,tp);
-      if (this->dagger) {
-        packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      } else {
-        packTwistedFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      }
-#else
-      errorQuda("Twisted face packing kernel is not built");
-#endif  
-    }
-
-    long long flops() const { return outputPerSite()*this->threads(); }
-  };
-
-  //!
-  void packTwistedFaceWilson(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int dagger,
-			     const int parity, const double a, const double b, const cudaStream_t &stream) {
-
-    switch(in.Precision()) {
-    case QUDA_DOUBLE_PRECISION:
-      {
-        PackFaceTwisted<double2, double> pack((double2*)ghost_buf, &in, zero_copy, dagger, parity, a, b);
-        pack.apply(stream);
-      }
-      break;
-    case QUDA_SINGLE_PRECISION:
-      {
-        PackFaceTwisted<float4, float> pack((float4*)ghost_buf, &in, zero_copy, dagger, parity, (float)a, (float)b);
-        pack.apply(stream);
-      }
-      break;
-    case QUDA_HALF_PRECISION:
-      {
-        PackFaceTwisted<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity, (float)a, (float)b);
         pack.apply(stream);
       }
       break;
@@ -1704,137 +1447,6 @@ namespace quda {
       }
   }
 
-#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-  template <int dagger, typename FloatN>
-    __global__ void packFaceNdegTMKernel(PackParam<FloatN> param)
-  {
-    const int nFace = 1; // 1 face for Wilson
-    const int Nf = 2;
-
-    int face_idx = block_idx(param.swizzle)*blockDim.x + threadIdx.x;
-    if (face_idx >= param.threads) return;
-
-    // determine which dimension we are packing
-    const int dim = dimFromFaceIndex(face_idx, param);
-
-    // compute where the output is located
-    // compute an index into the local volume from the index into the face
-    // read spinor, spin-project, and write half spinor to face
-    if (dim == 0) {
-      // face_num determines which end of the lattice we are packing:
-      // 0 = beginning, 1 = end FIXME these param.ghostFace constants
-      // do not include the Nf dimension
-      const int face_num = (face_idx >= nFace*Nf*param.ghostFace[0]) ? 1 : 0;
-      face_idx -= face_num*nFace*Nf*param.ghostFace[0];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,0,nFace,0>(face_idx,param);
-	packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
-				       param.inNorm, idx, face_idx, Nf*param.ghostFace[0], param);
-      } else {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,0,nFace,1>(face_idx,param);
-	packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
-				       param.inNorm, idx, face_idx, Nf*param.ghostFace[0], param);
-      }
-    } else if (dim == 1) {
-      const int face_num = (face_idx >= nFace*Nf*param.ghostFace[1]) ? 1 : 0;
-      face_idx -= face_num*nFace*Nf*param.ghostFace[1];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,1,nFace,0>(face_idx,param);
-	packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
-					param.inNorm, idx, face_idx, Nf*param.ghostFace[1], param);
-      } else {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,1,nFace,1>(face_idx,param);
-	packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
-					param.inNorm, idx, face_idx, Nf*param.ghostFace[1], param);
-      }
-    } else if (dim == 2) {
-      const int face_num = (face_idx >= nFace*Nf*param.ghostFace[2]) ? 1 : 0;
-      face_idx -= face_num*nFace*Nf*param.ghostFace[2];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,2,nFace,0>(face_idx,param);
-	packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
-					param.inNorm, idx, face_idx, Nf*param.ghostFace[2], param);
-      } else {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,2,nFace,1>(face_idx,param);
-	packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
-					param.inNorm, idx, face_idx, Nf*param.ghostFace[2], param);
-      }
-    } else {
-      const int face_num = (face_idx >= nFace*Nf*param.ghostFace[3]) ? 1 : 0;
-      face_idx -= face_num*nFace*Nf*param.ghostFace[3];
-      if (face_num == 0) {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,3,nFace,0>(face_idx,param);
-	packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
-					param.inNorm, idx, face_idx, Nf*param.ghostFace[3], param);
-      } else {
-	const int idx = indexFromFaceIndex<5,QUDA_4D_PC,3,nFace,1>(face_idx,param);
-	packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
-					param.inNorm, idx, face_idx, Nf*param.ghostFace[3], param);
-      }
-    }
-  }
-#endif
-
-  template <typename FloatN, typename Float>
-    class PackFaceNdegTM : public PackFace<FloatN, Float> {
-
-  private:
-
-    int inputPerSite() const { return 24; } // input is full spinor
-    int outputPerSite() const { return 12; } // output is spin projected
-
-  public:
-    PackFaceNdegTM(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
-		   const int dagger, const int parity)
-      : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, 1) { }
-    virtual ~PackFaceNdegTM() { }
-
-    void apply(const cudaStream_t &stream) {    
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-      static PackParam<FloatN> param;
-      this->prepareParam(param,tp);
-      if (this->dagger) {
-        packFaceNdegTMKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceNdegTMKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      }
-#else
-      errorQuda("Non-degenerate twisted mass face packing kernel is not built");
-#endif  
-    }
-
-    long long flops() const { return outputPerSite()*this->threads(); }
-  };
-
-  void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int dagger,
-		      const int parity, const cudaStream_t &stream) {
-
-    switch(in.Precision()) {
-    case QUDA_DOUBLE_PRECISION:
-      {
-        PackFaceNdegTM<double2, double> pack((double2*)ghost_buf, &in, zero_copy, dagger, parity);
-        pack.apply(stream);
-      }
-      break;
-    case QUDA_SINGLE_PRECISION:
-      {
-        PackFaceNdegTM<float4, float> pack((float4*)ghost_buf, &in, zero_copy, dagger, parity);
-        pack.apply(stream);
-      }
-      break;
-    case QUDA_HALF_PRECISION:
-      {
-        PackFaceNdegTM<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity);
-        pack.apply(stream);
-      }
-      break;
-    default:
-      errorQuda("Precision %d not supported", in.Precision());
-    } 
-  }
-
   void packFace(void *ghost_buf, cudaColorSpinorField &in,
 		bool zero_copy, const int nFace,
 		const int dagger, const int parity, 
@@ -1861,19 +1473,8 @@ namespace quda {
     // Need to update this logic for other multi-src dslash packing
     if (in.Nspin() == 1) {
       packFaceStaggered(ghost_buf, in, zero_copy, nFace, dagger, parity, dim, face_num, stream);
-    } else if (a!=0.0 || b!=0.0) {
-      // Need to update this logic for other multi-src dslash packing
-      if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS) {
-	packTwistedFaceWilson(ghost_buf, in, zero_copy, dagger, parity, a, b, stream);
-      } else {
-	errorQuda("Cannot perform twisted packing for the spinor.");
-      }
     } else if (in.Ndim() == 5) {
-      if(in.TwistFlavor() == QUDA_TWIST_INVALID) {
-	packFaceDW(ghost_buf, in, zero_copy, dagger, parity, stream);
-      } else {
-	packFaceNdegTM(ghost_buf, in, zero_copy, dagger, parity, stream);
-      }
+      packFaceDW(ghost_buf, in, zero_copy, dagger, parity, stream);
     } else {
       packFaceWilson(ghost_buf, in, zero_copy, dagger, parity, stream);
     }

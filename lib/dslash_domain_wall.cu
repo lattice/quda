@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include <color_spinor_field.h>
-#include <clover_field.h>
+//#include <clover_field.h>
 
 // these control the Wilson-type actions
 #ifdef GPU_WILSON_DIRAC

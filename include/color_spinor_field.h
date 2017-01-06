@@ -80,8 +80,6 @@ namespace quda {
     int nColor; // Number of colors of the field
     int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
 
-    QudaTwistFlavorType twistFlavor; // used by twisted mass
-
     QudaSiteOrder siteOrder; // defined for full fields
 
     QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
@@ -103,7 +101,7 @@ namespace quda {
 
   ColorSpinorParam()
     : LatticeFieldParam(), location(QUDA_INVALID_FIELD_LOCATION), nColor(0),
-      nSpin(0), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
+      nSpin(0), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
       create(QUDA_INVALID_FIELD_CREATE), PCtype(QUDA_PC_INVALID),
       is_composite(false), composite_dim(0), is_component(false), component_id(0) { ; }
@@ -114,11 +112,10 @@ namespace quda {
     : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), location(location), nColor(3),
       nSpin( (inv_param.dslash_type == QUDA_ASQTAD_DSLASH ||
               inv_param.dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4),
-      twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER),
+      siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
-      PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||
-	      (inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ),
+      PCtype((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)?QUDA_4D_PC:QUDA_5D_PC ),
       v(V), is_composite(false), composite_dim(0), is_component(false), component_id(0) {
 
         if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -132,13 +129,9 @@ namespace quda {
 	}
 
 	if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-	    inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-	    inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+	    inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
 	  nDim++;
 	  x[4] = inv_param.Ls;
-	} else if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)) {
-	  nDim++;
-	  x[4] = 2;//for two flavors
 	} else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
 	  nDim++;
 	  x[4] = inv_param.Ls;
@@ -172,7 +165,7 @@ namespace quda {
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
 		   QudaFieldLocation location=QUDA_CUDA_FIELD_LOCATION)
     : LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
-      location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor),
+      location(location), nColor(cpuParam.nColor), nSpin(cpuParam.nSpin),
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
       create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), is_composite(cpuParam.is_composite), composite_dim(cpuParam.composite_dim), is_component(false), component_id(0)
@@ -206,7 +199,6 @@ namespace quda {
     void print() {
       printfQuda("nColor = %d\n", nColor);
       printfQuda("nSpin = %d\n", nSpin);
-      printfQuda("twistFlavor = %d\n", twistFlavor);
       printfQuda("nDim = %d\n", nDim);
       for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
       printfQuda("precision = %d\n", precision);
@@ -233,10 +225,8 @@ namespace quda {
   class ColorSpinorField : public LatticeField {
 
   private:
-    void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
-		QudaPrecision precision, int pad, QudaSiteSubset subset,
-		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-		QudaDWFPCType PCtype);
+    void create(int nDim, const int *x, int Nc, int Ns, QudaPrecision precision, int pad, QudaSiteSubset subset,
+		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaDWFPCType PCtype);
     void destroy();
 
   protected:
@@ -253,8 +243,6 @@ namespace quda {
     int volumeCB;
     int pad;
     int stride;
-
-    QudaTwistFlavorType twistFlavor;
 
     QudaDWFPCType PCtype; // used to select preconditioning method in DWF
 
@@ -321,7 +309,6 @@ namespace quda {
     QudaPrecision Precision() const { return precision; }
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
-    QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
     int X(int d) const { return x[d]; }
@@ -607,11 +594,10 @@ namespace quda {
       @param buffer Optional parameter where the ghost should be
       stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
       @param zero_copy Whether we are packing directly into zero_copy memory
-      @param a Twisted mass parameter (default=0)
-      @param b Twisted mass parameter (default=0)
       */
+
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-		   cudaStream_t* stream, void *buffer=0, bool zero_copy=false, double a=0, double b=0);
+		   cudaStream_t* stream, void *buffer=0, bool zero_copy=false);
 
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
@@ -619,7 +605,7 @@ namespace quda {
 
 
     void packGhost(FullClover &clov, FullClover &clovInv, const int nFace, const QudaParity parity, const int dim,
-		   const QudaDirection dir, const int dagger, cudaStream_t* stream, void *buffer=0, double a=0);
+		   const QudaDirection dir, const int dagger, cudaStream_t* stream, void *buffer=0);
 
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
@@ -662,14 +648,12 @@ namespace quda {
 
     void streamInit(cudaStream_t *stream_p);
 
-    void pack(int nFace, int parity, int dagger, int stream_idx, bool zeroCopyPack,
-              double a=0, double b=0);
+    void pack(int nFace, int parity, int dagger, int stream_idx, bool zeroCopyPack);
 
     void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
 	      int stream_idx, bool zeroCopyPack, double a=0);
 
-    void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
-	      double a=0, double b=0);
+    void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack);
 
     void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
 	      cudaStream_t *stream_p, bool zeroCopyPack, double a=0);
