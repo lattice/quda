@@ -316,7 +316,7 @@ def prolog():
 
     prolog_str+= def_input_spinor()
     if dslash == True: prolog_str+= def_gauge()
-    if clover == True: prolog_str+= def_clover()
+#    if clover == True: prolog_str+= def_clover()
     prolog_str+= def_output_spinor()
 
     if (sharedFloats > 0):
@@ -365,7 +365,7 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
         prolog_str += (
 """
 #include "read_gauge.h"
-#include "read_clover.h"
+//#include "read_clover.h"
 #include "io_spinor.h"
 
 int coord[5];
@@ -446,7 +446,7 @@ if (kernel_type == INTERIOR_KERNEL) {
     else:
         prolog_str+=(
 """
-#include "read_clover.h"
+//#include "read_clover.h"
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -1163,7 +1163,7 @@ def generate_dslash_kernels(arch):
 
     dslash = True
     twist = False
-    clover = True
+    clover = False
     dagger = False
 
     filename = 'dslash_core/wilson_dslash_' + name + '_core.h'
@@ -1179,21 +1179,21 @@ def generate_dslash_kernels(arch):
     f.write(generate_dslash())
     f.close()
 
-    asymClover = True
+#   asymClover = True
 
-    dagger = False
-    filename = 'dslash_core/asym_wilson_clover_dslash_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename;
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
+#    dagger = False
+#    filename = 'dslash_core/asym_wilson_clover_dslash_' + name + '_core.h'
+#    print sys.argv[0] + ": generating " + filename;
+#    f = open(filename, 'w')
+#    f.write(generate_dslash())
+#    f.close()
 
-    dagger = True
-    filename = 'dslash_core/asym_wilson_clover_dslash_dagger_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename;
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
+#    dagger = True
+#    filename = 'dslash_core/asym_wilson_clover_dslash_dagger_' + name + '_core.h'
+#    print sys.argv[0] + ": generating " + filename;
+#    f = open(filename, 'w')
+#    f.write(generate_dslash())
+#    f.close()
 
     asymClover = False
 
@@ -1255,12 +1255,12 @@ dslash = False
 pack = False
 
 # generate clover solo term
-clover = True
-cloverSharedFloats = 0
-sharedFloats = cloverSharedFloats
+#clover = False
+#cloverSharedFloats = 0
+#sharedFloats = cloverSharedFloats
 # for the clover term, only makes sense to use shared memory as pseudo registers
-sharedDslash = False
-print sys.argv[0] + ": generating clover_core.h";
-f = open('dslash_core/clover_core.h', 'w')
-f.write(generate_clover())
-f.close()
+#sharedDslash = False
+#print sys.argv[0] + ": generating clover_core.h";
+#f = open('dslash_core/clover_core.h', 'w')
+#f.write(generate_clover())
+#f.close()

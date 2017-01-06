@@ -37,27 +37,13 @@
 
 // set options for current iteration
 
-#if (DD_CLOVER==0) // no clover
+// no clover
 #define DD_NAME_F dslash
-#elif (DD_CLOVER==1)   // clover
-#define DSLASH_CLOVER
-#define DD_NAME_F cloverDslash
-#else
-#define DSLASH_CLOVER
-#define DSLASH_CLOVER_XPAY
-#define DD_NAME_F asymCloverDslash
-#endif
 
 #if (DD_DAG==0) // no dagger
 #define DD_DAG_F
 #else           // dagger
 #define DD_DAG_F Dagger
-#endif
-
-// DSLASH_CLOVER_XPAY implies DD_XPAY=1
-#if (DD_XPAY==0) && defined(DSLASH_CLOVER_XPAY)
-#undef DD_XPAY
-#define DD_XPAY 1
 #endif
 
 #if (DD_XPAY==0) // no xpay 
@@ -227,20 +213,6 @@
 
 #define SPINOR_HOP 12
 
-// double-precision clover field
-#if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
-#define CLOVERTEX param.clover
-#define READ_CLOVER READ_CLOVER_DOUBLE_STR
-#else
-#ifdef USE_TEXTURE_OBJECTS
-#define CLOVERTEX (param.cloverTex)
-#else
-#define CLOVERTEX cloverTexDouble
-#endif
-#define READ_CLOVER READ_CLOVER_DOUBLE_TEX
-#endif
-#define CLOVER_DOUBLE
-
 #elif (DD_PREC==1) // single-precision fields
 
 #define TPROJSCALE tProjScale_f
@@ -313,17 +285,6 @@
 #define SPINOR_HOP 6
 
 // single-precision clover field
-#ifdef DIRECT_ACCESS_CLOVER
-#define CLOVERTEX param.clover
-#define READ_CLOVER READ_CLOVER_SINGLE
-#else
-#ifdef USE_TEXTURE_OBJECTS
-#define CLOVERTEX (param.cloverTex)
-#else
-#define CLOVERTEX cloverTexSingle
-#endif
-#define READ_CLOVER READ_CLOVER_SINGLE_TEX
-#endif
 
 #else             // half-precision fields
 
@@ -396,22 +357,6 @@
 
 #define SPINOR_HOP 6
 
-// half-precision clover field
-#ifdef DIRECT_ACCESS_CLOVER
-#define CLOVERTEX param.clover
-#define READ_CLOVER READ_CLOVER_HALF
-#define CLOVERTEXNORM (param.cloverNorm)
-#else
-#ifdef USE_TEXTURE_OBJECTS
-#define CLOVERTEX (param.cloverTex)
-#define CLOVERTEXNORM (param.cloverNormTex)
-#else
-#define CLOVERTEX cloverTexHalf
-#define CLOVERTEXNORM cloverTexNorm
-#endif
-#define READ_CLOVER READ_CLOVER_HALF_TEX
-#endif
-
 #endif
 
 #define DD_CONCAT(n,p,r,d,x) n ## p ## r ## d ## x ## Kernel
@@ -423,19 +368,7 @@ template <KernelType kernel_type>
   __global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
   // build Wilson or clover as appropriate
-#if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
-
 #ifdef SHARED_WILSON_DSLASH // Fermi optimal code
-
-#ifdef DSLASH_CLOVER_XPAY
-
-#if DD_DAG
-#include "asym_wilson_clover_dslash_dagger_fermi_core.h"
-#else
-#include "asym_wilson_clover_dslash_fermi_core.h"
-#endif
-
-#else
 
 #if DD_DAG
 #include "wilson_dslash_dagger_fermi_core.h"
@@ -443,19 +376,8 @@ template <KernelType kernel_type>
 #include "wilson_dslash_fermi_core.h"
 #endif
 
-#endif
 
 #else // no shared-memory blocking
-
-#ifdef DSLASH_CLOVER_XPAY
-
-#if DD_DAG
-#include "asym_wilson_clover_dslash_dagger_gt200_core.h"
-#else
-#include "asym_wilson_clover_dslash_gt200_core.h"
-#endif
-
-#else
 
 #if DD_DAG
 #include "wilson_dslash_dagger_gt200_core.h"
@@ -463,12 +385,7 @@ template <KernelType kernel_type>
 #include "wilson_dslash_gt200_core.h"
 #endif
 
-#endif
-
 #endif // SHARED_WILSON_DSLASH
-
-
-#endif // DD_CLOVER
 
 }
 
@@ -477,20 +394,7 @@ template <>
 __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
   (const DslashParam param) {
 
-  // build Wilson or clover as appropriate
-#if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
-
 #ifdef SHARED_WILSON_DSLASH // Fermi optimal code
-
-#ifdef DSLASH_CLOVER_XPAY
-
-#if DD_DAG
-#include "asym_wilson_clover_fused_exterior_dslash_dagger_fermi_core.h"
-#else
-#include "asym_wilson_clover_fused_exterior_dslash_fermi_core.h"
-#endif
-
-#else
 
 #if DD_DAG
 #include "wilson_fused_exterior_dslash_dagger_fermi_core.h"
@@ -498,19 +402,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #include "wilson_fused_exterior_dslash_fermi_core.h"
 #endif
 
-#endif
-
 #else // no shared-memory blocking
-
-#ifdef DSLASH_CLOVER_XPAY
-
-#if DD_DAG
-#include "asym_wilson_clover_fused_exterior_dslash_dagger_gt200_core.h"
-#else
-#include "asym_wilson_clover_fused_exterior_dslash_gt200_core.h"
-#endif
-
-#else
 
 #if DD_DAG
 #include "wilson_fused_exterior_dslash_dagger_gt200_core.h"
@@ -518,12 +410,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #include "wilson_fused_exterior_dslash_gt200_core.h"
 #endif
 
-#endif
 
 #endif // SHARED_WILSON_DSLASH
-
-
-#endif // DD_CLOVER
 
 }
 #endif // MULTI_GPU
@@ -553,13 +441,8 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #undef WRITE_SPINOR
 #undef READ_ACCUM
 #undef ACCUMTEX
-#undef READ_CLOVER
-#undef CLOVERTEX
-#undef DSLASH_CLOVER
-#undef DSLASH_CLOVER_XPAY
 #undef GAUGE_FLOAT2
 #undef SPINOR_DOUBLE
-#undef CLOVER_DOUBLE
 #undef SPINOR_HOP
 
 #undef TPROJSCALE

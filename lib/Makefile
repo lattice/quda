@@ -8,23 +8,20 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
 	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o		\
 	gauge_ape.o gauge_stout.o gauge_plaq.o               		\
-	inv_gcr_quda.o inv_mr_quda.o inv_bicgstabl_quda.o     		\
-	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\
+	inv_gcr_quda.o inv_mr_quda.o      		\
 	interface_quda.o util_quda.o color_spinor_field.o		\
 	color_spinor_util.o cpu_color_spinor_field.o			\
-	cuda_color_spinor_field.o dirac.o clover_field.o		\
+	cuda_color_spinor_field.o dirac.o 		\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
-	gauge_update_quda.o dirac_clover.o dirac_wilson.o		\
+	gauge_update_quda.o dirac_wilson.o		\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
-	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
+	dirac_domain_wall.o dirac_domain_wall_4d.o 	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
 	fat_force_quda.o llfat_quda_itf.o llfat_quda.o			\
 	gauge_force.o field_strength_tensor.o clover_quda.o	\
-	dslash_quda.o covDev.o dslash_wilson.o dslash_clover.o		\
-	dslash_clover_asym.o dslash_twisted_mass.o			\
-	dslash_ndeg_twisted_mass.o dslash_twisted_clover.o		\
-	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
+	dslash_quda.o covDev.o dslash_wilson.o 	\
+	dslash_domain_wall.o dslash_domain_wall_4d.o 	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
 	blas_quda.o multi_blas_quda.o copy_quda.o \
 	reduce_quda.o multi_reduce_quda.o face_buffer.o		\
@@ -37,8 +34,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_hs.o copy_color_spinor_hh.o			\
 	extract_gauge_ghost_extended.o copy_gauge_double.o		\
 	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
-	copy_clover.o staggered_oprod.o					\
-	clover_trace_quda.o						\
+	staggered_oprod.o					\
 	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\
@@ -51,7 +47,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
-	quda_memcpy.o quda_arpack_interface.o ${QIO_UTIL}
+	quda_memcpy.o ${QIO_UTIL}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
