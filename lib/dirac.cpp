@@ -166,12 +166,12 @@ namespace quda {
     } else if (param.type == QUDA_ASQTADPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
       return new DiracImprovedStaggeredPC(param);    
-    } else if (param.type == QUDA_COARSE_DIRAC) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
-      return new DiracCoarse(param);
-    } else if (param.type == QUDA_COARSEPC_DIRAC) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
-      return new DiracCoarsePC(param);
+//    } else if (param.type == QUDA_COARSE_DIRAC) {
+//      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
+//      return new DiracCoarse(param);
+//    } else if (param.type == QUDA_COARSEPC_DIRAC) {
+//      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
+//      return new DiracCoarsePC(param);
     }
 
     return 0;

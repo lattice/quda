@@ -154,7 +154,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   //inv_param->gcrNkrylov = 10;
 
   // domain decomposition preconditioner parameters
-  inv_param->inv_type_precondition = QUDA_SD_INVERTER;
+//  inv_param->inv_type_precondition = QUDA_SD_INVERTER;
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
@@ -316,8 +316,6 @@ invert_test(void)
       if(inv_type == QUDA_GCR_INVERTER){
       	inv_param.inv_type = QUDA_GCR_INVERTER;
       	inv_param.gcrNkrylov = 50;
-      }else if(inv_type == QUDA_PCG_INVERTER){
-	inv_param.inv_type = QUDA_PCG_INVERTER;
       }
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
@@ -343,8 +341,6 @@ invert_test(void)
       if(inv_type == QUDA_GCR_INVERTER){
       	inv_param.inv_type = QUDA_GCR_INVERTER;
       	inv_param.gcrNkrylov = 50;
-      }else if(inv_type == QUDA_PCG_INVERTER){
-	inv_param.inv_type = QUDA_PCG_INVERTER;
       }
 
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
@@ -367,92 +363,6 @@ invert_test(void)
     case 2: //full spinor
 
       errorQuda("full spinor not supported\n");
-      break;
-
-    case 3: //multi mass CG, even
-    case 4:
-
-#define NUM_OFFSETS 12
-
-      {    
-        double masses[NUM_OFFSETS] ={0.06, 0.061, 0.064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
-        inv_param.num_offset = NUM_OFFSETS;
-        // these can be set independently
-        for (int i=0; i<inv_param.num_offset; i++) {
-          inv_param.tol_offset[i] = inv_param.tol;
-          inv_param.tol_hq_offset[i] = inv_param.tol_hq;
-        }
-        void* outArray[NUM_OFFSETS];
-
-        cpuColorSpinorField* spinorOutArray[NUM_OFFSETS];
-        spinorOutArray[0] = out;    
-        for(int i=1;i < inv_param.num_offset; i++){
-          spinorOutArray[i] = new cpuColorSpinorField(csParam);       
-        }
-
-        for(int i=0;i < inv_param.num_offset; i++){
-          outArray[i] = spinorOutArray[i]->V();
-          inv_param.offset[i] = 4*masses[i]*masses[i];
-        }
-
-        if (test_type == 3) {
-          inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
-        } else {
-          inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
-        }
-
-        invertMultiShiftQuda(outArray, in->V(), &inv_param);	
-
-        cudaDeviceSynchronize();
-        time0 += clock(); // stop the timer
-        time0 /= CLOCKS_PER_SEC;
-
-        printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n", 
-            time0, inv_param.secs, inv_param.iter, inv_param.secs,
-            inv_param.gflops/inv_param.secs);
-
-
-        printfQuda("checking the solution\n");
-        QudaParity parity = QUDA_INVALID_PARITY;
-        if (inv_param.solve_type == QUDA_NORMOP_SOLVE){
-          //parity = QUDA_EVENODD_PARITY;
-          errorQuda("full parity not supported\n");
-        }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
-          parity = QUDA_EVEN_PARITY;
-        }else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD){
-          parity = QUDA_ODD_PARITY;
-        }else{
-          errorQuda("ERROR: invalid spinor parity \n");
-          exit(1);
-        }
-        for(int i=0;i < inv_param.num_offset;i++){
-          printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-#ifdef MULTI_GPU
-          matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-              spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, 
-              gaugeParam.cpu_prec, tmp, parity);
-#else
-          matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
-#endif
-
-	  mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	  double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	  double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
-	  double l2r = sqrt(nrm2/src2);
-	
-	  printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
-		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
-
-	  //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-	  if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
-	    ret |=1;
-	  }
-	}
-
-        for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
-      }
       break;
 
     default:

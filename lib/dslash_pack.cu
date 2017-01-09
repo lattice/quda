@@ -1451,18 +1451,17 @@ namespace quda {
 		bool zero_copy, const int nFace,
 		const int dagger, const int parity, 
 		const int dim, const int face_num, 
-		const cudaStream_t &stream, 
-		const double a, const double b)
+		const cudaStream_t &stream)
   {
     int nDimPack = 0;
     if(dim < 0){
       for (int d=0; d<4; d++) {
 	if(!commDim[d]) continue;
-	if (d != 3 || getKernelPackT() || a != 0.0 || b!= 0.0) nDimPack++;
+	if (d != 3 || getKernelPackT()) nDimPack++;
       }
     }else{
       if(commDim[dim]){
-	if(dim!=3 || getKernelPackT() || a!=0.0 || b != 0.0) nDimPack++;
+	if(dim!=3 || getKernelPackT()) nDimPack++;
       }
     }
     if (!nDimPack) return; // if zero then we have nothing to pack 

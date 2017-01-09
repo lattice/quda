@@ -1594,7 +1594,6 @@ double clover_coeff = 0.1;
 bool compute_clover = false;
 double tol = 1e-7;
 double tol_hq = 0.;
-QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
@@ -1650,7 +1649,6 @@ void usage(char** argv )
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius\n");
-  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
@@ -2100,16 +2098,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--flavor") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    twist_flavor =  get_flavor_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
+ 
   if( strcmp(argv[i], "--inv-type") == 0){
     if (i+1 >= argc){
       usage(argv);

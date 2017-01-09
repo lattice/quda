@@ -104,7 +104,8 @@ namespace quda {
 
   void GaugeField::applyStaggeredPhase() {
     if (staggeredPhaseApplied) errorQuda("Staggered phases already applied");
-    applyGaugePhase(*this);
+errorQuda("Check this method!");
+//    applyGaugePhase(*this);
     if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
       if (typeid(*this)==typeid(cudaGaugeField)) {
 	static_cast<cudaGaugeField&>(*this).exchangeGhost();
@@ -117,7 +118,8 @@ namespace quda {
 
   void GaugeField::removeStaggeredPhase() {
     if (!staggeredPhaseApplied) errorQuda("No staggered phases to remove");
-    applyGaugePhase(*this);
+errorQuda("Check this method!");
+//    applyGaugePhase(*this);
     if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
       if (typeid(*this)==typeid(cudaGaugeField)) {
 	static_cast<cudaGaugeField&>(*this).exchangeGhost();

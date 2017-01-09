@@ -460,6 +460,23 @@ namespace quda {
     DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarse();
 
+    /**
+       @brief Apply the coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    /**
+       @brief Apply the inverse coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+
 
     /**
        @brief Apply DslashXpay out = (D * in)

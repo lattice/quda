@@ -366,7 +366,7 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
         prolog_str += (
 """
 #include "read_gauge.h"
-#include "read_clover.h"
+//#include "read_clover.h"
 #include "io_spinor.h"
 
 int coord[5];
@@ -432,7 +432,7 @@ int sid;
     else:
         prolog_str+=(
 """
-#include "read_clover.h"
+//#include "read_clover.h"
 #include "io_spinor.h"
 
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -788,17 +788,17 @@ def clover_mult(v_out, v_in, chi):
 
 def apply_clover(v_out,v_in):
     str = ""
-    if dslash: str += "#ifdef DSLASH_CLOVER\n\n"
-    str += "// change to chiral basis\n"
-    str += to_chiral_basis(v_out,v_in,0) + to_chiral_basis(v_out,v_in,1) + to_chiral_basis(v_out,v_in,2)
-    str += "// apply first chiral block\n"
-    str += clover_mult(v_out,v_out,0)
-    str += "// apply second chiral block\n"
-    str += clover_mult(v_out,v_out,1)
-    str += "// change back from chiral basis\n"
-    str += "// (note: required factor of 1/2 is included in clover term normalization)\n"
-    str += from_chiral_basis(v_out,v_out,0) + from_chiral_basis(v_out,v_out,1) + from_chiral_basis(v_out,v_out,2)
-    if dslash: str += "#endif // DSLASH_CLOVER\n\n"
+#    if dslash: str += "#ifdef DSLASH_CLOVER\n\n"
+#    str += "// change to chiral basis\n"
+#    str += to_chiral_basis(v_out,v_in,0) + to_chiral_basis(v_out,v_in,1) + to_chiral_basis(v_out,v_in,2)
+#    str += "// apply first chiral block\n"
+#    str += clover_mult(v_out,v_out,0)
+#    str += "// apply second chiral block\n"
+#    str += clover_mult(v_out,v_out,1)
+#    str += "// change back from chiral basis\n"
+#    str += "// (note: required factor of 1/2 is included in clover term normalization)\n"
+#    str += from_chiral_basis(v_out,v_out,0) + from_chiral_basis(v_out,v_out,1) + from_chiral_basis(v_out,v_out,2)
+#    if dslash: str += "#endif // DSLASH_CLOVER\n\n"
 
     return str
 # end def clover
@@ -865,18 +865,18 @@ def twisted():
 
 def clover_xpay():
     str = ""
-    str += "#ifdef DSLASH_CLOVER_XPAY\n\n"
-    str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
+#    str += "#ifdef DSLASH_CLOVER_XPAY\n\n"
+#    str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
 
-    str += apply_clover("acc","acc")
+#    str += apply_clover("acc","acc")
 
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            str += out_re(s,c) +" = "+acc_re(s,c)+";\n"
-            str += out_im(s,c) +" = "+acc_im(s,c)+";\n"
+#    for s in range(0,4):
+#        for c in range(0,3):
+#            i = 3*s+c
+#            str += out_re(s,c) +" = "+acc_re(s,c)+";\n"
+#            str += out_im(s,c) +" = "+acc_im(s,c)+";\n"
 
-    str += "#endif // DSLASH_CLOVER_XPAY\n"
+#    str += "#endif // DSLASH_CLOVER_XPAY\n"
 
     return str
 #end def clover_xpay
@@ -1070,7 +1070,7 @@ def generate_dslash_kernels(arch):
 
     dslash = True
     twist = False
-    clover = True
+    clover = False
     dagger = False
 
     filename = 'dslash_core/wilson_fused_exterior_dslash_' + name + '_core.h'
@@ -1086,41 +1086,6 @@ def generate_dslash_kernels(arch):
     f.write(generate_dslash())
     f.close()
 
-    asymClover = True
-
-    dagger = False
-    filename = 'dslash_core/asym_wilson_clover_fused_exterior_dslash_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename;
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
-
-    dagger = True
-    filename = 'dslash_core/asym_wilson_clover_fused_exterior_dslash_dagger_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename;
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
-
-    asymClover = False
-
-    twist = True
-    clover = False
-    dagger = False
-    filename = 'dslash_core/tm_fused_exterior_dslash_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename;
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
-
-    dagger = True
-    filename = 'dslash_core/tm_fused_exterior_dslash_dagger_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename + "\n";
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
-
-    twist = False
     dslash = False
 
 

@@ -786,12 +786,6 @@ get_dslash_type(char* s)
   
   if (strcmp(s, "wilson") == 0){
     ret = QUDA_WILSON_DSLASH;
-  }else if (strcmp(s, "clover") == 0){
-    ret = QUDA_CLOVER_WILSON_DSLASH;
-  }else if (strcmp(s, "twisted-mass") == 0){
-    ret = QUDA_TWISTED_MASS_DSLASH;
-  }else if (strcmp(s, "twisted-clover") == 0){
-    ret = QUDA_TWISTED_CLOVER_DSLASH;
   }else if (strcmp(s, "staggered") == 0){
     ret =  QUDA_STAGGERED_DSLASH;
   }else if (strcmp(s, "asqtad") == 0){
@@ -800,8 +794,6 @@ get_dslash_type(char* s)
     ret =  QUDA_DOMAIN_WALL_DSLASH;
   }else if (strcmp(s, "domain-wall-4d") == 0){
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
-  }else if (strcmp(s, "mobius") == 0){
-    ret =  QUDA_MOBIUS_DWF_DSLASH;
   }else{
     fprintf(stderr, "Error: invalid dslash type\n");	
     exit(1);
@@ -819,15 +811,6 @@ get_dslash_str(QudaDslashType type)
   case QUDA_WILSON_DSLASH:
     ret=  "wilson";
     break;
-  case QUDA_CLOVER_WILSON_DSLASH:
-    ret= "clover";
-    break;
-  case QUDA_TWISTED_MASS_DSLASH:
-    ret= "twisted-mass";
-    break;
-  case QUDA_TWISTED_CLOVER_DSLASH:
-    ret= "twisted-clover";
-    break;
   case QUDA_STAGGERED_DSLASH:
     ret = "staggered";
     break;
@@ -839,9 +822,6 @@ get_dslash_str(QudaDslashType type)
       break;
   case QUDA_DOMAIN_WALL_4D_DSLASH:
     ret = "domain_wall_4d";
-      break;
-  case QUDA_MOBIUS_DWF_DSLASH:
-    ret = "mobius";
       break;
   default:
     ret = "unknown";	
@@ -862,8 +842,6 @@ get_mass_normalization_type(char* s)
     ret = QUDA_KAPPA_NORMALIZATION;
   }else if (strcmp(s, "mass") == 0){
     ret = QUDA_MASS_NORMALIZATION;
-  }else if (strcmp(s, "asym-mass") == 0){
-    ret = QUDA_ASYMMETRIC_MASS_NORMALIZATION;
   }else{
     fprintf(stderr, "Error: invalid mass normalization\n");
     exit(1);
@@ -883,9 +861,6 @@ get_mass_normalization_str(QudaMassNormalization type)
     break;
   case QUDA_MASS_NORMALIZATION:
     s = "mass";
-    break;
-  case QUDA_ASYMMETRIC_MASS_NORMALIZATION:
-    s = "asym-mass";
     break;
   default:
     fprintf(stderr, "Error: invalid mass normalization\n");
@@ -999,58 +974,6 @@ get_solve_str(QudaSolveType type)
   return ret;
 }
 
-QudaTwistFlavorType
-get_flavor_type(char* s)
-{
-  QudaTwistFlavorType ret =  QUDA_TWIST_MINUS;
-  
-  if (strcmp(s, "minus") == 0){
-    ret = QUDA_TWIST_MINUS;
-  }else if (strcmp(s, "plus") == 0){
-    ret = QUDA_TWIST_PLUS;
-  }else if (strcmp(s, "deg-doublet") == 0){
-    ret = QUDA_TWIST_DEG_DOUBLET;
-  }else if (strcmp(s, "nondeg-doublet") == 0){
-    ret = QUDA_TWIST_NONDEG_DOUBLET;
-  }else if (strcmp(s, "no") == 0){
-    ret =  QUDA_TWIST_NO;
-  }else{
-    fprintf(stderr, "Error: invalid flavor type\n");	
-    exit(1);
-  }
-  
-  return ret;
-}
-
-const char*
-get_flavor_str(QudaTwistFlavorType type)
-{
-  const char* ret;
-  
-  switch(type) {
-  case QUDA_TWIST_MINUS:
-    ret = "minus";
-    break;
-  case QUDA_TWIST_PLUS:
-    ret = "plus";
-    break;
-  case QUDA_TWIST_DEG_DOUBLET:
-    ret = "deg-doublet";
-    break;
-  case QUDA_TWIST_NONDEG_DOUBLET:
-    ret = "nondeg-doublet";
-    break;
-  case QUDA_TWIST_NO:
-    ret = "no";
-    break;
-  default:
-    ret = "unknown";
-    break;
-  }
-
-  return ret;
-}
-
 QudaInverterType
 get_solver_type(char* s)
 {
@@ -1058,36 +981,10 @@ get_solver_type(char* s)
   
   if (strcmp(s, "cg") == 0){
     ret = QUDA_CG_INVERTER;
-  } else if (strcmp(s, "bicgstab") == 0){
-    ret = QUDA_BICGSTAB_INVERTER;
   } else if (strcmp(s, "gcr") == 0){
     ret = QUDA_GCR_INVERTER;
-  } else if (strcmp(s, "pcg") == 0){
-    ret = QUDA_PCG_INVERTER;
-  } else if (strcmp(s, "mpcg") == 0){
-    ret = QUDA_MPCG_INVERTER; 
-  } else if (strcmp(s, "mpbicgstab") == 0){
-    ret = QUDA_MPBICGSTAB_INVERTER;
-  } else if (strcmp(s, "mr") == 0){
+   } else if (strcmp(s, "mr") == 0){
     ret = QUDA_MR_INVERTER;
-  } else if (strcmp(s, "sd") == 0){
-    ret = QUDA_SD_INVERTER;
-  } else if (strcmp(s, "eigcg") == 0){
-    ret = QUDA_EIGCG_INVERTER;
-  } else if (strcmp(s, "inc-eigcg") == 0){
-    ret = QUDA_INC_EIGCG_INVERTER;
-  } else if (strcmp(s, "gmresdr") == 0){
-    ret = QUDA_GMRESDR_INVERTER;
-  } else if (strcmp(s, "gmresdr-proj") == 0){
-    ret = QUDA_GMRESDR_PROJ_INVERTER;
-  } else if (strcmp(s, "gmresdr-sh") == 0){
-    ret = QUDA_GMRESDR_SH_INVERTER;
-  } else if (strcmp(s, "fgmresdr") == 0){
-    ret = QUDA_FGMRESDR_INVERTER;
-  } else if (strcmp(s, "mg") == 0){
-    ret = QUDA_MG_INVERTER;
-  } else if (strcmp(s, "bicgstab-l") == 0){
-    ret = QUDA_BICGSTABL_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);
@@ -1105,50 +1002,14 @@ get_solver_str(QudaInverterType type)
   case QUDA_CG_INVERTER:
     ret = "cg";
     break;
-  case QUDA_BICGSTAB_INVERTER:
-    ret = "bicgstab";
-    break;
   case QUDA_GCR_INVERTER:
     ret = "gcr";
-    break;
-  case QUDA_PCG_INVERTER:
-    ret = "pcg";
-    break;
-  case QUDA_MPCG_INVERTER:
-    ret = "mpcg";
-    break;
-  case QUDA_MPBICGSTAB_INVERTER:
-    ret = "mpbicgstab";
     break;
   case QUDA_MR_INVERTER:
     ret = "mr";
     break;
-  case QUDA_SD_INVERTER:
-    ret = "sd";
-    break;
-  case QUDA_EIGCG_INVERTER:
-    ret = "eigcg";
-    break;
-  case QUDA_INC_EIGCG_INVERTER:
-    ret = "inc-eigcg";
-    break;
-  case QUDA_GMRESDR_INVERTER:
-    ret = "gmresdr";
-    break;
-  case QUDA_GMRESDR_PROJ_INVERTER:
-    ret = "gmresdr-proj";
-    break;
-  case QUDA_GMRESDR_SH_INVERTER:
-    ret = "gmresdr-sh";
-    break;
-  case QUDA_FGMRESDR_INVERTER:
-    ret = "fgmresdr";
-    break;
   case QUDA_MG_INVERTER:
     ret= "mg";
-    break;
-  case QUDA_BICGSTABL_INVERTER:
-    ret = "bicgstab-l";
     break;
   default:
     ret = "unknown";
