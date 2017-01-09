@@ -135,34 +135,6 @@ void SU3test(int argc, char **argv) {
   double plaq[3];
   plaqQuda(plaq);
   printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-  // Stout smearing should be equivalent to APE smearing
-  // on D dimensional lattices for rho = alpha/2*(D-1). 
-  // Typical APE values are aplha=0.6, rho=0.1 for Stout.
-  unsigned int nSteps = 50;
-  double coeff_APE = 0.6;
-  double coeff_STOUT = coeff_APE/(2*(4-1));
-  QudaVerbosity verbosity = QUDA_VERBOSE;
-  setVerbosity(verbosity);
-  
-  //STOUT
-  // start the timer
-  double time0 = -((double)clock());
-  performSTOUTnStep(nSteps, coeff_STOUT);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for STOUT = %g secs\n", time0);
-
-  //APE
-  // start the timer
-  time0 = -((double)clock());
-  performAPEnStep(nSteps, coeff_APE);  
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for APE = %g secs\n", time0);
-  
 #else
   printf("Skipping plaquette tests since gauge tools have not been compiled\n");
 #endif

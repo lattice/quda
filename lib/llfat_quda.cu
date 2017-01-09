@@ -4,7 +4,6 @@
 
 #include <quda_internal.h>
 #include <gauge_field.h>
-//#include <clover_field.h>
 #include <llfat_quda.h>
 #include <read_gauge.h>
 #include <force_common.h>
