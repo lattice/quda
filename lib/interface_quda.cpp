@@ -13,20 +13,11 @@
 #include <blas_quda.h>
 #include <gauge_field.h>
 #include <dirac_quda.h>
-//#include <ritz_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
-//#include <lanczos_quda.h>
 #include <color_spinor_field.h>
-//#include <eig_variables.h>
-//#include <clover_field.h>
-//#include <llfat_quda.h>
-//#include <fat_force_quda.h>
-//#include <unitarization_links.h>
 #include <algorithm>
 #include <staggered_oprod.h>
-//#include <ks_improved_force.h>
-//#include <ks_force_quda.h>
 
 #include <multigrid.h>
 

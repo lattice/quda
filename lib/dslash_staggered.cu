@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include <color_spinor_field.h>
-//#include <clover_field.h>
 
 //these are access control for staggered action
 #ifdef GPU_STAGGERED_DIRAC

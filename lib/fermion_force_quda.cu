@@ -2,7 +2,6 @@
 #include <dslash_quda.h>
 #include <read_gauge.h>
 #include <gauge_field.h>
-#include <clover_field.h>
 
 #include <fermion_force_quda.h>
 #include <force_common.h>

@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include <color_spinor_field.h>
-//#include <clover_field.h>
 
 // these control the Wilson-type actions
 #ifdef GPU_WILSON_DIRAC
@@ -50,10 +49,6 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 #include <io_spinor.h>
-
-//#include <tm_core.h>              // solo twisted mass kernel
-//#include <tmc_core.h>              // solo twisted mass kernel
-//#include <clover_def.h>           // kernels for applying the clover term alone
   }
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
