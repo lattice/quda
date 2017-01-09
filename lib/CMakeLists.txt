@@ -3,7 +3,7 @@
 set (QUDA_OBJS
   gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_cg_quda.cpp 
-  gauge_ape.cu gauge_stout.cu gauge_plaq.cu
+  gauge_stout.cu gauge_plaq.cu
   inv_gcr_quda.cpp inv_mr_quda.cpp 
   interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
@@ -36,13 +36,10 @@ set (QUDA_OBJS
   staggered_oprod.cu staggered_oprod_new.cu ks_force_quda.cu
   hisq_paths_force_quda.cu fermion_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
-  extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
-  ritz_quda.cpp eig_solver.cpp blas_magma.cu misc_helpers.cu
-  pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
-  gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
-  pgauge_det_trace.cu 
-  momentum.cu qcharge_quda.cu
-  quda_memcpy.cpp version.cpp )
+  extended_color_spinor_utilities.cu 
+  blas_magma.cu misc_helpers.cu
+  random.cu
+  momentum.cu quda_memcpy.cpp version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})

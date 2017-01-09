@@ -66,17 +66,14 @@ set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architectur
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
-set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
 set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
-set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted mass Dirac operators")
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
 set(QUDA_FORCE_ASQTAD OFF CACHE BOOL "build code for asqtad fermion force")
 set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
-set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
 # Dynamic inversion saves memory but decreases the flops
 set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 
@@ -281,22 +278,6 @@ if (QUDA_DIRAC_STAGGERED)
   add_definitions(-DGPU_STAGGERED_DIRAC)
 endif(QUDA_DIRAC_STAGGERED)
 
-if(QUDA_DIRAC_CLOVER)
-  add_definitions(-DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
-endif(QUDA_DIRAC_CLOVER)
-
-if(QUDA_DIRAC_TWISTED_MASS)
-  add_definitions(-DGPU_TWISTED_MASS_DIRAC)
-endif(QUDA_DIRAC_TWISTED_MASS)
-
-if(QUDA_DIRAC_TWISTED_CLOVER)
-  add_definitions(-DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
-endif(QUDA_DIRAC_TWISTED_CLOVER)
-
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
-  add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
-
 if(QUDA_LINK_ASQTAD)
   add_definitions(-DGPU_FATLINK -DGPU_GAUGE_TOOLS)
 endif(QUDA_LINK_ASQTAD)
@@ -320,17 +301,6 @@ endif(QUDA_FORCE_HISQ)
 if(QUDA_GAUGE_TOOLS)
   add_definitions(-DGPU_GAUGE_TOOLS)
 endif(QUDA_GAUGE_TOOLS)
-
-if(QUDA_GAUGE_ALG)
-  add_definitions(-DGPU_GAUGE_ALG)
-  add_definitions(-DGPU_GAUGE_TOOLS)
-  add_definitions(-DGPU_UNITARIZE)
-  LIST(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
-endif(QUDA_GAUGE_ALG)
-
-if(QUDA_DYNAMIC_CLOVER)
-  add_definitions(-DDYNAMIC_CLOVER)
-endif(QUDA_DYNAMIC_CLOVER)
 
 if(QUDA_MPI_NVTX)
   LIST(APPEND COMM_OBJS nvtx_pmpi.c)
