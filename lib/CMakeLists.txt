@@ -97,7 +97,8 @@ endif()
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
-
+# some hackery to prevent having old shared / static builds of quda messing with the current build
+ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
