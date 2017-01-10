@@ -214,14 +214,6 @@ namespace quda {
       for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, csParam);
     }
 
-    // FIXME - hack from hell since static ghosts seem to be broken
-    static int hack = 0;
-    if (hack==0 && reliable) {
-      mat(*y[3], *y[2], *y[1], *y[0]);
-      for (int i=0; i<4; i++) blas::zero(*y[i]);
-      hack = 1;
-    }
-
     csParam.setPrecision(param.precision_sloppy);
   
     cudaColorSpinorField *r_sloppy;
