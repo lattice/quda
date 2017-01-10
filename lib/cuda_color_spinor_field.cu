@@ -49,13 +49,13 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), initComms(false), bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, initComms(false), bufferMessageHandler(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = param.v;
       norm = param.norm;
-   }
+    }
 
     create(param.create);
 
@@ -72,7 +72,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), initComms(false), bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, initComms(false), bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -82,7 +82,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), initComms(false), bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, initComms(false), bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -130,7 +130,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
-      ghostTexInit(false), initComms(false), bufferMessageHandler(0)
+      ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, initComms(false), bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -417,6 +417,8 @@ namespace quda {
 
 	  cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
 	}
+
+	ghost_field_tex[b] = ghost_field[b];
       } // buffer index
 
       ghostTexInit = true;
@@ -427,6 +429,7 @@ namespace quda {
 
   void cudaColorSpinorField::destroyTexObject() {
     if (isNative() && texInit) {
+      cudaDeviceSynchronize();
       cudaDestroyTextureObject(tex);
       if (ghost_bytes) {
 	cudaDestroyTextureObject(ghostTex[0]);
@@ -445,6 +448,7 @@ namespace quda {
 
   void cudaColorSpinorField::destroyGhostTexObject() {
     if (isNative() && ghostTexInit) {
+      cudaDeviceSynchronize();
       cudaDestroyTextureObject(ghostTex[0]);
       cudaDestroyTextureObject(ghostTex[1]);
       if (precision == QUDA_HALF_PRECISION) {
@@ -487,7 +491,6 @@ namespace quda {
     cudaMemsetAsync(v, 0, bytes, streams[Nstream-1]);
     if (precision == QUDA_HALF_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, streams[Nstream-1]);
   }
-
 
   void cudaColorSpinorField::zeroPad() {
     size_t pad_bytes = (stride - volume) * precision * fieldOrder;
@@ -645,6 +648,7 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
+    if (ghost_field_tex[0] != ghost_field[0] || ghost_field_tex[1] != ghost_field[1]) destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
 
@@ -972,12 +976,11 @@ namespace quda {
 
     allocateGhostBuffer(nFace); // allocate the ghost buffer if not yet allocated
 
-    if (bufferMessageHandler != bufferPinnedResizeCount) destroyComms();
-
-    if (!initComms || nFaceComms != nFace) {
+    if (!initComms || nFaceComms != nFace || bufferMessageHandler != bufferPinnedResizeCount) {
 
       // if we are requesting a new number of faces destroy and start over
-      if (nFace != nFaceComms) destroyComms();
+      destroyIPCComms();
+      destroyComms();
 
       if (siteSubset != QUDA_PARITY_SITE_SUBSET) 
 	errorQuda("Only supports single parity fields");
@@ -1238,17 +1241,17 @@ namespace quda {
   }
    
   void cudaColorSpinorField::createIPCComms() {
-    if ( (initIPCComms &&!ghost_field_reset) || comm_size() == 1 ) return;
+    if ( initIPCComms && !ghost_field_reset ) return;
 
     if (!initComms) errorQuda("Can only be called after create comms");
-    if (!ghost_field[0] || !ghost_field[1]) errorQuda("ghost_field appears not to be allocated");
+    if ( (!ghost_field[0] || !ghost_field[1]) && comm_size() > 1) errorQuda("ghost_field appears not to be allocated");
 
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
 
     for (int b=0; b<2; b++) {
       for (int dim=0; dim<4; ++dim) {
-	if (!commDimPartitioned(dim)) continue;
+	if (comm_dim(dim)==1) continue;
 	for (int dir=0; dir<2; ++dir) {
 	  MsgHandle* sendHandle = NULL;
 	  MsgHandle* receiveHandle = NULL;
@@ -1257,8 +1260,7 @@ namespace quda {
 	  // first set up receive
 	  if (comm_peer2peer_enabled(1-dir,dim)) {
 	    receiveHandle = comm_declare_receive_relative(&ipcRemoteGhostDestHandle[b][1-dir][dim],
-							  dim,
-							  -disp,
+							  dim, -disp,
 							  sizeof(ipcRemoteGhostDestHandle[b][1-dir][dim]));
 	  }
 	  // now send
@@ -1266,8 +1268,7 @@ namespace quda {
 	    cudaIpcMemHandle_t ipcLocalGhostDestHandle;
 	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_field[b]);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
-						    dim,
-						    disp,
+						    dim, disp,
 						    sizeof(ipcLocalGhostDestHandle));
 	  }
 	  if (receiveHandle) comm_start(receiveHandle);
@@ -1285,7 +1286,7 @@ namespace quda {
 
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
-	if (!commDimPartitioned(dim)) continue;
+	if (comm_dim(dim)==1) continue;
 	const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
@@ -1302,12 +1303,10 @@ namespace quda {
     // handles for obtained events
     cudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
 
-    // Note that the events can and probably should be static.
-    // We don't want a proliferation of events, I don't think
-    // Also note that no b index is necessary here
+    // Note that no b index is necessary here
     // Now communicate the event handles
     for (int dim=0; dim<4; ++dim) {
-      if (!commDimPartitioned(dim)) continue;
+      if (comm_dim(dim)==1) continue;
       for (int dir=0; dir<2; ++dir) {
 	for (int b=0; b<2; b++) {
 
@@ -1317,9 +1316,7 @@ namespace quda {
 
 	  // first set up receive
 	  if (comm_peer2peer_enabled(1-dir,dim)) {
-	    receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[b][1-dir][dim],
-							  dim,
-							  -disp,
+	    receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[b][1-dir][dim], dim, -disp,
 							  sizeof(ipcRemoteEventHandle[b][1-dir][dim]));
 	  }
 
@@ -1329,9 +1326,7 @@ namespace quda {
 	    cudaIpcEventHandle_t ipcLocalEventHandle;
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
-	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle,
-						    dim,
-						    disp,
+	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
 						    sizeof(ipcLocalEventHandle));
 	  }
 
@@ -1351,7 +1346,7 @@ namespace quda {
     checkCudaError();
 
     for (int dim=0; dim<4; ++dim) {
-      if (!commDimPartitioned(dim)) continue;
+      if (comm_dim(dim)==1) continue;
       for (int dir=0; dir<2; ++dir) {
 	if (!comm_peer2peer_enabled(dir,dim)) continue;
 	for (int b=0; b<2; b++) {
@@ -1362,7 +1357,7 @@ namespace quda {
 
     // Create message handles for IPC synchronization
     for (int dim=0; dim<4; ++dim) {
-      if (!commDimPartitioned(dim)) continue;
+      if (comm_dim(dim)==1) continue;
       if (comm_peer2peer_enabled(1,dim)) {
 	for (int b=0; b<2; b++) {
 	  // send to processor in forward direction
@@ -1394,7 +1389,7 @@ namespace quda {
 
     for (int dim=0; dim<4; ++dim) {
 
-      if (!commDimPartitioned(dim)) continue;
+      if (comm_dim(dim)==1) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
     
       for (int b=0; b<2; b++) {
