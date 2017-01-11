@@ -132,6 +132,23 @@ ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_direc
 # some hackery to prevent having old shared / static builds of quda messing with the current build
 ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
+install(TARGETS quda EXPORT qudaTargets
+        LIBRARY DESTINATION lib
+        INCLUDES DESTINATION include)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
+  VERSION ${QUDA_VERSION}
+  COMPATIBILITY AnyNewerVersion
+)
+
+export(EXPORT qudaTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake" NAMESPACE quda::)
+set(ConfigPackageLocation lib/cmake/quda/)
+install(EXPORT qudaTargets NAMESPACE quda:: DESTINATION ${ConfigPackageLocation})
+
+
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating dslash_core files" )

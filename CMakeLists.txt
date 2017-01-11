@@ -47,7 +47,8 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA")
+project("QUDA" VERSION 0.9.0)
+
 
 #######################################################################
 # QUDA OPTIONS
