@@ -96,6 +96,37 @@ else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
 
+# add dependencies for linking
+# if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
+FIND_LIBRARY(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
+
+target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LIBRARY})
+
+if(QUDA_QIO)
+  target_link_libraries(quda ${QIO_LIB} ${LIME_LIB})
+endif()
+
+if(QUDA_QMP)
+  target_link_libraries(quda ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+endif()
+
+if(QUDA_MPI)
+  target_link_libraries(quda ${MPI_CXX_LIBRARIES})
+endif()
+
+if(QUDA_MAGMA)
+  target_link_libraries(quda TEST_LIBS ${MAGMA})
+endif()
+
+if(QUDA_ARPACK)
+  target_link_libraries(quda ${PARPACK_OR_ARPACK})
+endif()
+
+if(QUDA_NUMA_NVML)
+target_link_libraries(quda ${NVML_LIBRARY})
+endif()
+
+
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 # some hackery to prevent having old shared / static builds of quda messing with the current build
