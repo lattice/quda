@@ -70,9 +70,6 @@ set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
-set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
-set(QUDA_FORCE_ASQTAD OFF CACHE BOOL "build code for asqtad fermion force")
-set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 # Dynamic inversion saves memory but decreases the flops
 set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
@@ -240,11 +237,6 @@ if(QUDA_ARPACK)
   endif()
 endif(QUDA_ARPACK)
 
-
-if(QUDA_SSTEP)
-  add_definitions(-DSSTEP)
-endif()
-
 if (QUDA_MULTIGRID)
   add_definitions(-DGPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
@@ -285,18 +277,6 @@ endif(QUDA_LINK_ASQTAD)
 if(QUDA_LINK_HISQ)
   add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS)
 endif(QUDA_LINK_HISQ)
-
-if(QUDA_FORCE_GAUGE)
-  add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_GAUGE)
-
-if(QUDA_FORCE_ASQTAD)
-  add_definitions(-DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_ASQTAD)
-
-if(QUDA_FORCE_HISQ)
-  add_definitions(-DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_HISQ)
 
 if(QUDA_GAUGE_TOOLS)
   add_definitions(-DGPU_GAUGE_TOOLS)

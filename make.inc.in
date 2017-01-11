@@ -21,37 +21,18 @@ BLAS_TEX = @BLAS_TEX@			# enable texture reads in BLAS?
 FERMI_DBLE_TEX = @FERMI_DBLE_TEX@		# enable double-precision texture reads on Fermi?
 
 BUILD_WILSON_DIRAC = @BUILD_WILSON_DIRAC@			# build Wilson Dirac operators?
-BUILD_CLOVER_DIRAC = @BUILD_CLOVER_DIRAC@			# build clover Dirac operators?
 BUILD_DOMAIN_WALL_DIRAC = @BUILD_DOMAIN_WALL_DIRAC@		# build domain wall Dirac operators?
 BUILD_STAGGERED_DIRAC = @BUILD_STAGGERED_DIRAC@			# build staggered Dirac operators?
-BUILD_TWISTED_MASS_DIRAC = @BUILD_TWISTED_MASS_DIRAC@		# build twisted mass Dirac operators?
-BUILD_TWISTED_CLOVER_DIRAC = @BUILD_TWISTED_CLOVER_DIRAC@	# build twisted clover Dirac operators?
-BUILD_NDEG_TWISTED_MASS_DIRAC = @BUILD_NDEG_TWISTED_MASS_DIRAC@	# build non-degenerate twisted mass Dirac operators?
 BUILD_FATLINK = @BUILD_FATLINK@					# build code for computing asqtad fat links?
 BUILD_HISQLINK = @BUILD_HISQLINK@				# build code for computing hisq fat links?
-BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@				# build code for (1-loop Symanzik) gauge force?
-BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@			# build code for asqtad fermion force?
-BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
-BUILD_GAUGE_ALG = @BUILD_GAUGE_ALG@				# build gauge-fixing and pure-gauge algorithms?
-BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
 BUILD_MULTIGRID = @BUILD_MULTIGRID@                                 # build multigrid linear solvers?
-
-#Dynamically invert the clover term for twisted-clover?
-DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases the flops
 
 # Multi-GPU options
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
-
-#BLAS library
-BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
-BUILD_MAGMA_VARS = @BUILD_MAGMA_VARS@ # build magma using env vars MAGMA_INC and MAGMA_LIB
-#ARPACK library
-BUILD_ARPACK = @BUILD_ARPACK@     # build arpack interface
-BUILD_ARPACK_VARS = @BUILD_ARPACK_VARS@ # build arpack using env vars ARPACK_LIB
 
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
@@ -71,9 +52,6 @@ BUILD_TIFR_INTERFACE = @BUILD_TIFR_INTERFACE@                   # build tifr int
 
 # Packing option
 DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
-
-# GPU contractions of spinors
-BUILD_CONTRACT = @BUILD_CONTRACT@    # build code for bilinear contraction?
 
 BUILD_QIO = @BUILD_QIO@    # set to 'yes' to build QIO code for binary I/O
 
@@ -169,52 +147,9 @@ ifeq ($(strip $(INTERFACE_NVTX)), yes)
   endif
 endif
 
-ifeq ($(strip $(BUILD_MAGMA)), yes)
-  ifeq ($(strip $(BUILD_MAGMA_VARS)),yes)
-     MAGMA_INCLUDE = ${MAGMA_INC}
-     LIB += ${MAGMA_LIB}
-  else
-     MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
-     LIB += $(shell pkg-config --libs magma)
-  endif
-
-  MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
-  COPT += -fopenmp  -DMAGMA_LIB
-else
-  MAGMA_INCLUDE =
-  MAGMA_FLAGS   =
-endif
-
-ifeq ($(strip $(BUILD_ARPACK)), yes)
-  ifeq ($(strip $(BUILD_ARPACK_VARS)),yes)
-     LIB += ${ARPACK_LIB}
-  else
-    ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
-        LIB += $(shell pkg-config --libs parpack)
-     else
-        LIB += $(shell pkg-config --libs arpack)
-     endif
-  endif
-
-  ARPACK_FLAGS   = -DARPACK_LIB
-  COPT += -fopenmp  -DARPACK_LIB
-else
-  ARPACK_FLAGS   =
-endif
-
-ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
-  NVCCOPT += -DDYNAMIC_CLOVER
-  COPT += -DDYNAMIC_CLOVER
-endif
-
 ifeq ($(strip $(BUILD_MULTIGRID)), yes)
   NVCCOPT += -DGPU_MULTIGRID
   COPT += -DGPU_MULTIGRID
-endif
-
-ifeq ($(strip $(BUILD_SSTEP)), yes)
-  NVCCOPT += -DSSTEP
-  COPT += -DSSTEP
 endif
 
 ifeq ($(strip $(POSIX_THREADS)), yes)
@@ -240,26 +175,6 @@ ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   COPT += -DGPU_STAGGERED_DIRAC
 endif
 
-ifeq ($(strip $(BUILD_CLOVER_DIRAC)), yes)
-  NVCCOPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
-  COPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
-endif
-
-ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
-  NVCCOPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-  COPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-endif
-
-ifeq ($(strip $(BUILD_TWISTED_CLOVER_DIRAC)), yes)
-  NVCCOPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
-  COPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
-endif
-
-ifeq ($(strip $(BUILD_NDEG_TWISTED_MASS_DIRAC)), yes)
-  NVCCOPT += -DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-  COPT += -DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-endif
-
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
   COPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
@@ -274,30 +189,9 @@ ifeq ($(strip $(BUILD_HISQLINK)), yes)
   COPT    += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
 endif
 
-ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
-  NVCCOPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
-  COPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
-endif
-
-ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
-  NVCCOPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
-  COPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
-endif
-
-ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
-  NVCCOPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
-  COPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
-endif
-
 ifeq ($(strip $(BUILD_GAUGE_TOOLS)), yes)
   NVCCOPT += -DGPU_GAUGE_TOOLS
   COPT += -DGPU_GAUGE_TOOLS
-endif
-
-ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
-  NVCCOPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
-  COPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
-  LIB += -lcufft -lcurand
 endif
 
 QUDA_DEBUG = false
@@ -370,11 +264,6 @@ endif
 ifeq ($(strip $(DEVICE_PACK)), yes)
   NVCCOPT += -DDEVICE_PACK
   COPT += -DDEVICE_PACK
-endif
-
-ifeq ($(strip $(BUILD_CONTRACT)), yes)
-  NVCCOPT += -DGPU_CONTRACT
-  COPT += -DGPU_CONTRACT
 endif
 
 ### Next conditional is necessary.

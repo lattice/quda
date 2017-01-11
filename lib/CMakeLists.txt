@@ -10,20 +10,18 @@ set (QUDA_OBJS
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
   lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu
-  extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
+  extract_gauge_ghost_mg.cu max_gauge.cu
   dirac_wilson.cpp dirac_staggered.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
-  dirac_domain_wall_4d.cpp  
-  tune.cpp fat_force_quda.cpp
-  llfat_quda_itf.cpp llfat_quda.cu gauge_force.cu
-  field_strength_tensor.cu dslash_quda.cu 
+  dirac_domain_wall_4d.cpp tune.cpp fat_force_quda.cpp
+  llfat_quda_itf.cpp llfat_quda.cu dslash_quda.cu 
   dslash_wilson.cu dslash_domain_wall.cu
   dslash_domain_wall_4d.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
   multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
-  copy_gauge_extended.cu
+  copy_gauge_extended.cu ks_force_quda.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_ss.cu
@@ -33,13 +31,12 @@ set (QUDA_OBJS
   copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
   copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu 
-  staggered_oprod.cu staggered_oprod_new.cu ks_force_quda.cu
-  hisq_paths_force_quda.cu fermion_force_quda.cu
-  unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
+  staggered_oprod.cu staggered_oprod_new.cu
+  unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu 
   blas_magma.cu misc_helpers.cu
   random.cu
-  momentum.cu quda_memcpy.cpp version.cpp )
+  quda_memcpy.cpp version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})

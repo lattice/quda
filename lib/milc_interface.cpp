@@ -1,3 +1,4 @@
+#ifdef BUILD_MILC_INTERFACE
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -12,7 +13,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-#ifdef BUILD_MILC_INTERFACE
 
 // code for NVTX taken from Jiri Kraus' blog post:
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/

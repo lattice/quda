@@ -16,11 +16,8 @@ extern cudaStream_t *stream;
  * Staple exchange routine
  * used in fat link computation
  ***************************************************************/
-//#ifndef CLOVER_FORCE
-//#define CLOVER_FORCE
-//#endif
 
-#if defined(MULTI_GPU) && (defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE) || defined(CLOVER_FORCE)) || defined(GPU_CLOVER_DIRAC)
+#if defined(MULTI_GPU) && defined(GPU_FATLINK) 
 
 enum {
   XUP = 0,

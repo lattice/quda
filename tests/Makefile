@@ -19,10 +19,6 @@ ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
 endif
 
-ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
-  GAUGE_ALG_TEST= gauge_alg_test
-endif
-
 TESTS = su3_test pack_test dslash_test invert_test		\
 	$(STAGGERED_DIRAC_TEST)	\
 	$(GAUGE_ALG_TEST)
@@ -44,9 +40,6 @@ staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_refe
 su3_test: su3_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-gauge_alg_test: gauge_alg_test.o test_util.o misc.o gtest-all.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
-
 pack_test: pack_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
@@ -54,10 +47,9 @@ blas_test: blas_test.o gtest-all.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:
-	-rm -f *.o dslash_test invert_test deflation_test staggered_dslash_test	\
+	-rm -f *.o dslash_test invert_test staggered_dslash_test	\
 	staggered_invert_test su3_test pack_test blas_test llfat_test	\
-	gauge_force_test fermion_force_test hisq_paths_force_test	\
-	hisq_unitarize_force_test unitarize_link_test multigrid_invert_test
+	unitarize_link_test multigrid_invert_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

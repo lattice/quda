@@ -6,7 +6,6 @@
 #include <quda_internal.h>
 #include <read_gauge.h>
 #include "gauge_field.h"
-#include <force_common.h>
 #include "llfat_quda.h"
 #include <face_quda.h>
 
