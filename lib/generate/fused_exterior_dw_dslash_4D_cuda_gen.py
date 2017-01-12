@@ -557,11 +557,11 @@ def gen(dir, pack_only=False):
 
 
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
-        if domain_wall: str += "const int ga_idx = Vh+(face_idx % ghostFace[" + `dir/2` + "]);\n"
-        else: str += "const int ga_idx = Vh+face_idx;\n"
+        if domain_wall: str += "const int ga_idx = param.volume4CB+(face_idx % ghostFace[" + `dir/2` + "]);\n"
+        else: str += "const int ga_idx = param.volume4CB+face_idx;\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -733,7 +733,7 @@ def gen_dw_inv():
     str += "// 'w' means output vector\n"
     str += "// 'v' means input vector\n"
     str += "{\n"
-    str += "  int base_idx = sid%Vh;\n"
+    str += "  int base_idx = sid%param.volume4CB;\n"
     str += "  int sp_idx;\n\n"
     str += "// let's assume the index,\n"
     str += "// s = output vector index,\n"
@@ -749,7 +749,7 @@ def gen_dw_inv():
         str += "    factorR = ( coord[4] > s ? -inv_d_n*pow(kappa,param.Ls-coord[4]+s)*mferm : inv_d_n*pow(kappa,s-coord[4]))/2.0;\n\n"
     else : 
         str += "    factorR = ( coord[4] < s ? -inv_d_n*pow(kappa,param.Ls-s+coord[4])*mferm : inv_d_n*pow(kappa,coord[4]-s))/2.0;\n\n"
-    str += "    sp_idx = base_idx + s*Vh;\n"
+    str += "    sp_idx = base_idx + s*param.volume4CB;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
     str += "    o00_re += factorR*(i00_re + i20_re);\n" 
