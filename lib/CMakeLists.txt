@@ -75,7 +75,7 @@ endif()
 mark_as_advanced(QUDA_GITDIR)
 
 
-
+# include_directories
 include_directories(dslash_core)
 include_directories(.)
 
@@ -95,6 +95,8 @@ if(QUDA_BUILD_SHAREDLIB)
 else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
 
 # add dependencies for linking
 # if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
