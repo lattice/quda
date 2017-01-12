@@ -1975,3 +1975,138 @@ void plaqQuda (double plq[3])
   return;
 }
 
+
+//A.S. : If we want to use external improved staggered configurations , not just randomly generated, we can re-introduce all stuff for the routine below (files / parameters / structures etc.) 
+// or maybe just to read pre-computed long links, or compute them in a simple c-code, see construct_fat_long_gauge_field in tests/test_util.cpp? (I did this long time ago)
+#if 0
+void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param)
+{
+#ifdef GPU_FATLINK
+  profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
+  profileFatLink.TPSTART(QUDA_PROFILE_INIT);
+
+  if(ulink){
+    const double unitarize_eps = 1e-14;
+    const double max_error = 1e-10;
+    const int reunit_allow_svd = 1;
+    const int reunit_svd_only  = 0;
+    const double svd_rel_error = 1e-6;
+    const double svd_abs_error = 1e-6;
+    quda::setUnitarizeLinksConstants(unitarize_eps, max_error,
+        reunit_allow_svd, reunit_svd_only,
+        svd_rel_error, svd_abs_error);
+  }
+
+  cudaGaugeField* cudaFatLink        = NULL;
+  cudaGaugeField* cudaLongLink       = NULL;
+  cudaGaugeField* cudaUnitarizedLink = NULL;
+  cudaGaugeField* cudaInLinkEx       = NULL;
+
+  QudaGaugeParam qudaGaugeParam_ex_buf;
+  QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;
+  memcpy(qudaGaugeParam_ex, param, sizeof(QudaGaugeParam));
+  int R[4] = {2, 2, 2, 2};
+  for(int dir=0; dir<4; ++dir){ qudaGaugeParam_ex->X[dir] = param->X[dir]+2*R[dir]; }
+
+  // fat-link padding
+  setFatLinkPadding(param);
+  qudaGaugeParam_ex->llfat_ga_pad = param->llfat_ga_pad;
+  qudaGaugeParam_ex->staple_pad   = param->staple_pad;
+  qudaGaugeParam_ex->site_ga_pad  = param->site_ga_pad;
+
+  GaugeFieldParam gParam(0, *param);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  // create the host fatlink
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.gauge = fatlink;
+  cpuGaugeField cpuFatLink(gParam);
+  gParam.gauge = longlink;
+  cpuGaugeField cpuLongLink(gParam);
+  gParam.gauge = ulink;
+  cpuGaugeField cpuUnitarizedLink(gParam);
+
+  // create the host sitelink
+  gParam.link_type = param->type;
+  gParam.gauge     = inlink;
+  cpuGaugeField cpuInLink(gParam);
+
+  // create the device fatlink
+  gParam.pad    = param->llfat_ga_pad;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.setPrecision(param->cuda_prec);
+  cudaFatLink = new cudaGaugeField(gParam);
+  if(ulink) cudaUnitarizedLink = new cudaGaugeField(gParam);
+  if(longlink) cudaLongLink = new cudaGaugeField(gParam);
+
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(param->cuda_prec);
+  gParam.pad         = param->site_ga_pad;
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
+  gParam.link_type   = param->type;
+  cudaGaugeField* cudaInLink = new cudaGaugeField(gParam);
+
+  for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaInLinkEx = new cudaGaugeField(gParam);
+
+  profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
+  fatlink::initLatticeConstants(*cudaFatLink, profileFatLink);
+  profileFatLink.TPSTART(QUDA_PROFILE_INIT);
+  cudaGaugeField* inlinkPtr;
+  llfat_init_cuda_ex(qudaGaugeParam_ex);
+  inlinkPtr = cudaInLinkEx;
+  profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileFatLink.TPSTART(QUDA_PROFILE_H2D);
+  cudaInLink->loadCPUField(cpuInLink);
+  profileFatLink.TPSTOP(QUDA_PROFILE_H2D);
+
+  profileFatLink.TPSTART(QUDA_PROFILE_COMMS);
+  copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
+  cudaInLinkEx->exchangeExtendedGhost(R,true);
+  profileFatLink.TPSTOP(QUDA_PROFILE_COMMS);
+
+  quda::computeFatLinkCore(inlinkPtr, const_cast<double*>(path_coeff), param, cudaFatLink, cudaLongLink, profileFatLink);
+
+  if(ulink){
+    profileFatLink.TPSTART(QUDA_PROFILE_INIT);
+    *num_failures_h = 0;
+    profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
+
+    profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
+    quda::unitarizeLinks(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
+    profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    if(*num_failures_h>0){
+      errorQuda("Error in the unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
+    }
+    profileFatLink.TPSTART(QUDA_PROFILE_D2H);
+    cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink);
+    profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
+  }
+
+  profileFatLink.TPSTART(QUDA_PROFILE_D2H);
+  if(fatlink) cudaFatLink->saveCPUField(cpuFatLink);
+  if(longlink) cudaLongLink->saveCPUField(cpuLongLink);
+  profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileFatLink.TPSTART(QUDA_PROFILE_FREE);
+  if(longlink) delete cudaLongLink;
+  delete cudaFatLink;
+  delete cudaInLink;
+  delete cudaUnitarizedLink;
+  if(cudaInLinkEx) delete cudaInLinkEx;
+  profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
+#else
+  errorQuda("Fat-link has not been built");
+#endif // GPU_FATLINK
+
+  return;
+}
+
+#endif
