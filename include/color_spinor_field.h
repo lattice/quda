@@ -477,6 +477,7 @@ namespace quda {
 
     static size_t ghostFaceBytes;
     static void *ghost_field[2];     // GPU halo receive buffer
+    void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
     static void *ghostFaceBuffer[2]; // GPU halo send buffer
     static void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer

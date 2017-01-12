@@ -568,14 +568,14 @@ def gen(dir, pack_only=False):
 
     str += "\n"
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));\n"
-        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));\n"
+        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.volume4CB+face_idx);\n"
         str += "#else\n"
-        if domain_wall: str += "const int ga_idx = sp_idx % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sp_idx % param.volume4CB;\n"
         else: str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
     str += "\n"
@@ -756,7 +756,7 @@ def gen_dw():
       str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n"
     str += "{\n// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
-    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
+    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*param.volume4CB : X%s2*param.volume4CB ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -799,7 +799,7 @@ def gen_dw():
     str += "  } // end P_L\n\n"
     str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
     str += "  {\n"
-    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
+    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*param.volume4CB : X%s2*param.volume4CB ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -912,7 +912,7 @@ def gen_dw_inv():
     str += "// 'w' means output vector\n"
     str += "// 'v' means input vector\n"
     str += "{\n"
-    str += "  int base_idx = sid%Vh;\n"
+    str += "  int base_idx = sid%param.volume4CB;\n"
     str += "  int sp_idx;\n\n"
     str += "// let's assume the index,\n"
     str += "// s = output vector index,\n"
@@ -930,7 +930,7 @@ def gen_dw_inv():
     else : 
         str += "    int exponent = coord[4] < s ? param.Ls-s+coord[4] : coord[4]-s;\n"
         str += "    factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0) );\n\n"
-    str += "    sp_idx = base_idx + s*Vh;\n"
+    str += "    sp_idx = base_idx + s*param.volume4CB;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
     str += "    o00_re += factorR*(i00_re + i20_re);\n" 

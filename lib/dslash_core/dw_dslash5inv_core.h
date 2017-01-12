@@ -166,7 +166,7 @@ VOLATILE spinorFloat kappa;
 // 'w' means output vector
 // 'v' means input vector
 {
-  int base_idx = sid%Vh;
+  int base_idx = sid%param.volume4CB;
   int sp_idx;
 
 // let's assume the index,
@@ -183,7 +183,7 @@ VOLATILE spinorFloat kappa;
     int exponent = coord[4] < s ? param.Ls-s+coord[4] : coord[4]-s;
     factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0) );
 
-    sp_idx = base_idx + s*Vh;
+    sp_idx = base_idx + s*param.volume4CB;
     // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 

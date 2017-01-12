@@ -120,10 +120,6 @@ cudaGaugeField *extendedGaugeResident = NULL;
 
 std::vector<cudaColorSpinorField*> solutionResident;
 
-// FIXME - this is temporary hack for persistent quark fields
-std::vector<ColorSpinorField*> quarkX;
-std::vector<ColorSpinorField*> quarkP;
-
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 2
 // each entry is a pair for both p and Ap storage
@@ -861,11 +857,6 @@ void endQuda(void)
     if(solutionResident[i]) delete solutionResident[i];
   }
   solutionResident.clear();
-
-  for (unsigned int i=0; i<quarkX.size(); i++) delete quarkX[i];
-  quarkX.clear();
-  for (unsigned int i=0; i<quarkP.size(); i++) delete quarkP[i];
-  quarkP.clear();
 
   LatticeField::freeBuffer(0);
   LatticeField::freeBuffer(1);
