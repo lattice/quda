@@ -155,7 +155,7 @@ coord[4] = X/(X1*X2*X3*X4);
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
-     int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
+     int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*param.volume4CB : X+2*param.volume4CB ) / 2;
 
 // read spinor from device memory
      READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
@@ -200,7 +200,7 @@ coord[4] = X/(X1*X2*X3*X4);
 
  // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
   {
-    int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
+    int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*param.volume4CB : X-2*param.volume4CB ) / 2;
 
 // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );

@@ -140,10 +140,6 @@ cudaGaugeField *extendedGaugeResident = NULL;
 
 std::vector<cudaColorSpinorField*> solutionResident;
 
-// FIXME - this is temporary hack for persistent quark fields
-std::vector<ColorSpinorField*> quarkX;
-std::vector<ColorSpinorField*> quarkP;
-
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 2
 // each entry is a pair for both p and Ap storage
@@ -1196,11 +1192,6 @@ void endQuda(void)
     if(solutionResident[i]) delete solutionResident[i];
   }
   solutionResident.clear();
-
-  for (unsigned int i=0; i<quarkX.size(); i++) delete quarkX[i];
-  quarkX.clear();
-  for (unsigned int i=0; i<quarkP.size(); i++) delete quarkP[i];
-  quarkP.clear();
 
   if(momResident) delete momResident;
 
@@ -5064,20 +5055,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-#if 0
-  std::vector<ColorSpinorField*> quarkX(nvector);
-  std::vector<ColorSpinorField*> quarkP(nvector);
-#endif
-
-  int x_size = quarkX.size();
-  for (int i=x_size; i<nvector; i++) quarkX.push_back(ColorSpinorField::Create(qParam));
-  int p_size = quarkP.size();
-  for (int i=p_size; i<nvector; i++) quarkP.push_back(ColorSpinorField::Create(qParam));
-
-  std::vector<ColorSpinorField*> quarkX_, quarkP_;
+  std::vector<ColorSpinorField*> quarkX, quarkP;
   for (int i=0; i<nvector; i++) {
-    quarkX_.push_back(quarkX[i]);
-    quarkP_.push_back(quarkP[i]);
+    quarkX.push_back(ColorSpinorField::Create(qParam));
+    quarkP.push_back(ColorSpinorField::Create(qParam));
   }
 
   qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -5120,8 +5101,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   std::vector<double> force_coeff(nvector);
   // loop over different quark fields
   for(int i=0; i<nvector; i++){
-    ColorSpinorField &x = *(quarkX_[i]);
-    ColorSpinorField &p = *(quarkP_[i]);
+    ColorSpinorField &x = *(quarkX[i]);
+    ColorSpinorField &p = *(quarkP[i]);
 
     if (!inv_param->use_resident_solution) {
       // for downloading x_e
@@ -5159,7 +5140,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
   }
 
-  computeCloverForce(cudaForce, *gaugePrecise, quarkX_, quarkP_, force_coeff);
+  computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
 
   // In double precision the clover derivative is faster with no reconstruct
   cudaGaugeField *u = &gaugeEx;
@@ -5180,7 +5161,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     ferm_epsilon[shift][1] = -kappa2 * 2.0*ck*coeff[shift]*dt;
   }
 
-  computeCloverSigmaOprod(oprod, quarkX_, quarkP_, ferm_epsilon);
+  computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
   copyExtendedGauge(oprodEx, oprod, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to oprod
   cudaDeviceSynchronize(); // ensure compute timing is correct
 
@@ -5207,12 +5188,12 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
 
-#if 0
   for (int i=0; i<nvector; i++) {
     delete quarkX[i];
     delete quarkP[i];
   }
 
+#if 0
   if (inv_param->use_resident_solution) {
     for (int i=0; i<nvector; i++) delete solutionResident[i];
     solutionResident.clear();
