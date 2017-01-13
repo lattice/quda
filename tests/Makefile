@@ -48,8 +48,8 @@ blas_test: blas_test.o gtest-all.o test_util.o misc.o $(QUDA)
 
 clean:
 	-rm -f *.o dslash_test invert_test staggered_dslash_test	\
-	staggered_invert_test su3_test pack_test blas_test llfat_test	\
-	unitarize_link_test multigrid_invert_test
+	staggered_invert_test su3_test pack_test blas_test 	\
+	multigrid_invert_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

@@ -5,7 +5,7 @@
 
 #include <quda_internal.h>
 #include <comm_quda.h>
-#include <fat_force_quda.h>
+//#include <fat_force_quda.h>
 #include <face_quda.h>
 
 using namespace quda;

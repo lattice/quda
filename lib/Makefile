@@ -191,12 +191,6 @@ dslash_pack.o: dslash_pack.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 gauge_plaq.o: gauge_plaq.cu $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-milc_interface.o: milc_interface.cpp $(HDRS) $(CORE)
-	$(NVCC) $(NVCCFLAGS) $< -c -o $@
-
-blas_magma.o: blas_magma.cu $(HDRS)
-	$(NVCC) $(MAGMA_INCLUDE) $(NVCCFLAGS) $(MAGMA_FLAGS) $< -c -o $@
-
 copy_gauge_double.o: copy_gauge_double.cu copy_gauge_inc.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 

@@ -71,34 +71,6 @@ static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
-//for MAGMA lib:
-#include <blas_magma.h>
-
-static bool InitMagma = false;
-
-void openMagma() {
-
-  if (!InitMagma) {
-    BlasMagmaArgs::OpenMagma();
-    InitMagma = true;
-  } else {
-    printfQuda("\nMAGMA library was already initialized..\n");
-  }
-
-}
-
-void closeMagma(){
-
-  if (InitMagma) {
-    BlasMagmaArgs::CloseMagma();
-    InitMagma = false;
-  } else {
-    printfQuda("\nMAGMA library was not initialized..\n");
-  }
-
-  return;
-}
-
 cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
@@ -1511,11 +1483,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  openMagma();
+//  openMagma();	TODO MUST LOOK FOR ALTERNATIVE
 
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
 
-  closeMagma();
+//  closeMagma();	TODO MUST LOOK FOR ALTERNATIVE
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   saveProfile(__func__);

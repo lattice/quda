@@ -68,38 +68,16 @@ set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
-set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
-set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 # Dynamic inversion saves memory but decreases the flops
 set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 
 # Multi-GPU options
-set(QUDA_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
 set(QUDA_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
 set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
 
-#BLAS library
-set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
-
-#ARPACK
-set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
-
 # Interface options
 set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
-set(QUDA_INTERFACE_MILC ON CACHE BOOL "build milc interface")
-set(QUDA_INTERFACE_CPS OFF CACHE BOOL "build cps interface")
-set(QUDA_INTERFACE_QDPJIT OFF CACHE BOOL "build qdpjit interface")
-set(QUDA_INTERFACE_BQCD OFF CACHE BOOL "build bqcd interface")
-set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
-
-# QDPJIT
-set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
-
-# Locations for QIO / QMP
-set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
-set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
-set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
@@ -124,10 +102,7 @@ set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communic
 set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
 
 # features in development
-set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
-set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
-set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -144,9 +119,6 @@ mark_as_advanced(QUDA_GPU_COMMS)
 
 mark_as_advanced(QUDA_DEVICE_PACK)
 
-mark_as_advanced(QUDA_SSTEP)
-mark_as_advanced(QUDA_EIGEN)
-mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_MULTIGRID)
 
 #######################################################################
@@ -204,55 +176,9 @@ if(QUDA_QIO)
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
 endif()
 
-if(QUDA_MAGMA)
-  add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(MAGMA  magma)
-  include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
-  message(${MAGMA_INCLUDEDIR})
-  find_package(OpenMP)
-  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
-endif(QUDA_MAGMA)
-
-# This selects arpack or parpack for Multi GPU
-if(QUDA_ARPACK)
-  add_definitions(-DARPACK_LIB)
-  find_package(PkgConfig REQUIRED)
-  if(QUDA_QMP OR QUDA_MPI)
-    pkg_check_modules(PARPACK QUIET parpack)
-    if(NOT PARPACK_FOUND OR QUDA_ARPACK_HOME)
-      find_library(PARPACK parpack PATH ${QUDA_ARPACK_HOME})
-    else()
-      find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
-    endif()
-  set(PARPACK_OR_ARPACK ${PARPACK})
-  else()
-    pkg_check_modules(ARPACK QUIET arpack)
-    if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
-      find_library(ARPACK arpack PATH ${QUDA_ARPACK_HOME})
-    else()
-      find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
-    endif()
-  set(PARPACK_OR_ARPACK ${ARPACK})
-  endif()
-endif(QUDA_ARPACK)
-
 if (QUDA_MULTIGRID)
   add_definitions(-DGPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
-
-if(QUDA_BLOCKSOLVER)
-  add_definitions(-DBLOCKSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
-  set(QUDA_NVTX ON)
-endif()
-
-if(QUDA_EIGEN)
-  add_definitions(-DEIGEN)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
-endif()
 
 if(QUDA_POSIX_THREADS)
   add_definitions(-DPTHREADS)
@@ -269,14 +195,6 @@ endif(QUDA_DIRAC_DOMAIN_WALL)
 if (QUDA_DIRAC_STAGGERED)
   add_definitions(-DGPU_STAGGERED_DIRAC)
 endif(QUDA_DIRAC_STAGGERED)
-
-if(QUDA_LINK_ASQTAD)
-  add_definitions(-DGPU_FATLINK -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_ASQTAD)
-
-if(QUDA_LINK_HISQ)
-  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_HISQ)
 
 if(QUDA_GAUGE_TOOLS)
   add_definitions(-DGPU_GAUGE_TOOLS)
@@ -317,32 +235,6 @@ if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
 endif(QUDA_INTERFACE_QDP)
 
-if(QUDA_INTERFACE_MILC)
-  add_definitions(-DBUILD_MILC_INTERFACE)
-endif(QUDA_INTERFACE_MILC)
-
-if(QUDA_INTERFACE_CPS)
-  add_definitions(-DBUILD_CPS_INTERFACE)
-endif(QUDA_INTERFACE_CPS)
-
-if(QUDA_INTERFACE_QDPJIT)
-add_definitions(-DBUILD_QDPJIT_INTERFACE)
-endif(QUDA_INTERFACE_QDPJIT)
-
-if(QUDA_INTERFACE_BQCD)
-  add_definitions(-DBUILD_BQCD_INTERFACE)
-endif(QUDA_INTERFACE_BQCD)
-
-if(QUDA_INTERFACE_TIFR)
-  add_definitions(-DBUILD_TIFR_INTERFACE)
-endif(QUDA_INTERFACE_TIFR)
-
-# derive whether we need to build the fortran interface
-if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
-  SET(BUILD_FORTRAN_INTERFACE ON)
-  enable_language(Fortran)
-endif()
-
 if(DEVICE_PACK)
   add_definitions(-DDEVICE_PACK)
 endif(DEVICE_PACK)
@@ -355,12 +247,6 @@ if(QUDA_NUMA_NVML)
   find_package(NVML REQUIRED)
   include_directories(NVML_INCLUDE_DIR)
 endif(QUDA_NUMA_NVML)
-
-
-if(QUDA_CONTRACT)
-  add_definitions(-DGPU_CONTRACT)
-endif(QUDA_CONTRACT)
-
 
 # COMPILER OPTIONS and BUILD types
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
