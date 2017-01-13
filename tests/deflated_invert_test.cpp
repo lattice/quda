@@ -29,7 +29,7 @@
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
-extern bool tune;
+//extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -185,7 +185,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
+//  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 
   inv_param.dslash_type = dslash_type;
 

@@ -2262,8 +2262,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
   cudaGaugeField *cudaGauge = checkGauge(param);
   //checkDeflationParam(&eig_param);
-
-  setTuning(param->tune);
+  //setTuning(param->tune);
   eig_param.secs   = 0;
   eig_param.gflops = 0;
 
