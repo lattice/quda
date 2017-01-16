@@ -52,11 +52,57 @@ enum KernelType {
 //Experimental only!
     int staggered_u1_emulation;
     int staggered_2link_term;
+    double w; //"wilson" coeff 
 #endif 
 #ifdef MULTI_GPU
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 #endif
+
+    double a;
+    float a_f;
+
+    double b;
+    float b_f;
+
+    double c;
+    float c_f;
+
+    double d;
+    float d_f;
+
+    double a_inv;
+    float a_inv_f;
+
+    double mferm;
+    float mferm_f;
+
+    void *out;
+    float *outNorm;
+    
+    void *in;
+    float *inNorm;
+
+    void *ghost;
+    float *ghostNorm;
+
+    void *x;
+    float *xNorm;
+
+    void *gauge0;
+    void *gauge1;
+
+    void *longGauge0;
+    void *longGauge1;
+
+    void *longPhase0;
+    void *longPhase1;
+
+    void *clover;
+    float *cloverNorm;
+
+    void *cloverInv;
+    float *cloverInvNorm;
 
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;

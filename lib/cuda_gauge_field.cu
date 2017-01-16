@@ -474,6 +474,9 @@ namespace quda {
     // if we have copied from a source without a pad then we need to exchange
     if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) exchangeGhost();
 
+    staggeredPhaseApplied = src.StaggeredPhaseApplied();
+    staggeredPhaseType = src.StaggeredPhase();
+
     checkCudaError();
   }
 
@@ -520,6 +523,8 @@ namespace quda {
       errorQuda("Invalid pack location %d", pack_location);
     }
 
+    cpu.staggeredPhaseApplied = staggeredPhaseApplied;
+    cpu.staggeredPhaseType = staggeredPhaseType;
   }
 
   void cudaGaugeField::backup() const {

@@ -1566,7 +1566,7 @@ o02_im = -o02_im + a*accum2.y;
 #ifdef MULTI_GPU
 if (active){
   READ_AND_SUM_SPINOR(INTERTEX, half_idx+src_idx*Vh);
-  WRITE_SPINOR(out, half_idx+src_idx*Vh, param.sp_stride);
+  WRITE_SPINOR(param.out, half_idx+src_idx*Vh, param.sp_stride);
 }
 #endif
 

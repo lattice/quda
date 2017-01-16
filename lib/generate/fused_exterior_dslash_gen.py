@@ -647,6 +647,13 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         mult += "\n"
 
     reconstruct = ""
+    if asymClover:
+        reconstruct += "#ifdef SPINOR_DOUBLE\n"
+        reconstruct += "spinorFloat a = param.a;\n"
+        reconstruct += "#else\n"
+        reconstruct += "spinorFloat a = param.a_f;\n"
+        reconstruct += "#endif\n"
+
     for m in range(0,3):
 
         for h in range(0,2):
@@ -878,6 +885,12 @@ def xpay():
     str = ""
     str += "#ifdef DSLASH_XPAY\n\n"
     str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
+
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "spinorFloat a = param.a;\n"
+    str += "#else\n"
+    str += "spinorFloat a = param.a_f;\n"
+    str += "#endif\n"
 
     for s in range(0,4):
         for c in range(0,3):

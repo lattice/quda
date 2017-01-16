@@ -40,6 +40,9 @@
 #define m5 m5_d
 #define mdwf_b5 mdwf_b5_d
 #define mdwf_c5 mdwf_c5_d
+#define mferm param.mferm
+#define a param.a
+#define b param.b
 #else
 #define spinorFloat float
 #define i00_re I0.x
@@ -69,6 +72,9 @@
 #define m5 m5_f
 #define mdwf_b5 mdwf_b5_f
 #define mdwf_c5 mdwf_c5_f
+#define mferm param.mferm_f
+#define a param.a_f
+#define b param.b_f
 #endif // SPINOR_DOUBLE
 
 // gauge link
@@ -294,7 +300,7 @@ if (isActive(dim,0,+1,coord,param.commDim,param.X) && coord[0]==X1m1 )
 #endif
 
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride);
@@ -457,7 +463,7 @@ if (isActive(dim,0,-1,coord,param.commDim,param.X) && coord[0]==0 )
 #endif
 
 
- const int ga_idx = Vh+(face_idx % ghostFace[0]);
+ const int ga_idx = param.volume4CB+(face_idx % ghostFace[0]);
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, ga_stride);
@@ -620,7 +626,7 @@ if (isActive(dim,1,+1,coord,param.commDim,param.X) && coord[1]==X2m1 )
 #endif
 
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride);
@@ -783,7 +789,7 @@ if (isActive(dim,1,-1,coord,param.commDim,param.X) && coord[1]==0 )
 #endif
 
 
- const int ga_idx = Vh+(face_idx % ghostFace[1]);
+ const int ga_idx = param.volume4CB+(face_idx % ghostFace[1]);
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, ga_stride);
@@ -946,7 +952,7 @@ if (isActive(dim,2,+1,coord,param.commDim,param.X) && coord[2]==X3m1 )
 #endif
 
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride);
@@ -1109,7 +1115,7 @@ if (isActive(dim,2,-1,coord,param.commDim,param.X) && coord[2]==0 )
 #endif
 
 
- const int ga_idx = Vh+(face_idx % ghostFace[2]);
+ const int ga_idx = param.volume4CB+(face_idx % ghostFace[2]);
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, ga_stride);
@@ -1272,7 +1278,7 @@ if (isActive(dim,3,+1,coord,param.commDim,param.X) && coord[3]==X4m1 )
 #endif
 
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
  {
@@ -1473,7 +1479,7 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
 #endif
 
 
- const int ga_idx = Vh+(face_idx % ghostFace[3]);
+ const int ga_idx = param.volume4CB+(face_idx % ghostFace[3]);
 
  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
  {
@@ -1732,6 +1738,9 @@ WRITE_SPINOR(param.sp_stride);
 #undef m5
 #undef mdwf_b5
 #undef mdwf_c5
+#undef mferm
+#undef a
+#undef b
 #undef spinorFloat
 #undef SHARED_STRIDE
 

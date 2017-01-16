@@ -239,7 +239,6 @@ VOLATILE spinorFloat *s = s_data +
 
 #endif // PARALLEL_DIR
 
-
 // output spinor
 spinorFloat o00_re;
 spinorFloat o00_im;
@@ -408,7 +407,7 @@ int long_sign = 1;
 #endif
 
 #if ( DD_IMPROVED != 1 )
-const double omega = 0.5*w;//(2*0.25 factor)
+const double omega = 0.5*param.w;//(2*0.25 factor)
 #endif
 
 #ifdef PARALLEL_DIR
@@ -1004,6 +1003,14 @@ if (threadIdx.z & 1) {
 #endif
 
 #ifdef DSLASH_AXPY
+
+
+#if (DD_PREC == 0)
+spinorFloat a = param.a;
+#else
+spinorFloat a = param.a_f;
+#endif
+
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
   READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
@@ -1653,6 +1660,13 @@ if (threadIdx.z & 1) {
 #endif
 
 #ifdef DSLASH_AXPY
+
+#if (DD_PREC == 0)
+spinorFloat a = param.a;
+#else
+spinorFloat a = param.a_f;
+#endif
+
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
   READ_ACCUM(ACCUMTEX,sid + src_idx*Vh);
@@ -1690,7 +1704,7 @@ if (kernel_type != INTERIOR_KERNEL){
 
 
 // write spinor field back to device memory
-WRITE_SPINOR(out, sid + src_idx*Vh, param.sp_stride);
+WRITE_SPINOR(param.out, sid + src_idx*Vh, param.sp_stride);
   }
 
 // undefine to prevent warning when precision is changed

@@ -84,6 +84,14 @@ namespace quda {
       errorQuda("TIFR interface has not been built\n");
 #endif
 
+    } else if (u.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      extractGhost<Float,length>(TIFRPaddedOrder<Float,length>(u, 0, Ghost), u, location, extract);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }

@@ -118,11 +118,11 @@ namespace quda {
 			     const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity);
 
   // face packing routines
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, const int nFace, const int dagger,
+  void packFace(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int nFace, const int dagger,
 		const int parity, const int dim, const int face_num, const cudaStream_t &stream,
 		const double a=0.0, const double b=0.0);
 
-  void packFaceExtended(void *ghost_buf, cudaColorSpinorField &field, const int nFace, const int R[], const int dagger,
+  void packFaceExtended(void *ghost_buf, cudaColorSpinorField &field, bool zero_copy, const int nFace, const int R[], const int dagger,
 			const int parity, const int dim, const int face_num, const cudaStream_t &stream, const bool unpack=false);
 
   // face packing routines

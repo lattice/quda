@@ -338,8 +338,7 @@ namespace quda {
 	axpyBzpcx(a1, x1, y1, b1, z_, c1);
       }
     }
-    
-    
+
     /**
        Functor performing the operations y[i] = a*x[i] + y[i] and z[i] = b*x[i] + z[i]
     */
@@ -488,7 +487,6 @@ namespace quda {
         caxpyBxpz(a1, x1, y_, b1, z_);
       }
     }
-
 
   } // namespace blas
 

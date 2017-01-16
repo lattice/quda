@@ -137,6 +137,7 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
+set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -154,6 +155,7 @@ mark_as_advanced(QUDA_GPU_COMMS)
 mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
+mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_MULTIGRID)
 
@@ -177,20 +179,24 @@ find_package(Threads REQUIRED)
 # do all the build definitions
 #
 
-if(${QUDA_MPI} OR ${QUDA_QMP})
+if(QUDA_MPI OR QUDA_QMP)
   add_definitions(-DMULTI_GPU)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
-if(${QUDA_MPI})
+if(QUDA_MPI AND QUDA_QMP)
+  message(WARNING "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+endif()
+
+if(QUDA_MPI)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 endif()
 
-if (${QUDA_QMP})
+if(QUDA_QMP)
   add_definitions(-DQMP_COMMS)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -200,7 +206,7 @@ if (${QUDA_QMP})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
-if (${QUDA_QIO})
+if(QUDA_QIO)
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
@@ -255,6 +261,12 @@ if(QUDA_BLOCKSOLVER)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
   set(QUDA_NVTX ON)
+endif()
+
+if(QUDA_EIGEN)
+  add_definitions(-DEIGEN)
+  find_package(Eigen REQUIRED)
+  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_POSIX_THREADS)

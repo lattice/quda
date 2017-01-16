@@ -83,7 +83,7 @@ namespace quda {
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
-      param_presmooth->pipeline = 5;
+      param_presmooth->pipeline = 8;
     }
 
     presmoother = Solver::create(*param_presmooth, param.matSmooth,

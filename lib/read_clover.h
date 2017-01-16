@@ -1,4 +1,5 @@
-#define READ_CLOVER_DOUBLE(clover, chi)		      \
+#define READ_CLOVER_DOUBLE(clover_, chi)		    \
+  double2* clover = (double2*)clover_;			    \
   double2 C0 = clover[sid + (18*chi+0)*param.cl_stride];    \
   double2 C1 = clover[sid + (18*chi+1)*param.cl_stride];    \
   double2 C2 = clover[sid + (18*chi+2)*param.cl_stride];    \
@@ -18,9 +19,10 @@
   double2 C16 = clover[sid + (18*chi+16)*param.cl_stride];  \
   double2 C17 = clover[sid + (18*chi+17)*param.cl_stride];
 
-#define READ_CLOVER_DOUBLE_STR(clover, chi)				\
+#define READ_CLOVER_DOUBLE_STR(clover_, chi)				\
   double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9;			\
   double2 C10, C11, C12, C13, C14, C15, C16, C17;			\
+  double2* clover = (double2*)clover_;					\
   load_streaming_double2(C0, &clover[sid + (18*chi+0)*param.cl_stride]);	\
   load_streaming_double2(C1, &clover[sid + (18*chi+1)*param.cl_stride]);	\
   load_streaming_double2(C2, &clover[sid + (18*chi+2)*param.cl_stride]);	\
@@ -40,18 +42,20 @@
   load_streaming_double2(C16, &clover[sid + (18*chi+16)*param.cl_stride]);	\
   load_streaming_double2(C17, &clover[sid + (18*chi+17)*param.cl_stride]);	
 
-#define READ_CLOVER_SINGLE(clover, chi)		  \
-  float4 C0 = clover[sid + (9*chi+0)*param.cl_stride];  \
-  float4 C1 = clover[sid + (9*chi+1)*param.cl_stride];  \
-  float4 C2 = clover[sid + (9*chi+2)*param.cl_stride];  \
-  float4 C3 = clover[sid + (9*chi+3)*param.cl_stride];  \
-  float4 C4 = clover[sid + (9*chi+4)*param.cl_stride];  \
-  float4 C5 = clover[sid + (9*chi+5)*param.cl_stride];  \
-  float4 C6 = clover[sid + (9*chi+6)*param.cl_stride];  \
-  float4 C7 = clover[sid + (9*chi+7)*param.cl_stride];  \
+#define READ_CLOVER_SINGLE(clover_, chi)				\
+  float4 *clover = (float4*)clover_;					\
+  float4 C0 = clover[sid + (9*chi+0)*param.cl_stride];	\
+  float4 C1 = clover[sid + (9*chi+1)*param.cl_stride];	\
+  float4 C2 = clover[sid + (9*chi+2)*param.cl_stride];	\
+  float4 C3 = clover[sid + (9*chi+3)*param.cl_stride];	\
+  float4 C4 = clover[sid + (9*chi+4)*param.cl_stride];	\
+  float4 C5 = clover[sid + (9*chi+5)*param.cl_stride];	\
+  float4 C6 = clover[sid + (9*chi+6)*param.cl_stride];	\
+  float4 C7 = clover[sid + (9*chi+7)*param.cl_stride];	\
   float4 C8 = clover[sid + (9*chi+8)*param.cl_stride];
 
-#define READ_CLOVER_HALF(clover, chi)				\
+#define READ_CLOVER_HALF(clover_, chi)					\
+  short4 *clover = (short4*)clover_;					\
   float4 C0 = short42float4(clover[sid + (9*chi+0)*param.cl_stride]);	\
   float4 C1 = short42float4(clover[sid + (9*chi+1)*param.cl_stride]);	\
   float4 C2 = short42float4(clover[sid + (9*chi+2)*param.cl_stride]);	\
@@ -61,7 +65,7 @@
   float4 C6 = short42float4(clover[sid + (9*chi+6)*param.cl_stride]);	\
   float4 C7 = short42float4(clover[sid + (9*chi+7)*param.cl_stride]);	\
   float4 C8 = short42float4(clover[sid + (9*chi+8)*param.cl_stride]);	\
-  float K = cloverNorm[sid + chi*param.cl_stride];			\
+  float K = CLOVERTEXNORM[sid + chi*param.cl_stride];		\
   C0.x *= K; C0.y *= K;	C0.z *= K; C0.w *= K;		        \
   C1.x *= K; C1.y *= K;	C1.z *= K; C1.w *= K;		        \
   C2.x *= K; C2.y *= K;	C2.z *= K; C2.w *= K;		        \
@@ -187,7 +191,7 @@
   C6 = short42float4(clover[sid + (9*chi+6)*param.cl_stride]);	\
   C7 = short42float4(clover[sid + (9*chi+7)*param.cl_stride]);	\
   C8 = short42float4(clover[sid + (9*chi+8)*param.cl_stride]);	\
-  K = cloverNorm[sid + chi*param.cl_stride];			\
+  K = TMCLOVERTEXNORM[sid + chi*param.cl_stride];		\
   C0.x *= K; C0.y *= K;	C0.z *= K; C0.w *= K;		        \
   C1.x *= K; C1.y *= K;	C1.z *= K; C1.w *= K;		        \
   C2.x *= K; C2.y *= K;	C2.z *= K; C2.w *= K;		        \

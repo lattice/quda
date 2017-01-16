@@ -244,7 +244,7 @@ namespace quda {
     */ 
     bool isNative() const;
 
-    size_t Bytes() const { return bytes; }
+    size_t Bytes() const { if (order == QUDA_TIFR_PADDED_GAUGE_ORDER) warningQuda("method will evaluate incorrectly for TIFR padded fields"); return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
 

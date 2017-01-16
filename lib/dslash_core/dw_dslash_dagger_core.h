@@ -285,7 +285,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]<X1m1)) |
  const int sp_idx = (coord[0]==X1m1 ? X-X1m1 : X+1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  if ( ! s_parity ) { ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride); }
@@ -480,9 +480,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  // read gauge matrix from device memory
@@ -677,7 +677,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]<X2m1)) |
  const int sp_idx = (coord[1]==X2m1 ? X-X2X1mX1 : X+X1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  if ( ! s_parity ) { ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride); }
@@ -872,9 +872,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  // read gauge matrix from device memory
@@ -1069,7 +1069,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]<X3m1)) |
  const int sp_idx = (coord[2]==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  if ( ! s_parity ) { ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride); }
@@ -1264,9 +1264,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  // read gauge matrix from device memory
@@ -1461,7 +1461,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]<X4m1)) |
  const int sp_idx = (coord[3]==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
  {
@@ -1718,9 +1718,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
@@ -1965,7 +1965,7 @@ if(kernel_type == INTERIOR_KERNEL)
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
-     int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
+     int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*param.volume4CB : X-2*param.volume4CB ) / 2;
 
 // read spinor from device memory
      READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
@@ -1990,27 +1990,27 @@ if(kernel_type == INTERIOR_KERNEL)
     }
     else
     {
-   o00_re += -mferm*(+i00_re-i20_re);   o00_im += -mferm*(+i00_im-i20_im);
-   o01_re += -mferm*(+i01_re-i21_re);   o01_im += -mferm*(+i01_im-i21_im);
-   o02_re += -mferm*(+i02_re-i22_re);   o02_im += -mferm*(+i02_im-i22_im);
+   o00_re += -param.mferm*(+i00_re-i20_re);   o00_im += -param.mferm*(+i00_im-i20_im);
+   o01_re += -param.mferm*(+i01_re-i21_re);   o01_im += -param.mferm*(+i01_im-i21_im);
+   o02_re += -param.mferm*(+i02_re-i22_re);   o02_im += -param.mferm*(+i02_im-i22_im);
 
-   o10_re += -mferm*(+i10_re-i30_re);   o10_im += -mferm*(+i10_im-i30_im);
-   o11_re += -mferm*(+i11_re-i31_re);   o11_im += -mferm*(+i11_im-i31_im);
-   o12_re += -mferm*(+i12_re-i32_re);   o12_im += -mferm*(+i12_im-i32_im);
+   o10_re += -param.mferm*(+i10_re-i30_re);   o10_im += -param.mferm*(+i10_im-i30_im);
+   o11_re += -param.mferm*(+i11_re-i31_re);   o11_im += -param.mferm*(+i11_im-i31_im);
+   o12_re += -param.mferm*(+i12_re-i32_re);   o12_im += -param.mferm*(+i12_im-i32_im);
 
-   o20_re += -mferm*(-i00_re+i20_re);   o20_im += -mferm*(-i00_im+i20_im);
-   o21_re += -mferm*(-i01_re+i21_re);   o21_im += -mferm*(-i01_im+i21_im);
-   o22_re += -mferm*(-i02_re+i22_re);   o22_im += -mferm*(-i02_im+i22_im);
+   o20_re += -param.mferm*(-i00_re+i20_re);   o20_im += -param.mferm*(-i00_im+i20_im);
+   o21_re += -param.mferm*(-i01_re+i21_re);   o21_im += -param.mferm*(-i01_im+i21_im);
+   o22_re += -param.mferm*(-i02_re+i22_re);   o22_im += -param.mferm*(-i02_im+i22_im);
 
-   o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
-   o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
-   o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
+   o30_re += -param.mferm*(-i10_re+i30_re);   o30_im += -param.mferm*(-i10_im+i30_im);
+   o31_re += -param.mferm*(-i11_re+i31_re);   o31_im += -param.mferm*(-i11_im+i31_im);
+   o32_re += -param.mferm*(-i12_re+i32_re);   o32_im += -param.mferm*(-i12_im+i32_im);
     } // end if ( coord[4]!= 0 )
   } // end P_L
 
  // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
   {
-    int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
+    int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*param.volume4CB : X+2*param.volume4CB ) / 2;
 
 // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
@@ -2035,21 +2035,21 @@ if(kernel_type == INTERIOR_KERNEL)
     }
     else
     {
-   o00_re += -mferm*(+i00_re+i20_re);   o00_im += -mferm*(+i00_im+i20_im);
-   o01_re += -mferm*(+i01_re+i21_re);   o01_im += -mferm*(+i01_im+i21_im);
-   o02_re += -mferm*(+i02_re+i22_re);   o02_im += -mferm*(+i02_im+i22_im);
+   o00_re += -param.mferm*(+i00_re+i20_re);   o00_im += -param.mferm*(+i00_im+i20_im);
+   o01_re += -param.mferm*(+i01_re+i21_re);   o01_im += -param.mferm*(+i01_im+i21_im);
+   o02_re += -param.mferm*(+i02_re+i22_re);   o02_im += -param.mferm*(+i02_im+i22_im);
 
-   o10_re += -mferm*(+i10_re+i30_re);   o10_im += -mferm*(+i10_im+i30_im);
-   o11_re += -mferm*(+i11_re+i31_re);   o11_im += -mferm*(+i11_im+i31_im);
-   o12_re += -mferm*(+i12_re+i32_re);   o12_im += -mferm*(+i12_im+i32_im);
+   o10_re += -param.mferm*(+i10_re+i30_re);   o10_im += -param.mferm*(+i10_im+i30_im);
+   o11_re += -param.mferm*(+i11_re+i31_re);   o11_im += -param.mferm*(+i11_im+i31_im);
+   o12_re += -param.mferm*(+i12_re+i32_re);   o12_im += -param.mferm*(+i12_im+i32_im);
 
-   o20_re += -mferm*(+i00_re+i20_re);   o20_im += -mferm*(+i00_im+i20_im);
-   o21_re += -mferm*(+i01_re+i21_re);   o21_im += -mferm*(+i01_im+i21_im);
-   o22_re += -mferm*(+i02_re+i22_re);   o22_im += -mferm*(+i02_im+i22_im);
+   o20_re += -param.mferm*(+i00_re+i20_re);   o20_im += -param.mferm*(+i00_im+i20_im);
+   o21_re += -param.mferm*(+i01_re+i21_re);   o21_im += -param.mferm*(+i01_im+i21_im);
+   o22_re += -param.mferm*(+i02_re+i22_re);   o22_im += -param.mferm*(+i02_im+i22_im);
 
-   o30_re += -mferm*(+i10_re+i30_re);   o30_im += -mferm*(+i10_im+i30_im);
-   o31_re += -mferm*(+i11_re+i31_re);   o31_im += -mferm*(+i11_im+i31_im);
-   o32_re += -mferm*(+i12_re+i32_re);   o32_im += -mferm*(+i12_im+i32_im);
+   o30_re += -param.mferm*(+i10_re+i30_re);   o30_im += -param.mferm*(+i10_im+i30_im);
+   o31_re += -param.mferm*(+i11_re+i31_re);   o31_im += -param.mferm*(+i11_im+i31_im);
+   o32_re += -param.mferm*(+i12_re+i32_re);   o32_im += -param.mferm*(+i12_im+i32_im);
     } // end if ( coord[4] != param.Ls-1 )
   } // end P_R
 } // end 5th dimension
@@ -2061,8 +2061,11 @@ if (kernel_type == INTERIOR_KERNEL)
 {
 #ifdef DSLASH_XPAY
   READ_ACCUM(ACCUMTEX, param.sp_stride)
-  VOLATILE spinorFloat a_inv = 1.0/a;
-
+#ifdef SPINOR_DOUBLE
+spinorFloat a_inv = param.a_inv;
+#else
+spinorFloat a_inv = param.a_inv_f;
+#endif
 #ifdef SPINOR_DOUBLE
  o00_re = o00_re + a_inv*accum0.x;
  o00_im = o00_im + a_inv*accum0.y;
@@ -2138,6 +2141,11 @@ if (!incomplete)
 {
 
 #ifdef DSLASH_XPAY
+#ifdef SPINOR_DOUBLE
+ spinorFloat a = param.a;
+#else
+ spinorFloat a = param.a_f;
+#endif
 #ifdef SPINOR_DOUBLE
   o00_re = a*o00_re;
   o00_im = a*o00_im;

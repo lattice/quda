@@ -15,6 +15,7 @@
 #include <register_traits.h>
 #include <typeinfo>
 #include <complex_quda.h>
+#include <index_helper.cuh>
 
 namespace quda {
 
@@ -489,6 +490,102 @@ namespace quda {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
 		field[parity*offset + ((x*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+	      }
+	    }
+	  }
+	}
+
+	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z];
+	      }
+	    }
+	  }
+	}
+
+	__device__ __host__ inline void saveGhost(const RegType v[length], int x, int dim, int dir, int parity=0) {
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+	      }
+	    }
+	  }
+	}
+
+	size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
+      };
+
+    // custom accessor for TIFR z-halo padded arrays
+    template <typename Float, int Ns, int Nc>
+      struct PaddedSpaceSpinorColorOrder {
+	typedef typename mapper<Float>::type RegType;
+	static const int length = 2 * Ns * Nc;
+	Float *field;
+	size_t offset;
+	Float *ghost[8];
+	int volumeCB;
+	int exVolumeCB;
+	int faceVolumeCB[4];
+	int stride;
+	int nParity;
+	int dim[4]; // full field dimensions
+	int exDim[4]; // full field dimensions
+      PaddedSpaceSpinorColorOrder(const ColorSpinorField &a, Float *field_=0, float *dummy=0, Float **ghost_=0)
+      : field(field_ ? field_ : (Float*)a.V()),
+	  volumeCB(a.VolumeCB()), exVolumeCB(1), stride(a.Stride()), nParity(a.SiteSubset()),
+	  dim{ a.X(0), a.X(1), a.X(2), a.X(3)}, exDim{ a.X(0), a.X(1), a.X(2) + 4, a.X(3)}
+	{
+	  if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
+	  for (int i=0; i<4; i++) {
+	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
+	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
+	    faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
+	    exVolumeCB *= exDim[i];
+	  }
+	  exVolumeCB /= nParity;
+	  dim[0] *= (nParity == 1) ? 2 : 1; // need to full dimensions
+	  exDim[0] *= (nParity == 1) ? 2 : 1; // need to full dimensions
+
+	  offset = (exVolumeCB*Ns*Nc*2) / 2; // compute manually since Bytes is likely wrong due to z-padding
+	}
+	virtual ~PaddedSpaceSpinorColorOrder() { ; }
+
+	/**
+	   @brief Compute the index into the padded field.  Assumes that
+	   parity doesn't change from unpadded to padded.
+	*/
+	__device__ __host__ int getPaddedIndex(int x_cb, int parity) const {
+	  // find coordinates
+	  int coord[4];
+	  getCoords(coord, x_cb, dim, parity);
+
+	  // get z-extended index
+	  coord[2] += 2; // offset for halo
+	  return linkIndex(coord, exDim);
+	}
+
+	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
+	  int y = getPaddedIndex(x, parity);
+
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v[(s*Nc+c)*2+z] = field[parity*offset + ((y*Ns + s)*Nc + c)*2 + z];
+	      }
+	    }
+	  }
+	}
+
+	__device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
+	  int y = getPaddedIndex(x, parity);
+
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		field[parity*offset + ((y*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
 	      }
 	    }
 	  }

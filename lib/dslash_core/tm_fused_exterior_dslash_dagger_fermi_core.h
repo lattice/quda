@@ -1670,6 +1670,15 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
 }
 
 {
+#ifndef TWIST_INV_DSLASH
+#ifdef SPINOR_DOUBLE
+  const spinorFloat a = param.a;
+  const spinorFloat b = param.b;
+#else
+  const spinorFloat a = param.a_f;
+  const spinorFloat b = param.b_f;
+#endif
+#endif
 #ifdef DSLASH_XPAY
   READ_ACCUM(ACCUMTEX, param.sp_stride)
   

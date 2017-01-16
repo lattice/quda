@@ -45,6 +45,9 @@
 #define m5 m5_d
 #define mdwf_b5 mdwf_b5_d
 #define mdwf_c5 mdwf_c5_d
+#define mferm param.mferm
+#define a param.a
+#define b param.b
 #else
 #define spinorFloat float
 #define POW(a, b) __fast_pow(a, b)
@@ -75,6 +78,9 @@
 #define m5 m5_f
 #define mdwf_b5 mdwf_b5_f
 #define mdwf_c5 mdwf_c5_f
+#define mferm param.mferm_f
+#define a param.a
+#define b param.b
 #endif // SPINOR_DOUBLE
 
 // gauge link
@@ -292,7 +298,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]<X1m1)) |
  const int sp_idx = (coord[0]==X1m1 ? X-X1m1 : X+1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 0, ga_idx, ga_stride);
@@ -486,9 +492,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || coord[0]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  // read gauge matrix from device memory
@@ -682,7 +688,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]<X2m1)) |
  const int sp_idx = (coord[1]==X2m1 ? X-X2X1mX1 : X+X1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 2, ga_idx, ga_stride);
@@ -876,9 +882,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || coord[1]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  // read gauge matrix from device memory
@@ -1072,7 +1078,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]<X3m1)) |
  const int sp_idx = (coord[2]==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  // read gauge matrix from device memory
  ASSN_GAUGE_MATRIX(G, GAUGE0TEX, 4, ga_idx, ga_stride);
@@ -1266,9 +1272,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || coord[2]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  // read gauge matrix from device memory
@@ -1462,7 +1468,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]<X4m1)) |
  const int sp_idx = (coord[3]==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
 #endif
 
- const int ga_idx = sid % Vh;
+ const int ga_idx = sid % param.volume4CB;
 
  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
  {
@@ -1718,9 +1724,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]>0)) ||
 #endif
 
 #ifdef MULTI_GPU
- const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
+ const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));
 #else
- const int ga_idx = sp_idx % Vh;
+ const int ga_idx = sp_idx % param.volume4CB;
 #endif
 
  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
@@ -2045,6 +2051,9 @@ WRITE_SPINOR(param.sp_stride);
 #undef m5
 #undef mdwf_b5
 #undef mdwf_c5
+#undef mferm
+#undef a
+#undef b
 #undef spinorFloat
 #undef POW
 #undef SHARED_STRIDE

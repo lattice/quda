@@ -109,6 +109,8 @@ extern "C" {
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
     double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
+
+    int compute_true_res; /** Whether to compute the true residual post solve */
     double true_res; /**< Actual L2 residual norm achieved in solver */
     double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
     int maxiter; /**< Maximum number of iterations in the linear solver */
@@ -153,6 +155,17 @@ extern "C" {
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
+
+    /** Residuals in the partial faction expansion */
+    double residue[QUDA_MAX_MULTI_SHIFT];
+
+    /** Whether we should evaluate the action after the linear solver*/
+    int compute_action;
+
+    /** Computed value of the bilinear action (complex-valued)
+	invert: \phi^\dagger A^{-1} \phi
+	multishift: \phi^\dagger r(x) \phi = \phi^\dagger (sum_k residue[k] * (A + offset[k])^{-1} ) \phi */
+    double action[2];
 
     QudaSolutionType solution_type;  /**< Type of system to solve */
     QudaSolveType solve_type;        /**< How to solve it */
@@ -293,6 +306,18 @@ extern "C" {
 
     /** Whether to use the resident solution vector(s) */
     int use_resident_solution;
+
+    /** Whether to use the solution vector to augment the chronological basis */
+    int make_resident_chrono;
+
+    /** Whether to use the resident chronological basis */
+    int use_resident_chrono;
+
+    /** The maximum length of the chronological history to store */
+    int max_chrono_dim;
+
+    /** The index to indeicate which chrono history we are augmenting */
+    int chrono_index;
 
   } QudaInvertParam;
 
@@ -816,7 +841,7 @@ extern "C" {
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
-   * action.  The momentum field is assumed to be in MILC order.
+   * action.
    *
    * @param momentum The momentum field
    * @param param The parameters of the external fields and the computation settings
@@ -891,14 +916,18 @@ extern "C" {
   void computeStaggeredOprodQuda(void** oprod, void** quark, int num, double** coeff, QudaGaugeParam* param);
 
   /**
-   * Compute the naive staggered force (experimental).  All fields are
-   * QUDA device fields and must be in the same precision.
+   * Compute the naive staggered force.  All fields must be in the same precision.
    *
-   * mom Momentum field (QUDA device field)
-   * quark Quark field solution vectors
-   * coeff Step-size coefficient
+   * @param mom Momentum field
+   * @param dt Integrating step size
+   * @param delta Additional scale factor when updating momentum (mom += delta * [force]_TA
+   * @param gauge Gauge field (at present only supports resident gauge field)
+   * @param x Array of single-parity solution vectors (at present only supports resident solutions)
+   * @param gauge_param Gauge field meta data
+   * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, void* quark, double* coeff);
+  void computeStaggeredForceQuda(void* mom, double dt, double delta, void **x, void *gauge,
+				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
    * Compute the fermion force for the asqtad quark action.
@@ -1028,6 +1057,13 @@ extern "C" {
                       const unsigned int stopWtheta,
                       QudaGaugeParam* param,
                       double* timeinfo);
+
+  /**
+   * @brief Flush the chronological history for the given index
+   * @param[in] index Index for which we are flushing
+   */
+  void flushChronoQuda(int index);
+
 
   /**
   * Open/Close MAGMA library
