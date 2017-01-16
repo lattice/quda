@@ -112,57 +112,119 @@ namespace quda {
 
       // mark true since we will copy the "a" matrix into constant memory
       coeff_array<Complex> a(a_, true), b, c;
+    
+      if(x.size() <= 16) 
+      {
+        if(x[0]->Precision() == y[0]->Precision()) 
+        {
+          switch (x.size()) {
+          case 1:
+	    multiblasCuda<1,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 2:
+	    multiblasCuda<2,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 3:
+	    multiblasCuda<3,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 4:
+	    multiblasCuda<4,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 5:
+	    multiblasCuda<5,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 6:
+	    multiblasCuda<6,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 7:
+	    multiblasCuda<7,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 8:
+	    multiblasCuda<8,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 9:
+	    multiblasCuda<9,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 10:
+	    multiblasCuda<10,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 11:
+	    multiblasCuda<11,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 12:
+	    multiblasCuda<12,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 13:
+	    multiblasCuda<13,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 14:
+	    multiblasCuda<14,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 15:
+	    multiblasCuda<15,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 16:
+	    multiblasCuda<16,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          default:
+            break;
+         }
+       } else {
+          switch (x.size()) {
+          case 1:
+	    mixed::multiblasCuda<1,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 2:
+	    mixed::multiblasCuda<2,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 3:
+	    mixed::multiblasCuda<3,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 4:
+	    mixed::multiblasCuda<4,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 5:
+	    mixed::multiblasCuda<5,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 6:
+	    mixed::multiblasCuda<6,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 7:
+	    mixed::multiblasCuda<7,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 8:
+	    mixed::multiblasCuda<8,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 9:
+	    mixed::multiblasCuda<9,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 10:
+	    mixed::multiblasCuda<10,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 11:
+	    mixed::multiblasCuda<11,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 12:
+	    mixed::multiblasCuda<12,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 13:
+	    mixed::multiblasCuda<13,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 14:
+	    mixed::multiblasCuda<14,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 15:
+	    mixed::multiblasCuda<15,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          case 16:
+	    mixed::multiblasCuda<16,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
+            break;
+          default:
+            break;
+         }
+       }
 
-      switch (x.size()) {
-      case 1:
-	multiblasCuda<1,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 2:
-	multiblasCuda<2,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 3:
-	multiblasCuda<3,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 4:
-	multiblasCuda<4,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 5:
-	multiblasCuda<5,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 6:
-	multiblasCuda<6,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 7:
-	multiblasCuda<7,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 8:
-	multiblasCuda<8,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 9:
-	multiblasCuda<9,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 10:
-	multiblasCuda<10,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 11:
-	multiblasCuda<11,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 12:
-	multiblasCuda<12,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 13:
-	multiblasCuda<13,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 14:
-	multiblasCuda<14,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 15:
-	multiblasCuda<15,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      case 16:
-	multiblasCuda<16,multicaxpy_,0,1,0,0>(a, b, c, x, y, x, y);
-        break;
-      default:
+     } else {  
 	// split the problem in half and recurse
 	const Complex *a0 = &a_[0];
 	const Complex *a1 = &a_[x.size()*y.size()/2];
@@ -174,6 +236,7 @@ namespace quda {
 	caxpy(a1, x1, y);
       }
     }
+
 
     void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy(a, x.Components(), y.Components()); }
 
