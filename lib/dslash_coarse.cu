@@ -233,18 +233,34 @@ namespace quda {
 #pragma unroll
        for(int d = thread_dim; d < nDim; d+=dim_stride) // loop over dimension
        {
-	  const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+	 const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 
+	 if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+	   int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 #pragma unroll
-	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
-	    int c_row = color_block + color_local; // global color index
-	    int row = s_row*Nc + c_row;
+	   for(int color_local = 0; color_local < Mc; color_local++) { //Color row
+	     int c_row = color_block + color_local; // global color index
+	     int row = s_row*Nc + c_row;
 #pragma unroll
-            for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
+	     for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
+	       int col = s_col*Nc + c_col + color_offset;
+	       out[color_local] += arg.Y(d+4, parity, x_cb, row, col)
+		  * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+	     }
+	   }
+
+	 } else {
+#pragma unroll
+	   for(int color_local = 0; color_local < Mc; color_local++) { //Color row
+	     int c_row = color_block + color_local; // global color index
+	     int row = s_row*Nc + c_row;
+#pragma unroll
+             for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
 	       int col = s_col*Nc + c_col + color_offset;
 	       out[color_local] += arg.Y(d+4, parity, x_cb, row, col) * arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
-	    }
-	  }
+	     }
+	   }
+         }
        } //nDim
 
 #if defined(__CUDA_ARCH__)
@@ -260,11 +276,24 @@ namespace quda {
     }else{//compute backward links (dir = 1)
 #endif
 #pragma unroll
+      //Backward link - compute back offset for spinor and gauge fetch
       for(int d = thread_dim; d < nDim; d+=dim_stride){ //Ndim
-        //Backward link - compute back offset for spinor and gauge fetch
-        {
-	  const int back_idx = linkIndexM1(coord, arg.dim, d);
-	  const int gauge_idx = back_idx;
+	const int back_idx = linkIndexM1(coord, arg.dim, d);
+	const int gauge_idx = back_idx;
+	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	  const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+#pragma unroll
+	  for (int color_local=0; color_local<Mc; color_local++) {
+	    int c_row = color_block + color_local;
+	    int row = s_row*Nc + c_row;
+#pragma unroll
+	    for (int c_col=0; c_col<Nc; c_col+=color_stride) {
+	      int col = s_col*Nc + c_col + color_offset;
+	      out[color_local] += conj(arg.Y.Ghost(d, (parity+1)&1, ghost_idx, col, row))
+		  * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+	    }
+	  }
+	} else {
 #pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) {
 	    int c_row = color_block + color_local;
@@ -757,9 +786,9 @@ namespace quda {
       ApplyCoarse<Float,csOrder,gOrder,2,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 4) {
       ApplyCoarse<Float,csOrder,gOrder,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
-#if 0
     } else if (inA.Ncolor() == 8) {
       ApplyCoarse<Float,csOrder,gOrder,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
+#if 0
     } else if (inA.Ncolor() == 12) {
       ApplyCoarse<Float,csOrder,gOrder,12,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
     } else if (inA.Ncolor() == 16) {

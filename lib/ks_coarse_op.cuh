@@ -22,7 +22,6 @@ namespace quda {
     int xc_size[QUDA_MAX_DIM];  /** Dimensions of coarse grid */
 
     int geo_bs[QUDA_MAX_DIM];   /** Geometric block dimensions */
-
     int comm_dim[QUDA_MAX_DIM]; /** Node parition array */
 
     Float mass;                /** mass value */
@@ -30,12 +29,10 @@ namespace quda {
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
-    int nFace;
-
     CalculateKSYArg(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, fineSpinorTmp *UV, fineSpinorTmp *UVL, const fineGauge *FL, const fineGauge *LL, const fineSpinor &V, const fineClover &C, const fineClover &Cinv,
 		  double mass, const int *x_size_, const int *xc_size_, int *geo_bs_)
       : Y(Y), X(X), Xinv(Xinv), UV(UV), UVL(UVL), FL(FL), LL(LL),V(V), C(C), Cinv(Cinv), mass(static_cast<Float>(mass)),
-	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()), nFace(3)
+	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
 	x_size[i] = x_size_[i];
@@ -71,17 +68,24 @@ namespace quda {
     }
 
     if ( arg.comm_dim[dim] && (coord[dim] + 1 >= arg.x_size[dim]) ) {
+
+      const int stagNFace = 1;
+      int ghost_idx    = ghostFaceIndex<1>(coord, arg.x_size, dim, stagNFace);//must be 1
 #if 0
-      int ghost_idx    = ghostFaceIndex<1>(coord, arg.x_size, dim, 1);//must be 1
-      int ghost_idx_3d = (arg.LL && !from_coarse) ghostFaceIndex<3>(coord, arg.x_size, dim, arg.nFace) : 0;
+      errorQuda("MultiGPU improved staggered is not supported\n");
+      int ghost_idx_3d = (arg.LL && !from_coarse) ghostFaceIndex<3>(coord, arg.x_size, dim, 3) : 0;
+#endif
 
       for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if(!from_coarse){
 	      (*arg.UV)(parity, x_cb, stag_sp, ic, ic_c) +=
-	      (*arg.FL)(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, jc, ic_c);
+	      (*arg.FL)(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 1, (parity+1)&1, ghost_idx, stag_sp, jc, ic_c);
+#if 0
+              errorQuda("MultiGPU improved staggered is not supported\n");
               if( arg.LL ) (*arg.UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*arg.LL)(dim, parity, x_cb, ic, jc) * arg.V.Ghost(dim, 3, (parity+1)&1, ghost_idx_3d, stag_sp, jc, ic_c);
+#endif
             } else {
               for(int s = 0; s < fineSpin; s++) {  //Fine Spin
                 //for (int s_col=0; s_col<fineSpin; s_col++) 
@@ -95,7 +99,6 @@ namespace quda {
 	  }  //Fine color columns
 	}  //Fine color rows
       }  //Coarse color
-#endif
     } else {
       int y_cb = linkIndexP1(coord, arg.x_size, dim);
       int y3_cb = (arg.LL && !from_coarse) ? linkIndexP3(coord, arg.x_size, dim) : 0;
