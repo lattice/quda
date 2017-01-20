@@ -100,6 +100,7 @@ module quda_fortran
      real(8) :: tol ! Requested L2 residual norm
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm
+     integer(4) :: compute_true_res ! Whether to compute the true residual post solve
      real(8) :: true_res ! Actual L2 residual norm achieved in solver
      real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
@@ -126,6 +127,17 @@ module quda_fortran
 
      ! Actual heavy quark residual norm achieved in solver for each offset
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset
+
+     ! Residuals in the partial faction expansion
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: residue
+
+     ! Whether we should evaluate the action after the linear solve
+     integer(4) :: compute_action
+
+     ! Computed value of the bilinear action (complex valued)
+     !   invert: \phi^\dagger A^{-1} \phi
+     !   multishift: \phi^\dagger r(x) \phi = \phi^\dagger (sum_k residue[k] * (A + offset[k])^{-1} ) \phi
+     real(8), dimension(2) :: action
 
      QudaSolutionType :: solution_type  ! Type of system to solve
      QudaSolveType :: solve_type        ! How to solve it
@@ -231,8 +243,20 @@ module quda_fortran
      real(8)::inc_tol     ! initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle
 
      ! Parameters for setting data residency of the solver
-     integer(8)::make_resident_solution ! Whether to make the solution vector(s) after the solve
-     integer(8)::use_resident_solution  ! Whether to use the resident solution vector(s)
+     integer(4)::make_resident_solution ! Whether to make the solution vector(s) after the solve
+     integer(4)::use_resident_solution  ! Whether to use the resident solution vector(s)
+
+     ! Whether to use the solution vector to augment the chronological forecast
+     integer(4)::make_resident_chrono
+
+     ! Whether to use the resident chronological basis
+     integer(4)::use_resident_chrono
+
+     ! The maximum length of the chronological history to store
+     integer(4)::max_chrono_dim
+
+     ! The index to indeicate which chrono history we are augmenting */
+     integer(4)::chrono_index;
 
   end type quda_invert_param
 

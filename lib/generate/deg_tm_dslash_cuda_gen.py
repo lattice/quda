@@ -451,6 +451,17 @@ def gen(dir, pack_only=False):
     decl_half += "\n"
 
     load_spinor = "// read spinor from device memory\n"
+
+    load_spinor += "#ifdef TWIST_INV_DSLASH\n"
+    load_spinor += "#ifdef SPINOR_DOUBLE\n"
+    load_spinor += "const spinorFloat a = param.a;\n"
+    load_spinor += "const spinorFloat b = param.b;\n"
+    load_spinor += "#else\n"
+    load_spinor += "const spinorFloat a = param.a_f;\n"
+    load_spinor += "const spinorFloat b = param.b_f;\n"
+    load_spinor += "#endif\n"
+    load_spinor += "#endif\n"
+
     if row_cnt[0] == 0:
         if not pack_only:
             load_spinor += "#ifndef TWIST_INV_DSLASH\n"
@@ -737,6 +748,16 @@ def input_spinor(s,c,z):
 
 def twisted_xpay():
     str = ""
+    str += "#ifndef TWIST_INV_DSLASH\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "const spinorFloat a = param.a;\n"
+    str += "const spinorFloat b = param.b;\n"
+    str += "#else\n"
+    str += "const spinorFloat a = param.a_f;\n"
+    str += "const spinorFloat b = param.b_f;\n"
+    str += "#endif\n"
+    str += "#endif\n"
+
     str += "#ifdef DSLASH_XPAY\n"
     str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
     str += "#ifndef TWIST_XPAY\n"

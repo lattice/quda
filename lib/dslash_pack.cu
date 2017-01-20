@@ -686,6 +686,7 @@ namespace quda {
     const int nFace;
     const int dim;
     const int face_num;
+    const bool zero_copy;
 
     // compute how many threads we need in total for the face packing
     unsigned int threads() const {
@@ -709,8 +710,7 @@ namespace quda {
     virtual int outputPerSite() const = 0;
 
     // prepare the param struct with kernel arguments
-    PackParam<FloatN> prepareParam(TuneParam &tp, int dim=-1, int face_num=2) {
-      PackParam<FloatN> param;
+    void prepareParam(PackParam<FloatN> &param, TuneParam &tp, int dim=-1, int face_num=2) {
       param.in = (FloatN*)in->V();
       param.inNorm = (float*)in->Norm();
       param.dim = dim;
@@ -737,7 +737,6 @@ namespace quda {
         param.threadDimMapUpper[i] = param.threadDimMapLower[i] + 2*nFace*in->GhostFace()[i];
 
         size_t faceBytes = nFace*outputPerSite()*in->GhostFace()[i]*sizeof(faces->x);
-
         if (typeid(FloatN) == typeid(short4) || typeid(FloatN) == typeid(short2)) {
           faceBytes += nFace*in->GhostFace()[i]*sizeof(float);
           param.out[2*i] = (FloatN*)((char*)faces + 
@@ -791,8 +790,6 @@ namespace quda {
       }
 
       param.swizzle = tp.aux.x;
-
-      return param;
     }
 
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -821,12 +818,13 @@ namespace quda {
       default:
 	errorQuda("Number of faces not supported");
       }
+      if (zero_copy) strcat(aux,",zero_copy");
     }
 
   public:
-    PackFace(FloatN *faces, const cudaColorSpinorField *in, 
+    PackFace(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
 	     const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
-      : faces(faces), in(in), dagger(dagger), 
+      : faces(faces), in(in), zero_copy(zero_copy), dagger(dagger),
 	parity(parity), nFace(nFace), dim(dim), face_num(face_num) 
     { 
       fillAux(); 
@@ -887,16 +885,17 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-  PackFaceWilson(FloatN *faces, const cudaColorSpinorField *in, 
-		 const int dagger, const int parity)
-    : PackFace<FloatN, Float>(faces, in, dagger, parity, 1) { }
+    PackFaceWilson(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
+		   const int dagger, const int parity)
+      : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, 1) { }
     virtual ~PackFaceWilson() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_WILSON_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -909,25 +908,25 @@ namespace quda {
 
   };
 
-  void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 
-		      const int parity, const cudaStream_t &stream) {
+  void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy,
+		      const int dagger, const int parity, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
-        PackFaceWilson<double2, double> pack((double2*)ghost_buf, &in, dagger, parity);
+        PackFaceWilson<double2, double> pack((double2*)ghost_buf, &in, zero_copy, dagger, parity);
         pack.apply(stream);
       }
       break;
     case QUDA_SINGLE_PRECISION:
       {
-        PackFaceWilson<float4, float> pack((float4*)ghost_buf, &in, dagger, parity);
+        PackFaceWilson<float4, float> pack((float4*)ghost_buf, &in, zero_copy, dagger, parity);
         pack.apply(stream);
       }
       break;
     case QUDA_HALF_PRECISION:
       {
-        PackFaceWilson<short4, float> pack((short4*)ghost_buf, &in, dagger, parity);
+        PackFaceWilson<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity);
         pack.apply(stream);
       }
       break;
@@ -947,16 +946,17 @@ namespace quda {
     Float b;
 
   public:
-  PackFaceTwisted(FloatN *faces, const cudaColorSpinorField *in, 
-		  const int dagger, const int parity, Float a, Float b)
-    : PackFace<FloatN, Float>(faces, in, dagger, parity, 1), a(a), b(b) { }
+    PackFaceTwisted(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
+		    const int dagger, const int parity, Float a, Float b)
+    : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, 1), a(a), b(b) { }
     virtual ~PackFaceTwisted() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_TWISTED_MASS_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
       } else {
@@ -971,25 +971,25 @@ namespace quda {
   };
 
   //!
-  void packTwistedFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 
+  void packTwistedFaceWilson(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int dagger,
 			     const int parity, const double a, const double b, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
-        PackFaceTwisted<double2, double> pack((double2*)ghost_buf, &in, dagger, parity, a, b);
+        PackFaceTwisted<double2, double> pack((double2*)ghost_buf, &in, zero_copy, dagger, parity, a, b);
         pack.apply(stream);
       }
       break;
     case QUDA_SINGLE_PRECISION:
       {
-        PackFaceTwisted<float4, float> pack((float4*)ghost_buf, &in, dagger, parity, (float)a, (float)b);
+        PackFaceTwisted<float4, float> pack((float4*)ghost_buf, &in, zero_copy, dagger, parity, (float)a, (float)b);
         pack.apply(stream);
       }
       break;
     case QUDA_HALF_PRECISION:
       {
-        PackFaceTwisted<short4, float> pack((short4*)ghost_buf, &in, dagger, parity, (float)a, (float)b);
+        PackFaceTwisted<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity, (float)a, (float)b);
         pack.apply(stream);
       }
       break;
@@ -1309,10 +1309,10 @@ namespace quda {
 
 
   public:
-  PackFaceStaggered(FloatN *faces, const cudaColorSpinorField *in, 
-		    const int nFace, const int dagger, const int parity, 
-		    const int dim, const int face_num, const int* R=NULL, const bool unpack=false)
-    : PackFace<FloatN, Float>(faces, in, dagger, parity, nFace, dim, face_num), R(R), unpack(unpack) { }
+    PackFaceStaggered(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
+		      const int nFace, const int dagger, const int parity,
+		      const int dim, const int face_num, const int* R=NULL, const bool unpack=false)
+      : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, nFace, dim, face_num), R(R), unpack(unpack) { }
     virtual ~PackFaceStaggered() { }
 
     void apply(const cudaStream_t &stream) {
@@ -1320,7 +1320,8 @@ namespace quda {
 
 #ifdef GPU_STAGGERED_DIRAC
 
-      PackParam<FloatN> param = this->prepareParam(tp,this->dim, this->face_num);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp,this->dim, this->face_num);
       if(!R){
         if (PackFace<FloatN,Float>::nFace==1) {
           packFaceStaggeredKernel<FloatN, 1> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
@@ -1385,25 +1386,25 @@ namespace quda {
   };
 
 
-  void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, int nFace, 
+  void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, int nFace,
 			 int dagger, int parity, const int dim, const int face_num, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
-        PackFaceStaggered<double2, double> pack((double2*)ghost_buf, &in, nFace, dagger, parity, dim, face_num);
+        PackFaceStaggered<double2, double> pack((double2*)ghost_buf, &in, zero_copy, nFace, dagger, parity, dim, face_num);
         pack.apply(stream);
       }
       break;
     case QUDA_SINGLE_PRECISION:
       {
-        PackFaceStaggered<float2, float> pack((float2*)ghost_buf, &in, nFace, dagger, parity, dim, face_num);
+        PackFaceStaggered<float2, float> pack((float2*)ghost_buf, &in, zero_copy, nFace, dagger, parity, dim, face_num);
         pack.apply(stream);
       }
       break;
     case QUDA_HALF_PRECISION:
       {
-        PackFaceStaggered<short2, float> pack((short2*)ghost_buf, &in, nFace, dagger, parity, dim, face_num);
+        PackFaceStaggered<short2, float> pack((short2*)ghost_buf, &in, zero_copy, nFace, dagger, parity, dim, face_num);
         pack.apply(stream);
       }
       break;
@@ -1412,25 +1413,25 @@ namespace quda {
     }
   }
 
-  void packFaceExtendedStaggered(void *buffer, cudaColorSpinorField &field, const int nFace, const int R[],
+  void packFaceExtendedStaggered(void *buffer, cudaColorSpinorField &field, bool zero_copy, const int nFace, const int R[],
 				 int dagger, int parity, const int dim, const int face_num, const cudaStream_t &stream, bool unpack=false)
   {
     switch(field.Precision()){
     case QUDA_DOUBLE_PRECISION:
       {
-        PackFaceStaggered<double2,double> pack(static_cast<double2*>(buffer), &field, nFace, dagger, parity, dim, face_num, R, unpack);
+        PackFaceStaggered<double2,double> pack(static_cast<double2*>(buffer), &field, zero_copy, nFace, dagger, parity, dim, face_num, R, unpack);
         pack.apply(stream);  
       }
       break;
     case QUDA_SINGLE_PRECISION:
       {
-        PackFaceStaggered<float2,float> pack(static_cast<float2*>(buffer), &field, nFace, dagger, parity, dim, face_num, R, unpack);
+        PackFaceStaggered<float2,float> pack(static_cast<float2*>(buffer), &field, zero_copy, nFace, dagger, parity, dim, face_num, R, unpack);
         pack.apply(stream);  
       } 
       break;
     case QUDA_HALF_PRECISION:
       {
-        PackFaceStaggered<short2,float> pack(static_cast<short2*>(buffer), &field, nFace, dagger, parity, dim, face_num, R, unpack);
+        PackFaceStaggered<short2,float> pack(static_cast<short2*>(buffer), &field, zero_copy, nFace, dagger, parity, dim, face_num, R, unpack);
         pack.apply(stream);  
       }
       break;
@@ -1590,16 +1591,17 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-  PackFaceDW(FloatN *faces, const cudaColorSpinorField *in, 
-	     const int dagger, const int parity)
-    : PackFace<FloatN, Float>(faces, in, dagger, parity, 1) { }
+    PackFaceDW(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
+	       const int dagger, const int parity)
+    : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, 1) { }
     virtual ~PackFaceDW() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packFaceDWKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -1622,16 +1624,17 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-  PackFaceDW4D(FloatN *faces, const cudaColorSpinorField *in, 
-	       const int dagger, const int parity)
-    : PackFace<FloatN, Float>(faces, in, dagger, parity, 1) { }
+    PackFaceDW4D(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
+		 const int dagger, const int parity)
+      : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, 1) { }
     virtual ~PackFaceDW4D() { }
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     
 #ifdef GPU_DOMAIN_WALL_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
 	packFaceDW4DKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -1645,7 +1648,7 @@ namespace quda {
     long long flops() const { return outputPerSite()*this->threads(); }
   };
 
-  void packFaceDW(void *ghost_buf, cudaColorSpinorField &in, const int dagger,  
+  void packFaceDW(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int dagger,
 		  const int parity, const cudaStream_t &stream) {
 
 
@@ -1654,19 +1657,19 @@ namespace quda {
 	switch(in.Precision()) {
 	case QUDA_DOUBLE_PRECISION:
 	  {
-	    PackFaceDW4D<double2, double> pack((double2*)ghost_buf, &in, dagger, parity);
+	    PackFaceDW4D<double2, double> pack((double2*)ghost_buf, &in, zero_copy, dagger, parity);
 	    pack.apply(stream);
 	  }
 	  break;
 	case QUDA_SINGLE_PRECISION:
 	  {
-	    PackFaceDW4D<float4, float> pack((float4*)ghost_buf, &in, dagger, parity);
+	    PackFaceDW4D<float4, float> pack((float4*)ghost_buf, &in, zero_copy, dagger, parity);
 	    pack.apply(stream);
 	  }
 	  break;
 	case QUDA_HALF_PRECISION:
 	  {
-	    PackFaceDW4D<short4, float> pack((short4*)ghost_buf, &in, dagger, parity);
+	    PackFaceDW4D<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity);
 	    pack.apply(stream);
 	  }
 	  break;
@@ -1679,19 +1682,19 @@ namespace quda {
 	switch(in.Precision()) {
 	case QUDA_DOUBLE_PRECISION:
 	  {
-	    PackFaceDW<double2, double> pack((double2*)ghost_buf, &in, dagger, parity);
+	    PackFaceDW<double2, double> pack((double2*)ghost_buf, &in, zero_copy, dagger, parity);
 	    pack.apply(stream);
 	  }
 	  break;
 	case QUDA_SINGLE_PRECISION:
 	  {
-	    PackFaceDW<float4, float> pack((float4*)ghost_buf, &in, dagger, parity);
+	    PackFaceDW<float4, float> pack((float4*)ghost_buf, &in, zero_copy, dagger, parity);
 	    pack.apply(stream);
 	  }
 	  break;
 	case QUDA_HALF_PRECISION:
 	  {
-	    PackFaceDW<short4, float> pack((short4*)ghost_buf, &in, dagger, parity);
+	    PackFaceDW<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity);
 	    pack.apply(stream);
 	  }
 	  break;
@@ -1781,16 +1784,17 @@ namespace quda {
     int outputPerSite() const { return 12; } // output is spin projected
 
   public:
-  PackFaceNdegTM(FloatN *faces, const cudaColorSpinorField *in, 
-		 const int dagger, const int parity)
-    : PackFace<FloatN, Float>(faces, in, dagger, parity, 1) { }
+    PackFaceNdegTM(FloatN *faces, const cudaColorSpinorField *in, bool zero_copy,
+		   const int dagger, const int parity)
+      : PackFace<FloatN, Float>(faces, in, zero_copy, dagger, parity, 1) { }
     virtual ~PackFaceNdegTM() { }
 
     void apply(const cudaStream_t &stream) {    
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-      PackParam<FloatN> param = this->prepareParam(tp);
+      static PackParam<FloatN> param;
+      this->prepareParam(param,tp);
       if (this->dagger) {
         packFaceNdegTMKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
       } else {
@@ -1804,25 +1808,25 @@ namespace quda {
     long long flops() const { return outputPerSite()*this->threads(); }
   };
 
-  void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 
+  void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int dagger,
 		      const int parity, const cudaStream_t &stream) {
 
     switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
-        PackFaceNdegTM<double2, double> pack((double2*)ghost_buf, &in, dagger, parity);
+        PackFaceNdegTM<double2, double> pack((double2*)ghost_buf, &in, zero_copy, dagger, parity);
         pack.apply(stream);
       }
       break;
     case QUDA_SINGLE_PRECISION:
       {
-        PackFaceNdegTM<float4, float> pack((float4*)ghost_buf, &in, dagger, parity);
+        PackFaceNdegTM<float4, float> pack((float4*)ghost_buf, &in, zero_copy, dagger, parity);
         pack.apply(stream);
       }
       break;
     case QUDA_HALF_PRECISION:
       {
-        PackFaceNdegTM<short4, float> pack((short4*)ghost_buf, &in, dagger, parity);
+        PackFaceNdegTM<short4, float> pack((short4*)ghost_buf, &in, zero_copy, dagger, parity);
         pack.apply(stream);
       }
       break;
@@ -1831,7 +1835,8 @@ namespace quda {
     } 
   }
 
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, const int nFace, 
+  void packFace(void *ghost_buf, cudaColorSpinorField &in,
+		bool zero_copy, const int nFace,
 		const int dagger, const int parity, 
 		const int dim, const int face_num, 
 		const cudaStream_t &stream, 
@@ -1855,28 +1860,29 @@ namespace quda {
 
     // Need to update this logic for other multi-src dslash packing
     if (in.Nspin() == 1) {
-      packFaceStaggered(ghost_buf, in, nFace, dagger, parity, dim, face_num, stream);
+      packFaceStaggered(ghost_buf, in, zero_copy, nFace, dagger, parity, dim, face_num, stream);
     } else if (a!=0.0 || b!=0.0) {
       // Need to update this logic for other multi-src dslash packing
       if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS) {
-	packTwistedFaceWilson(ghost_buf, in, dagger, parity, a, b, stream);
+	packTwistedFaceWilson(ghost_buf, in, zero_copy, dagger, parity, a, b, stream);
       } else {
 	errorQuda("Cannot perform twisted packing for the spinor.");
       }
     } else if (in.Ndim() == 5) {
       if(in.TwistFlavor() == QUDA_TWIST_INVALID) {
-	packFaceDW(ghost_buf, in, dagger, parity, stream);
+	packFaceDW(ghost_buf, in, zero_copy, dagger, parity, stream);
       } else {
-	packFaceNdegTM(ghost_buf, in, dagger, parity, stream);
+	packFaceNdegTM(ghost_buf, in, zero_copy, dagger, parity, stream);
       }
     } else {
-      packFaceWilson(ghost_buf, in, dagger, parity, stream);
+      packFaceWilson(ghost_buf, in, zero_copy, dagger, parity, stream);
     }
   }
 
 
 
-  void packFaceExtended(void* buffer, cudaColorSpinorField &field, const int nFace, const int R[],
+  void packFaceExtended(void* buffer, cudaColorSpinorField &field,
+			bool zero_copy, const int nFace, const int R[],
 			const int dagger, const int parity, const int dim, const int face_num, 
 			const cudaStream_t &stream, const bool unpack)
   {
@@ -1891,7 +1897,7 @@ namespace quda {
 
     if(!nDimPack) return; // if zero then we have nothing to pack
     if(field.Nspin() == 1){
-      packFaceExtendedStaggered(buffer, field, nFace, R, dagger, parity, dim, face_num, stream, unpack);
+      packFaceExtendedStaggered(buffer, field, zero_copy, nFace, R, dagger, parity, dim, face_num, stream, unpack);
     }else{
       errorQuda("Extended quark field is not supported");
     }

@@ -588,6 +588,8 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 BUILD_MAGMA_VARS
 BUILD_MAGMA
+BUILD_ARPACK_VARS
+BUILD_ARPACK
 QDP_INSTALL_PATH
 USE_QDPJIT
 FERMI_DBLE_TEX
@@ -1370,7 +1372,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-cpu-arch=arch  Set CPU arch: x86 or x86_64 (default: x86_64)
   --enable-gpu-arch=arch  Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50,
-                          sm_52 (default: sm_35)
+                          sm_52, sm_60 (default: sm_35)
   --enable-os=os          Set operating system: linux, osx (default: linux)
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
@@ -1436,6 +1438,9 @@ Optional Features:
                           magma)
   --enable-magma-vars     Build with MAGMA using env vars: MAGMA_INC and
                           MAGMA_LIB
+  --enable-arpack          Build with (P)ARPACK (requires pkg-config to detect
+                          arpack)
+  --enable-arpack-vars     Build with (P)ARPACK using env vars: ARPACK_LIB
   --enable-blas-tex       Enable texture reads for blas (default: enabled)
   --enable-fermi-double-tex
                           Enable double-precision texture reads on Fermi
@@ -4043,9 +4048,9 @@ x86 | x86_64 ) ;;
 esac
 
 case ${gpu_arch} in
-sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
+sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60) ;;
 *)
-  as_fn_error $? " GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
+  as_fn_error $? " GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60 " "$LINENO" 5
   ;;
 esac
 
@@ -4613,10 +4618,13 @@ QDP_INSTALL_PATH=${qdp_home}
 $as_echo "$as_me: Setting BUILD_MAGMA = ${build_magma}" >&6;}
 BUILD_MAGMA=${build_magma}
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_ARPACK = ${build_arpack}" >&5
+$as_echo "$as_me: Setting BUILD_ARPACK = ${build_arpack}" >&6;}
+BUILD_ARPACK=${build_arpack}
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MAGMA_VARS = ${build_magma_vars}" >&5
-$as_echo "$as_me: Setting BUILD_MAGMA_VARS = ${build_magma_vars}" >&6;}
-BUILD_MAGMA_VARS=${build_magma_vars}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_ARPACK_VARS = ${build_arpack_vars}" >&5
+$as_echo "$as_me: Setting BUILD_ARPACK_VARS = ${build_arpack_vars}" >&6;}
+BUILD_ARPACK_VARS=${build_arpack_vars}
 
 
 if test "X${force_ac}X" = "XnoX";

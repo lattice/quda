@@ -272,6 +272,16 @@ namespace quda {
       SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
+    } else if (out.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      PaddedSpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
     } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
@@ -308,6 +318,15 @@ namespace quda {
     } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
+    } else if (in.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      PaddedSpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
     } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE

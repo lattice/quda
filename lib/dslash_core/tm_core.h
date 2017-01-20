@@ -1,6 +1,10 @@
 #ifndef _TM_CORE_H
 #define _TM_CORE_H
 
+template<typename T, bool>
+__global__ void twistGamma5Kernel(DslashParam param) {}
+
+
 //action of the operator b*(1 + i*a*gamma5)
 //used also macros from io_spinor.h
 
@@ -42,13 +46,16 @@ __device__ double2 operator*(const double &x, const double2 &y)
 #define SPINORTEX spinorTexDouble
 #endif
 
-__global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double b, 
-				  const double2 *in, const float *null2, DslashParam param)
+template<>
+__global__ void twistGamma5Kernel<double2,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_MASS_DIRAC
 
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
+
+   double a = param.a;
+   double b = param.b;
 
 #ifndef FERMI_NO_DBLE_TEX
    double2 I0  = fetch_double2(SPINORTEX, sid + 0 * param.sp_stride);   
@@ -151,6 +158,7 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
    I11.x = b * tmp3_re;
    I11.y = b * tmp3_im;
       
+   double2 *spinor = ((double2*)param.out);
    spinor[sid + 0  * param.sp_stride] = I0;   
    spinor[sid + 1  * param.sp_stride] = I1;   
    spinor[sid + 2  * param.sp_stride] = I2;   
@@ -167,12 +175,17 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, double a, double
 }
 
 
-__global__ void twistGamma5Kernel(double2 *spinor, float *null, const double a, const double b, const double c, const double2 *in, const float *null2, DslashParam param)
+template<>
+__global__ void twistGamma5Kernel<double2,true>(DslashParam param)
 {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
    int sid = blockIdx.x * blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;   
    
+   double a = param.a;
+   double b = param.b;
+   double c = param.c;
+
    //temporal regs:
    double2 accum1_0, accum1_1;
    double2 accum2_0, accum2_1;
@@ -227,7 +240,8 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, const double a, 
    accum1_1.y += b * tmp1.y;
    
    //store results back to memory:
-   
+
+   double2 *spinor = ((double2*)param.out);
    spinor[flv1_idx + 0  * param.sp_stride] = c * accum1_0;   
    spinor[flv1_idx + 6  * param.sp_stride] = c * accum1_1;   
    spinor[flv2_idx + 0  * param.sp_stride] = c * accum2_0;   
@@ -500,8 +514,8 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, const double a, 
 #endif
 
 
-__global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, 
-				  const float4 *in, const float *null2, DslashParam param)
+template<>
+__global__ void twistGamma5Kernel<float4,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_MASS_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -514,8 +528,9 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
    float4 I4 = TEX1DFETCH(float4, SPINORTEX, sid + 4 * param.sp_stride);   
    float4 I5 = TEX1DFETCH(float4, SPINORTEX, sid + 5 * param.sp_stride);
 
+   float a = param.a_f;
+   float b = param.b_f;
    volatile float4 tmp0, tmp1;
-    
    //apply (1 + i*a*gamma_5) to the input spinor and then add to (b * output spinor)
    
    //get the 1st color component:(I0.xy, I1.zw, I3.xy, I4.zw)
@@ -587,6 +602,7 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
    I5.z = b * tmp3_re;
    I5.w = b * tmp3_im;
    
+   float4* spinor = (float4*)param.out;
    spinor[sid + 0  * param.sp_stride] = I0;   
    spinor[sid + 1  * param.sp_stride] = I1;   
    spinor[sid + 2  * param.sp_stride] = I2;   
@@ -596,12 +612,17 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
 #endif 
 }
 
-__global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b, float c,  const float4 *in,  const float *null2, DslashParam param)
+template<>
+__global__ void twistGamma5Kernel<float4,true>(DslashParam param)
 {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
    int sid = blockIdx.x * blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
    
+   float a = param.a_f;
+   float b = param.b_f;
+   float c = param.c_f;
+
    float4 accum1_0, accum1_1;
    float4 accum2_0, accum2_1;
    float4 tmp0, tmp1;
@@ -659,6 +680,7 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
    accum1_1.z += b * tmp1.z;
    accum1_1.w += b * tmp1.w;
    
+   float4* spinor = (float4*)param.out;
    spinor[flv1_idx + 0  * param.sp_stride] = c * accum1_0;   
    spinor[flv1_idx + 3  * param.sp_stride] = c * accum1_1;   
    spinor[flv2_idx + 0  * param.sp_stride] = c * accum2_0;   
@@ -783,12 +805,15 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
 #endif
 
 
-__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, 
-				  const short4 *in, const float *inNorm, DslashParam param)
+template<>
+__global__ void twistGamma5Kernel<short4,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_MASS_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
+
+   float a = param.a_f;
+   float b = param.b_f;
 
    float4 I0 = TEX1DFETCH(float4, SPINORTEX, sid + 0 * param.sp_stride);   
    float4 I1 = TEX1DFETCH(float4, SPINORTEX, sid + 1 * param.sp_stride);   
@@ -903,7 +928,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    c2 = fmaxf(c4, c5);							
    c0 = fmaxf(c0, c1);							
    c0 = fmaxf(c0, c2);							
-   spinorNorm[sid] = c0;								
+   param.outNorm[sid] = c0;								
    float scale = __fdividef(MAX_SHORT, c0);
    
    I0 = scale * I0; 	
@@ -913,6 +938,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    I4 = scale * I4;
    I5 = scale * I5;
    
+   short4* spinor = (short4*)param.out;
    spinor[sid+0*(param.sp_stride)] = make_short4((short)I0.x, (short)I0.y, (short)I0.z, (short)I0.w); 
    spinor[sid+1*(param.sp_stride)] = make_short4((short)I1.x, (short)I1.y, (short)I1.z, (short)I1.w); 
    spinor[sid+2*(param.sp_stride)] = make_short4((short)I2.x, (short)I2.y, (short)I2.z, (short)I2.w); 
@@ -923,13 +949,17 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
 #endif 
 }
 
-
-__global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, float b, float c, const short4 *in, const float *inNorm, DslashParam param)
+template<>
+__global__ void twistGamma5Kernel<short4,true>(DslashParam param)
 {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
    int sid = blockIdx.x * blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
    
+   float a = param.a_f;
+   float b = param.b_f;
+   float c = param.b_f;
+
    int flv1_idx = sid;
    int flv2_idx = sid + param.fl_stride;
    
@@ -1145,7 +1175,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    c1_2 = fmaxf(c1_4, c1_5);							
    c1_0 = fmaxf(c1_0, c1_1);							
    c1_0 = fmaxf(c1_0, c1_2);							
-   spinorNorm[flv1_idx] = c1_0;								
+   param.outNorm[flv1_idx] = c1_0;								
    float scale = __fdividef(MAX_SHORT, c1_0);
    
    accum1_0 = scale * accum1_0; 	
@@ -1166,7 +1196,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    c2_2 = fmaxf(c2_4, c2_5);							
    c2_0 = fmaxf(c2_0, c2_1);							
    c2_0 = fmaxf(c2_0, c2_2);							
-   spinorNorm[flv2_idx] = c2_0;								
+   param.outNorm[flv2_idx] = c2_0;								
    scale = __fdividef(MAX_SHORT, c2_0);
    
    accum2_0 = scale * accum2_0; 	
@@ -1177,6 +1207,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    accum2_5 = scale * accum2_5;   
 
    
+   short4* spinor = (short4*)param.out;
    spinor[flv1_idx+0*(param.sp_stride)] = make_short4((short)accum1_0.x, (short)accum1_0.y, (short)accum1_0.z, (short)accum1_0.w); 
    spinor[flv1_idx+1*(param.sp_stride)] = make_short4((short)accum1_1.x, (short)accum1_1.y, (short)accum1_1.z, (short)accum1_1.w); 
    spinor[flv1_idx+2*(param.sp_stride)] = make_short4((short)accum1_2.x, (short)accum1_2.y, (short)accum1_2.z, (short)accum1_2.w); 

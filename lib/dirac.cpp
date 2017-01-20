@@ -140,71 +140,71 @@ namespace quda {
   Dirac* Dirac::create(const DiracParam &param)
   {
     if (param.type == QUDA_WILSON_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracWilson operator\n");
       return new DiracWilson(param);
     } else if (param.type == QUDA_WILSONPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracWilsonPC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracWilsonPC operator\n");
       return new DiracWilsonPC(param);
     } else if (param.type == QUDA_CLOVER_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracClover operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
       return new DiracClover(param);
     } else if (param.type == QUDA_CLOVERPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
       return new DiracCloverPC(param);
     } else if (param.type == QUDA_DOMAIN_WALL_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWall operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall operator\n");
       return new DiracDomainWall(param);
     } else if (param.type == QUDA_DOMAIN_WALLPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
       return new DiracDomainWallPC(param);
     } else if (param.type == QUDA_DOMAIN_WALL_4DPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWall4DPC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracDomainWall4DPC operator\n");
       return new DiracDomainWall4DPC(param);
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALL_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracMobius operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobius operator\n");
       return new DiracMobius(param);
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
       return new DiracMobiusPC(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);
     } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
       return new DiracStaggeredPC(param);    
     } else if (param.type == QUDA_ASQTAD_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracImprovedStaggered operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggered operator\n");
       return new DiracImprovedStaggered(param);
     } else if (param.type == QUDA_ASQTADPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
       return new DiracImprovedStaggeredPC(param);    
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
       if (param.Ls == 1) {
 	return new DiracTwistedClover(param, 4);
       } else { 
 	errorQuda("Cannot create DiracTwistedClover operator for %d flavors\n", param.Ls);
       }
     } else if (param.type == QUDA_TWISTED_CLOVERPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedCloverPC operator (%d flavor(s))\n", param.Ls);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedCloverPC operator (%d flavor(s))\n", param.Ls);
       if (param.Ls == 1) {
 	return new DiracTwistedCloverPC(param, 4);
       } else {
 	errorQuda("Cannot create DiracTwistedCloverPC operator for %d flavors\n", param.Ls);
       }
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMass(param, 4);
         else return new DiracTwistedMass(param, 5);
     } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMassPC(param, 4);
         else return new DiracTwistedMassPC(param, 5);
     } else if (param.type == QUDA_COARSE_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
       return new DiracCoarse(param);
     } else if (param.type == QUDA_COARSEPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
       return new DiracCoarsePC(param);
     }
 

@@ -27,6 +27,7 @@ extern "C" {
     double boundary_phase[4]; /** Boundary conditions */
     int make_resident_solution; /** Make the solution resident and don't copy back */
     int use_resident_solution; /** Use the resident solution */
+    QudaInverterType solver_type; /** Type of solver to use */
   } QudaInvertArgs_t;
 
 

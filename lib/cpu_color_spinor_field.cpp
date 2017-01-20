@@ -132,8 +132,9 @@ namespace quda {
 
     if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
 	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
-	fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER &&
-	fieldOrder != QUDA_QDPJIT_FIELD_ORDER) {
+	fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER  &&
+	fieldOrder != QUDA_QDPJIT_FIELD_ORDER           &&
+	fieldOrder != QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
       errorQuda("Field order %d not supported", fieldOrder);
     }
 
