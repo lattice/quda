@@ -213,9 +213,16 @@ namespace quda {
 
       bool breakdown = false;
       if (param.pipeline) {
+        double Ap2;
         //TODO: alternative reliable updates - need r2, Ap2, pAp, p norm
-        double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
-        r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
+        if(alternative_reliable){
+          double4 quadruple = blas::quadrupleCGReduction(rSloppy, Ap, p);
+          r2 = quadruple.x; Ap2 = quadruple.y; pAp = quadruple.z; ppnorm= quadruple.w;
+        }
+        else{
+          double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
+          r2 = triplet.x; Ap2 = triplet.y; pAp = triplet.z;
+        }
         r2_old = r2;
         alpha = r2 / pAp;
         sigma = alpha*(alpha * Ap2 - pAp);
@@ -256,7 +263,8 @@ namespace quda {
         // alternative reliable updates
         updateX = (d <= deps*sqrt(r2_old)) and (d_new > deps*rNorm) and (d_new > 1.1 * dinit);
         updateR = 0;
-        printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
+        if(updateX)
+          printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
         updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
       }
       else{
@@ -296,7 +304,8 @@ namespace quda {
     pnorm = pnorm + alpha * alpha* (ppnorm);
     xnorm = sqrt(pnorm);
     d_new = d + u*rNorm + uhigh*Anorm * xnorm;
-    printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * xnorm);
+    if(steps_since_reliable==0)
+      printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * xnorm);
   }
     steps_since_reliable++;
 
