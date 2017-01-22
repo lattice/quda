@@ -170,7 +170,7 @@ namespace quda {
     double d_new;
     double d;
     double dinit;
-    const double u=5*pow(10.,-2*param.precision_sloppy);
+    const double u=1*pow(10.,-2*param.precision_sloppy);
     const double uhigh=1*pow(10.,-2*param.precision); //MW: set this automatically depending on QUDA precision
     const double deps=sqrt(u);
 
@@ -242,8 +242,8 @@ namespace quda {
       // if (rNorm > maxrr) maxrr = rNorm;
       // int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       // int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-      int updateX = (d <= deps*sqrt(r2_old)) and (d_new > deps*rNorm) and (d_new > 1.1 *dinit);
-      //printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e (dinit %e)\n",updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,dinit);
+      int updateX = (d <= deps*sqrt(r2_old)) and (d_new > deps*rNorm) and (d_new > 1.1 * dinit);
+      printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;t (dnew > 1.1 dinit %e %e)\n",updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
       int updateR=0;
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol ) updateX = 1;
@@ -273,7 +273,9 @@ namespace quda {
 
     pnorm = pnorm + alpha * alpha* (ppnorm);//sqrt(norm2(p));
     xnorm = sqrt(pnorm);
+    // xnorm = sqrt(blas::norm2(xSloppy));
     d_new = d + u*rNorm + uhigh*Anorm * xnorm;
+    printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * xnorm);
    	steps_since_reliable++;
 
       } else {
@@ -290,7 +292,7 @@ namespace quda {
         dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
         xnorm = 0;//sqrt(norm2(x));
         pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
-        printfQuda("New dinit: %e (r %e , y %e)",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
+        printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
         d_new = dinit;
 
 
