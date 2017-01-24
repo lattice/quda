@@ -9,6 +9,8 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <sys/time.h>
+#include <limits>
+#include <cmath>
 
 #include <face_quda.h>
 
@@ -38,7 +40,7 @@ namespace quda {
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     // hack to select alternative reliable updates
-    constexpr bool alternative_reliable = true;
+    constexpr bool alternative_reliable = false;
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -86,8 +88,9 @@ namespace quda {
 
     // alternative reliable updates
     // alternative reliable updates - set precision
-    const double u=0.1*pow(10.,-2*param.precision_sloppy);
-    const double uhigh=1*pow(10.,-2*param.precision); //MW: set this automatically depending on QUDA precision
+
+    const double u= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-14));
+    const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-14));
     const double deps=sqrt(u);
     double d_new;
     double d;
@@ -305,7 +308,7 @@ namespace quda {
     xnorm = sqrt(pnorm);
     d_new = d + u*rNorm + uhigh*Anorm * xnorm;
     if(steps_since_reliable==0)
-      printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * xnorm);
+      printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
   }
     steps_since_reliable++;
 
