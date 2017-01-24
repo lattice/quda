@@ -86,7 +86,7 @@ namespace quda {
 
     // alternative reliable updates
     // alternative reliable updates - set precision
-    const double u=1*pow(10.,-2*param.precision_sloppy);
+    const double u=0.1*pow(10.,-2*param.precision_sloppy);
     const double uhigh=1*pow(10.,-2*param.precision); //MW: set this automatically depending on QUDA precision
     const double deps=sqrt(u);
     double d_new;
@@ -263,9 +263,9 @@ namespace quda {
         // alternative reliable updates
         updateX = (d <= deps*sqrt(r2_old)) and (d_new > deps*rNorm) and (d_new > 1.1 * dinit);
         updateR = 0;
-        if(updateX)
-          printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
-        updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
+        // if(updateX)
+          // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
+        // updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
       }
       else{
         if (rNorm > maxrx) maxrx = rNorm;
