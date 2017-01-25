@@ -40,7 +40,7 @@ namespace quda {
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     // hack to select alternative reliable updates
-    constexpr bool alternative_reliable = false;
+    constexpr bool alternative_reliable = true;
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
