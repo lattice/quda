@@ -72,6 +72,10 @@ namespace quda {
       report("MPBICGSTAB");
       solver = new MPBiCGstab(mat, param, profile);
       break;
+    case QUDA_BICGSTABL_INVERTER:
+      report("BICGSTABL");
+      solver = new BiCGstabL(mat, matSloppy, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }
@@ -162,15 +166,36 @@ namespace quda {
 
   void Solver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n",
-		   name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);
+      if (param.compute_true_res) {
+	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n",
+		     name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);
+	} else {
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e\n",
+		     name, k, sqrt(r2/b2), param.true_res);
+	}
       } else {
-	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e\n",
-		   name, k, sqrt(r2/b2), param.true_res);
+	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, heavy-quark residual = %e\n",
+		     name, k, sqrt(r2/b2), param.true_res_hq);
+	} else {
+	  printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e\n", name, k, sqrt(r2/b2));
+	}
       }
-
     }
+  }
+
+
+  bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
+
+    for (int i=0; i<n; i++) {
+      // check the L2 relative residual norm if necessary
+      if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
+	    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2[i] > r2_tol[i]) )
+	return false;
+    }
+
+    return true;
   }
 
   // Deflated solver factory

@@ -67,11 +67,7 @@ namespace quda {
   class StaggeredDslashCuda : public DslashCuda {
 
   private:
-    const fatGFloat *fat0, *fat1;
-    const longGFloat *long0, *long1;
-    const phaseFloat *phase0, *phase1;
-    const double a;
-    const int nSrc;
+    const unsigned int nSrc;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -90,10 +86,17 @@ namespace quda {
 			const phaseFloat *phase0, const phaseFloat *phase1, 
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), fat0(fat0), fat1(fat1), long0(long0), 
-	long1(long1), phase0(phase0), phase1(phase1), a(a), nSrc(in->X(4))
+      : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
     { 
       bindSpinorTex<sFloat>(in, out, x);
+      dslashParam.gauge0 = (void*)fat0;
+      dslashParam.gauge1 = (void*)fat1;
+      dslashParam.longGauge0 = (void*)long0;
+      dslashParam.longGauge1 = (void*)long1;
+      dslashParam.longPhase0 = (void*)phase0;
+      dslashParam.longPhase1 = (void*)phase1;
+      dslashParam.a = a;
+      dslashParam.a_f = a;
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -102,11 +105,7 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dslashParam.swizzle = tp.aux.x;
-      IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-				(sFloat*)out->V(), (float*)out->Norm(), 
-				fat0, fat1, long0, long1, phase0, phase1, 
-				(sFloat*)in->V(), (float*)in->Norm(), 
-				(sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
+      IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 
     bool advanceBlockDim(TuneParam &param) const

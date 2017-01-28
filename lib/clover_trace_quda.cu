@@ -10,19 +10,20 @@ namespace quda {
 
 #ifdef GPU_CLOVER_DIRAC
 
-  template<typename Clover1, typename Clover2, typename Gauge>
+  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
   struct CloverTraceArg {
     Clover1 clover1;
     Clover2 clover2;
     Gauge gauge;
+    Float coeff;
 
-    CloverTraceArg(Clover1 &clover1, Clover2 &clover2, Gauge &gauge)
-      : clover1(clover1), clover2(clover2), gauge(gauge) {}
+    CloverTraceArg(Clover1 &clover1, Clover2 &clover2, Gauge &gauge, Float coeff)
+      : clover1(clover1), clover2(clover2), gauge(gauge), coeff(coeff) {}
   };
 
 
-  template <typename Float, typename Clover1, typename Clover2, typename Gauge>
-    __device__ __host__ void cloverSigmaTraceCompute(CloverTraceArg<Clover1, Clover2, Gauge>& arg, const int x, int parity)
+  template <typename Float, typename Arg>
+    __device__ __host__ void cloverSigmaTraceCompute(Arg & arg, const int x, int parity)
     {
 
       Float A[72];
@@ -137,6 +138,7 @@ namespace quda {
 	    }
 	  }
 
+	  mat *= arg.coeff;
 	  arg.gauge.save((Float*)(mat.data), x, (mu-1)*mu/2 + nu, parity);
 	} // nu
       } // mu
@@ -144,30 +146,29 @@ namespace quda {
       return;
     }
 
-  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
-    void cloverSigmaTrace(CloverTraceArg<Clover1,Clover2,Gauge> arg)
+  template<typename Float, typename Arg>
+    void cloverSigmaTrace(Arg &arg)
     {
       for (int x=0; x<arg.clover1.volumeCB; x++) {
-        cloverSigmaTraceCompute<Float,Clover1,Clover2,Gauge>(arg, x, 1);
+        cloverSigmaTraceCompute<Float,Arg>(arg, x, 1);
       }
       return;
     }
 
 
-  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
-    __global__ void cloverSigmaTraceKernel(CloverTraceArg<Clover1,Clover2,Gauge> arg)
+  template<typename Float, typename Arg>
+    __global__ void cloverSigmaTraceKernel(Arg arg)
     {
       int idx = blockIdx.x*blockDim.x + threadIdx.x;
       if (idx >= arg.clover1.volumeCB) return;
       // odd parity
-      cloverSigmaTraceCompute<Float,Clover1,Clover2,Gauge>(arg, idx, 1);
+      cloverSigmaTraceCompute<Float,Arg>(arg, idx, 1);
     }
 
-  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
+  template<typename Float, typename Arg>
     class CloverSigmaTrace : Tunable {
-      CloverTraceArg<Clover1,Clover2,Gauge> arg;
+      Arg &arg;
       const GaugeField &meta;
-      const QudaFieldLocation location;
 
       private:
       unsigned int sharedBytesPerThread() const { return 0; }
@@ -178,18 +179,18 @@ namespace quda {
       unsigned int minThreads() const { return arg.clover1.volumeCB; }
 
       public: 
-      CloverSigmaTrace(CloverTraceArg<Clover1,Clover2,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
-        : arg(arg), meta(meta), location(location) {
+      CloverSigmaTrace(Arg &arg, const GaugeField &meta)
+        : arg(arg), meta(meta) {
 	writeAuxString("stride=%d", arg.clover1.stride);
       }
       virtual ~CloverSigmaTrace() {;}
 
       void apply(const cudaStream_t &stream){
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
+        if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          cloverSigmaTraceKernel<Float,Clover1,Clover2,Gauge><<<tp.grid,tp.block,0>>>(arg);
+          cloverSigmaTraceKernel<Float,Arg><<<tp.grid,tp.block,0>>>(arg);
         } else {
-          cloverSigmaTrace<Float,Clover1,Clover2,Gauge>(arg);
+          cloverSigmaTrace<Float,Arg>(arg);
         }
       }
 
@@ -203,26 +204,27 @@ namespace quda {
 
   template<typename Float, typename Clover1, typename Clover2, typename Gauge>
   void computeCloverSigmaTrace(Clover1 clover1, Clover2 clover2, Gauge gauge,
-			       const GaugeField &meta, QudaFieldLocation location)
+			       const GaugeField &meta, Float coeff)
   {
-    CloverTraceArg<Clover1, Clover2, Gauge> arg(clover1, clover2, gauge);
-    CloverSigmaTrace<Float,Clover1,Clover2,Gauge> traceCompute(arg, meta, location);
+    typedef CloverTraceArg<Float, Clover1, Clover2, Gauge> Arg;
+    Arg arg(clover1, clover2, gauge, coeff);
+    CloverSigmaTrace<Float, Arg> traceCompute(arg, meta);
     traceCompute.apply(0);
     return;
   }
 
   template<typename Float>
-    void computeCloverSigmaTrace(GaugeField& gauge, const CloverField& clover, QudaFieldLocation location){
+  void computeCloverSigmaTrace(GaugeField& gauge, const CloverField& clover, Float coeff){
 
     if(clover.isNative()) {
       typedef typename clover_mapper<Float>::type C;
       if (gauge.isNative()) {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  computeCloverSigmaTrace<Float>( C(clover,0), C(clover,1), G(gauge), gauge, location);
+	  computeCloverSigmaTrace<Float>( C(clover,0), C(clover,1), G(gauge), gauge, coeff);
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  computeCloverSigmaTrace<Float>( C(clover,0), C(clover,1), G(gauge), gauge, location);
+	  computeCloverSigmaTrace<Float>( C(clover,0), C(clover,1), G(gauge), gauge, coeff);
 	} else {
 	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
 	}
@@ -237,13 +239,13 @@ namespace quda {
 
 #endif
 
-  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, QudaFieldLocation location){
+  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff) {
 
 #ifdef GPU_CLOVER_DIRAC
     if (clover.Precision() == QUDA_SINGLE_PRECISION) {
-      computeCloverSigmaTrace<float>(output, clover, location);
+      computeCloverSigmaTrace<float>(output, clover, static_cast<float>(coeff));
     } else if (clover.Precision() == QUDA_DOUBLE_PRECISION){
-      computeCloverSigmaTrace<double>(output, clover, location);
+      computeCloverSigmaTrace<double>(output, clover, coeff);
     } else {
       errorQuda("Precision %d not supported", clover.Precision());
     }

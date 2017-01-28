@@ -92,6 +92,8 @@ set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dsl
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
 
+#ARPACK
+set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
 
 # Interface options
 set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
@@ -107,6 +109,7 @@ set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
 # Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
+set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
@@ -134,6 +137,7 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
+set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -151,6 +155,7 @@ mark_as_advanced(QUDA_GPU_COMMS)
 mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
+mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_MULTIGRID)
 
@@ -174,20 +179,24 @@ find_package(Threads REQUIRED)
 # do all the build definitions
 #
 
-if(${QUDA_MPI} OR ${QUDA_QMP})
+if(QUDA_MPI OR QUDA_QMP)
   add_definitions(-DMULTI_GPU)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
-if(${QUDA_MPI})
+if(QUDA_MPI AND QUDA_QMP)
+  message(WARNING "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+endif()
+
+if(QUDA_MPI)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 endif()
 
-if (${QUDA_QMP})
+if(QUDA_QMP)
   add_definitions(-DQMP_COMMS)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -197,7 +206,7 @@ if (${QUDA_QMP})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
-if (${QUDA_QIO})
+if(QUDA_QIO)
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
@@ -212,7 +221,32 @@ if(QUDA_MAGMA)
   include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
   message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
+  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
 endif(QUDA_MAGMA)
+
+# This selects arpack or parpack for Multi GPU
+if(QUDA_ARPACK)
+  add_definitions(-DARPACK_LIB)
+  find_package(PkgConfig REQUIRED)
+  if(QUDA_QMP OR QUDA_MPI)
+    pkg_check_modules(PARPACK QUIET parpack)
+    if(NOT PARPACK_FOUND OR QUDA_ARPACK_HOME)
+      find_library(PARPACK parpack PATH ${QUDA_ARPACK_HOME})
+    else()
+      find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
+    endif()
+  set(PARPACK_OR_ARPACK ${PARPACK})
+  else()
+    pkg_check_modules(ARPACK QUIET arpack)
+    if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
+      find_library(ARPACK arpack PATH ${QUDA_ARPACK_HOME})
+    else()
+      find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
+    endif()
+  set(PARPACK_OR_ARPACK ${ARPACK})
+  endif()
+endif(QUDA_ARPACK)
+
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
@@ -224,6 +258,12 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
+  find_package(Eigen REQUIRED)
+  include_directories(${EIGEN_INCLUDE_DIRS})
+endif()
+
+if(QUDA_EIGEN)
+  add_definitions(-DEIGEN)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
 endif()

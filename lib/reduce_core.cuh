@@ -1,21 +1,21 @@
-__host__ __device__ double set(double &x) { return x;}
-__host__ __device__ double2 set(double2 &x) { return x;}
-__host__ __device__ double3 set(double3 &x) { return x;}
-__host__ __device__ void sum(double &a, double &b) { a += b; }
-__host__ __device__ void sum(double2 &a, double2 &b) { a.x += b.x; a.y += b.y; }
-__host__ __device__ void sum(double3 &a, double3 &b) { a.x += b.x; a.y += b.y; a.z += b.z; }
+__host__ __device__ inline double set(double &x) { return x;}
+__host__ __device__ inline double2 set(double2 &x) { return x;}
+__host__ __device__ inline double3 set(double3 &x) { return x;}
+__host__ __device__ inline void sum(double &a, double &b) { a += b; }
+__host__ __device__ inline void sum(double2 &a, double2 &b) { a.x += b.x; a.y += b.y; }
+__host__ __device__ inline void sum(double3 &a, double3 &b) { a.x += b.x; a.y += b.y; a.z += b.z; }
 
 #ifdef QUAD_SUM
-__host__ __device__ double set(doubledouble &a) { return a.head(); }
-__host__ __device__ double2 set(doubledouble2 &a) { return make_double2(a.x.head(),a.y.head()); }
-__host__ __device__ double3 set(doubledouble3 &a) { return make_double3(a.x.head(),a.y.head(),a.z.head()); }
-__host__ __device__ void sum(double &a, doubledouble &b) { a += b.head(); }
-__host__ __device__ void sum(double2 &a, doubledouble2 &b) { a.x += b.x.head(); a.y += b.y.head(); }
-__host__ __device__ void sum(double3 &a, doubledouble3 &b) { a.x += b.x.head(); a.y += b.y.head(); a.z += b.z.head(); }
+__host__ __device__ inline double set(doubledouble &a) { return a.head(); }
+__host__ __device__ inline double2 set(doubledouble2 &a) { return make_double2(a.x.head(),a.y.head()); }
+__host__ __device__ inline double3 set(doubledouble3 &a) { return make_double3(a.x.head(),a.y.head(),a.z.head()); }
+__host__ __device__ inline void sum(double &a, doubledouble &b) { a += b.head(); }
+__host__ __device__ inline void sum(double2 &a, doubledouble2 &b) { a.x += b.x.head(); a.y += b.y.head(); }
+__host__ __device__ inline void sum(double3 &a, doubledouble3 &b) { a.x += b.x.head(); a.y += b.y.head(); a.z += b.z.head(); }
 #endif
 
-__device__ unsigned int count = 0;
-__shared__ bool isLastBlockDone;
+__device__ static unsigned int count = 0;
+__shared__ static bool isLastBlockDone;
 
 #include <launch_kernel.cuh>
 
@@ -256,7 +256,6 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
 
 /**
    Generic reduce kernel with four loads and up to four stores.
-
    FIXME - this is hacky due to the lack of std::complex support in
    CUDA.  The functors are defined in terms of FloatN vectors, whereas
    the operator() accessor returns std::complex<Float>
@@ -373,7 +372,7 @@ doubleN genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField
     value = genericReduce<ReduceType,Float,zFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
       (x, y, z, w, v, r);
   } else {
-    errorQuda("Not implemeneted");
+    warningQuda("CPU reductions not implemeneted for %d field order", x.FieldOrder());
   }
   return set(value);
 }

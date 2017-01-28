@@ -27,6 +27,7 @@ extern "C" {
     double boundary_phase[4]; /** Boundary conditions */
     int make_resident_solution; /** Make the solution resident and don't copy back */
     int use_resident_solution; /** Use the resident solution */
+    QudaInverterType solver_type; /** Type of solver to use */
   } QudaInvertArgs_t;
 
 
@@ -88,6 +89,19 @@ extern "C" {
    */
   void qudaFinalize();
 
+  /**
+   * Allocate pinned memory suitable for CPU-GPU transfers
+   * @param bytes The size of the requested allocation
+   * @return Pointer to allocated memory
+  */
+  void* qudaAllocatePinned(size_t bytes);
+
+  /**
+   * Free pinned memory
+   * @param ptr Pointer to memory to be free
+   */
+  void qudaFreePinned(void *ptr);
+  
   /**
    * Set the algorithms to use for HISQ fermion calculations, e.g.,
    * SVD parameters for reunitarization.

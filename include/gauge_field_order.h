@@ -18,6 +18,7 @@
 #include <register_traits.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>
+#include <index_helper.cuh>
 
 namespace quda {
 
@@ -1264,6 +1265,105 @@ namespace quda {
 	  for (int j=0; j<Nc; j++) {
 	    for (int z=0; z<2; z++) {
 	      gauge[((((dir*2+parity)*volumeCB + x)*Nc + j)*Nc + i)*2 + z] = (Float)v[(i*Nc+j)*2+z] * scale;
+	    }
+	  }
+	}
+#endif
+      }
+
+      size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
+    };
+
+    /**
+       struct to define TIFR ordered gauge fields (with inlined z halo of depth two):
+       [mu][parity][t][z+4][y][x/2][col][row]
+    */
+    template <typename Float, int length> struct TIFRPaddedOrder : LegacyOrder<Float,length> {
+      typedef typename mapper<Float>::type RegType;
+      Float *gauge;
+      const int volumeCB;
+      int exVolumeCB;
+      const int Nc;
+      const Float scale;
+      const int dim[4];
+      const int exDim[4];
+    TIFRPaddedOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
+      : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
+	volumeCB(u.VolumeCB()), exVolumeCB(1), Nc(3), scale(u.Scale()),
+	dim{ u.X()[0], u.X()[1], u.X()[2], u.X()[3] },
+	exDim{ u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3] } {
+	if (length != 18) errorQuda("Gauge length %d not supported", length);
+
+	// exVolumeCB is the padded checkboard volume
+	for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
+	exVolumeCB /= 2;
+      }
+
+    TIFRPaddedOrder(const TIFRPaddedOrder &order)
+      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB), Nc(3), scale(order.scale),
+	  dim{order.dim[0], order.dim[1], order.dim[2], order.dim[3]},
+	  exDim{order.exDim[0], order.exDim[1], order.exDim[2], order.exDim[3]} {
+	if (length != 18) errorQuda("Gauge length %d not supported", length);
+      }
+
+      virtual ~TIFRPaddedOrder() { ; }
+
+      /**
+	 @brief Compute the index into the padded field.  Assumes that
+	 parity doesn't change from unpadded to padded.
+       */
+      __device__ __host__ inline int getPaddedIndex(int x_cb, int parity) const {
+	// find coordinates
+	int coord[4];
+	getCoords(coord, x_cb, dim, parity);
+
+	// get z-extended index
+	coord[2] += 2; // offset for halo
+	return linkIndex(coord, exDim);
+      }
+
+      // we need to transpose for TIFR ordering
+      __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+
+	int y = getPaddedIndex(x, parity);
+
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+	structure v_ = gauge_[(dir*2+parity)*exVolumeCB + y];
+	for (int i=0; i<Nc; i++)
+	  for (int j=0; j<Nc; j++)
+	    for (int z=0; z<2; z++)
+	      v[(i*Nc+j)*2+z] = (RegType)v_.v[(j*Nc+i)*2+z] / scale;
+#else
+	for (int i=0; i<Nc; i++) {
+	  for (int j=0; j<Nc; j++) {
+	    for (int z=0; z<2; z++) {
+	      v[(i*Nc+j)*2+z] = (RegType)gauge[((((dir*2+parity)*exVolumeCB + y)*Nc + j)*Nc + i)*2 + z] / scale;
+	    }
+	  }
+	}
+#endif
+      }
+
+      __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+
+	int y = getPaddedIndex(x, parity);
+
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	typedef S<Float,length> structure;
+	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
+	structure v_;
+	for (int i=0; i<Nc; i++)
+	  for (int j=0; j<Nc; j++)
+	    for (int z=0; z<2; z++)
+	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]) * scale;
+	gauge_[(dir*2+parity)*exVolumeCB + y] = v_;
+#else
+	for (int i=0; i<Nc; i++) {
+	  for (int j=0; j<Nc; j++) {
+	    for (int z=0; z<2; z++) {
+	      gauge[((((dir*2+parity)*exVolumeCB + y)*Nc + j)*Nc + i)*2 + z] = (Float)v[(i*Nc+j)*2+z] * scale;
 	    }
 	  }
 	}

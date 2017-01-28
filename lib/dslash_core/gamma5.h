@@ -22,7 +22,7 @@
 
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_DOUBLE
-#define SPINORTEX in
+#define SPINORTEX param.in
 #else
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 
@@ -61,7 +61,7 @@
 #define o32_re I11.x
 #define o32_im I11.y
 
-__global__ void gamma5Kernel(double2 *out, float *outNorm, double2 *in, float *inNorm, DslashParam param, int myStride)
+__global__ void gamma5DKernel(DslashParam param)
 {
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
@@ -80,7 +80,7 @@ __global__ void gamma5Kernel(double2 *out, float *outNorm, double2 *in, float *i
    VOLATILE double2 I10;
    VOLATILE double2 I11;
 */
-   READ_SPINOR			(SPINORTEX, myStride, sid, sid);
+   READ_SPINOR			(SPINORTEX, param.sp_stride, sid, sid);
 /*
 #if defined(FERMI_NO_DBLE_TEX) || defined (USE_TEXTURE_OBJECTS)
    double2 I0  = spinor[sid + 0 * sp_stride];   
@@ -198,7 +198,7 @@ __global__ void gamma5Kernel(double2 *out, float *outNorm, double2 *in, float *i
    spinor[sid + 11 * myStride] = I11;
 */
 
-   WRITE_SPINOR(myStride);
+   WRITE_SPINOR(param.sp_stride);
 
    return;  
 }
@@ -253,7 +253,7 @@ __global__ void gamma5Kernel(double2 *out, float *outNorm, double2 *in, float *i
 
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 	#define READ_SPINOR READ_SPINOR_SINGLE
-	#define SPINORTEX in
+	#define SPINORTEX param.in
 #else
 	#define READ_SPINOR READ_SPINOR_SINGLE_TEX
 
@@ -292,7 +292,7 @@ __global__ void gamma5Kernel(double2 *out, float *outNorm, double2 *in, float *i
 #define o32_re I5.z
 #define o32_im I5.w
 
-__global__ void gamma5Kernel(float4 *out, float *outNorm, float4 *in, float *inNorm, DslashParam param, int myStride)
+__global__ void gamma5SKernel(DslashParam param)
 {
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
    if (sid >= param.threads) return;
@@ -321,7 +321,7 @@ __global__ void gamma5Kernel(float4 *out, float *outNorm, float4 *in, float *inN
    float4 I5 = tex1Dfetch(spinorTexSingle, sid + 5 * myStride);
 #endif
 */
-   READ_SPINOR			(SPINORTEX, myStride, sid, sid);
+   READ_SPINOR			(SPINORTEX, param.sp_stride, sid, sid);
 
    volatile float4 tmp0, tmp1;
     
@@ -404,7 +404,7 @@ __global__ void gamma5Kernel(float4 *out, float *outNorm, float4 *in, float *inN
    spinor[sid + 5  * myStride] = I5;   
 */
 
-   WRITE_SPINOR(myStride);
+   WRITE_SPINOR(param.sp_stride);
 
    return;  
 }

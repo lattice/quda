@@ -45,6 +45,9 @@
 #define m5 m5_d
 #define mdwf_b5 mdwf_b5_d
 #define mdwf_c5 mdwf_c5_d
+#define mferm param.mferm
+#define a param.a
+#define b param.b
 #else
 #define spinorFloat float
 #define POW(a, b) __fast_pow(a, b)
@@ -75,6 +78,9 @@
 #define m5 m5_f
 #define mdwf_b5 mdwf_b5_f
 #define mdwf_c5 mdwf_c5_f
+#define mferm param.mferm_f
+#define a param.a
+#define b param.b
 #endif // SPINOR_DOUBLE
 
 // output spinor
@@ -160,7 +166,7 @@ VOLATILE spinorFloat kappa;
 // 'w' means output vector
 // 'v' means input vector
 {
-  int base_idx = sid%Vh;
+  int base_idx = sid%param.volume4CB;
   int sp_idx;
 
 // let's assume the index,
@@ -177,7 +183,7 @@ VOLATILE spinorFloat kappa;
     int exponent = coord[4] < s ? param.Ls-s+coord[4] : coord[4]-s;
     factorR = inv_d_n * POW(kappa,exponent) * ( coord[4] < s ? -mferm : static_cast<spinorFloat>(1.0) );
 
-    sp_idx = base_idx + s*Vh;
+    sp_idx = base_idx + s*param.volume4CB;
     // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
@@ -312,6 +318,9 @@ WRITE_SPINOR(param.sp_stride);
 #undef m5
 #undef mdwf_b5
 #undef mdwf_c5
+#undef mferm
+#undef a
+#undef b
 #undef spinorFloat
 #undef POW
 #undef SHARED_STRIDE

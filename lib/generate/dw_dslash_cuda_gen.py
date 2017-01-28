@@ -535,14 +535,14 @@ def gen(dir, pack_only=False):
 
     str += "\n"
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % Vh : Vh+(face_idx % ghostFace[static_cast<int>(kernel_type)]));\n"
-        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+        if domain_wall: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx % param.volume4CB : param.volume4CB+(face_idx % ghostFace[static_cast<int>(kernel_type)]));\n"
+        else: str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : param.volume4CB+face_idx);\n"
         str += "#else\n"
-        if domain_wall: str += "const int ga_idx = sp_idx % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sp_idx % param.volume4CB;\n"
         else: str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
     str += "\n"
@@ -727,7 +727,7 @@ def gen_dw():
     str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n{\n"
     str += "// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
-    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
+    str += "     int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*param.volume4CB : X%s2*param.volume4CB ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -764,13 +764,13 @@ def gen_dw():
     str += "    {\n"
     
     # xs == 0:
-    str += out_L.replace(" += "," += -mferm*(").replace(";",");")
+    str += out_L.replace(" += "," += -param.mferm*(").replace(";",");")
 
     str += "    } // end if ( coord[4]!= %s )\n" % ledge
     str += "  } // end P_L\n\n"
     str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
     str += "  {\n"
-    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
+    str += "    int sp_idx = ( coord[4] == %s ? X%s(param.Ls-1)*2*param.volume4CB : X%s2*param.volume4CB ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -786,7 +786,7 @@ def gen_dw():
     str += "    {\n"
 
     # xs == Ls-1
-    str += out_L.replace("-","+").replace(" += "," += -mferm*(").replace(";",");")
+    str += out_L.replace("-","+").replace(" += "," += -param.mferm*(").replace(";",");")
 
     str += "    } // end if ( coord[4] != %s )\n" % redge
     str += "  } // end P_R\n"
@@ -895,98 +895,6 @@ def apply_clover():
 # end def clover
 
 
-def twisted_rotate(x):
-    str = "// apply twisted mass rotation\n"
-
-    for h in range(0, 4):
-        for c in range(0, 3):
-            strRe = ""
-            strIm = ""
-            for s in range(0, 4):
-                # identity
-                re = id[4*h+s].real
-                im = id[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re)+out_re(s,c)
-                    strIm += sign(re)+out_im(s,c)
-                elif re==0:
-                    strRe += sign(-im)+out_im(s,c)
-                    strIm += sign(im)+out_re(s,c)
-                
-                # sign(x)*i*mu*gamma_5
-                re = igamma5[4*h+s].real
-                im = igamma5[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re*x)+out_re(s,c) + "*a"
-                    strIm += sign(re*x)+out_im(s,c) + "*a"
-                elif re==0:
-                    strRe += sign(-im*x)+out_im(s,c) + "*a"
-                    strIm += sign(im*x)+out_re(s,c) + "*a"
-
-            str += "VOLATILE spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
-            str += "VOLATILE spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
-        str += "\n"
-    
-    return str+"\n"
-
-
-def twisted():
-    str = ""
-    str += twisted_rotate(+1)
-
-    str += "#ifndef DSLASH_XPAY\n"
-    str += "//scale by b = 1/(1 + a*a) \n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out_re(s,c) + " = b*" + tmp_re(s,c) + ";\n"
-            str += out_im(s,c) + " = b*" + tmp_im(s,c) + ";\n"
-    str += "#else\n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out_re(s,c) + " = " + tmp_re(s,c) + ";\n"
-            str += out_im(s,c) + " = " + tmp_im(s,c) + ";\n"
-    str += "#endif // DSLASH_XPAY\n"
-    str += "\n"
-
-    return block(str)+"\n"
-# end def twisted
-
-def xpay():
-    str = ""
-    str += "#ifdef DSLASH_XPAY\n\n"
-    str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
-    str += "#ifdef SPINOR_DOUBLE\n"
-
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
-
-    str += "#else\n"
-
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            if twist == False:
-                str += out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
-            else:
-                str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
-
-    str += "#endif // SPINOR_DOUBLE\n\n"
-    str += "#endif // DSLASH_XPAY\n"
-
-    return str
-# end def xpay
-
 def xpay_lmem_pre():
     str = ""
     str += "#if defined MULTI_GPU && defined DSLASH_XPAY\n"
@@ -995,7 +903,11 @@ def xpay_lmem_pre():
     str += "{\n"
     str += "#ifdef DSLASH_XPAY\n"
     str += "  READ_ACCUM(ACCUMTEX, param.sp_stride)\n"
-    str += "  VOLATILE spinorFloat a_inv = 1.0/a;\n\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "spinorFloat a_inv = param.a_inv;\n"
+    str += "#else\n"
+    str += "spinorFloat a_inv = param.a_inv_f;\n"
+    str += "#endif\n"
     str += "#ifdef SPINOR_DOUBLE\n"
 
     for s in range(0,4):
@@ -1023,6 +935,13 @@ def xpay_lmem_pre():
 def xpay_lmem():
     str = ""
     str += "#ifdef DSLASH_XPAY\n"
+
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "spinorFloat a = param.a;\n"
+    str += "#else\n"
+    str += "spinorFloat a = param.a_f;\n"
+    str += "#endif\n"
+
     str += "#ifdef SPINOR_DOUBLE\n"
 
     for s in range(0,4):

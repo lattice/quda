@@ -1,11 +1,9 @@
-
-
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
-  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp
+  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
@@ -26,7 +24,8 @@ set (QUDA_OBJS
   dslash_twisted_clover.cu dslash_domain_wall.cu
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
-  copy_quda.cu reduce_quda.cu face_buffer.cpp face_gauge.cpp
+  multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu
@@ -38,7 +37,7 @@ set (QUDA_OBJS
   copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
   copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
-  staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
+  staggered_oprod.cu staggered_oprod_new.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu fermion_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
@@ -48,7 +47,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  quda_memcpy.cpp version.cpp )
+  quda_memcpy.cpp quda_arpack_interface.cpp version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
@@ -99,7 +98,8 @@ endif()
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
-
+# some hackery to prevent having old shared / static builds of quda messing with the current build
+ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

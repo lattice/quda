@@ -60,12 +60,6 @@ namespace quda {
   template <typename sFloat, typename gFloat, typename cFloat>
   class AsymCloverDslashCuda : public SharedDslashCuda {
 
-  private:
-    const gFloat *gauge0, *gauge1;
-    const cFloat *clover;
-    const float *cloverNorm;
-    const double a;
-
   protected:
     unsigned int sharedBytesPerThread() const
     {
@@ -82,10 +76,15 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cFloat *clover, 
 			 const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cloverNorm(cloverNorm), a(a)
+      : SharedDslashCuda(out, in, x, reconstruct, dagger)
     { 
       bindSpinorTex<sFloat>(in, out, x);
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.clover = (void*)clover;
+      dslashParam.cloverNorm = (float*)cloverNorm;
+      dslashParam.a = a;
+      dslashParam.a_f = a;
       dslashParam.cl_stride = cl_stride;
       if (!x) errorQuda("Asymmetric clover dslash only defined for Xpay");
     }
@@ -101,9 +100,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dslashParam.block[0] = tp.aux.x; dslashParam.block[1] = tp.aux.y; dslashParam.block[2] = tp.aux.z; dslashParam.block[3] = tp.aux.w;
       for (int i=0; i<4; i++) dslashParam.grid[i] = ( (i==0 ? 2 : 1) * in->X(i)) / dslashParam.block[i];
-      ASYM_DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-                  (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cloverNorm, 
-                  (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)x, (float*)x->Norm(), a);
+      ASYM_DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 
     long long flops() const {
