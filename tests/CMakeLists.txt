@@ -4,35 +4,7 @@ include_directories(.)
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-
-# if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
-FIND_LIBRARY(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
-
-set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LIBRARY})
-
-if(QUDA_QIO)
-  LIST(APPEND TEST_LIBS ${QIO_LIB} ${LIME_LIB})
-endif()
-
-if(QUDA_QMP)
-  LIST(APPEND TEST_LIBS ${QMP_LIB} ${MPI_CXX_LIBRARIES})
-endif()
-
-if(QUDA_MPI)
-  LIST(APPEND TEST_LIBS ${MPI_CXX_LIBRARIES})
-endif()
-
-if(QUDA_MAGMA)
-  LIST(APPEND TEST_LIBS ${MAGMA})
-endif()
-
-if(QUDA_ARPACK)
-  LIST(APPEND TEST_LIBS ${PARPACK_OR_ARPACK})
-endif()
-
-if(QUDA_NUMA_NVML)
-  LIST(APPEND TEST_LIBS ${NVML_LIBRARY})
-endif()
+set(TEST_LIBS quda quda_test)
 
 
 MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
