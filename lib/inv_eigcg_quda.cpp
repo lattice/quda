@@ -21,7 +21,7 @@
 
 #include <deflation.h>
 
-//#define DEBUG_EIGCG
+//#define USE_MAGMA_HEEV
 
 /*
 Based on  eigCG(nev, m) algorithm:
@@ -59,23 +59,9 @@ namespace quda {
        double global_stop;
 
        EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),  
-       m(m), k(k), restarts(0), global_stop(0.0) { 
-#ifdef DEBUG_EIGCG
-         cudaHostRegister(static_cast<void *>(Tm.data()),       m*m*sizeof(Complex),        cudaHostRegisterDefault);
-         cudaHostRegister(static_cast<void *>(ritzVecs.data()), m*m*sizeof(Complex),        cudaHostRegisterDefault);
-         cudaHostRegister(static_cast<void *>(Tmvals.data()),   m*sizeof(double),           cudaHostRegisterDefault);
-         cudaHostRegister(static_cast<void *>(H2k.data()),      (2*k)*(2*k)*sizeof(Complex),cudaHostRegisterDefault);
-#endif       
-       }
+       m(m), k(k), restarts(0), global_stop(0.0) { }
 
-       ~EigCGArgs() { 
-#ifdef DEBUG_EIGCG
-         cudaHostUnregister(Tm.data());
-         cudaHostUnregister(ritzVecs.data());
-         cudaHostUnregister(Tmvals.data());
-         cudaHostUnregister(H2k.data());
-#endif       
-       }
+       ~EigCGArgs() { }
 
        //methods for constructing Lanczos matrix :
        inline void ResetArgs() { 
@@ -119,16 +105,7 @@ namespace quda {
         }
         //Warning! this won't work with arbitrary (big) param.cur_dim. That's why pipelining is needed.
         blas::cDotProduct(&s[offset], w_, v_);//<i, b>
-        //
-#ifdef DEBUG_EIGCG
-        Complex s_check;
-        for(int i = 0; i < local_length; i++)
-        {
-          s_check = blas::cDotProduct(*w, v->Component(offset+i));
-          s_check -= s[offset+i];
-          std::cout << "\nCheck dot products: " << i << " : " << offset << "  " << s_check << std::endl;
-        }
-#endif      
+    
         offset += cdot_pipeline_length; 
 
      } while (offset < 2*k);
@@ -144,53 +121,57 @@ namespace quda {
      return;
    }
 
-  void EigCGArgs::ComputeRitz()
-  {
-#ifdef DEBUG_EIGCG
-    //Solve m dim problem:
-    ritzVecs = Tm;//copy original matrix
-    magma_Xheev(static_cast<void *>(ritzVecs.data()), m, m, static_cast<void *>(Tmvals.data()), sizeof(Complex));
-    //Solve m-1 dim problem:
-    DenseMatrix Tm_dense(Tm);//copy original matrix
-    magma_Xheev(static_cast<void *>(Tm.data()), (m-1), m, static_cast<void *>(Tmvals.data()), sizeof(Complex));
-    ritzVecs.middleCols(k, k) = Tm.leftCols(k);
+   void EigCGArgs::ComputeRitz()
+   {
+#if (not defined USE_MAGMA_HEEV) //Eigen version
+     //Solve m dim eigenproblem:
+     SelfAdjointEigenSolver<MatrixXcd> es_tm(Tm); 
+     ritzVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
+     //Solve m-1 dim eigenproblem:
+     SelfAdjointEigenSolver<MatrixXcd> es_tm1(Map<MatrixXcd, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
+     Block<MatrixXcd>(ritzVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
+     ritzVecs.block(m-1, k, 1, k).setZero();
 #else
-    //Solve m dim problem:
-    SelfAdjointEigenSolver<MatrixXcd> es_tm(Tm);
-    ritzVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
-    //Solve m-1 dim problem:
-    SelfAdjointEigenSolver<MatrixXcd> es_tm1(Map<MatrixXcd, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
-    Block<MatrixXcd>(ritzVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
-    //SelfAdjointEigenSolver<MatrixXcd> es_tm1(Tm.topLeftCorner(m-1, m-1));
-    //ritzVecs.block(0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
-#endif
-    //set segment(k,2k) of the last row to zero:
-    ritzVecs.block(m-1, k, 1, k).setZero();
-    //Perform QR-factorization and compute QH*Tm*Q:    
-    //1. QR of the eigenvctor matrix:
-    MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
-  
-    HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(ritzVecs.data(), m, 2*k) );
-    Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ());
+     //Solve m dim eigenproblem:
+     ritzVecs = Tm;
+     Complex *evecm = static_cast<Complex*>( ritzVecs.data());
+     double  *evalm = static_cast<double *>(Tmvals.data()); 
 
-#ifdef DEBUG_EIGCG
-    std::memset(Tmvals.data(), 0, m*sizeof(double));
-    //2. Construct H = QH*Tm*Q :
-    H2k = Q2k.adjoint()*Tm_dense*Q2k;
-    //3. solve 2nev problem:
-    magma_Xheev(static_cast<void *>(H2k.data()), 2*k, 2*k, static_cast<void *>(Tmvals.data()), sizeof(Complex));
-#else
-    //2. Construct H = QH*Tm*Q :
-    H2k = Q2k.adjoint()*Tm*Q2k;
-    //3. solve 2nev problem:
-    SelfAdjointEigenSolver<MatrixXcd> es_h2k(H2k);
-    ritzVecs.leftCols(2*k).applyOnTheRight(es_h2k.eigenvectors());//QZ
-    //4. get 2nev Ritz values:
-    Tmvals.segment(0,2*k) = es_h2k.eigenvalues();
+     cudaHostRegister(static_cast<void *>(evecm), m*m*sizeof(Complex),  cudaHostRegisterDefault);
+     magma_Xheev(evecm, m, m, evalm, sizeof(Complex));
+     //Solve m-1 dim eigenproblem:
+     DenseMatrix ritzVecsm1(Tm);
+     Complex *evecm1 = static_cast<Complex*>( ritzVecsm1.data());
+
+     cudaHostRegister(static_cast<void *>(evecm1), m*m*sizeof(Complex),  cudaHostRegisterDefault);
+     magma_Xheev(evecm1, (m-1), m, evalm, sizeof(Complex));
+     // fill 0s in mth element of old evecs:
+     for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;
+     // Attach the first nev old evecs at the end of the nev latest ones:
+     memcpy(&evecm[k*m], evecm1, k*m*sizeof(Complex));
+#endif
+    // Orthogonalize the 2*nev (new+old) vectors evecm=QR:
+
+     MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
+     HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(ritzVecs.data(), m, 2*k) );
+     Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ() );
+
+     //2. Construct H = QH*Tm*Q :
+     H2k = Q2k.adjoint()*Tm*Q2k;
+
+     /* solve the small evecm1 2nev x 2nev eigenproblem */
+     SelfAdjointEigenSolver<MatrixXcd> es_h2k(H2k);
+     Block<MatrixXcd>(ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors(); 
+     Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
+
+#ifdef USE_MAGMA_HEEV
+     cudaHostUnregister(evecm);
+     cudaHostUnregister(evecm1);
 #endif
 
-    return;
+     return;
   }
+
 
   // set the required parameters for the inner solver
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer, bool use_sloppy_partial_accumulator = true)
@@ -284,24 +265,6 @@ namespace quda {
          blas::caxpy( static_cast<Complex*>(args.ritzVecs.col(i).data()), vm , v2k ); 
       }
     }
-#ifdef DEBUG_EIGCG
-    csParam.setPrecision(Vm->Precision());
-    ColorSpinorFieldSet *V2k_check = ColorSpinorFieldSet::Create(csParam);
-    csParam.is_composite  = false;
-
-    ColorSpinorFieldSet *Vtmp = ColorSpinorFieldSet::Create(csParam);
-
-    for(int i = 0; i < 2*args.k; i++) 
-    {
-       for(int j = 0; j < args.m; j++) blas::caxpy( static_cast<Complex*>(args.ritzVecs.col(i).data())[j], Vm->Component(j) , V2k_check->Component(i) ); 
-
-       *Vtmp = V2k->Component(i);
-       double check_nrm = blas::xmyNorm(V2k_check->Component(i), *Vtmp);
-       printfQuda("\nCheck norm : %le (%le :: %le)\n", check_nrm, blas::norm2(V2k_check->Component(i)), blas::norm2(V2k->Component(i)));
-    }
-
-    delete V2k_check; 
-#endif 
 
     for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), V2k->Component(i));
 
