@@ -89,8 +89,8 @@ namespace quda {
     // alternative reliable updates
     // alternative reliable updates - set precision
 
-    const double u= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-14));
-    const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-14));
+    const double u= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
+    const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double deps=sqrt(u);
     double d_new;
     double d;
@@ -326,7 +326,8 @@ namespace quda {
 
         // alternative reliable updates
         if(alternative_reliable){
-          dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
+          dinit = uhigh*(sqrt(r2));// + Anorm * sqrt(blas::norm2(y)));
+          d = d_new;
           xnorm = 0;//sqrt(norm2(x));
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
           printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
