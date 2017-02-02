@@ -40,6 +40,8 @@ namespace quda {
    using Vector          = VectorXcd;
    using RealVector      = VectorXd;
 
+   enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
+
    class EigCGArgs{
 
      public:
@@ -70,77 +72,94 @@ namespace quda {
          ritzVecs.setZero(); 
        }
 
-       template<int diag>
-       inline void SetLanczos(int idx, Complex val){ Tm.diagonal<diag>()[idx] = val; } 
-       inline void RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const double inv_sqrt_r2);
-       //methods for Rayleigh Ritz procedure:
-       void ComputeRitz();
+       template<int diag>  inline void SetLanczos(int idx, Complex val){ Tm.diagonal<diag>()[idx] = val; } 
 
+       void RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const double inv_sqrt_r2)
+       {
+         Tm.setZero();
+
+         Complex *s  = new Complex[2*k];
+         for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
+    
+         const int cdot_pipeline_length  = 5;
+         int offset = 0;
+   
+         do {
+           const int local_length = (2*k - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (2*k - offset) ;
+
+           std::vector<cudaColorSpinorField*> v_;
+           std::vector<cudaColorSpinorField*> w_;
+           v_.reserve(local_length);
+           w_.reserve(local_length);
+
+           for(int i = 0; i < local_length; i++)
+           {
+             v_.push_back(static_cast<cudaColorSpinorField*>(&v->Component(offset+i)));
+             w_.push_back(static_cast<cudaColorSpinorField*>(w));
+           }
+           //Warning! this won't work with arbitrary (big) param.cur_dim. That's why pipelining is needed.
+           blas::cDotProduct(&s[offset], w_, v_);//<i, b>
+           offset += cdot_pipeline_length; 
+
+         } while (offset < 2*k);
+
+        Map<VectorXcd, Unaligned > s_(s, 2*k);
+        s_ *= inv_sqrt_r2;
+
+        Tm.col(2*k).segment(0, 2*k) = s_;
+        Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
+
+        delete [] s;
+
+        return;
+      }
    };
 
+   //Rayleigh Ritz procedure:
+   template<libtype which_lib> void ComputeRitz(EigCGArgs &args) {errorQuda("\nUnknown library type.\n");}
 
-   void EigCGArgs::RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const double inv_sqrt_r2)
+   //pure eigen version: 
+   template <> void ComputeRitz<libtype::eigen_lib>(EigCGArgs &args)
    {
-     Tm.setZero();
+     const int m = args.m;
+     const int k = args.k;
+     //Solve m dim eigenproblem:
+     SelfAdjointEigenSolver<MatrixXcd> es_tm(args.Tm); 
+     args.ritzVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
+     //Solve m-1 dim eigenproblem:
+     SelfAdjointEigenSolver<MatrixXcd> es_tm1(Map<MatrixXcd, Unaligned, DynamicStride >(args.Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
+     Block<MatrixXcd>(args.ritzVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
+     args.ritzVecs.block(m-1, k, 1, k).setZero();
 
-     Complex *s  = new Complex[2*k];
+     MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
+     HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(args.ritzVecs.data(), m, 2*k) );
+     Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ() );
 
-     for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
-    
-     const int cdot_pipeline_length  = 5;
-     int offset = 0;
-   
-     do {
-        const int local_length = (2*k - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (2*k - offset) ;
+     //2. Construct H = QH*Tm*Q :
+     args.H2k = Q2k.adjoint()*args.Tm*Q2k;
 
-        std::vector<cudaColorSpinorField*> v_;
-        std::vector<cudaColorSpinorField*> w_;
-        v_.reserve(local_length);
-        w_.reserve(local_length);
-
-        for(int i = 0; i < local_length; i++)
-        {
-          v_.push_back(static_cast<cudaColorSpinorField*>(&v->Component(offset+i)));
-          w_.push_back(static_cast<cudaColorSpinorField*>(w));
-        }
-        //Warning! this won't work with arbitrary (big) param.cur_dim. That's why pipelining is needed.
-        blas::cDotProduct(&s[offset], w_, v_);//<i, b>
-    
-        offset += cdot_pipeline_length; 
-
-     } while (offset < 2*k);
-
-     Map<VectorXcd, Unaligned > s_(s, 2*k);
-     s_ *= inv_sqrt_r2;
-
-     Tm.col(2*k).segment(0, 2*k) = s_;
-     Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
-
-     delete [] s;
+     /* solve the small evecm1 2nev x 2nev eigenproblem */
+     SelfAdjointEigenSolver<MatrixXcd> es_h2k(args.H2k);
+     Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors(); 
+     args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
 
      return;
    }
-
-   void EigCGArgs::ComputeRitz()
+   
+   //(supposed to be a pure) magma version: 
+   template <> void ComputeRitz<libtype::magma_lib>(EigCGArgs &args)
    {
-#if (not defined USE_MAGMA_HEEV) //Eigen version
+     const int m = args.m;
+     const int k = args.k;
      //Solve m dim eigenproblem:
-     SelfAdjointEigenSolver<MatrixXcd> es_tm(Tm); 
-     ritzVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
-     //Solve m-1 dim eigenproblem:
-     SelfAdjointEigenSolver<MatrixXcd> es_tm1(Map<MatrixXcd, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
-     Block<MatrixXcd>(ritzVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
-     ritzVecs.block(m-1, k, 1, k).setZero();
-#else
-     //Solve m dim eigenproblem:
-     ritzVecs = Tm;
-     Complex *evecm = static_cast<Complex*>( ritzVecs.data());
-     double  *evalm = static_cast<double *>(Tmvals.data()); 
+     args.ritzVecs = args.Tm;
+     Complex *evecm = static_cast<Complex*>( args.ritzVecs.data());
+     double  *evalm = static_cast<double *>( args.Tmvals.data()); 
 
      cudaHostRegister(static_cast<void *>(evecm), m*m*sizeof(Complex),  cudaHostRegisterDefault);
      magma_Xheev(evecm, m, m, evalm, sizeof(Complex));
      //Solve m-1 dim eigenproblem:
-     DenseMatrix ritzVecsm1(Tm);
+     DenseMatrix ritzVecsm1(args.Tm);
      Complex *evecm1 = static_cast<Complex*>( ritzVecsm1.data());
 
      cudaHostRegister(static_cast<void *>(evecm1), m*m*sizeof(Complex),  cudaHostRegisterDefault);
@@ -149,29 +168,26 @@ namespace quda {
      for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;
      // Attach the first nev old evecs at the end of the nev latest ones:
      memcpy(&evecm[k*m], evecm1, k*m*sizeof(Complex));
-#endif
+//?
     // Orthogonalize the 2*nev (new+old) vectors evecm=QR:
 
      MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
-     HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(ritzVecs.data(), m, 2*k) );
+     HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(args.ritzVecs.data(), m, 2*k) );
      Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ() );
 
      //2. Construct H = QH*Tm*Q :
-     H2k = Q2k.adjoint()*Tm*Q2k;
+     args.H2k = Q2k.adjoint()*args.Tm*Q2k;
 
      /* solve the small evecm1 2nev x 2nev eigenproblem */
-     SelfAdjointEigenSolver<MatrixXcd> es_h2k(H2k);
-     Block<MatrixXcd>(ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors(); 
-     Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
-
-#ifdef USE_MAGMA_HEEV
+     SelfAdjointEigenSolver<MatrixXcd> es_h2k(args.H2k);
+     Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors(); 
+     args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
+//?
      cudaHostUnregister(evecm);
      cudaHostUnregister(evecm1);
-#endif
 
      return;
   }
-
 
   // set the required parameters for the inner solver
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer, bool use_sloppy_partial_accumulator = true)
@@ -245,7 +261,7 @@ namespace quda {
   {
     EigCGArgs &args = *eigcg_args;
 
-    args.ComputeRitz();
+    ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
 
     //Create intermediate model:
     ColorSpinorParam csParam(Vm->Component(0));
