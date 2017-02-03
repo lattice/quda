@@ -262,9 +262,10 @@ namespace quda {
       rNorm = sqrt(r2);
       int updateX;
       int updateR;
+      const double dfac = 1.1;
       if(alternative_reliable){
         // alternative reliable updates
-        updateX = (d <= deps*sqrt(r2_old)) and (d_new > deps*rNorm) and (d_new > 1.1 * dinit);
+        updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
         updateR = 0;
         // if(updateX)
           // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
@@ -332,6 +333,7 @@ namespace quda {
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
           printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
           d_new = dinit;
+          r0Norm = sqrt(r2);
         }
         else{
           rNorm = sqrt(r2);
