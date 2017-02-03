@@ -327,7 +327,7 @@ namespace quda {
 
         // alternative reliable updates
         if(alternative_reliable){
-          dinit = uhigh*(sqrt(r2));// + Anorm * sqrt(blas::norm2(y)));
+          dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
