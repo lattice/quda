@@ -19,6 +19,23 @@ namespace quda {
   }
   
   /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] + dx[]
+
+     @return 1-d checkerboard index
+     @param y new 4-d lattice index
+     @param x original 4-d lattice index
+     @param dx 4-d shift index
+     @param X Full lattice dimensions
+   */
+  template <typename I, typename J>
+  static __device__ __host__ inline int linkIndexShift(I y[], I x[], J dx[], const int X[4]) {
+#pragma unroll
+    for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
+    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
+    return idx;
+  }
+
+  /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] in the mu direction
 
      @return 1-d checkerboard index

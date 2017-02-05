@@ -112,7 +112,7 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.reconstruct = link_recon;
   qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct;
 
-  setFatLinkPadding(&qudaGaugeParam);
+  qudaGaugeParam.llfat_ga_pad = qudaGaugeParam.site_ga_pad = qudaGaugeParam.ga_pad = qudaGaugeParam.staple_pad = 0;
 
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;

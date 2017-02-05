@@ -3575,158 +3575,48 @@ void destroyDeflationQuda(QudaInvertParam *param, const int *X,  void *_h_u, dou
 }
 
 
-#ifdef GPU_FATLINK
-#include <sys/time.h>
+void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param) {
 
-void setFatLinkPadding(QudaGaugeParam* param)
-{
-  int* X    = param->X;
-  int Vsh_x = X[1]*X[2]*X[3]/2;
-  int Vsh_y = X[0]*X[2]*X[3]/2;
-  int Vsh_z = X[0]*X[1]*X[3]/2;
-  int Vsh_t = X[0]*X[1]*X[2]/2;
-
-  int E[4];
-  for (int i=0; i<4; i++) E[i] = X[i] + 4;
-
-  // fat-link padding
-  param->llfat_ga_pad = std::max(Vsh_x, std::max(Vsh_y, std::max(Vsh_z, Vsh_t)));
-
-  // site-link padding
-  param->site_ga_pad = (E[0]*E[1]*E[2]/2)*3;
-  param->ga_pad = param->site_ga_pad;
-
-  // staple padding
-  param->staple_pad = (E[0]*E[1]*E[2]/2)*3;
-
-  return;
-}
-
-
-namespace quda {
-  void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
-			  QudaGaugeParam* qudaGaugeParam, cudaGaugeField* cudaFatLink,
-			  cudaGaugeField* cudaLongLink, TimeProfile &profile)
-  {
-
-    profile.TPSTART(QUDA_PROFILE_INIT);
-    GaugeFieldParam gParam(0,*qudaGaugeParam);
-
-    for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
-
-    gParam.pad    = qudaGaugeParam->staple_pad;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
-    gParam.setPrecision(gParam.precision);
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-
-    cudaGaugeField *cudaStapleField  = new cudaGaugeField(gParam);
-    cudaGaugeField *cudaStapleField1 = new cudaGaugeField(gParam);
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    llfat_cuda_ex(cudaFatLink, cudaLongLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    profile.TPSTART(QUDA_PROFILE_FREE);
-    delete cudaStapleField;
-    delete cudaStapleField1;
-    profile.TPSTOP(QUDA_PROFILE_FREE);
-
-    return;
-  }
-} // namespace quda
-
-
-namespace quda {
-  namespace fatlink {
-#include <dslash_init.cuh>
-  }
-}
-
-#endif // GPU_FATLINK
-
-void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param)
-{
 #ifdef GPU_FATLINK
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
 
-  if(ulink){
+  if (ulink) {
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
     const int reunit_allow_svd = 1;
     const int reunit_svd_only  = 0;
     const double svd_rel_error = 1e-6;
     const double svd_abs_error = 1e-6;
-    quda::setUnitarizeLinksConstants(unitarize_eps, max_error,
-        reunit_allow_svd, reunit_svd_only,
-        svd_rel_error, svd_abs_error);
+    quda::setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only,
+				     svd_rel_error, svd_abs_error);
   }
-
-  cudaGaugeField* cudaFatLink        = NULL;
-  cudaGaugeField* cudaLongLink       = NULL;
-  cudaGaugeField* cudaUnitarizedLink = NULL;
-  cudaGaugeField* cudaInLinkEx       = NULL;
-
-  QudaGaugeParam qudaGaugeParam_ex_buf;
-  QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;
-  memcpy(qudaGaugeParam_ex, param, sizeof(QudaGaugeParam));
-  int R[4] = {2, 2, 2, 2};
-  for(int dir=0; dir<4; ++dir){ qudaGaugeParam_ex->X[dir] = param->X[dir]+2*R[dir]; }
-
-  // fat-link padding
-  setFatLinkPadding(param);
-  qudaGaugeParam_ex->llfat_ga_pad = param->llfat_ga_pad;
-  qudaGaugeParam_ex->staple_pad   = param->staple_pad;
-  qudaGaugeParam_ex->site_ga_pad  = param->site_ga_pad;
 
   GaugeFieldParam gParam(0, *param);
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  // create the host fatlink
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.gauge = fatlink;
-  cpuGaugeField cpuFatLink(gParam);
+  cpuGaugeField cpuFatLink(gParam);   // create the host fatlink
   gParam.gauge = longlink;
-  cpuGaugeField cpuLongLink(gParam);
+  cpuGaugeField cpuLongLink(gParam);  // create the host longlink
   gParam.gauge = ulink;
   cpuGaugeField cpuUnitarizedLink(gParam);
 
-  // create the host sitelink
   gParam.link_type = param->type;
   gParam.gauge     = inlink;
-  cpuGaugeField cpuInLink(gParam);
+  cpuGaugeField cpuInLink(gParam);    // create the host sitelink
 
-  // create the device fatlink
-  gParam.pad    = param->llfat_ga_pad;
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.setPrecision(param->cuda_prec);
-  cudaFatLink = new cudaGaugeField(gParam);
-  if(ulink) cudaUnitarizedLink = new cudaGaugeField(gParam);
-  if(longlink) cudaLongLink = new cudaGaugeField(gParam);
-
+  // create the device fields
+  gParam.pad = 0;
   gParam.reconstruct = param->reconstruct;
-  gParam.setPrecision(param->cuda_prec);
-  gParam.pad         = param->site_ga_pad;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = param->type;
+  gParam.setPrecision(param->cuda_prec);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField* cudaInLink = new cudaGaugeField(gParam);
 
-  for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];
-  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaInLinkEx = new cudaGaugeField(gParam);
-
-  profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
-  fatlink::initLatticeConstants(*cudaFatLink, profileFatLink);
-  profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-  cudaGaugeField* inlinkPtr;
-  llfat_init_cuda_ex(qudaGaugeParam_ex);
-  inlinkPtr = cudaInLinkEx;
+  for (int dir=0; dir<4; dir++) gParam.x[dir] = param->X[dir]+2*R[dir];
+  cudaGaugeField* cudaInLinkEx = new cudaGaugeField(gParam);
   profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
   profileFatLink.TPSTART(QUDA_PROFILE_H2D);
@@ -3738,36 +3628,41 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   cudaInLinkEx->exchangeExtendedGhost(R,true);
   profileFatLink.TPSTOP(QUDA_PROFILE_COMMS);
 
-  quda::computeFatLinkCore(inlinkPtr, const_cast<double*>(path_coeff), param, cudaFatLink, cudaLongLink, profileFatLink);
+  profileFatLink.TPSTART(QUDA_PROFILE_FREE);
+  delete cudaInLink;
+  profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
-  if(ulink){
-    profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-    *num_failures_h = 0;
-    profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  for (int dir=0; dir<4; dir++) gParam.x[dir] = param->X[dir];
+  cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
+  cudaGaugeField* cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
+  cudaGaugeField* cudaLongLink = longlink ? new cudaGaugeField(gParam) : nullptr;
 
+  profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
+  llfat_cuda_ex(cudaFatLink, cudaLongLink, *cudaInLinkEx, param, path_coeff);
+  profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  if (ulink) {
     profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
+    *num_failures_h = 0;
     quda::unitarizeLinks(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
+    if (*num_failures_h>0) errorQuda("Error in unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
     profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    if(*num_failures_h>0){
-      errorQuda("Error in the unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
-    }
-    profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-    cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink);
-    profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-  if(fatlink) cudaFatLink->saveCPUField(cpuFatLink);
-  if(longlink) cudaLongLink->saveCPUField(cpuLongLink);
+  if (ulink) cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink);
+  if (fatlink) cudaFatLink->saveCPUField(cpuFatLink);
+  if (longlink) cudaLongLink->saveCPUField(cpuLongLink);
   profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
 
   profileFatLink.TPSTART(QUDA_PROFILE_FREE);
-  if(longlink) delete cudaLongLink;
   delete cudaFatLink;
-  delete cudaInLink;
-  delete cudaUnitarizedLink;
-  if(cudaInLinkEx) delete cudaInLinkEx;
+  if (longlink) delete cudaLongLink;
+  if (ulink) delete cudaUnitarizedLink;
+  delete cudaInLinkEx;
   profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
   profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
