@@ -3615,7 +3615,11 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField* cudaInLink = new cudaGaugeField(gParam);
 
-  for (int dir=0; dir<4; dir++) gParam.x[dir] = param->X[dir]+2*R[dir];
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  for (int dir=0; dir<4; dir++) {
+    gParam.x[dir] = param->X[dir]+2*R[dir];
+    gParam.r[dir] = R[dir];
+  }
   cudaGaugeField* cudaInLinkEx = new cudaGaugeField(gParam);
   profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -3635,7 +3639,11 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  for (int dir=0; dir<4; dir++) gParam.x[dir] = param->X[dir];
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  for (int dir=0; dir<4; dir++) {
+    gParam.x[dir] = param->X[dir];
+    gParam.r[dir] = 0;
+  }
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField* cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
   cudaGaugeField* cudaLongLink = longlink ? new cudaGaugeField(gParam) : nullptr;
