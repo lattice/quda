@@ -93,6 +93,12 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
+    double3 pipePCGMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+                                ColorSpinorField &r, ColorSpinorField &s,  
+                                ColorSpinorField &m, const double &b, ColorSpinorField &q,   
+			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
+
+
     /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
@@ -120,6 +126,22 @@ namespace quda {
        @param y[in,out] Computed output matrix
     */
     void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the block "axpy" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       The dimensions of a can be rectangular, e.g., the width of x
+       and y need not be same, though the maximum width for both is
+       16.
+
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
 
     /**
        @brief Compute the vectorized "axpyBzpcx" with over the set of

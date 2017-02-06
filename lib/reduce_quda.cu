@@ -127,6 +127,10 @@ namespace quda {
 #include <reduce_core.h>
 #include <reduce_mixed_core.h>
 
+//EXPERIMENTAL:
+#include <exp_reduce_core.cuh>
+#include <exp_reduce_core.h>
+
     } // namespace reduce
 
     /**
@@ -139,7 +143,7 @@ namespace quda {
       virtual __device__ __host__ void pre() { ; }
 
       //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y,
+      virtual __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y,
 							   FloatN &z, FloatN &w, FloatN &v) = 0;
 
       //! post-computation routine called after the "M-loop"
@@ -742,6 +746,80 @@ namespace quda {
       return reduce::reduceCuda<double3,QudaSumFloat3,tripleCGReduction_,0,0,0,0,0,false>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
+
+///EXPERIMENTAL:
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct ReduceFunctorExp {
+
+      //! pre-computation routine called before the "M-loop"
+      virtual __device__ __host__ void pre() { ; }
+
+      //! where the reduction is usually computed and any auxiliary operations
+      virtual __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &p, FloatN &u,FloatN &r,
+						  FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) = 0;
+
+      //! post-computation routine called after the "M-loop"
+      virtual __device__ __host__ void post(ReduceType &sum) { ; }
+
+    };
+    /**
+       This convoluted kernel does the following:
+//Gr1
+       x += a*p,
+       p = u + a*p,
+       r -= a*s,
+//Gr2
+       u -= a*q, 
+       q = m + b*q, 
+//Gr3
+       s = w + b*s, 
+       w -= a*z,
+       z = n + b*z, 
+//Gr4       
+       norm = (u,u), 
+       rdot = (w,u),
+       rdot = (r,u),
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct pipePCGMergedOp_ : public ReduceFunctorExp<ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      pipePCGMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
+	typedef typename ScalarType<ReduceType>::type scalar;
+//Gr1:
+         x = x + a.x*p;
+         p = u + a.x*p;
+         r = r - a.x*s;
+//Gr2:
+         u = u - a.x*q;
+         q = m + b.x*q;
+//Gr3:
+         s = w + b.x*s;
+         w = w - b.x*z;
+         z = n + b.x*z;
+//Gr4:
+         norm2_<scalar> (sum.x, u);
+         dot_<scalar> (sum.y, r, u);
+         dot_<scalar> (sum.z, w, u);
+      }
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
+
+    double3 pipePCGMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+                                ColorSpinorField &r, ColorSpinorField &s,  
+                                ColorSpinorField &m, const double &b, ColorSpinorField &q,   
+			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
+      if (x.Precision() != p.Precision()) {
+         errorQuda("\nMixed blas is not implemented.\n");
+      } else {
+	return reduce::reduceCudaExp<double3, QudaSumFloat3,pipePCGMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+	  (make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+      }
+    }
+///END EXPERIMENTAL
+
 
    } // namespace blas
 

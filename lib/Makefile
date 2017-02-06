@@ -72,7 +72,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 BLAS_INLN = blas_core.h blas_mixed_core.h
 
 # These are only inlined into reduce_quda.cu
-REDUCE_INLN = reduce_core.h reduce_mixed_core.h multi_reduce_core.h
+REDUCE_INLN = reduce_core.h reduce_mixed_core.h multi_reduce_core.h exp_reduce_core.h
 
 # These are only inlined into cuda_color_spinor_field.cu
 CSF_INLN =

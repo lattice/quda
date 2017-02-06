@@ -193,6 +193,11 @@ extern "C" {
   void comm_barrier(void);
   void comm_abort(int status);
 
+  /*just allocates handle*/
+  MsgHandle *comm_handle(void);
+  /*async allreduce*/
+  void comm_allreduce_array_async(double* data, size_t size, MsgHandle *mh);
+
 #ifdef __cplusplus
 }
 #endif

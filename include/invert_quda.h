@@ -432,6 +432,21 @@ namespace quda {
       Solver *K;
       SolverParam Kparam; // parameters for preconditioner solve
 
+      bool init;
+
+      ColorSpinorField *rp;       //! residual vector
+      ColorSpinorField *pp;        
+      ColorSpinorField *sp; 
+      ColorSpinorField *qp; 
+      ColorSpinorField *mp; 
+      ColorSpinorField *np;
+      ColorSpinorField *zp;
+      ColorSpinorField *up;   
+      ColorSpinorField *wp;       
+      ColorSpinorField *tmpp;
+      ColorSpinorField *r_pre;    //! residual passed to preconditioner
+      ColorSpinorField *p_pre;    //! preconditioner result
+
     public:
       PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
                SolverParam &param, TimeProfile &profile);

@@ -322,6 +322,16 @@ void comm_allreduce_array(double* data, size_t size)
   QMP_CHECK( QMP_sum_double_array(data, size) );
 }
 
+MsgHandle *comm_handle(void)
+{
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+  return mh;
+}
+
+void comm_allreduce_array_async(double* data, size_t size, MsgHandle *mh)
+{
+  errorQuda("\nNot implemented.\n"); 
+}
 
 void comm_allreduce_int(int* data)
 {

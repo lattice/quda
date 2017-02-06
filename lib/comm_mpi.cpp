@@ -351,6 +351,21 @@ void comm_allreduce_array(double* data, size_t size)
   delete []recvbuf;
 }
 
+MsgHandle *comm_handle(void)
+{
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+  mh->custom = false;
+  return mh;
+}
+
+
+void comm_allreduce_array_async(double* data, size_t size, MsgHandle *mh)
+{
+  double *recvbuf = new double[size];
+  MPI_CHECK( MPI_Iallreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), &(mh->request));
+  memcpy(data, recvbuf, size*sizeof(double));
+  delete []recvbuf;
+}
 
 void comm_allreduce_int(int* data)
 {
