@@ -258,11 +258,13 @@ namespace quda {
   };
 
   template<typename Float, int recon, int recon_mu, typename Arg>
-  __global__ void computeGenStaple(Arg arg, int mu, int nu, int save_staple)
+  __global__ void computeGenStaple(Arg arg, int nu, int dir1, int dir2, int save_staple)
   {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y*blockDim.y + threadIdx.y;
+    int mu = blockIdx.z*blockDim.z + threadIdx.z;
     if (idx >= arg.threads) return;
+    if (mu == nu || mu == dir1 || mu == dir2) return;
 
     int y[4], x[4] = {0, 0, 0, 0}, dx[4] = {0, 0, 0, 0};
     getCoords(x, idx, arg.X, (parity+arg.odd_bit)%2);
@@ -347,26 +349,27 @@ namespace quda {
     return;
   }
 
+  // Compute the staple field for direction nu,excluding the directions dir1 and dir2.
   void computeGenStaple(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
-			int mu, int nu, double coeff, int save_staple) {
-    dim3 blockDim = dim3(BLOCK_DIM, 2, 1);
+			int nu, int dir1, int dir2, double coeff, int save_staple) {
+    dim3 blockDim = dim3(BLOCK_DIM, 2, 4);
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	StapleArg<double,L,L,L,L> arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
 	dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	computeGenStaple<double,18,18><<<gridDim,blockDim>>>(arg, mu, nu, save_staple);
+	computeGenStaple<double,18,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12>::type G;
 	if (mulink.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  StapleArg<double,L,L,L,G> arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
 	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<double,12,18><<<gridDim,blockDim>>>(arg, mu, nu, save_staple);
+	  computeGenStaple<double,12,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
 	} else if (mulink.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  StapleArg<double,L,L,G,G> arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
 	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<double,12,12><<<gridDim,blockDim>>>(arg, mu, nu, save_staple);
+	  computeGenStaple<double,12,12><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
 	} else {
 	  errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
 	}
@@ -378,17 +381,17 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	StapleArg<float,L,L,L,L> arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
 	dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	computeGenStaple<float,18,18><<<gridDim,blockDim>>>(arg, mu, nu, save_staple);
+	computeGenStaple<float,18,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12>::type G;
 	if (mulink.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  StapleArg<double,L,L,L,G> arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
 	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<float,12,18><<<gridDim,blockDim>>>(arg, mu, nu, save_staple);
+	  computeGenStaple<float,12,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
 	} else if (mulink.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  StapleArg<double,L,L,G,G> arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
 	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<float,12,12><<<gridDim,blockDim>>>(arg, mu, nu, save_staple);
+	  computeGenStaple<float,12,12><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
 	} else {
 	  errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
 	}
@@ -433,31 +436,26 @@ namespace quda {
     if (fabs(coeff[2]) < MIN_COEFF && fabs(coeff[3]) < MIN_COEFF &&
 	fabs(coeff[4]) < MIN_COEFF && fabs(coeff[5]) < MIN_COEFF) return;
 
-    for (int dir = 0;dir < 4; dir++) {
-      for (int nu = 0; nu < 4; nu++) {
-	if (nu != dir) {
+    for (int nu = 0; nu < 4; nu++) {
+      computeGenStaple(*fat, staple, u, u, nu, -1, -1, coeff[2], 1);
 
-          computeGenStaple(*fat, staple, u, u, dir, nu, coeff[2], 1);
+      if (coeff[5] != 0.0) computeGenStaple(*fat, staple, staple, u, nu, -1, -1, coeff[5], 0);
 
-	  if (coeff[5] != 0.0) computeGenStaple(*fat, staple, staple, u, dir, nu, coeff[5], 0);
+      for (int rho = 0; rho < 4; rho++) {
+        if (rho != nu) {
 
-	  for (int rho = 0; rho < 4; rho++) {
-	    if (rho != dir && rho != nu) {
+          computeGenStaple(*fat, staple1, staple, u, rho, nu, -1, coeff[3], 1);
 
-	      computeGenStaple(*fat, staple1, staple, u, dir, rho, coeff[3], 1);
-
-	      if (fabs(coeff[4]) > MIN_COEFF) {
-		for (int sig = 0; sig < 4; sig++) {
-		  if (sig != dir && sig != nu && sig != rho) {
-		    computeGenStaple(*fat, staple, staple1, u, dir, sig, coeff[4], 0);
-		  }
-		}//sig
-	      } // MIN_COEFF
-	    }
-	  }//rho
+	  if (fabs(coeff[4]) > MIN_COEFF) {
+	    for (int sig = 0; sig < 4; sig++) {
+              if (sig != nu && sig != rho) {
+                computeGenStaple(*fat, staple, staple1, u, sig, nu, rho, coeff[4], 0);
+              }
+	    } //sig
+	  } // MIN_COEFF
 	}
-      }//nu
-    }//dir
+      } //rho
+    } //nu
 
     cudaDeviceSynchronize();
     checkCudaError();
