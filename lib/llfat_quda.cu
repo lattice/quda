@@ -299,6 +299,9 @@ namespace quda {
     Mulink mulink;
     Float coeff;
 
+    int n_mu;
+    int mu_map[4];
+
     bool Pt0;     // Are we processor 0 in time?
     bool PtNm1;  // Are we processor Nt-1 in time?
 
@@ -388,13 +391,20 @@ namespace quda {
   }
 
   template<typename Float, int recon, int recon_mu, bool save_staple, typename Arg>
-  __global__ void computeStaple(Arg arg, int nu, int dir1, int dir2)
+  __global__ void computeStaple(Arg arg, int nu)
   {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y*blockDim.y + threadIdx.y;
-    int mu = blockIdx.z*blockDim.z + threadIdx.z;
     if (idx >= arg.threads) return;
-    if (mu == nu || mu == dir1 || mu == dir2 || mu >= 4) return;
+
+    int mu_idx = blockIdx.z*blockDim.z + threadIdx.z;
+    if (mu_idx >= arg.n_mu) return;
+    int mu;
+    switch(mu_idx) {
+    case 0: mu = arg.mu_map[0]; break;
+    case 1: mu = arg.mu_map[1]; break;
+    case 2: mu = arg.mu_map[2]; break;
+    }
 
     int x[4];
     getCoords(x, idx, arg.X, (parity+arg.odd_bit)%2);
@@ -457,39 +467,47 @@ namespace quda {
 
   public:
     Staple(Arg &arg, int nu, int dir1, int dir2, bool save_staple, const GaugeField &meta)
-      : TunableVectorYZ(2,4), nu(nu), dir1(dir1), dir2(dir2), save_staple(save_staple),
-	arg(arg), meta(meta) {}
+      : TunableVectorYZ(2,(3 - ( (dir1 > -1) ? 1 : 0 ) - ( (dir2 > -1) ? 1 : 0 ))),
+	arg(arg), meta(meta), nu(nu), dir1(dir1), dir2(dir2), save_staple(save_staple)
+	{
+	  // compute the map for z thread index to mu index in the kernel
+	  // mu != nu 3 -> n_mu = 3
+	  // mu != nu != rho 2 -> n_mu = 2
+	  // mu != nu != rho != sig 1 -> n_mu = 1
+	  arg.n_mu = 3 - ( (dir1 > -1) ? 1 : 0 ) - ( (dir2 > -1) ? 1 : 0 );
+	  int j=0;
+	  for (int i=0; i<4; i++) {
+	    if (i==nu || i==dir1 || i==dir2) continue; // skip these dimensions
+	    arg.mu_map[j++] = i;
+	  }
+	  assert(j == arg.n_mu);
+	}
     virtual ~Staple() {}
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (save_staple)
-	computeStaple<Float,recon,recon_mu,true><<<tp.grid,tp.block>>>(arg, nu, dir1, dir2);
+	computeStaple<Float,recon,recon_mu,true><<<tp.grid,tp.block>>>(arg, nu);
       else
-	computeStaple<Float,recon,recon_mu,false><<<tp.grid,tp.block>>>(arg, nu, dir1, dir2);
+	computeStaple<Float,recon,recon_mu,false><<<tp.grid,tp.block>>>(arg, nu);
     }
 
     TuneKey tuneKey() const {
       std::stringstream aux;
       aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
-      aux << ",nu=" << nu << ",dir1=" << dir1 << ",dir2=" << dir2 << "save_staple=" << save_staple;
+      aux << ",nu=" << nu << ",dir1=" << dir1 << ",dir2=" << dir2 << ",save=" << save_staple;
       return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
     }
 
     void preTune() { arg.fat.save(); arg.staple.save(); }
     void postTune() { arg.fat.load(); arg.staple.load(); }
 
-    // mu != nu 3 -> loops = 3
-    // mu != nu != rho 2 -> loops = 2
-    // mu != nu != rho != sig 1 -> loops = 1
     long long flops() const {
-      int loops = 3 - ( (dir1 > -1) ? 1 : 0 ) - ( (dir2 > -1) ? 1 : 0 );
-      return 2*loops*arg.threads*( 4*198 + 18 + 36 );
+      return 2*arg.n_mu*arg.threads*( 4*198 + 18 + 36 );
     }
     long long bytes() const {
-      int loops = 3 - ( (dir1 > -1) ? 1 : 0 ) - ( (dir2 > -1) ? 1 : 0 );
-      return 2*loops*(2*meta.VolumeCB()*arg.fat.Bytes() + // fat load/store is only done on interior
-		      arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + save_staple ? arg.staple.Bytes() : 0));
+      return 2*arg.n_mu*(2*meta.VolumeCB()*arg.fat.Bytes() + // fat load/store is only done on interior
+			 arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + save_staple ? arg.staple.Bytes() : 0));
     }
   };
 
