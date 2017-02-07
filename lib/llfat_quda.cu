@@ -87,6 +87,7 @@ namespace quda {
 
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y*blockDim.y + threadIdx.y;
+    int dir = blockIdx.z*blockDim.z + threadIdx.z;
     if (idx >= arg.threads) return;
 
     int y[4], x[4] = {0, 0, 0, 0}, dx[4] = {0, 0, 0, 0};
@@ -96,55 +97,85 @@ namespace quda {
     typedef Matrix<complex<Float>,3> Link;
     Link a, b, c, f;
 
-    for (int dir=0; dir<4; ++dir) {
-      arg.u.load((Float*)a.data, linkIndex(x,arg.E), dir, parity);
-      int sign_a = reconstruct_sign<recon,false>(dir, x, arg.border, arg.X);
-      for (int i=0; i<3; i++) a(2,i) *= static_cast<Float>(sign_a);
+    arg.u.load((Float*)a.data, linkIndex(x,arg.E), dir, parity);
+    int sign_a = reconstruct_sign<recon,false>(dir, x, arg.border, arg.X);
+    for (int i=0; i<3; i++) a(2,i) *= static_cast<Float>(sign_a);
 
-      dx[dir]++;
-      arg.u.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), dir, 1-parity);
-      int sign_b = reconstruct_sign<recon,false>(dir, y, arg.border, arg.X);
-      for (int i=0; i<3; i++) b(2,i) *= static_cast<Float>(sign_a);
+    dx[dir]++;
+    arg.u.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), dir, 1-parity);
+    int sign_b = reconstruct_sign<recon,false>(dir, y, arg.border, arg.X);
+    for (int i=0; i<3; i++) b(2,i) *= static_cast<Float>(sign_a);
 
-      dx[dir]++;
-      arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), dir, parity);
-      dx[dir]-=2;
-      int sign_c = reconstruct_sign<recon,false>(dir, y, arg.border, arg.X);
-      for (int i=0; i<3; i++) c(2,i) *= static_cast<Float>(sign_a);
+    dx[dir]++;
+    arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), dir, parity);
+    dx[dir]-=2;
+    int sign_c = reconstruct_sign<recon,false>(dir, y, arg.border, arg.X);
+    for (int i=0; i<3; i++) c(2,i) *= static_cast<Float>(sign_a);
 
-      f = arg.coeff * a * b * c;
+    f = arg.coeff * a * b * c;
 
-      arg.link.save((Float*)f.data, idx, dir, parity);
-    }
+    arg.link.save((Float*)f.data, idx, dir, parity);
     return;
   }
 
+  template <typename Float, int recon, typename Arg>
+  class LongLink : public TunableVectorYZ {
+    Arg &arg;
+    const GaugeField &meta;
+    unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return false; }
+
+  public:
+    LongLink(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2,4), arg(arg), meta(meta) {}
+    virtual ~LongLink() {}
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      computeLongLink<Float,recon><<<tp.grid,tp.block>>>(arg);
+    }
+
+    TuneKey tuneKey() const {
+      std::stringstream aux;
+      aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+    }
+
+    long long flops() const { return 2*4*arg.threads*198; }
+    long long bytes() const { return 2*4*arg.threads*(3*arg.u.Bytes()+arg.link.Bytes()); }
+  };
+
   void computeLongLink(GaugeField &lng, const GaugeField &u, double coeff)
   {
-    dim3 blockDim = dim3(BLOCK_DIM, 2, 1);
-    dim3 gridDim = dim3((lng.VolumeCB()+blockDim.x-1)/blockDim.x,1,1);
-
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	LinkArg<double,L,L> arg(L(lng),L(u),coeff, lng, u);
-	computeLongLink<double,18><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<double,L,L> Arg;
+	Arg arg(L(lng), L(u), coeff, lng, u);
+	LongLink<double,18,Arg> longLink(arg,lng);
+	longLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12>::type G;
-	LinkArg<double,L,G> arg(L(lng),G(u),coeff, lng, u);
-	computeLongLink<double,12><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<double,L,G> Arg;
+	Arg arg(L(lng), G(u), coeff, lng, u);
+	LongLink<double,12,Arg> longLink(arg,lng);
+	longLink.apply(0);
       } else {
 	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
       }
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
       typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	LinkArg<float,L,L> arg(L(lng),L(u),coeff, lng, u);
-	computeLongLink<float,18><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<float,L,L> Arg;
+	Arg arg(L(lng), L(u), coeff, lng, u) ;
+	LongLink<float,18,Arg> longLink(arg,lng);
+	longLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12>::type G;
-	LinkArg<float,L,G> arg(L(lng),G(u),coeff, lng, u);
-	computeLongLink<float,12><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<float,L,G> Arg;
+	Arg arg(L(lng), G(u), coeff, lng, u);
+	LongLink<float,12,Arg> longLink(arg,lng);
+	longLink.apply(0);
+
       } else {
 	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
       }
