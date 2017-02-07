@@ -369,10 +369,10 @@ namespace quda {
   void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
     if (order == QUDA_QDP_GAUGE_ORDER) {
       void **buffer = new void*[geometry];
-      for (int d=0; d<geometry; d++) buffer[d] = device_malloc(bytes/geometry);
+      for (int d=0; d<geometry; d++) buffer[d] = pool_device_malloc(bytes/geometry);
       return ((void*)buffer);
     } else {
-      return device_malloc(bytes);
+      return pool_device_malloc(bytes);
     }
 
   }
@@ -381,7 +381,7 @@ namespace quda {
 
     if (order > 4) {
       void **buffer = new void*[4];
-      for (int d=0; d<4; d++) buffer[d] = device_malloc(bytes[d]);
+      for (int d=0; d<4; d++) buffer[d] = pool_device_malloc(bytes[d]);
       return buffer;
     } else {
       return 0;
@@ -391,16 +391,16 @@ namespace quda {
 
   void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
     if (order == QUDA_QDP_GAUGE_ORDER) {
-      for (int d=0; d<geometry; d++) device_free(((void**)buffer)[d]);
+      for (int d=0; d<geometry; d++) pool_device_free(((void**)buffer)[d]);
       delete []((void**)buffer);
     } else {
-      device_free(buffer);
+      pool_device_free(buffer);
     }
   }
 
   void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order) {
     if (order > 4) {
-      for (int d=0; d<4; d++) device_free(buffer[d]);
+      for (int d=0; d<4; d++) pool_device_free(buffer[d]);
       delete []buffer;
     }
   }
