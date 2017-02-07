@@ -61,10 +61,14 @@ llfat_test(int test)
   setDims(qudaGaugeParam.X);
 
   qudaGaugeParam.cpu_prec = cpu_prec;
-  qudaGaugeParam.cuda_prec = prec;
+  qudaGaugeParam.cuda_prec = qudaGaugeParam.cuda_prec_sloppy = prec;
   qudaGaugeParam.gauge_order = gauge_order;
-  qudaGaugeParam.type=QUDA_WILSON_LINKS;
-  qudaGaugeParam.reconstruct = link_recon;
+  qudaGaugeParam.type = QUDA_WILSON_LINKS;
+  qudaGaugeParam.reconstruct = qudaGaugeParam.reconstruct_sloppy = link_recon;
+  qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  qudaGaugeParam.staggered_phase_type = QUDA_MILC_STAGGERED_PHASE;
+  qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  qudaGaugeParam.ga_pad = 0;
 
   void* fatlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
   void* longlink = pinned_malloc(4*V*gaugeSiteSize*gSize);

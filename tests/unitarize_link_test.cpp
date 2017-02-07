@@ -57,12 +57,6 @@ cudaGaugeField *cudaFatLink, *cudaULink;
 
 const double tol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 
-namespace quda {
-  namespace fatlink {
-    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
-  }
-}
-
 TEST(unitarization, verify) {
   unitarizeLinksCPU(*cpuULink, *cpuFatLink);
   cudaULink->saveCPUField(*cudaResult);
@@ -185,8 +179,6 @@ static int unitarize_link_test(int &test_rc)
     act_path_coeff[3] = 0.030778;
     act_path_coeff[4] = -0.007200;
     act_path_coeff[5] = -0.123113;
-
-    quda::fatlink::initLatticeConstants(*cudaFatLink, profile);
 
     computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam);
 

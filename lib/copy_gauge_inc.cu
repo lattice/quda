@@ -217,7 +217,7 @@ namespace quda {
 #endif
 
     } else {
-      errorQuda("Gauge field %d order not supported", in.Order());
+      errorQuda("Gauge field order %d not supported", in.Order());
     }
 
   }

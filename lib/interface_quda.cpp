@@ -3581,6 +3581,8 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
 
+  checkGaugeParam(param);
+
   if (ulink) {
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
@@ -3610,8 +3612,8 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   // create the device fields
   gParam.pad = 0;
   gParam.reconstruct = param->reconstruct;
-  gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.setPrecision(param->cuda_prec);
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField* cudaInLink = new cudaGaugeField(gParam);
 
@@ -3620,6 +3622,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     gParam.x[dir] = param->X[dir]+2*R[dir];
     gParam.r[dir] = R[dir];
   }
+
   cudaGaugeField* cudaInLinkEx = new cudaGaugeField(gParam);
   profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -3639,17 +3642,18 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.setPrecision(param->cuda_prec);
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   for (int dir=0; dir<4; dir++) {
     gParam.x[dir] = param->X[dir];
     gParam.r[dir] = 0;
   }
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
-  cudaGaugeField* cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
-  cudaGaugeField* cudaLongLink = longlink ? new cudaGaugeField(gParam) : nullptr;
+  cudaGaugeField *cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
+  cudaGaugeField *cudaLongLink = longlink ? new cudaGaugeField(gParam) : nullptr;
 
   profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
-  llfat_cuda_ex(cudaFatLink, cudaLongLink, *cudaInLinkEx, param, path_coeff);
+  fatLongKSLink(cudaFatLink, cudaLongLink, *cudaInLinkEx, path_coeff);
   profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (ulink) {
