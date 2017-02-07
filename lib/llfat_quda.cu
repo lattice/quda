@@ -13,44 +13,36 @@
 #include <gauge_field_order.h>
 
 #define MIN_COEFF 1e-7
-#define BLOCK_DIM 64
 
 namespace quda {
 
 #ifdef GPU_FATLINK
 
-  namespace fatlink {
-    // Are we processor 0 in time?
-    __constant__ bool Pt0;
-
-    // Are we processor Nt-1 in time?
-    __constant__ bool PtNm1;
-  }
-
-  template <int recon, bool temporal=true>
-  __device__ inline int reconstruct_sign(int dir, int y[], const int border[], int X[]) {
-    using namespace fatlink;
-    int sign = 1;
-    switch (dir) {
-    case XUP:
-      if ( ((y[3] - border[3]) & 1) != 0) sign = -1;
-      break;
-    case YUP:
-      if ( ((y[0]-border[0]+y[3]-border[3]) & 1) != 0) sign = -1;
-      break;
-    case ZUP:
-      if ( ((y[0]-border[0]+y[1]-border[1]+y[3]-border[3]) & 1) != 0) sign = -1;
-      break;
-    case TUP:
-      if ( temporal && ( ((y[3]-border[3]) == X[3]-1 && PtNm1) || ((y[3]-border[3]) == -1 && Pt0) ) ) sign = -1;
-      break;
+  template <typename Float, int recon, bool temporal=true, typename Arg>
+  __device__ inline Float reconstruct_sign(int dir, int y[], const int border[], int X[], const Arg &arg) {
+    Float sign = 1;
+    if (recon != 18) {
+      switch (dir) {
+      case XUP:
+	if ( ((y[3] - border[3]) & 1) != 0)
+	  sign = -static_cast<Float>(1.0);
+	break;
+      case YUP:
+	if ( ((y[0]-border[0]+y[3]-border[3]) & 1) != 0)
+	  sign = -static_cast<Float>(1.0);
+	break;
+      case ZUP:
+	if ( ((y[0]-border[0]+y[1]-border[1]+y[3]-border[3]) & 1) != 0)
+	  sign = -static_cast<Float>(1.0);
+	break;
+      case TUP:
+	if ( temporal && ( ((y[3]-border[3]) == X[3]-1 && arg.PtNm1) || ((y[3]-border[3]) == -1 && arg.Pt0) ) )
+	  sign = -static_cast<Float>(1.0);
+	break;
+      }
     }
     return sign;
   }
-
-  template<>  __device__ inline int reconstruct_sign<18,true>(int dir, int y[], const int border[], int X[]) { return 1; }
-  template<>  __device__ inline int reconstruct_sign<18,false>(int dir, int y[], const int border[], int X[]) { return 1; }
-
 
   template <typename Float, typename Link, typename Gauge>
   struct LinkArg {
@@ -70,8 +62,12 @@ namespace quda {
     Link link;
     Float coeff;
 
+    bool Pt0;     // Are we processor 0 in time?
+    bool PtNm1;  // Are we processor Nt-1 in time?
+
     LinkArg(Link link, Gauge u, Float coeff, const GaugeField &link_meta, const GaugeField &u_meta)
       : threads(link_meta.VolumeCB()), link(link), u(u), coeff(coeff),
+	Pt0(commCoords(3)==0), PtNm1(commCoords(3)==commDim(3)-1),
 	odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
 		  commDimPartitioned(2)+commDimPartitioned(3))%2 ) {
 	for (int d=0; d<4; d++) {
@@ -99,19 +95,19 @@ namespace quda {
     Link a, b, c, f;
 
     arg.u.load((Float*)a.data, linkIndex(x,arg.E), dir, parity);
-    int sign_a = reconstruct_sign<recon,false>(dir, x, arg.border, arg.X);
-    for (int i=0; i<3; i++) a(2,i) *= static_cast<Float>(sign_a);
+    Float sign_a = reconstruct_sign<Float,recon,false>(dir, x, arg.border, arg.X, arg);
+    for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
     dx[dir]++;
     arg.u.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), dir, 1-parity);
-    int sign_b = reconstruct_sign<recon,false>(dir, y, arg.border, arg.X);
-    for (int i=0; i<3; i++) b(2,i) *= static_cast<Float>(sign_a);
+    Float sign_b = reconstruct_sign<Float,recon,false>(dir, y, arg.border, arg.X, arg);
+    for (int i=0; i<3; i++) b(2,i) *= sign_b;
 
     dx[dir]++;
     arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), dir, parity);
     dx[dir]-=2;
-    int sign_c = reconstruct_sign<recon,false>(dir, y, arg.border, arg.X);
-    for (int i=0; i<3; i++) c(2,i) *= static_cast<Float>(sign_a);
+    Float sign_c = reconstruct_sign<Float,recon,false>(dir, y, arg.border, arg.X, arg);
+    for (int i=0; i<3; i++) c(2,i) *= sign_c;
 
     f = arg.coeff * a * b * c;
 
@@ -204,8 +200,8 @@ namespace quda {
 
     for (int dir=0; dir < 4; dir++) {
       arg.u.load((Float*)a.data, linkIndex(x,arg.E), dir, parity);
-      int sign_a = reconstruct_sign<recon,false>(dir, x, arg.border, arg.X);
-      for (int i=0; i<3; i++) a(2,i) *= static_cast<Float>(sign_a);
+      Float sign_a = reconstruct_sign<Float,recon,false>(dir, x, arg.border, arg.X, arg);
+      for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
       fat = arg.coeff*a;
 
@@ -303,9 +299,13 @@ namespace quda {
     Mulink mulink;
     Float coeff;
 
+    bool Pt0;     // Are we processor 0 in time?
+    bool PtNm1;  // Are we processor Nt-1 in time?
+
     StapleArg(Fat fat, Staple staple, Mulink mulink, Gauge u, Float coeff,
 	      const GaugeField &fat_meta, const GaugeField &u_meta)
       : threads(1), fat(fat), staple(staple), mulink(mulink), u(u), coeff(coeff),
+	Pt0(commCoords(3)==0), PtNm1(commCoords(3)==commDim(3)-1),
 	odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
 		  commDimPartitioned(2)+commDimPartitioned(3))%2 ) {
 	for (int d=0; d<4; d++) {
@@ -336,21 +336,21 @@ namespace quda {
     {
       /* load matrix A*/
       arg.u.load((Float*)a.data, linkIndex(x, arg.E), nu, parity);
-      int sign_a = reconstruct_sign<recon,false>(nu, x, arg.inner_border, arg.inner_X);
-      for (int i=0; i<3; i++) a(2,i) *= static_cast<Float>(sign_a);
+      Float sign_a = reconstruct_sign<Float,recon,false>(nu, x, arg.inner_border, arg.inner_X, arg);
+      for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
       /* load matrix B*/
       dx[nu]++;
       arg.mulink.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), mu, 1-parity);
-      int sign_b = reconstruct_sign<recon_mu,false>(mu, y, arg.inner_border, arg.inner_X);
-      for (int i=0; i<3; i++) b(2,i) *= static_cast<Float>(sign_b);
+      Float sign_b = reconstruct_sign<Float,recon_mu,false>(mu, y, arg.inner_border, arg.inner_X, arg);
+      for (int i=0; i<3; i++) b(2,i) *= sign_b;
       dx[nu]--;
 
       /* load matrix C*/
       dx[mu]++;
       arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), nu, 1-parity);
-      int sign_c = reconstruct_sign<recon,false>(nu, y, arg.inner_border, arg.inner_X);
-      for (int i=0; i<3; i++) c(2,i) *= static_cast<Float>(sign_c);
+      Float sign_c = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
+      for (int i=0; i<3; i++) c(2,i) *= sign_c;
       dx[mu]--;
 
       staple = a * b * conj(c);
@@ -367,19 +367,19 @@ namespace quda {
       /* load matrix A*/
       dx[nu]--;
       arg.u.load((Float*)a.data, linkIndexShift(y, x, dx, arg.E), nu, 1-parity);
-      int sign_a = reconstruct_sign<recon,false>(nu, y, arg.inner_border, arg.inner_X);
-      for (int i=0; i<3; i++) a(2,i) *= static_cast<Float>(sign_a);
+      Float sign_a = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
+      for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
       /* load matrix B*/
       arg.mulink.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), mu, 1-parity);
-      int sign_b = reconstruct_sign<recon_mu,false>(mu, y, arg.inner_border, arg.inner_X);
-      for (int i=0; i<3; i++) b(2,i) *= static_cast<Float>(sign_b);
+      Float sign_b = reconstruct_sign<Float,recon_mu,false>(mu, y, arg.inner_border, arg.inner_X, arg);
+      for (int i=0; i<3; i++) b(2,i) *= sign_b;
 
       /* load matrix C*/
       dx[mu]++;
       arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), nu, parity);
-      int sign_c = reconstruct_sign<recon,false>(nu, y, arg.inner_border, arg.inner_X);
-      for (int i=0; i<3; i++) c(2,i) *= static_cast<Float>(sign_c);
+      Float sign_c = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
+      for (int i=0; i<3; i++) c(2,i) *= sign_c;
       dx[mu]--;
       dx[nu]++;
 
@@ -396,7 +396,7 @@ namespace quda {
     if (idx >= arg.threads) return;
     if (mu == nu || mu == dir1 || mu == dir2 || mu >= 4) return;
 
-    int y[4], x[4] = {0, 0, 0, 0}, dx[4] = {0, 0, 0, 0};
+    int x[4];
     getCoords(x, idx, arg.X, (parity+arg.odd_bit)%2);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
@@ -565,11 +565,6 @@ namespace quda {
     cudaGaugeField staple(gParam);
     cudaGaugeField staple1(gParam);
 
-    bool first_node_in_t = (commCoords(3) == 0);
-    bool last_node_in_t = (commCoords(3) == commDim(3)-1);
-    cudaMemcpyToSymbol(fatlink::Pt0, &(first_node_in_t), sizeof(bool));
-    cudaMemcpyToSymbol(fatlink::PtNm1, &(last_node_in_t), sizeof(bool));
-
     if( ((fat->X()[0] % 2 != 0) || (fat->X()[1] % 2 != 0) || (fat->X()[2] % 2 != 0) || (fat->X()[3] % 2 != 0))
 	&& (u.Reconstruct()  != QUDA_RECONSTRUCT_NO)){
       errorQuda("Reconstruct %d and odd dimensionsize is not supported by link fattening code (yet)\n",
@@ -615,7 +610,6 @@ namespace quda {
     return;
   }
 
-#undef BLOCK_DIM
 #undef MIN_COEFF
 
 } // namespace quda
