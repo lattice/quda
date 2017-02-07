@@ -89,6 +89,7 @@ namespace quda {
     int parity = blockIdx.y*blockDim.y + threadIdx.y;
     int dir = blockIdx.z*blockDim.z + threadIdx.z;
     if (idx >= arg.threads) return;
+    if (dir >= 4) return;
 
     int y[4], x[4] = {0, 0, 0, 0}, dx[4] = {0, 0, 0, 0};
     getCoords(x, idx, arg.X, parity);
@@ -186,11 +187,13 @@ namespace quda {
   }
 
   template <typename Float, int recon, typename Arg>
-  __global__ void computeFatOneLink(Arg arg)  {
+  __global__ void computeOneLink(Arg arg)  {
 
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
+    int dir =  blockIdx.z * blockDim.z + threadIdx.z;
     if (idx >= arg.threads) return;
+    if (dir >= 4) return;
 
     int x[4] = {0, 0, 0, 0};
     getCoords(x, idx, arg.X, parity);
@@ -211,33 +214,63 @@ namespace quda {
     return;
   }
 
+  template <typename Float, int recon, typename Arg>
+  class OneLink : public TunableVectorYZ {
+    Arg &arg;
+    const GaugeField &meta;
+    unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return false; }
+
+  public:
+    OneLink(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2,4), arg(arg), meta(meta) {}
+    virtual ~OneLink() {}
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      computeOneLink<Float,recon><<<tp.grid,tp.block>>>(arg);
+    }
+
+    TuneKey tuneKey() const {
+      std::stringstream aux;
+      aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+    }
+
+    long long flops() const { return 2*4*arg.threads*18; }
+    long long bytes() const { return 2*4*arg.threads*(arg.u.Bytes()+arg.link.Bytes()); }
+  };
 
   void computeOneLink(GaugeField &fat, const GaugeField &u, double coeff)
   {
-    dim3 blockDim = dim3(BLOCK_DIM, 2, 1);
-    dim3 gridDim = dim3((fat.VolumeCB()+blockDim.x-1)/blockDim.x,1,1);
-
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	LinkArg<double,L,L> arg(L(fat), L(u), coeff, fat, u);
-	computeFatOneLink<double,18><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<double,L,L> Arg;
+	Arg arg(L(fat), L(u), coeff, fat, u);
+	OneLink<double,18,Arg> oneLink(arg,fat);
+	oneLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12>::type G;
-	LinkArg<double,L,G> arg(L(fat), G(u), coeff, fat, u);
-	computeFatOneLink<double,12><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<double,L,G> Arg;
+	Arg arg(L(fat), G(u), coeff, fat, u);
+	OneLink<double,12,Arg> oneLink(arg,fat);
+	oneLink.apply(0);
       } else {
 	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
       }
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
       typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	LinkArg<float,L,L> arg(L(fat), L(u), coeff, fat, u);
-	computeFatOneLink<float,18><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<float,L,L> Arg;
+	Arg arg(L(fat), L(u), coeff, fat, u);
+	OneLink<float,18,Arg> oneLink(arg,fat);
+	oneLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12>::type G;
-	LinkArg<float,L,G> arg(L(fat), G(u), coeff, fat, u);
-	computeFatOneLink<float,12><<<gridDim,blockDim>>>(arg);
+	typedef LinkArg<float,L,G> Arg;
+	Arg arg(L(fat), G(u), coeff, fat, u);
+	OneLink<float,12,Arg> oneLink(arg,fat);
+	oneLink.apply(0);
       } else {
 	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
       }
@@ -288,21 +321,10 @@ namespace quda {
     }
   };
 
-  template<typename Float, int recon, int recon_mu, typename Arg>
-  __global__ void computeGenStaple(Arg arg, int nu, int dir1, int dir2, int save_staple)
-  {
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = blockIdx.y*blockDim.y + threadIdx.y;
-    int mu = blockIdx.z*blockDim.z + threadIdx.z;
-    if (idx >= arg.threads) return;
-    if (mu == nu || mu == dir1 || mu == dir2) return;
-
-    int y[4], x[4] = {0, 0, 0, 0}, dx[4] = {0, 0, 0, 0};
-    getCoords(x, idx, arg.X, (parity+arg.odd_bit)%2);
-    for (int d=0; d<4; d++) x[d] += arg.border[d];
-
-    typedef Matrix<complex<Float>,3> Link;
-    Link a, b, c, staple, fat;
+  template<typename Float, int mu, int nu, int recon, int recon_mu, typename Arg>
+  __device__ inline void computeStaple(Matrix<complex<Float>,3> &staple, Arg &arg, int x[], int parity) {
+    Matrix<complex<Float>,3> a, b, c;
+    int y[4], dx[4] = {0, 0, 0, 0};
 
     /* Computes the upper staple :
      *                 mu (B)
@@ -363,6 +385,48 @@ namespace quda {
 
       staple = staple + conj(a)*b*c;
     }
+  }
+
+  template<typename Float, int recon, int recon_mu, bool save_staple, typename Arg>
+  __global__ void computeStaple(Arg arg, int nu, int dir1, int dir2)
+  {
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = blockIdx.y*blockDim.y + threadIdx.y;
+    int mu = blockIdx.z*blockDim.z + threadIdx.z;
+    if (idx >= arg.threads) return;
+    if (mu == nu || mu == dir1 || mu == dir2 || mu >= 4) return;
+
+    int y[4], x[4] = {0, 0, 0, 0}, dx[4] = {0, 0, 0, 0};
+    getCoords(x, idx, arg.X, (parity+arg.odd_bit)%2);
+    for (int d=0; d<4; d++) x[d] += arg.border[d];
+
+    Matrix<complex<Float>,3> staple, fat;
+    switch(mu) {
+    case 0:
+      switch(nu) {
+      case 1: computeStaple<Float,0,1,recon,recon_mu>(staple, arg, x, parity); break;
+      case 2: computeStaple<Float,0,2,recon,recon_mu>(staple, arg, x, parity); break;
+      case 3: computeStaple<Float,0,3,recon,recon_mu>(staple, arg, x, parity); break;
+      } break;
+    case 1:
+      switch(nu) {
+      case 0: computeStaple<Float,1,0,recon,recon_mu>(staple, arg, x, parity); break;
+      case 2: computeStaple<Float,1,2,recon,recon_mu>(staple, arg, x, parity); break;
+      case 3: computeStaple<Float,1,3,recon,recon_mu>(staple, arg, x, parity); break;
+      } break;
+    case 2:
+      switch(nu) {
+      case 0: computeStaple<Float,2,0,recon,recon_mu>(staple, arg, x, parity); break;
+      case 1: computeStaple<Float,2,1,recon,recon_mu>(staple, arg, x, parity); break;
+      case 3: computeStaple<Float,2,3,recon,recon_mu>(staple, arg, x, parity); break;
+      } break;
+    case 3:
+      switch(nu) {
+      case 0: computeStaple<Float,3,0,recon,recon_mu>(staple, arg, x, parity); break;
+      case 1: computeStaple<Float,3,1,recon,recon_mu>(staple, arg, x, parity); break;
+      case 2: computeStaple<Float,3,2,recon,recon_mu>(staple, arg, x, parity); break;
+      } break;
+    }
 
     // exclude inner halo
     if ( !(x[0] < arg.inner_border[0] || x[0] >= arg.inner_X[0] + arg.inner_border[0] ||
@@ -380,27 +444,78 @@ namespace quda {
     return;
   }
 
+  template <typename Float, int recon, int recon_mu, typename Arg>
+  class Staple : public TunableVectorYZ {
+    Arg &arg;
+    const GaugeField &meta;
+    unsigned int minThreads() const { return arg.threads; }
+    bool tuneGridDim() const { return false; }
+    int nu;
+    int dir1;
+    int dir2;
+    bool save_staple;
+
+  public:
+    Staple(Arg &arg, int nu, int dir1, int dir2, bool save_staple, const GaugeField &meta)
+      : TunableVectorYZ(2,4), nu(nu), dir1(dir1), dir2(dir2), save_staple(save_staple),
+	arg(arg), meta(meta) {}
+    virtual ~Staple() {}
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (save_staple)
+	computeStaple<Float,recon,recon_mu,true><<<tp.grid,tp.block>>>(arg, nu, dir1, dir2);
+      else
+	computeStaple<Float,recon,recon_mu,false><<<tp.grid,tp.block>>>(arg, nu, dir1, dir2);
+    }
+
+    TuneKey tuneKey() const {
+      std::stringstream aux;
+      aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
+      aux << ",nu=" << nu << ",dir1=" << dir1 << ",dir2=" << dir2 << "save_staple=" << save_staple;
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+    }
+
+    void preTune() { arg.fat.save(); arg.staple.save(); }
+    void postTune() { arg.fat.load(); arg.staple.load(); }
+
+    // mu != nu 3 -> loops = 3
+    // mu != nu != rho 2 -> loops = 2
+    // mu != nu != rho != sig 1 -> loops = 1
+    long long flops() const {
+      int loops = 3 - ( (dir1 > -1) ? 1 : 0 ) - ( (dir2 > -1) ? 1 : 0 );
+      return 2*loops*arg.threads*( 4*198 + 18 + 36 );
+    }
+    long long bytes() const {
+      int loops = 3 - ( (dir1 > -1) ? 1 : 0 ) - ( (dir2 > -1) ? 1 : 0 );
+      return 2*loops*(2*meta.VolumeCB()*arg.fat.Bytes() + // fat load/store is only done on interior
+		      arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + save_staple ? arg.staple.Bytes() : 0));
+    }
+  };
+
   // Compute the staple field for direction nu,excluding the directions dir1 and dir2.
-  void computeGenStaple(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
-			int nu, int dir1, int dir2, double coeff, int save_staple) {
-    dim3 blockDim = dim3(BLOCK_DIM, 2, 4);
+  void computeStaple(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
+		     int nu, int dir1, int dir2, double coeff, bool save_staple) {
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	StapleArg<double,L,L,L,L> arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
-	dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	computeGenStaple<double,18,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
+	typedef StapleArg<double,L,L,L,L> Arg;
+	Arg arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
+	Staple<double,18,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	stapler.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12>::type G;
 	if (mulink.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  StapleArg<double,L,L,L,G> arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
-	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<double,12,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
+	  typedef StapleArg<double,L,L,L,G> Arg;
+	  Arg arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
+	  Staple<double,12,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  stapler.apply(0);
 	} else if (mulink.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  StapleArg<double,L,L,G,G> arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
-	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<double,12,12><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
+	  typedef StapleArg<double,L,L,G,G> Arg;
+	  Arg arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
+	  Staple<double,12,12,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  stapler.apply(0);
 	} else {
 	  errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
 	}
@@ -410,19 +525,22 @@ namespace quda {
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
       typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type L;
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	StapleArg<float,L,L,L,L> arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
-	dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	computeGenStaple<float,18,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
+	typedef StapleArg<float,L,L,L,L> Arg;
+	Arg arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
+	Staple<float,18,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	stapler.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12>::type G;
 	if (mulink.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  StapleArg<double,L,L,L,G> arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
-	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<float,12,18><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
+	  typedef StapleArg<double,L,L,L,G> Arg;
+	  Arg arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
+	  Staple<float,12,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  stapler.apply(0);
 	} else if (mulink.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  StapleArg<double,L,L,G,G> arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
-	  dim3 gridDim = dim3((arg.threads+blockDim.x-1)/blockDim.x,1,1);
-	  computeGenStaple<float,12,12><<<gridDim,blockDim>>>(arg, nu, dir1, dir2, save_staple);
+	  typedef StapleArg<double,L,L,G,G> Arg;
+	  Arg arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
+	  Staple<float,12,12,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  stapler.apply(0);
 	} else {
 	  errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
 	}
@@ -468,19 +586,19 @@ namespace quda {
 	fabs(coeff[4]) < MIN_COEFF && fabs(coeff[5]) < MIN_COEFF) return;
 
     for (int nu = 0; nu < 4; nu++) {
-      computeGenStaple(*fat, staple, u, u, nu, -1, -1, coeff[2], 1);
+      computeStaple(*fat, staple, u, u, nu, -1, -1, coeff[2], 1);
 
-      if (coeff[5] != 0.0) computeGenStaple(*fat, staple, staple, u, nu, -1, -1, coeff[5], 0);
+      if (coeff[5] != 0.0) computeStaple(*fat, staple, staple, u, nu, -1, -1, coeff[5], 0);
 
       for (int rho = 0; rho < 4; rho++) {
         if (rho != nu) {
 
-          computeGenStaple(*fat, staple1, staple, u, rho, nu, -1, coeff[3], 1);
+          computeStaple(*fat, staple1, staple, u, rho, nu, -1, coeff[3], 1);
 
 	  if (fabs(coeff[4]) > MIN_COEFF) {
 	    for (int sig = 0; sig < 4; sig++) {
               if (sig != nu && sig != rho) {
-                computeGenStaple(*fat, staple, staple1, u, sig, nu, rho, coeff[4], 0);
+                computeStaple(*fat, staple, staple1, u, sig, nu, rho, coeff[4], 0);
               }
 	    } //sig
 	  } // MIN_COEFF
