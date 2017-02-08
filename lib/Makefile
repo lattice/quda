@@ -86,7 +86,7 @@ DSLASH_INLN = dslash_constants.h dslash_textures.h io_spinor.h	\
 
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/
-QUDA_INLN = check_params.h quda_matrix.h force_common.h llfat_core.h	\
+QUDA_INLN = check_params.h quda_matrix.h force_common.h 		\
 	hisq_force_macros.h read_clover.h                               \
 	read_gauge.h svd_quda.h dslash_init.cuh
 
