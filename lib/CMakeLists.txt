@@ -117,7 +117,7 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda TEST_LIBS ${MAGMA})
+  target_link_libraries(quda ${MAGMA})
 endif()
 
 if(QUDA_ARPACK)
