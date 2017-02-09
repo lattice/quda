@@ -22,8 +22,66 @@
 
 namespace quda {
 
-  namespace gauge {
+  /**
+     @brief gauge_wrapper is an internal class that is used to wrap
+     instances of gauge accessors, currying in a specific location on
+     the field.  The operator() accessors in gauge-field accessors
+     return instances to this class, allowing us to then use operator
+     overloading upon this class to interact with the Matrix class.
+     As a result we can include gauge-field accessors directly in
+     Matrix expressions in kernels without having to declare
+     temporaries with explicit calls to the load/save methods in the
+     gauge-field accessors.
+   */
+  template <typename Float, typename T>
+    struct gauge_wrapper {
+      const int dim;
+      const int x_cb;
+      const int parity;
+      T &gauge;
 
+      /**
+	 @brief gauge_wrapper constructor
+	 @param gauge[in] Gauge field accessor we are wrapping
+	 @param dim[in] Dimension we are accessing
+	 @param x_cb[in] Checkerboarded space-time index we are accessing
+	 @param parity[in] Parity we are accessing
+       */
+      __device__ __host__ inline gauge_wrapper<Float,T>(T &gauge, int dim, int x_cb, int parity)
+	: gauge(gauge), dim(dim), x_cb(x_cb), parity(parity) { }
+
+      /**
+	 @brief Assignment operator with Matrix instance as input
+	 @param M[in] Matrix we want to store in this accessot
+       */
+      template<typename M>
+      __device__ __host__ inline void operator=(const M &a) {
+	gauge.save((Float*)a.data, x_cb, dim, parity);
+      }
+    };
+
+  /**
+     @brief Copy constructor for the Matrix class with a gauge_wrapper input.
+     @param a[in] Input gauge_wrapper that we use to file in this matrix instance
+   */
+  template <typename T, int N>
+    template <typename S>
+    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<typename RealType<T>::type,S> &a) {
+    a.gauge.load((typename RealType<T>::type*)data, a.x_cb, a.dim, a.parity);
+  }
+
+  /**
+     @brief Assignement operator for the Matrix class with a gauge_wrapper input.
+     @param a[in] Input gauge_wrapper that we use to file in this matrix instance
+   */
+  template <typename T, int N>
+    template <typename S>
+    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<typename RealType<T>::type,S> &a) {
+    a.gauge.load((typename RealType<T>::type*)data, a.x_cb, a.dim, a.parity);
+  }
+
+
+  namespace gauge {
 
     template<typename Float, int nColor, QudaGaugeFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
@@ -632,6 +690,17 @@ namespace quda {
 
     };
 
+  __host__ __device__ inline constexpr int ct_sqrt(int n, int i = 1){
+    return n == i ? n : (i * i < n ? ct_sqrt(n, i + 1) : i);
+  }
+
+  /**
+     @brief Return the number of colors of the accessor based on the length of the field
+     @param length[in] Number of real numbers per link
+     @return Number of colors (=sqrt(length/2))
+   */
+  __host__ __device__ inline constexpr int Ncolor(int length) { return ct_sqrt(length/2); }
+
   template <typename Float, int length, int N, int reconLenParam>
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;
@@ -716,6 +785,21 @@ namespace quda {
           RegType phase = reconstruct.getPhase(v);
           copy((gauge+parity*offset)[phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI)));
         }
+      }
+
+      /**
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param dir[in] Which dimension are we requesting
+	 @param x_cb[in] Checkerboarded space-time index we are requesting
+	 @param parity[in] Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam> >
+	   operator()(int dim, int x_cb, int parity) {
+	return gauge_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam> >(*this, dim, x_cb, parity);
       }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
