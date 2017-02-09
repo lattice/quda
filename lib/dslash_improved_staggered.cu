@@ -55,13 +55,6 @@ namespace quda {
 
   using namespace improvedstaggered;
 
-  template<typename T> struct RealType {};
-  template<> struct RealType<double2> { typedef double type; };
-  template<> struct RealType<float2> { typedef float type; };
-  template<> struct RealType<float4> { typedef float type; };
-  template<> struct RealType<short2> { typedef short type; };
-  template<> struct RealType<short4> { typedef short type; };
-
 #ifdef GPU_STAGGERED_DIRAC
   template <typename sFloat, typename fatGFloat, typename longGFloat, typename phaseFloat>
   class StaggeredDslashCuda : public DslashCuda {
