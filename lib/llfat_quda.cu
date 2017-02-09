@@ -92,26 +92,23 @@ namespace quda {
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
     typedef Matrix<complex<Float>,3> Link;
-    Link a, b, c, f;
 
-    arg.u.load((Float*)a.data, linkIndex(x,arg.E), dir, parity);
+    Link a = arg.u(dir, linkIndex(x,arg.E), parity);
     Float sign_a = reconstruct_sign<Float,recon,false>(dir, x, arg.border, arg.X, arg);
     for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
     dx[dir]++;
-    arg.u.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), dir, 1-parity);
+    Link b = arg.u(dir, linkIndexShift(y, x, dx, arg.E), 1-parity);
     Float sign_b = reconstruct_sign<Float,recon,false>(dir, y, arg.border, arg.X, arg);
     for (int i=0; i<3; i++) b(2,i) *= sign_b;
 
     dx[dir]++;
-    arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), dir, parity);
+    Link c = arg.u(dir, linkIndexShift(y, x, dx, arg.E), parity);
     dx[dir]-=2;
     Float sign_c = reconstruct_sign<Float,recon,false>(dir, y, arg.border, arg.X, arg);
     for (int i=0; i<3; i++) c(2,i) *= sign_c;
 
-    f = arg.coeff * a * b * c;
-
-    arg.link.save((Float*)f.data, idx, dir, parity);
+    arg.link(dir, idx, parity) = arg.coeff * a * b * c;
     return;
   }
 
@@ -196,17 +193,13 @@ namespace quda {
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
     typedef Matrix<complex<Float>,3> Link;
-    Link a, fat;
 
-    for (int dir=0; dir < 4; dir++) {
-      arg.u.load((Float*)a.data, linkIndex(x,arg.E), dir, parity);
-      Float sign_a = reconstruct_sign<Float,recon,false>(dir, x, arg.border, arg.X, arg);
-      for (int i=0; i<3; i++) a(2,i) *= sign_a;
+    Link a = arg.u(dir, linkIndex(x,arg.E), parity);
+    Float sign_a = reconstruct_sign<Float,recon,false>(dir, x, arg.border, arg.X, arg);
+    for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
-      fat = arg.coeff*a;
+    arg.link(dir, idx, parity) = arg.coeff*a;
 
-      arg.link.save((Float*)fat.data, idx, dir, parity);
-    }
     return;
   }
 
@@ -326,7 +319,7 @@ namespace quda {
 
   template<typename Float, int mu, int nu, int recon, int recon_mu, typename Arg>
   __device__ inline void computeStaple(Matrix<complex<Float>,3> &staple, Arg &arg, int x[], int parity) {
-    Matrix<complex<Float>,3> a, b, c;
+    typedef Matrix<complex<Float>,3> Link;
     int y[4], dx[4] = {0, 0, 0, 0};
 
     /* Computes the upper staple :
@@ -338,20 +331,20 @@ namespace quda {
      */
     {
       /* load matrix A*/
-      arg.u.load((Float*)a.data, linkIndex(x, arg.E), nu, parity);
+      Link a = arg.u(nu, linkIndex(x, arg.E), parity);
       Float sign_a = reconstruct_sign<Float,recon,false>(nu, x, arg.inner_border, arg.inner_X, arg);
       for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
       /* load matrix B*/
       dx[nu]++;
-      arg.mulink.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), mu, 1-parity);
+      Link b = arg.mulink(mu, linkIndexShift(y, x, dx, arg.E), 1-parity);
       Float sign_b = reconstruct_sign<Float,recon_mu,false>(mu, y, arg.inner_border, arg.inner_X, arg);
       for (int i=0; i<3; i++) b(2,i) *= sign_b;
       dx[nu]--;
 
       /* load matrix C*/
       dx[mu]++;
-      arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), nu, 1-parity);
+      Link c = arg.u(nu, linkIndexShift(y, x, dx, arg.E), 1-parity);
       Float sign_c = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
       for (int i=0; i<3; i++) c(2,i) *= sign_c;
       dx[mu]--;
@@ -369,18 +362,18 @@ namespace quda {
     {
       /* load matrix A*/
       dx[nu]--;
-      arg.u.load((Float*)a.data, linkIndexShift(y, x, dx, arg.E), nu, 1-parity);
+      Link a = arg.u(nu, linkIndexShift(y, x, dx, arg.E), 1-parity);
       Float sign_a = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
       for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
       /* load matrix B*/
-      arg.mulink.load((Float*)b.data, linkIndexShift(y, x, dx, arg.E), mu, 1-parity);
+      Link b = arg.mulink(mu, linkIndexShift(y, x, dx, arg.E), 1-parity);
       Float sign_b = reconstruct_sign<Float,recon_mu,false>(mu, y, arg.inner_border, arg.inner_X, arg);
       for (int i=0; i<3; i++) b(2,i) *= sign_b;
 
       /* load matrix C*/
       dx[mu]++;
-      arg.u.load((Float*)c.data, linkIndexShift(y, x, dx, arg.E), nu, parity);
+      Link c = arg.u(nu, linkIndexShift(y, x, dx, arg.E), parity);
       Float sign_c = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
       for (int i=0; i<3; i++) c(2,i) *= sign_c;
       dx[mu]--;
@@ -410,7 +403,8 @@ namespace quda {
     getCoords(x, idx, arg.X, (parity+arg.odd_bit)%2);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-    Matrix<complex<Float>,3> staple, fat;
+    typedef Matrix<complex<Float>,3> Link;
+    Link staple;
     switch(mu) {
     case 0:
       switch(nu) {
@@ -445,12 +439,12 @@ namespace quda {
 	   x[3] < arg.inner_border[3] || x[3] >= arg.inner_X[3] + arg.inner_border[3]) ) {
       // convert to inner coords
       int inner_x[] = {x[0]-arg.inner_border[0], x[1]-arg.inner_border[1], x[2]-arg.inner_border[2], x[3]-arg.inner_border[3]};
-      arg.fat.load((Float*)fat.data, linkIndex(inner_x, arg.inner_X), mu, parity);
+      Link fat = arg.fat(mu, linkIndex(inner_x, arg.inner_X), parity);
       fat += arg.coeff * staple;
-      arg.fat.save((Float*)fat.data, linkIndex(inner_x, arg.inner_X), mu, parity);
+      arg.fat(mu, linkIndex(inner_x, arg.inner_X), parity) = fat;
     }
 
-    if (save_staple) arg.staple.save((Float*)staple.data, linkIndex(x, arg.E), mu, parity);
+    if (save_staple) arg.staple(mu, linkIndex(x, arg.E), parity) = staple;
     return;
   }
 
