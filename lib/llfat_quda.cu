@@ -11,6 +11,7 @@
 #include <dslash_quda.h>
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
+#include <fast_intdiv.h>
 
 #define MIN_COEFF 1e-7
 
@@ -18,8 +19,8 @@ namespace quda {
 
 #ifdef GPU_FATLINK
 
-  template <typename Float, int recon, bool temporal=true, typename Arg>
-  __device__ inline Float reconstruct_sign(int dir, int y[], const int border[], int X[], const Arg &arg) {
+  template <typename Float, int recon, bool temporal=true, typename I, typename Arg>
+  __device__ inline Float reconstruct_sign(int dir, int y[], const int border[], const I X[], const Arg &arg) {
     Float sign = 1;
     if (recon != 18) {
       switch (dir) {
@@ -48,8 +49,8 @@ namespace quda {
   struct LinkArg {
     unsigned int threads;
 
-    int X[4];
-    int E[4];
+    int_fastdiv X[4];
+    int_fastdiv E[4];
     int border[4];
 
     /** This keeps track of any parity changes that result in using a
@@ -273,11 +274,11 @@ namespace quda {
   struct StapleArg {
     unsigned int threads;
 
-    int X[4];
-    int E[4];
+    int_fastdiv X[4];
+    int_fastdiv E[4];
     int border[4];
 
-    int inner_X[4];
+    int_fastdiv inner_X[4];
     int inner_border[4];
 
     /** This keeps track of any parity changes that result in using a
