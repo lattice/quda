@@ -10,7 +10,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K>
-  static __device__ __host__ inline int linkIndexShift(I x[], J dx[], const K X[4]) {
+  static __device__ __host__ inline int linkIndexShift(const I x[], const J dx[], const K X[4]) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
@@ -28,7 +28,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K>
-  static __device__ __host__ inline int linkIndexShift(I y[], I x[], J dx[], const K X[4]) {
+  static __device__ __host__ inline int linkIndexShift(I y[], const I x[], const J dx[], const K X[4]) {
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -43,7 +43,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I>
-  static __device__ __host__ inline int linkIndex(int x[], const I X[4]) {
+  static __device__ __host__ inline int linkIndex(const int x[], const I X[4]) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     return idx;
   }
@@ -57,7 +57,7 @@ namespace quda {
      @param mu direction in which to subtract 1
    */
   template <typename I>
-  static __device__ __host__ inline int linkIndexM1(int x[], const I X[4], const int mu) {
+  static __device__ __host__ inline int linkIndexM1(const int x[], const I X[4], const int mu) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
@@ -75,7 +75,7 @@ namespace quda {
      @param mu direction in which to add 1
    */
   template <typename I>
-  static __device__ __host__ inline int linkNormalIndexP1(int x[], const I X[4], const int mu) {
+  static __device__ __host__ inline int linkNormalIndexP1(const int x[], const I X[4], const int mu) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
@@ -93,7 +93,7 @@ namespace quda {
      @param mu direction in which to add 1
    */  
   template <typename I>
-  static __device__ __host__ inline int linkIndexP1(int x[], const I X[4], const int mu) {
+  static __device__ __host__ inline int linkIndexP1(const int x[], const I X[4], const int mu) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
