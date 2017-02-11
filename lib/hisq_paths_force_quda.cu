@@ -816,8 +816,8 @@ namespace quda {
       }
       
       long long flops() const { 
-	if(GOES_FORWARDS(sig)) return 810*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
-	return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*396; 
+	if(GOES_FORWARDS(sig)) return 810ll*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
+	return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*396ll;
       }
     };
 
@@ -1113,9 +1113,9 @@ namespace quda {
           }
 
           long long flops() const { 
-	    if(GOES_FORWARDS(sig)) return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*1242;
+	    if(GOES_FORWARDS(sig)) return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*1242ll;
 	
-	    return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*828;
+	    return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*828ll;
 	  }
       };
 
@@ -1181,7 +1181,7 @@ namespace quda {
           }
 
           long long flops() const { 
-	    return 72*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
+	    return 72ll*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
 	  }
       };
 
@@ -1256,7 +1256,7 @@ namespace quda {
             output.restore();
           }
 
-          long long flops() const { return 4968*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]; }
+          long long flops() const { return 4968ll*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]; }
       };
 
 
@@ -1337,7 +1337,7 @@ namespace quda {
           }
 
           long long flops() const { 
-	    return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*792;
+	    return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*792ll;
 	  }
       };
 
