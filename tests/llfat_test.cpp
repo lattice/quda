@@ -67,7 +67,7 @@ static void llfat_test()
   qudaGaugeParam.type = QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = qudaGaugeParam.reconstruct_sloppy = link_recon;
   qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.staggered_phase_type = QUDA_MILC_STAGGERED_PHASE;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad = 0;
 

@@ -49,6 +49,21 @@ namespace quda {
   }
 
   /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] in the mu direction
+
+     @return 1-d checkerboard index
+     @param y copy of 4-d lattice index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+   */
+  template <typename I>
+  static __device__ __host__ inline int linkIndex(int y[], const int x[], const I X[4]) {
+    int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
+    y[0] = x[0]; y[1] = x[1]; y[2] = x[2]; y[3] = x[3];
+    return idx;
+  }
+
+  /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -1 in the mu direction
 
      @return 1-d checkerboard index

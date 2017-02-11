@@ -64,7 +64,7 @@ namespace quda {
       compute_fat_link_max(false),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
 
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
+      staggeredPhaseType(QUDA_STAGGERED_PHASE_NO),
       staggeredPhaseApplied(false),
       i_mu(0.0)
 	{
@@ -88,7 +88,7 @@ namespace quda {
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
       compute_fat_link_max(false), ghostExchange(ghostExchange),
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), i_mu(0.0)
+      staggeredPhaseType(QUDA_STAGGERED_PHASE_NO), staggeredPhaseApplied(false), i_mu(0.0)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;

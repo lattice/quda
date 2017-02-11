@@ -19,32 +19,6 @@ namespace quda {
 
 #ifdef GPU_FATLINK
 
-  template <typename Float, int recon, bool temporal=true, typename I, typename Arg>
-  __device__ inline Float reconstruct_sign(int dir, int y[], const int border[], const I X[], const Arg &arg) {
-    Float sign = 1;
-    if (recon != 18) {
-      switch (dir) {
-      case XUP:
-	if ( ((y[3] - border[3]) & 1) != 0)
-	  sign = -static_cast<Float>(1.0);
-	break;
-      case YUP:
-	if ( ((y[0]-border[0]+y[3]-border[3]) & 1) != 0)
-	  sign = -static_cast<Float>(1.0);
-	break;
-      case ZUP:
-	if ( ((y[0]-border[0]+y[1]-border[1]+y[3]-border[3]) & 1) != 0)
-	  sign = -static_cast<Float>(1.0);
-	break;
-      case TUP:
-	if ( temporal && ( ((y[3]-border[3]) == X[3]-1 && arg.PtNm1) || ((y[3]-border[3]) == -1 && arg.Pt0) ) )
-	  sign = -static_cast<Float>(1.0);
-	break;
-      }
-    }
-    return sign;
-  }
-
   template <typename Float, typename Link, typename Gauge>
   struct LinkArg {
     unsigned int threads;
@@ -63,14 +37,9 @@ namespace quda {
     Link link;
     Float coeff;
 
-    bool Pt0;     // Are we processor 0 in time?
-    bool PtNm1;  // Are we processor Nt-1 in time?
-
     LinkArg(Link link, Gauge u, Float coeff, const GaugeField &link_meta, const GaugeField &u_meta)
-      : threads(link_meta.VolumeCB()), link(link), u(u), coeff(coeff),
-	Pt0(commCoords(3)==0), PtNm1(commCoords(3)==commDim(3)-1),
-	odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
-		  commDimPartitioned(2)+commDimPartitioned(3))%2 ) {
+      : threads(link_meta.VolumeCB()), link(link), u(u), coeff(coeff)
+    {
 	for (int d=0; d<4; d++) {
 	  X[d] = link_meta.X()[d];
 	  E[d] = u_meta.X()[d];
@@ -79,7 +48,7 @@ namespace quda {
     }
   };
 
-  template <typename Float, int recon, typename Arg>
+  template <typename Float, typename Arg>
   __global__ void computeLongLink(Arg arg) {
 
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -88,32 +57,27 @@ namespace quda {
     if (idx >= arg.threads) return;
     if (dir >= 4) return;
 
-    int y[4], x[4] = {0, 0, 0, 0}, dx[4] = {0, 0, 0, 0};
+    int x[4], dx[4] = {0, 0, 0, 0};
+    int *y = arg.u.coords;
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
     typedef Matrix<complex<Float>,3> Link;
 
-    Link a = arg.u(dir, linkIndex(x,arg.E), parity);
-    Float sign_a = reconstruct_sign<Float,recon,false>(dir, x, arg.border, arg.X, arg);
-    for (int i=0; i<3; i++) a(2,i) *= sign_a;
+    Link a = arg.u(dir, linkIndex(y, x, arg.E), parity);
 
     dx[dir]++;
     Link b = arg.u(dir, linkIndexShift(y, x, dx, arg.E), 1-parity);
-    Float sign_b = reconstruct_sign<Float,recon,false>(dir, y, arg.border, arg.X, arg);
-    for (int i=0; i<3; i++) b(2,i) *= sign_b;
 
     dx[dir]++;
     Link c = arg.u(dir, linkIndexShift(y, x, dx, arg.E), parity);
     dx[dir]-=2;
-    Float sign_c = reconstruct_sign<Float,recon,false>(dir, y, arg.border, arg.X, arg);
-    for (int i=0; i<3; i++) c(2,i) *= sign_c;
 
     arg.link(dir, idx, parity) = arg.coeff * a * b * c;
     return;
   }
 
-  template <typename Float, int recon, typename Arg>
+  template <typename Float, typename Arg>
   class LongLink : public TunableVectorYZ {
     Arg &arg;
     const GaugeField &meta;
@@ -126,7 +90,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeLongLink<Float,recon><<<tp.grid,tp.block>>>(arg);
+      computeLongLink<Float><<<tp.grid,tp.block>>>(arg);
     }
 
     TuneKey tuneKey() const {
@@ -146,13 +110,13 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef LinkArg<double,L,L> Arg;
 	Arg arg(L(lng), L(u), coeff, lng, u);
-	LongLink<double,18,Arg> longLink(arg,lng);
+	LongLink<double,Arg> longLink(arg,lng);
 	longLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12>::type G;
+	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
 	typedef LinkArg<double,L,G> Arg;
 	Arg arg(L(lng), G(u), coeff, lng, u);
-	LongLink<double,12,Arg> longLink(arg,lng);
+	LongLink<double,Arg> longLink(arg,lng);
 	longLink.apply(0);
       } else {
 	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
@@ -162,13 +126,13 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef LinkArg<float,L,L> Arg;
 	Arg arg(L(lng), L(u), coeff, lng, u) ;
-	LongLink<float,18,Arg> longLink(arg,lng);
+	LongLink<float,Arg> longLink(arg,lng);
 	longLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12>::type G;
+	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
 	typedef LinkArg<float,L,G> Arg;
 	Arg arg(L(lng), G(u), coeff, lng, u);
-	LongLink<float,12,Arg> longLink(arg,lng);
+	LongLink<float,Arg> longLink(arg,lng);
 	longLink.apply(0);
 
       } else {
@@ -180,7 +144,7 @@ namespace quda {
     return;
   }
 
-  template <typename Float, int recon, typename Arg>
+  template <typename Float, typename Arg>
   __global__ void computeOneLink(Arg arg)  {
 
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -189,22 +153,20 @@ namespace quda {
     if (idx >= arg.threads) return;
     if (dir >= 4) return;
 
-    int x[4] = {0, 0, 0, 0};
+    int *x = arg.u.coords;
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
     typedef Matrix<complex<Float>,3> Link;
 
-    Link a = arg.u(dir, linkIndex(x,arg.E), parity);
-    Float sign_a = reconstruct_sign<Float,recon,false>(dir, x, arg.border, arg.X, arg);
-    for (int i=0; i<3; i++) a(2,i) *= sign_a;
+    Link a = arg.u(dir, linkIndex(x,x,arg.E), parity);
 
     arg.link(dir, idx, parity) = arg.coeff*a;
 
     return;
   }
 
-  template <typename Float, int recon, typename Arg>
+  template <typename Float, typename Arg>
   class OneLink : public TunableVectorYZ {
     Arg &arg;
     const GaugeField &meta;
@@ -217,7 +179,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeOneLink<Float,recon><<<tp.grid,tp.block>>>(arg);
+      computeOneLink<Float><<<tp.grid,tp.block>>>(arg);
     }
 
     TuneKey tuneKey() const {
@@ -237,13 +199,13 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef LinkArg<double,L,L> Arg;
 	Arg arg(L(fat), L(u), coeff, fat, u);
-	OneLink<double,18,Arg> oneLink(arg,fat);
+	OneLink<double,Arg> oneLink(arg,fat);
 	oneLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12>::type G;
+	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
 	typedef LinkArg<double,L,G> Arg;
 	Arg arg(L(fat), G(u), coeff, fat, u);
-	OneLink<double,12,Arg> oneLink(arg,fat);
+	OneLink<double,Arg> oneLink(arg,fat);
 	oneLink.apply(0);
       } else {
 	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
@@ -253,13 +215,13 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef LinkArg<float,L,L> Arg;
 	Arg arg(L(fat), L(u), coeff, fat, u);
-	OneLink<float,18,Arg> oneLink(arg,fat);
+	OneLink<float,Arg> oneLink(arg,fat);
 	oneLink.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12>::type G;
+	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
 	typedef LinkArg<float,L,G> Arg;
 	Arg arg(L(fat), G(u), coeff, fat, u);
-	OneLink<float,12,Arg> oneLink(arg,fat);
+	OneLink<float,Arg> oneLink(arg,fat);
 	oneLink.apply(0);
       } else {
 	errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
@@ -296,13 +258,9 @@ namespace quda {
     int n_mu;
     int mu_map[4];
 
-    bool Pt0;     // Are we processor 0 in time?
-    bool PtNm1;  // Are we processor Nt-1 in time?
-
     StapleArg(Fat fat, Staple staple, Mulink mulink, Gauge u, Float coeff,
 	      const GaugeField &fat_meta, const GaugeField &u_meta)
       : threads(1), fat(fat), staple(staple), mulink(mulink), u(u), coeff(coeff),
-	Pt0(commCoords(3)==0), PtNm1(commCoords(3)==commDim(3)-1),
 	odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
 		  commDimPartitioned(2)+commDimPartitioned(3))%2 ) {
 	for (int d=0; d<4; d++) {
@@ -318,10 +276,10 @@ namespace quda {
     }
   };
 
-  template<typename Float, int mu, int nu, int recon, int recon_mu, typename Arg>
+  template<typename Float, int mu, int nu, typename Arg>
   __device__ inline void computeStaple(Matrix<complex<Float>,3> &staple, Arg &arg, int x[], int parity) {
     typedef Matrix<complex<Float>,3> Link;
-    int y[4], dx[4] = {0, 0, 0, 0};
+    int *y = arg.u.coords, *y_mu = arg.mulink.coords, dx[4] = {0, 0, 0, 0};
 
     /* Computes the upper staple :
      *                 mu (B)
@@ -332,22 +290,16 @@ namespace quda {
      */
     {
       /* load matrix A*/
-      Link a = arg.u(nu, linkIndex(x, arg.E), parity);
-      Float sign_a = reconstruct_sign<Float,recon,false>(nu, x, arg.inner_border, arg.inner_X, arg);
-      for (int i=0; i<3; i++) a(2,i) *= sign_a;
+      Link a = arg.u(nu, linkIndex(y, x, arg.E), parity);
 
       /* load matrix B*/
       dx[nu]++;
-      Link b = arg.mulink(mu, linkIndexShift(y, x, dx, arg.E), 1-parity);
-      Float sign_b = reconstruct_sign<Float,recon_mu,false>(mu, y, arg.inner_border, arg.inner_X, arg);
-      for (int i=0; i<3; i++) b(2,i) *= sign_b;
+      Link b = arg.mulink(mu, linkIndexShift(y_mu, x, dx, arg.E), 1-parity);
       dx[nu]--;
 
       /* load matrix C*/
       dx[mu]++;
       Link c = arg.u(nu, linkIndexShift(y, x, dx, arg.E), 1-parity);
-      Float sign_c = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
-      for (int i=0; i<3; i++) c(2,i) *= sign_c;
       dx[mu]--;
 
       staple = a * b * conj(c);
@@ -364,19 +316,13 @@ namespace quda {
       /* load matrix A*/
       dx[nu]--;
       Link a = arg.u(nu, linkIndexShift(y, x, dx, arg.E), 1-parity);
-      Float sign_a = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
-      for (int i=0; i<3; i++) a(2,i) *= sign_a;
 
       /* load matrix B*/
-      Link b = arg.mulink(mu, linkIndexShift(y, x, dx, arg.E), 1-parity);
-      Float sign_b = reconstruct_sign<Float,recon_mu,false>(mu, y, arg.inner_border, arg.inner_X, arg);
-      for (int i=0; i<3; i++) b(2,i) *= sign_b;
+      Link b = arg.mulink(mu, linkIndexShift(y_mu, x, dx, arg.E), 1-parity);
 
       /* load matrix C*/
       dx[mu]++;
       Link c = arg.u(nu, linkIndexShift(y, x, dx, arg.E), parity);
-      Float sign_c = reconstruct_sign<Float,recon,false>(nu, y, arg.inner_border, arg.inner_X, arg);
-      for (int i=0; i<3; i++) c(2,i) *= sign_c;
       dx[mu]--;
       dx[nu]++;
 
@@ -384,7 +330,7 @@ namespace quda {
     }
   }
 
-  template<typename Float, int recon, int recon_mu, bool save_staple, typename Arg>
+  template<typename Float, bool save_staple, typename Arg>
   __global__ void computeStaple(Arg arg, int nu)
   {
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -409,27 +355,27 @@ namespace quda {
     switch(mu) {
     case 0:
       switch(nu) {
-      case 1: computeStaple<Float,0,1,recon,recon_mu>(staple, arg, x, parity); break;
-      case 2: computeStaple<Float,0,2,recon,recon_mu>(staple, arg, x, parity); break;
-      case 3: computeStaple<Float,0,3,recon,recon_mu>(staple, arg, x, parity); break;
+      case 1: computeStaple<Float,0,1>(staple, arg, x, parity); break;
+      case 2: computeStaple<Float,0,2>(staple, arg, x, parity); break;
+      case 3: computeStaple<Float,0,3>(staple, arg, x, parity); break;
       } break;
     case 1:
       switch(nu) {
-      case 0: computeStaple<Float,1,0,recon,recon_mu>(staple, arg, x, parity); break;
-      case 2: computeStaple<Float,1,2,recon,recon_mu>(staple, arg, x, parity); break;
-      case 3: computeStaple<Float,1,3,recon,recon_mu>(staple, arg, x, parity); break;
+      case 0: computeStaple<Float,1,0>(staple, arg, x, parity); break;
+      case 2: computeStaple<Float,1,2>(staple, arg, x, parity); break;
+      case 3: computeStaple<Float,1,3>(staple, arg, x, parity); break;
       } break;
     case 2:
       switch(nu) {
-      case 0: computeStaple<Float,2,0,recon,recon_mu>(staple, arg, x, parity); break;
-      case 1: computeStaple<Float,2,1,recon,recon_mu>(staple, arg, x, parity); break;
-      case 3: computeStaple<Float,2,3,recon,recon_mu>(staple, arg, x, parity); break;
+      case 0: computeStaple<Float,2,0>(staple, arg, x, parity); break;
+      case 1: computeStaple<Float,2,1>(staple, arg, x, parity); break;
+      case 3: computeStaple<Float,2,3>(staple, arg, x, parity); break;
       } break;
     case 3:
       switch(nu) {
-      case 0: computeStaple<Float,3,0,recon,recon_mu>(staple, arg, x, parity); break;
-      case 1: computeStaple<Float,3,1,recon,recon_mu>(staple, arg, x, parity); break;
-      case 2: computeStaple<Float,3,2,recon,recon_mu>(staple, arg, x, parity); break;
+      case 0: computeStaple<Float,3,0>(staple, arg, x, parity); break;
+      case 1: computeStaple<Float,3,1>(staple, arg, x, parity); break;
+      case 2: computeStaple<Float,3,2>(staple, arg, x, parity); break;
       } break;
     }
 
@@ -449,7 +395,7 @@ namespace quda {
     return;
   }
 
-  template <typename Float, int recon, int recon_mu, typename Arg>
+  template <typename Float, typename Arg>
   class Staple : public TunableVectorYZ {
     Arg &arg;
     const GaugeField &meta;
@@ -482,9 +428,9 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (save_staple)
-	computeStaple<Float,recon,recon_mu,true><<<tp.grid,tp.block>>>(arg, nu);
+	computeStaple<Float,true><<<tp.grid,tp.block>>>(arg, nu);
       else
-	computeStaple<Float,recon,recon_mu,false><<<tp.grid,tp.block>>>(arg, nu);
+	computeStaple<Float,false><<<tp.grid,tp.block>>>(arg, nu);
     }
 
     TuneKey tuneKey() const {
@@ -501,8 +447,8 @@ namespace quda {
       return 2*arg.n_mu*arg.threads*( 4*198 + 18 + 36 );
     }
     long long bytes() const {
-      return 2*arg.n_mu*(2*meta.VolumeCB()*arg.fat.Bytes() + // fat load/store is only done on interior
-			 arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + save_staple ? arg.staple.Bytes() : 0));
+      return 2*arg.n_mu*meta.VolumeCB()*arg.fat.Bytes()*2 // fat load/store is only done on interior
+	+ arg.n_mu*2*arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + save_staple ? arg.staple.Bytes() : 0);
     }
   };
 
@@ -515,19 +461,19 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef StapleArg<double,L,L,L,L> Arg;
 	Arg arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
-	Staple<double,18,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	Staple<double,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
 	stapler.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12>::type G;
+	typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
 	if (mulink.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef StapleArg<double,L,L,L,G> Arg;
 	  Arg arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
-	  Staple<double,12,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  Staple<double,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
 	  stapler.apply(0);
 	} else if (mulink.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  typedef StapleArg<double,L,L,G,G> Arg;
 	  Arg arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
-	  Staple<double,12,12,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  Staple<double,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
 	  stapler.apply(0);
 	} else {
 	  errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
@@ -540,19 +486,19 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef StapleArg<float,L,L,L,L> Arg;
 	Arg arg(L(fat), L(staple), L(mulink), L(u), coeff, fat, u);
-	Staple<float,18,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	Staple<float,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
 	stapler.apply(0);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12>::type G;
+	typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_12,18,QUDA_STAGGERED_PHASE_MILC>::type G;
 	if (mulink.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef StapleArg<double,L,L,L,G> Arg;
 	  Arg arg(L(fat), L(staple), L(mulink), G(u), coeff, fat, u);
-	  Staple<float,12,18,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  Staple<float,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
 	  stapler.apply(0);
 	} else if (mulink.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  typedef StapleArg<double,L,L,G,G> Arg;
 	  Arg arg(L(fat), L(staple), G(mulink), G(u), coeff, fat, u);
-	  Staple<float,12,12,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
+	  Staple<float,Arg> stapler(arg, nu, dir1, dir2, save_staple, fat);
 	  stapler.apply(0);
 	} else {
 	  errorQuda("Reconstruct %d is not supported\n", u.Reconstruct());
