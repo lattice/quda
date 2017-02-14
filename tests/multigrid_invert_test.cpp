@@ -188,11 +188,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
 
+  mg_param.delta_massMG = delta_massMG;
+  mg_param.delta_kappaMG = delta_kappaMG;
+
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
     mg_param.delta_muMG = delta_muMG;
-    mg_param.delta_massMG = delta_massMG;
-    mg_param.delta_kappaMG = delta_kappaMG;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
 
