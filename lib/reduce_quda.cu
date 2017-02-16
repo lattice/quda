@@ -787,21 +787,20 @@ namespace quda {
       pipePCGMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
 	typedef typename ScalarType<ReduceType>::type scalar;
-//Gr1:
-         x = x + a.x*p;
-         p = u + a.x*p;
-         r = r - a.x*s;
-//Gr2:
-         u = u - a.x*q;
-         q = m + b.x*q;
-//Gr3:
-         s = w + b.x*s;
-         w = w - b.x*z;
+
          z = n + b.x*z;
-//Gr4:
-         norm2_<scalar> (sum.x, u);
-         dot_<scalar> (sum.y, r, u);
-         dot_<scalar> (sum.z, w, u);
+         q = m + b.x*q;
+         s = w + b.x*s;
+         p = u + b.x*p;
+
+         x = x + a.x*p;
+         r = r - a.x*s;
+         u = u - a.x*q;
+         w = w - a.x*z;
+
+         dot_<scalar> (sum.x, r, u);
+         dot_<scalar> (sum.y, w, u);
+         norm2_<scalar> (sum.z, u);
       }
       static int streams() { return 18; } //! total number of input and output streams
       static int flops() { return (16+6); } //! flops per real element

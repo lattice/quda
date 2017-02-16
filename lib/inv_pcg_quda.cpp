@@ -18,6 +18,9 @@
 * Source P. Ghysels and W. Vanroose "Hiding global synchronization latency in the preconditioned Conjugate Gradient algorithm" 
 ***/
 
+#define USE_WORKER
+//#define PIPECG_DEBUG 
+
 #ifndef USE_WORKER
 #include <comm_quda.h>
 #endif
@@ -116,10 +119,9 @@ namespace quda {
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
+    ColorSpinorParam csParam(b);
     if (!init) {
       // high precision fields:
-      ColorSpinorParam csParam(b);
-
       csParam.create = QUDA_COPY_FIELD_CREATE;
       rp = ColorSpinorField::Create(b, csParam);
 
@@ -154,8 +156,8 @@ namespace quda {
     ColorSpinorField &u = *up;
     ColorSpinorField &w = *wp;
     ColorSpinorField &q = *qp;
-    ColorSpinorField &n = *wp;
-    ColorSpinorField &m = *qp;
+    ColorSpinorField &n = *np;
+    ColorSpinorField &m = *mp;
     ColorSpinorField &z = *zp;
 
     ColorSpinorField &pPre = *p_pre;
@@ -197,15 +199,21 @@ namespace quda {
       commGlobalReductionSet(true);
 
       if( !precMatch ) u = pPre;
-      else {u = m; blas::zero(m);}
+      else {
+       u = m; 
+       blas::zero(m);
+      }
+    } else {
+      printfQuda("\nNo preconditioning...\n");
+      u = r;
     }
 
-    mat(w, u, tmp); // => r = A*x;
+    mat(w, u, tmp); // => w = A*u;
 
     //Remark : no overlap here. 
-    delta = blas::reDotProduct(w,u); 
     gamma = blas::reDotProduct(r,u); 
-    double mNorm = sqrt(blas::norm2(u));
+    delta = blas::reDotProduct(w,u);
+    double mNorm = blas::norm2(u);
 
     alpha = gamma / delta;
     beta  = 0.0;
@@ -219,18 +227,24 @@ namespace quda {
     GlobalMPIallreduce global_reduce((double*)&buffer, 3);
     dslash::aux_worker = &global_reduce;
 #else
-    MsgHandle* allreduceHandle = comm_handle();
+    //MsgHandle* allreduceHandle = comm_handle();
 #endif
 
     int j = 0;
 
     double heavy_quark_res = 0.0;
 
-    while(!convergence(mNorm*mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
+    //
+    m = w;
+    mat(n, m, tmp);
+
+    PrintStats( "PreconCG", j, (mNorm*mNorm), b2, heavy_quark_res);
+
+    while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
 
       if(j > 0) {
          beta  = gamma / gammajm1;
-         alpha = gamma / (delta-(beta*gamma)/alpha);
+         alpha = gamma / (delta - beta / alpha * gamma); 
       } 
 
       buffer = pipePCGMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
@@ -248,13 +262,18 @@ namespace quda {
           commGlobalReductionSet(true);
 
           if( !precMatch ) u = pPre;
-        }
+        } else {
+          m = w;
+        }        
         //
+        dslash::aux_worker = &global_reduce;
         mat(n, m, tmp);
+        dslash::aux_worker = nullptr;
       }
 #else
       {
-        comm_allreduce_array_async((double*) &buffer, 3, allreduceHandle);
+        //comm_allreduce_array_async((double*) &buffer, 3, allreduceHandle);
+        reduceDoubleArray((double*)&buffer, 3);
 
         if(K) {
           if( !precMatch )  rPre = w;
@@ -264,25 +283,31 @@ namespace quda {
           commGlobalReductionSet(true);
 
           if( !precMatch ) u = pPre;
+        } else {
+          m = w;
         }
         //
         mat(n, m, tmp);
 
-        comm_wait(allreduceHandle);
+        //comm_wait(allreduceHandle);
       }
 #endif
-      delta = buffer.x;
+
       gammajm1 = gamma;
-      gamma = buffer.y;
+      gamma = buffer.x;
+      delta = buffer.y;
       mNorm = buffer.z;
+      //
+      m = w;
+      mat(n, m, tmp);
 
       j += 1;
-      PrintStats( "PreconCG", j, (mNorm*mNorm), b2, heavy_quark_res);
+      PrintStats( "PreconCG", j, mNorm, b2, heavy_quark_res);
     }
 #ifdef USE_WORKER
     dslash::aux_worker = nullptr;
 #else
-    comm_free(allreduceHandle);
+    //comm_free(allreduceHandle);
 #endif
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -307,6 +332,13 @@ namespace quda {
     matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+#ifdef PIPECG_DEBUG
+    delete tz;
+    delete tu;
+    delete ts;
+    delete tq;
+#endif
 
 
     return;
