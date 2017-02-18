@@ -601,8 +601,8 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps = Tunable::paramString(param);
-      ps << ", atomicadd=" << param.block.z;
+      std::stringstream ps;
+      ps << Tunable::paramString(param) << ", atomicadd=" << param.block.z;
       return ps.str();
     }
 
@@ -879,8 +879,8 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps = Tuanble::paramString(param);
-      ps << ", atomicadd=" << param.block.z;
+      std::stringstream ps;
+      ps << Tunable::paramString(param) << ", atomicadd=" << param.block.z;
       return ps.str();
     }
 
@@ -1159,8 +1159,8 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps = Tunable::paramString(param);
-      ps << ", atomicadd=" << param.block.z;
+      std::stringstream ps;
+      ps << Tunable::paramString(param) << ", atomicadd=" << param.block.z;
       return ps.str();
     }
 
@@ -1275,7 +1275,7 @@ namespace quda {
     }
     else{
       for ( int i = 0; i < NElems / 2; ++i ) ((Cmplx*)tmp)[i] = array[idx + size * i];
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0);
+      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }
   }
@@ -1342,7 +1342,7 @@ namespace quda {
     }
     else{
       for ( int i = 0; i < NElems / 2; ++i ) ((Cmplx*)tmp)[i] = array[idx + size * i];
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0);
+      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }
   }
@@ -1366,11 +1366,10 @@ namespace quda {
 
 
   template<typename Float, typename Gauge, int NElems, int gauge_dir>
-  void gaugefixingOVR( Gauge dataOr,  cudaGaugeField& data, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, \
-                       const Float relax_boost, const double tolerance, \
-                       const unsigned int reunit_interval, \
-                       const unsigned int stopWtheta) {
+  void gaugefixingOVR( Gauge dataOr,  cudaGaugeField& data,
+		       const int Nsteps, const int verbose_interval,
+		       const Float relax_boost, const double tolerance,
+		       const int reunit_interval, const int stopWtheta) {
 
 
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
@@ -1748,9 +1747,8 @@ namespace quda {
   }
 
   template<typename Float, int NElems, typename Gauge>
-  void gaugefixingOVR( Gauge dataOr,  cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, \
-                       const Float relax_boost, const double tolerance, const unsigned int reunit_interval, const unsigned int stopWtheta) {
+  void gaugefixingOVR( Gauge dataOr,  cudaGaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                       const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta) {
     if ( gauge_dir != 3 ) {
       printfQuda("Starting Landau gauge fixing...\n");
       gaugefixingOVR<Float, Gauge, NElems, 4>(dataOr, data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
@@ -1764,9 +1762,8 @@ namespace quda {
 
 
   template<typename Float>
-  void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const Float relax_boost, const double tolerance, \
-                       const unsigned int reunit_interval, const unsigned int stopWtheta) {
+  void gaugefixingOVR( cudaGaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+		       const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta) {
 
     // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
     if ( data.isNative() ) {
@@ -1807,9 +1804,8 @@ namespace quda {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir,
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const double relax_boost,
-                       const double tolerance, const unsigned int reunit_interval, const unsigned int stopWtheta) {
+  void gaugefixingOVR( cudaGaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
+                       const double tolerance, const int reunit_interval, const int stopWtheta) {
 #ifdef GPU_GAUGE_ALG
     if ( data.Precision() == QUDA_HALF_PRECISION ) {
       errorQuda("Half precision not supported\n");
