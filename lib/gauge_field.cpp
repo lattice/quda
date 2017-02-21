@@ -4,7 +4,7 @@
 
 namespace quda {
 
-  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(),
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u),
     nColor(3),
     nFace(u.Nface()),
     reconstruct(u.Reconstruct()),
@@ -19,21 +19,9 @@ namespace quda {
     create(QUDA_NULL_FIELD_CREATE),
     geometry(u.Geometry()),
     compute_fat_link_max(false),
-    ghostExchange(u.GhostExchange()),
     staggeredPhaseType(u.StaggeredPhase()),
     staggeredPhaseApplied(u.StaggeredPhaseApplied()),
-    i_mu(u.iMu())
-      {
-	precision = u.Precision();
-	nDim = u.Ndim();
-	pad = u.Pad();
-	siteSubset = QUDA_FULL_SITE_SUBSET;
-
-	for(int dir=0; dir<nDim; ++dir) {
-	  x[dir] = u.X()[dir];
-	  r[dir] = u.R()[dir];
-	}
-      }
+    i_mu(u.iMu()) { }
 
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
@@ -42,7 +30,7 @@ namespace quda {
     nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
     order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
-    create(param.create), ghostExchange(param.ghostExchange), 
+    create(param.create),
     staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
   {
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
@@ -72,13 +60,6 @@ namespace quda {
       real_length = 2*nDim*volume*nInternal;
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     }
-
-    if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
-      for (int d=0; d<nDim; d++) r[d] = param.r[d];
-    } else {
-      for (int d=0; d<nDim; d++) r[d] = 0;
-    }
-
 
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.  
@@ -255,10 +236,6 @@ namespace quda {
     output << "scale = " << param.scale << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
-    output << "ghostExchange = " << param.ghostExchange << std::endl;
-    for (int i=0; i<param.nDim; i++) {
-      output << "r[" << i << "] = " << param.r[i] << std::endl;    
-    }
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
     output << "staggeredPhaseApplied = " << param.staggeredPhaseApplied << std::endl;
 

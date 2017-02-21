@@ -17,12 +17,23 @@ namespace quda {
   bool LatticeField::bufferDeviceInit = false;
   size_t LatticeField::bufferDeviceBytes = 0;
 
+  LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
+    : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
+      siteSubset(field.SiteSubset()), ghostExchange(field.GhostExchange())
+  {
+    for(int dir=0; dir<nDim; ++dir) {
+      x[dir] = field.X()[dir];
+      r[dir] = field.R()[dir];
+    }
+  }
+
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
-      siteSubset(param.siteSubset)
+      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange)
   {
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
+      r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
       volume *= param.x[i];
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
@@ -158,6 +169,11 @@ namespace quda {
     }
     output << "pad = " << param.pad << std::endl;
     output << "precision = " << param.precision << std::endl;
+
+    output << "ghostExchange = " << param.ghostExchange << std::endl;
+    for (int i=0; i<param.nDim; i++) {
+      output << "r[" << i << "] = " << param.r[i] << std::endl;
+    }
 
     return output;  // for multiple << operators.
   }
