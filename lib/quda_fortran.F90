@@ -14,9 +14,7 @@
 
 !-------------------------------------------------------------------------------
 
-#define QUDA_MAX_DIM 5
-#define QUDA_MAX_MULTI_SHIFT 32
-#define QUDA_MAX_DWF_LS 128
+#include <quda_constants.h>
 
 module quda_fortran
 
