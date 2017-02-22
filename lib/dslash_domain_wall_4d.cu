@@ -63,7 +63,7 @@ namespace quda {
     const int DS_type;
 
     bool checkGrid(TuneParam &param) const {
-      if (param.grid.x > deviceProp.maxGridSize[0] || param.grid.y > deviceProp.maxGridSize[1]) {
+      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0] || param.grid.y > (unsigned int)deviceProp.maxGridSize[1]) {
         warningQuda("Autotuner is skipping blockDim=(%u,%u,%u), gridDim=(%u,%u,%u) because lattice volume is too large",
         param.block.x, param.block.y, param.block.z, 
         param.grid.x, param.grid.y, param.grid.z);
@@ -82,7 +82,7 @@ namespace quda {
 
       // first try to advance block.x
       param.block.x += step[0];
-      if (param.block.x > deviceProp.maxThreadsDim[0] || 
+      if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
           sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
         advance[0] = false;
         param.block.x = step[0]; // reset block.x
@@ -93,7 +93,7 @@ namespace quda {
       if (!advance[0]) {  // if failed to advance block.x, now try block.y
         param.block.y += step[1];
 
-        if (param.block.y > in->X(4) || 
+        if (param.block.y > (unsigned)in->X(4) ||
             sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
           advance[1] = false;
           param.block.y = step[1]; // reset block.x

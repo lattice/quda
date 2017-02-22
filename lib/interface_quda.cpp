@@ -1187,9 +1187,7 @@ void endQuda(void)
 
   for (int i=0; i<QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
 
-  for (unsigned int i=0; i<solutionResident.size(); i++) {
-    if(solutionResident[i]) delete solutionResident[i];
-  }
+  for (auto v : solutionResident) if (v) delete v;
   solutionResident.clear();
 
   if(momResident) delete momResident;
@@ -2333,13 +2331,21 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam);
 
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  if ((int)solutionResident.size() >= 1 && cudaParam.siteSubset == solutionResident[0]->SiteSubset()) {
-    // perhaps need to make this more robust in case solutionResident[0] is of the correct type for x
-    x = solutionResident[0];
-  } else {
-    x = new cudaColorSpinorField(cudaParam); // solution
+  // now check if we need to invalidate the solutionResident vectors
+  bool invalidate = false;
+  for (auto v : solutionResident)
+    if (cudaParam.precision != v->Precision()) { invalidate = true; break; }
+
+  if (invalidate) {
+    for (auto v : solutionResident) if (v) delete v;
+    solutionResident.clear();
   }
+
+  if (!solutionResident.size()) {
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    solutionResident.push_back(new cudaColorSpinorField(cudaParam)); // solution
+  }
+  x = solutionResident[0];
 
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
@@ -2526,16 +2532,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     *(basis[0]).first = *x; // set first entry to new solution
   }
 
-  if (param->make_resident_solution) {
-#if 0
-    for (unsigned int i=0; i<solutionResident.size(); i++) {
-      if (solutionResident[i]) delete solutionResident[i];
-    }
-#endif
-    //if (!solutionResident.size()) solutionResident.resize(1);
-    solutionResident[0] = static_cast<cudaColorSpinorField*>(x);
-  }
-
   if (param->compute_action) {
     Complex action = blas::cDotProduct(*b, *x);
     param->action[0] = action.real();
@@ -2554,9 +2550,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete h_b;
   delete h_x;
   delete b;
-  //if (!param->make_resident_solution) delete x;
-  if (!solutionResident.size() || x != solutionResident[0]) {
-    delete x;
+
+  if (!param->make_resident_solution) {
+    for (auto v: solutionResident) if (v) delete v;
+    solutionResident.clear();
   }
 
   delete d;
@@ -2896,14 +2893,6 @@ for(int i=0; i < param->num_src; i++) {
     profileInvert.TPSTOP(QUDA_PROFILE_D2H);
   }
 
-//  if (param->make_resident_solution) {
-//    for (unsigned int i=0; i<solutionResident.size(); i++) {
-//      if (solutionResident[i]) delete solutionResident[i];
-//    }
-//    solutionResident.resize(1);
-//    solutionResident[0] = static_cast<cudaColorSpinorField*>(x);
-//  }
-
   if (getVerbosity() >= QUDA_VERBOSE){
     for(int i=0; i< param->num_src; i++){
       double nx = blas::norm2(x->Component(i));
@@ -3084,12 +3073,21 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // Create the solution fields filled with zero
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
 
+  // now check if we need to invalidate the solutionResident vectors
+  bool invalidate = false;
+  for (auto v : solutionResident)
+    if (cudaParam.precision != v->Precision()) { invalidate = true; break; }
+
+  if (invalidate) {
+    for (auto v : solutionResident) delete v;
+    solutionResident.clear();
+  }
+
   // grow resident solutions to be big enough
-  int res_size = solutionResident.size();
-  for (int i=res_size; i < param->num_offset; i++) {
+  for (int i=solutionResident.size(); i < param->num_offset; i++) {
     solutionResident.push_back(new cudaColorSpinorField(cudaParam));
   }
-  for(int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
+  for (int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
 
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -3263,12 +3261,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.TPSTOP(QUDA_PROFILE_D2H);
 
   profileMulti.TPSTART(QUDA_PROFILE_EPILOGUE);
-  if (param->make_resident_solution) {
-    // probably not needed
-    for (int i=0; i<param->num_offset; i++) {
-      solutionResident[i] = static_cast<cudaColorSpinorField*>(x[i]);
-    }
+
+  if (!param->make_resident_solution) {
+    for (auto v: solutionResident) if (v) delete v;
+    solutionResident.clear();
   }
+
   profileMulti.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   profileMulti.TPSTART(QUDA_PROFILE_FREE);
@@ -3575,158 +3573,55 @@ void destroyDeflationQuda(QudaInvertParam *param, const int *X,  void *_h_u, dou
 }
 
 
-#ifdef GPU_FATLINK
-#include <sys/time.h>
+void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param) {
 
-void setFatLinkPadding(QudaGaugeParam* param)
-{
-  int* X    = param->X;
-  int Vsh_x = X[1]*X[2]*X[3]/2;
-  int Vsh_y = X[0]*X[2]*X[3]/2;
-  int Vsh_z = X[0]*X[1]*X[3]/2;
-  int Vsh_t = X[0]*X[1]*X[2]/2;
-
-  int E[4];
-  for (int i=0; i<4; i++) E[i] = X[i] + 4;
-
-  // fat-link padding
-  param->llfat_ga_pad = std::max(Vsh_x, std::max(Vsh_y, std::max(Vsh_z, Vsh_t)));
-
-  // site-link padding
-  param->site_ga_pad = (E[0]*E[1]*E[2]/2)*3;
-  param->ga_pad = param->site_ga_pad;
-
-  // staple padding
-  param->staple_pad = (E[0]*E[1]*E[2]/2)*3;
-
-  return;
-}
-
-
-namespace quda {
-  void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
-			  QudaGaugeParam* qudaGaugeParam, cudaGaugeField* cudaFatLink,
-			  cudaGaugeField* cudaLongLink, TimeProfile &profile)
-  {
-
-    profile.TPSTART(QUDA_PROFILE_INIT);
-    GaugeFieldParam gParam(0,*qudaGaugeParam);
-
-    for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
-
-    gParam.pad    = qudaGaugeParam->staple_pad;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
-    gParam.setPrecision(gParam.precision);
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-
-    cudaGaugeField *cudaStapleField  = new cudaGaugeField(gParam);
-    cudaGaugeField *cudaStapleField1 = new cudaGaugeField(gParam);
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    llfat_cuda_ex(cudaFatLink, cudaLongLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    profile.TPSTART(QUDA_PROFILE_FREE);
-    delete cudaStapleField;
-    delete cudaStapleField1;
-    profile.TPSTOP(QUDA_PROFILE_FREE);
-
-    return;
-  }
-} // namespace quda
-
-
-namespace quda {
-  namespace fatlink {
-#include <dslash_init.cuh>
-  }
-}
-
-#endif // GPU_FATLINK
-
-void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param)
-{
 #ifdef GPU_FATLINK
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
 
-  if(ulink){
+  checkGaugeParam(param);
+
+  if (ulink) {
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
     const int reunit_allow_svd = 1;
     const int reunit_svd_only  = 0;
     const double svd_rel_error = 1e-6;
     const double svd_abs_error = 1e-6;
-    quda::setUnitarizeLinksConstants(unitarize_eps, max_error,
-        reunit_allow_svd, reunit_svd_only,
-        svd_rel_error, svd_abs_error);
+    quda::setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only,
+				     svd_rel_error, svd_abs_error);
   }
-
-  cudaGaugeField* cudaFatLink        = NULL;
-  cudaGaugeField* cudaLongLink       = NULL;
-  cudaGaugeField* cudaUnitarizedLink = NULL;
-  cudaGaugeField* cudaInLinkEx       = NULL;
-
-  QudaGaugeParam qudaGaugeParam_ex_buf;
-  QudaGaugeParam* qudaGaugeParam_ex = &qudaGaugeParam_ex_buf;
-  memcpy(qudaGaugeParam_ex, param, sizeof(QudaGaugeParam));
-  int R[4] = {2, 2, 2, 2};
-  for(int dir=0; dir<4; ++dir){ qudaGaugeParam_ex->X[dir] = param->X[dir]+2*R[dir]; }
-
-  // fat-link padding
-  setFatLinkPadding(param);
-  qudaGaugeParam_ex->llfat_ga_pad = param->llfat_ga_pad;
-  qudaGaugeParam_ex->staple_pad   = param->staple_pad;
-  qudaGaugeParam_ex->site_ga_pad  = param->site_ga_pad;
 
   GaugeFieldParam gParam(0, *param);
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  // create the host fatlink
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.gauge = fatlink;
-  cpuGaugeField cpuFatLink(gParam);
+  cpuGaugeField cpuFatLink(gParam);   // create the host fatlink
   gParam.gauge = longlink;
-  cpuGaugeField cpuLongLink(gParam);
+  cpuGaugeField cpuLongLink(gParam);  // create the host longlink
   gParam.gauge = ulink;
   cpuGaugeField cpuUnitarizedLink(gParam);
 
-  // create the host sitelink
   gParam.link_type = param->type;
   gParam.gauge     = inlink;
-  cpuGaugeField cpuInLink(gParam);
+  cpuGaugeField cpuInLink(gParam);    // create the host sitelink
 
-  // create the device fatlink
-  gParam.pad    = param->llfat_ga_pad;
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.setPrecision(param->cuda_prec);
-  cudaFatLink = new cudaGaugeField(gParam);
-  if(ulink) cudaUnitarizedLink = new cudaGaugeField(gParam);
-  if(longlink) cudaLongLink = new cudaGaugeField(gParam);
-
+  // create the device fields
+  gParam.pad = 0;
   gParam.reconstruct = param->reconstruct;
   gParam.setPrecision(param->cuda_prec);
-  gParam.pad         = param->site_ga_pad;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = param->type;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField* cudaInLink = new cudaGaugeField(gParam);
 
-  for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];
-  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaInLinkEx = new cudaGaugeField(gParam);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  for (int dir=0; dir<4; dir++) {
+    gParam.x[dir] = param->X[dir]+2*R[dir];
+    gParam.r[dir] = R[dir];
+  }
 
-  profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
-  fatlink::initLatticeConstants(*cudaFatLink, profileFatLink);
-  profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-  cudaGaugeField* inlinkPtr;
-  llfat_init_cuda_ex(qudaGaugeParam_ex);
-  inlinkPtr = cudaInLinkEx;
+  cudaGaugeField* cudaInLinkEx = new cudaGaugeField(gParam);
   profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
   profileFatLink.TPSTART(QUDA_PROFILE_H2D);
@@ -3738,36 +3633,46 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   cudaInLinkEx->exchangeExtendedGhost(R,true);
   profileFatLink.TPSTOP(QUDA_PROFILE_COMMS);
 
-  quda::computeFatLinkCore(inlinkPtr, const_cast<double*>(path_coeff), param, cudaFatLink, cudaLongLink, profileFatLink);
+  profileFatLink.TPSTART(QUDA_PROFILE_FREE);
+  delete cudaInLink;
+  profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
-  if(ulink){
-    profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-    *num_failures_h = 0;
-    profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.setPrecision(param->cuda_prec);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  for (int dir=0; dir<4; dir++) {
+    gParam.x[dir] = param->X[dir];
+    gParam.r[dir] = 0;
+  }
+  cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
+  cudaGaugeField *cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
+  cudaGaugeField *cudaLongLink = longlink ? new cudaGaugeField(gParam) : nullptr;
 
+  profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
+  fatLongKSLink(cudaFatLink, cudaLongLink, *cudaInLinkEx, path_coeff);
+  profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  if (ulink) {
     profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
+    *num_failures_h = 0;
     quda::unitarizeLinks(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
+    if (*num_failures_h>0) errorQuda("Error in unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
     profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    if(*num_failures_h>0){
-      errorQuda("Error in the unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
-    }
-    profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-    cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink);
-    profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-  if(fatlink) cudaFatLink->saveCPUField(cpuFatLink);
-  if(longlink) cudaLongLink->saveCPUField(cpuLongLink);
+  if (ulink) cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink);
+  if (fatlink) cudaFatLink->saveCPUField(cpuFatLink);
+  if (longlink) cudaLongLink->saveCPUField(cpuLongLink);
   profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
 
   profileFatLink.TPSTART(QUDA_PROFILE_FREE);
-  if(longlink) delete cudaLongLink;
   delete cudaFatLink;
-  delete cudaInLink;
-  delete cudaUnitarizedLink;
-  if(cudaInLinkEx) delete cudaInLinkEx;
+  if (longlink) delete cudaLongLink;
+  if (ulink) delete cudaUnitarizedLink;
+  delete cudaInLinkEx;
   profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
   profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -4174,7 +4079,7 @@ void destroyGaugeFieldQuda(void* gauge){
 
 #if 0
   if (inv_param->use_resident_solution) {
-    for (int i=0; i<nvector; i++) delete solutionResident[i];
+    for (auto v : solutionResident) if (v) delete solutionResident[i];
     solutionResident.clear();
   }
 #endif
@@ -5124,7 +5029,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
 #if 0
   if (inv_param->use_resident_solution) {
-    for (int i=0; i<nvector; i++) delete solutionResident[i];
+    for (auto v : solutionResident) if (v) delete v;
     solutionResident.clear();
   }
 #endif

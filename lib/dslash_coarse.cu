@@ -370,7 +370,7 @@ namespace quda {
 	return true;
       } else { // block.x (spacetime) was reset
 
-	if (param.block.y < arg.nParity * arg.dim[4]) { // advance parity / 5th dimension
+	if (param.block.y < (unsigned int)(arg.nParity * arg.dim[4])) { // advance parity / 5th dimension
 	  param.block.y++;
 	  param.grid.y = (arg.nParity * arg.dim[4] + param.block.y - 1) / param.block.y;
 	  return true;
@@ -380,7 +380,7 @@ namespace quda {
 	  param.grid.y = arg.nParity * arg.dim[4];
 
 	  // let's try to advance spin/block-color
-	  while(param.block.z <= dim_threads * 2 * 2 * (Nc/Mc)) {
+	  while(param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc))) {
 	    param.block.z+=dim_threads * 2;
 	    if ( (dim_threads*2*2*(Nc/Mc)) % param.block.z == 0) {
 	      param.grid.z = (dim_threads * 2 * 2 * (Nc/Mc)) / param.block.z;
@@ -389,7 +389,8 @@ namespace quda {
 	  }
 
 	  // we can advance spin/block-color since this is valid
-	  if (param.block.z <= dim_threads * 2 * 2 * (Nc/Mc) && param.block.z <= deviceProp.maxThreadsDim[2] ) { //
+	  if (param.block.z <= (unsigned int)(dim_threads * 2 * 2 * (Nc/Mc)) &&
+	      param.block.z <= (unsigned int)deviceProp.maxThreadsDim[2] ) { //
 	    return true;
 	  } else { // we have run off the end so let's reset
 	    param.block.z = dim_threads * 2;
@@ -423,7 +424,7 @@ namespace quda {
 	param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
 
 	// check this grid size is valid before returning
-	if (param.grid.x < deviceProp.maxGridSize[0]) return true;
+	if (param.grid.x < (unsigned int)deviceProp.maxGridSize[0]) return true;
       }
 #endif
 

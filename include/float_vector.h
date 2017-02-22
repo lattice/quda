@@ -265,4 +265,17 @@ namespace quda {
   inline complex<double> make_Complex(const double2 &a) { return complex<double>(a.x, a.y); }
   inline complex<float> make_Complex(const float2 &a) { return complex<float>(a.x, a.y); }
 
+  template<typename T> struct RealType {};
+  template<> struct RealType<double> { typedef double type; };
+  template<> struct RealType<double2> { typedef double type; };
+  template<> struct RealType<complex<double> > { typedef double type; };
+  template<> struct RealType<float> { typedef float type; };
+  template<> struct RealType<float2> { typedef float type; };
+  template<> struct RealType<complex<float> > { typedef float type; };
+  template<> struct RealType<float4> { typedef float type; };
+  template<> struct RealType<short> { typedef short type; };
+  template<> struct RealType<short2> { typedef short type; };
+  template<> struct RealType<complex<short> > { typedef short type; };
+  template<> struct RealType<short4> { typedef short type; };
+
 }

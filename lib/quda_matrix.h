@@ -120,6 +120,8 @@ namespace quda {
       return i*N + j;
     }
 
+  template<typename Float, typename T> struct gauge_wrapper;
+
   template<class T, int N>
     class Matrix
     {
@@ -155,6 +157,11 @@ namespace quda {
 	  for(int i=0; i<N*N; i++) data[i] = b.data[i];
 	}
 
+	template<typename S>
+	  __device__ __host__ inline Matrix(const gauge_wrapper<typename RealType<T>::type, S> &s);
+
+	template<typename S>
+	  __device__ __host__ inline void operator=(const gauge_wrapper<typename RealType<T>::type, S> &s);
     };
 
   template<class T>

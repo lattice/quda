@@ -53,13 +53,13 @@ namespace quda {
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
   void gaugefixingOVR( cudaGaugeField& data,
-		       const unsigned int gauge_dir,
-                       const unsigned int Nsteps,
-		       const unsigned int verbose_interval,
+		       const int gauge_dir,
+                       const int Nsteps,
+		       const int verbose_interval,
 		       const double relax_boost,
                        const double tolerance,
-		       const unsigned int reunit_interval,
-		       const unsigned int stopWtheta);
+		       const int reunit_interval,
+		       const int stopWtheta);
 
 
   /**
@@ -75,13 +75,13 @@ namespace quda {
    * maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir,
-		       const unsigned int Nsteps,
-		       const unsigned int verbose_interval,
+  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir,
+		       const int Nsteps,
+		       const int verbose_interval,
 		       const double alpha,
-		       const unsigned int autotune,
+		       const int autotune,
                        const double tolerance,
-		       const unsigned int stopWtheta);
+		       const int stopWtheta);
   /**
      Compute the Fmunu tensor
      @param Fmunu The Fmunu tensor
