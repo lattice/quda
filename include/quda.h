@@ -50,6 +50,9 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
+    int R[4];         /**< Radius applied to gauge field by the host application (BQCD and certain TIFR codes
+			   employ an extended field with inline halo when storing their gauge field elements) */
+
     int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
 
     int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
