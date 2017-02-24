@@ -7,7 +7,7 @@
 
 namespace quda {
 
-  cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : 
+  cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
     GaugeField(param), backed_up(false)
   {
     if (precision == QUDA_HALF_PRECISION) {

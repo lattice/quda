@@ -207,16 +207,22 @@ namespace quda {
 
   }
 
-  void GaugeField::checkField(const GaugeField &a) {
-    LatticeField::checkField(a);
-    if (a.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, a.link_type);
-    if (a.nColor != nColor) errorQuda("nColor does not match %d %d", nColor, a.nColor);
-    if (a.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, a.nFace);
-    if (a.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, a.fixed);
-    if (a.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, a.t_boundary);
-    if (a.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, a.anisotropy);
-    if (a.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, a.tadpole);
-    //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale); 
+  void GaugeField::checkField(const LatticeField &l) const {
+    LatticeField::checkField(l);
+    try {
+      const GaugeField &g = dynamic_cast<const GaugeField&>(l);
+      if (g.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, g.link_type);
+      if (g.nColor != nColor) errorQuda("nColor does not match %d %d", nColor, g.nColor);
+      if (g.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, g.nFace);
+      if (g.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, g.fixed);
+      if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
+      if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
+      if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
+      //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale);
+    }
+    catch(std::bad_cast &e) {
+      errorQuda("Failed to cast reference to GaugeField");
+    }
   }
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param) {

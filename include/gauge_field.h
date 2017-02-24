@@ -85,10 +85,20 @@ namespace quda {
 	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
 	  else errorQuda("Error: invalid link type(%d)\n", link_type);
+
+	  // for TIFR we can be copying a pre-extended field, so check if this is the case
+	  bool extended = false;
+	  for (int i=0; i<4; i++) {
+	    if (r[i]) {
+	      extended = true;
+	      if (order != QUDA_TIFR_GAUGE_ORDER) errorQuda("Non-zero halo not supported for this gauge-field order");
+	    }
+	  }
+	  if (extended) ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
 	}
     
     /**
-       Helper function for setting the precision and corresponding
+       @brief Helper function for setting the precision and corresponding
        field order for QUDA internal fields.
        @param precision The precision to use 
      */
@@ -96,6 +106,29 @@ namespace quda {
       this->precision = precision;
       order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
 	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
+    }
+
+    /**
+       @brief Helper function for reseting the param field from
+       wrapping a host application field to wrapping a native field.
+       In the case that host application uses extended fields, we also
+       resize the native field setting appropriately to non-extended
+       type.
+    */
+    void setNative() {
+
+      if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
+	// if the created CPU field is extended and in non-native field
+	// order then once we have consumed the GaugeFieldParam, we
+	// cannot use it again for creating extended fields and it must
+	// be manually reset
+	for (int i=0; i<4; i++) {
+	  x[i] -= 2*r[i];
+	  r[i] = 0;
+	}
+	ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      }
+
     }
 
   };
@@ -187,7 +220,7 @@ namespace quda {
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
 
-    void checkField(const GaugeField &);
+    void checkField(const LatticeField &) const;
 
     /**
        This function returns true if the field is stored in an
@@ -336,7 +369,14 @@ namespace quda {
     void **gauge; // the actual gauge field
 
   public:
-    cpuGaugeField(const GaugeFieldParam &);
+    /**
+       @brief Constructor for cpuGaugeField from a GaugeFieldParam
+       @param[in,out] param Parameter struct - note that in the case
+       that we are wrapping host-side extended fields, this param is
+       modified for subsequent creation of fields that are not
+       extended.
+    */
+    cpuGaugeField(const GaugeFieldParam &param);
     virtual ~cpuGaugeField();
 
     /**

@@ -103,11 +103,11 @@ namespace quda {
     */
     LatticeFieldParam(const QudaGaugeParam &param) 
     : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET),
-      ghostExchange(QUDA_GHOST_EXCHANGE_PAD)
+      ghostExchange(QUDA_GHOST_EXCHANGE_NO)
     {
       for (int i=0; i<nDim; i++) {
 	this->x[i] = param.X[i];
-	this->r[i] = 0;
+	this->r[i] = param.R[i];
       }
     }
 
