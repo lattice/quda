@@ -1190,15 +1190,14 @@ namespace quda {
     Float *gauge;
     const int volumeCB;
     const Float anisotropy;
-    const int Nc;
+    static constexpr int Nc = 3;
     const int geometry;
   CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
     : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3),
-      geometry(u.Geometry())
+      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), geometry(u.Geometry())
       { if (length != 18) errorQuda("Gauge length %d not supported", length); }
   CPSOrder(const CPSOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge),
-      volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3), geometry(order.geometry)
+      volumeCB(order.volumeCB), anisotropy(order.anisotropy), geometry(order.geometry)
       { ; }
     virtual ~CPSOrder() { ; }
 
@@ -1261,16 +1260,16 @@ namespace quda {
       Float *gauge;
       const int volumeCB;
       int exVolumeCB; // extended checkerboard volume
-      const int Nc;
+      static constexpr int Nc = 3;
     BQCDOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
-      : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()), Nc(3) {
+      : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
 	// compute volumeCB + halo region
 	exVolumeCB = u.X()[0]/2 + 2;
 	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
       }
     BQCDOrder(const BQCDOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge),
-	volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB), Nc(3) {
+	volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
@@ -1329,15 +1328,15 @@ namespace quda {
       typedef typename mapper<Float>::type RegType;
       Float *gauge;
       const int volumeCB;
-      const int Nc;
+      static constexpr int Nc = 3;
       const Float scale;
     TIFROrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	volumeCB(u.VolumeCB()), Nc(3), scale(u.Scale()) {
+	volumeCB(u.VolumeCB()), scale(u.Scale()) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
     TIFROrder(const TIFROrder &order)
-      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), Nc(3), scale(order.scale) {
+      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), scale(order.scale) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
@@ -1397,13 +1396,13 @@ namespace quda {
       Float *gauge;
       const int volumeCB;
       int exVolumeCB;
-      const int Nc;
+      static constexpr int Nc = 3;
       const Float scale;
       const int dim[4];
       const int exDim[4];
     TIFRPaddedOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	volumeCB(u.VolumeCB()), exVolumeCB(1), Nc(3), scale(u.Scale()),
+	volumeCB(u.VolumeCB()), exVolumeCB(1), scale(u.Scale()),
 	dim{ u.X()[0], u.X()[1], u.X()[2], u.X()[3] },
 	exDim{ u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3] } {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
@@ -1414,7 +1413,7 @@ namespace quda {
       }
 
     TIFRPaddedOrder(const TIFRPaddedOrder &order)
-      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB), Nc(3), scale(order.scale),
+      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB), scale(order.scale),
 	  dim{order.dim[0], order.dim[1], order.dim[2], order.dim[3]},
 	  exDim{order.exDim[0], order.exDim[1], order.exDim[2], order.exDim[3]} {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
