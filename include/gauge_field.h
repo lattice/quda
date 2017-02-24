@@ -74,9 +74,10 @@ namespace quda {
       staggeredPhaseApplied(false), i_mu(0.0)
       { }
 
-  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
-      nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order),
-      fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary),
+  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
+    : LatticeFieldParam(param), nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
+      order(param.gauge_order), fixed(param.gauge_fix),
+      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
       anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
@@ -84,7 +85,7 @@ namespace quda {
 	{
 	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
-	  else errorQuda("Error: invalid link type(%d)\n", link_type);
+	  else if (link_type == QUDA_INVALID_LINKS) errorQuda("Error: invalid link type(%d)\n", link_type);
 	}
     
     /**

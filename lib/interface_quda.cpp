@@ -3593,8 +3593,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 				     svd_rel_error, svd_abs_error);
   }
 
-  GaugeFieldParam gParam(fatlink, *param);
-  gParam.link_type = QUDA_GENERAL_LINKS;
+  GaugeFieldParam gParam(fatlink, *param, QUDA_GENERAL_LINKS);
   cpuGaugeField cpuFatLink(gParam);   // create the host fatlink
   gParam.gauge = longlink;
   cpuGaugeField cpuLongLink(gParam);  // create the host longlink
@@ -3749,10 +3748,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.TPSTOP(QUDA_PROFILE_COMMS);
   profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
 
-  GaugeFieldParam gParamMom(mom, *qudaGaugeParam);
+  GaugeFieldParam gParamMom(mom, *qudaGaugeParam, QUDA_ASQTAD_MOM_LINKS);
   // FIXME - test program always uses MILC for mom but can use QDP for gauge
   if (gParamMom.order == QUDA_QDP_GAUGE_ORDER) gParamMom.order = QUDA_MILC_GAUGE_ORDER;
-  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER) gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
   else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
 
@@ -3890,11 +3888,10 @@ void createCloverQuda(QudaInvertParam* invertParam)
 
 void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
 {
-  GaugeFieldParam gParam(gauge, *param);
+  GaugeFieldParam gParam(gauge, *param, QUDA_GENERAL_LINKS);
   gParam.geometry = static_cast<QudaFieldGeometry>(geometry);
   if (geometry != QUDA_SCALAR_GEOMETRY && geometry != QUDA_VECTOR_GEOMETRY)
     errorQuda("Only scalar and vector geometries are supported\n");
-  gParam.link_type = QUDA_GENERAL_LINKS;
 
   cpuGaugeField *cpuGauge = nullptr;
   if (gauge) cpuGauge = new cpuGaugeField(gParam);
@@ -3916,9 +3913,8 @@ void saveGaugeFieldQuda(void* gauge, void* inGauge, QudaGaugeParam* param){
 
   cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
 
-  GaugeFieldParam gParam(gauge,*param);
+  GaugeFieldParam gParam(gauge, *param, QUDA_GENERAL_LINKS);
   gParam.geometry = cudaGauge->Geometry();
-  gParam.link_type = QUDA_GENERAL_LINKS;
 
   cpuGaugeField cpuGauge(gParam);
   cudaGauge->saveCPUField(cpuGauge);
@@ -3944,13 +3940,11 @@ void destroyGaugeFieldQuda(void* gauge){
   profileStaggeredForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileStaggeredForce.TPSTART(QUDA_PROFILE_INIT);
 
-  GaugeFieldParam gParam(h_mom, *gauge_param);
+  GaugeFieldParam gParam(h_mom, *gauge_param, QUDA_ASQTAD_MOM_LINKS);
 
   // create the host momentum field
-  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.reconstruct = gauge_param->reconstruct;
   gParam.t_boundary = QUDA_PERIODIC_T;
-  gParam.nFace = 1;
   cpuGaugeField cpuMom(gParam);
 
   // create the host momentum field
@@ -4124,12 +4118,11 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 #endif
 
   // create host fields
-  GaugeFieldParam param((void*)link, *gParam);
+  GaugeFieldParam param((void*)link, *gParam, QUDA_GENERAL_LINKS);
   param.anisotropy = 1.0;
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
   param.t_boundary = QUDA_PERIODIC_T;
   param.nFace = 1;
-  param.link_type = QUDA_GENERAL_LINKS;
   cpuGauge = new cpuGaugeField(param);
 
   param.order = QUDA_QDP_GAUGE_ORDER;
@@ -4322,9 +4315,8 @@ computeHISQForceCompleteQuda(void* const milc_momentum,
   // You have to look at the MILC routine to understand the following
   // Basically, I have already absorbed the one-link coefficient
 
-  GaugeFieldParam param(milc_momentum, *gParam);
+  GaugeFieldParam param(milc_momentum, *gParam, QUDA_ASQTAD_MOM_LINKS);
   param.order  = QUDA_MILC_GAUGE_ORDER;
-  param.link_type = QUDA_ASQTAD_MOM_LINKS;
   param.reconstruct = QUDA_RECONSTRUCT_10;
   cpuGaugeField* cpuMom = (!gParam->use_resident_mom) ? new cpuGaugeField(param) : NULL;
 
@@ -4562,11 +4554,10 @@ void computeStaggeredOprodQuda(void** oprod,
   checkGaugeParam(param);
 
   profileStaggeredOprod.TPSTART(QUDA_PROFILE_INIT);
-  GaugeFieldParam oParam(oprod[0], *param);
+  GaugeFieldParam oParam(oprod[0], *param, QUDA_GENERAL_LINKS);
 
   oParam.nFace = 0;
   // create the host outer-product field
-  oParam.link_type = QUDA_GENERAL_LINKS;
   oParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuGaugeField cpuOprod0(oParam);
 
@@ -4784,11 +4775,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
 
-  GaugeFieldParam fParam(h_mom, *gauge_param);
+  GaugeFieldParam fParam(h_mom, *gauge_param, QUDA_ASQTAD_MOM_LINKS);
   // create the host momentum field
   fParam.reconstruct = QUDA_RECONSTRUCT_10;
   fParam.order = gauge_param->gauge_order;
-  fParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   cpuGaugeField cpuMom(fParam);
 
   // create the device momentum field
@@ -4987,8 +4977,7 @@ void updateGaugeFieldQuda(void* gauge,
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_INIT);
 
   // create the host fields
-  GaugeFieldParam gParam(gauge, *param);
-  gParam.link_type = QUDA_SU3_LINKS;
+  GaugeFieldParam gParam(gauge, *param, QUDA_SU3_LINKS);
   bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
   cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
@@ -5079,8 +5068,7 @@ void updateGaugeFieldQuda(void* gauge,
    checkGaugeParam(param);
 
    // create the gauge field
-   GaugeFieldParam gParam(gauge_h, *param);
-   gParam.link_type = QUDA_GENERAL_LINKS;
+   GaugeFieldParam gParam(gauge_h, *param, QUDA_GENERAL_LINKS);
    bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
    cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
@@ -5136,8 +5124,7 @@ void updateGaugeFieldQuda(void* gauge,
    checkGaugeParam(param);
 
    // create the gauge field
-   GaugeFieldParam gParam(gauge_h, *param);
-   gParam.link_type = QUDA_GENERAL_LINKS;
+   GaugeFieldParam gParam(gauge_h, *param, QUDA_GENERAL_LINKS);
    bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
    cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
@@ -5193,10 +5180,9 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   checkGaugeParam(param);
 
   // create the momentum fields
-  GaugeFieldParam gParam(momentum, *param);
+  GaugeFieldParam gParam(momentum, *param, QUDA_ASQTAD_MOM_LINKS);
   gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER || gParam.order == QUDA_TIFR_PADDED_GAUGE_ORDER) ?
     QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
-  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
 
   cpuGaugeField *cpuMom = !param->use_resident_mom ? new cpuGaugeField(gParam) : NULL;
 
