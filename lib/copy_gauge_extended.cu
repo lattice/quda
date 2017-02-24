@@ -298,8 +298,6 @@ namespace quda {
 
   }
 
-  void checkMomOrder(const GaugeField &u);
-
   template <typename FloatOut, typename FloatIn>
   void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 		   FloatOut *Out, FloatIn *In) {
@@ -316,42 +314,7 @@ namespace quda {
       // we are doing gauge field packing
       copyGaugeEx<FloatOut,FloatIn,18>(out, in, location, Out, In);
     } else {
-      if (out.Geometry() != QUDA_VECTOR_GEOMETRY) errorQuda("Unsupported geometry %d", out.Geometry());
-
-      checkMomOrder(in);
-      checkMomOrder(out);
-
-      int faceVolumeCB[QUDA_MAX_DIM];
-      for (int d=0; d<in.Ndim(); d++) faceVolumeCB[d] = out.SurfaceCB(d) * out.Nface();
-
-      // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
-      if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
-#ifdef BUILD_TIFR_INTERFACE
-	  typedef FloatNOrder<FloatOut,18,2,11> momOut;
-	  typedef TIFROrder<FloatIn,18> momIn;
-	  copyGaugeEx<FloatOut,FloatIn,18>(momOut(out, Out), momIn(in, In), out.X(), in.X(), faceVolumeCB, out, location);
-#else
-	  errorQuda("TIFR interface has not been built\n");
-#endif
-	} else {
-	  errorQuda("Gauge field orders %d not supported", in.Order());
-	}
-      } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
-#ifdef BUILD_TIFR_INTERFACE
-	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	  typedef TIFROrder<FloatOut,18> momOut;
-	  typedef FloatNOrder<FloatIn,18,2,11> momIn;
-	  copyGaugeEx<FloatOut,FloatIn,18>(momOut(out, Out), momIn(in, In), out.X(), in.X(), faceVolumeCB, out, location);
-	} else {
-	  errorQuda("Gauge field orders %d not supported", in.Order());
-	}
-#else
-	errorQuda("TIFR interface has not been built\n");
-#endif
-      } else {
-	errorQuda("Gauge field orders %d not supported", out.Order());
-      }
+      errorQuda("Not supported");
     }
   }
 
