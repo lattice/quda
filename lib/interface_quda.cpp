@@ -545,8 +545,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) :
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
 
-  gauge_param.setNative();
-
   // free any current gauge field before new allocations to reduce memory overhead
   switch (param->type) {
     case QUDA_WILSON_LINKS:
@@ -3607,8 +3605,6 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   cpuGaugeField cpuInLink(gParam);    // create the host sitelink
 
   // create the device fields
-  gParam.setNative();
-  gParam.pad = 0;
   gParam.reconstruct = param->reconstruct;
   gParam.setPrecision(param->cuda_prec);
   gParam.create      = QUDA_NULL_FIELD_CREATE;
@@ -3705,7 +3701,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   GaugeFieldParam gParam(siteLink, *qudaGaugeParam);
   cpuGaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new cpuGaugeField(gParam) : NULL;
-  gParam.setNative();
 
   cudaGaugeField* cudaSiteLink = NULL;
 
@@ -3762,7 +3757,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
 
   cpuGaugeField* cpuMom = (!qudaGaugeParam->use_resident_mom) ? new cpuGaugeField(gParamMom) : NULL;
-  gParamMom.setNative();
 
   cudaGaugeField* cudaMom = NULL;
   if (qudaGaugeParam->use_resident_mom) {
@@ -3905,7 +3899,6 @@ void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
   cpuGaugeField *cpuGauge = nullptr;
   if (gauge) cpuGauge = new cpuGaugeField(gParam);
 
-  gParam.setNative();
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaGaugeField* cudaGauge = new cudaGaugeField(gParam);
@@ -3964,7 +3957,6 @@ void destroyGaugeFieldQuda(void* gauge){
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.gauge = h_force;
   cpuGaugeField cpuForce(gParam);
-  gParam.setNative();
 
   // create the device momentum field
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
@@ -4152,7 +4144,6 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   param.reconstruct = QUDA_RECONSTRUCT_10;
   param.gauge = milc_momentum;
   cpuMom = new cpuGaugeField(param);
-  param.setNative();
 
   // create device fields
   param.create = QUDA_NULL_FIELD_CREATE;
@@ -4583,7 +4574,6 @@ void computeStaggeredOprodQuda(void** oprod,
   cpuGaugeField cpuOprod1(oParam);
 
   // create the device outer-product field
-  oParam.setNative();
   oParam.create = QUDA_ZERO_FIELD_CREATE;
   oParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaGaugeField cudaOprod0(oParam);
@@ -4800,7 +4790,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   fParam.order = gauge_param->gauge_order;
   fParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   cpuGaugeField cpuMom(fParam);
-  fParam.setNative();
 
   // create the device momentum field
   fParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -5010,7 +4999,6 @@ void updateGaugeFieldQuda(void* gauge,
   cpuGaugeField *cpuMom = !param->use_resident_mom ? new cpuGaugeField(gParamMom) : NULL;
 
   // create the device fields
-  gParam.setNative();
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
@@ -5097,7 +5085,6 @@ void updateGaugeFieldQuda(void* gauge,
    cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
    // create the device fields
-   gParam.setNative();
    gParam.create = QUDA_NULL_FIELD_CREATE;
    gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
    gParam.reconstruct = param->reconstruct;
@@ -5155,7 +5142,6 @@ void updateGaugeFieldQuda(void* gauge,
    cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
 
    // create the device fields
-   gParam.setNative();
    gParam.create = QUDA_NULL_FIELD_CREATE;
    gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
    gParam.reconstruct = param->reconstruct;
@@ -5215,7 +5201,6 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   cpuGaugeField *cpuMom = !param->use_resident_mom ? new cpuGaugeField(gParam) : NULL;
 
   // create the device fields
-  gParam.setNative();
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
@@ -5720,7 +5705,6 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
   cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
 
   //gParam.pad = getFatLinkPadding(param->X);
-  gParam.setNative();
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.link_type   = param->type;
   gParam.reconstruct = param->reconstruct;
@@ -5836,7 +5820,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
 
   //gParam.pad = getFatLinkPadding(param->X);
-  gParam.setNative();
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.link_type   = param->type;
   gParam.reconstruct = param->reconstruct;

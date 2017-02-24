@@ -1250,7 +1250,10 @@ namespace quda {
   };
 
     /**
-       struct to define BQCD ordered gauge fields:
+       @brief struct to define BQCD ordered gauge fields:
+
+       Note the convention in BQCD is to store the gauge field
+       variables in and extended fields with inline halos
        [mu][parity][volumecb+halos][col][row]
     */
     template <typename Float, int length> struct BQCDOrder : LegacyOrder<Float,length> {

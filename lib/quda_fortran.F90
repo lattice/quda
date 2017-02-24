@@ -41,8 +41,6 @@ module quda_fortran
      QudaReconstructType :: reconstruct_precondition
      QudaGaugeFixed :: gauge_fix
 
-     integer(4), dimension(4) :: r ! Host application inline halo settings (BQCD and TIFR only)
-
      integer(4) :: ga_pad
 
      integer(4) :: site_ga_pad ! Used by link fattening and the gauge and fermion forces

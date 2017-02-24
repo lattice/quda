@@ -83,12 +83,6 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
 
-#if defined INIT_PARAM
-  for (int i=0; i<4; i++) P(R[i], 0);
-#else
-  for (int i=0; i<4; i++) P(R[i], INVALID_INT);
-#endif
-
   P(ga_pad, INVALID_INT);
   
 #if defined INIT_PARAM

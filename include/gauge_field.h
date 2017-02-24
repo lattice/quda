@@ -85,16 +85,6 @@ namespace quda {
 	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
 	  else errorQuda("Error: invalid link type(%d)\n", link_type);
-
-	  // for TIFR we can be copying a pre-extended field, so check if this is the case
-	  bool extended = false;
-	  for (int i=0; i<4; i++) {
-	    if (r[i]) {
-	      extended = true;
-	      if (order != QUDA_TIFR_GAUGE_ORDER) errorQuda("Non-zero halo not supported for this gauge-field order");
-	    }
-	  }
-	  if (extended) ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
 	}
     
     /**
@@ -106,29 +96,6 @@ namespace quda {
       this->precision = precision;
       order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
 	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
-    }
-
-    /**
-       @brief Helper function for reseting the param field from
-       wrapping a host application field to wrapping a native field.
-       In the case that host application uses extended fields, we also
-       resize the native field setting appropriately to non-extended
-       type.
-    */
-    void setNative() {
-
-      if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
-	// if the created CPU field is extended and in non-native field
-	// order then once we have consumed the GaugeFieldParam, we
-	// cannot use it again for creating extended fields and it must
-	// be manually reset
-	for (int i=0; i<4; i++) {
-	  x[i] -= 2*r[i];
-	  r[i] = 0;
-	}
-	ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      }
-
     }
 
   };
@@ -228,7 +195,7 @@ namespace quda {
     */ 
     bool isNative() const;
 
-    size_t Bytes() const { if (order == QUDA_TIFR_PADDED_GAUGE_ORDER) warningQuda("method will evaluate incorrectly for TIFR padded fields"); return bytes; }
+    size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
 

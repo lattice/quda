@@ -15,9 +15,9 @@ namespace quda {
       errorQuda("QDP ordering only supported for reference fields");
     }
 
-    if (order == QUDA_QDP_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER ||
-	order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER ||
-	order == QUDA_CPS_WILSON_GAUGE_ORDER) 
+    if (order == QUDA_MILC_GAUGE_ORDER || order == QUDA_QDP_GAUGE_ORDER ||
+	order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_TIFR_PADDED_GAUGE_ORDER ||
+	order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_CPS_WILSON_GAUGE_ORDER)
       errorQuda("Field ordering %d presently disabled for this type", order);
 
 #ifdef MULTI_GPU

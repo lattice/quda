@@ -107,7 +107,7 @@ namespace quda {
     {
       for (int i=0; i<nDim; i++) {
 	this->x[i] = param.X[i];
-	this->r[i] = param.R[i];
+	this->r[i] = 0;
       }
     }
 
@@ -177,7 +177,6 @@ namespace quda {
 
     /** Resize the device-memory buffer */
     void resizeBufferDevice(size_t bytes) const;
-
 
 
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)

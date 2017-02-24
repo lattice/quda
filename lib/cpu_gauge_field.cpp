@@ -30,6 +30,13 @@ namespace quda {
     else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
     else errorQuda("Unknown geometry type %d", geometry);
 
+    // compute the correct bytes size for these padded field orders
+    if (order == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+      bytes = siteDim * (x[0]*x[1]*(x[2]+4)*x[3]) * nInternal * precision;
+    } else if (order == QUDA_BQCD_GAUGE_ORDER) {
+      bytes = siteDim * (x[0]+4)*(x[1]+2)*(x[2]+2)*(x[3]+2) * nInternal * precision;
+    }
+
     if (order == QUDA_QDP_GAUGE_ORDER) {
       gauge = (void**) safe_malloc(siteDim * sizeof(void*));
 
@@ -50,9 +57,8 @@ namespace quda {
 	       order == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	size_t nbytes = siteDim * volume * nInternal * precision;
-	gauge = (void **) safe_malloc(nbytes);
-	if(create == QUDA_ZERO_FIELD_CREATE) memset(gauge, 0, nbytes);
+	gauge = (void **) safe_malloc(bytes);
+	if(create == QUDA_ZERO_FIELD_CREATE) memset(gauge, 0, bytes);
       } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
 	gauge = (void**) param.gauge;
       } else {
