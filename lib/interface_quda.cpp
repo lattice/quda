@@ -2255,7 +2255,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   multigrid_solver *mg = static_cast<multigrid_solver*>(mg_);
 
   QudaInvertParam *param = mg_param->invert_param;
-  cudaGaugeField *cudaGauge = checkGauge(param);
+  checkGauge(param);
   checkMultigridParam(mg_param);
 
   bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
