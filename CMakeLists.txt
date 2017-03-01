@@ -50,7 +50,7 @@ endif()
 project("QUDA" VERSION 0.9.0)
 
 if(NOT GITVERSION)
-  set(GITVERSION ${CMAKE_VERSION)
+  set(GITVERSION ${CMAKE_VERSION})
 endif()
 
 
