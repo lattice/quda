@@ -2196,6 +2196,21 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   // create the dirac operators for the fine grid
 
+  //Temporarily change mu, mass, and kappa.
+  //Record originals
+  double orig_mu = param->mu;
+  double orig_mass = param->mass;
+  double orig_kappa = param->kappa;
+
+  printfQuda("multigrid_solver - original parameters: mu=%.6f mass=%.6f kappa=%.6f\n", param->mu, param->mass, param->kappa);
+
+  //Change values in MG invert param structure
+  param->mu    = orig_mu    * mg_param.delta_muMG;
+  param->mass  = orig_mass  * mg_param.delta_massMG;
+  param->kappa = orig_kappa * mg_param.delta_kappaMG;
+
+  printfQuda("multigrid_solver - MG(delta)parameters: mu=%.6f mass=%.6f kappa=%.6f\n", param->mu, param->mass, param->kappa);
+
   // this is the Dirac operator we use for inter-grid residual computation
   // at present this doesn't support preconditioning
   DiracParam diracParam;
@@ -2229,6 +2244,12 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
 
   mg = new MG(*mgParam, profile);
+
+  //Revert values in MG invert param structure
+  param->mu    = orig_mu;
+  param->mass  = orig_mass;
+  param->kappa = orig_kappa;
+
   mgParam->updateInvertParam(*param);
   profile.TPSTOP(QUDA_PROFILE_INIT);
 }

@@ -52,6 +52,11 @@ extern int niter;
 extern int nvec[];
 extern int mg_levels;
 
+//Experimental MG additions
+extern double delta_muMG;
+extern double delta_kappaMG;    
+extern double delta_massMG;
+
 extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern int nu_pre;
@@ -183,8 +188,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
 
+  mg_param.delta_massMG = delta_massMG;
+  mg_param.delta_kappaMG = delta_kappaMG;
+
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
+    mg_param.delta_muMG = delta_muMG;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
 

@@ -412,6 +412,11 @@ extern "C" {
     /**< The time taken by the multigrid solver setup */
     double secs;
 
+    /**< Experimental MG additions */
+    double delta_muMG;
+    double delta_kappaMG;    
+    double delta_massMG;
+
   } QudaMultigridParam;
 
 

@@ -1600,6 +1600,11 @@ QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
 
+//Experimental MG additions
+double delta_muMG = 1.0;
+double delta_kappaMG = 1.0;    
+double delta_massMG = 1.0;
+
 int mg_levels = 2;
 
 int nu_pre = 2;
@@ -1685,6 +1690,10 @@ void usage(char** argv )
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --help                                    # Print out this message\n");
+  //Experimental MG additions
+  printf("    --delta-muMG                              # Multiplicative change in mu on during P/R set-up (default 1.0)\n");
+  printf("    --delta-kappaMG                           # Multiplicative change in kappa on during P/R set-up (default 1.0)\n");
+  printf("    --delta-massMG                            # Multiplicative change in mass on during P/R set-up (default 1.0)\n");
 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -2521,6 +2530,34 @@ int process_command_line_option(int argc, char** argv, int* idx)
 	   get_quda_ver_str());
     printf(" %s GPU build\n", msg);
     exit(0);
+  }
+  //Experimental MG additions
+  if( strcmp(argv[i], "--delta-muMG") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    delta_muMG = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }  
+  if( strcmp(argv[i], "--delta-kappaMG") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    delta_kappaMG = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }  
+  if( strcmp(argv[i], "--delta-massMG") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    delta_massMG = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
   }
 
  out:
