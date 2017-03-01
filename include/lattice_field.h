@@ -21,6 +21,8 @@ namespace quda {
   // LatticeField is an abstract base clase for all Field objects.
 
   // Forward declaration of all children
+  class LatticeField;
+
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
@@ -42,33 +44,77 @@ namespace quda {
   class cpuCloverField;
 
   struct LatticeFieldParam {
+
+    /** Number of field dimensions */
     int nDim;
+
+    /** Array storing the length of dimension */
     int x[QUDA_MAX_DIM];
+
     int pad;
 
     QudaPrecision precision;
     QudaSiteSubset siteSubset;
   
-    LatticeFieldParam() 
-    : nDim(0), pad(0), precision(QUDA_INVALID_PRECISION), siteSubset(QUDA_INVALID_SITE_SUBSET) {
-      for (int i=0; i<nDim; i++) x[i] = 0; 
+    /** The type of ghost exchange to be done with this field */
+    QudaGhostExchange ghostExchange;
+
+    /** The extended field radius (if applicable) */
+    int r[QUDA_MAX_DIM];
+
+    /**
+       @brief Default constructor for LatticeFieldParam
+    */
+    LatticeFieldParam()
+    : nDim(4), pad(0), precision(QUDA_INVALID_PRECISION), siteSubset(QUDA_INVALID_SITE_SUBSET),
+      ghostExchange(QUDA_GHOST_EXCHANGE_PAD)
+    {
+      for (int i=0; i<nDim; i++) {
+	x[i] = 0;
+	r[i] = 0;
+      }
     }
 
-    LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision)
-    : nDim(nDim), pad(pad), precision(precision), siteSubset(QUDA_FULL_SITE_SUBSET) { 
+    /**
+       @brief Constructor for creating a LatticeFieldParam from a set of parameters
+       @param[in] nDim Number of field dimensions
+       @param[in] x Array of dimension lengths
+       @param[in] pad Field padding
+       @param[in] precision Field Precision
+       @param[in] ghostExchange Type of ghost exchange
+    */
+    LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision,
+		      QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD)
+    : nDim(nDim), pad(pad), precision(precision), siteSubset(QUDA_FULL_SITE_SUBSET),
+      ghostExchange(ghostExchange)
+    {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
-      for (int i=0; i<nDim; i++) this->x[i] = x[i]; 
+      for (int i=0; i<nDim; i++) {
+	this->x[i] = x[i];
+	this->r[i] = 0;
+      }
     }
     
     /**
-       Constructor for creating a LatticeField from a QudaGaugeParam
-       @param param Contains the metadate for creating the
-       LatticeField
+       @brief Constructor for creating a LatticeFieldParam from a
+       QudaGaugeParam.  Used for wrapping around a CPU reference
+       field.
+       @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) 
-    : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET) {
-      for (int i=0; i<nDim; i++) this->x[i] = param.X[i];
+    : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET),
+      ghostExchange(QUDA_GHOST_EXCHANGE_NO)
+    {
+      for (int i=0; i<nDim; i++) {
+	this->x[i] = param.X[i];
+	this->r[i] = 0;
+      }
     }
+
+    /**
+       @brief Contructor for creating LatticeFieldParam from a LatticeField
+    */
+    LatticeFieldParam(const LatticeField &field);
   };
 
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param);
@@ -76,14 +122,18 @@ namespace quda {
   class LatticeField : public Object {
 
   protected:
-    int volume; // lattice volume
-    int volumeCB; // the checkboarded volume
+    /** Lattice volume */
+    int volume;
+
+    /** Checkerboarded volume */
+    int volumeCB;
+
     int stride;
     int pad;
 
     size_t total_bytes;
 
-    /** The number field dimensions */
+    /** Number of field dimensions */
     int nDim;
     
     /** Array storing the length of dimension */
@@ -92,9 +142,10 @@ namespace quda {
     int surface[QUDA_MAX_DIM];
     int surfaceCB[QUDA_MAX_DIM];
 
-    /**
-       The precision of the field 
-    */
+    /** The extended lattice radius (if applicable) */
+    int r[QUDA_MAX_DIM];
+
+    /** Precision of the field */
     QudaPrecision precision;
     
     /** Whether the field is full or single parity */
@@ -126,7 +177,6 @@ namespace quda {
 
     /** Resize the device-memory buffer */
     void resizeBufferDevice(size_t bytes) const;
-
 
 
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
@@ -169,6 +219,9 @@ namespace quda {
     
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
+
+    /** Type of ghost exchange to perform */
+    QudaGhostExchange ghostExchange;
 
   public:
 
@@ -231,9 +284,24 @@ namespace quda {
     int Pad() const { return pad; }
     
     /**
+       @return Extended field radius
+    */
+    const int* R() const { return r; }
+
+    /**
+       @return Type of ghost exchange
+     */
+    QudaGhostExchange GhostExchange() const { return ghostExchange; }
+
+    /**
        @return The field precision
     */
     QudaPrecision Precision() const { return precision; }
+
+    /**
+       @return Field subset type
+     */
+    virtual QudaSiteSubset SiteSubset() const { return siteSubset; }
 
     /**
        @return The vector storage length used for native fields , 2
@@ -292,10 +360,11 @@ namespace quda {
     const char *VolString() const { return vol_string; }
   };
   
+  
   /**
-     Helper function for determining if the location of the fields is the same.
-     @param a Input field
-     @param b Input field
+     @brief Helper function for determining if the location of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
      @return If location is unique return the location
    */
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b) {
@@ -306,100 +375,19 @@ namespace quda {
   }
 
   /**
-     Helper function for determining if the location of the fields is the same.
-     @param a Input field
-     @param b Input field
-     @param c Input field
+     @brief Helper function for determining if the location of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check location on
      @return If location is unique return the location
    */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
-				    const LatticeField &c) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(b,c));
+  template <typename... Args>
+  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b, const Args &... args) {
+    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,args...));
   }
 
   /**
-     Helper function for determining if the location of the fields is the same.
-     @param a Input field
-     @param b Input field
-     @param c Input field
-     @param d Input field
-     @return If location is unique return the location
-   */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
-				    const LatticeField &c, const LatticeField &d) {
-    return static_cast<QudaFieldLocation>(Location(a,b,c) & Location(a,d));
-  }
-
-  /**
-     Helper function for determining if the location of the fields is the same.
-     @param a Input field
-     @param b Input field
-     @param c Input field
-     @param d Input field
-     @param e Input field
-     @return If location is unique return the location
-   */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
-				    const LatticeField &c, const LatticeField &d,
-				    const LatticeField &e) {
-    return static_cast<QudaFieldLocation>(Location(a,b,c,d) & Location(a,e));
-  }
-
-  /**
-     Helper function for determining if the location of the fields is the same.
-     @param a Input field
-     @param b Input field
-     @param c Input field
-     @param d Input field
-     @param e Input field
-     @param f Input field
-     @return If location is unique return the location
-   */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
-				    const LatticeField &c, const LatticeField &d,
-				    const LatticeField &e, const LatticeField &f) {
-    return static_cast<QudaFieldLocation>(Location(a,b,c,d,e) & Location(a,f));
-  }
-
-  /**
-     Helper function for determining if the location of the fields is the same.
-     @param a Input field
-     @param b Input field
-     @param c Input field
-     @param d Input field
-     @param e Input field
-     @param f Input field
-     @param g Input field
-     @return If location is unique return the location
-   */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
-				    const LatticeField &c, const LatticeField &d,
-				    const LatticeField &e, const LatticeField &f,
-				    const LatticeField &g) {
-    return static_cast<QudaFieldLocation>(Location(a,b,c,d,e,f) & Location(a,g));
-  }
-
-  /**
-     Helper function for determining if the location of the fields is the same.
-     @param a Input field
-     @param b Input field
-     @param c Input field
-     @param d Input field
-     @param e Input field
-     @param f Input field
-     @param g Input field
-     @param h Input field
-     @return If location is unique return the location
-   */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
-				    const LatticeField &c, const LatticeField &d,
-				    const LatticeField &e, const LatticeField &f,
-				    const LatticeField &g, const LatticeField &h) {
-    return static_cast<QudaFieldLocation>(Location(a,b,c,d,e,f,h) & Location(a,h));
-  }
-
-  /**
-     Return whether data is reorderd on the CPU or GPU.  This can set
+     @brief Return whether data is reorderd on the CPU or GPU.  This can set
      at QUDA initialization using the environment variable
      QUDA_REORDER_LOCATION.
      @return Reorder location
@@ -407,7 +395,7 @@ namespace quda {
   QudaFieldLocation reorder_location();
 
   /**
-     Set whether data is reorderd on the CPU or GPU.  This can set at
+     @brief Set whether data is reorderd on the CPU or GPU.  This can set at
      QUDA initialization using the environment variable
      QUDA_REORDER_LOCATION.
      @param reorder_location_ The location to set where data will be reordered
