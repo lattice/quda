@@ -2250,6 +2250,11 @@ if ( isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0 )
   
   READ_ACCUM(ACCUMTEX, param.sp_stride)
   
+#ifdef SPINOR_DOUBLE
+  spinorFloat a = param.a;
+#else
+  spinorFloat a = param.a_f;
+#endif
   o00_re = a*o00_re+acc00_re;
   o00_im = a*o00_im+acc00_im;
   o01_re = a*o01_re+acc01_re;

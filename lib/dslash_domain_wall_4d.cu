@@ -60,14 +60,10 @@ namespace quda {
   class DomainWallDslash4DPCCuda : public DslashCuda {
 
   private:
-    const gFloat *gauge0, *gauge1;
-    const double mferm;
-    const double a;
-    const double b;
     const int DS_type;
 
     bool checkGrid(TuneParam &param) const {
-      if (param.grid.x > deviceProp.maxGridSize[0] || param.grid.y > deviceProp.maxGridSize[1]) {
+      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0] || param.grid.y > (unsigned int)deviceProp.maxGridSize[1]) {
         warningQuda("Autotuner is skipping blockDim=(%u,%u,%u), gridDim=(%u,%u,%u) because lattice volume is too large",
         param.block.x, param.block.y, param.block.z, 
         param.grid.x, param.grid.y, param.grid.z);
@@ -86,7 +82,7 @@ namespace quda {
 
       // first try to advance block.x
       param.block.x += step[0];
-      if (param.block.x > deviceProp.maxThreadsDim[0] || 
+      if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
           sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
         advance[0] = false;
         param.block.x = step[0]; // reset block.x
@@ -97,7 +93,7 @@ namespace quda {
       if (!advance[0]) {  // if failed to advance block.x, now try block.y
         param.block.y += step[1];
 
-        if (param.block.y > in->X(4) || 
+        if (param.block.y > (unsigned)in->X(4) ||
             sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
           advance[1] = false;
           param.block.y = step[1]; // reset block.x
@@ -125,10 +121,17 @@ namespace quda {
 			     const QudaReconstructType reconstruct, const cudaColorSpinorField *in, 
 			     const cudaColorSpinorField *x, const double mferm, 
 			     const double a, const double b, const int dagger, const int DS_type)
-      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), 
-	mferm(mferm), a(a), b(b), DS_type(DS_type)
+      : DslashCuda(out, in, x, reconstruct, dagger), DS_type(DS_type)
     { 
       bindSpinorTex<sFloat>(in, out, x);
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.a = a;
+      dslashParam.a_f = a;
+      dslashParam.b = b;
+      dslashParam.b_f = b;
+      dslashParam.mferm = mferm;
+      dslashParam.mferm_f = mferm;
     }
     virtual ~DomainWallDslash4DPCCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
@@ -176,19 +179,13 @@ namespace quda {
       
       switch(DS_type){
         case 0:
-          DSLASH(domainWallDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-		 (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(),
-		 (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, b);
+          DSLASH(domainWallDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           break;
         case 1:
-          DSLASH(domainWallDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-		 (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(),
-		 (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, b);
+          DSLASH(domainWallDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           break;
         case 2:
-          DSLASH(domainWallDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-		 (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(),
-		 (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a, b);
+          DSLASH(domainWallDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
           break;
         default:
           errorQuda("invalid Dslash type");

@@ -82,8 +82,8 @@ namespace quda {
 
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.  
-      int half_phase_bytes = (length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
-      int half_gauge_bytes = (length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
+      int half_phase_bytes = ((size_t)length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
+      int half_gauge_bytes = ((size_t)length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
       // Adjust the alignments for the gauge and phase separately
       half_phase_bytes = ((half_phase_bytes + (512-1))/512)*512;
       half_gauge_bytes = ((half_gauge_bytes + (512-1))/512)*512;
@@ -92,8 +92,8 @@ namespace quda {
       phase_bytes = half_phase_bytes*2;
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
     } else {
-      bytes = length*precision;
-      bytes = 2*ALIGNMENT_ADJUST(bytes/2);
+      bytes = (size_t)length*precision;
+      if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
   }
@@ -174,8 +174,8 @@ namespace quda {
     } else { // FIXME for CUDA field copy back to the CPU
       for (int i=0; i<nDimComms; i++) {
 	if (comm_dim_partitioned(i)) {
-	  send[i] = allocatePinned(bytes[i]);
-	  receive[i] = allocatePinned(bytes[i]);
+	  send[i] = pool_pinned_malloc(bytes[i]);
+	  receive[i] = pool_pinned_malloc(bytes[i]);
 	  qudaMemcpy(send[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToHost);
 	} else {
 	  if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
@@ -213,8 +213,8 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
 	qudaMemcpy(ghost_link[i], receive[i], bytes[i], cudaMemcpyHostToDevice);
-	freePinned(send[i]);
-	freePinned(receive[i]);
+	pool_pinned_free(send[i]);
+	pool_pinned_free(receive[i]);
       }
     }
 

@@ -92,20 +92,15 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 
 
 #if defined INIT_PARAM
-  P(staggered_phase_type, QUDA_MILC_STAGGERED_PHASE);
+  P(staggered_phase_type, QUDA_STAGGERED_PHASE_NO);
   P(staggered_phase_applied, 0);
   P(i_mu, 0.0);
+  P(overlap, 0);
 #else
-  P(staggered_phase_type, QUDA_INVALID_STAGGERED_PHASE);
+  P(staggered_phase_type, QUDA_STAGGERED_PHASE_INVALID);
   P(staggered_phase_applied, INVALID_INT);
   P(i_mu, INVALID_DOUBLE);
-#endif
-
-#if defined INIT_PARAM
-  P(overlap, 0);
-  P(preserve_gauge, 0);
-#else
-  P(preserve_gauge, INVALID_INT);
+  P(overlap, INVALID_INT);
 #endif
 
 #if defined INIT_PARAM
@@ -245,7 +240,16 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(overlap, 0); /**< width of domain overlaps */
 #endif
 
+#ifdef INIT_PARAM
+  P(compute_action, 0);
+  P(compute_true_res, 1);
+#else
+  P(compute_action, INVALID_INT);
+  P(compute_true_res, INVALID_INT);
+#endif
+
   if (param->num_offset > 0) {
+
     for (int i=0; i<param->num_offset; i++) {
       P(offset[i], INVALID_DOUBLE);
       P(tol_offset[i], INVALID_DOUBLE);     
@@ -255,7 +259,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
       P(true_res_offset[i], INVALID_DOUBLE); 
       P(iter_res_offset[i], INVALID_DOUBLE);
 #endif
+      if (param->compute_action) P(residue[i], INVALID_DOUBLE);
     }
+#ifndef CHECK_PARAM
+    P(action[0], INVALID_DOUBLE);
+    P(action[1], INVALID_DOUBLE);
+#endif
   }
 
   P(solution_type, QUDA_INVALID_SOLUTION);
@@ -292,8 +301,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(gamma_basis, QUDA_INVALID_GAMMA_BASIS);
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
   P(sp_pad, INVALID_INT);
-
-  P(tune, QUDA_TUNE_INVALID);
 
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);
@@ -439,6 +446,18 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(make_resident_solution, INVALID_INT);
 #endif
 
+
+#if defined INIT_PARAM
+  P(use_resident_chrono, 0);
+  P(make_resident_chrono, 0);
+  P(max_chrono_dim, 0);
+  P(chrono_index, 0);
+#else
+  P(use_resident_chrono, INVALID_INT);
+  P(make_resident_chrono, INVALID_INT);
+  P(max_chrono_dim, INVALID_INT);
+  P(chrono_index, INVALID_INT);
+#endif
 
 #ifdef INIT_PARAM
   return ret;

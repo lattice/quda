@@ -1,11 +1,9 @@
-
-
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
-  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp
+  solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
@@ -19,14 +17,15 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp fat_force_quda.cpp
-  llfat_quda_itf.cpp llfat_quda.cu gauge_force.cu
+  llfat_quda.cu gauge_force.cu
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu covDev.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
   dslash_twisted_clover.cu dslash_domain_wall.cu
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
-  copy_quda.cu reduce_quda.cu face_buffer.cpp face_gauge.cpp
+  multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu
@@ -38,7 +37,7 @@ set (QUDA_OBJS
   copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
   copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
-  staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
+  staggered_oprod.cu staggered_oprod_new.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu fermion_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
@@ -48,8 +47,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  quda_memcpy.cpp version.cpp )
-
+  quda_memcpy.cpp quda_arpack_interface.cpp version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
@@ -60,6 +58,7 @@ FOREACH(item ${QUDA_OBJS})
 ENDFOREACH(item ${QUDA_OBJS})
 
 LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
+
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
@@ -76,16 +75,86 @@ endif()
 mark_as_advanced(QUDA_GITDIR)
 
 
-
+# include_directories
 include_directories(dslash_core)
 include_directories(.)
 
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
-cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+
+# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
+IF(GITVERSION)
+  target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
+ENDIF()
+
+# make one library
+if(QUDA_BUILD_SHAREDLIB)
+    set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+    cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS} )
+else()
+  cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+endif()
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
+# add dependencies for linking
+# if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
+FIND_LIBRARY(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
+
+target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LIBRARY})
+
+if(QUDA_QIO)
+  target_link_libraries(quda ${QIO_LIB} ${LIME_LIB})
+endif()
+
+if(QUDA_QMP)
+  target_link_libraries(quda ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+endif()
+
+if(QUDA_MPI)
+  target_link_libraries(quda ${MPI_CXX_LIBRARIES})
+endif()
+
+if(QUDA_MAGMA)
+  target_link_libraries(quda ${MAGMA})
+endif()
+
+if(QUDA_ARPACK)
+  target_link_libraries(quda ${PARPACK_OR_ARPACK})
+endif()
+
+if(QUDA_NUMA_NVML)
+target_link_libraries(quda ${NVML_LIBRARY})
+endif()
+
+
+# malloc.cpp uses both the driver and runtime api
+# So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
+find_library(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
+target_link_libraries(quda ${CUDA_CUDA_LIBRARY})
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+# some hackery to prevent having old shared / static builds of quda messing with the current build
+ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
+
+install(TARGETS quda EXPORT qudaTargets
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        INCLUDES DESTINATION include)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
+  VERSION ${QUDA_VERSION}
+  COMPATIBILITY AnyNewerVersion
+)
+
+export(EXPORT qudaTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake" NAMESPACE quda::)
+set(ConfigPackageLocation lib/cmake/quda/)
+install(EXPORT qudaTargets NAMESPACE quda:: DESTINATION ${ConfigPackageLocation})
 
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py

@@ -8,7 +8,7 @@ namespace quda {
   struct TuneKey {
 
     static const int volume_n = 32;
-    static const int name_n = 384;
+    static const int name_n = 256;
     static const int aux_n = 256;
     char volume[volume_n];
     char name[name_n];

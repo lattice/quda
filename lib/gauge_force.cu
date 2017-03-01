@@ -16,7 +16,6 @@ namespace quda {
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
     int border[4]; // radius of border
-    int ghostDim[4]; // Whether a ghost zone has been allocated for a given dimension
 
     int num_paths;
     int path_max_length;
@@ -41,7 +40,6 @@ namespace quda {
 	X[i] = meta_mom.X()[i];
 	E[i] = meta_u.X()[i];
 	border[i] = (E[i] - X[i])/2;
-	ghostDim[i] = commDimPartitioned(i);
       }
     }
 
@@ -78,7 +76,7 @@ namespace quda {
     extern __shared__ int s[];
     int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
     s[tid] = 0;
-    char *dx = (char*)&s[tid];
+    signed char *dx = (signed char*)&s[tid];
 #else
     int dx[4] = {0, 0, 0, 0};
 #endif

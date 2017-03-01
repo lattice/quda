@@ -78,6 +78,9 @@ namespace quda {
     /**< Solver tolerance in the heavy quark residual norm */
     double tol_hq;
 
+    /**< Whether to compute the true residual post solve */
+    bool compute_true_res;
+
     /**< Actual L2 residual norm achieved in solver */
     double true_res;
 
@@ -181,8 +184,6 @@ namespace quda {
 
     QudaVerbosity verbosity_precondition; //! verbosity to use for preconditioner
 
-    bool compute_true_res; //! whether to compute the true residual or not at the end
-
     bool is_preconditioner; //! whether the solver acting as a preconditioner for another solver
 
     bool global_reduction; //! whether to use a global or local (node) reduction for this solver
@@ -190,7 +191,8 @@ namespace quda {
     /**
        Default constructor
      */
-    SolverParam() : verbosity_precondition(QUDA_SILENT), compute_true_res(true) { ; }
+    SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
+      compute_true_res(true), verbosity_precondition(QUDA_SILENT) { ; }
 
     /**
        Constructor that matches the initial values to that of the
@@ -200,12 +202,13 @@ namespace quda {
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
-      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
+      use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      true_res(param.true_res), true_res_hq(param.true_res_hq),
-      maxiter(param.maxiter), iter(param.iter),
+      compute_true_res(param.compute_true_res), true_res(param.true_res),
+      true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
       precision_precondition(param.cuda_prec_precondition),
       preserve_source(param.preserve_source), num_src(param.num_src), num_offset(param.num_offset),
@@ -217,7 +220,7 @@ namespace quda {
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
-      verbosity_precondition(param.verbosity_precondition), compute_true_res(true),
+      verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(false), global_reduction(true)
     {
       for (int i=0; i<num_offset; i++) {
@@ -242,8 +245,8 @@ namespace quda {
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      true_res(param.true_res), true_res_hq(param.true_res_hq),
-      maxiter(param.maxiter), iter(param.iter),
+      compute_true_res(param.compute_true_res), true_res(param.true_res),
+      true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.precision), precision_sloppy(param.precision_sloppy),
       precision_precondition(param.precision_precondition),
       preserve_source(param.preserve_source), num_offset(param.num_offset),
@@ -255,7 +258,7 @@ namespace quda {
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
-      verbosity_precondition(param.verbosity_precondition), compute_true_res(param.compute_true_res),
+      verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction)
     {
       for (int i=0; i<num_offset; i++) {
@@ -486,7 +489,66 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class BiCGstabL : public Solver {
 
+  private:
+    DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+
+    /**
+       The size of the Krylov space that BiCGstabL uses.
+     */
+    int nKrylov; // in the language of BiCGstabL, this is L.
+    
+    // Various coefficients and params needed on each iteration.
+    Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L. 
+    Complex *gamma, *gamma_prime, *gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    Complex **tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    double *sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
+    
+    // pointers to fields to avoid multiple creation overhead
+    // full precision fields
+    ColorSpinorField *r_fullp;   //! Full precision residual.
+    ColorSpinorField *yp;        //! Full precision temporary.
+    // sloppy precision fields
+    ColorSpinorField *tempp;     //! Sloppy temporary vector. 
+    std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
+    std::vector<ColorSpinorField*> u; // Search directions.
+    
+    // Saved, preallocated vectors. (may or may not get used depending on precision.)
+    ColorSpinorField *x_sloppy_saved_p; //! Sloppy solution vector.
+    ColorSpinorField *r0_saved_p;       //! Shadow residual, in BiCG language.
+    ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
+    
+    /**
+       Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
+     */
+    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+    
+    /**
+       Internal routines for pipelined Gram-Schmidt. Made to not conflict with GCR's implementation.
+     */
+    void computeTau(Complex **tau, double *sigma, std::vector<ColorSpinorField*> r, int begin, int size, int j);
+    void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
+    void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
+    
+    void updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov);
+    void updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
+                                std::vector<ColorSpinorField*> r, ColorSpinorField& x, int nKrylov);
+    
+    /**
+       Solver uses lazy allocation: this flag determines whether we have allocated or not.
+     */
+    bool init; 
+    
+    std::string solver_name; // holds BiCGstab-l, where 'l' literally equals nKrylov.
+
+  public:
+    BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~BiCGstabL();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
 
   class GCR : public Solver {
 
@@ -634,6 +696,7 @@ namespace quda {
     virtual ~MultiShiftSolver() { ; }
 
     virtual void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in) = 0;
+    bool convergence(const double *r2, const double *r2_tol, int n) const;
   };
 
   class MultiShiftCG : public MultiShiftSolver {
@@ -654,32 +717,50 @@ namespace quda {
   /**
      This computes the optimum guess for the system Ax=b in the L2
      residual norm.  For use in the HMD force calculations using a
-     minimal residual chronological method This computes the guess
+     minimal residual chronological method.  This computes the guess
      solution as a linear combination of a given number of previous
      solutions.  Following Brower et al, only the orthogonalised vector
      basis is stored to conserve memory.
+
+     If Eigen support is enabled then Eigen's SVD algorithm is used
+     for solving the linear system, else Gaussian eliminiation with
+     partial pivots is used.
   */
   class MinResExt {
 
   protected:
     const DiracMatrix &mat;
+    bool orthogonal; //! Whether to construct an orthogonal basis or not
+    bool apply_mat; //! Whether to compute q = Ap or assume it is provided
     TimeProfile &profile;
 
   public:
-    MinResExt(DiracMatrix &mat, TimeProfile &profile);
+    /**
+       @param mat The operator for the linear system we wish to solve
+       @param orthogonal Whether to construct an orthogonal basis prior to constructing the linear system
+       @param apply_mat Whether to apply the operator in place or assume q already contains this
+       @profile Timing profile to use
+    */
+    MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, TimeProfile &profile);
     virtual ~MinResExt();
 
     /**
-       param x The optimum for the solution vector.
-       param b The source vector in the equation to be solved. This is not preserved.
-       param p The basis vectors in which we are building the guess
-       param q The basis vectors multipled by A
-       param N The number of basis vectors
-       return The residue of this guess.
+       @param x The optimum for the solution vector.
+       @param b The source vector in the equation to be solved. This is not preserved and is overwritten by the new residual.
+       @param basis Vector of pairs storing the basis (p,Ap)
+    */
+    void operator()(ColorSpinorField &x, ColorSpinorField &b,
+		    std::vector<std::pair<ColorSpinorField*,ColorSpinorField*> > basis);
+
+    /**
+       @param x The optimum for the solution vector.
+       @param b The source vector in the equation to be solved. This is not preserved.
+       @param p The basis vectors in which we are building the guess
+       @param q The basis vectors multipled by A
     */
     void operator()(ColorSpinorField &x, ColorSpinorField &b,
 		    std::vector<ColorSpinorField*> p,
-		    std::vector<ColorSpinorField*> q, int N);
+		    std::vector<ColorSpinorField*> q);
   };
 
   class DeflatedSolver {

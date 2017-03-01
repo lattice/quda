@@ -37,8 +37,6 @@ extern QudaPrecision prec;
 extern char latfile[];
 extern int gridsize_from_cmdline[];
     
-extern bool tune;
-
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
 void init() {
@@ -90,7 +88,6 @@ void init() {
   initQuda(device);
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
-  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
 
   csParam.setPrecision(prec);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;

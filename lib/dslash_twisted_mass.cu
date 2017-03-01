@@ -88,6 +88,13 @@ namespace quda {
       c = epsilon;
       d = k;
       if (dslashType == QUDA_NONDEG_DSLASH) errorQuda("Invalid dslashType for twisted-mass Dslash");
+
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.a = kappa;
+      dslashParam.a_f = kappa;
+      dslashParam.b = mu;
+      dslashParam.b_f = mu;
       dslashParam.fl_stride = in->VolumeCB();
     }
     virtual ~TwistedDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -123,19 +130,13 @@ namespace quda {
 
       switch(dslashType){
       case QUDA_DEG_TWIST_INV_DSLASH:
-	DSLASH(twistedMassTwistInvDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
+	DSLASH(twistedMassTwistInvDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       case QUDA_DEG_DSLASH_TWIST_INV:
-	DSLASH(twistedMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
+	DSLASH(twistedMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       case QUDA_DEG_DSLASH_TWIST_XPAY:
-	DSLASH(twistedMassDslashTwist, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-	       (sFloat*)in->V(), (float*)in->Norm(), a, b, (sFloat*)x->V(), (float*)x->Norm());
+	DSLASH(twistedMassDslashTwist, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	break;
       default: errorQuda("Invalid twisted mass dslash type");
       }

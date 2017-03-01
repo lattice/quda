@@ -55,21 +55,12 @@ namespace quda {
 
   using namespace staggered;
 
-  template<typename T> struct RealType {};
-  template<> struct RealType<double2> { typedef double type; };
-  template<> struct RealType<float2> { typedef float type; };
-  template<> struct RealType<float4> { typedef float type; };
-  template<> struct RealType<short2> { typedef short type; };
-  template<> struct RealType<short4> { typedef short type; };
-
 #ifdef GPU_STAGGERED_DIRAC
   template <typename sFloat, typename gFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
   private:
-    const gFloat *gauge0, *gauge1;
-    const double a;
-    const int nSrc;
+    const unsigned int nSrc;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -86,9 +77,13 @@ namespace quda {
     StaggeredDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a), nSrc(in->X(4))
+      : DslashCuda(out, in, x, reconstruct, dagger), nSrc(in->X(4))
     { 
       bindSpinorTex<sFloat>(in, out, x);
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.a = a;
+      dslashParam.a_f = a;
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
@@ -97,19 +92,16 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dslashParam.swizzle = tp.aux.x;
-      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-		       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-		       (sFloat*)in->V(), (float*)in->Norm(), 
-		       (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
+      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 
     bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       // first try to advance block.y (number of right-hand sides per block)
-      if (param.block.y < nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
+      if (param.block.y < nSrc && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
 	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
-	  (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
+	  (param.block.x*(param.block.y+1u)) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	param.block.y++;
 	param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
 	return true;

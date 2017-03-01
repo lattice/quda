@@ -157,13 +157,11 @@ namespace quda {
     Gauge gauge;
     Oprod oprod;
 
-    bool conjugate;
-
     CloverDerivArg(const Force& force, const Gauge& gauge, const Oprod& oprod,
 		   const int *X_, const int *E_,
-		   double coeff, int parity, bool conjugate) :
+		   double coeff, int parity) :
       coeff(coeff), parity(parity), volumeCB(force.volumeCB),
-      force(force), gauge(gauge), oprod(oprod), conjugate(conjugate)
+      force(force), gauge(gauge), oprod(oprod)
     {
       for(int dir=0; dir<4; ++dir) {
 	this->X[dir] = X_[dir];
@@ -175,10 +173,10 @@ namespace quda {
 
 
 #ifdef DYNAMIC_MU_NU
-  template <typename real, bool isConjugate, typename Arg, typename Link>
+  template <typename real, typename Arg, typename Link>
   __device__ void computeForce(LINK force, Arg &arg, int xIndex, int yIndex, int mu, int nu) {
 #else
-  template <typename real, bool isConjugate, typename Arg, int mu, int nu, typename Link>
+  template <typename real, typename Arg, int mu, int nu, typename Link>
   __device__ __forceinline__ void computeForce(LINK force, Arg &arg, int xIndex, int yIndex) {
 #endif
 
@@ -215,16 +213,12 @@ namespace quda {
 	// load Oprod
 	arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
 
-	if (isConjugate) Oprod1 -= conj(Oprod1);
-
         if (nu < mu) sub(force, U1*U2*conj(U3)*conj(U4)*Oprod1);
 	else   	     add(force, U1*U2*conj(U3)*conj(U4)*Oprod1);
 
 	d[mu]++; d[nu]++;
 	arg.oprod.load((real*)(Oprod2.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
 	d[mu]--; d[nu]--;
-
-	if (isConjugate) Oprod2 -= conj(Oprod2);
 
         if (nu < mu) sub(force, U1*U2*Oprod2*conj(U3)*conj(U4));
 	else         add(force, U1*U2*Oprod2*conj(U3)*conj(U4));
@@ -256,14 +250,10 @@ namespace quda {
 	arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
 	d[mu]--; d[nu]++;
 
-	if (isConjugate) Oprod1 -= conj(Oprod1);
-
         if (nu < mu) add(force, conj(U1)*U2*Oprod1*U3*conj(U4));
 	else         sub(force, conj(U1)*U2*Oprod1*U3*conj(U4));
 
 	arg.oprod.load((real*)(Oprod4.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
-
-	if (isConjugate) Oprod4 -= conj(Oprod4);
 
         if (nu < mu) add(force, Oprod4*conj(U1)*U2*U3*conj(U4));
 	else         sub(force, Oprod4*conj(U1)*U2*U3*conj(U4));
@@ -299,8 +289,6 @@ namespace quda {
 	arg.oprod.load((real*)(Oprod3.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
 	d[nu]--;
 
-	if (isConjugate) Oprod3 -= conj(Oprod3);
-
 	if (nu < mu) sub(force, U1*U2*conj(U3)*Oprod3*conj(U4));
 	else         add(force, U1*U2*conj(U3)*Oprod3*conj(U4));
 
@@ -308,8 +296,6 @@ namespace quda {
 	d[mu]++;
 	arg.oprod.load((real*)(Oprod4.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
 	d[mu]--;
-
-	if (isConjugate) Oprod4 -= conj(Oprod4);
 
 	if (nu < mu) sub(force, U1*Oprod4*U2*conj(U3)*conj(U4));
 	else         add(force, U1*Oprod4*U2*conj(U3)*conj(U4));
@@ -344,16 +330,12 @@ namespace quda {
 	arg.oprod.load((real*)(Oprod1.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
 	d[mu]--;
 
-	if (isConjugate) Oprod1 -= conj(Oprod1);
-
 	if (nu < mu) add(force, conj(U1)*U2*U3*Oprod1*conj(U4));
 	else         sub(force, conj(U1)*U2*U3*Oprod1*conj(U4));
 
 	d[nu]--;
 	arg.oprod.load((real*)(Oprod2.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
 	d[nu]++;
-
-	if (isConjugate) Oprod2 -= conj(Oprod2);
 
 	if (nu < mu) add(force, conj(U1)*Oprod2*U2*U3*conj(U4));
 	else         sub(force, conj(U1)*Oprod2*U2*U3*conj(U4));
@@ -363,7 +345,7 @@ namespace quda {
 
   }
 
-  template<typename real, bool isConjugate, typename Arg>
+  template<typename real, typename Arg>
   __global__ void cloverDerivativeKernel(Arg arg)
   {
     int index = threadIdx.x + blockIdx.x*blockDim.x;
@@ -385,29 +367,29 @@ namespace quda {
 #ifdef DYNAMIC_MU_NU
     for (int nu=0; nu<4; nu++) {
       if (mu==nu) continue;
-      computeForce<real,isConjugate,Arg,Link>(force, arg, index, yIndex, mu, nu);
+      computeForce<real,Arg,Link>(force, arg, index, yIndex, mu, nu);
     }
 #else
     switch(mu) {
     case 0:
-      computeForce<real,isConjugate,Arg,0,1,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,0,2,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,0,3,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,0,1,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,0,2,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,0,3,Link>(force, arg, index, yIndex);
       break;
     case 1:
-      computeForce<real,isConjugate,Arg,1,0,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,1,3,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,1,2,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,1,0,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,1,3,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,1,2,Link>(force, arg, index, yIndex);
       break;
     case 2:
-      computeForce<real,isConjugate,Arg,2,3,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,2,0,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,2,1,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,2,3,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,2,0,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,2,1,Link>(force, arg, index, yIndex);
       break;
     case 3:
-      computeForce<real,isConjugate,Arg,3,2,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,3,1,Link>(force, arg, index, yIndex);
-      computeForce<real,isConjugate,Arg,3,0,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,3,2,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,3,1,Link>(force, arg, index, yIndex);
+      computeForce<real,Arg,3,0,Link>(force, arg, index, yIndex);
       break;
     }
 #endif
@@ -443,19 +425,15 @@ namespace quda {
 
   public:
     CloverDerivative(const Arg &arg, const GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) {
-      writeAuxString("conj=%d,threads=%d,prec=%lu,fstride=%d,gstride=%d,ostride=%d",
-		     arg.conjugate,arg.volumeCB,sizeof(Float),arg.force.stride,
+      writeAuxString("threads=%d,prec=%lu,fstride=%d,gstride=%d,ostride=%d",
+		     arg.volumeCB,sizeof(Float),arg.force.stride,
 		     arg.gauge.stride,arg.oprod.stride);
     }
     virtual ~CloverDerivative() {}
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (arg.conjugate) {
-	cloverDerivativeKernel<Float,true><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      } else {
-	cloverDerivativeKernel<Float,false><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      }
+      cloverDerivativeKernel<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     } // apply
 
     bool advanceBlockDim(TuneParam &param) const {
@@ -504,8 +482,7 @@ namespace quda {
   void cloverDerivative(cudaGaugeField &force,
 			cudaGaugeField &gauge,
 			cudaGaugeField &oprod,
-			double coeff, int parity,
-			int conjugate) {
+			double coeff, int parity) {
  
     if (oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Force field does not support reconstruction");
@@ -524,14 +501,14 @@ namespace quda {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	  typedef CloverDerivArg<Float,F,G,O> Arg;
-	  Arg arg(F(force), G(gauge), O(oprod), force.X(), oprod.X(), coeff, parity, conjugate);
+	  Arg arg(F(force), G(gauge), O(oprod), force.X(), oprod.X(), coeff, parity);
 	  CloverDerivative<Float, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
 #if 0
 	} else if (gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	  typedef CloverDerivArg<Float,F,G,O> Arg;
-	  Arg arg(F(force), G(gauge), O(oprod), force.X(), oprod.X(), coeff, parity, conjugate);
+	  Arg arg(F(force), G(gauge), O(oprod), force.X(), oprod.X(), coeff, parity);
 	  CloverDerivative<Float, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
 #endif
@@ -552,7 +529,7 @@ namespace quda {
 void cloverDerivative(cudaGaugeField &force,   
 		      cudaGaugeField &gauge,
 		      cudaGaugeField &oprod,
-		      double coeff, QudaParity parity, int conjugate)
+		      double coeff, QudaParity parity)
 {
 #ifdef GPU_CLOVER_DIRAC
   assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
@@ -566,10 +543,10 @@ void cloverDerivative(cudaGaugeField &force,
   int device_parity = (parity == QUDA_EVEN_PARITY) ? 0 : 1;
 
   if(force.Precision() == QUDA_DOUBLE_PRECISION){
-    cloverDerivative<double>(force, gauge, oprod, coeff, device_parity, conjugate);
+    cloverDerivative<double>(force, gauge, oprod, coeff, device_parity);
 #if 0
   } else if (force.Precision() == QUDA_SINGLE_PRECISION){
-    cloverDerivative<float>(force, gauge, oprod, coeff, device_parity, conjugate);
+    cloverDerivative<float>(force, gauge, oprod, coeff, device_parity);
 #endif
   } else {
     errorQuda("Precision %d not supported", force.Precision());

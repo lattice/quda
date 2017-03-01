@@ -1576,8 +1576,9 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
-bool tune = true;
 int niter = 100;
+int gcrNkrylov = 10;
+int pipeline = 0; 
 int test_type = 0;
 int nvec[QUDA_MAX_MG_LEVEL] = { };
 char vec_infile[256] = "";
@@ -1652,6 +1653,8 @@ void usage(char** argv )
   printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
+  printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
+  printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n"); 
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
 	 "                                                  For multigrid this sets the smoother type.\n");
@@ -1666,7 +1669,6 @@ void usage(char** argv )
   printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
-  printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
@@ -1968,25 +1970,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-
-  if( strcmp(argv[i], "--tune") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-
-    if (strcmp(argv[i+1], "true") == 0){
-      tune = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      tune = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid tuning type\n");	
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
 
   if( strcmp(argv[i], "--multishift") == 0){
     if (i+1 >= argc){
@@ -2498,6 +2481,34 @@ int process_command_line_option(int argc, char** argv, int* idx)
     niter= atoi(argv[i+1]);
     if (niter < 1 || niter > 1e6){
       printf("ERROR: invalid number of iterations (%d)\n", niter);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--ngcrkrylov") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    gcrNkrylov = atoi(argv[i+1]);
+    if (gcrNkrylov < 1 || gcrNkrylov > 1e6){
+      printf("ERROR: invalid number of gcrkrylov iterations (%d)\n", gcrNkrylov);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--pipeline") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    pipeline = atoi(argv[i+1]);
+    if (pipeline < 0 || pipeline > 8){
+      printf("ERROR: invalid pipeline length (%d)\n", pipeline);
       usage(argv);
     }
     i++;

@@ -159,12 +159,12 @@ extern "C" {
 
   /**
    * Solve for multiple shifts (e.g., masses).
-   * @param _hp_x    Array of solution spinor fields
+   * @param _hp_x    Array of solution spinor fields (large contiguous allocation)
    * @param _hp_b    Array of source spinor fields
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invert_multi_shift_quda_(void *_hp_x[QUDA_MAX_MULTI_SHIFT], void *_hp_b, QudaInvertParam *param);
+  void invert_multishift_quda_(void *_hp_x, void *_hp_b, QudaInvertParam *param);
 
 
   /**
@@ -181,45 +181,71 @@ extern "C" {
   void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, 
 				bool *conj_mom, bool *exact, QudaGaugeParam* param);
 
-  void compute_staggered_force_quda_(void* cudaMom, void* qudaQuark, double *coeff);
-
   /**
-   * Compute the gauge force and update the mometum field
+   * Compute the naive staggered force.  All fields must be in the same precision.
    *
-   * @param mom The momentum field to be updated
-   * @param gauge The gauge field from which we compute the force
-   * @param input_path_buf[dim][num_paths][path_length] (Fortran 3-d array)
-   * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
-   * @param loop_coeff Coefficients of the different loops in the Symanzik action
-   * @param num_paths How many contributions from path_length different "staples"
-   * @param max_length The maximum number of non-zero of links in any path in the action
-   * @param dt The integration step size (for MILC this is dt*beta/3)
-   * @param param The parameters of the external fields and the computation settings
+   * @param mom Momentum field
+   * @param dt Integrating step size
+   * @param delta Additional scale factor when updating momentum (mom += delta * [force]_TA
+   * @param gauge Gauge field (at present only supports resident gauge field)
+   * @param x Array of single-parity solution vectors (at present only supports resident solutions)
+   * @param gauge_param Gauge field meta data
+   * @param invert_param Dirac and solver meta data
    */
-  int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int *path_length,
-				double *loop_coeff, int *num_paths, int *max_length, double *dt,
-				QudaGaugeParam *qudaGaugeParam);
+  void compute_staggered_force_quda_(void *mom, double *dt, double *delta, void *gauge, void *x,
+				     QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
 
   /**
-   * Apply the staggered phase factors to the resident gauge field
+   * @brief Compute the gauge force and update the mometum field
+   *
+   * @param[in,out] mom The momentum field to be updated
+   * @param[in] gauge The gauge field from which we compute the force
+   * @param[in] num_loop_types Number of loop types in the gauge action
+   * @param[in] loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param[in] dt The integration step size
+   * @param[in] param The parameters of the external fields and the computation settings
+   */
+  void compute_gauge_force_quda_(void *mom, void *gauge, int *num_loop_types, double *coeff, double *dt,
+				 QudaGaugeParam *param);
+
+  /**
+   * @brief Apply the staggered phase factors to the resident gauge field
    */
   void apply_staggered_phase_quda_();
 
   /**
-   * Remove the staggered phase factors to the resident gauge field
+   * @brief Remove the staggered phase factors to the resident gauge field
    */
   void remove_staggered_phase_quda_();
 
   /**
-   * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+   * @brief Evaluate the kinetic (momentum) contribution to classical
+   * Hamiltonian for Hybrid Monte Carlo.
+   *
+   * @param kin Kinetic energy
+   * @param momentum The momentum field
+   * @param param The parameters of the external fields and the computation settings
+   * @return momentum action
+   */
+  void kinetic_quda_(double *kin, void* momentum, QudaGaugeParam* param);
+
+  /**
+   * @param Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
   void plaq_quda_(double plaq[3]);
 
   /**
-   * Temporary function exposed for TIFR benchmarking
+   * @brief fTemporary function exposed for TIFR benchmarking
    */
   void set_kernel_pack_t_(int *pack);
+
+  /**
+   * @brief Flush the chronological history for the given index
+   * @param[in] index Index for which we are flushing
+   */
+  void flush_chrono_quda_(int index);
+
 
 #ifdef __cplusplus
 }

@@ -97,7 +97,8 @@
   (G##3).z = (G##0).x = pi_f*(G##0).x;						\
   (G##3).w = (G##0).y = pi_f*(G##0).y;
 
-#define READ_GAUGE_MATRIX_18_DOUBLE2(G, gauge, dir, idx, stride)    \
+#define READ_GAUGE_MATRIX_18_DOUBLE2(G, gauge_, dir, idx, stride)   \
+  double2 *gauge = (double2*)gauge_;				    \
   double2 G##0 = gauge[idx + ((dir/2)*9+0)*stride];		    \
   double2 G##1 = gauge[idx + ((dir/2)*9+1)*stride];		    \
   double2 G##2 = gauge[idx + ((dir/2)*9+2)*stride];		    \
@@ -108,7 +109,8 @@
   double2 G##7 = gauge[idx + ((dir/2)*9+7)*stride];		    \
   double2 G##8 = gauge[idx + ((dir/2)*9+8)*stride];		    \
   
-#define READ_GAUGE_MATRIX_18_FLOAT2(G, gauge, dir, idx, stride)	\
+#define READ_GAUGE_MATRIX_18_FLOAT2(G, gauge_, dir, idx, stride)    \
+  float2 *gauge = (float2*)gauge_;				    \
   float2 G##0 = ((float2*)gauge)[idx + ((dir/2)*9+0)*stride];	\
   float2 G##1 = ((float2*)gauge)[idx + ((dir/2)*9+1)*stride];	\
   float2 G##2 = ((float2*)gauge)[idx + ((dir/2)*9+2)*stride];	\
@@ -119,7 +121,8 @@
   float2 G##7 = ((float2*)gauge)[idx + ((dir/2)*9+7)*stride];	\
   float2 G##8 = ((float2*)gauge)[idx + ((dir/2)*9+8)*stride];	\
   
-#define READ_GAUGE_MATRIX_18_SHORT2(G, gauge, dir, idx, stride)		\
+#define READ_GAUGE_MATRIX_18_SHORT2(G, gauge_, dir, idx, stride)	\
+  short2 *gauge = (short2*)gauge_;					\
   float2 G##0 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+0)*stride]); \
   float2 G##1 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+1)*stride]); \
   float2 G##2 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+2)*stride]); \
@@ -130,7 +133,8 @@
   float2 G##7 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+7)*stride]); \
   float2 G##8 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+8)*stride]); \
   
-#define READ_GAUGE_MATRIX_12_DOUBLE2(G, gauge, dir, idx, stride)	\
+#define READ_GAUGE_MATRIX_12_DOUBLE2(G, gauge_, dir, idx, stride)	\
+  double2 *gauge = (double2*)gauge_;					\
   double2 G##0 = gauge[idx + ((dir/2)*6+0)*stride];			\
   double2 G##1 = gauge[idx + ((dir/2)*6+1)*stride];			\
   double2 G##2 = gauge[idx + ((dir/2)*6+2)*stride];			\
@@ -141,14 +145,16 @@
   double2 G##7 = make_double2(0,0);					\
   double2 G##8 = make_double2(0,0);					
 
-#define READ_GAUGE_MATRIX_12_FLOAT4(G, gauge, dir, idx, stride)	\
+#define READ_GAUGE_MATRIX_12_FLOAT4(G, gauge_, dir, idx, stride)\
+  float4 *gauge = (float4*)gauge_;				\
   float4 G##0 = gauge[idx + ((dir/2)*3+0)*stride];		\
   float4 G##1 = gauge[idx + ((dir/2)*3+1)*stride];		\
   float4 G##2 = gauge[idx + ((dir/2)*3+2)*stride];		\
   float4 G##3 = make_float4(0,0,0,0);				\
   float4 G##4 = make_float4(0,0,0,0);				
 
-#define READ_GAUGE_MATRIX_12_SHORT4(G, gauge, dir, idx, stride)		\
+#define READ_GAUGE_MATRIX_12_SHORT4(G, gauge_, dir, idx, stride)	\
+  short4 *gauge = (short4*)gauge_;					\
   float4 G##0 = short42float4(gauge[idx + ((dir/2)*3+0)*stride]);	\
   float4 G##1 = short42float4(gauge[idx + ((dir/2)*3+1)*stride]);	\
   float4 G##2 = short42float4(gauge[idx + ((dir/2)*3+2)*stride]);	\
@@ -156,7 +162,8 @@
   float4 G##4 = make_float4(0,0,0,0);
 
 // set A to be last components of G4 (otherwise unused)
-#define READ_GAUGE_MATRIX_8_DOUBLE2(G, gauge, dir, idx, stride)		\
+#define READ_GAUGE_MATRIX_8_DOUBLE2(G, gauge_, dir, idx, stride)	\
+  double2 *gauge = (double2*)gauge_;					\
   double2 G##0 = gauge[idx + ((dir/2)*4+0)*stride];			\
   double2 G##1 = gauge[idx + ((dir/2)*4+1)*stride];			\
   double2 G##2 = gauge[idx + ((dir/2)*4+2)*stride];			\
@@ -170,7 +177,8 @@
   (G##7).y = (G##0).y;
 
 // set A to be last components of G4 (otherwise unused)
-#define READ_GAUGE_MATRIX_8_FLOAT4(G, gauge, dir, idx, stride)	\
+#define READ_GAUGE_MATRIX_8_FLOAT4(G, gauge_, dir, idx, stride)	\
+  float4 *gauge = (float4*)gauge_;				\
   float4 G##0 = gauge[idx + ((dir/2)*2+0)*stride];		\
   float4 G##1 = gauge[idx + ((dir/2)*2+1)*stride];		\
   float4 G##2 = make_float4(0,0,0,0);				\
@@ -179,13 +187,14 @@
   (G##3).z = (G##0).x;						\
   (G##3).w = (G##0).y;
 
-#define READ_GAUGE_MATRIX_8_SHORT4(G, gauge, dir, idx, stride)		\
+#define READ_GAUGE_MATRIX_8_SHORT4(G, gauge_, dir, idx, stride)		\
+  short4 *gauge = (short4*)gauge_;					\
   float4 G##0 = short42float4(gauge[idx + ((dir/2)*2+0)*stride]);	\
   float4 G##1 = short42float4(gauge[idx + ((dir/2)*2+1)*stride]);	\
   float4 G##2 = make_float4(0,0,0,0);					\
   float4 G##3 = make_float4(0,0,0,0);					\
   float4 G##4 = make_float4(0,0,0,0);					\
-  (G##3).z = (G##0).x = pi_f*(G##0).x;						\
+  (G##3).z = (G##0).x = pi_f*(G##0).x;					\
   (G##3).w = (G##0).y = pi_f*(G##0).y;
 
 
@@ -258,7 +267,8 @@
   (G##3).z = (G##0).x = pi_f*(G##0).x;					\
   (G##3).w = (G##0).y = pi_f*(G##0).y;
 
-#define ASSN_GAUGE_MATRIX_18_DOUBLE2(G, gauge, dir, idx, stride)    \
+#define ASSN_GAUGE_MATRIX_18_DOUBLE2(G, gauge_, dir, idx, stride)    \
+   double2 *gauge = (double2*)gauge_;				     \
    G##0 = gauge[idx + ((dir/2)*9+0)*stride];		    \
    G##1 = gauge[idx + ((dir/2)*9+1)*stride];		    \
    G##2 = gauge[idx + ((dir/2)*9+2)*stride];		    \
@@ -269,7 +279,8 @@
    G##7 = gauge[idx + ((dir/2)*9+7)*stride];		    \
    G##8 = gauge[idx + ((dir/2)*9+8)*stride];		    \
   
-#define ASSN_GAUGE_MATRIX_18_FLOAT2(G, gauge, dir, idx, stride)	\
+#define ASSN_GAUGE_MATRIX_18_FLOAT2(G, gauge_, dir, idx, stride)	\
+   float2 *gauge = (float2*)gauge_;					\
    G##0 = ((float2*)gauge)[idx + ((dir/2)*9+0)*stride];	\
    G##1 = ((float2*)gauge)[idx + ((dir/2)*9+1)*stride];	\
    G##2 = ((float2*)gauge)[idx + ((dir/2)*9+2)*stride];	\
@@ -280,7 +291,8 @@
    G##7 = ((float2*)gauge)[idx + ((dir/2)*9+7)*stride];	\
    G##8 = ((float2*)gauge)[idx + ((dir/2)*9+8)*stride];	\
   
-#define ASSN_GAUGE_MATRIX_18_SHORT2(G, gauge, dir, idx, stride)		\
+#define ASSN_GAUGE_MATRIX_18_SHORT2(G, gauge_, dir, idx, stride)	\
+   short2 *gauge = (short2*)gauge_;					\
    G##0 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+0)*stride]); \
    G##1 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+1)*stride]); \
    G##2 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+2)*stride]); \
@@ -291,7 +303,8 @@
    G##7 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+7)*stride]); \
    G##8 = short22float2(((short2*)gauge)[idx + ((dir/2)*9+8)*stride]); \
   
-#define ASSN_GAUGE_MATRIX_12_DOUBLE2(G, gauge, dir, idx, stride)	\
+#define ASSN_GAUGE_MATRIX_12_DOUBLE2(G, gauge_, dir, idx, stride)   \
+   double2 *gauge = (double2*)gauge_;				    \
    G##0 = gauge[idx + ((dir/2)*6+0)*stride];			\
    G##1 = gauge[idx + ((dir/2)*6+1)*stride];			\
    G##2 = gauge[idx + ((dir/2)*6+2)*stride];			\
@@ -302,14 +315,16 @@
    G##7 = make_double2(0,0);					\
    G##8 = make_double2(0,0);					
 
-#define ASSN_GAUGE_MATRIX_12_FLOAT4(G, gauge, dir, idx, stride)	\
+#define ASSN_GAUGE_MATRIX_12_FLOAT4(G, gauge_, dir, idx, stride)    \
+   float4 *gauge = (float4*)gauge_;				    \
    G##0 = gauge[idx + ((dir/2)*3+0)*stride];		\
    G##1 = gauge[idx + ((dir/2)*3+1)*stride];		\
    G##2 = gauge[idx + ((dir/2)*3+2)*stride];		\
    G##3 = make_float4(0,0,0,0);				\
    G##4 = make_float4(0,0,0,0);				
 
-#define ASSN_GAUGE_MATRIX_12_SHORT4(G, gauge, dir, idx, stride)		\
+#define ASSN_GAUGE_MATRIX_12_SHORT4(G, gauge_, dir, idx, stride)	\
+   short4 *gauge = (short4*)gauge_;				    \
    G##0 = short42float4(gauge[idx + ((dir/2)*3+0)*stride]);	\
    G##1 = short42float4(gauge[idx + ((dir/2)*3+1)*stride]);	\
    G##2 = short42float4(gauge[idx + ((dir/2)*3+2)*stride]);	\
@@ -317,7 +332,8 @@
    G##4 = make_float4(0,0,0,0);
 
 // set A to be last components of G4 (otherwise unused)
-#define ASSN_GAUGE_MATRIX_8_DOUBLE2(G, gauge, dir, idx, stride)		\
+#define ASSN_GAUGE_MATRIX_8_DOUBLE2(G, gauge_, dir, idx, stride)	\
+  double2 *gauge = (double2*)gauge_;					\
    G##0 = gauge[idx + ((dir/2)*4+0)*stride];			\
    G##1 = gauge[idx + ((dir/2)*4+1)*stride];			\
    G##2 = gauge[idx + ((dir/2)*4+2)*stride];			\
@@ -331,7 +347,8 @@
   (G##7).y = (G##0).y;
 
 // set A to be last components of G4 (otherwise unused)
-#define ASSN_GAUGE_MATRIX_8_FLOAT4(G, gauge, dir, idx, stride)	\
+#define ASSN_GAUGE_MATRIX_8_FLOAT4(G, gauge_, dir, idx, stride)	\
+   float4 *gauge = (float4*)gauge_;				    \
    G##0 = gauge[idx + ((dir/2)*2+0)*stride];		\
    G##1 = gauge[idx + ((dir/2)*2+1)*stride];		\
    G##2 = make_float4(0,0,0,0);				\
@@ -340,7 +357,8 @@
   (G##3).z = (G##0).x;						\
   (G##3).w = (G##0).y;
 
-#define ASSN_GAUGE_MATRIX_8_SHORT4(G, gauge, dir, idx, stride)		\
+#define ASSN_GAUGE_MATRIX_8_SHORT4(G, gauge_, dir, idx, stride)	    \
+   short4 *gauge = (short4*)gauge_;				    \
    G##0 = short42float4(gauge[idx + ((dir/2)*2+0)*stride]);	\
    G##1 = short42float4(gauge[idx + ((dir/2)*2+1)*stride]);	\
    G##2 = make_float4(0,0,0,0);					\

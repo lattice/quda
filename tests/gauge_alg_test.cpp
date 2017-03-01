@@ -91,10 +91,6 @@ class GaugeAlgTest : public ::testing::Test {
 
   virtual void SetUp() {
     setVerbosity(QUDA_VERBOSE);
-    if (true) {
-      printfQuda("Tuning...\n");
-      setTuning(QUDA_TUNE_YES);
-    }
 
     param = newQudaGaugeParam();
 

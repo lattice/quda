@@ -58,12 +58,8 @@ namespace quda {
   class DomainWallDslashCuda : public DslashCuda {
 
   private:
-    const gFloat *gauge0, *gauge1;
-    const double mferm;
-    const double a;
-
     bool checkGrid(TuneParam &param) const {
-      if (param.grid.x > deviceProp.maxGridSize[0] || param.grid.y > deviceProp.maxGridSize[1]) {
+      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0] || param.grid.y > (unsigned int)deviceProp.maxGridSize[1]) {
 	warningQuda("Autotuner is skipping blockDim=(%u,%u,%u), gridDim=(%u,%u,%u) because lattice volume is too large",
                     param.block.x, param.block.y, param.block.z, 
                     param.grid.x, param.grid.y, param.grid.z);
@@ -82,7 +78,7 @@ namespace quda {
 
       // first try to advance block.x
       param.block.x += step[0];
-      if (param.block.x > deviceProp.maxThreadsDim[0] || 
+      if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
 	  sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
 	advance[0] = false;
 	param.block.x = step[0]; // reset block.x
@@ -93,7 +89,7 @@ namespace quda {
       if (!advance[0]) {  // if failed to advance block.x, now try block.y
 	param.block.y += step[1];
 
-	if (param.block.y > in->X(4) || 
+	if (param.block.y > (unsigned)in->X(4) ||
 	    sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
 	  advance[1] = false;
 	  param.block.y = step[1]; // reset block.x
@@ -121,10 +117,17 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double mferm, 
 			 const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), 
-	gauge1(gauge1), mferm(mferm), a(a)
+      : DslashCuda(out, in, x, reconstruct, dagger)
     { 
       bindSpinorTex<sFloat>(in, out, x);
+      dslashParam.gauge0 = (void*)gauge0;
+      dslashParam.gauge1 = (void*)gauge1;
+      dslashParam.a = a;
+      dslashParam.a_f = a;
+      dslashParam.a_inv = 1.0/a;
+      dslashParam.a_inv_f = 1.0/a;
+      dslashParam.mferm = mferm;
+      dslashParam.mferm_f = mferm;
     }
     virtual ~DomainWallDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
@@ -152,9 +155,7 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-	     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-	     (sFloat*)in->V(), (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
+      DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 
     long long flops() const {

@@ -47,13 +47,27 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA")
+project("QUDA" VERSION 0.9.0)
+
+if(NOT GITVERSION)
+  set(GITVERSION ${CMAKE_VERSION})
+endif()
+
 
 #######################################################################
 # QUDA OPTIONS
 # likely to be changed by users
 #######################################################################
-set(QUDA_GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
+if(DEFINED ENV{QUDA_GPU_ARCH})
+  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
+else()
+  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+endif()
+if(NOT QUDA_GPU_ARCH)
+  message ("-- Building QUDA for arch " "${QUDA_DEFAULT_GPU_ARCH}")
+endif()
+
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
@@ -83,6 +97,8 @@ set(QUDA_POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dsl
 #BLAS library
 set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
 
+#ARPACK
+set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
 
 # Interface options
 set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
@@ -98,12 +114,14 @@ set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
 # Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
+set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
 # that ususally should not be changed by users
 #######################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
+set(QUDA_BUILD_SHAREDLIB OFF CACHE BOOL "build quda as a shared lib")
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
@@ -124,8 +142,10 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
+set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
+mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
@@ -140,6 +160,7 @@ mark_as_advanced(QUDA_GPU_COMMS)
 mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
+mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_MULTIGRID)
 
@@ -155,28 +176,41 @@ set(CPU_ARCH x86_64)
 # we need to check for some packages
 find_package(PythonInterp)
 
-set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
-mark_as_advanced(CUDA_HOST_COMPILER)
-find_package(CUDA REQUIRED)
+if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
+  find_package(CUDAWrapper)
+  set(USING_CUDA_LANG_SUPPORT True)
+  set(CMAKE_CUDA_STANDARD 11)
+  set(CMAKE_CUDA_STANDARD_REQUIRED True)
+else()
+  set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
+  mark_as_advanced(CUDA_HOST_COMPILER)
+  find_package(CUDA REQUIRED)
+  set(USING_CUDA_LANG_SUPPORT False)
+endif()
+
 find_package(Threads REQUIRED)
 
 # do all the build definitions
 #
 
-if(${QUDA_MPI} OR ${QUDA_QMP})
+if(QUDA_MPI OR QUDA_QMP)
   add_definitions(-DMULTI_GPU)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
-if(${QUDA_MPI})
+if(QUDA_MPI AND QUDA_QMP)
+  message(WARNING "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+endif()
+
+if(QUDA_MPI)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 endif()
 
-if (${QUDA_QMP})
+if(QUDA_QMP)
   add_definitions(-DQMP_COMMS)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -186,7 +220,7 @@ if (${QUDA_QMP})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
-if (${QUDA_QIO})
+if(QUDA_QIO)
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
@@ -201,7 +235,32 @@ if(QUDA_MAGMA)
   include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
   message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
+  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
 endif(QUDA_MAGMA)
+
+# This selects arpack or parpack for Multi GPU
+if(QUDA_ARPACK)
+  add_definitions(-DARPACK_LIB)
+  find_package(PkgConfig REQUIRED)
+  if(QUDA_QMP OR QUDA_MPI)
+    pkg_check_modules(PARPACK QUIET parpack)
+    if(NOT PARPACK_FOUND OR QUDA_ARPACK_HOME)
+      find_library(PARPACK parpack PATH ${QUDA_ARPACK_HOME})
+    else()
+      find_library(PARPACK ${PARPACK_LIBRARIES} PATH ${PARPACK_LIBRARY_DIRS})
+    endif()
+  set(PARPACK_OR_ARPACK ${PARPACK})
+  else()
+    pkg_check_modules(ARPACK QUIET arpack)
+    if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
+      find_library(ARPACK arpack PATH ${QUDA_ARPACK_HOME})
+    else()
+      find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
+    endif()
+  set(PARPACK_OR_ARPACK ${ARPACK})
+  endif()
+endif(QUDA_ARPACK)
+
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
@@ -216,6 +275,12 @@ if(QUDA_BLOCKSOLVER)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
   set(QUDA_NVTX ON)
+endif()
+
+if(QUDA_EIGEN)
+  add_definitions(-DEIGEN)
+  find_package(Eigen REQUIRED)
+  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_POSIX_THREADS)
@@ -239,7 +304,7 @@ if(QUDA_DIRAC_CLOVER)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
-  add_definitions(-DGPU_TWISTED_MASS_DIRAC)
+  add_definitions(-DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_TWISTED_MASS)
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
@@ -375,12 +440,12 @@ include_directories(lib)
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
-set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
-add_definitions(-DQUDA_HASH=${HASH})
+set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
+
 
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
-
+# build up git version
 # add -debug to GITVERSION if we build with debug options enabled
 if(DEBUG_BUILD)
   if(GITVERSION)
@@ -390,9 +455,8 @@ if(DEBUG_BUILD)
   endif()
 endif()
 
-IF(GITVERSION)
-  add_definitions(-DGITVERSION="${GITVERSION}")
-ENDIF()
+set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
+
 
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
@@ -401,7 +465,13 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
 # NVCC FLAGS independet off build type
-set(QUDA_NVCC_FLAGS -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+if(NOT USING_CUDA_LANG_SUPPORT)
+  set(QUDA_NVCC_FLAGS -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+else()
+  set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
+  set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)
+endif()
+
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
@@ -416,7 +486,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     endif()
 endif()
 
-## define NVCC flags
+## define CUDA flags when CMake < 3.8
 set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
@@ -433,6 +503,26 @@ set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -G CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds."
+    FORCE )
+
+## define CUDA flags when CMake >= 3.8
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
+    "Flags used by the CUDA compiler during regular development builds."
+    FORCE )
+set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
+    "Flags used by the CUDA compiler during strict jenkins builds."
+    FORCE )
+set(CMAKE_CUDA_FLAGS_RELEASE "${QUDA_NVCC_FLAGS} -O3 -w" CACHE STRING
+    "Flags used by the CUDA compiler during release builds."
+    FORCE )
+set(CMAKE_CUDA_FLAGS_HOSTDEBUG "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG" CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds."
+    FORCE )
+set(CMAKE_CUDA_FLAGS_DEVICEDEBUG "${QUDA_NVCC_FLAGS} -G" CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds."
+    FORCE )
+set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
@@ -477,6 +567,10 @@ mark_as_advanced(CUDA_NVCC_FLAGS_DEVEL)
 mark_as_advanced(CUDA_NVCC_FLAGS_STRICT)
 mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
 mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
+mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
+mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_C_FLAGS_STRICT)

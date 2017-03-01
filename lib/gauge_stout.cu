@@ -61,47 +61,65 @@ namespace quda {
 
     setZero(&staple);
 
-    for (int mu=0; mu<3; mu++) {  // I believe most users won't want to include time staples in smearing
-      if (mu == dir) {
-        continue;
-      }
+    // I believe most users won't want to include time staples in smearing
+    for (int mu=0; mu<3; mu++) {
 
-      int nu = dir;
-
-      {
-        int dx[4] = {0, 0, 0, 0};
-        Link U1, U2, U3, U4, tmpS;
-        arg.origin.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity); 
-
-        dx[mu]++;
-        arg.origin.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity); 
-
-        dx[mu]--;
-        dx[nu]++;
-        arg.origin.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity); 
-   
-        tmpS	= U1 * U2;
-	tmpS	= tmpS * conj(U3);
-
-	staple = staple + tmpS;
-
-        dx[mu]--;
-        dx[nu]--;
-        arg.origin.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, 1-parity); 
-        arg.origin.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity); 
-
-        dx[nu]++;
-        arg.origin.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, parity); 
-
-        tmpS	= conj(U1);
-	tmpS	= tmpS * U2;
-	tmpS	= tmpS * U3;
-
-	staple = staple + tmpS;
+      //identify directions orthogonal to the link.
+      if (mu != dir) {
+	
+	int nu = dir;	
+	{
+	  int dx[4] = {0, 0, 0, 0};
+	  Link U1, U2, U3, U4, tmpS;
+	  
+	  //Get link U_{\mu}(x)
+	  arg.origin.load((Float*)(U1.data),
+			  linkIndexShift(x,dx,X), mu, parity); 
+	  
+	  dx[mu]++;
+	  //Get link U_{\nu}(x+\mu)
+	  arg.origin.load((Float*)(U2.data),
+			  linkIndexShift(x,dx,X), nu, 1-parity); 
+	  
+	  dx[mu]--;
+	  dx[nu]++;
+	  //Get link U_{\mu}(x+\nu)
+	  arg.origin.load((Float*)(U3.data),
+			  linkIndexShift(x,dx,X), mu, 1-parity); 
+	  
+	  //tmpS = U_{\mu}(x) * U_{\nu}(x+\mu) * U^\dag_{\mu}(x+\nu)
+	  tmpS	= U1 * U2;
+	  tmpS	= tmpS * conj(U3);
+	  
+	  //Add to staple sum
+	  staple = staple + tmpS;
+	  
+	  dx[mu]--;
+	  dx[nu]--;
+	  //Get link U_{\mu}(x-\mu)
+	  arg.origin.load((Float*)(U1.data),
+			  linkIndexShift(x,dx,X), mu, 1-parity); 
+	  //Get link U_{\nu}(x-\mu)
+	  arg.origin.load((Float*)(U2.data),
+			  linkIndexShift(x,dx,X), nu, 1-parity); 
+	  
+	  dx[nu]++;
+	  //Get link U_{\mu}(x-\mu+\nu)
+	  arg.origin.load((Float*)(U3.data),
+			  linkIndexShift(x,dx,X), mu, parity); 
+	  
+	  //tmpS = U^\dag_{\mu}(x-\mu) * U_{\nu}(x-\mu) * U_{\mu}(x-\mu+\nu)
+	  tmpS	= conj(U1);
+	  tmpS	= tmpS * U2;
+	  tmpS	= tmpS * U3;
+	  
+	  //Add to staple sum
+	  staple = staple + tmpS;
+	}
       }
     }
   }
-
+  
   template<typename Float, typename GaugeOr, typename GaugeDs>
     __global__ void computeSTOUTStep(GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
@@ -128,7 +146,8 @@ namespace quda {
 #endif
 
       int dx[4] = {0, 0, 0, 0};
-      for (int dir=0; dir < 3; dir++) {				//Only spatial dimensions are smeared
+      //Only spatial dimensions are smeared
+      for (int dir=0; dir < 3; dir++) {
         Link U, UDag, Stap, Omega, OmegaDag, OmegaDiff, ODT, Q, exp_iQ, tmp1;
 	Complex OmegaDiffTr;
 	Complex i_2(0,0.5);
@@ -136,12 +155,12 @@ namespace quda {
 	//This function gets stap = S_{mu,nu} i.e., the staple of length 3,
         computeStaple<Float,GaugeOr,GaugeDs,Complex>(arg,idx,parity,dir,Stap);
 	//
-	// |- > -|
-	// ^     v
-	// |     |
-	//          +  |     |
-	//             v     ^
-	//             |- > -|
+	// |- > -|                /- > -/                /- > -
+	// ^     v               ^     v                ^
+	// |     |              /     /                /- < -
+	//         + |     |  +         +  /     /  +         +  - > -/
+	//           v     ^              v     ^                    v 
+	//           |- > -|             /- > -/                - < -/
 
 	// Get link U
         arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X),dir,parity);
@@ -173,8 +192,38 @@ namespace quda {
 	Q = i_2 * Q;
 	//Q is now defined.
 
+#ifdef HOST_DEBUG
+	//Test for Tracless:
+	//reuse OmegaDiffTr
+	OmegaDiffTr = getTrace(Q);
+	double error;
+	error = OmegaDiffTr.real();
+	printf("Trace test %d %d %.15e\n", idx, dir, error);	
+
+	//Test for hemiticity:
+	Link Q_diff = conj(Q);
+	Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
+	Q_diff *= Q_diff;
+	//reuse OmegaDiffTr
+	OmegaDiffTr = getTrace(Q_diff);
+	error = OmegaDiffTr.real();
+	printf("Herm test %d %d %.15e\n", idx, dir, error);
+#endif
+
 	exponentiate_iQ(Q,&exp_iQ);
+
+#ifdef HOST_DEBUG
+	//Test for expiQ unitarity:
+	error = ErrorSU3(exp_iQ);	
+	printf("expiQ test %d %d %.15e\n", idx, dir, error);
+#endif
+
 	U = exp_iQ * U;
+#ifdef HOST_DEBUG
+	//Test for expiQ*U unitarity:
+	error = ErrorSU3(U);	
+	printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
+#endif
 
         arg.dest.save((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity); 
     }

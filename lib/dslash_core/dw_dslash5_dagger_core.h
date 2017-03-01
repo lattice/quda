@@ -45,6 +45,9 @@
 #define m5 m5_d
 #define mdwf_b5 mdwf_b5_d
 #define mdwf_c5 mdwf_c5_d
+#define mferm param.mferm
+#define a param.a
+#define b param.b
 #else
 #define spinorFloat float
 #define POW(a, b) __fast_pow(a, b)
@@ -75,6 +78,9 @@
 #define m5 m5_f
 #define mdwf_b5 mdwf_b5_f
 #define mdwf_c5 mdwf_c5_f
+#define mferm param.mferm_f
+#define a param.a
+#define b param.b
 #endif // SPINOR_DOUBLE
 
 // output spinor
@@ -149,7 +155,7 @@ coord[4] = X/(X1*X2*X3*X4);
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
-     int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
+     int sp_idx = ( coord[4] == 0 ? X+(param.Ls-1)*2*param.volume4CB : X-2*param.volume4CB ) / 2;
 
 // read spinor from device memory
      READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
@@ -194,7 +200,7 @@ coord[4] = X/(X1*X2*X3*X4);
 
  // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
   {
-    int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
+    int sp_idx = ( coord[4] == param.Ls-1 ? X-(param.Ls-1)*2*param.volume4CB : X+2*param.volume4CB ) / 2;
 
 // read spinor from device memory
     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
@@ -441,6 +447,9 @@ WRITE_SPINOR(param.sp_stride);
 #undef m5
 #undef mdwf_b5
 #undef mdwf_c5
+#undef mferm
+#undef a
+#undef b
 #undef spinorFloat
 #undef POW
 #undef SHARED_STRIDE

@@ -34,8 +34,6 @@ extern QudaDslashType dslash_type;
 
 extern int test_type;
 
-extern bool tune;
-
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
 
@@ -415,9 +413,8 @@ static int dslashTest()
 
   for (int i=0; i<attempts; i++) {
 
-    if (tune) { // warm-up run
+    { // warm-up run
       printfQuda("Tuning...\n");
-      setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...", niter);
