@@ -234,6 +234,8 @@ extern "C" {
 
     /** Preconditioner instance, e.g., multigrid */
     void *preconditioner;
+    void *preconditionerUP;
+    void *preconditionerDN;
 
     /**
       Dirac Dslash used in preconditioner
