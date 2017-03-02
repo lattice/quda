@@ -739,6 +739,7 @@ namespace quda {
 
   void disableProfileCount();
   void enableProfileCount();
+  void setPolicyTuning(bool);
 
  class DslashCoarsePolicyTune : public Tunable {
 
@@ -771,10 +772,11 @@ namespace quda {
        disableProfileCount();
        dslash();
        enableProfileCount();
+       setPolicyTuning(true);
      }
     }
 
-   virtual ~DslashCoarsePolicyTune() { }
+   virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
    void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
