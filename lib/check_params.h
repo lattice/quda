@@ -82,6 +82,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 
   P(gauge_fix, QUDA_GAUGE_FIXED_INVALID);
+
   P(ga_pad, INVALID_INT);
   
 #if defined INIT_PARAM

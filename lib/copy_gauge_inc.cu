@@ -282,7 +282,7 @@ namespace quda {
 #endif
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 #ifdef BUILD_TIFR_INTERFACE
-	    typedef FloatNOrder<FloatOut,10,2,11> momOut;
+	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
 	    typedef TIFROrder<FloatIn,18> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
@@ -292,7 +292,7 @@ namespace quda {
 #endif
 	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 #ifdef BUILD_TIFR_INTERFACE
-	    typedef FloatNOrder<FloatOut,10,2,11> momOut;
+	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
 	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
