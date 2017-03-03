@@ -616,8 +616,14 @@ namespace quda {
     if (!comm_partitioned()) return;
     createGhostZone(nFace);
 
+    // temporary work around until the ghost buffer for fine and
+    // coarse grid are merged: this ensures we reset the fine ghost
+    // buffer if the coarse grid operator allocates a ghost buffer
+    // that is larger than the fine grid operator
+    static size_t ghostFaceBytes_ = 0;
+
     // only allocate if not already allocated or buffer required is bigger than previously
-    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes ) {
+    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes || ghost_bytes > ghostFaceBytes_) {
 
       if (initGhostFaceBuffer) {
 #ifdef USE_TEXTURE_OBJECTS
@@ -640,8 +646,8 @@ namespace quda {
 	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(ghost_bytes);
 	initGhostFaceBuffer = true;
 	ghostFaceBytes = ghost_bytes;
+	ghostFaceBytes_ = ghost_bytes;
       }
-
     }
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -895,7 +901,6 @@ namespace quda {
 					 const int dim, const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
   {
-
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
     int len = nFace*ghostFace[dim]*Nint*precision;
