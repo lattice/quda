@@ -30,7 +30,6 @@ See also: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES 
 namespace quda {
 //Notes:
 //GMResDR does not require large m (and esp. nev), so this will use normal LAPACK routines.
-
     using namespace blas;
 
     using namespace Eigen;
@@ -51,6 +50,8 @@ namespace quda {
       static bool SelectSmall (SortedEvals v1, SortedEvals v2) { return (v1._val < v2._val);}
     };
 
+    enum class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
+
     class GMResDRArgs{
 
       public:
@@ -61,7 +62,6 @@ namespace quda {
       
        int m;
        int k;
-
        int restarts;
 
        Complex      *c;//  c = &ritzVecs[(m+1)*k] => ritzVecs.col(k)
@@ -70,11 +70,6 @@ namespace quda {
        eta(Vector::Zero(m)), m(m), k(nev), restarts(0) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
 
        void ComputeHarmonicRitz();
-
-       inline void AddShortResidual() { 
-          Map<VectorXcd, Unaligned> c_(c, m+1);
-          c_ -= H * eta;
-       }
 
        inline void ResetArgs() { 
          ritzVecs.setZero();
@@ -133,13 +128,45 @@ namespace quda {
      std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortedEvals::SelectSmall);
 
      //5. Copy sorted eigenvectors:
-     for(int e = 0; e < k; e++) memcpy(ritzVecs.col((m+1)*e).data(), harVecs.col((m+1)*( sorted_evals[e]._idx)).data(), (m)*sizeof(Complex));
+     for(int e = 0; e < k; e++) memcpy(ritzVecs.col(e).data(), harVecs.col(sorted_evals[e]._idx).data(), (m)*sizeof(Complex));//CHECK!
 
      return;
    }
 
+    //Solve least sq:
+    template<libtype which_lib> void ComputeEta(GMResDRArgs &args) {errorQuda("\nUnknown library type.\n");}
+
+    //pure magma version: 
+    template <> void ComputeEta<libtype::magma_lib>(GMResDRArgs &args) {
+
+       DenseMatrix Htemp(DenseMatrix::Zero(args.m+1,args.m));
+       Htemp = args.H; //need this copy
+
+       Complex *ctemp = static_cast<Complex*> (args.ritzVecs.col(0).data());
+       memcpy(ctemp, args.c, (args.m+1)*sizeof(Complex));
+
+       cudaHostRegister(static_cast<void*>(Htemp.data()), (args.m+1)*args.m*sizeof(Complex), cudaHostRegisterDefault);
+       magma_Xgels(static_cast<void*>(Htemp.data()), ctemp, args.m+1, args.m, args.m+1, sizeof(Complex));
+       cudaHostUnregister(Htemp.data());
+
+       memcpy(args.eta.data(), ctemp, args.m*sizeof(Complex));
+       memset(ctemp, 0, (args.m+1)*sizeof(Complex));
+
+       return;
+    }
+
+    //pure magma version: 
+    template <> void ComputeEta<libtype::eigen_lib>(GMResDRArgs &args) {
+
+        Map<VectorXcd, Unaligned> c_(args.c, args.m+1);
+        args.eta = args.H.jacobiSvd(ComputeThinU | ComputeThinV).solve(c_);
+
+       return;
+    }
+
+
     // set the required parameters for the inner solver
-    void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
+    void fillInnerSolveParam_(SolverParam &inner, const SolverParam &outer) {
       inner.tol = outer.tol_precondition;
       inner.maxiter = outer.maxiter_precondition;
       inner.delta = 1e-20; // no reliable updates within the inner solver
@@ -169,7 +196,7 @@ namespace quda {
  {
      //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMResDR is not currently supported.\n");
      //
-     fillInnerSolveParam(Kparam, param);
+     fillInnerSolveParam_(Kparam, param);
 
      if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
        K = new CG(matPrecon, matPrecon, Kparam, profile);
@@ -223,33 +250,32 @@ namespace quda {
 
    profile.TPSTOP(QUDA_PROFILE_FREE);
  }
-
+#define EIGEN_GELS
  void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
  {
    GMResDRArgs &args = *gmresdr_args;
-
-#ifdef USE_MAGMA
-   if(do_gels) {
-     cudaHostRegister(static_cast<void *>(args.H.data()), (args.m+1)*args.m*sizeof(Complex), cudaHostRegisterDefault);
-     magma_Xgels(static_cast<void*>(args.H.data()), static_cast<void*>(args.eta.data()), args.m+1, args.m, args.m+1, sizeof(Complex));
-     cudaHostUnregister(args.H.data());
-   }
+#ifdef EIGEN_GELS
+   if(do_gels) ComputeEta<libtype::eigen_lib>(args);
 #else
-   //not implemented.
+   if(do_gels) ComputeEta<libtype::magma_lib>(args);
 #endif
+
    //compute x = x0+Wm*lsqSol, where Wm is Vm or Zm (if preconditioned):
-   std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().end());
-   std::vector<ColorSpinorField*> V_(Vm->Components().begin(),Vm->Components().end());
+   std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().begin()+args.m);//warning: without preconditioner, Zm is an alias of Vm and has length args.m+1
+   std::vector<ColorSpinorField*> V_(Vm->Components());
 
    std::vector<ColorSpinorField*> x_, r_;
    x_.push_back(x), r_.push_back(r);
 
    blas::caxpy( static_cast<Complex*> ( args.eta.data()), Z_, x_);
 
-   VectorXcd Heta = VectorXcd::Zero(args.m+1); 
-   Heta = (args.H * args.eta);
+   VectorXcd minusHeta = - (args.H * args.eta);
+   //Compute "short" residual:
+   Map<VectorXcd, Unaligned> c_(args.c, args.m+1);
+   c_ += minusHeta; 
 
-   blas::caxpy(static_cast<Complex*>(Heta.data()), V_, r_);
+   //Compute iterative residual:
+   blas::caxpy(static_cast<Complex*>(minusHeta.data()), V_, r_);
 
    return;
  }
@@ -259,10 +285,6 @@ namespace quda {
    GMResDRArgs &args = *gmresdr_args;
 
    args.ComputeHarmonicRitz(); 
-   args.AddShortResidual();
-
-   //Map<MatrixXcd, Unaligned> _H   (_args.H, (args.m+1), args.m);
-   //Map<MatrixXcd, Unaligned> _Gkp1(_args.ritzVecs, (args.m+1), (args.k+1));
 
    //1. QR of the eigenvctor matrix:
    DenseMatrix Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
@@ -276,18 +298,18 @@ namespace quda {
    args.H.topLeftCorner(args.k+1, args.k) = Res;
 
    //2. Update Vm+1 : Vk+1 = Vm+1 Qk+1
-
    //Call multiblas:
    //Create intermediate model:
    ColorSpinorParam csParam(Vm->Component(0));
 
    csParam.is_composite  = true;
    csParam.composite_dim = (args.k+1);
+   csParam.create = QUDA_ZERO_FIELD_CREATE;  
    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
    ColorSpinorFieldSet *Vkp1 = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
 
-   std::vector<ColorSpinorField*> V(Vm->Components().begin(), Vm->Components().end());
+   std::vector<ColorSpinorField*> V(Vm->Components());
 
    for(int i = 0; i < (args.k+1); i++) 
    {
@@ -306,11 +328,11 @@ namespace quda {
    }
 
    //3. Zk = Zm Qk
-   if( Zm->V() &&  Zm->V() != Vm->V() )
+   if( Zm->V() != Vm->V() )
    {
      DenseMatrix Qk = Qkp1.topLeftCorner(args.m,args.k);
 
-     std::vector<ColorSpinorField*> Z(Zm->Components().begin(), Zm->Components().end());
+     std::vector<ColorSpinorField*> Z(Zm->Components());
 
      for(int i = 0; i < args.k; i++) 
      {
@@ -337,31 +359,23 @@ namespace quda {
      caxpy(-alpha, Vm->Component(j), Vm->Component(args.k));
    }
 
-   blas::ax(1.0/ norm2(Vm->Component(args.k)), Vm->Component(args.k));
+   blas::ax(1.0/ sqrt(blas::norm2(Vm->Component(args.k))), Vm->Component(args.k));
+
+   args.ritzVecs.setZero();
 
    return;
  }
 
- int GMResDR::RunFlexArnoldiProcess(const int start_idx, bool do_givens = false)
+ int GMResDR::RunFlexArnoldiProcess(const int start_idx, bool do_givens = false)//bool => const bool
  {
    GMResDRArgs &args = *gmresdr_args;
    ColorSpinorField &tmp = *tmpp;
 
-   Complex *givensH = nullptr;
-   Complex *cn      = nullptr;
-   double  *sn      = nullptr;
+   Complex *givensH = (do_givens) ? new Complex[(args.m+1)*args.m] : nullptr;
+   Complex *cn      = (do_givens) ? new Complex[args.m]            : nullptr;
+   double  *sn      = (do_givens) ? new double [args.m]            : nullptr;
 
-   if(do_givens)
-   {
-     if (start_idx != 0) 
-       do_givens = false; 
-     else {
-       givensH = new Complex[(args.m+1)*args.m];
-       //Givens coefficients:
-       cn = new Complex[args.m];
-       sn = new double [args.m];
-     }
-   }
+   Complex c0 = args.c[0];//keep the first element 
 
    int j = start_idx;
 
@@ -377,24 +391,23 @@ namespace quda {
      }
 
      matSloppy(Vm->Component(j+1), Zm->Component(j), tmp);
+
+     args.H(0, j) = cDotProduct(Vm->Component(0), Vm->Component(j+1));//
+     caxpy(-args.H(0, j), Vm->Component(0), Vm->Component(j+1));     
+
+     Complex h0 = do_givens ? args.H(0, j) : 0.0;
      
-     Complex h0(0.0, 0.0);
-     
-     for(int i = start_idx; i <= j; i++)
+     for(int i = 1; i <= j; i++)
      {
         args.H(i, j) = cDotProduct(Vm->Component(i), Vm->Component(j+1));//
-
         caxpy(-args.H(i, j), Vm->Component(i), Vm->Component(j+1));
 
         if(do_givens) {
-           if( i == 0 ) { //initialize h0:
-             h0 = args.H(0,j);
-           } else { //do givens for i > 0:
-             givensH[args.m*j+(i-1)] = conj(cn[i-1])*h0 + sn[i-1]*args.H(i,j);
-             h0 = -sn[i-1]*h0 + cn[i-1]*args.H(i,j); 
-           }
+           givensH[(args.m+1)*j+(i-1)] = conj(cn[i-1])*h0 + sn[i-1]*args.H(i,j);
+           h0 = -sn[i-1]*h0 + cn[i-1]*args.H(i,j); 
         }
      }
+
      //6. Compute h(j+1,j):
      args.H(j+1, j) = Complex(sqrt(norm2(Vm->Component(j+1))), 0.0);
      //7. Scale the last arnoldi vector:
@@ -408,11 +421,12 @@ namespace quda {
        //
        sn[j] = args.H(j+1,j).real() * inv_denom;
        //9. Compute diagonal element in G:
-       givensH[j*args.m+j] = conj(cn[j])*h0 + sn[j]*args.H(j+1,j);
+       givensH[j*(args.m+1)+j] = conj(cn[j])*h0 + sn[j]*args.H(j+1,j);
       
        //10. Compute iter residual:
        args.c[j+1] = -sn[j]*args.c[j];
        args.c[j]  *= conj(cn[j]);
+       //printfQuda("\nResidual: %le\n", std::norm(args.c[j+1]));
      }
 
      j += 1;
@@ -424,8 +438,11 @@ namespace quda {
    if(do_givens)
    {
      Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH, args.m, args.m, DynamicStride(args.m+1,1) );//extract triangular part
-     Map<VectorXcd, Unaligned> c_(args.c, args.m);//segment(0, m)
-     args.eta = c_;
+     memcpy(args.eta.data(),  args.c, args.m*sizeof(Complex));
+     //restore the orig array:
+     memset(args.c, 0, (args.m+1)*sizeof(Complex));
+     args.c[0] = c0;
+
      givensH_.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
 
      delete[] givensH;
@@ -435,7 +452,8 @@ namespace quda {
    } else {
      const int cdot_pipeline_length  = 5;
      int offset = 0;
-   
+     memset(args.c, 0, (args.m+1)*sizeof(Complex));
+ 
      do {
         const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
 
@@ -455,13 +473,11 @@ namespace quda {
         offset += cdot_pipeline_length; 
 
      } while (offset < (args.k+1));
-     Map<VectorXcd, Unaligned> c_(args.c, args.m);//segment(0, m)
-     args.eta = c_;
    }
 
    UpdateSolution(x_sloppy, r_sloppy, !do_givens);
 
-   return j;
+   return (j-start_idx);
  }
 
  void GMResDR::operator()(ColorSpinorField &out, ColorSpinorField &in)
@@ -537,15 +553,21 @@ namespace quda {
     mat(r, out, y);
     //
     double r2 = xmyNorm(in, r);//compute residual
-    double b2 = r2;
+    double b2     = r2;
+
     args.c[0] = Complex(sqrt(r2), 0.0);
 
-    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
+    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
     //2. Compute the first Arnoldi vector:
-    if(param.precision_sloppy != param.precision) blas::copy(rSloppy, r);
+    if(param.precision_sloppy != param.precision) {
+      blas::copy(rSloppy, r);
 
-    blas::ax(1.0 / args.c[0].real(), r);   
-    Vm->Component(0) = r;
+      blas::ax(1.0 / args.c[0].real(), r);   
+      Vm->Component(0) = r;
+    } else {
+      blas::zero(Vm->Component(0));//no need for this op
+      blas::axpy(1.0 / args.c[0].real(), rSloppy, Vm->Component(0));   
+    }
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -557,14 +579,14 @@ namespace quda {
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
    /************************Run Flex Arnoldi cycles*****************************/
-   int restart_idx = 0, j = 0;
+   int restart_idx = 0, j = 0, check_interval = 10;
 
-   bool do_givens           = true; //do Givens transforms for the initial cycle
+   bool do_givens = true; //do Givens transforms for the initial cycle
 
    while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
    {
 
-     tot_iters += RunFlexArnoldiProcess(j, do_givens);
+     tot_iters += RunFlexArnoldiProcess(j, ((j == 0) and do_givens));
 
      r2 = norm2(rSloppy);
 
@@ -575,28 +597,28 @@ namespace quda {
        blas::xpy(y, x);
        blas::zero(xSloppy);
      }
-
-     mat(r, x, y);
-     //
-     double ext_r2 = xmyNorm(in, r);//compute full precision residual
-
-     //printfQuda("\nDone for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
      //
      PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
 
-     if(param.precision_sloppy != param.precision) rSloppy = r;
-
-     if( !((param.precision_sloppy != param.precision) && ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold)) ) {
+     if( (restart_idx != param.deflation_grid-1) ) {
 
        RestartVZH();
        j = args.k;
 
      } else {
 
+       mat(r, x, y);
+       //
+       double ext_r2 = xmyNorm(in, r);//compute full precision residual
+
+       printfQuda("\nDone for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
+
        args.ResetArgs();
        args.c[0] = Complex(sqrt(ext_r2), 0.0);
-       blas::ax(1.0 / args.c[0].real(), r); 
-       Vm->Component(0) = r;
+//@       blas::ax(1.0 / args.c[0].real(), r); 
+//@       Vm->Component(0) = r;
+       blas::zero(Vm->Component(0));//no need for this op
+       blas::axpy(1.0 / args.c[0].real(), rSloppy, Vm->Component(0));
 
        j = 0; 
      }
@@ -615,7 +637,6 @@ namespace quda {
 
    // compute the true residuals
    mat(r, x, y);
-   //matSloppy(r, x, tmp, tmp2);
 
    param.true_res = sqrt(xmyNorm(in, r) / b2);
 
