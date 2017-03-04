@@ -432,10 +432,11 @@ extern "C" {
   } QudaGhostExchange;
 
   typedef enum QudaStaggeredPhase_s {
-    QUDA_MILC_STAGGERED_PHASE = 0,
-    QUDA_CPS_STAGGERED_PHASE = 1,
-    QUDA_TIFR_STAGGERED_PHASE = 2,
-    QUDA_INVALID_STAGGERED_PHASE = QUDA_INVALID_ENUM
+    QUDA_STAGGERED_PHASE_NO = 0,
+    QUDA_STAGGERED_PHASE_MILC = 1,
+    QUDA_STAGGERED_PHASE_CPS = 2,
+    QUDA_STAGGERED_PHASE_TIFR = 3,
+    QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {

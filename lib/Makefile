@@ -19,7 +19,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
-	fat_force_quda.o llfat_quda_itf.o llfat_quda.o			\
+	fat_force_quda.o llfat_quda.o					\
 	gauge_force.o field_strength_tensor.o clover_quda.o	\
 	dslash_quda.o covDev.o dslash_wilson.o dslash_clover.o		\
 	dslash_clover_asym.o dslash_twisted_mass.o			\
@@ -86,7 +86,7 @@ DSLASH_INLN = dslash_constants.h dslash_textures.h io_spinor.h	\
 
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/
-QUDA_INLN = check_params.h quda_matrix.h force_common.h llfat_core.h	\
+QUDA_INLN = check_params.h quda_matrix.h force_common.h 		\
 	hisq_force_macros.h read_clover.h                               \
 	read_gauge.h svd_quda.h dslash_init.cuh
 

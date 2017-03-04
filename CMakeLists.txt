@@ -49,6 +49,10 @@ endif()
 #
 project("QUDA" VERSION 0.9.0)
 
+if(NOT GITVERSION)
+  set(GITVERSION ${CMAKE_VERSION})
+endif()
+
 
 #######################################################################
 # QUDA OPTIONS
@@ -300,7 +304,7 @@ if(QUDA_DIRAC_CLOVER)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
-  add_definitions(-DGPU_TWISTED_MASS_DIRAC)
+  add_definitions(-DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_TWISTED_MASS)
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
@@ -438,6 +442,7 @@ STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG}
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
+
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
@@ -449,6 +454,9 @@ if(DEBUG_BUILD)
     set(GITVERSION debug)
   endif()
 endif()
+
+set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
+
 
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})

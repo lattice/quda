@@ -28,14 +28,15 @@ extern int gridsize_from_cmdline[];
 
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
+extern int niter;
+
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 //static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static size_t gSize;
 
-  static void
-llfat_test(int test)
+static void llfat_test()
 {
 
   QudaGaugeParam qudaGaugeParam;
@@ -61,10 +62,14 @@ llfat_test(int test)
   setDims(qudaGaugeParam.X);
 
   qudaGaugeParam.cpu_prec = cpu_prec;
-  qudaGaugeParam.cuda_prec = prec;
+  qudaGaugeParam.cuda_prec = qudaGaugeParam.cuda_prec_sloppy = prec;
   qudaGaugeParam.gauge_order = gauge_order;
-  qudaGaugeParam.type=QUDA_WILSON_LINKS;
-  qudaGaugeParam.reconstruct = link_recon;
+  qudaGaugeParam.type = QUDA_WILSON_LINKS;
+  qudaGaugeParam.reconstruct = qudaGaugeParam.reconstruct_sloppy = link_recon;
+  qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  qudaGaugeParam.ga_pad = 0;
 
   void* fatlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
   void* longlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
@@ -157,12 +162,15 @@ llfat_test(int test)
   struct timeval t0, t1;
 
   void* longlink_ptr = longlink;
-#ifdef MULTI_GPU
-  if(!test) longlink_ptr = NULL; // Have to have an extended volume for the long-link calculation
-#endif
+  {
+    printfQuda("Tuning...\n");
+    computeKSLinkQuda(fatlink, longlink_ptr, NULL, milc_sitelink, act_path_coeff, &qudaGaugeParam);
+  }
 
+  printfQuda("Running %d iterations of computation\n", niter);
   gettimeofday(&t0, NULL);
-  computeKSLinkQuda(fatlink, longlink_ptr, NULL, milc_sitelink, act_path_coeff, &qudaGaugeParam);
+  for (int i=0; i<niter; i++)
+    computeKSLinkQuda(fatlink, longlink_ptr, NULL, milc_sitelink, act_path_coeff, &qudaGaugeParam);
   gettimeofday(&t1, NULL);
 
   double secs = TDIFF(t0,t1);
@@ -176,32 +184,25 @@ llfat_test(int test)
 
   if (verify_results){
 
-    //FIXME: we have this compplication because references takes coeff as float/double 
+    //FIXME: we have this complication because references takes coeff as float/double
     //        depending on the precision while the GPU code aways take coeff as double
     void* coeff;
     double coeff_dp[6];
     float  coeff_sp[6];
-    for(int i=0;i < 6;i++){
-      coeff_sp[i] = coeff_dp[i] = act_path_coeff[i];
-    }
-    if(prec == QUDA_DOUBLE_PRECISION){
-      coeff = coeff_dp;
-    }else{
-      coeff = coeff_sp;
-    }
+    for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeff[i];
+    coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
+
 #ifdef MULTI_GPU
     int optflag = 0;
     //we need x,y,z site links in the back and forward T slice
     // so it is 3*2*Vs_t
     int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
-    for(int i=0;i < 4; i++){
-      ghost_sitelink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
-    }
+    for (int i=0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
 
     /*
        nu |     |
-       |_____|
-       mu
+          |_____|
+            mu
        */
 
     for(int nu=0;nu < 4;nu++){
@@ -246,14 +247,14 @@ llfat_test(int test)
   //format change for fatlink and longlink
   void* myfatlink[4];
   void* mylonglink[4];
-  for(int i=0;i < 4;i++){
+  for(int i=0; i < 4; i++){
     myfatlink[i] = safe_malloc(V*gaugeSiteSize*gSize);
     mylonglink[i] = safe_malloc(V*gaugeSiteSize*gSize);
     memset(myfatlink[i], 0, V*gaugeSiteSize*gSize);
     memset(mylonglink[i], 0, V*gaugeSiteSize*gSize);
   }
 
-  for(int i=0;i < V; i++){
+  for(int i=0; i < V; i++){
     for(int dir=0; dir< 4; dir++){
       char* src = ((char*)fatlink)+ (4*i+dir)*gaugeSiteSize*gSize;
       char* dst = ((char*)myfatlink[dir]) + i*gaugeSiteSize*gSize;
@@ -277,41 +278,28 @@ llfat_test(int test)
 		      V, qudaGaugeParam.cpu_prec);
     
     printfQuda("Fat-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
-#ifdef MULTI_GPU
-    if(test){
-#endif
-      printfQuda("Checking long links...\n");
-      res = 1;
-      for(int dir=0; dir<4; ++dir){
-	res &= compare_floats(long_reflink[dir], mylonglink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
-      }
-      
-      strong_check_link(mylonglink, "GPU results: ",
-			long_reflink, "CPU reference results:",
-			V, qudaGaugeParam.cpu_prec);
-      
-      printfQuda("Long-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
-      
-#ifdef MULTI_GPU
-    }else{ // !test
-      printfQuda("Extended volume is required for multi-GPU long-link construction\n");
+
+    printfQuda("Checking long links...\n");
+    res = 1;
+    for(int dir=0; dir<4; ++dir){
+      res &= compare_floats(long_reflink[dir], mylonglink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
     }
-#endif
+      
+    strong_check_link(mylonglink, "GPU results: ",
+		      long_reflink, "CPU reference results:",
+		      V, qudaGaugeParam.cpu_prec);
+      
+    printfQuda("Long-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
   }
 
   int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
-  int flops= 61632;
-#ifdef MULTI_GPU
-  if(test) flops += (252*4); // long-link contribution 
-#else
-  flops += (252*4); // 2*117 + 18 (two matrix-matrix multiplications and a matrix rescale)
-#endif
+  long long flops= 61632 * niter;
+  flops += (252*4)*(long long)niter; // long-link contribution
 
-  double perf = 1.0* flops*volume/(secs*1024*1024*1024);
-  printfQuda("link computation time =%.2f ms, flops= %.2f Gflops\n", secs*1000, perf);
+  double perf = flops*volume/(secs*1024*1024*1024);
+  printfQuda("link computation time =%.2f ms, flops= %.2f Gflops\n", (secs*1000)/niter, perf);
 
-
-  for(int i=0;i < 4;i++){
+  for (int i=0; i < 4; i++) {
     host_free(myfatlink[i]);
     host_free(mylonglink[i]);
   }
@@ -328,7 +316,7 @@ llfat_test(int test)
   }
 #endif
 
-  for(int i=0;i < 4; i++){
+  for(int i=0; i < 4; i++){
     host_free(sitelink[i]);
     host_free(sitelink_ex[i]);
     host_free(fat_reflink[i]);
@@ -344,55 +332,44 @@ llfat_test(int test)
   endQuda();
 }
 
-  static void
-display_test_info(int test)
+static void display_test_info()
 {
   printfQuda("running the following test:\n");
 
-  printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       Test          Ordering\n");
-  printfQuda("%s                       %s                         %d/%d/%d/                  %d             %d              %s \n", 
+  printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       Ordering\n");
+  printfQuda("%s                       %s                         %d/%d/%d/                  %d             %s \n", 
       get_prec_str(prec),
       get_recon_str(link_recon), 
-      xdim, ydim, zdim, tdim, test, 
+      xdim, ydim, zdim, tdim,
       get_gauge_order_str(gauge_order));
 
-#ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n",
       dimPartitioned(0),
       dimPartitioned(1),
       dimPartitioned(2),
       dimPartitioned(3));
-#endif
 
   return ;
 
 }
 
-  void
-usage_extra(char** argv )
+void usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
   printfQuda("    --gauge-order <qdp/milc>		   # ordering of the input gauge-field\n");
   return ;
 }
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 
-#ifdef MULTI_GPU
-  int test = 1;
-#else
-  int test = 0;
-#endif
   //default to 18 reconstruct, 8^3 x 8
   link_recon = QUDA_RECONSTRUCT_NO;
   xdim=ydim=zdim=tdim=8;
   cpu_prec = prec = QUDA_DOUBLE_PRECISION;
 
-  int i;
-  for (i =1;i < argc; i++){
+  for (int i = 1; i < argc; i++){
 
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -419,16 +396,9 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-
-#ifdef MULTI_GPU
-  if(gauge_order == QUDA_MILC_GAUGE_ORDER && test == 0){
-    errorQuda("ERROR: milc format for multi-gpu with test0 is not supported yet!\n");
-  }
-#endif
-
   initComms(argc, argv, gridsize_from_cmdline);
-  display_test_info(test);
-  llfat_test(test);
+  display_test_info();
+  llfat_test();
   finalizeComms();
 }
 
