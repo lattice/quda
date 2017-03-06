@@ -271,7 +271,7 @@ namespace quda {
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     int ghost_threads[4] = {0};
-    int bulk_threads = ((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) ? in->Volume() : in->Volume() / 2;
+    int bulk_threads = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->Volume() : in->Volume() / 2;
 
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
@@ -281,7 +281,7 @@ namespace quda {
       dslashParam.ghostNormOffset[i][0] = in->GhostNormOffset(i,0);
       dslashParam.ghostNormOffset[i][1] = in->GhostNormOffset(i,1);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
-      ghost_threads[i] = ((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
+      ghost_threads[i] = (in->TwistFlavor() == QUDA_TWIST_SINGLET) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
     }
 
 #ifdef MULTI_GPU

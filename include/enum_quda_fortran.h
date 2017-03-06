@@ -324,8 +324,7 @@
 #define QUDA_PC_INVALID QUDA_INVALID_ENUM
 
 #define QudaTwistFlavorType integer(4)
-#define QUDA_TWIST_MINUS -1
-#define QUDA_TWIST_PLUS +1
+#define QUDA_TWIST_SINGLET 1
 #define QUDA_TWIST_NONDEG_DOUBLET +2
 #define QUDA_TWIST_DEG_DOUBLET -2
 #define QUDA_TWIST_NO  0
