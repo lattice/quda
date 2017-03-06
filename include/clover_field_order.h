@@ -101,13 +101,12 @@ namespace quda {
 
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
-      Accessor(const CloverField &A, bool inverse=false) { }
+      Accessor(const CloverField &A, bool inverse=false) {
+	errorQuda("Not implemented for order %d", order);
+      }
 
       __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row, int s_col,
 							    int c_row, int c_col) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
 	return dummy;
       }
     };
