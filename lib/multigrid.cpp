@@ -787,7 +787,9 @@ namespace quda {
       delete B_gpu[i];
     }
 
-    saveVectors(B);
+    if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
+      saveVectors(B);
+    }
 
     return;
   }
