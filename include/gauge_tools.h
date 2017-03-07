@@ -31,12 +31,10 @@ namespace quda {
      @param dataDs Output smeared field
      @param dataOr Input gauge field
      @param rho smearing parameter
-     @param location Location of the computation
   */
   void STOUTStep (GaugeField &dataDs,
-		const GaugeField& dataOr,
-		double rho,
-		QudaFieldLocation location);
+		  const GaugeField& dataOr,
+		  double rho);
 
 
   /**
