@@ -202,7 +202,7 @@ namespace quda {
 #ifndef FINE_GRAINED_ACCESS
       writeAuxString("out_stride=%d,in_stride=%d,geometry=%d", arg.out.stride, arg.in.stride, arg.in.geometry);
 #else
-      writeAuxString("");
+      writeAuxString("fine-grained");
 #endif
     }
 
