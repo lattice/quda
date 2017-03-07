@@ -36,7 +36,7 @@ namespace quda {
 
   template<int blockSize, typename Float, typename Gauge>
   __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
-    typedef complex<Float> Complex;
+    typedef Matrix<complex<Float>,3> Link;
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y;
 
@@ -50,40 +50,29 @@ namespace quda {
       int dx[4] = {0, 0, 0, 0};
       for (int mu = 0; mu < 3; mu++) {
 	for (int nu = (mu+1); nu < 3; nu++) {
-	  Matrix<Complex,3> U1, U2, U3, U4, tmpM;
 
-	  arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,arg.E), mu, parity);
+	  Link U1 = arg.dataOr(mu, linkIndexShift(x,dx,arg.E), parity);
 	  dx[mu]++;
-	  arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,arg.E), nu, 1-parity);
+	  Link U2 = arg.dataOr(nu, linkIndexShift(x,dx,arg.E), 1-parity);
 	  dx[mu]--;
 	  dx[nu]++;
-	  arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,arg.E), mu, 1-parity);
+	  Link U3 = arg.dataOr(mu, linkIndexShift(x,dx,arg.E), 1-parity);
 	  dx[nu]--;
-	  arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,arg.E), nu, parity);
+	  Link U4 = arg.dataOr(nu, linkIndexShift(x,dx,arg.E), parity);
 
-	  tmpM = U1 * U2;
-	  tmpM = tmpM * conj(U3);
-	  tmpM = tmpM * conj(U4);
-
-	  plaq.x += getTrace(tmpM).x;
+	  plaq.x += getTrace( U1 * U2 * conj(U3) * conj(U4) ).x;
 	}
 
-	Matrix<Complex,3> U1, U2, U3, U4, tmpM;
-
-	arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,arg.E), mu, parity);
+	Link U1 = arg.dataOr(mu, linkIndexShift(x,dx,arg.E), parity);
 	dx[mu]++;
-	arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,arg.E), 3, 1-parity);
+	Link U2 = arg.dataOr(3, linkIndexShift(x,dx,arg.E), 1-parity);
 	dx[mu]--;
 	dx[3]++;
-	arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,arg.E), mu, 1-parity);
+	Link U3 = arg.dataOr(mu,linkIndexShift(x,dx,arg.E), 1-parity);
 	dx[3]--;
-	arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,arg.E), 3, parity);
+	Link U4 = arg.dataOr(3, linkIndexShift(x,dx,arg.E), parity);
 
-	tmpM = U1 * U2;
-	tmpM = tmpM * conj(U3);
-	tmpM = tmpM * conj(U4);
-
-	plaq.y += getTrace(tmpM).x;
+	plaq.y += getTrace( U1 * U2 * conj(U3) * conj(U4) ).x;
       }
     }
 

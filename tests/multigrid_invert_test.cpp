@@ -508,7 +508,7 @@ int main(int argc, char **argv)
       wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {
+        if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
           tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
         } else {
           printfQuda("Unsupported dslash_type\n");
@@ -527,7 +527,7 @@ int main(int argc, char **argv)
 		inv_param.cpu_prec, gauge_param);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        if (inv_param.twist_flavor == QUDA_TWIST_MINUS || inv_param.twist_flavor == QUDA_TWIST_PLUS) {
+        if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
           tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                    inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         } else {

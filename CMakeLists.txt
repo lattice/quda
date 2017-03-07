@@ -49,6 +49,10 @@ endif()
 #
 project("QUDA" VERSION 0.9.0)
 
+if(NOT GITVERSION)
+  set(GITVERSION ${CMAKE_VERSION})
+endif()
+
 
 #######################################################################
 # QUDA OPTIONS
@@ -111,6 +115,8 @@ set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
+
+set(QUDA_MAGMAHOME "" CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
@@ -226,12 +232,18 @@ endif()
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(MAGMA  magma)
-  include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
-  message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
-  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  if("${QUDA_MAGMAHOME}" STREQUAL "")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MAGMA  magma)
+    include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
+    message("${MAGMA_INCLUDEDIR}")
+    find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  else()
+    # prefer static library
+    FIND_LIBRARY(MAGMA_LIB libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
+    include_directories(SYSTEM ${QUDA_MAGMAHOME}/include)
+  endif()  
 endif(QUDA_MAGMA)
 
 # This selects arpack or parpack for Multi GPU
@@ -300,7 +312,7 @@ if(QUDA_DIRAC_CLOVER)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
-  add_definitions(-DGPU_TWISTED_MASS_DIRAC)
+  add_definitions(-DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_TWISTED_MASS)
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
@@ -438,6 +450,7 @@ STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG}
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
+
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
@@ -449,6 +462,9 @@ if(DEBUG_BUILD)
     set(GITVERSION debug)
   endif()
 endif()
+
+set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
+
 
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})

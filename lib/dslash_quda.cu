@@ -411,7 +411,7 @@ class TwistGamma5Cuda : public Tunable {
     dslashParam.in = (void*)in->V();
     dslashParam.inNorm = (float*)in->Norm();
     dslashParam.sp_stride = in->Stride();
-    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
+    if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {
       setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, twist);
       dslashParam.c = 0.0;
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
@@ -437,7 +437,7 @@ class TwistGamma5Cuda : public Tunable {
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
+      if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {
         twistGamma5Kernel<sFloat,false><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
       } else {
         twistGamma5Kernel<sFloat,true><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
@@ -471,7 +471,7 @@ class TwistGamma5Cuda : public Tunable {
 void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
     const int dagger, const double &kappa, const double &mu, const double &epsilon,   const QudaTwistGamma5Type twist)
 {
-  if(in->TwistFlavor() == QUDA_TWIST_PLUS || in->TwistFlavor() == QUDA_TWIST_MINUS)
+  if(in->TwistFlavor() == QUDA_TWIST_SINGLET)
     dslashParam.threads = in->Volume();
   else //twist doublet    
     dslashParam.threads = in->Volume() / 2;
@@ -539,7 +539,7 @@ class TwistCloverGamma5Cuda : public Tunable {
       dslashParam.fl_stride = in->VolumeCB();
 #endif
 
-      if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
+      if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {
 	setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, tw);
       } else {//twist doublet
 	errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
@@ -562,7 +562,7 @@ class TwistCloverGamma5Cuda : public Tunable {
 #if defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)
+      if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)
         if (twist == QUDA_TWIST_GAMMA5_DIRECT)
           twistCloverGamma5Kernel<sFloat><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
         else if (twist == QUDA_TWIST_GAMMA5_INVERSE)
@@ -599,7 +599,7 @@ class TwistCloverGamma5Cuda : public Tunable {
 void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger, const double &kappa, const double &mu,
     const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity)
 {
-  if(in->TwistFlavor() == QUDA_TWIST_PLUS || in->TwistFlavor() == QUDA_TWIST_MINUS)
+  if(in->TwistFlavor() == QUDA_TWIST_SINGLET)
     dslashParam.threads = in->Volume();
   else //twist doublet    
     errorQuda("Twisted doublet not supported in twisted clover dslash");

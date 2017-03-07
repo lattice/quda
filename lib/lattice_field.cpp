@@ -17,12 +17,23 @@ namespace quda {
   bool LatticeField::bufferDeviceInit = false;
   size_t LatticeField::bufferDeviceBytes = 0;
 
+  LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
+    : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
+      siteSubset(field.SiteSubset()), ghostExchange(field.GhostExchange())
+  {
+    for(int dir=0; dir<nDim; ++dir) {
+      x[dir] = field.X()[dir];
+      r[dir] = field.R()[dir];
+    }
+  }
+
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
-      siteSubset(param.siteSubset)
+      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange)
   {
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
+      r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
       volume *= param.x[i];
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
@@ -60,13 +71,31 @@ namespace quda {
   }
 
   void LatticeField::checkField(const LatticeField &a) const {
-    if (a.volume != volume) errorQuda("Volume does not match %d %d", volume, a.volume);
-    if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %d %d", volumeCB, a.volumeCB);
     if (a.nDim != nDim) errorQuda("nDim does not match %d %d", nDim, a.nDim);
-    for (int i=0; i<nDim; i++) {
-      if (a.x[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]);
-      if (a.surface[i] != surface[i]) errorQuda("surface[%d] does not match %d %d", i, surface[i], a.surface[i]);
-      if (a.surfaceCB[i] != surfaceCB[i]) errorQuda("surfaceCB[%d] does not match %d %d", i, surfaceCB[i], a.surfaceCB[i]);  
+    if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && a.ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
+      // if source is extended by I am not then we need to compare their interior volume to my volume
+      int a_volume_interior = 1;
+      for (int i=0; i<nDim; i++) {
+	if (a.x[i]-2*a.r[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]-2*a.r[i]);
+	a_volume_interior *= a.x[i] - 2*a.r[i];
+      }
+      if (a_volume_interior != volume) errorQuda("Interior volume does not match %d %d", volume, a_volume_interior);
+    } else if (a.ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
+      // if source is extended by I am not then we need to compare their interior volume to my volume
+      int this_volume_interior = 1;
+      for (int i=0; i<nDim; i++) {
+	if (x[i]-2*r[i] != a.x[i]) errorQuda("x[%d] does not match %d %d", i, x[i]-2*r[i], a.x[i]);
+	this_volume_interior *= x[i] - 2*r[i];
+      }
+      if (this_volume_interior != a.volume) errorQuda("Interior volume does not match %d %d", this_volume_interior, a.volume);
+    } else {
+      if (a.volume != volume) errorQuda("Volume does not match %d %d", volume, a.volume);
+      if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %d %d", volumeCB, a.volumeCB);
+      for (int i=0; i<nDim; i++) {
+	if (a.x[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]);
+	if (a.surface[i] != surface[i]) errorQuda("surface[%d] does not match %d %d", i, surface[i], a.surface[i]);
+	if (a.surfaceCB[i] != surfaceCB[i]) errorQuda("surfaceCB[%d] does not match %d %d", i, surfaceCB[i], a.surfaceCB[i]);
+      }
     }
   }
 
@@ -158,6 +187,11 @@ namespace quda {
     }
     output << "pad = " << param.pad << std::endl;
     output << "precision = " << param.precision << std::endl;
+
+    output << "ghostExchange = " << param.ghostExchange << std::endl;
+    for (int i=0; i<param.nDim; i++) {
+      output << "r[" << i << "] = " << param.r[i] << std::endl;
+    }
 
     return output;  // for multiple << operators.
   }

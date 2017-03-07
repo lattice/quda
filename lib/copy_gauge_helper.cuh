@@ -22,12 +22,6 @@ namespace quda {
     }
   };
 
-  __host__ __device__ inline constexpr int ct_sqrt(int n, int i = 1){
-    return n == i ? n : (i * i < n ? ct_sqrt(n, i + 1) : i);
-  }
-
-  __host__ __device__ inline constexpr int Ncolor(int length) { return ct_sqrt(length/2); }
-
   /**
      Generic CPU gauge reordering and packing 
   */

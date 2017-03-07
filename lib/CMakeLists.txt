@@ -17,7 +17,7 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp fat_force_quda.cpp
-  llfat_quda_itf.cpp llfat_quda.cu gauge_force.cu
+  llfat_quda.cu gauge_force.cu
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu covDev.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
@@ -117,7 +117,7 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda TEST_LIBS ${MAGMA})
+  target_link_libraries(quda ${MAGMA})
 endif()
 
 if(QUDA_ARPACK)
@@ -141,6 +141,7 @@ ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMA
 
 install(TARGETS quda EXPORT qudaTargets
         LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
         INCLUDES DESTINATION include)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
