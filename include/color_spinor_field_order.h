@@ -16,29 +16,24 @@
 #include <typeinfo>
 #include <complex_quda.h>
 #include <index_helper.cuh>
+#include <thrust/device_ptr.h>
+#include <thrust/transform_reduce.h>
 
 namespace quda {
 
   namespace colorspinor {
 
+    template<typename Float> struct square { __host__ __device__ Float operator()(quda::complex<Float> x) { return norm(x); } };
+
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB { 
-      AccessorCB(const ColorSpinorField &) { }
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const {	
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
-	return 0;
-      }
+      AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
+      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const { return 0; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct GhostAccessorCB {
-      GhostAccessorCB(const ColorSpinorField &) { }
-      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
-	return 0;
-      }
+      GhostAccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
+      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      { return 0; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec> 
@@ -270,15 +265,21 @@ namespace quda {
       /** Returns the number of packed vectors (for mg prolongator) */
       __device__ __host__ inline int Nvec() const { return nVec; }
 
+      /**
+       * Returns the L2 norm squared of the field in a given dimension
+       * @return L2 norm squared
+      */
       __host__ double norm2() const {
-	double nrm2 = 0.0;
-	for (int parity=0; parity<nParity; parity++)
-	  for (int x_cb=0; x_cb<volumeCB; x_cb++)
-	    for (int s=0; s<nSpin; s++)
-	      for (int c=0; c<nColor; c++)
-		for (int v=0; v<nVec; v++)
-		  nrm2 += norm((*this)(parity,x_cb,s,c,v));
-	return nrm2;
+	cudaPointerAttributes attributes;
+	cudaPointerGetAttributes(&attributes, v);
+	const QudaFieldLocation location = (attributes.memoryType == cudaMemoryTypeDevice) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
+
+	if (location == QUDA_CUDA_FIELD_LOCATION) {
+	  thrust::device_ptr<complex<Float> > ptr(v);
+	  return thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor, square<Float>(), 0.0, thrust::plus<Float>());
+	} else {
+	  return thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor, square<Float>(), 0.0, thrust::plus<Float>());
+	}
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(Float); }

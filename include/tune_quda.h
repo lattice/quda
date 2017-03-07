@@ -46,6 +46,14 @@ namespace quda {
       return *this;
     }
 
+    friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
+      output << "block = (" << param.block.x << ", " << param.block.y << ", " << param.block.z << ")" << std::endl;
+      output << "grid = (" << param.grid.x << ", " << param.grid.y << ", " << param.grid.z << ")" << std::endl;
+      output << "shared_bytes = " << param.shared_bytes << std::endl;
+      output << "aux = (" << param.aux.x << ", " << param.aux.y << ", " << param.aux.z << ")" << std::endl;
+      output << param.comment << std::endl;
+      return output;
+    }
   };
 
 

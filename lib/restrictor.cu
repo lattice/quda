@@ -401,7 +401,8 @@ namespace quda {
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
     // for fine grids (Nc=3) have more parallelism so can use more coarse strategy
-    constexpr int coarse_colors_per_thread = fineColor == 3 ? 8 : 2;
+    constexpr int coarse_colors_per_thread = fineColor != 3 ? 2 :
+      coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
 
     Arg arg(Out, In, V, fine_to_coarse, coarse_to_fine, parity, in);
     RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread> restrictor(arg, out, in, Location(out, in, v));

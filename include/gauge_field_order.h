@@ -21,6 +21,9 @@
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
 #include <type_traits>
+#include <atomic.cuh>
+#include <thrust/device_ptr.h>
+#include <thrust/transform_reduce.h>
 
 namespace quda {
 
@@ -85,24 +88,24 @@ namespace quda {
 
   namespace gauge {
 
+    template<typename Float> struct square { __host__ __device__ Float operator()(quda::complex<Float> x) { return norm(x); } };
+
     template<typename Float, int nColor, QudaGaugeFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
-      Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) { }
+      Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
+	errorQuda("Not implemented for order=%d", order);
+      }
       __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
 	return dummy;
       }
     };
 
     template<typename Float, int nColor, QudaGaugeFieldOrder order> struct GhostAccessor {
       mutable complex<Float> dummy;
-      GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) { }
+      GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
+	errorQuda("Not implemented for order=%d", order);
+      }
       __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
 	return dummy;
       }
     };
@@ -123,6 +126,21 @@ namespace quda {
       }
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
+
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+#ifdef __CUDA_ARCH__
+	typedef typename vector<Float,2>::type vec2;
+	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
+	atomicAdd(u2, (vec2&)val);
+#else
+	u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col] += val;
+#endif
+      }
+
+      __host__ Float device_norm2(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
     };
 
     template<typename Float, int nColor>
@@ -137,6 +155,57 @@ namespace quda {
 	}
       }
       GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> &a) {
+	for (int d=0; d<4; d++) {
+	  ghost[d] = a.ghost[d];
+	  ghostOffset[d] = a.ghostOffset[d];
+	}
+      }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      { return ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col]; }
+    };
+
+    template<typename Float, int nColor>
+      struct Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> {
+      complex<Float> *u;
+      const int volumeCB;
+      const int geometry;
+    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
+	  static_cast<complex<Float>*>(const_cast<void *>(U.Gauge_p()))),
+	volumeCB(U.VolumeCB()), geometry(U.Geometry()) { }
+    Accessor(const Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> &a)
+      : u(a.u), volumeCB(a.volumeCB), geometry(a.geometry) { }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      { return 	u[(((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col]; }
+
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+#ifdef __CUDA_ARCH__
+	typedef typename vector<Float,2>::type vec2;
+	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
+	atomicAdd(u2, (vec2&)val);
+#else
+	u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col] += val;
+#endif
+      }
+
+      __host__ Float device_norm2(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+    };
+
+    template<typename Float, int nColor>
+      struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> {
+      complex<Float> *ghost[4];
+      int ghostOffset[4];
+      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
+	for (int d=0; d<4; d++) {
+	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
+	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
+	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+	}
+      }
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> &a) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
@@ -161,14 +230,39 @@ namespace quda {
       complex<Float> *u;
       const int offset_cb;
       const int stride;
+      const int geometry;
     Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
       : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
 	  static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
-	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride())
+	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride()), geometry(U.Geometry())
 	{  }
-    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a): u(a.u), offset_cb(a.offset_cb), stride(a.stride) {  }
+    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
+      : u(a.u), offset_cb(a.offset_cb), stride(a.stride), geometry(a.geometry) {  }
+
       __device__ __host__ inline complex<Float>& operator()(int dim, int parity, int x_cb, int row, int col) const
       { return u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb]; }
+
+      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+#ifdef __CUDA_ARCH__
+	typedef typename vector<Float,2>::type vec2;
+	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
+	atomicAdd(u2, (vec2&)val);
+#else
+	u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb] += val;
+#endif
+      }
+
+      __host__ Float device_norm2(int dim) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust::device_ptr<complex<Float> > ptr(u);
+	Float even = thrust::transform_reduce(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
+					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
+					      square<Float>(), 0.0, thrust::plus<Float>());
+	Float odd  = thrust::transform_reduce(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
+					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
+					      square<Float>(), 0.0, thrust::plus<Float>());
+	return even + odd;
+      }
     };
 
     template<typename Float, int nColor>
@@ -201,6 +295,8 @@ namespace quda {
 
 	const Accessor<Float,nColor,order> accessor;
 	const GhostAccessor<Float,nColor,order> ghostAccessor;
+
+	QudaFieldLocation location;
 
       public:
 	/**
@@ -326,6 +422,11 @@ namespace quda {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
+	__device__ __host__ inline void atomicAdd(int d, int parity, int x, int s_row, int s_col,
+						  int c_row, int c_col, complex<Float> &val) {
+	  accessor.atomic_add(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col, val);
+	}
+
 	/** Returns the number of field colors */
 	__device__ __host__ inline int Ncolor() const { return nColor; }
 
@@ -347,16 +448,32 @@ namespace quda {
 	/** Returns the number of coarse gauge field colors */
 	__device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
 
-
+	/**
+	 * @brief Returns the L2 norm squared of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the norm of
+	 * @return L2 norm squared
+	 */
 	__host__ double norm2(int dim) const {
-	  double nrm2 = 0.0;
-	  for (int parity=0; parity<2; parity++)
-	    for (int x_cb=0; x_cb<volumeCB; x_cb++) {
-	      for (int row=0; row<nColor; row++)
-		for (int col=0; col<nColor; col++)
-		  nrm2 += norm((*this)(dim,parity,x_cb,row,col));
-	    }
-	  return nrm2;
+	  cudaPointerAttributes attributes;
+	  cudaPointerGetAttributes(&attributes, accessor.u);
+	  const QudaFieldLocation location = (attributes.memoryType == cudaMemoryTypeDevice) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
+
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    return accessor.device_norm2(dim);
+	  } else {
+	    cudaDeviceSynchronize();
+	    cudaGetLastError(); // clear error state if CPU non CUDA allocation
+	    // do simple norm on host memory
+	    double nrm2 = 0.0;
+	    for (int parity=0; parity<2; parity++)
+	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		for (int row=0; row<nColor; row++)
+		  for (int col=0; col<nColor; col++)
+		    nrm2 += norm((*this)(dim,parity,x_cb,row,col));
+	      }
+	    return nrm2;
+	  }
 	}
 
 	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */

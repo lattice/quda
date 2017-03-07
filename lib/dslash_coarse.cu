@@ -488,6 +488,9 @@ namespace quda {
       dim_threads = param.aux.y;
 
       Tunable::defaultTuneParam(param);
+      // ensure that the default x block size is divisible by the warpSize
+      param.block.x = deviceProp.warpSize;
+      param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
       param.block.y = 1;
       param.grid.y = arg.nParity * arg.dim[4];
       param.block.z = dim_threads * 2;

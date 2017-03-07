@@ -708,7 +708,9 @@ namespace quda {
       if (comm_dim_partitioned(i)) faceBytes += 2*siteSubset*num_faces*surfaceCB[i]*spinor_size;
     }
 
-    if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes) {
+    static size_t ghostFaceBytes_ = 0;
+
+    if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes || faceBytes > ghostFaceBytes_) {
 
       if (initGhostFaceBuffer) {
 	for (int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]);
@@ -718,6 +720,7 @@ namespace quda {
 	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(faceBytes);
 	initGhostFaceBuffer = true;
 	ghostFaceBytes = faceBytes;
+	ghostFaceBytes_ = faceBytes;
       }
 
     }
