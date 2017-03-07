@@ -116,6 +116,8 @@ set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
 
+set(QUDA_MAGMAHOME "" CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
+
 #######################################################################
 #QUDA ADVANCED OPTIONS
 # that ususally should not be changed by users
@@ -230,12 +232,17 @@ endif()
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(MAGMA  magma)
-  include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
-  message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
-  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  if("${QUDA_MAGMAHOME}" STREQUAL "")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MAGMA  magma)
+    include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
+    message(${MAGMA_INCLUDEDIR})
+    find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  else()
+    FIND_LIBRARY(MAGMA_LIB magma ${QUDA_MAGMAHOME}/lib/)
+    include_directories(SYSTEM ${QUDA_MAGMAHOME}/include)
+  endif()  
 endif(QUDA_MAGMA)
 
 # This selects arpack or parpack for Multi GPU
