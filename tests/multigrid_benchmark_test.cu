@@ -233,7 +233,7 @@ int main(int argc, char** argv)
   Nspin = 2;
 
   printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", get_prec_str(prec), niter);
-  for (int c=4; c<=32; c+=4) {
+  for (int c=24; c<=32; c+=8) {
     Ncolor = c;
 
     initFields(prec);
