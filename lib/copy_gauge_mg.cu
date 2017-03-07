@@ -29,8 +29,6 @@ namespace quda {
 
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-
 #ifdef FINE_GRAINED_ACCESS
       typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_QDP_GAUGE_ORDER> G;
       copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(),
@@ -41,9 +39,16 @@ namespace quda {
 					 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
 #endif
 
+    } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 
+#ifdef FINE_GRAINED_ACCESS
+      typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_MILC_GAUGE_ORDER> G;
+      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(),
+					 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
 #else
-      errorQuda("QDP interface has not been built\n");
+      typedef typename MILCOrder<FloatOut,length> G;
+      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out.Volume(),
+					 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
 #endif
 
     } else {
@@ -70,8 +75,6 @@ namespace quda {
 #endif
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-
 #ifdef FINE_GRAINED_ACCESS
       typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_QDP_GAUGE_ORDER> G;
       copyGaugeMG<FloatOut,FloatIn,length>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, location, Out, outGhost, type);
@@ -80,8 +83,14 @@ namespace quda {
       copyGaugeMG<FloatOut,FloatIn,length>(G(in, In, inGhost), out, location, Out, outGhost, type);
 #endif
 
+    } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+
+#ifdef FINE_GRAINED_ACCESS
+      typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_MILC_GAUGE_ORDER> G;
+      copyGaugeMG<FloatOut,FloatIn,length>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, location, Out, outGhost, type);
 #else
-      errorQuda("QDP interface has not been built\n");
+      typedef typename MILCOrder<FloatIn,length> G;
+      copyGaugeMG<FloatOut,FloatIn,length>(G(in, In, inGhost), out, location, Out, outGhost, type);
 #endif
 
     } else {
@@ -132,6 +141,7 @@ namespace quda {
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			  void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
+
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
