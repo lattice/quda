@@ -184,6 +184,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
 #else
 
   GaugeFieldParam gauge_field_param(gauge, gauge_param);
+  gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField cpu(gauge_field_param);
   void **ghostGauge = (void**)cpu.Ghost();
 

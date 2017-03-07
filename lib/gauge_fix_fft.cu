@@ -30,11 +30,12 @@ namespace quda {
 
 
 
-
+#ifdef HOST_DEBUG
 #ifdef GAUGEFIXING_DONT_USE_GX
 #warning Not using precalculated g(x)
 #else
 #warning Using precalculated g(x)
+#endif
 #endif
 
 
@@ -169,7 +170,7 @@ namespace quda {
   template<typename Float>
   class GaugeFixFFTRotate : Tunable {
     GaugeFixFFTRotateArg<Float> arg;
-    unsigned int direction;
+    int direction;
     mutable char aux_string[128];     // used as a label in the autotuner
     private:
     unsigned int sharedBytesPerThread() const {
@@ -192,7 +193,7 @@ namespace quda {
     }
     ~GaugeFixFFTRotate () {
     }
-    void setDirection(unsigned int dir, complex<Float> *data_in, complex<Float> *data_out){
+    void setDirection(int dir, complex<Float> *data_in, complex<Float> *data_out){
       direction = dir;
       arg.tmp0 = data_in;
       arg.tmp1 = data_out;
@@ -247,7 +248,7 @@ namespace quda {
 
 
 
-  template<int blockSize, unsigned int Elems, typename Float, typename Gauge, int gauge_dir>
+  template<int blockSize, int Elems, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix_quality(GaugeFixQualityArg<Float, Gauge> argQ){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
@@ -298,7 +299,7 @@ namespace quda {
 
 
 
-  template<unsigned int Elems, typename Float, typename Gauge, int gauge_dir>
+  template<int Elems, typename Float, typename Gauge, int gauge_dir>
   class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Float, Gauge> argQ;
     mutable char aux_string[128];     // used as a label in the autotuner
@@ -348,7 +349,7 @@ namespace quda {
     complex<Float> *delta;
     complex<Float> *gx;
 
-    GaugeFixArg( cudaGaugeField & data, const unsigned int Elems) : data(data){
+    GaugeFixArg( cudaGaugeField & data, const int Elems) : data(data){
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = X[0] * X[1] * X[2] * X[3];
       invpsq = (Float*)device_malloc(sizeof(Float) * threads);
@@ -690,7 +691,7 @@ namespace quda {
 
 
 #else
-  template <unsigned int Elems, typename Float>
+  template <int Elems, typename Float>
   __global__ void kernel_gauge_GX(GaugeFixArg<Float> arg, Float half_alpha){
 
     int id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -744,7 +745,7 @@ namespace quda {
 
 
 
-  template<unsigned int Elems, typename Float>
+  template<int Elems, typename Float>
   class GaugeFix_GX : Tunable {
     GaugeFixArg<Float> arg;
     Float half_alpha;
@@ -805,7 +806,7 @@ namespace quda {
   };
 
 
-  template <unsigned int Elems, typename Float, typename Gauge>
+  template <int Elems, typename Float, typename Gauge>
   __global__ void kernel_gauge_fix_U_EO( GaugeFixArg<Float> arg, Gauge dataOr){
     int idd = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -868,7 +869,7 @@ namespace quda {
   }
 
 
-  template<unsigned int Elems, typename Float, typename Gauge>
+  template<int Elems, typename Float, typename Gauge>
   class GaugeFix : Tunable {
     GaugeFixArg<Float> arg;
     Gauge dataOr;
@@ -933,57 +934,11 @@ namespace quda {
 //GAUGEFIXING_DONT_USE_GX
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  template<unsigned int Elems, typename Float, typename Gauge, int gauge_dir>
+  template<int Elems, typename Float, typename Gauge, int gauge_dir>
   void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, \
-                       const Float alpha0, const unsigned int autotune, const double tolerance, \
-                       const unsigned int stopWtheta) {
+                       const int Nsteps, const int verbose_interval, \
+                       const Float alpha0, const int autotune, const double tolerance, \
+                       const int stopWtheta) {
 
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
 
@@ -1018,14 +973,14 @@ namespace quda {
     GaugeFixINVPSP<Float> invpsp(arg);
 
 
-        #ifdef GAUGEFIXING_DONT_USE_GX
+#ifdef GAUGEFIXING_DONT_USE_GX
     //without using GX, gx will be created only for plane rotation but with less size
     GaugeFixNEW<Float, Gauge> gfixNew(dataOr, arg, alpha);
-        #else
+#else
     //using GX
     GaugeFix_GX<Elems, Float> calcGX(arg, alpha);
     GaugeFix<Elems, Float, Gauge> gfix(dataOr, arg);
-        #endif
+#endif
 
     GaugeFixQualityArg<Float, Gauge> argQ(dataOr, data, arg.delta);
     GaugeFixQuality<Elems, Float, Gauge, gauge_dir> gfixquality(argQ);
@@ -1186,10 +1141,10 @@ namespace quda {
     }
   }
 
-  template<unsigned int Elems, typename Float, typename Gauge>
-  void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const Float alpha, const unsigned int autotune, \
-                       const double tolerance, const unsigned int stopWtheta) {
+  template<int Elems, typename Float, typename Gauge>
+  void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, const int gauge_dir, \
+                       const int Nsteps, const int verbose_interval, const Float alpha, const int autotune, \
+                       const double tolerance, const int stopWtheta) {
     if ( gauge_dir != 3 ) {
       printf("Starting Landau gauge fixing with FFTs...\n");
       gaugefixingFFT<Elems, Float, Gauge, 4>(dataOr, data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
@@ -1203,9 +1158,9 @@ namespace quda {
 
 
   template<typename Float>
-  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const Float alpha, const unsigned int autotune, \
-                       const double tolerance, const unsigned int stopWtheta) {
+  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir, \
+                       const int Nsteps, const int verbose_interval, const Float alpha, const int autotune, \
+                       const double tolerance, const int stopWtheta) {
 
     // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
     // Need to fix this!!
@@ -1246,9 +1201,9 @@ namespace quda {
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const double alpha, const unsigned int autotune, \
-                       const double tolerance, const unsigned int stopWtheta) {
+  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir, \
+                       const int Nsteps, const int verbose_interval, const double alpha, const int autotune, \
+                       const double tolerance, const int stopWtheta) {
 
 #ifdef GPU_GAUGE_ALG
 #ifdef MULTI_GPU

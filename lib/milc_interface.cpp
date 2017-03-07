@@ -233,6 +233,9 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
+  param.staggered_phase_applied = 1;
+  param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+
   computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param);
   qudamilc_called<false>(__func__);
 
@@ -359,7 +362,7 @@ void qudaRephase(int prec, void *gauge, int flag, double i_mu)
 						QUDA_GENERAL_LINKS);
 
   gaugeParam.staggered_phase_applied = 1-flag;
-  gaugeParam.staggered_phase_type = QUDA_MILC_STAGGERED_PHASE;
+  gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gaugeParam.i_mu = i_mu;
   gaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
 
