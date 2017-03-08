@@ -362,8 +362,7 @@ extern "C" {
   } QudaDWFPCType; 
 
   typedef enum QudaTwistFlavorType_s {
-    QUDA_TWIST_MINUS = -1,
-    QUDA_TWIST_PLUS = +1,
+    QUDA_TWIST_SINGLET = 1,
     QUDA_TWIST_NONDEG_DOUBLET = +2,
     QUDA_TWIST_DEG_DOUBLET = -2,    
     QUDA_TWIST_NO  = 0,
