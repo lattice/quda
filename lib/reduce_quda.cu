@@ -747,6 +747,7 @@ namespace quda {
     }
 
 
+#ifdef ALTRELIABLE
     /**
        double4 quadrupleCGReduction(V x, V y, V z){}
        First performs the operation norm2(x)
@@ -769,6 +770,8 @@ namespace quda {
       return reduce::reduceCuda<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
   (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
+
+#endif
 
    } // namespace blas
 
