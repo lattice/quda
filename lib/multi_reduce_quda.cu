@@ -124,67 +124,67 @@ namespace quda {
     switch(x.size()){
       case 1:
         reduce::multiReduceCuda<1,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 2:
         reduce::multiReduceCuda<2,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 3:
         reduce::multiReduceCuda<3,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 4:
         reduce::multiReduceCuda<4,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 5:
         reduce::multiReduceCuda<5,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 6:
         reduce::multiReduceCuda<6,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 7:
         reduce::multiReduceCuda<7,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 8:
         reduce::multiReduceCuda<8,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 9:
         reduce::multiReduceCuda<9,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 10:
         reduce::multiReduceCuda<10,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 11:
         reduce::multiReduceCuda<11,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 12:
         reduce::multiReduceCuda<12,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 13:
         reduce::multiReduceCuda<13,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 14:
         reduce::multiReduceCuda<14,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 15:
         reduce::multiReduceCuda<15,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       case 16:
         reduce::multiReduceCuda<16,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x);
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
       default:
         errorQuda("Unsupported vector size");
@@ -242,37 +242,21 @@ namespace quda {
 
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
 
-      printfQuda("ESW Entered cDotProduct\n");
-      // if (y.size() > 16), we need to split and recurse in y. This requires awkward memory remapping.
+      printfQuda("ESW Entered cDotProduct x.size() = %lu, y.size() = %lu\n", x.size(), y.size());
+      // if (y.size() > 16), we need to split and recurse in y. 
       // 16 is because of the MAX_MULTI_BLAS in multi_reduce_core.cuh, along with the switch statement up to 15.
       if (y.size() > 4) // using 4 just for compile time at the moment. 
       {
-        printfQuda("ESW Begin recurse y b/c y.size() = %d\n", y.size());
+        printfQuda("ESW Begin recurse y b/c y.size() = %lu\n", y.size());
         // Do the recurse first.
-        Complex* tmpresult = new Complex[x.size()*y.size()];
-        memset(tmpresult, 0, x.size()*y.size()*sizeof(Complex));
-        Complex* result0 = &tmpresult[0];
-        Complex* result1 = &tmpresult[x.size()*(y.size()/2)];
+
+        Complex* result0 = &result[0];
+        Complex* result1 = &result[x.size()*(y.size()/2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
-
         cDotProduct(result0, x, y0);
         cDotProduct(result1, x, y1);
-
-        // Re-order the memory. 
-        const int ylen0 = y.size()/2;
-        const int ylen1 = y.size() - ylen0;
-        const int xlen = x.size();
-        int count = 0, count0 = 0, count1 = 0;
-        for (int i = 0; i < xlen; i++)
-        {
-          for (int j = 0; j < ylen0; j++)
-            result[count++] = result0[count0++];
-          for (int j = 0; j < ylen1; j++)
-            result[count++] = result1[count1++];
-        }
-        delete[] tmpresult;
-        printfQuda("ESW End recurse y b/c y.size() = %d\n", y.size());
+        printfQuda("ESW End recurse y b/c y.size() = %lu\n", y.size());
 
       }
       else
@@ -281,74 +265,91 @@ namespace quda {
 
         reduce::coeff_array<Complex> a, b, c;
 
-        printfQuda("ESW Try multiReduceCuda, x.size() = %d, y.size() = %d\n", x.size(), y.size());
+        printfQuda("ESW Try multiReduceCuda, x.size() = %lu, y.size() = %lu\n", x.size(), y.size());
 
         switch(x.size()){
         case 1:
           printfQuda("ESW multiReduceCuda<1>\n");
           reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;
         case 2:
           printfQuda("ESW multiReduceCuda<2>\n");
           reduce::multiReduceCuda<2,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;
         case 3:
           printfQuda("ESW multiReduceCuda<3>\n");
           reduce::multiReduceCuda<3,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;
         case 4:
           printfQuda("ESW multiReduceCuda<4>\n");
           reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;
         /*case 5:
           reduce::multiReduceCuda<5,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;
         case 6:
           reduce::multiReduceCuda<6,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;
         case 7:
           reduce::multiReduceCuda<7,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;
         case 8:
           reduce::multiReduceCuda<8,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-  	  (cdot, a, b, c, x, y, x, x);
+  	  (cdot, a, b, c, x, y, x, y);
           break;*/
         default:
-          // split the problem and recurse.
-          printfQuda("ESW Begin recurse x b/c x.size() = %d\n", x.size());
-          Complex* result0 = &result[0];
-          Complex* result1 = &result[(x.size()/2)*y.size()];
+          // split the problem and recurse. Splitting in x requires
+          // memory reshuffling (unless y = 1)
+          printfQuda("ESW Begin recurse x b/c x.size() = %lu\n", x.size());
+          Complex* tmpresult = new Complex[x.size()*y.size()];
+          Complex* result0 = &tmpresult[0];
+          Complex* result1 = &tmpresult[(x.size()/2)*y.size()];
           std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
           std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
-          printfQuda("result0 is at %lu, result1 is at %lu\n", (unsigned long)(result0)/sizeof(unsigned long), (unsigned long)(result1)/sizeof(unsigned long));
-
           cDotProduct(result0, x0, y);
           cDotProduct(result1, x1, y);
-          printfQuda("ESW End recurse x b/c x.size() = %d\n", x.size());
+
+          // Re-order the memory. 
+          const int xlen0 = x.size()/2;
+          const int xlen1 = x.size() - xlen0;
+          const int ylen = y.size();
+          int count = 0, count0 = 0, count1 = 0;
+          for (int i = 0; i < ylen; i++)
+          {
+            for (int j = 0; j < xlen0; j++)
+              result[count++] = result0[count0++];
+            for (int j = 0; j < xlen1; j++)
+              result[count++] = result1[count1++];
+          }
+          delete[] tmpresult;
+
+          printfQuda("ESW End recurse x b/c x.size() = %lu\n", x.size());
           break;
         }
-        printfQuda("ESW Done multiReduceCuda, x.size() = %d, y.size() = %d\n", x.size(), y.size());
+        printfQuda("ESW Done multiReduceCuda, x.size() = %lu, y.size() = %lu\n", x.size(), y.size());
 
         // if x.size() > 4 we recursed directly into result.
         if (x.size() <= 4) for (unsigned int i=0; i<x.size()*y.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
         delete[] cdot;
       }
 
-      if (x.size() > 4)
+      //if (x.size() >= 4)
       {
         for (unsigned int i = 0; i < x.size(); i++)
         {
           printf("%.15e + I %.15e\n", real(result[i]), imag(result[i]));
         }
       }
+
+      printfQuda("ESW Exited cDotProduct x.size() = %lu, y.size() = %lu\n", x.size(), y.size());
     }
 
    } // namespace blas

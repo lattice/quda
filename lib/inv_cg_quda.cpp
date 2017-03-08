@@ -16,6 +16,11 @@
 
 #ifdef BLOCKSOLVER
 #include <Eigen/Dense>
+
+// define this to use multireduce, otherwise it'll
+// do loops over dot products.
+// this is more here for development convenience.
+#define BLOCKSOLVER_MULTIREDUCE
 #endif
 
 
@@ -391,7 +396,14 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   profile.TPSTART(QUDA_PROFILE_INIT);
 
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  using Eigen::Matrix;
+  using Eigen::Map;
+  using Eigen::RowMajor;
+  using Eigen::Dynamic; 
+#else
   using Eigen::MatrixXcd;
+#endif
 
   // Check to see that we're not trying to invert on a zero-field source
   //MW: it might be useful to check what to do here.
@@ -436,8 +448,46 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::xmyNorm(b.Component(i), r.Component(i));
   }
 
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  // Set up eigen matrices here.
+  // We need to do some goofing around with Eigen maps.
+  // https://eigen.tuxfamily.org/dox/group__TutorialMapClass.html
+
+  // Convenience. By default, Eigen matrices are column major.
+  // We switch to row major because cDotProduct returns in row major.
+  typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> MatrixBCG;
+
+  // Allocate some raw memory for each matrix we need raw pointers for.
+  Complex* r2_raw = new Complex[param.num_src*param.num_src];
+  Complex* pAp_raw = new Complex[param.num_src*param.num_src];
+
+  // Create maps. This forces the above pointers to be used under the hood.
+  Map<MatrixBCG> r2(r2_raw, param.num_src, param.num_src);
+  Map<MatrixBCG> pAp(pAp_raw, param.num_src, param.num_src);
+
+  // Create other non-mapped matrices.
+  MatrixBCG alpha = MatrixBCG::Zero(param.num_src,param.num_src);
+  MatrixBCG beta = MatrixBCG::Zero(param.num_src,param.num_src);
+  MatrixBCG C = MatrixBCG::Zero(param.num_src,param.num_src);
+  MatrixBCG S = MatrixBCG::Identity(param.num_src,param.num_src);
+  quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
+
+  #ifdef MWVERBOSE
+  Complex* pTp_raw = new Complex[param.num_src*param.num_src];
+  Map<MatrixBCG> pTp(pTp_raw);
+  #endif
+#endif // BLOCKSOLVER_MULTIREDUCE
+
   // initialize r2 matrix
   double r2avg=0;
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  blas::cDotProduct(r2_raw, r.Components(), r.Components());
+  for (int i = 0; i < param.num_src; i++)
+  {
+    r2avg += r2(i,i).real();
+    printfQuda("r2[%i] %e\n", i, r2(i,i).real());
+  }
+#else
   MatrixXcd r2(param.num_src, param.num_src);
   for(int i=0; i<param.num_src; i++){
     for(int j=i; j < param.num_src; j++){
@@ -449,6 +499,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
   }
+#endif
 
 
   csParam.setPrecision(param.precision_sloppy);
@@ -515,6 +566,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
   }
 
+  #ifndef BLOCKSOLVER_MULTIREDUCE  // Otherwise it's done above. 
   // Eigen Matrices instead of scalars
   MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
   MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
@@ -526,6 +578,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #ifdef MWVERBOSE
   MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
   #endif
+  #endif 
 
 
 
@@ -563,9 +616,15 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   }
 
   // CHolesky decomposition
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  MatrixBCG L = r2.llt().matrixL();
+  C = L.adjoint();
+  MatrixBCG Linv = C.inverse();
+#else
   MatrixXcd L = r2.llt().matrixL();//// retrieve factor L  in the decomposition
   C = L.adjoint();
   MatrixXcd Linv = C.inverse();
+#endif
 
   #ifdef MWVERBOSE
   std::cout << "r2\n " << r2 << std::endl;
@@ -588,11 +647,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   }
 
   #ifdef MWVERBOSE
+  #ifdef BLOCKSOLVER_MULTIREDUCE
+  blas::cDotProduct(pTp_raw, p.Components(), p.Components());
+  #else
   for(int i=0; i<param.num_src; i++){
     for(int j=0; j<param.num_src; j++){
       pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
     }
   }
+  #endif
+
   std::cout << " pTp  " << std::endl << pTp << std::endl;
   std::cout << " L " << std::endl << L.adjoint() << std::endl;
   std::cout << " C " << std::endl << C << std::endl;
@@ -605,12 +669,17 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
 
     // calculate pAp
+    #ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::cDotProduct(pAp_raw, p.Components(), Ap.Components());
+    #else
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
         pAp(i,j) = blas::cDotProduct(p.Component(i), Ap.Component(j));
         if (i!=j) pAp(j,i) = std::conj(pAp(i,j));
       }
     }
+    #endif
+  
 
     // update Xsloppy
     alpha = pAp.inverse() * C;
@@ -637,12 +706,19 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     for(int i=0; i< param.num_src; i++){
       blas::copy(rnew.Component(i), rSloppy.Component(i));
     }
+    #ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::cDotProduct(r2_raw, r.Components(), r.Components());
+    #else
+    printfQuda("Iteration %d\n",k);
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
         r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+        printfQuda("r2(%d,%d) = %.15e + I %.15e\n", i, j, real(r2(i,j)), imag(r2(i,j)));
         if (i!=j) r2(j,i) = std::conj(r2(i,j));
       }
     }
+    #endif
+  
     // Cholesky decomposition
     L = r2.llt().matrixL();// retrieve factor L  in the decomposition
     S = L.adjoint();
@@ -657,11 +733,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::caxpy(AC,rnew,rSloppy);
 
     #ifdef MWVERBOSE
+    #ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::cDotProduct(ptp_raw, rSloppy.Components(), rSloppy.Components());
+    #else
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
         pTp(i,j) = blas::cDotProduct(rSloppy.Component(i), rSloppy.Component(j));
       }
     }
+    #endif
+    
     std::cout << " rTr " << std::endl << pTp << std::endl;
     std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
     #endif
@@ -687,11 +768,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     C = S * C;
 
     #ifdef MWVERBOSE
+    #ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::cDotProduct(pTp_raw, p.Components(), p.Components());
+    #else
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
         pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
       }
     }
+    #endif
+
     std::cout << " pTp " << std::endl << pTp << std::endl;
     std::cout <<  "S " << S<<  std::endl << "C " << C << std::endl;
     #endif
@@ -763,6 +849,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   delete rpnew;
   delete pp;
   delete[] AC;
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  delete[] r2_raw;
+  delete[] pAp_raw;
+#endif
   profile.TPSTOP(QUDA_PROFILE_FREE);
 
   return;
