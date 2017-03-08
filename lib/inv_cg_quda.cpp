@@ -39,8 +39,14 @@ namespace quda {
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
+
+#ifdef ALTRELIABLE
     // hack to select alternative reliable updates
     constexpr bool alternative_reliable = true;
+    warningQuda("Using alternative reliable updates. This feature is mostly ok but needs a little more testing in the real world.\n");
+#else
+    constexpr bool alternative_reliable = false;
+#endif
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -87,19 +93,22 @@ namespace quda {
     ColorSpinorField &tmp3 = *tmp3_p;
 
     // alternative reliable updates
-    // alternative reliable updates - set precision
+    // alternative reliable updates - set precision - does not hurt performance here
 
     const double u= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double deps=sqrt(u);
-    double d_new;
-    double d;
-    double dinit;
+    constexpr double dfac = 1.1;
+    double d_new =0 ;
+    double d =0 ;
+    double dinit =0;
     double xNorm = 0;
     double xnorm = 0;
     double pnorm = 0;
     double ppnorm = 0;
     double Anorm = 0;
+    
+    // for alternative reliable updates
     if(alternative_reliable){
       // estimate norm for reliable updates
       mat(r, b, y, tmp3);
@@ -239,7 +248,7 @@ namespace quda {
       } else {
         r2_old = r2;
 
-
+        // alternative reliable updates,
         if(alternative_reliable){
           double3 pAppp = blas::cDotProductNormA(p,Ap);
           pAp = pAppp.x;
@@ -247,7 +256,6 @@ namespace quda {
         }
         else{
           pAp = blas::reDotProduct(p, Ap);
-          // alternative reliable updates,
         }
 
         alpha = r2 / pAp;
@@ -262,7 +270,7 @@ namespace quda {
       rNorm = sqrt(r2);
       int updateX;
       int updateR;
-      const double dfac = 1.1;
+
       if(alternative_reliable){
         // alternative reliable updates
         updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
