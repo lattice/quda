@@ -412,6 +412,9 @@ extern "C" {
     /**< The time taken by the multigrid solver setup */
     double secs;
 
+    /** Multiplicative factor for the mu parameter */
+    double mu_factor[QUDA_MAX_MG_LEVEL];
+
   } QudaMultigridParam;
 
 

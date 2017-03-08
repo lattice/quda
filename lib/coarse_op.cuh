@@ -1457,7 +1457,7 @@ namespace quda {
       y.apply(0);
     }
 
-    if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
+    if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC) {
       y.setComputeType(COMPUTE_TMDIAGONAL);
       y.apply(0);
     }

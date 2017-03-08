@@ -94,6 +94,9 @@ namespace quda {
 
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
       diracParam.kappa = param.matResidual->Expose()->Kappa();
+      diracParam.mu = param.matResidual->Expose()->Mu()*( param.level==0 ? param.mg_global.mu_factor[param.level+1] :
+							  (param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level]));
+
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
       diracParam.tmp1 = &(tmp_coarse->Even());
@@ -426,7 +429,20 @@ namespace quda {
 #endif
 
     printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
+
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
+
+    // When the mu is shifted on the coarse level; we can compute exxactly the error we introduce in the check:
+    //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
+    if(param.matResidual->Expose()->Mu() != 0) {
+      double delta_factor = param.mg_global.mu_factor[param.level+1] - param.mg_global.mu_factor[param.level];
+      if(fabs(delta_factor) > tol ) {
+	double delta_a = delta_factor * 2.0 * param.matResidual->Expose()->Kappa() *
+	  param.matResidual->Expose()->Mu() * transfer->Vectors().TwistFlavor();
+	deviation -= fabs(delta_a) * sqrt( norm2(*tmp_coarse) / norm2(*x_coarse) );
+	deviation = fabs(deviation);
+      }
+    }
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
     

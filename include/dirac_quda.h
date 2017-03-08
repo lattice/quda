@@ -142,6 +142,7 @@ namespace quda {
     static Dirac* create(const DiracParam &param);
 
     double Kappa() const { return kappa; }
+    virtual double Mu() const { return 0.; }
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 
@@ -158,8 +159,10 @@ namespace quda {
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat[out] Coarse preconditioned link field
      * @param T[in] Transfer operator defining the coarse grid
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mu TM mu parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0.) const
     {errorQuda("Not implemented");}
   };
 
@@ -199,8 +202,9 @@ namespace quda {
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat[out] Coarse preconditioned link field
      * @param T[in] Transfer operator defining the coarse grid
+     * @param kappa Kappa parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0.) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -258,8 +262,9 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat coarse preconditioned link field
+     * @param kappa Kappa parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0.) const;
   };
 
   // Even-odd preconditioned clover
@@ -297,8 +302,9 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat coarse preconditioned link field
+     * @param kappa Kappa parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0.) const;
   };
 
 
@@ -483,6 +489,9 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    double Mu() const { return mu; }
+
    /**
      * @brief Create the coarse twisted-mass operator
      *
@@ -491,8 +500,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat coarse preconditioned link field
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mu TM mu parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -527,8 +538,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat coarse preconditioned link field
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mu TM mu parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const;
   };
 
   // Full twisted mass with a clover term
@@ -558,6 +571,9 @@ namespace quda {
        const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
            const QudaSolutionType) const;
+
+    double Mu() const { return mu; }
+
    /**
      * @brief Create the coarse twisted-clover operator
      *
@@ -566,8 +582,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat coarse preconditioned link field
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mu TM mu parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -607,7 +625,7 @@ namespace quda {
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat coarse preconditioned link field
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const;
   };
 
   // Full staggered
@@ -717,6 +735,7 @@ namespace quda {
   class DiracCoarse : public Dirac {
 
   protected:
+    double mu;
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
 
@@ -736,6 +755,8 @@ namespace quda {
     bool init; /** Whether this instance did the allocation or not */
 
   public:
+    double Mu() const { return mu; }
+
     /**
        @param[in] param Parameters defining this operator
        @param[in] enable_gpu Whether to enable this operator for the GPU
@@ -820,8 +841,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat[out] Coarse preconditioned link field
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mu TM mu parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const;
   };
 
   /**
@@ -854,8 +877,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
      * @param Yhat coarse preconditioned link field
+     * @param kappa Kappa parameter for the coarse operator
+     * @param mu TM mu parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const;
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)

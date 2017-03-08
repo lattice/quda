@@ -57,6 +57,7 @@ extern bool generate_all_levels;
 extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
+extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
 extern QudaInverterType smoother_type;
 
@@ -213,6 +214,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
+    mg_param.mu_factor[i] = mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
@@ -355,6 +357,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 int main(int argc, char **argv)
 {
+  // We give here the default value. Any better place??
+  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) mu_factor[i] = 1.;
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
