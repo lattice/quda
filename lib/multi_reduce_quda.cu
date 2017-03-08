@@ -242,15 +242,17 @@ namespace quda {
 
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
 
+      printfQuda("ESW Entered cDotProduct\n");
       // if (y.size() > 16), we need to split and recurse in y. This requires awkward memory remapping.
       // 16 is because of the MAX_MULTI_BLAS in multi_reduce_core.cuh, along with the switch statement up to 15.
       if (y.size() > 4) // using 4 just for compile time at the moment. 
       {
+        printfQuda("ESW Begin recurse y b/c y.size() = %d\n", y.size());
         // Do the recurse first.
         Complex* tmpresult = new Complex[x.size()*y.size()];
         memset(tmpresult, 0, x.size()*y.size()*sizeof(Complex));
         Complex* result0 = &tmpresult[0];
-        Complex* result1 = &tmpresult[x.size()*y.size()/2];
+        Complex* result1 = &tmpresult[x.size()*(y.size()/2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
 
@@ -270,6 +272,7 @@ namespace quda {
             result[count++] = result1[count1++];
         }
         delete[] tmpresult;
+        printfQuda("ESW End recurse y b/c y.size() = %d\n", y.size());
 
       }
       else
@@ -278,20 +281,26 @@ namespace quda {
 
         reduce::coeff_array<Complex> a, b, c;
 
+        printfQuda("ESW Try multiReduceCuda, x.size() = %d, y.size() = %d\n", x.size(), y.size());
+
         switch(x.size()){
         case 1:
+          printfQuda("ESW multiReduceCuda<1>\n");
           reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, x);
           break;
         case 2:
+          printfQuda("ESW multiReduceCuda<2>\n");
           reduce::multiReduceCuda<2,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, x);
           break;
         case 3:
+          printfQuda("ESW multiReduceCuda<3>\n");
           reduce::multiReduceCuda<3,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, x);
           break;
         case 4:
+          printfQuda("ESW multiReduceCuda<4>\n");
           reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, x);
           break;
@@ -313,21 +322,33 @@ namespace quda {
           break;*/
         default:
           // split the problem and recurse.
+          printfQuda("ESW Begin recurse x b/c x.size() = %d\n", x.size());
           Complex* result0 = &result[0];
-          Complex* result1 = &result[x.size()*y.size()/2];
+          Complex* result1 = &result[(x.size()/2)*y.size()];
           std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
           std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
+          printfQuda("result0 is at %lu, result1 is at %lu\n", (unsigned long)(result0)/sizeof(unsigned long), (unsigned long)(result1)/sizeof(unsigned long));
+
           cDotProduct(result0, x0, y);
           cDotProduct(result1, x1, y);
+          printfQuda("ESW End recurse x b/c x.size() = %d\n", x.size());
           break;
         }
+        printfQuda("ESW Done multiReduceCuda, x.size() = %d, y.size() = %d\n", x.size(), y.size());
 
-        for (unsigned int i=0; i<x.size()*y.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
+        // if x.size() > 4 we recursed directly into result.
+        if (x.size() <= 4) for (unsigned int i=0; i<x.size()*y.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
         delete[] cdot;
       }
 
-      
+      if (x.size() > 4)
+      {
+        for (unsigned int i = 0; i < x.size(); i++)
+        {
+          printf("%.15e + I %.15e\n", real(result[i]), imag(result[i]));
+        }
+      }
     }
 
    } // namespace blas

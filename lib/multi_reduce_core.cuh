@@ -48,7 +48,7 @@ template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY,
   Reducer  r;
   const int length;
   const int nParity;
- MultiReduceArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Reducer r, int length, int nParity)
+ MultiReduceArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Reducer r, int NYW, int length, int nParity)
    : NYW(NYW), r(r), length(length), nParity(nParity) {
 
     for (int i=0; i<NXZ; ++i)
@@ -170,14 +170,14 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
 
   if(tp.grid.x > REDUCE_MAX_BLOCKS)
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
-
+  
   // ESW: this is where the multireduce kernel is called...?
 #ifdef WARP_MULTI_REDUCE
   multiReduceKernel<ReduceType,FloatN,M,NXZ><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #else
   LAUNCH_KERNEL(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
 #endif
-
+  
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
   if(deviceProp.canMapHostMemory){
     cudaEventRecord(*getReduceEvent(), stream);
@@ -185,7 +185,7 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
   } else
 #endif
     { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
-
+  
   // ESW: This is then where the results get copied into the 'result' array 
   // from the buffer reduces go into.
   for(int i=0; i<NXZ*arg.NYW; ++i) {
@@ -243,7 +243,7 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
  public:
  MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],
 		 Reducer &r, int NYW, int length, int nParity, size_t **bytes, size_t **norm_bytes) :
-  TunableVectorY(NYW), NYW(NYW), arg(X, Y, Z, W, r, length/nParity, nParity), nParity(nParity), result(result),
+  TunableVectorY(NYW), NYW(NYW), arg(X, Y, Z, W, r, NYW, length/nParity, nParity), nParity(nParity), result(result),
     Y_h(), W_h(), Ynorm_h(), Wnorm_h(),
     bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
 
@@ -252,7 +252,7 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
     strcpy(name, num_to_string<NXZ>::value);
     strcat(name, std::to_string(NYW).c_str());
     strcat(name, typeid(arg.r).name());
-    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_str);
+    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_tmp);
   }
 
   unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock; }
@@ -342,6 +342,8 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
 			  std::vector<ColorSpinorField*>& z, std::vector<ColorSpinorField*>& w,
 			  int length) {
 
+  printfQuda("ESW line 337 entered multiReduceCuda\n");
+
   const int NYW = y.size();
 
   int nParity = x[0]->SiteSubset();
@@ -362,6 +364,8 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
       return;
     }
   }
+
+  printfQuda("ESW line 338 finished spinor check, zeroed result memory.\n");
 
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
@@ -402,6 +406,8 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
     Cmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(c.data));
   }
 
+  printfQuda("ESW line 409 set up texture memory.\n");
+
   blasStrings.vol_str = x[0]->VolString();
   strcpy(blasStrings.aux_tmp, x[0]->AuxString());
 
@@ -417,6 +423,8 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
   multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
   multi::Spinor<RegType,StoreType,M,writeW,3> W[MAX_MULTI_BLAS_N];
 
+  printfQuda("ESW line 426 created multi spinors X, Y, Z, W.\n");
+
   //MWFIXME (copied from multi_blas_core.cuh)
   for (int i=0; i<NXZ; i++) {
     X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
@@ -427,7 +435,11 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
     W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
   }
 
+  printfQuda("ESW line 438  copied x, y, z, w into multi spinors X, Y, Z, W.\n");
+
   Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
+
+  printfQuda("ESW line 442 created reducer r.\n");
 
   MultiReduceCuda<NXZ,doubleN,ReduceType,RegType,M,
 		  multi::SpinorTexture<RegType,StoreType,M,0>,
@@ -437,6 +449,8 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
       decltype(r) >
     reduce(result, X, Y, Z, W, r, NYW, length, x[0]->SiteSubset(), bytes, norm_bytes);
   reduce.apply(*blas::getStream());
+
+  printfQuda("ESW line 453 applied reduce.\n");
 
   blas::bytes += reduce.bytes();
   blas::flops += reduce.flops();

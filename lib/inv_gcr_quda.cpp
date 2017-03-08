@@ -52,12 +52,12 @@ namespace quda {
 
   void computeBeta(Complex **beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k) {
     Complex *Beta = new Complex[N];
-    std::vector<ColorSpinorField*> a(N), b(N);
+    std::vector<ColorSpinorField*> a(N), b(1);
     for (int j=0; j<N; j++) {
       a[j] = Ap[i+j];
-      b[j] = Ap[k];
       Beta[j] = 0;
     }
+    b[0] = Ap[k];
     blas::cDotProduct(Beta, a, b); // vectorized dot product
 #if 0
     for (int j=0; j<N; j++) {

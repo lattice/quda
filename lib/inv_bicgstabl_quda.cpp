@@ -27,20 +27,20 @@ namespace quda {
   void BiCGstabL::computeTau(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int begin, int size, int j)
   {
     Complex *Tau = new Complex[size];
-    std::vector<ColorSpinorField*> a(size), b(size);
+    std::vector<ColorSpinorField*> a(size), b(1);
     for (int k=0; k<size; k++)
     {
-      a[k] = r[begin+k];//static_cast<ColorSpinorField*>(r[begin+k]);
-      b[k] = r[j];//static_cast<ColorSpinorField*>(r[j]);
+      a[k] = r[begin+k];
       Tau[k] = 0;
     }
+    b[0] = r[j];
     blas::cDotProduct(Tau, a, b); // vectorized dot product
 
     for (int k=0; k<size; k++)
     {
       tau[begin+k][j] = Tau[k]/sigma[begin+k];
     }
-    delete [] Tau;
+
   }
   
   void BiCGstabL::updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j)
