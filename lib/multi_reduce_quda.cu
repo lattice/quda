@@ -241,57 +241,93 @@ namespace quda {
 
 
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
-      double2* cdot = new double2[x.size()*y.size()];
 
-      reduce::coeff_array<Complex> a, b, c;
+      // if (y.size() > 16), we need to split and recurse in y. This requires awkward memory remapping.
+      // 16 is because of the MAX_MULTI_BLAS in multi_reduce_core.cuh, along with the switch statement up to 15.
+      if (y.size() > 4) // using 4 just for compile time at the moment. 
+      {
+        // Do the recurse first.
+        Complex* tmpresult = new Complex[x.size()*y.size()];
+        memset(tmpresult, 0, x.size()*y.size()*sizeof(Complex));
+        Complex* result0 = &tmpresult[0];
+        Complex* result1 = &tmpresult[x.size()*y.size()/2];
+        std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
+        std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
 
-      switch(x.size()){
-      case 1:
-        reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      case 2:
-        reduce::multiReduceCuda<2,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      case 3:
-        reduce::multiReduceCuda<3,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      case 4:
-        reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      case 5:
-        reduce::multiReduceCuda<5,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      case 6:
-        reduce::multiReduceCuda<6,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      case 7:
-        reduce::multiReduceCuda<7,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      case 8:
-        reduce::multiReduceCuda<8,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-	  (cdot, a, b, c, x, y, x, x);
-        break;
-      default:
-        // split the problem in half and recurse.
-        Complex* result0 = &result[0];
-        Complex* result1 = &result[x.size()*y.size()/2];
-        std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-        std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+        cDotProduct(result0, x, y0);
+        cDotProduct(result1, x, y1);
 
-        cDotProduct(result0, x0, y);
-        cDotProduct(result1, x1, y);
-        break;
+        // Re-order the memory. 
+        const int ylen0 = y.size()/2;
+        const int ylen1 = y.size() - ylen0;
+        const int xlen = x.size();
+        int count = 0, count0 = 0, count1 = 0;
+        for (int i = 0; i < xlen; i++)
+        {
+          for (int j = 0; j < ylen0; j++)
+            result[count++] = result0[count0++];
+          for (int j = 0; j < ylen1; j++)
+            result[count++] = result1[count1++];
+        }
+        delete[] tmpresult;
+
+      }
+      else
+      {
+        double2* cdot = new double2[x.size()*y.size()];
+
+        reduce::coeff_array<Complex> a, b, c;
+
+        switch(x.size()){
+        case 1:
+          reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;
+        case 2:
+          reduce::multiReduceCuda<2,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;
+        case 3:
+          reduce::multiReduceCuda<3,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;
+        case 4:
+          reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;
+        /*case 5:
+          reduce::multiReduceCuda<5,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;
+        case 6:
+          reduce::multiReduceCuda<6,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;
+        case 7:
+          reduce::multiReduceCuda<7,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;
+        case 8:
+          reduce::multiReduceCuda<8,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+  	  (cdot, a, b, c, x, y, x, x);
+          break;*/
+        default:
+          // split the problem and recurse.
+          Complex* result0 = &result[0];
+          Complex* result1 = &result[x.size()*y.size()/2];
+          std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+          std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+
+          cDotProduct(result0, x0, y);
+          cDotProduct(result1, x1, y);
+          break;
+        }
+
+        for (unsigned int i=0; i<x.size()*y.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
+        delete[] cdot;
       }
 
-      for (unsigned int i=0; i<x.size()*y.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
-      delete[] cdot;
+      
     }
 
    } // namespace blas

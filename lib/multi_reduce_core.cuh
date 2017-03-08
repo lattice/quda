@@ -23,7 +23,7 @@ __shared__ static bool isLastBlockDone;
 
 // This is also defined in multi_blas_core.cuh.
 // We may need to put it in one, more common place.
-#define MAX_MULTI_BLAS_N 16
+#define MAX_MULTI_BLAS_N 4 //16
 
 /**
    @brief Parameter struct for generic multi-blas kernel.
@@ -134,10 +134,24 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
 
   if (k >= arg.NYW) return;
 
-  if (k == 1)
-    compute< 1,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity);
-  else if (k == NXZ)
-    compute< NXZ,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity);
+  switch(k) {
+  case  0: compute< 0,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  1: compute< 1,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  2: compute< 2,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  3: compute< 3,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  /*case  4: compute< 4,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  5: compute< 5,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  6: compute< 6,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  7: compute< 7,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  8: compute< 8,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  9: compute< 9,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case 10: compute<10,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case 11: compute<11,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case 12: compute<12,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case 13: compute<13,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case 14: compute<14,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case 15: compute<15,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;*/
+  }
 
 // ESW: Need to check indexing ()
 #ifdef WARP_MULTI_REDUCE

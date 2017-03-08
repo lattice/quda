@@ -9,11 +9,6 @@ template<int NXZ, typename doubleN, typename ReduceType,
 		       CompositeColorSpinorField& z, CompositeColorSpinorField& w){
   const int NYW = y.size();
 
-  if (NYW != 1 && NYW != NXZ)
-  {
-    errorQuda("multi-reduce requires NYW == 1 or NXZ");
-  }
-
   int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
 
   if (x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
