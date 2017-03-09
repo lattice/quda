@@ -288,7 +288,7 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    // if (!composite_descr.is_composite || composite_descr.is_component)
       createTexObject();
 #endif
   }

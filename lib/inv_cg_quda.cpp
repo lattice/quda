@@ -694,14 +694,14 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #endif
 
   while ( !allconverged && k < param.maxiter ) {
-    PUSH_RANGE("Dslash",1)
+    // PUSH_RANGE("Dslash",1)
      // for(int i=0; i<param.num_src; i++){
      //  matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
      // }
 
     matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
     
-    POP_RANGE
+    // POP_RANGE
 
     // calculate pAp
     for(int i=0; i<param.num_src; i++){
