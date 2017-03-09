@@ -59,6 +59,7 @@ extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
+extern QudaInverterType setup_inv;
 extern QudaInverterType smoother_type;
 
 extern QudaMatPCType matpc_type;
@@ -205,6 +206,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
+  mg_param.setup_inv_type = setup_inv;
   for (int i=0; i<mg_param.n_level; i++) {
     for (int j=0; j<QUDA_MAX_DIM; j++) {
       // if not defined use 4

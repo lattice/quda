@@ -731,10 +731,8 @@ namespace quda {
     solverParam.maxiter = 500;
     solverParam.tol = 5e-6;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    //solverParam.delta = 1e-1; // For BICGSTABL, was 1e-7 for BICGSTAB
     solverParam.delta = 1e-7; 
-    solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
-    //solverParam.inv_type = QUDA_BICGSTABL_INVERTER;
+    solverParam.inv_type = param.mg_global.setup_inv_type;
     solverParam.Nkrylov = 4;
     solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTABL_INVERTER ? 4 : 0); // pipeline != 0 breaks BICGSTAB
     
@@ -761,8 +759,21 @@ namespace quda {
 
     std::vector<ColorSpinorField*> B_gpu;
 
-    Solver *solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     const Dirac &dirac = *(param.matSmooth->Expose());
+    Solver *solve;
+    DiracMdagM mdagm(dirac);
+    const Dirac &diracSloppy = *(param.matSmoothSloppy->Expose());
+    DiracMdagM mdagmSloppy(diracSloppy);
+    if(solverParam.inv_type == QUDA_CG_INVERTER) {
+      if(param.level == 0)
+	solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
+      else { // at the moment mdag is not implemented for the coarse operator
+	solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
+	solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      }
+    } else {
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    }
 
     // Generate sources and launch solver for each source:
     for(unsigned int i=0; i<B.size(); i++) {
