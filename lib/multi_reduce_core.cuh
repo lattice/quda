@@ -80,7 +80,10 @@ static signed char *Cmatrix_h;
 template<int k, int NXZ, typename FloatN, int M, typename ReduceType, typename Arg>
   __device__ inline void compute(ReduceType *sum, Arg &arg, int idx, int parity) {
 
-  constexpr int kmod = k < NXZ ? k : 0; // silence out-of-bounds compiler warning
+  constexpr int kmod = k; // there's an old warning about silencing an out-of-bounds compiler warning,
+                          // but I never seem to get it, and I'd need to compare against NYW anyway,
+                          // which we can't really get at here b/c it's not a const, and I don't want 
+                          // to fix that. It works fine based on the switch in the function below.
 
   while (idx < arg.length) {
 

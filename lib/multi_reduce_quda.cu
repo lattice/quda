@@ -306,38 +306,76 @@ namespace quda {
           break;*/
         default:
           // split the problem and recurse. Splitting in x requires
-          // memory reshuffling (unless y = 1)
+          // memory reshuffling (unless y = 1).
+          // Use a few temporary variables. 
           printfQuda("ESW Begin recurse x b/c x.size() = %lu\n", x.size());
-          Complex* tmpresult = new Complex[x.size()*y.size()];
-          Complex* result0 = &tmpresult[0];
-          Complex* result1 = &tmpresult[(x.size()/2)*y.size()];
+          Complex* tmpmajor = new Complex[x.size()*y.size()];
+          Complex* result0 = &tmpmajor[0];
+          Complex* result1 = &tmpmajor[(x.size()/2)*y.size()];
           std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
           std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
           cDotProduct(result0, x0, y);
           cDotProduct(result1, x1, y);
 
-          // Re-order the memory. 
+          // Re-order the memory. result0, result1 are stored as col major, need
+          // to switch to row major.
+          /*Complex* tmpmajor = new Complex[x.size()*y.size()];
+          Complex* major0 = &tmpmajor[0];
+          Complex* major1 = &tmpmajor[(x.size()/2)*y.size()];
           const int xlen0 = x.size()/2;
           const int xlen1 = x.size() - xlen0;
           const int ylen = y.size();
-          int count = 0, count0 = 0, count1 = 0;
-          for (int i = 0; i < ylen; i++)
+
+          if (x0.size() < 4 && x1.size() < 4 && y.size() < 4)
           {
-            for (int j = 0; j < xlen0; j++)
+            // Switch major0.
+            for (int i = 0; i < ylen; i++)
+              for (int j = 0; j < xlen0; j++)
+                major0[i*xlen0 + j] = result0[j*ylen + i];
+
+            // Switch major1
+            for (int i = 0; i < ylen; i++)
+              for (int j = 0; j < xlen1; j++)
+                major1[i*xlen1 + j] = result1[j*ylen + i];
+          }
+          else
+          {
+            for (int i = 0; i < y.size(); i++)
+              for (int j = 0; j < x.size(); j++)
+                tmpmajor[j+i*x.size()] = result[j+i*x.size()];
+          }*/
+
+          const unsigned int xlen0 = x.size()/2;
+          const unsigned int xlen1 = x.size() - xlen0;
+          const unsigned int ylen = y.size();
+
+          // Copy back into result.
+          int count = 0, count0 = 0, count1 = 0;
+          for (unsigned int i = 0; i < ylen; i++)
+          {
+            for (unsigned int j = 0; j < xlen0; j++)
               result[count++] = result0[count0++];
-            for (int j = 0; j < xlen1; j++)
+            for (unsigned int j = 0; j < xlen1; j++)
               result[count++] = result1[count1++];
           }
-          delete[] tmpresult;
+          //delete[] tmpresult;
+          delete[] tmpmajor;
 
           printfQuda("ESW End recurse x b/c x.size() = %lu\n", x.size());
           break;
         }
         printfQuda("ESW Done multiReduceCuda, x.size() = %lu, y.size() = %lu\n", x.size(), y.size());
 
-        // if x.size() > 4 we recursed directly into result.
-        if (x.size() <= 4) for (unsigned int i=0; i<x.size()*y.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
+        // if x.size() > 4, we directly ran the reduce kernel. We perform the row-to-column-major transpose here.
+        if (x.size() <= 4)
+        {
+          const unsigned int xlen = x.size();
+          const unsigned int ylen = y.size();
+          for (unsigned int j = 0; j < xlen; j++)
+            for (unsigned int i = 0; i < ylen; i++)
+              result[i*xlen+j] = Complex(cdot[j*ylen + i].x, cdot[j*ylen+i].y);
+        }
         delete[] cdot;
       }
 

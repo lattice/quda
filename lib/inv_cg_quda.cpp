@@ -386,6 +386,46 @@ namespace quda {
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
+
+
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  using Eigen::Matrix;
+  using Eigen::Map;
+  using Eigen::RowMajor;
+  using Eigen::ColMajor;
+  using Eigen::Dynamic; 
+
+// Convenience. By default, Eigen matrices are column major.
+// We switch to row major because cDotProduct returns in row major.
+typedef Matrix<Complex, Dynamic, Dynamic, ColMajor> MatrixBCG;
+#else
+  using Eigen::MatrixXcd;
+#endif
+
+// Matrix printing functions
+#ifdef BLOCKSOLVER_MULTIREDUCE
+void printmat(const char* label, MatrixBCG& mat)
+{
+  printfQuda("\n%s\n", label);
+  std::cout << mat;
+  printfQuda("\n");
+}
+
+void printmat(const char* label, Map<MatrixBCG>& mat)
+{
+  printfQuda("\n%s\n", label);
+  std::cout << mat;
+  printfQuda("\n");
+}
+#else
+void printmat(const char* label, MatrixXcd& mat)
+{
+  printfQuda("\n%s\n", label);
+  std::cout << mat;
+  printfQuda("\n");
+}
+#endif
+
 void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #ifndef BLOCKSOLVER
   errorQuda("QUDA_BLOCKSOLVER not built.");
@@ -395,15 +435,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   errorQuda("Not supported");
 
   profile.TPSTART(QUDA_PROFILE_INIT);
-
-#ifdef BLOCKSOLVER_MULTIREDUCE
-  using Eigen::Matrix;
-  using Eigen::Map;
-  using Eigen::RowMajor;
-  using Eigen::Dynamic; 
-#else
-  using Eigen::MatrixXcd;
-#endif
 
   // Check to see that we're not trying to invert on a zero-field source
   //MW: it might be useful to check what to do here.
@@ -453,10 +484,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // We need to do some goofing around with Eigen maps.
   // https://eigen.tuxfamily.org/dox/group__TutorialMapClass.html
 
-  // Convenience. By default, Eigen matrices are column major.
-  // We switch to row major because cDotProduct returns in row major.
-  typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> MatrixBCG;
-
   // Allocate some raw memory for each matrix we need raw pointers for.
   Complex* r2_raw = new Complex[param.num_src*param.num_src];
   Complex* pAp_raw = new Complex[param.num_src*param.num_src];
@@ -500,7 +527,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
 #endif
-
+  printmat("r2", r2);
 
   csParam.setPrecision(param.precision_sloppy);
   // tmp2 only needed for multi-gpu Wilson-like kernels
@@ -679,6 +706,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     #endif
+    printmat("pAp", pAp);
   
 
     // update Xsloppy
@@ -713,11 +741,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
         r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-        printfQuda("r2(%d,%d) = %.15e + I %.15e\n", i, j, real(r2(i,j)), imag(r2(i,j)));
+        //printfQuda("r2(%d,%d) = %.15e + I %.15e\n", i, j, real(r2(i,j)), imag(r2(i,j)));
         if (i!=j) r2(j,i) = std::conj(r2(i,j));
       }
     }
     #endif
+    printmat("r2", r2);
   
     // Cholesky decomposition
     L = r2.llt().matrixL();// retrieve factor L  in the decomposition
