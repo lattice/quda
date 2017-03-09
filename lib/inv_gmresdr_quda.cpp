@@ -28,8 +28,6 @@ See also: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES 
 */
 
 namespace quda {
-//Notes:
-//GMResDR does not require large m (and esp. nev), so this will use normal LAPACK routines.
 
     using namespace blas;
 
@@ -469,7 +467,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
  {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
-    const double tol_threshold = 1.2;
+    const double tol_threshold     = 1.2;
+    const double det_max_deviation = 0.8;
 
     if (!init) {
 
@@ -504,6 +503,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
       Zm = K ? ColorSpinorFieldSet::Create(csParam) : Vm;
 
+      init = true;
     }
 
     GMResDRArgs &args = *gmresdr_args;
@@ -550,7 +550,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
 
-  int restart_idx = 0, j = 0, check_interval = 4;
+   int restart_idx = 0, j = 0, check_interval = 4;
 
    DenseMatrix Gm = DenseMatrix::Zero(args.k+1, args.k+1);
 
@@ -568,40 +568,42 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
        mat(r, x, y);
        ext_r2 = xmyNorm(b, r);
 
-       do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold);
+       for(int l = 0; l < args.k+1; l++) {
+
+         const int cdot_pipeline_length  = 1;
+         int offset = 0;
+
+         Complex *col = Gm.col(l).data();
+
+         do {
+           const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
+
+            std::vector<cudaColorSpinorField*> v1_;
+            std::vector<cudaColorSpinorField*> v2_;
+            v1_.reserve(local_length);
+            v2_.reserve(local_length);
+
+            for(int i = 0; i < local_length; i++)
+            {
+              v1_.push_back(static_cast<cudaColorSpinorField*>(&Vm->Component(offset+i)));
+              v2_.push_back(static_cast<cudaColorSpinorField*>(&Vm->Component(l)));
+            }
+            blas::cDotProduct(&col[offset], v1_, v2_);
+
+            offset += cdot_pipeline_length;
+
+         } while (offset < (args.k+1));
+       }//end l-loop
+
+       Complex detGm = Gm.determinant();
+
+       PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
+       printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2, detGm.real(), detGm.imag());
+
+       Gm.setZero();
+
+       do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || (norm(detGm) > det_max_deviation);
      }
-
-     for(int j = 0; j < args.k+1; j++) {
-
-       const int cdot_pipeline_length  = 4;
-       int offset = 0;
-
-       do {
-          const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
-
-          std::vector<cudaColorSpinorField*> v1_;
-          std::vector<cudaColorSpinorField*> v2_;
-          v1_.reserve(local_length);
-          v2_.reserve(local_length);
-
-          for(int i = 0; i < local_length; i++)
-          {
-            v1_.push_back(static_cast<cudaColorSpinorField*>(&Vm->Component(offset+i)));
-            v2_.push_back(static_cast<cudaColorSpinorField*>(&Vm->Component(offset+i)));
-          }
-          blas::cDotProduct(Gm.col(j).data(), v1_, v2_);
-
-          offset += cdot_pipeline_length;
-
-       } while (offset < (args.k+1));
-     }
-
-     Complex detGm = Gm.determinant();
-
-     PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
-     printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2, detGm.real(), detGm.imag());
-
-     Gm.setZero();
 
      if( ((restart_idx != param.deflation_grid-1) && !do_clean_restart) ) {
 
