@@ -165,8 +165,7 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
   // host pointer used for backing up fields when tuning
   char *X_h[N], *Y_h[N], *Z_h[N], *W_h[N], *V_h[N];
   char *Xnorm_h[N], *Ynorm_h[N], *Znorm_h[N], *Wnorm_h[N], *Vnorm_h[N];
-  const size_t **bytes_;
-  const size_t **norm_bytes_;
+  std::vector<cudaColorSpinorField*> &x, &y, &z, &v, &w;
 
   unsigned int sharedBytesPerThread() const { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -182,11 +181,12 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
 
  public:
  MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], SpinorV V[],
-		 Reducer &r, int length, int nParity, size_t **bytes, size_t **norm_bytes) :
-  arg(X, Y, Z, W, V, r, length/nParity, nParity), nParity(nParity), result(result),
-    X_h(), Y_h(), Z_h(), W_h(), V_h(), Xnorm_h(),
-    Ynorm_h(), Znorm_h(), Wnorm_h(), Vnorm_h(),
-    bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
+		 Reducer &r, int length, int nParity, std::vector<cudaColorSpinorField*> &x,
+		 std::vector<cudaColorSpinorField*> &y, std::vector<cudaColorSpinorField*> &z,
+		 std::vector<cudaColorSpinorField*> &v, std::vector<cudaColorSpinorField*> &w)
+   : arg(X, Y, Z, W, V, r, length/nParity, nParity), nParity(nParity), result(result),
+     X_h(), Y_h(), Z_h(), W_h(), V_h(), Xnorm_h(), Ynorm_h(), Znorm_h(), Wnorm_h(), Vnorm_h(),
+     x(x), y(y), z(z), v(v), w(w) { }
 
   inline TuneKey tuneKey() const {
     char name[TuneKey::name_n];
@@ -245,21 +245,21 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
 
   void preTune() {
     for(int i=0; i<N; ++i){
-      arg.X[i].backup(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.Z[i].backup(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
-      arg.V[i].backup(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
+      arg.X[i].backup(&X_h[i], &Xnorm_h[i], x[i]->Bytes(), x[i]->NormBytes());
+      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.Z[i].backup(&Z_h[i], &Znorm_h[i], z[i]->Bytes(), z[i]->NormBytes());
+      arg.V[i].backup(&V_h[i], &Vnorm_h[i], v[i]->Bytes(), v[i]->NormBytes());
+      arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
   void postTune() {
     for(int i=0; i<N; ++i){
-      arg.X[i].restore(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.Z[i].restore(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
-      arg.V[i].restore(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
+      arg.X[i].restore(&X_h[i], &Xnorm_h[i], x[i]->Bytes(), x[i]->NormBytes());
+      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.Z[i].restore(&Z_h[i], &Znorm_h[i], z[i]->Bytes(), z[i]->NormBytes());
+      arg.V[i].restore(&V_h[i], &Vnorm_h[i], v[i]->Bytes(), v[i]->NormBytes());
+      arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
@@ -282,7 +282,7 @@ template <int N, typename doubleN, typename ReduceType, typename RegType, typena
 			  std::vector<cudaColorSpinorField*>& v, int length) {
 
   int nParity = x[0]->SiteSubset();
-  memset(result, 0, nParity*N*sizeof(doubleN));
+  memset(result, 0, N*sizeof(doubleN));
 
   for (int i=0; i<N; i++) {
     checkSpinor(*x[i],*y[i]); checkSpinor(*x[i],*z[i]); checkSpinor(*x[i],*w[i]); checkSpinor(*x[i],*v[i]);
@@ -294,15 +294,6 @@ template <int N, typename doubleN, typename ReduceType, typename RegType, typena
 
   blasStrings.vol_str = x[0]->VolString();
   blasStrings.aux_str = x[0]->AuxString();
-
-  size_t **bytes = new size_t*[N], **norm_bytes = new size_t*[N];
-  for (int i=0; i<N; i++) {
-    bytes[i] = new size_t[5]; norm_bytes[i] = new size_t[5];
-    bytes[i][0] = x[i]->Bytes(); bytes[i][1] = y[i]->Bytes(); bytes[i][2] = z[i]->Bytes();
-    bytes[i][3] = w[i]->Bytes(); bytes[i][4] = v[i]->Bytes();
-    norm_bytes[i][0] = x[i]->NormBytes(); norm_bytes[i][1] = y[i]->NormBytes(); norm_bytes[i][2] = z[i]->NormBytes();
-    norm_bytes[i][3] = w[i]->NormBytes(); norm_bytes[i][4] = v[i]->NormBytes();
-  }
 
   multi::Spinor<RegType,StoreType,M,writeX,0> X[N];
   multi::Spinor<RegType,StoreType,M,writeY,1> Y[N];
@@ -321,17 +312,13 @@ template <int N, typename doubleN, typename ReduceType, typename RegType, typena
 		  multi::Spinor<RegType,StoreType,M,writeX,0>,multi::Spinor<RegType,StoreType,M,writeY,1>,
 		  multi::Spinor<RegType,StoreType,M,writeZ,2>,multi::Spinor<RegType,StoreType,M,writeW,3>,
 		  multi::Spinor<RegType,StoreType,M,writeV,4>,Reducer<ReduceType, Float2, RegType> >
-    reduce(result, X, Y, Z, W, V, r, length, nParity, bytes, norm_bytes);
-  reduce.apply(*blas::getStream());
+    reduce(result, X, Y, Z, W, V, r, length, nParity, x, y, z, v, w);
+    reduce.apply(*blas::getStream());
 
   blas::bytes += reduce.bytes();
   blas::flops += reduce.flops();
 
   checkCudaError();
-
-  for (int i=0; i<N; i++) { delete []bytes[i]; delete []norm_bytes[i]; }
-  delete []bytes;
-  delete []norm_bytes;
 
   return;
 }

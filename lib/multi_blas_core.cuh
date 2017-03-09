@@ -139,17 +139,16 @@ private:
   // host pointers used for backing up fields when tuning
   // don't curry into the Spinors to minimize parameter size
   char *Y_h[MAX_MULTI_BLAS_N], *W_h[MAX_MULTI_BLAS_N], *Ynorm_h[MAX_MULTI_BLAS_N], *Wnorm_h[MAX_MULTI_BLAS_N];
-  const size_t **bytes_;
-  const size_t **norm_bytes_;
+  std::vector<ColorSpinorField*> &y, &w;
 
   bool tuneSharedBytes() const { return false; }
 
 public:
   MultiBlasCuda(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f,
-		int NYW, int length, int nParity, size_t **bytes,  size_t **norm_bytes)
+		int NYW, int length, int nParity,
+		std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
     : TunableVectorY(NYW), NYW(NYW), arg(X, Y, Z, W, f, NYW, length/nParity),
-      nParity(nParity), Y_h(), W_h(), Ynorm_h(), Wnorm_h(),
-      bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
+      nParity(nParity), Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { }
 
   virtual ~MultiBlasCuda() { }
 
@@ -168,15 +167,15 @@ public:
 
   void preTune() {
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
   void postTune() {
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
@@ -283,17 +282,6 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
     strcat(blasStrings.aux_tmp, y[0]->AuxString());
   }
 
-  size_t **bytes = new size_t*[NYW], **norm_bytes = new size_t*[NYW];
-  for (int i=0; i<NYW; i++) {
-    bytes[i] = new size_t[2];
-    bytes[i][0] = y[i]->Bytes();
-    bytes[i][1] = w[i]->Bytes();
-
-    norm_bytes[i] = new size_t[2];
-    norm_bytes[i][0] = y[i]->NormBytes();
-    norm_bytes[i][1] = w[i]->NormBytes();
-  }
-
   multi::SpinorTexture<RegType,StoreType,M,0> X[NXZ];
   multi::Spinor<RegType,    yType,M,writeY,1> Y[MAX_MULTI_BLAS_N];
   multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
@@ -311,18 +299,11 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
 		multi::SpinorTexture<RegType,StoreType,M,2>,
 		multi::Spinor<RegType,StoreType,M,writeW,3>,
 		decltype(f) >
-    blas(X, Y, Z, W, f, NYW, length, x[0]->SiteSubset(), bytes, norm_bytes);
+    blas(X, Y, Z, W, f, NYW, length, x[0]->SiteSubset(), y, w);
   blas.apply(*getStream());
 
   blas::bytes += blas.bytes();
   blas::flops += blas.flops();
-
-  for (int i=0; i<NYW; i++) {
-    delete []bytes[i];
-    delete []norm_bytes[i];
-  }
-  delete []bytes;
-  delete []norm_bytes;
 
   checkCudaError();
 }
