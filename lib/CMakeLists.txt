@@ -21,7 +21,7 @@ set (QUDA_OBJS
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu covDev.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
-  dslash_twisted_clover.cu dslash_domain_wall.cu
+  dslash_twisted_clover.cu dslash_ndeg_twisted_clover.cu dslash_domain_wall.cu
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
   multi_blas_quda.cu copy_quda.cu reduce_quda.cu

@@ -1,10 +1,10 @@
 #ifndef _TMC_GAMMA_CORE_H
 #define _TMC_GAMMA_CORE_H
 
-template<typename T>
+template<typename T, bool pair>
 __global__ void twistCloverGamma5Kernel(DslashParam param) { }
 
-template<typename T>
+template<typename T, bool pair>
 __global__ void twistCloverGamma5InvKernel(DslashParam param) { }
 
 
@@ -615,6 +615,54 @@ __device__ double2 operator*(const double &x, const double2 &y)
 #define S31_im	I10.y
 #define S32_re	I11.x
 #define S32_im	I11.y
+#define S1_00_re	I0.x
+#define S1_00_im	I0.y
+#define S1_01_re	I1.x
+#define S1_01_im	I1.y
+#define S1_02_re	I2.x
+#define S1_02_im	I2.y
+#define S1_10_re	I3.x
+#define S1_10_im	I3.y
+#define S1_11_re	I4.x
+#define S1_11_im	I4.y
+#define S1_12_re	I5.x
+#define S1_12_im	I5.y
+#define S1_20_re	I6.x
+#define S1_20_im	I6.y
+#define S1_21_re	I7.x
+#define S1_21_im	I7.y
+#define S1_22_re	I8.x
+#define S1_22_im	I8.y
+#define S1_30_re	I9.x
+#define S1_30_im	I9.y
+#define S1_31_re	I10.x
+#define S1_31_im	I10.y
+#define S1_32_re	I11.x
+#define S1_32_im	I11.y
+#define S2_00_re	J0.x
+#define S2_00_im	J0.y
+#define S2_01_re	J1.x
+#define S2_01_im	J1.y
+#define S2_02_re	J2.x
+#define S2_02_im	J2.y
+#define S2_10_re	J3.x
+#define S2_10_im	J3.y
+#define S2_11_re	J4.x
+#define S2_11_im	J4.y
+#define S2_12_re	J5.x
+#define S2_12_im	J5.y
+#define S2_20_re	J6.x
+#define S2_20_im	J6.y
+#define S2_21_re	J7.x
+#define S2_21_im	J7.y
+#define S2_22_re	J8.x
+#define S2_22_im	J8.y
+#define S2_30_re	J9.x
+#define S2_30_im	J9.y
+#define S2_31_re	J10.x
+#define S2_31_im	J10.y
+#define S2_32_re	J11.x
+#define S2_32_im	J11.y
 #define spinorFloat double
 
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
@@ -637,7 +685,7 @@ __device__ double2 operator*(const double &x, const double2 &y)
 #define CLOVER_DOUBLE
 
 template<>
-__global__ void twistCloverGamma5Kernel<double2>(DslashParam param)
+__global__ void twistCloverGamma5Kernel<double2,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -695,7 +743,101 @@ __global__ void twistCloverGamma5Kernel<double2>(DslashParam param)
 }
 
 template<>
-__global__ void twistCloverGamma5InvKernel<double2>(DslashParam param)
+__global__ void twistCloverGamma5Kernel<double2,true>(DslashParam param)
+{
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
+
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+#ifndef FERMI_NO_DBLE_TEX
+   double2 I0  = fetch_double2(SPINORTEX, sid + 0 * param.sp_stride);   
+   double2 I1  = fetch_double2(SPINORTEX, sid + 1 * param.sp_stride);   
+   double2 I2  = fetch_double2(SPINORTEX, sid + 2 * param.sp_stride);   
+   double2 I3  = fetch_double2(SPINORTEX, sid + 3 * param.sp_stride);   
+   double2 I4  = fetch_double2(SPINORTEX, sid + 4 * param.sp_stride);   
+   double2 I5  = fetch_double2(SPINORTEX, sid + 5 * param.sp_stride);   
+   double2 I6  = fetch_double2(SPINORTEX, sid + 6 * param.sp_stride);   
+   double2 I7  = fetch_double2(SPINORTEX, sid + 7 * param.sp_stride);   
+   double2 I8  = fetch_double2(SPINORTEX, sid + 8 * param.sp_stride);   
+   double2 I9  = fetch_double2(SPINORTEX, sid + 9 * param.sp_stride);   
+   double2 I10 = fetch_double2(SPINORTEX, sid + 10 * param.sp_stride); 
+   double2 I11 = fetch_double2(SPINORTEX, sid + 11 * param.sp_stride);
+   double2 J0  = fetch_double2(SPINORTEX, sid + param.fl_stride + 0 * param.sp_stride);   
+   double2 J1  = fetch_double2(SPINORTEX, sid + param.fl_stride + 1 * param.sp_stride);   
+   double2 J2  = fetch_double2(SPINORTEX, sid + param.fl_stride + 2 * param.sp_stride);   
+   double2 J3  = fetch_double2(SPINORTEX, sid + param.fl_stride + 3 * param.sp_stride);   
+   double2 J4  = fetch_double2(SPINORTEX, sid + param.fl_stride + 4 * param.sp_stride);   
+   double2 J5  = fetch_double2(SPINORTEX, sid + param.fl_stride + 5 * param.sp_stride);   
+   double2 J6  = fetch_double2(SPINORTEX, sid + param.fl_stride + 6 * param.sp_stride);   
+   double2 J7  = fetch_double2(SPINORTEX, sid + param.fl_stride + 7 * param.sp_stride);   
+   double2 J8  = fetch_double2(SPINORTEX, sid + param.fl_stride + 8 * param.sp_stride);   
+   double2 J9  = fetch_double2(SPINORTEX, sid + param.fl_stride + 9 * param.sp_stride);   
+   double2 J10 = fetch_double2(SPINORTEX, sid + param.fl_stride + 10 * param.sp_stride); 
+   double2 J11 = fetch_double2(SPINORTEX, sid + param.fl_stride + 11 * param.sp_stride);
+#else
+   double2 I0  = in[sid + 0 * param.sp_stride];   
+   double2 I1  = in[sid + 1 * param.sp_stride];   
+   double2 I2  = in[sid + 2 * param.sp_stride];   
+   double2 I3  = in[sid + 3 * param.sp_stride];   
+   double2 I4  = in[sid + 4 * param.sp_stride];   
+   double2 I5  = in[sid + 5 * param.sp_stride];   
+   double2 I6  = in[sid + 6 * param.sp_stride];   
+   double2 I7  = in[sid + 7 * param.sp_stride];   
+   double2 I8  = in[sid + 8 * param.sp_stride];   
+   double2 I9  = in[sid + 9 * param.sp_stride];   
+   double2 I10 = in[sid + 10 * param.sp_stride]; 
+   double2 I11 = in[sid + 11 * param.sp_stride];
+   double2 J0  = in[sid + param.fl_stride + 0 * param.sp_stride];   
+   double2 J1  = in[sid + param.fl_stride + 1 * param.sp_stride];   
+   double2 J2  = in[sid + param.fl_stride + 2 * param.sp_stride];   
+   double2 J3  = in[sid + param.fl_stride + 3 * param.sp_stride];   
+   double2 J4  = in[sid + param.fl_stride + 4 * param.sp_stride];   
+   double2 J5  = in[sid + param.fl_stride + 5 * param.sp_stride];   
+   double2 J6  = in[sid + param.fl_stride + 6 * param.sp_stride];   
+   double2 J7  = in[sid + param.fl_stride + 7 * param.sp_stride];   
+   double2 J8  = in[sid + param.fl_stride + 8 * param.sp_stride];   
+   double2 J9  = in[sid + param.fl_stride + 9 * param.sp_stride];   
+   double2 J10 = in[sid + param.fl_stride + 10 * param.sp_stride]; 
+   double2 J11 = in[sid + param.fl_stride + 11 * param.sp_stride];
+#endif
+
+   double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17;
+
+   //apply (Clover + i*a*gamma_5) to the input spinor
+   APPLY_CLOVER_NDEG_TWIST(cd, param.a, param.b, S);
+
+   double2 *spinor = (double2*)param.out;
+   spinor[sid + 0  * param.sp_stride] = I0;   
+   spinor[sid + 1  * param.sp_stride] = I1;   
+   spinor[sid + 2  * param.sp_stride] = I2;   
+   spinor[sid + 3  * param.sp_stride] = I3;   
+   spinor[sid + 4  * param.sp_stride] = I4;   
+   spinor[sid + 5  * param.sp_stride] = I5;   
+   spinor[sid + 6  * param.sp_stride] = I6;   
+   spinor[sid + 7  * param.sp_stride] = I7;   
+   spinor[sid + 8  * param.sp_stride] = I8;   
+   spinor[sid + 9  * param.sp_stride] = I9;   
+   spinor[sid + 10 * param.sp_stride] = I10;   
+   spinor[sid + 11 * param.sp_stride] = I11;
+   spinor[sid + param.fl_stride + 0  * param.sp_stride] = J0;   
+   spinor[sid + param.fl_stride + 1  * param.sp_stride] = J1;   
+   spinor[sid + param.fl_stride + 2  * param.sp_stride] = J2;   
+   spinor[sid + param.fl_stride + 3  * param.sp_stride] = J3;   
+   spinor[sid + param.fl_stride + 4  * param.sp_stride] = J4;   
+   spinor[sid + param.fl_stride + 5  * param.sp_stride] = J5;   
+   spinor[sid + param.fl_stride + 6  * param.sp_stride] = J6;   
+   spinor[sid + param.fl_stride + 7  * param.sp_stride] = J7;   
+   spinor[sid + param.fl_stride + 8  * param.sp_stride] = J8;   
+   spinor[sid + param.fl_stride + 9  * param.sp_stride] = J9;   
+   spinor[sid + param.fl_stride + 10 * param.sp_stride] = J10;   
+   spinor[sid + param.fl_stride + 11 * param.sp_stride] = J11;
+
+#endif
+}
+
+template<>
+__global__ void twistCloverGamma5InvKernel<double2,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
@@ -757,6 +899,105 @@ __global__ void twistCloverGamma5InvKernel<double2>(DslashParam param)
 #endif
 }
 
+template<>
+__global__ void twistCloverGamma5InvKernel<double2,true>(DslashParam param)
+{
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
+
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+#ifndef FERMI_NO_DBLE_TEX
+   double2 I0  = fetch_double2(SPINORTEX, sid + 0 * param.sp_stride);   
+   double2 I1  = fetch_double2(SPINORTEX, sid + 1 * param.sp_stride);   
+   double2 I2  = fetch_double2(SPINORTEX, sid + 2 * param.sp_stride);   
+   double2 I3  = fetch_double2(SPINORTEX, sid + 3 * param.sp_stride);   
+   double2 I4  = fetch_double2(SPINORTEX, sid + 4 * param.sp_stride);   
+   double2 I5  = fetch_double2(SPINORTEX, sid + 5 * param.sp_stride);   
+   double2 I6  = fetch_double2(SPINORTEX, sid + 6 * param.sp_stride);   
+   double2 I7  = fetch_double2(SPINORTEX, sid + 7 * param.sp_stride);   
+   double2 I8  = fetch_double2(SPINORTEX, sid + 8 * param.sp_stride);   
+   double2 I9  = fetch_double2(SPINORTEX, sid + 9 * param.sp_stride);   
+   double2 I10 = fetch_double2(SPINORTEX, sid + 10 * param.sp_stride); 
+   double2 I11 = fetch_double2(SPINORTEX, sid + 11 * param.sp_stride);
+   double2 J0  = fetch_double2(SPINORTEX, sid + param.fl_stride + 0 * param.sp_stride);   
+   double2 J1  = fetch_double2(SPINORTEX, sid + param.fl_stride + 1 * param.sp_stride);   
+   double2 J2  = fetch_double2(SPINORTEX, sid + param.fl_stride + 2 * param.sp_stride);   
+   double2 J3  = fetch_double2(SPINORTEX, sid + param.fl_stride + 3 * param.sp_stride);   
+   double2 J4  = fetch_double2(SPINORTEX, sid + param.fl_stride + 4 * param.sp_stride);   
+   double2 J5  = fetch_double2(SPINORTEX, sid + param.fl_stride + 5 * param.sp_stride);   
+   double2 J6  = fetch_double2(SPINORTEX, sid + param.fl_stride + 6 * param.sp_stride);   
+   double2 J7  = fetch_double2(SPINORTEX, sid + param.fl_stride + 7 * param.sp_stride);   
+   double2 J8  = fetch_double2(SPINORTEX, sid + param.fl_stride + 8 * param.sp_stride);   
+   double2 J9  = fetch_double2(SPINORTEX, sid + param.fl_stride + 9 * param.sp_stride);   
+   double2 J10 = fetch_double2(SPINORTEX, sid + param.fl_stride + 10 * param.sp_stride); 
+   double2 J11 = fetch_double2(SPINORTEX, sid + param.fl_stride + 11 * param.sp_stride);
+#else
+   double2 I0  = in[sid + 0 * param.sp_stride];   
+   double2 I1  = in[sid + 1 * param.sp_stride];   
+   double2 I2  = in[sid + 2 * param.sp_stride];   
+   double2 I3  = in[sid + 3 * param.sp_stride];   
+   double2 I4  = in[sid + 4 * param.sp_stride];   
+   double2 I5  = in[sid + 5 * param.sp_stride];   
+   double2 I6  = in[sid + 6 * param.sp_stride];   
+   double2 I7  = in[sid + 7 * param.sp_stride];   
+   double2 I8  = in[sid + 8 * param.sp_stride];   
+   double2 I9  = in[sid + 9 * param.sp_stride];   
+   double2 I10 = in[sid + 10 * param.sp_stride]; 
+   double2 I11 = in[sid + 11 * param.sp_stride];
+   double2 J0  = in[sid + param.fl_stride + 0 * param.sp_stride];   
+   double2 J1  = in[sid + param.fl_stride + 1 * param.sp_stride];   
+   double2 J2  = in[sid + param.fl_stride + 2 * param.sp_stride];   
+   double2 J3  = in[sid + param.fl_stride + 3 * param.sp_stride];   
+   double2 J4  = in[sid + param.fl_stride + 4 * param.sp_stride];   
+   double2 J5  = in[sid + param.fl_stride + 5 * param.sp_stride];   
+   double2 J6  = in[sid + param.fl_stride + 6 * param.sp_stride];   
+   double2 J7  = in[sid + param.fl_stride + 7 * param.sp_stride];   
+   double2 J8  = in[sid + param.fl_stride + 8 * param.sp_stride];   
+   double2 J9  = in[sid + param.fl_stride + 9 * param.sp_stride];   
+   double2 J10 = in[sid + param.fl_stride + 10 * param.sp_stride]; 
+   double2 J11 = in[sid + param.fl_stride + 11 * param.sp_stride];
+#endif
+
+   double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17;
+
+   //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+   double a = param.a;
+   double b = param.b;
+#ifndef DYNAMIC_CLOVER
+   APPLY_CLOVER_NDEG_TWIST_INV(cd, cdinv, a, b, S);
+#else
+   APPLY_CLOVER_NDEG_TWIST_DYN_INV(cd, a, b, S);
+#endif
+
+   double2 *spinor = (double2*)param.out;
+   spinor[sid + 0  * param.sp_stride] = I0;   
+   spinor[sid + 1  * param.sp_stride] = I1;   
+   spinor[sid + 2  * param.sp_stride] = I2;   
+   spinor[sid + 3  * param.sp_stride] = I3;   
+   spinor[sid + 4  * param.sp_stride] = I4;   
+   spinor[sid + 5  * param.sp_stride] = I5;   
+   spinor[sid + 6  * param.sp_stride] = I6;   
+   spinor[sid + 7  * param.sp_stride] = I7;   
+   spinor[sid + 8  * param.sp_stride] = I8;   
+   spinor[sid + 9  * param.sp_stride] = I9;   
+   spinor[sid + 10 * param.sp_stride] = I10;   
+   spinor[sid + 11 * param.sp_stride] = I11;
+   spinor[sid + param. fl_stride + 0  * param.sp_stride] = J0;   
+   spinor[sid + param. fl_stride + 1  * param.sp_stride] = J1;   
+   spinor[sid + param. fl_stride + 2  * param.sp_stride] = J2;   
+   spinor[sid + param. fl_stride + 3  * param.sp_stride] = J3;   
+   spinor[sid + param. fl_stride + 4  * param.sp_stride] = J4;   
+   spinor[sid + param. fl_stride + 5  * param.sp_stride] = J5;   
+   spinor[sid + param. fl_stride + 6  * param.sp_stride] = J6;   
+   spinor[sid + param. fl_stride + 7  * param.sp_stride] = J7;   
+   spinor[sid + param. fl_stride + 8  * param.sp_stride] = J8;   
+   spinor[sid + param. fl_stride + 9  * param.sp_stride] = J9;   
+   spinor[sid + param. fl_stride + 10 * param.sp_stride] = J10;   
+   spinor[sid + param. fl_stride + 11 * param.sp_stride] = J11;
+
+#endif
+}
 #undef TMCLOVERTEX
 #undef TM_INV_CLOVERTEX
 #undef READ_CLOVER
@@ -787,6 +1028,54 @@ __global__ void twistCloverGamma5InvKernel<double2>(DslashParam param)
 #undef S31_im
 #undef S32_re
 #undef S32_im
+#undef S1_00_re
+#undef S1_00_im
+#undef S1_01_re
+#undef S1_01_im
+#undef S1_02_re
+#undef S1_02_im
+#undef S1_10_re
+#undef S1_10_im
+#undef S1_11_re
+#undef S1_11_im
+#undef S1_12_re
+#undef S1_12_im
+#undef S1_20_re
+#undef S1_20_im
+#undef S1_21_re
+#undef S1_21_im
+#undef S1_22_re
+#undef S1_22_im
+#undef S1_30_re
+#undef S1_30_im
+#undef S1_31_re
+#undef S1_31_im
+#undef S1_32_re
+#undef S1_32_im
+#undef S2_00_re
+#undef S2_00_im
+#undef S2_01_re
+#undef S2_01_im
+#undef S2_02_re
+#undef S2_02_im
+#undef S2_10_re
+#undef S2_10_im
+#undef S2_11_re
+#undef S2_11_im
+#undef S2_12_re
+#undef S2_12_im
+#undef S2_20_re
+#undef S2_20_im
+#undef S2_21_re
+#undef S2_21_im
+#undef S2_22_re
+#undef S2_22_im
+#undef S2_30_re
+#undef S2_30_im
+#undef S2_31_re
+#undef S2_31_im
+#undef S2_32_re
+#undef S2_32_im
 #undef spinorFloat
 
 #undef SPINORTEX
@@ -820,6 +1109,54 @@ __global__ void twistCloverGamma5InvKernel<double2>(DslashParam param)
 #define S31_im I5.y
 #define S32_re I5.z
 #define S32_im I5.w
+#define S1_00_re I0.x
+#define S1_00_im I0.y
+#define S1_01_re I0.z
+#define S1_01_im I0.w
+#define S1_02_re I1.x
+#define S1_02_im I1.y
+#define S1_10_re I1.z
+#define S1_10_im I1.w
+#define S1_11_re I2.x
+#define S1_11_im I2.y
+#define S1_12_re I2.z
+#define S1_12_im I2.w
+#define S1_20_re I3.x
+#define S1_20_im I3.y
+#define S1_21_re I3.z
+#define S1_21_im I3.w
+#define S1_22_re I4.x
+#define S1_22_im I4.y
+#define S1_30_re I4.z
+#define S1_30_im I4.w
+#define S1_31_re I5.x
+#define S1_31_im I5.y
+#define S1_32_re I5.z
+#define S1_32_im I5.w
+#define S2_00_re J0.x
+#define S2_00_im J0.y
+#define S2_01_re J0.z
+#define S2_01_im J0.w
+#define S2_02_re J1.x
+#define S2_02_im J1.y
+#define S2_10_re J1.z
+#define S2_10_im J1.w
+#define S2_11_re J2.x
+#define S2_11_im J2.y
+#define S2_12_re J2.z
+#define S2_12_im J2.w
+#define S2_20_re J3.x
+#define S2_20_im J3.y
+#define S2_21_re J3.z
+#define S2_21_im J3.w
+#define S2_22_re J4.x
+#define S2_22_im J4.y
+#define S2_30_re J4.z
+#define S2_30_im J4.w
+#define S2_31_re J5.x
+#define S2_31_im J5.y
+#define S2_32_re J5.z
+#define S2_32_im J5.w
 
 #define spinorFloat float
 
@@ -841,7 +1178,7 @@ __global__ void twistCloverGamma5InvKernel<double2>(DslashParam param)
 #endif
 
 template<>
-__global__ void twistCloverGamma5Kernel<float4>(DslashParam param)
+__global__ void twistCloverGamma5Kernel<float4,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -857,7 +1194,7 @@ __global__ void twistCloverGamma5Kernel<float4>(DslashParam param)
    float4 C0, C1, C2, C3, C4, C5, C6, C7, C8;
 
    //apply (Clover + i*a*gamma_5) to the input spinor
-   APPLY_CLOVER_TWIST(c, param.a, S);
+   APPLY_CLOVER_TWIST(c, param.a_f, S);
 
    float4* spinor = (float4*)param.out;
    spinor[sid + 0  * param.sp_stride] = I0;   
@@ -871,7 +1208,49 @@ __global__ void twistCloverGamma5Kernel<float4>(DslashParam param)
 }
 
 template<>
-__global__ void twistCloverGamma5InvKernel<float4>(DslashParam param)
+__global__ void twistCloverGamma5Kernel<float4,true>(DslashParam param)
+{
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+   float4 I0 = TEX1DFETCH(float4, SPINORTEX, sid + 0 * param.sp_stride);   
+   float4 I1 = TEX1DFETCH(float4, SPINORTEX, sid + 1 * param.sp_stride);   
+   float4 I2 = TEX1DFETCH(float4, SPINORTEX, sid + 2 * param.sp_stride);   
+   float4 I3 = TEX1DFETCH(float4, SPINORTEX, sid + 3 * param.sp_stride);   
+   float4 I4 = TEX1DFETCH(float4, SPINORTEX, sid + 4 * param.sp_stride);   
+   float4 I5 = TEX1DFETCH(float4, SPINORTEX, sid + 5 * param.sp_stride);
+   float4 J0 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 0 * param.sp_stride);   
+   float4 J1 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 1 * param.sp_stride);   
+   float4 J2 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 2 * param.sp_stride);   
+   float4 J3 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 3 * param.sp_stride);   
+   float4 J4 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 4 * param.sp_stride);   
+   float4 J5 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 5 * param.sp_stride);
+
+   float4 C0, C1, C2, C3, C4, C5, C6, C7, C8;
+
+   //apply (Clover + i*a*gamma_5) to the input spinor
+   APPLY_CLOVER_NDEG_TWIST(c, param.a_f, param.b_f, S);
+
+   float4* spinor = (float4*)param.out;
+   spinor[sid + 0  * param.sp_stride] = I0;   
+   spinor[sid + 1  * param.sp_stride] = I1;   
+   spinor[sid + 2  * param.sp_stride] = I2;   
+   spinor[sid + 3  * param.sp_stride] = I3;   
+   spinor[sid + 4  * param.sp_stride] = I4;   
+   spinor[sid + 5  * param.sp_stride] = I5;   
+   spinor[sid + param.fl_stride + 0  * param.sp_stride] = J0;   
+   spinor[sid + param.fl_stride + 1  * param.sp_stride] = J1;   
+   spinor[sid + param.fl_stride + 2  * param.sp_stride] = J2;   
+   spinor[sid + param.fl_stride + 3  * param.sp_stride] = J3;   
+   spinor[sid + param.fl_stride + 4  * param.sp_stride] = J4;   
+   spinor[sid + param.fl_stride + 5  * param.sp_stride] = J5;   
+
+#endif 
+}
+
+template<>
+__global__ void twistCloverGamma5InvKernel<float4,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -901,6 +1280,54 @@ __global__ void twistCloverGamma5InvKernel<float4>(DslashParam param)
    spinor[sid + 3  * param.sp_stride] = I3;   
    spinor[sid + 4  * param.sp_stride] = I4;   
    spinor[sid + 5  * param.sp_stride] = I5;   
+
+#endif 
+}
+
+template<>
+__global__ void twistCloverGamma5InvKernel<float4,true>(DslashParam param)
+{
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+   float4 I0 = TEX1DFETCH(float4, SPINORTEX, sid + 0 * param.sp_stride);   
+   float4 I1 = TEX1DFETCH(float4, SPINORTEX, sid + 1 * param.sp_stride);   
+   float4 I2 = TEX1DFETCH(float4, SPINORTEX, sid + 2 * param.sp_stride);   
+   float4 I3 = TEX1DFETCH(float4, SPINORTEX, sid + 3 * param.sp_stride);   
+   float4 I4 = TEX1DFETCH(float4, SPINORTEX, sid + 4 * param.sp_stride);   
+   float4 I5 = TEX1DFETCH(float4, SPINORTEX, sid + 5 * param.sp_stride);
+   float4 J0 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 0 * param.sp_stride);   
+   float4 J1 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 1 * param.sp_stride);   
+   float4 J2 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 2 * param.sp_stride);   
+   float4 J3 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 3 * param.sp_stride);   
+   float4 J4 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 4 * param.sp_stride);   
+   float4 J5 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 5 * param.sp_stride);
+
+   float4 C0, C1, C2, C3, C4, C5, C6, C7, C8;
+
+   //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+   float a = param.a_f;
+   float b = param.b_f;
+#ifndef DYNAMIC_CLOVER
+   APPLY_CLOVER_NDEG_TWIST_INV(c, cinv, a, b, S);
+#else
+   APPLY_CLOVER_NDEG_TWIST_DYN_INV(c, a, b, S);
+#endif
+   
+   float4 *spinor = (float4*)param.out;
+   spinor[sid + 0  * param.sp_stride] = I0;   
+   spinor[sid + 1  * param.sp_stride] = I1;   
+   spinor[sid + 2  * param.sp_stride] = I2;   
+   spinor[sid + 3  * param.sp_stride] = I3;   
+   spinor[sid + 4  * param.sp_stride] = I4;   
+   spinor[sid + 5  * param.sp_stride] = I5;   
+   spinor[sid + param.fl_stride + 0  * param.sp_stride] = J0;   
+   spinor[sid + param.fl_stride + 1  * param.sp_stride] = J1;   
+   spinor[sid + param.fl_stride + 2  * param.sp_stride] = J2;   
+   spinor[sid + param.fl_stride + 3  * param.sp_stride] = J3;   
+   spinor[sid + param.fl_stride + 4  * param.sp_stride] = J4;   
+   spinor[sid + param.fl_stride + 5  * param.sp_stride] = J5;   
 
 #endif 
 }
@@ -944,7 +1371,7 @@ __global__ void twistCloverGamma5InvKernel<float4>(DslashParam param)
 #endif
 
 template<>
-__global__ void twistCloverGamma5Kernel<short4>(DslashParam param)
+__global__ void twistCloverGamma5Kernel<short4,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -1013,11 +1440,139 @@ __global__ void twistCloverGamma5Kernel<short4>(DslashParam param)
    spinor[sid+4*(param.sp_stride)] = make_short4((short)I4.x, (short)I4.y, (short)I4.z, (short)I4.w); 
    spinor[sid+5*(param.sp_stride)] = make_short4((short)I5.x, (short)I5.y, (short)I5.z, (short)I5.w);
 
+#endif
+}
+
+template<>
+__global__ void twistCloverGamma5Kernel<short4,true>(DslashParam param)
+{
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+   float4 I0 = TEX1DFETCH(float4, SPINORTEX, sid + 0 * param.sp_stride);   
+   float4 I1 = TEX1DFETCH(float4, SPINORTEX, sid + 1 * param.sp_stride);   
+   float4 I2 = TEX1DFETCH(float4, SPINORTEX, sid + 2 * param.sp_stride);   
+   float4 I3 = TEX1DFETCH(float4, SPINORTEX, sid + 3 * param.sp_stride);   
+   float4 I4 = TEX1DFETCH(float4, SPINORTEX, sid + 4 * param.sp_stride);   
+   float4 I5 = TEX1DFETCH(float4, SPINORTEX, sid + 5 * param.sp_stride);
+   
+   float KC = TEX1DFETCH(float, SPINORTEXNORM, sid);
+   
+   I0 = KC * I0;
+   I1 = KC * I1;
+   I2 = KC * I2;
+   I3 = KC * I3;
+   I4 = KC * I4;
+   I5 = KC * I5;    
+   
+   float4 J0 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 0 * param.sp_stride);   
+   float4 J1 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 1 * param.sp_stride);   
+   float4 J2 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 2 * param.sp_stride);   
+   float4 J3 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 3 * param.sp_stride);   
+   float4 J4 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 4 * param.sp_stride);   
+   float4 J5 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 5 * param.sp_stride);
+   
+   KC = TEX1DFETCH(float, SPINORTEXNORM, sid + param.fl_stride);
+   
+   I0 = KC * I0;
+   I1 = KC * I1;
+   I2 = KC * I2;
+   I3 = KC * I3;
+   I4 = KC * I4;
+   I5 = KC * I5;    
+   
+   float4 C0, C1, C2, C3, C4, C5, C6, C7, C8;
+   float K;
+
+   //apply (Clover + i*a*gamma_5) to the input spinor
+   APPLY_CLOVER_NDEG_TWIST(c, param.a_f, param.b_f, S);
+   
+   float k0  = fmaxf(fabsf(I0.x), fabsf(I0.y));			
+   float k1  = fmaxf(fabsf(I0.z), fabsf(I0.w));			
+   float k2  = fmaxf(fabsf(I1.x), fabsf(I1.y));			
+   float k3  = fmaxf(fabsf(I1.z), fabsf(I1.w));			
+   float k4  = fmaxf(fabsf(I2.x), fabsf(I2.y));			
+   float k5  = fmaxf(fabsf(I2.z), fabsf(I2.w));			
+   float k6  = fmaxf(fabsf(I3.x), fabsf(I3.y));			
+   float k7  = fmaxf(fabsf(I3.z), fabsf(I3.w));			
+   float k8  = fmaxf(fabsf(I4.x), fabsf(I4.y));			
+   float k9  = fmaxf(fabsf(I4.z), fabsf(I4.w));			
+   float k10 = fmaxf(fabsf(I5.x), fabsf(I5.y));			
+   float k11 = fmaxf(fabsf(I5.z), fabsf(I5.w));			
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k3 = fmaxf(k6, k7);							
+   k4 = fmaxf(k8, k9);							
+   k5 = fmaxf(k10, k11);							
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k0 = fmaxf(k0, k1);							
+   k0 = fmaxf(k0, k2);							
+   param.outNorm[sid] = k0;								
+   float scale = __fdividef(MAX_SHORT, k0);
+   
+   I0 = scale * I0; 	
+   I1 = scale * I1;
+   I2 = scale * I2;
+   I3 = scale * I3;
+   I4 = scale * I4;
+   I5 = scale * I5;
+   
+   k0  = fmaxf(fabsf(J0.x), fabsf(J0.y));			
+   k1  = fmaxf(fabsf(J0.z), fabsf(J0.w));			
+   k2  = fmaxf(fabsf(J1.x), fabsf(J1.y));			
+   k3  = fmaxf(fabsf(J1.z), fabsf(J1.w));			
+   k4  = fmaxf(fabsf(J2.x), fabsf(J2.y));			
+   k5  = fmaxf(fabsf(J2.z), fabsf(J2.w));			
+   k6  = fmaxf(fabsf(J3.x), fabsf(J3.y));			
+   k7  = fmaxf(fabsf(J3.z), fabsf(J3.w));			
+   k8  = fmaxf(fabsf(J4.x), fabsf(J4.y));			
+   k9  = fmaxf(fabsf(J4.z), fabsf(J4.w));			
+   k10 = fmaxf(fabsf(J5.x), fabsf(J5.y));			
+   k11 = fmaxf(fabsf(J5.z), fabsf(J5.w));			
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k3 = fmaxf(k6, k7);							
+   k4 = fmaxf(k8, k9);							
+   k5 = fmaxf(k10, k11);							
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k0 = fmaxf(k0, k1);							
+   k0 = fmaxf(k0, k2);							
+   param.outNorm[sid + param.fl_stride] = k0;								
+   scale = __fdividef(MAX_SHORT, k0);
+   
+   J0 = scale * J0; 	
+   J1 = scale * J1;
+   J2 = scale * J2;
+   J3 = scale * J3;
+   J4 = scale * J4;
+   J5 = scale * J5;
+   
+   short4 *spinor = (short4*)param.out;
+   spinor[sid+0*(param.sp_stride)] = make_short4((short)I0.x, (short)I0.y, (short)I0.z, (short)I0.w); 
+   spinor[sid+1*(param.sp_stride)] = make_short4((short)I1.x, (short)I1.y, (short)I1.z, (short)I1.w); 
+   spinor[sid+2*(param.sp_stride)] = make_short4((short)I2.x, (short)I2.y, (short)I2.z, (short)I2.w); 
+   spinor[sid+3*(param.sp_stride)] = make_short4((short)I3.x, (short)I3.y, (short)I3.z, (short)I3.w); 
+   spinor[sid+4*(param.sp_stride)] = make_short4((short)I4.x, (short)I4.y, (short)I4.z, (short)I4.w); 
+   spinor[sid+5*(param.sp_stride)] = make_short4((short)I5.x, (short)I5.y, (short)I5.z, (short)I5.w);
+   spinor[sid+param.fl_stride+0*(param.sp_stride)] = make_short4((short)J0.x, (short)J0.y, (short)J0.z, (short)J0.w); 
+   spinor[sid+param.fl_stride+1*(param.sp_stride)] = make_short4((short)J1.x, (short)J1.y, (short)J1.z, (short)J1.w); 
+   spinor[sid+param.fl_stride+2*(param.sp_stride)] = make_short4((short)J2.x, (short)J2.y, (short)J2.z, (short)J2.w); 
+   spinor[sid+param.fl_stride+3*(param.sp_stride)] = make_short4((short)J3.x, (short)J3.y, (short)J3.z, (short)J3.w); 
+   spinor[sid+param.fl_stride+4*(param.sp_stride)] = make_short4((short)J4.x, (short)J4.y, (short)J4.z, (short)J4.w); 
+   spinor[sid+param.fl_stride+5*(param.sp_stride)] = make_short4((short)J5.x, (short)J5.y, (short)J5.z, (short)J5.w);
+
 #endif 
 }
 
 template<>
-__global__ void twistCloverGamma5InvKernel<short4>(DslashParam param)
+__global__ void twistCloverGamma5InvKernel<short4,false>(DslashParam param)
 {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
    int sid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -1094,6 +1649,140 @@ __global__ void twistCloverGamma5InvKernel<short4>(DslashParam param)
 #endif 
 }
 
+template<>
+__global__ void twistCloverGamma5InvKernel<short4,true>(DslashParam param)
+{
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
+   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+   if (sid >= param.threads) return;
+
+   float4 I0 = TEX1DFETCH(float4, SPINORTEX, sid + 0 * param.sp_stride);   
+   float4 I1 = TEX1DFETCH(float4, SPINORTEX, sid + 1 * param.sp_stride);   
+   float4 I2 = TEX1DFETCH(float4, SPINORTEX, sid + 2 * param.sp_stride);   
+   float4 I3 = TEX1DFETCH(float4, SPINORTEX, sid + 3 * param.sp_stride);   
+   float4 I4 = TEX1DFETCH(float4, SPINORTEX, sid + 4 * param.sp_stride);   
+   float4 I5 = TEX1DFETCH(float4, SPINORTEX, sid + 5 * param.sp_stride);
+   
+   float KC = TEX1DFETCH(float, SPINORTEXNORM, sid);
+   
+   I0 = KC * I0;
+   I1 = KC * I1;
+   I2 = KC * I2;
+   I3 = KC * I3;
+   I4 = KC * I4;
+   I5 = KC * I5;    
+   
+   float4 J0 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 0 * param.sp_stride);   
+   float4 J1 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 1 * param.sp_stride);   
+   float4 J2 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 2 * param.sp_stride);   
+   float4 J3 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 3 * param.sp_stride);   
+   float4 J4 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 4 * param.sp_stride);   
+   float4 J5 = TEX1DFETCH(float4, SPINORTEX, sid + param.fl_stride + 5 * param.sp_stride);
+
+   KC = TEX1DFETCH(float, SPINORTEXNORM, sid + param.fl_stride);
+   
+   J0 = KC * J0;
+   J1 = KC * J1;
+   J2 = KC * J2;
+   J3 = KC * J3;
+   J4 = KC * J4;
+   J5 = KC * J5;    
+
+   float4 C0, C1, C2, C3, C4, C5, C6, C7, C8;
+   float K;
+
+   //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+   float a = param.a_f;
+   float b = param.b_f;
+#ifndef DYNAMIC_CLOVER
+   APPLY_CLOVER_NDEG_TWIST_INV(c, cinv, a, b, S);
+#else
+   APPLY_CLOVER_NDEG_TWIST_DYN_INV(c, a, b, S);
+#endif
+   
+   float k0  = fmaxf(fabsf(I0.x), fabsf(I0.y));			
+   float k1  = fmaxf(fabsf(I0.z), fabsf(I0.w));			
+   float k2  = fmaxf(fabsf(I1.x), fabsf(I1.y));			
+   float k3  = fmaxf(fabsf(I1.z), fabsf(I1.w));			
+   float k4  = fmaxf(fabsf(I2.x), fabsf(I2.y));			
+   float k5  = fmaxf(fabsf(I2.z), fabsf(I2.w));			
+   float k6  = fmaxf(fabsf(I3.x), fabsf(I3.y));			
+   float k7  = fmaxf(fabsf(I3.z), fabsf(I3.w));			
+   float k8  = fmaxf(fabsf(I4.x), fabsf(I4.y));			
+   float k9  = fmaxf(fabsf(I4.z), fabsf(I4.w));			
+   float k10 = fmaxf(fabsf(I5.x), fabsf(I5.y));			
+   float k11 = fmaxf(fabsf(I5.z), fabsf(I5.w));			
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k3 = fmaxf(k6, k7);							
+   k4 = fmaxf(k8, k9);							
+   k5 = fmaxf(k10, k11);							
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k0 = fmaxf(k0, k1);							
+   k0 = fmaxf(k0, k2);							
+   param.outNorm[sid] = k0;							
+   float scale = __fdividef(MAX_SHORT, k0);
+   
+   I0 = scale * I0; 	
+   I1 = scale * I1;
+   I2 = scale * I2;
+   I3 = scale * I3;
+   I4 = scale * I4;
+   I5 = scale * I5;
+
+   k0  = fmaxf(fabsf(J0.x), fabsf(J0.y));			
+   k1  = fmaxf(fabsf(J0.z), fabsf(J0.w));			
+   k2  = fmaxf(fabsf(J1.x), fabsf(J1.y));			
+   k3  = fmaxf(fabsf(J1.z), fabsf(J1.w));			
+   k4  = fmaxf(fabsf(J2.x), fabsf(J2.y));			
+   k5  = fmaxf(fabsf(J2.z), fabsf(J2.w));			
+   k6  = fmaxf(fabsf(J3.x), fabsf(J3.y));			
+   k7  = fmaxf(fabsf(J3.z), fabsf(J3.w));			
+   k8  = fmaxf(fabsf(J4.x), fabsf(J4.y));			
+   k9  = fmaxf(fabsf(J4.z), fabsf(J4.w));			
+   k10 = fmaxf(fabsf(J5.x), fabsf(J5.y));			
+   k11 = fmaxf(fabsf(J5.z), fabsf(J5.w));			
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k3 = fmaxf(k6, k7);							
+   k4 = fmaxf(k8, k9);							
+   k5 = fmaxf(k10, k11);							
+   k0 = fmaxf(k0, k1);							
+   k1 = fmaxf(k2, k3);							
+   k2 = fmaxf(k4, k5);							
+   k0 = fmaxf(k0, k1);							
+   k0 = fmaxf(k0, k2);							
+   param.outNorm[sid + param.fl_stride] = k0;							
+   scale = __fdividef(MAX_SHORT, k0);
+   
+   J0 = scale * J0; 	
+   J1 = scale * J1;
+   J2 = scale * J2;
+   J3 = scale * J3;
+   J4 = scale * J4;
+   J5 = scale * J5;
+   
+   short4 *spinor = (short4*)param.out;
+   spinor[sid+0*(param.sp_stride)] = make_short4((short)I0.x, (short)I0.y, (short)I0.z, (short)I0.w); 
+   spinor[sid+1*(param.sp_stride)] = make_short4((short)I1.x, (short)I1.y, (short)I1.z, (short)I1.w); 
+   spinor[sid+2*(param.sp_stride)] = make_short4((short)I2.x, (short)I2.y, (short)I2.z, (short)I2.w); 
+   spinor[sid+3*(param.sp_stride)] = make_short4((short)I3.x, (short)I3.y, (short)I3.z, (short)I3.w); 
+   spinor[sid+4*(param.sp_stride)] = make_short4((short)I4.x, (short)I4.y, (short)I4.z, (short)I4.w); 
+   spinor[sid+5*(param.sp_stride)] = make_short4((short)I5.x, (short)I5.y, (short)I5.z, (short)I5.w);
+   spinor[sid+param.fl_stride+0*(param.sp_stride)] = make_short4((short)J0.x, (short)J0.y, (short)J0.z, (short)J0.w); 
+   spinor[sid+param.fl_stride+1*(param.sp_stride)] = make_short4((short)J1.x, (short)J1.y, (short)J1.z, (short)J1.w); 
+   spinor[sid+param.fl_stride+2*(param.sp_stride)] = make_short4((short)J2.x, (short)J2.y, (short)J2.z, (short)J2.w); 
+   spinor[sid+param.fl_stride+3*(param.sp_stride)] = make_short4((short)J3.x, (short)J3.y, (short)J3.z, (short)J3.w); 
+   spinor[sid+param.fl_stride+4*(param.sp_stride)] = make_short4((short)J4.x, (short)J4.y, (short)J4.z, (short)J4.w); 
+   spinor[sid+param.fl_stride+5*(param.sp_stride)] = make_short4((short)J5.x, (short)J5.y, (short)J5.z, (short)J5.w);
+
+#endif 
+}
+
 #undef CLOVERTEX 
 #undef READ_CLOVER
 #undef TMCLOVERTEX
@@ -1129,6 +1818,54 @@ __global__ void twistCloverGamma5InvKernel<short4>(DslashParam param)
 #undef S31_im
 #undef S32_re
 #undef S32_im
+#undef S1_00_re
+#undef S1_00_im
+#undef S1_01_re
+#undef S1_01_im
+#undef S1_02_re
+#undef S1_02_im
+#undef S1_10_re
+#undef S1_10_im
+#undef S1_11_re
+#undef S1_11_im
+#undef S1_12_re
+#undef S1_12_im
+#undef S1_20_re
+#undef S1_20_im
+#undef S1_21_re
+#undef S1_21_im
+#undef S1_22_re
+#undef S1_22_im
+#undef S1_30_re
+#undef S1_30_im
+#undef S1_31_re
+#undef S1_31_im
+#undef S1_32_re
+#undef S1_32_im
+#undef S2_00_re
+#undef S2_00_im
+#undef S2_01_re
+#undef S2_01_im
+#undef S2_02_re
+#undef S2_02_im
+#undef S2_10_re
+#undef S2_10_im
+#undef S2_11_re
+#undef S2_11_im
+#undef S2_12_re
+#undef S2_12_im
+#undef S2_20_re
+#undef S2_20_im
+#undef S2_21_re
+#undef S2_21_im
+#undef S2_22_re
+#undef S2_22_im
+#undef S2_30_re
+#undef S2_30_im
+#undef S2_31_re
+#undef S2_31_im
+#undef S2_32_re
+#undef S2_32_im
 #undef spinorFloat
 
 #endif //_TM_GAMMA_CORE_H

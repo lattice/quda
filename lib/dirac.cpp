@@ -180,18 +180,12 @@ namespace quda {
       return new DiracImprovedStaggeredPC(param);    
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1) {
-	return new DiracTwistedClover(param, 4);
-      } else { 
-	errorQuda("Cannot create DiracTwistedClover operator for %d flavors\n", param.Ls);
-      }
+      if (param.Ls == 1) return new DiracTwistedClover(param, 4);
+      else return new DiracTwistedClover(param, 5);
     } else if (param.type == QUDA_TWISTED_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedCloverPC operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1) {
-	return new DiracTwistedCloverPC(param, 4);
-      } else {
-	errorQuda("Cannot create DiracTwistedCloverPC operator for %d flavors\n", param.Ls);
-      }
+      if (param.Ls == 1) return new DiracTwistedCloverPC(param, 4);
+      else return new DiracTwistedCloverPC(param, 5); 
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMass(param, 4);

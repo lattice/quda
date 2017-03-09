@@ -108,6 +108,11 @@ namespace quda {
 			       const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim,
 			       TimeProfile &profile);
 
+  // twisted clover Dslash
+  void ndegTwistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover *clover, const FullClover *cloverInv,
+			       const cudaColorSpinorField *in, const int parity, const int dagger, 
+			       const cudaColorSpinorField *x, const QudaTwistCloverDslashType type, const double &kappa, const double &mu, 
+			       const double &epsilon, const double &k,  const int *commOverride, TimeProfile &profile);
   // solo twist term
   void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger,
                        const double &kappa, const double &mu, const double &epsilon,

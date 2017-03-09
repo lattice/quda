@@ -44,7 +44,7 @@
 ((a##_re)*(a##_re) + (a##_im)*(a##_im))
 
 
-#define INVERT_CLOVER(c,b)\
+#define INVERT_CLOVER(c)\
 \
 /* Inverts the clover term, copy-paste from clover_invert.cu with minor modifications */ \
 {\
@@ -2061,6 +2061,7 @@
   spinorFloat a10_re = 0; spinorFloat a10_im = 0;\
   spinorFloat a11_re = 0; spinorFloat a11_im = 0;\
   spinorFloat a12_re = 0; spinorFloat a12_im = 0;\
+  \
   a00_re += c##00_00_re * reg##00_re;\
   a00_im += c##00_00_re * reg##00_im;\
   a00_re += c##00_01_re * reg##01_re;\
@@ -2215,7 +2216,7 @@
 }\
 /*Apply inverse clover*/\
 {\
-  INVERT_CLOVER(c,0) \
+  INVERT_CLOVER(c) \
   spinorFloat a00_re = 0; spinorFloat a00_im = 0;\
   spinorFloat a01_re = 0; spinorFloat a01_im = 0;\
   spinorFloat a02_re = 0; spinorFloat a02_im = 0;\
@@ -2535,7 +2536,7 @@
 }\
 /*Apply inverse clover*/\
 {\
-  INVERT_CLOVER(c,0) \
+  INVERT_CLOVER(c) \
   spinorFloat a20_re = 0; spinorFloat a20_im = 0;\
   spinorFloat a21_re = 0; spinorFloat a21_im = 0;\
   spinorFloat a22_re = 0; spinorFloat a22_im = 0;\
@@ -2739,11 +2740,13 @@
   reg##12_re = a12_re*2.;  reg##12_im = a12_im*2.;\
   reg##22_re = a22_re*2.;  reg##22_im = a22_im*2.;\
   reg##32_re = a32_re*2.;  reg##32_im = a32_im*2.;\
-}
-
+}\
+\
 
 #define APPLY_CLOVER_NDEG_TWIST(c, a, b, reg)\
-/* change to chiral basis (flavor 1) */\
+\
+/* change to chiral basis*/\
+/* Flavor 1 */\
 {\
   spinorFloat a00_re = -reg##1_10_re - reg##1_30_re;\
   spinorFloat a00_im = -reg##1_10_im - reg##1_30_im;\
@@ -2791,6 +2794,7 @@
   reg##1_22_re = a22_re;  reg##1_22_im = a22_im;\
   reg##1_32_re = a32_re;  reg##1_32_im = a32_im;\
 }\
+\
 /* Flavor 2 */\
 {\
   spinorFloat a00_re = -reg##2_10_re - reg##2_30_re;\
@@ -2807,6 +2811,7 @@
   reg##2_20_re = a20_re;  reg##2_20_im = a20_im;\
   reg##2_30_re = a30_re;  reg##2_30_im = a30_im;\
 }\
+\
 {\
   spinorFloat a01_re = -reg##2_11_re - reg##2_31_re;\
   spinorFloat a01_im = -reg##2_11_im - reg##2_31_im;\
@@ -2822,6 +2827,7 @@
   reg##2_21_re = a21_re;  reg##2_21_im = a21_im;\
   reg##2_31_re = a31_re;  reg##2_31_im = a31_im;\
 }\
+\
 {\
   spinorFloat a02_re = -reg##2_12_re - reg##2_32_re;\
   spinorFloat a02_im = -reg##2_12_im - reg##2_32_im;\
@@ -2832,11 +2838,12 @@
   spinorFloat a32_re =  reg##2_02_re - reg##2_22_re;\
   spinorFloat a32_im =  reg##2_02_im - reg##2_22_im;\
   \
-  reg##2_02_re = a02_re;  reg##2_02_im = a02_im;\
-  reg##2_12_re = a12_re;  reg##2_12_im = a12_im;\
-  reg##2_22_re = a22_re;  reg##2_22_im = a22_im;\
-  reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
+  reg##2_2_02_re = a02_re;  reg##2_02_im = a02_im;\
+  reg##2_2_12_re = a12_re;  reg##2_12_im = a12_im;\
+  reg##2_2_22_re = a22_re;  reg##2_22_im = a22_im;\
+  reg##2_2_32_re = a32_re;  reg##2_32_im = a32_im;\
 }\
+\
 /* apply first chiral block*/\
 {\
   ASSN_CLOVER(TMCLOVERTEX, 0)\
@@ -3165,6 +3172,7 @@
   reg##1_12_re = a12_re;  reg##1_12_im = a12_im;\
   \
 }\
+\
 /* apply second chiral block*/\
 {\
   ASSN_CLOVER(TMCLOVERTEX, 1)\
@@ -3491,7 +3499,9 @@
   reg##1_30_re = a30_re;  reg##1_30_im = a30_im;\
   reg##1_31_re = a31_re;  reg##1_31_im = a31_im;\
   reg##1_32_re = a32_re;  reg##1_32_im = a32_im;\
+  \
 }\
+\
 /* change back from chiral basis*/\
 /* (note: required factor of 1/2 is included in clover term normalization)*/\
 /* Flavor 1 */\
@@ -3526,6 +3536,7 @@
   reg##1_21_re = a21_re;  reg##1_21_im = a21_im;\
   reg##1_31_re = a31_re;  reg##1_31_im = a31_im;\
 }\
+\
 {\
   spinorFloat a02_re =  reg##1_12_re + reg##1_32_re;\
   spinorFloat a02_im =  reg##1_12_im + reg##1_32_im;\
@@ -3557,6 +3568,7 @@
   reg##2_20_re = a20_re;  reg##2_20_im = a20_im;\
   reg##2_30_re = a30_re;  reg##2_30_im = a30_im;\
 }\
+\
 {\
   spinorFloat a01_re =  reg##2_11_re + reg##2_31_re;\
   spinorFloat a01_im =  reg##2_11_im + reg##2_31_im;\
@@ -3572,6 +3584,7 @@
   reg##2_21_re = a21_re;  reg##2_21_im = a21_im;\
   reg##2_31_re = a31_re;  reg##2_31_im = a31_im;\
 }\
+\
 {\
   spinorFloat a02_re =  reg##2_12_re + reg##2_32_re;\
   spinorFloat a02_im =  reg##2_12_im + reg##2_32_im;\
@@ -3587,9 +3600,7 @@
   reg##2_22_re = a22_re;  reg##2_22_im = a22_im;\
   reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
 }\
-
-
-
+\
 #define APPLY_CLOVER_NDEG_TWIST_INV(c, cinv, a, b, reg)\
 \
 /* change to chiral basis*/\
@@ -3685,10 +3696,10 @@
   spinorFloat a32_re =  reg##2_02_re - reg##2_22_re;\
   spinorFloat a32_im =  reg##2_02_im - reg##2_22_im;\
   \
-  reg##2_02_re = a02_re;  reg##2_02_im = a02_im;\
-  reg##2_12_re = a12_re;  reg##2_12_im = a12_im;\
-  reg##2_22_re = a22_re;  reg##2_22_im = a22_im;\
-  reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
+  reg##2_2_02_re = a02_re;  reg##2_02_im = a02_im;\
+  reg##2_2_12_re = a12_re;  reg##2_12_im = a12_im;\
+  reg##2_2_22_re = a22_re;  reg##2_22_im = a22_im;\
+  reg##2_2_32_re = a32_re;  reg##2_32_im = a32_im;\
 }\
 \
 /* apply first chiral block*/\
@@ -5075,7 +5086,7 @@
   reg##2_22_re = a22_re;  reg##2_22_im = a22_im;\
   reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
 }\
-
+\
 #define APPLY_CLOVER_NDEG_TWIST_DYN_INV(c, a, b, reg)\
 \
 /* change to chiral basis*/\
@@ -5127,6 +5138,7 @@
   reg##1_22_re = a22_re;  reg##1_22_im = a22_im;\
   reg##1_32_re = a32_re;  reg##1_32_im = a32_im;\
 }\
+\
 /* Flavor 2 */\
 {\
   spinorFloat a00_re = -reg##2_10_re - reg##2_30_re;\
@@ -5170,11 +5182,12 @@
   spinorFloat a32_re =  reg##2_02_re - reg##2_22_re;\
   spinorFloat a32_im =  reg##2_02_im - reg##2_22_im;\
   \
-  reg##2_02_re = a02_re;  reg##2_02_im = a02_im;\
-  reg##2_12_re = a12_re;  reg##2_12_im = a12_im;\
-  reg##2_22_re = a22_re;  reg##2_22_im = a22_im;\
-  reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
+  reg##2_2_02_re = a02_re;  reg##2_02_im = a02_im;\
+  reg##2_2_12_re = a12_re;  reg##2_12_im = a12_im;\
+  reg##2_2_22_re = a22_re;  reg##2_22_im = a22_im;\
+  reg##2_2_32_re = a32_re;  reg##2_32_im = a32_im;\
 }\
+\
 /* apply first chiral block*/\
 {\
   ASSN_CLOVER(TMCLOVERTEX, 0)\
@@ -5506,7 +5519,7 @@
 /* Apply inverse clover */ \
 /* Flavor 1 */ \
 {\
-  INVERT_CLOVER(c,b) \
+  INVERT_CLOVER(c) \
   spinorFloat a00_re = 0; spinorFloat a00_im = 0;\
   spinorFloat a01_re = 0; spinorFloat a01_im = 0;\
   spinorFloat a02_re = 0; spinorFloat a02_im = 0;\
@@ -5670,7 +5683,7 @@
   spinorFloat a11_re = 0; spinorFloat a11_im = 0;\
   spinorFloat a12_re = 0; spinorFloat a12_im = 0;\
   \
-  a00_re += c##00_00_re * reg##2_00_re;\
+  a00_re += c##00_00_re * reg##2_00_re`;\
   a00_im += c##00_00_re * reg##2_00_im;\
   a00_re += c##00_01_re * reg##2_01_re;\
   a00_re -= c##00_01_im * reg##2_01_im;\
@@ -6149,7 +6162,7 @@
 /*Apply inverse clover*/\
 /* Flavor 1 */ \
 {\
-  INVERT_CLOVER(c,b) \
+  INVERT_CLOVER(c) \
   spinorFloat a20_re = 0; spinorFloat a20_im = 0;\
   spinorFloat a21_re = 0; spinorFloat a21_im = 0;\
   spinorFloat a22_re = 0; spinorFloat a22_im = 0;\
@@ -6560,4 +6573,7 @@
   reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
 }\
 \
-
+\
+\
+\
+\

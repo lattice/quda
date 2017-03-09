@@ -541,11 +541,18 @@ class TwistCloverGamma5Cuda : public Tunable {
 
       if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {
 	setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, tw);
+#if (defined GPU_TWISTED_CLOVER_DIRAC) || (defined GPU_NDEG_TWISTED_CLOVER_DIRAC)
+	dslashParam.fl_stride = in->VolumeCB();
+#endif
       } else {//twist doublet
-	errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
+	dslashParam.a = kappa, dslashParam.b = mu, dslashParam.c = epsilon;
+#if (defined GPU_TWISTED_CLOVER_DIRAC) || (defined GPU_NDEG_TWISTED_CLOVER_DIRAC)
+	dslashParam.fl_stride = in->VolumeCB()/2;
+#endif
       }
       dslashParam.a_f = dslashParam.a;
       dslashParam.b_f = dslashParam.b;
+      dslashParam.c_f = dslashParam.c;
 
       strcpy(aux_string,in->AuxString());
       strcat(aux_string, twist == QUDA_TWIST_GAMMA5_DIRECT ? ",direct" : ",inverse");
@@ -564,11 +571,14 @@ class TwistCloverGamma5Cuda : public Tunable {
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)
         if (twist == QUDA_TWIST_GAMMA5_DIRECT)
-          twistCloverGamma5Kernel<sFloat><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+          twistCloverGamma5Kernel<sFloat,false><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
         else if (twist == QUDA_TWIST_GAMMA5_INVERSE)
-          twistCloverGamma5InvKernel<sFloat><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+          twistCloverGamma5InvKernel<sFloat,false><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
       } else {
-        errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
+        if (twist == QUDA_TWIST_GAMMA5_DIRECT)
+          twistCloverGamma5Kernel<sFloat,true><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+        else if (twist == QUDA_TWIST_GAMMA5_INVERSE)
+          twistCloverGamma5InvKernel<sFloat,true><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
       }
 #endif
     }
@@ -602,7 +612,7 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
   if(in->TwistFlavor() == QUDA_TWIST_SINGLET)
     dslashParam.threads = in->Volume();
   else //twist doublet    
-    errorQuda("Twisted doublet not supported in twisted clover dslash");
+    dslashParam.threads = in->Volume() / 2;
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
   Tunable *tmClovGamma5 = 0;
