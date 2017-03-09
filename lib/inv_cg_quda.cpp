@@ -391,7 +391,6 @@ namespace quda {
 #ifdef BLOCKSOLVER_MULTIREDUCE
   using Eigen::Matrix;
   using Eigen::Map;
-  using Eigen::RowMajor;
   using Eigen::ColMajor;
   using Eigen::Dynamic; 
 
@@ -406,23 +405,23 @@ typedef Matrix<Complex, Dynamic, Dynamic, ColMajor> MatrixBCG;
 #ifdef BLOCKSOLVER_MULTIREDUCE
 void printmat(const char* label, MatrixBCG& mat)
 {
-  printfQuda("\n%s\n", label);
-  std::cout << mat;
-  printfQuda("\n");
+  //printfQuda("\n%s\n", label);
+  //std::cout << mat;
+  //printfQuda("\n");
 }
 
 void printmat(const char* label, Map<MatrixBCG>& mat)
 {
-  printfQuda("\n%s\n", label);
-  std::cout << mat;
-  printfQuda("\n");
+  //printfQuda("\n%s\n", label);
+  //std::cout << mat;
+  //printfQuda("\n");
 }
 #else
 void printmat(const char* label, MatrixXcd& mat)
 {
-  printfQuda("\n%s\n", label);
-  std::cout << mat;
-  printfQuda("\n");
+  //printfQuda("\n%s\n", label);
+  //std::cout << mat;
+  //printfQuda("\n");
 }
 #endif
 

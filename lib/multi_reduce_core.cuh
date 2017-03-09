@@ -217,7 +217,7 @@ struct num_to_string : detail::explode<num / 10, num % 10> {};
 
 template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
   typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
-  class MultiReduceCuda : public TunableVectorY {
+  class MultiReduceCuda : public Tunable {
 
  private:
   const int NYW; 
@@ -228,8 +228,7 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
   // host pointer used for backing up fields when tuning
   // don't curry into the Spinors to minimize parameter size
   char *Y_h[MAX_MULTI_BLAS_N], *W_h[MAX_MULTI_BLAS_N], *Ynorm_h[MAX_MULTI_BLAS_N], *Wnorm_h[MAX_MULTI_BLAS_N];
-  size_t bytes_[MAX_MULTI_BLAS_N][2];
-  size_t norm_bytes_[MAX_MULTI_BLAS_N][2];
+  std::vector<ColorSpinorField*> &y, &w;
 
   unsigned int sharedBytesPerThread() const { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -245,13 +244,9 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
 
 public:
   MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],
-    Reducer &r, int NYW, int length, int nParity,
-    size_t (&bytes)[MAX_MULTI_BLAS_N][2],  size_t (&norm_bytes)[MAX_MULTI_BLAS_N][2])
-    : TunableVectorY(NYW), NYW(NYW), arg(X, Y, Z, W, r, NYW, length/nParity, nParity), nParity(nParity), result(result),
-      Y_h(), W_h(), Ynorm_h(), Wnorm_h() {
-      std::copy(&bytes_[0][0], &bytes_[0][0]+MAX_MULTI_BLAS_N*2, &bytes[0][0]);
-      std::copy(&norm_bytes_[0][0], &norm_bytes_[0][0]+MAX_MULTI_BLAS_N*2, &norm_bytes[0][0]);
-    }
+    Reducer &r, int NYW, int length, int nParity, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
+    : NYW(NYW), arg(X, Y, Z, W, r, NYW, length/nParity, nParity), nParity(nParity), result(result),
+      Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { ; }
 
   inline TuneKey tuneKey() const {
     char name[TuneKey::name_n];
@@ -297,26 +292,30 @@ public:
   }
 
   void initTuneParam(TuneParam &param) const {
-    TunableVectorY::initTuneParam(param);
+    Tunable::initTuneParam(param);
+    param.block.y = 1;
+    param.grid.y = NYW;
     param.grid.z = nParity;
   }
 
   void defaultTuneParam(TuneParam &param) const {
-    TunableVectorY::defaultTuneParam(param);
+    Tunable::defaultTuneParam(param);
+    param.grid.y = 1;
+    param.grid.y = NYW;
     param.grid.z = nParity;
   }
 
   void preTune() {
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
   void postTune() {
     for(int i=0; i<NYW; ++i){
-      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
+      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
@@ -348,8 +347,6 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
 			  std::vector<ColorSpinorField*>& z, std::vector<ColorSpinorField*>& w,
 			  int length) {
 
-  printfQuda("ESW line 337 entered multiReduceCuda with y.size() = %lu.\n", y.size());
-
   const int NYW = y.size();
 
   int nParity = x[0]->SiteSubset();
@@ -370,8 +367,6 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
       return;
     }
   }
-
-  printfQuda("ESW line 338 finished spinor check, zeroed result memory.\n");
 
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
@@ -412,27 +407,13 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
     Cmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(c.data));
   }
 
-  printfQuda("ESW line 409 set up texture memory.\n");
-
   blasStrings.vol_str = x[0]->VolString();
   strcpy(blasStrings.aux_tmp, x[0]->AuxString());
-
-  size_t bytes[MAX_MULTI_BLAS_N][2];
-  size_t norm_bytes[MAX_MULTI_BLAS_N][2];
-  for (int i=0; i<NYW; i++) {
-    bytes[i][0] = y[i]->Bytes();
-    bytes[i][1] = w[i]->Bytes();
-
-    norm_bytes[i][0] = y[i]->NormBytes();
-    norm_bytes[i][1] = w[i]->NormBytes();
-  }
 
   multi::SpinorTexture<RegType,StoreType,M,0> X[NXZ];
   multi::Spinor<RegType,StoreType,M,writeY,1> Y[MAX_MULTI_BLAS_N];
   multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
   multi::Spinor<RegType,StoreType,M,writeW,3> W[MAX_MULTI_BLAS_N];
-
-  printfQuda("ESW line 426 created multi spinors X, Y, Z, W.\n");
 
   //MWFIXME (copied from multi_blas_core.cuh)
   for (int i=0; i<NXZ; i++) {
@@ -444,11 +425,7 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
     W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
   }
 
-  printfQuda("ESW line 438  copied x, y, z, w into multi spinors X, Y, Z, W.\n");
-
   Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
-
-  printfQuda("ESW line 442 created reducer r.\n");
 
   MultiReduceCuda<NXZ,doubleN,ReduceType,RegType,M,
 		  multi::SpinorTexture<RegType,StoreType,M,0>,
@@ -456,10 +433,8 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
       multi::SpinorTexture<RegType,StoreType,M,2>,
       multi::Spinor<RegType,StoreType,M,writeW,3>,
       decltype(r) >
-    reduce(result, X, Y, Z, W, r, NYW, length, x[0]->SiteSubset(), bytes, norm_bytes);
+    reduce(result, X, Y, Z, W, r, NYW, length, x[0]->SiteSubset(), y, w);
     reduce.apply(*blas::getStream());
-
-  printfQuda("ESW line 453 applied reduce.\n");
 
   blas::bytes += reduce.bytes();
   blas::flops += reduce.flops();
