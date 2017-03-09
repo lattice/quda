@@ -232,7 +232,7 @@ namespace quda {
           r2 = quadruple.x; Ap2 = quadruple.y; pAp = quadruple.z; ppnorm= quadruple.w;
         }
         else{
-          double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
+        double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
           r2 = triplet.x; Ap2 = triplet.y; pAp = triplet.z;
         }
         r2_old = r2;
@@ -255,7 +255,7 @@ namespace quda {
           ppnorm = pAppp.z;
         }
         else{
-          pAp = blas::reDotProduct(p, Ap);
+        pAp = blas::reDotProduct(p, Ap);
         }
 
         alpha = r2 / pAp;
@@ -280,8 +280,8 @@ namespace quda {
         // updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
       }
       else{
-        if (rNorm > maxrx) maxrx = rNorm;
-        if (rNorm > maxrr) maxrr = rNorm;
+      if (rNorm > maxrx) maxrx = rNorm;
+      if (rNorm > maxrr) maxrr = rNorm;
         updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
         updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
       }
@@ -319,7 +319,7 @@ namespace quda {
     if(steps_since_reliable==0)
       printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
   }
-    steps_since_reliable++;
+        steps_since_reliable++;
 
       } else {
 
@@ -608,7 +608,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   for(int i = 0; i < param.num_src; i++){
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
-  }
+    }
 
   // Eigen Matrices instead of scalars
   MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
@@ -694,10 +694,14 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #endif
 
   while ( !allconverged && k < param.maxiter ) {
-    // apply matrix
-    for(int i=0; i<param.num_src; i++){
-      matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
-    }
+    PUSH_RANGE("Dslash",1)
+     // for(int i=0; i<param.num_src; i++){
+     //  matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
+     // }
+
+    matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
+    
+    POP_RANGE
 
     // calculate pAp
     for(int i=0; i<param.num_src; i++){
@@ -710,8 +714,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // update Xsloppy
     alpha = pAp.inverse() * C;
     // temporary hack using AC
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0;j<param.num_src; j++){
+    for(int i = 0; i < param.num_src; i++){
+      for(int j = 0; j < param.num_src; j++){
         AC[i*param.num_src + j] = alpha(i,j);
       }
     }

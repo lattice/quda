@@ -122,7 +122,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = X1*X2*X3/2;
 
-  inv_param->verbosity = QUDA_VERBOSE;
+  inv_param->verbosity = QUDA_DEBUG_VERBOSE;
   inv_param->mass = mass;
 
   // outer solver parameters
@@ -176,7 +176,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   inv_param->dslash_type = dslash_type;
 
-  inv_param->sp_pad = X1*X2*X3/2;
+  inv_param->sp_pad = 0;//X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   inv_param->input_location = QUDA_CPU_FIELD_LOCATION;

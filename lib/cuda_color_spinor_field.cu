@@ -491,7 +491,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::zeroPad() {
-    size_t pad_bytes = (stride - volume) * precision * fieldOrder;
+    size_t pad_bytes = 0;//(stride - volume) * precision * fieldOrder;
     int Npad = nColor * nSpin * 2 / fieldOrder;
 
     if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:
