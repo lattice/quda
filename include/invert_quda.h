@@ -889,7 +889,7 @@ namespace quda {
     //
     //void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
-    int RunFlexArnoldiProcess(const int start_idx, const bool do_givens);
+    int FlexArnoldiProcedure (const int start_idx, const bool do_givens);
 
     void RestartVZH();
 
