@@ -1,3 +1,4 @@
+#include <random_quda.h>
 namespace quda {
   /**
      Compute the plaquette of the gauge field
@@ -11,6 +12,10 @@ namespace quda {
   double3 plaquette(const GaugeField& U,
 		    QudaFieldLocation location);
 
+
+
+
+  void gaugeRandom(GaugeField &dataDs, RNG &rngstate);
   
   /**
      Apply APE smearing to the gauge field

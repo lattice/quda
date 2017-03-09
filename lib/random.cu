@@ -119,7 +119,9 @@ RNG::RNG(int rng_sizes, int seedin){
     printfQuda("Using curandStateMRG32k3a\n");
 #endif
 } 
-RNG::RNG(int rng_sizes, int seedin, int XX[4]){
+
+
+RNG::RNG(int rng_sizes, int seedin, const int XX[4]){
     rng_size = rng_sizes;
     seed = seedin;
     state = NULL;

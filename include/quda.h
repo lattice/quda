@@ -986,6 +986,7 @@ extern "C" {
    */
   void performSTOUTnStep(unsigned int nSteps, double rho);
 
+  void randomGaugeQuda();
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */

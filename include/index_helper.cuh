@@ -36,7 +36,7 @@ namespace quda {
   }
 
   /**
-     Compute the checkerboard 1-d index from the 4-d coordinate x[] in the mu direction
+     Compute the checkerboard 1-d index from the 4-d coordinate x[]
 
      @return 1-d checkerboard index
      @param x 4-d lattice index
@@ -49,7 +49,7 @@ namespace quda {
   }
 
   /**
-     Compute the checkerboard 1-d index from the 4-d coordinate x[] in the mu direction
+     Compute the checkerboard 1-d index from the 4-d coordinate x[]
 
      @return 1-d checkerboard index
      @param y copy of 4-d lattice index
