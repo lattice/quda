@@ -9,6 +9,8 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <sys/time.h>
+#include <limits>
+#include <cmath>
 
 #include <face_quda.h>
 
@@ -38,6 +40,13 @@ namespace quda {
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
 
+#ifdef ALTRELIABLE
+    // hack to select alternative reliable updates
+    constexpr bool alternative_reliable = true;
+    warningQuda("Using alternative reliable updates. This feature is mostly ok but needs a little more testing in the real world.\n");
+#else
+    constexpr bool alternative_reliable = false;
+#endif
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -82,6 +91,30 @@ namespace quda {
     ColorSpinorField *tmp3_p = (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
       ColorSpinorField::Create(x, csParam) : &tmp;
     ColorSpinorField &tmp3 = *tmp3_p;
+
+    // alternative reliable updates
+    // alternative reliable updates - set precision - does not hurt performance here
+
+    const double u= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
+    const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
+    const double deps=sqrt(u);
+    constexpr double dfac = 1.1;
+    double d_new =0 ;
+    double d =0 ;
+    double dinit =0;
+    double xNorm = 0;
+    double xnorm = 0;
+    double pnorm = 0;
+    double ppnorm = 0;
+    double Anorm = 0;
+    
+    // for alternative reliable updates
+    if(alternative_reliable){
+      // estimate norm for reliable updates
+      mat(r, b, y, tmp3);
+      Anorm = sqrt(blas::norm2(r)/b2);
+    }
+
 
     // compute initial residual
     mat(r, x, y, tmp3);
@@ -151,6 +184,7 @@ namespace quda {
     double maxrr = rNorm;
     double delta = param.delta;
 
+
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
@@ -179,14 +213,28 @@ namespace quda {
     int steps_since_reliable = 1;
     bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
+    // alternative reliable updates
+    if(alternative_reliable){
+      dinit = uhigh * (rNorm + Anorm * xNorm);
+      d = dinit;
+    }
+
     while ( !converged && k < param.maxiter ) {
       matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
       double sigma;
 
       bool breakdown = false;
       if (param.pipeline) {
-        double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
-        r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
+        double Ap2;
+        //TODO: alternative reliable updates - need r2, Ap2, pAp, p norm
+        if(alternative_reliable){
+          double4 quadruple = blas::quadrupleCGReduction(rSloppy, Ap, p);
+          r2 = quadruple.x; Ap2 = quadruple.y; pAp = quadruple.z; ppnorm= quadruple.w;
+        }
+        else{
+          double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
+          r2 = triplet.x; Ap2 = triplet.y; pAp = triplet.z;
+        }
         r2_old = r2;
         alpha = r2 / pAp;
         sigma = alpha*(alpha * Ap2 - pAp);
@@ -199,7 +247,17 @@ namespace quda {
         r2 = sigma;
       } else {
         r2_old = r2;
-        pAp = blas::reDotProduct(p, Ap);
+
+        // alternative reliable updates,
+        if(alternative_reliable){
+          double3 pAppp = blas::cDotProductNormA(p,Ap);
+          pAp = pAppp.x;
+          ppnorm = pAppp.z;
+        }
+        else{
+          pAp = blas::reDotProduct(p, Ap);
+        }
+
         alpha = r2 / pAp;
 
         // here we are deploying the alternative beta computation
@@ -210,10 +268,23 @@ namespace quda {
 
       // reliable update conditions
       rNorm = sqrt(r2);
-      if (rNorm > maxrx) maxrx = rNorm;
-      if (rNorm > maxrr) maxrr = rNorm;
-      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+      int updateX;
+      int updateR;
+
+      if(alternative_reliable){
+        // alternative reliable updates
+        updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
+        updateR = 0;
+        // if(updateX)
+          // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
+        // updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
+      }
+      else{
+        if (rNorm > maxrx) maxrx = rNorm;
+        if (rNorm > maxrr) maxrr = rNorm;
+        updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+        updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+      }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol ) updateX = 1;
@@ -239,8 +310,17 @@ namespace quda {
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
 	  }
 	}
+  // alternative reliable updates
+  if(alternative_reliable){
+    d = d_new;
+    pnorm = pnorm + alpha * alpha* (ppnorm);
+    xnorm = sqrt(pnorm);
+    d_new = d + u*rNorm + uhigh*Anorm * xnorm;
+    if(steps_since_reliable==0)
+      printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
+  }
+    steps_since_reliable++;
 
-        steps_since_reliable++;
       } else {
 
         blas::axpy(alpha, p, xSloppy);
@@ -252,6 +332,24 @@ namespace quda {
 
         blas::copy(rSloppy, r); //nop when these pointers alias
         blas::zero(xSloppy);
+
+        // alternative reliable updates
+        if(alternative_reliable){
+          dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
+          d = d_new;
+          xnorm = 0;//sqrt(norm2(x));
+          pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
+          printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
+          d_new = dinit;
+          r0Norm = sqrt(r2);
+        }
+        else{
+          rNorm = sqrt(r2);
+          maxrr = rNorm;
+          maxrx = rNorm;
+          r0Norm = rNorm;
+        }
+
 
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
@@ -289,11 +387,7 @@ namespace quda {
           }
         }
 
-        rNorm = sqrt(r2);
-        maxrr = rNorm;
-        maxrx = rNorm;
-        r0Norm = rNorm;
-        rUpdate++;
+
 
         if (use_heavy_quark_res and heavy_quark_restart) {
           // perform a restart
@@ -308,8 +402,9 @@ namespace quda {
           blas::xpay(rSloppy, beta, p);
         }
 
-
         steps_since_reliable = 0;
+        rUpdate++;
+
         heavy_quark_res_old = heavy_quark_res;
       }
 

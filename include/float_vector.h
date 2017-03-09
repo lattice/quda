@@ -3,8 +3,8 @@
 /**
    @file float_vector.h
 
-   @section DESCRIPTION 
-   Inline device functions for elementary operations on short vectors, e.g., float4, etc. 
+   @section DESCRIPTION
+   Inline device functions for elementary operations on short vectors, e.g., float4, etc.
 */
 
 #pragma once
@@ -14,6 +14,7 @@ namespace quda {
   __device__ __host__ inline void zero(double &a) { a = 0.0; }
   __device__ __host__ inline void zero(double2 &a) { a.x = 0.0; a.y = 0.0; }
   __device__ __host__ inline void zero(double3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
+  __device__ __host__ inline void zero(double4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
 
   __device__ __host__ inline void zero(float &a) { a = 0.0; }
   __device__ __host__ inline void zero(float2 &a) { a.x = 0.0; a.y = 0.0; }
@@ -38,6 +39,10 @@ namespace quda {
 
   __host__ __device__ inline double3 operator+(const double3& x, const double3 &y) {
     return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
+  }
+
+  __host__ __device__ inline double4 operator+(const double4& x, const double4 &y) {
+    return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
   }
 
   __host__ __device__ inline float4 operator*(const float a, const float4 x) {
@@ -112,6 +117,14 @@ namespace quda {
     x.x += y.x;
     x.y += y.y;
     x.z += y.z;
+    return x;
+  }
+
+  __host__ __device__ inline double4 operator+=(double4 &x, const double4 y) {
+    x.x += y.x;
+    x.y += y.y;
+    x.z += y.z;
+    x.w += y.w;
     return x;
   }
 
