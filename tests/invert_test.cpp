@@ -469,8 +469,19 @@ int main(int argc, char **argv)
 	  tm_ndeg_mat(evenOut, oddOut, gauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0, inv_param.cpu_prec, gauge_param);	
 	}
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-	tmc_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,
-		inv_param.cpu_prec, gauge_param);
+	if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
+	  tmc_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,
+		  inv_param.cpu_prec, gauge_param);
+	} else {
+          int tm_offset = V*spinorSiteSize; //12*spinorRef->Volume(); 	  
+	  void *evenOut = spinorCheck;
+	  void *oddOut  = cpu_prec == sizeof(double) ? (void*)((double*)evenOut + tm_offset): (void*)((float*)evenOut + tm_offset);
+	  
+	  void *evenIn  = spinorOut;
+	  void *oddIn   = cpu_prec == sizeof(double) ? (void*)((double*)evenIn + tm_offset): (void*)((float*)evenIn + tm_offset);
+	  
+	  tm_ndeg_mat(evenOut, oddOut, gauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0, inv_param.cpu_prec, gauge_param); //FIXME tmClover!!!	
+	}
       } else if (dslash_type == QUDA_WILSON_DSLASH) {
         wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -499,7 +510,7 @@ int main(int argc, char **argv)
             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
             dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
           ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-        } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+        } else if ((dslash_type == QUDA_TWISTED_MASS_DSLASH || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)) && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
           ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinorSiteSize, inv_param.cpu_prec);
 	} else {
           ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);

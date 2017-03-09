@@ -2986,22 +2986,22 @@
   a12_im += c##12_12_re * reg##1_12_im;\
   \
   /*apply  i*(2*kappa*mu=a)*gamma5*/\
-  a00_re = a00_re - .5*a* reg##1_00_im + .5*b* reg##2_00_re;  a00_im = a00_im + .5*a* reg##1_00_re + .5*b* reg##2_00_im;\
-  a01_re = a01_re - .5*a* reg##1_01_im + .5*b* reg##2_01_re;  a01_im = a01_im + .5*a* reg##1_01_re + .5*b* reg##2_01_im;\
-  a02_re = a02_re - .5*a* reg##1_02_im + .5*b* reg##2_02_re;  a02_im = a02_im + .5*a* reg##1_02_re + .5*b* reg##2_02_im;\
-  a10_re = a10_re - .5*a* reg##1_10_im + .5*b* reg##2_10_re;  a10_im = a10_im + .5*a* reg##1_10_re + .5*b* reg##2_10_im;\
-  a11_re = a11_re - .5*a* reg##1_11_im + .5*b* reg##2_11_re;  a11_im = a11_im + .5*a* reg##1_11_re + .5*b* reg##2_11_im;\
-  a12_re = a12_re - .5*a* reg##1_12_im + .5*b* reg##2_12_re;  a12_im = a12_im + .5*a* reg##1_12_re + .5*b* reg##2_12_im;\
+  a00_re = a00_re - .5*a* reg##1_00_im - .5*b* reg##2_00_re;  a00_im = a00_im + .5*a* reg##1_00_re - .5*b* reg##2_00_im;\
+  a01_re = a01_re - .5*a* reg##1_01_im - .5*b* reg##2_01_re;  a01_im = a01_im + .5*a* reg##1_01_re - .5*b* reg##2_01_im;\
+  a02_re = a02_re - .5*a* reg##1_02_im - .5*b* reg##2_02_re;  a02_im = a02_im + .5*a* reg##1_02_re - .5*b* reg##2_02_im;\
+  a10_re = a10_re - .5*a* reg##1_10_im - .5*b* reg##2_10_re;  a10_im = a10_im + .5*a* reg##1_10_re - .5*b* reg##2_10_im;\
+  a11_re = a11_re - .5*a* reg##1_11_im - .5*b* reg##2_11_re;  a11_im = a11_im + .5*a* reg##1_11_re - .5*b* reg##2_11_im;\
+  a12_re = a12_re - .5*a* reg##1_12_im - .5*b* reg##2_12_re;  a12_im = a12_im + .5*a* reg##1_12_re - .5*b* reg##2_12_im;\
   \
   /* At this point, the aXX_re/im have the final result for flavor 1, but we still need reg1 to compute flavor 2       */ \
   /* This can potentially be very confusing. To avoid register spilling, I'll use flavor 1 output as temporary storage */ \
   \
-  reg##1_00_re *= 0.5*b; reg##1_00_im *= 0.5*b; \
-  reg##1_01_re *= 0.5*b; reg##1_01_im *= 0.5*b; \
-  reg##1_02_re *= 0.5*b; reg##1_02_im *= 0.5*b; \
-  reg##1_10_re *= 0.5*b; reg##1_10_im *= 0.5*b; \
-  reg##1_11_re *= 0.5*b; reg##1_11_im *= 0.5*b; \
-  reg##1_12_re *= 0.5*b; reg##1_12_im *= 0.5*b; \
+  reg##1_00_re *= -0.5*b; reg##1_00_im *= -0.5*b; \
+  reg##1_01_re *= -0.5*b; reg##1_01_im *= -0.5*b; \
+  reg##1_02_re *= -0.5*b; reg##1_02_im *= -0.5*b; \
+  reg##1_10_re *= -0.5*b; reg##1_10_im *= -0.5*b; \
+  reg##1_11_re *= -0.5*b; reg##1_11_im *= -0.5*b; \
+  reg##1_12_re *= -0.5*b; reg##1_12_im *= -0.5*b; \
   \
   reg##1_00_re += c##00_00_re * reg##2_00_re;\
   reg##1_00_im += c##00_00_re * reg##2_00_im;\
@@ -3314,22 +3314,22 @@
   a32_im += c##32_32_re * reg##1_32_im;\
   \
   /*apply  i*(2*kappa*mu=a)*gamma5*/\
-  a20_re = a20_re + .5*a* reg##1_20_im + .5*b* reg##2_20_re;  a20_im = a20_im - .5*a* reg##1_20_re + .5*b* reg##2_20_im;\
-  a21_re = a21_re + .5*a* reg##1_21_im + .5*b* reg##2_21_re;  a21_im = a21_im - .5*a* reg##1_21_re + .5*b* reg##2_21_im;\
-  a22_re = a22_re + .5*a* reg##1_22_im + .5*b* reg##2_22_re;  a22_im = a22_im - .5*a* reg##1_22_re + .5*b* reg##2_22_im;\
-  a30_re = a30_re + .5*a* reg##1_30_im + .5*b* reg##2_30_re;  a30_im = a30_im - .5*a* reg##1_30_re + .5*b* reg##2_30_im;\
-  a31_re = a31_re + .5*a* reg##1_31_im + .5*b* reg##2_31_re;  a31_im = a31_im - .5*a* reg##1_31_re + .5*b* reg##2_31_im;\
-  a32_re = a32_re + .5*a* reg##1_32_im + .5*b* reg##2_32_re;  a32_im = a32_im - .5*a* reg##1_32_re + .5*b* reg##2_32_im;\
+  a20_re = a20_re + .5*a* reg##1_20_im - .5*b* reg##2_20_re;  a20_im = a20_im - .5*a* reg##1_20_re - .5*b* reg##2_20_im;\
+  a21_re = a21_re + .5*a* reg##1_21_im - .5*b* reg##2_21_re;  a21_im = a21_im - .5*a* reg##1_21_re - .5*b* reg##2_21_im;\
+  a22_re = a22_re + .5*a* reg##1_22_im - .5*b* reg##2_22_re;  a22_im = a22_im - .5*a* reg##1_22_re - .5*b* reg##2_22_im;\
+  a30_re = a30_re + .5*a* reg##1_30_im - .5*b* reg##2_30_re;  a30_im = a30_im - .5*a* reg##1_30_re - .5*b* reg##2_30_im;\
+  a31_re = a31_re + .5*a* reg##1_31_im - .5*b* reg##2_31_re;  a31_im = a31_im - .5*a* reg##1_31_re - .5*b* reg##2_31_im;\
+  a32_re = a32_re + .5*a* reg##1_32_im - .5*b* reg##2_32_re;  a32_im = a32_im - .5*a* reg##1_32_re - .5*b* reg##2_32_im;\
   \
   /* At this point, the aXX_re/im have the final result for flavor 1, but we still need reg1 to compute flavor 2       */ \
   /* This can potentially be very confusing. To avoid register spilling, I'll use flavor 1 output as temporary storage */ \
   \
-  reg##1_20_re *= 0.5*b; reg##1_20_im *= 0.5*b; \
-  reg##1_21_re *= 0.5*b; reg##1_21_im *= 0.5*b; \
-  reg##1_22_re *= 0.5*b; reg##1_22_im *= 0.5*b; \
-  reg##1_30_re *= 0.5*b; reg##1_30_im *= 0.5*b; \
-  reg##1_31_re *= 0.5*b; reg##1_31_im *= 0.5*b; \
-  reg##1_32_re *= 0.5*b; reg##1_32_im *= 0.5*b; \
+  reg##1_20_re *= -0.5*b; reg##1_20_im *= -0.5*b; \
+  reg##1_21_re *= -0.5*b; reg##1_21_im *= -0.5*b; \
+  reg##1_22_re *= -0.5*b; reg##1_22_im *= -0.5*b; \
+  reg##1_30_re *= -0.5*b; reg##1_30_im *= -0.5*b; \
+  reg##1_31_re *= -0.5*b; reg##1_31_im *= -0.5*b; \
+  reg##1_32_re *= -0.5*b; reg##1_32_im *= -0.5*b; \
   \
   reg##1_20_re += c##20_20_re * reg##2_20_re;\
   reg##1_20_im += c##20_20_re * reg##2_20_im;\
@@ -3840,22 +3840,22 @@
   a12_im += c##12_12_re * reg##1_12_im;\
   \
   /*apply  i*(2*kappa*mu=a)*gamma5*/\
-  a00_re = a00_re - .5*a* reg##1_00_im + .5*b* reg##2_00_re;  a00_im = a00_im + .5*a* reg##1_00_re + .5*b* reg##2_00_im;\
-  a01_re = a01_re - .5*a* reg##1_01_im + .5*b* reg##2_01_re;  a01_im = a01_im + .5*a* reg##1_01_re + .5*b* reg##2_01_im;\
-  a02_re = a02_re - .5*a* reg##1_02_im + .5*b* reg##2_02_re;  a02_im = a02_im + .5*a* reg##1_02_re + .5*b* reg##2_02_im;\
-  a10_re = a10_re - .5*a* reg##1_10_im + .5*b* reg##2_10_re;  a10_im = a10_im + .5*a* reg##1_10_re + .5*b* reg##2_10_im;\
-  a11_re = a11_re - .5*a* reg##1_11_im + .5*b* reg##2_11_re;  a11_im = a11_im + .5*a* reg##1_11_re + .5*b* reg##2_11_im;\
-  a12_re = a12_re - .5*a* reg##1_12_im + .5*b* reg##2_12_re;  a12_im = a12_im + .5*a* reg##1_12_re + .5*b* reg##2_12_im;\
+  a00_re = a00_re - .5*a* reg##1_00_im - .5*b* reg##2_00_re;  a00_im = a00_im + .5*a* reg##1_00_re - .5*b* reg##2_00_im;\
+  a01_re = a01_re - .5*a* reg##1_01_im - .5*b* reg##2_01_re;  a01_im = a01_im + .5*a* reg##1_01_re - .5*b* reg##2_01_im;\
+  a02_re = a02_re - .5*a* reg##1_02_im - .5*b* reg##2_02_re;  a02_im = a02_im + .5*a* reg##1_02_re - .5*b* reg##2_02_im;\
+  a10_re = a10_re - .5*a* reg##1_10_im - .5*b* reg##2_10_re;  a10_im = a10_im + .5*a* reg##1_10_re - .5*b* reg##2_10_im;\
+  a11_re = a11_re - .5*a* reg##1_11_im - .5*b* reg##2_11_re;  a11_im = a11_im + .5*a* reg##1_11_re - .5*b* reg##2_11_im;\
+  a12_re = a12_re - .5*a* reg##1_12_im - .5*b* reg##2_12_re;  a12_im = a12_im + .5*a* reg##1_12_re - .5*b* reg##2_12_im;\
   \
   /* At this point, the aXX_re/im have the final result for flavor 1, but we still need reg1 to compute flavor 2       */ \
   /* This can potentially be very confusing. To avoid register spilling, I'll use flavor 1 output as temporary storage */ \
   \
-  reg##1_00_re *= 0.5*b; reg##1_00_im *= 0.5*b; \
-  reg##1_01_re *= 0.5*b; reg##1_01_im *= 0.5*b; \
-  reg##1_02_re *= 0.5*b; reg##1_02_im *= 0.5*b; \
-  reg##1_10_re *= 0.5*b; reg##1_10_im *= 0.5*b; \
-  reg##1_11_re *= 0.5*b; reg##1_11_im *= 0.5*b; \
-  reg##1_12_re *= 0.5*b; reg##1_12_im *= 0.5*b; \
+  reg##1_00_re *= -0.5*b; reg##1_00_im *= -0.5*b; \
+  reg##1_01_re *= -0.5*b; reg##1_01_im *= -0.5*b; \
+  reg##1_02_re *= -0.5*b; reg##1_02_im *= -0.5*b; \
+  reg##1_10_re *= -0.5*b; reg##1_10_im *= -0.5*b; \
+  reg##1_11_re *= -0.5*b; reg##1_11_im *= -0.5*b; \
+  reg##1_12_re *= -0.5*b; reg##1_12_im *= -0.5*b; \
   \
   reg##1_00_re += c##00_00_re * reg##2_00_re;\
   reg##1_00_im += c##00_00_re * reg##2_00_im;\
@@ -4176,17 +4176,16 @@
   reg##1_11_re = a11_re;  reg##1_11_im = a11_im;\
   reg##1_12_re = a12_re;  reg##1_12_im = a12_im;\
   \
-}\
 /* Flavor 2 */ \
-{\
-  spinorFloat a00_re = 0; spinorFloat a00_im = 0;\
-  spinorFloat a01_re = 0; spinorFloat a01_im = 0;\
-  spinorFloat a02_re = 0; spinorFloat a02_im = 0;\
-  spinorFloat a10_re = 0; spinorFloat a10_im = 0;\
-  spinorFloat a11_re = 0; spinorFloat a11_im = 0;\
-  spinorFloat a12_re = 0; spinorFloat a12_im = 0;\
   \
-  a00_re += cinv##00_00_re * reg##2_00_re`;\
+  a00_re = 0; a00_im = 0;\
+  a01_re = 0; a01_im = 0;\
+  a02_re = 0; a02_im = 0;\
+  a10_re = 0; a10_im = 0;\
+  a11_re = 0; a11_im = 0;\
+  a12_re = 0; a12_im = 0;\
+  \
+  a00_re += cinv##00_00_re * reg##2_00_re;\
   a00_im += cinv##00_00_re * reg##2_00_im;\
   a00_re += cinv##00_01_re * reg##2_01_re;\
   a00_re -= cinv##00_01_im * reg##2_01_im;\
@@ -4483,22 +4482,22 @@
   a32_im += c##32_32_re * reg##1_32_im;\
   \
   /*apply  i*(2*kappa*mu=a)*gamma5*/\
-  a20_re = a20_re + .5*a* reg##1_20_im + .5*b* reg##2_20_re;  a20_im = a20_im - .5*a* reg##1_20_re + .5*b* reg##2_20_im;\
-  a21_re = a21_re + .5*a* reg##1_21_im + .5*b* reg##2_21_re;  a21_im = a21_im - .5*a* reg##1_21_re + .5*b* reg##2_21_im;\
-  a22_re = a22_re + .5*a* reg##1_22_im + .5*b* reg##2_22_re;  a22_im = a22_im - .5*a* reg##1_22_re + .5*b* reg##2_22_im;\
-  a30_re = a30_re + .5*a* reg##1_30_im + .5*b* reg##2_30_re;  a30_im = a30_im - .5*a* reg##1_30_re + .5*b* reg##2_30_im;\
-  a31_re = a31_re + .5*a* reg##1_31_im + .5*b* reg##2_31_re;  a31_im = a31_im - .5*a* reg##1_31_re + .5*b* reg##2_31_im;\
-  a32_re = a32_re + .5*a* reg##1_32_im + .5*b* reg##2_32_re;  a32_im = a32_im - .5*a* reg##1_32_re + .5*b* reg##2_32_im;\
+  a20_re = a20_re + .5*a* reg##1_20_im - .5*b* reg##2_20_re;  a20_im = a20_im - .5*a* reg##1_20_re - .5*b* reg##2_20_im;\
+  a21_re = a21_re + .5*a* reg##1_21_im - .5*b* reg##2_21_re;  a21_im = a21_im - .5*a* reg##1_21_re - .5*b* reg##2_21_im;\
+  a22_re = a22_re + .5*a* reg##1_22_im - .5*b* reg##2_22_re;  a22_im = a22_im - .5*a* reg##1_22_re - .5*b* reg##2_22_im;\
+  a30_re = a30_re + .5*a* reg##1_30_im - .5*b* reg##2_30_re;  a30_im = a30_im - .5*a* reg##1_30_re - .5*b* reg##2_30_im;\
+  a31_re = a31_re + .5*a* reg##1_31_im - .5*b* reg##2_31_re;  a31_im = a31_im - .5*a* reg##1_31_re - .5*b* reg##2_31_im;\
+  a32_re = a32_re + .5*a* reg##1_32_im - .5*b* reg##2_32_re;  a32_im = a32_im - .5*a* reg##1_32_re - .5*b* reg##2_32_im;\
   \
   /* At this point, the aXX_re/im have the final result for flavor 1, but we still need reg1 to compute flavor 2       */ \
   /* This can potentially be very confusing. To avoid register spilling, I'll use flavor 1 output as temporary storage */ \
   \
-  reg##1_20_re *= 0.5*b; reg##1_20_im *= 0.5*b; \
-  reg##1_21_re *= 0.5*b; reg##1_21_im *= 0.5*b; \
-  reg##1_22_re *= 0.5*b; reg##1_22_im *= 0.5*b; \
-  reg##1_30_re *= 0.5*b; reg##1_30_im *= 0.5*b; \
-  reg##1_31_re *= 0.5*b; reg##1_31_im *= 0.5*b; \
-  reg##1_32_re *= 0.5*b; reg##1_32_im *= 0.5*b; \
+  reg##1_20_re *= -0.5*b; reg##1_20_im *= -0.5*b; \
+  reg##1_21_re *= -0.5*b; reg##1_21_im *= -0.5*b; \
+  reg##1_22_re *= -0.5*b; reg##1_22_im *= -0.5*b; \
+  reg##1_30_re *= -0.5*b; reg##1_30_im *= -0.5*b; \
+  reg##1_31_re *= -0.5*b; reg##1_31_im *= -0.5*b; \
+  reg##1_32_re *= -0.5*b; reg##1_32_im *= -0.5*b; \
   \
   reg##1_20_re += c##20_20_re * reg##2_20_re;\
   reg##1_20_im += c##20_20_re * reg##2_20_im;\
@@ -4819,15 +4818,14 @@
   reg##1_31_re = a31_re;  reg##1_31_im = a31_im;\
   reg##1_32_re = a32_re;  reg##1_32_im = a32_im;\
   \
-}\
 /* Flavor 2 */ \
-{\
-  spinorFloat a20_re = 0; spinorFloat a20_im = 0;\
-  spinorFloat a21_re = 0; spinorFloat a21_im = 0;\
-  spinorFloat a22_re = 0; spinorFloat a22_im = 0;\
-  spinorFloat a30_re = 0; spinorFloat a30_im = 0;\
-  spinorFloat a31_re = 0; spinorFloat a31_im = 0;\
-  spinorFloat a32_re = 0; spinorFloat a32_im = 0;\
+  \
+  a20_re = 0; a20_im = 0;\
+  a21_re = 0; a21_im = 0;\
+  a22_re = 0; a22_im = 0;\
+  a30_re = 0; a30_im = 0;\
+  a31_re = 0; a31_im = 0;\
+  a32_re = 0; a32_im = 0;\
   \
   a20_re += cinv##20_20_re * reg##2_20_re;\
   a20_im += cinv##20_20_re * reg##2_20_im;\
@@ -5324,22 +5322,22 @@
   a12_im += c##12_12_re * reg##1_12_im;\
   \
   /*apply  i*(2*kappa*mu=a)*gamma5*/\
-  a00_re = a00_re - .5*a* reg##1_00_im + .5*b* reg##2_00_re;  a00_im = a00_im + .5*a* reg##1_00_re + .5*b* reg##2_00_im;\
-  a01_re = a01_re - .5*a* reg##1_01_im + .5*b* reg##2_01_re;  a01_im = a01_im + .5*a* reg##1_01_re + .5*b* reg##2_01_im;\
-  a02_re = a02_re - .5*a* reg##1_02_im + .5*b* reg##2_02_re;  a02_im = a02_im + .5*a* reg##1_02_re + .5*b* reg##2_02_im;\
-  a10_re = a10_re - .5*a* reg##1_10_im + .5*b* reg##2_10_re;  a10_im = a10_im + .5*a* reg##1_10_re + .5*b* reg##2_10_im;\
-  a11_re = a11_re - .5*a* reg##1_11_im + .5*b* reg##2_11_re;  a11_im = a11_im + .5*a* reg##1_11_re + .5*b* reg##2_11_im;\
-  a12_re = a12_re - .5*a* reg##1_12_im + .5*b* reg##2_12_re;  a12_im = a12_im + .5*a* reg##1_12_re + .5*b* reg##2_12_im;\
+  a00_re = a00_re - .5*a* reg##1_00_im - .5*b* reg##2_00_re;  a00_im = a00_im + .5*a* reg##1_00_re - .5*b* reg##2_00_im;\
+  a01_re = a01_re - .5*a* reg##1_01_im - .5*b* reg##2_01_re;  a01_im = a01_im + .5*a* reg##1_01_re - .5*b* reg##2_01_im;\
+  a02_re = a02_re - .5*a* reg##1_02_im - .5*b* reg##2_02_re;  a02_im = a02_im + .5*a* reg##1_02_re - .5*b* reg##2_02_im;\
+  a10_re = a10_re - .5*a* reg##1_10_im - .5*b* reg##2_10_re;  a10_im = a10_im + .5*a* reg##1_10_re - .5*b* reg##2_10_im;\
+  a11_re = a11_re - .5*a* reg##1_11_im - .5*b* reg##2_11_re;  a11_im = a11_im + .5*a* reg##1_11_re - .5*b* reg##2_11_im;\
+  a12_re = a12_re - .5*a* reg##1_12_im - .5*b* reg##2_12_re;  a12_im = a12_im + .5*a* reg##1_12_re - .5*b* reg##2_12_im;\
   \
   /* At this point, the aXX_re/im have the final result for flavor 1, but we still need reg1 to compute flavor 2       */ \
   /* This can potentially be very confusing. To avoid register spilling, I'll use flavor 1 output as temporary storage */ \
   \
-  reg##1_00_re *= 0.5*b; reg##1_00_im *= 0.5*b; \
-  reg##1_01_re *= 0.5*b; reg##1_01_im *= 0.5*b; \
-  reg##1_02_re *= 0.5*b; reg##1_02_im *= 0.5*b; \
-  reg##1_10_re *= 0.5*b; reg##1_10_im *= 0.5*b; \
-  reg##1_11_re *= 0.5*b; reg##1_11_im *= 0.5*b; \
-  reg##1_12_re *= 0.5*b; reg##1_12_im *= 0.5*b; \
+  reg##1_00_re *= -0.5*b; reg##1_00_im *= -0.5*b; \
+  reg##1_01_re *= -0.5*b; reg##1_01_im *= -0.5*b; \
+  reg##1_02_re *= -0.5*b; reg##1_02_im *= -0.5*b; \
+  reg##1_10_re *= -0.5*b; reg##1_10_im *= -0.5*b; \
+  reg##1_11_re *= -0.5*b; reg##1_11_im *= -0.5*b; \
+  reg##1_12_re *= -0.5*b; reg##1_12_im *= -0.5*b; \
   \
   reg##1_00_re += c##00_00_re * reg##2_00_re;\
   reg##1_00_im += c##00_00_re * reg##2_00_im;\
@@ -5660,15 +5658,14 @@
   reg##1_11_re = a11_re;  reg##1_11_im = a11_im;\
   reg##1_12_re = a12_re;  reg##1_12_im = a12_im;\
   \
-}\
 /* Flavor 2 */ \
-{\
-  spinorFloat a00_re = 0; spinorFloat a00_im = 0;\
-  spinorFloat a01_re = 0; spinorFloat a01_im = 0;\
-  spinorFloat a02_re = 0; spinorFloat a02_im = 0;\
-  spinorFloat a10_re = 0; spinorFloat a10_im = 0;\
-  spinorFloat a11_re = 0; spinorFloat a11_im = 0;\
-  spinorFloat a12_re = 0; spinorFloat a12_im = 0;\
+  \
+  a00_re = 0; a00_im = 0;\
+  a01_re = 0; a01_im = 0;\
+  a02_re = 0; a02_im = 0;\
+  a10_re = 0; a10_im = 0;\
+  a11_re = 0; a11_im = 0;\
+  a12_re = 0; a12_im = 0;\
   \
   a00_re += c##00_00_re * reg##2_00_re;\
   a00_im += c##00_00_re * reg##2_00_im;\
@@ -5967,22 +5964,22 @@
   a32_im += c##32_32_re * reg##1_32_im;\
   \
   /*apply  i*(2*kappa*mu=a)*gamma5*/\
-  a20_re = a20_re + .5*a* reg##1_20_im + .5*b* reg##2_20_re;  a20_im = a20_im - .5*a* reg##1_20_re + .5*b* reg##2_20_im;\
-  a21_re = a21_re + .5*a* reg##1_21_im + .5*b* reg##2_21_re;  a21_im = a21_im - .5*a* reg##1_21_re + .5*b* reg##2_21_im;\
-  a22_re = a22_re + .5*a* reg##1_22_im + .5*b* reg##2_22_re;  a22_im = a22_im - .5*a* reg##1_22_re + .5*b* reg##2_22_im;\
-  a30_re = a30_re + .5*a* reg##1_30_im + .5*b* reg##2_30_re;  a30_im = a30_im - .5*a* reg##1_30_re + .5*b* reg##2_30_im;\
-  a31_re = a31_re + .5*a* reg##1_31_im + .5*b* reg##2_31_re;  a31_im = a31_im - .5*a* reg##1_31_re + .5*b* reg##2_31_im;\
-  a32_re = a32_re + .5*a* reg##1_32_im + .5*b* reg##2_32_re;  a32_im = a32_im - .5*a* reg##1_32_re + .5*b* reg##2_32_im;\
+  a20_re = a20_re + .5*a* reg##1_20_im - .5*b* reg##2_20_re;  a20_im = a20_im - .5*a* reg##1_20_re - .5*b* reg##2_20_im;\
+  a21_re = a21_re + .5*a* reg##1_21_im - .5*b* reg##2_21_re;  a21_im = a21_im - .5*a* reg##1_21_re - .5*b* reg##2_21_im;\
+  a22_re = a22_re + .5*a* reg##1_22_im - .5*b* reg##2_22_re;  a22_im = a22_im - .5*a* reg##1_22_re - .5*b* reg##2_22_im;\
+  a30_re = a30_re + .5*a* reg##1_30_im - .5*b* reg##2_30_re;  a30_im = a30_im - .5*a* reg##1_30_re - .5*b* reg##2_30_im;\
+  a31_re = a31_re + .5*a* reg##1_31_im - .5*b* reg##2_31_re;  a31_im = a31_im - .5*a* reg##1_31_re - .5*b* reg##2_31_im;\
+  a32_re = a32_re + .5*a* reg##1_32_im - .5*b* reg##2_32_re;  a32_im = a32_im - .5*a* reg##1_32_re - .5*b* reg##2_32_im;\
   \
   /* At this point, the aXX_re/im have the final result for flavor 1, but we still need reg1 to compute flavor 2       */ \
   /* This can potentially be very confusing. To avoid register spilling, I'll use flavor 1 output as temporary storage */ \
   \
-  reg##1_20_re *= 0.5*b; reg##1_20_im *= 0.5*b; \
-  reg##1_21_re *= 0.5*b; reg##1_21_im *= 0.5*b; \
-  reg##1_22_re *= 0.5*b; reg##1_22_im *= 0.5*b; \
-  reg##1_30_re *= 0.5*b; reg##1_30_im *= 0.5*b; \
-  reg##1_31_re *= 0.5*b; reg##1_31_im *= 0.5*b; \
-  reg##1_32_re *= 0.5*b; reg##1_32_im *= 0.5*b; \
+  reg##1_20_re *= -0.5*b; reg##1_20_im *= -0.5*b; \
+  reg##1_21_re *= -0.5*b; reg##1_21_im *= -0.5*b; \
+  reg##1_22_re *= -0.5*b; reg##1_22_im *= -0.5*b; \
+  reg##1_30_re *= -0.5*b; reg##1_30_im *= -0.5*b; \
+  reg##1_31_re *= -0.5*b; reg##1_31_im *= -0.5*b; \
+  reg##1_32_re *= -0.5*b; reg##1_32_im *= -0.5*b; \
   \
   reg##1_20_re += c##20_20_re * reg##2_20_re;\
   reg##1_20_im += c##20_20_re * reg##2_20_im;\
@@ -6303,15 +6300,14 @@
   reg##1_31_re = a31_re;  reg##1_31_im = a31_im;\
   reg##1_32_re = a32_re;  reg##1_32_im = a32_im;\
   \
-}\
 /* Flavor 2 */ \
-{\
-  spinorFloat a20_re = 0; spinorFloat a20_im = 0;\
-  spinorFloat a21_re = 0; spinorFloat a21_im = 0;\
-  spinorFloat a22_re = 0; spinorFloat a22_im = 0;\
-  spinorFloat a30_re = 0; spinorFloat a30_im = 0;\
-  spinorFloat a31_re = 0; spinorFloat a31_im = 0;\
-  spinorFloat a32_re = 0; spinorFloat a32_im = 0;\
+  \
+  a20_re = 0; a20_im = 0;\
+  a21_re = 0; a21_im = 0;\
+  a22_re = 0; a22_im = 0;\
+  a30_re = 0; a30_im = 0;\
+  a31_re = 0; a31_im = 0;\
+  a32_re = 0; a32_im = 0;\
   \
   a20_re += c##20_20_re * reg##2_20_re;\
   a20_im += c##20_20_re * reg##2_20_im;\

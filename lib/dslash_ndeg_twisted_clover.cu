@@ -88,7 +88,7 @@ namespace quda {
     { 
       bindSpinorTex<sFloat>(in, out, x); 
       a = mu;
-      b = -epsilon;
+      b = epsilon;
       c = kappa;
       d = k;
 
@@ -96,8 +96,8 @@ namespace quda {
       dslashParam.gauge1 = (void*)gauge1;
       dslashParam.a = mu;
       dslashParam.a_f = mu;
-      dslashParam.b = -epsilon;
-      dslashParam.b_f = -epsilon;
+      dslashParam.b = epsilon;
+      dslashParam.b_f = epsilon;
       dslashParam.c = kappa;
       dslashParam.c_f = kappa;
       dslashParam.cl_stride = cl_stride;
