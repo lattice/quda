@@ -360,8 +360,11 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Verbosity on each level of the multigrid */
+    QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
+
     /** Inverter to use in the setup phase */
-    QudaInverterType setup_inv_type;
+    QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];

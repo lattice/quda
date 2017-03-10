@@ -59,7 +59,9 @@ extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
-extern QudaInverterType setup_inv;
+extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
+
+extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
 extern QudaInverterType smoother_type;
 
 extern QudaMatPCType matpc_type;
@@ -206,12 +208,13 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
-  mg_param.setup_inv_type = setup_inv;
   for (int i=0; i<mg_param.n_level; i++) {
     for (int j=0; j<QUDA_MAX_DIM; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
+    mg_param.verbosity[i] = mg_verbosity[i];
+    mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.nu_pre[i] = nu_pre;
@@ -330,7 +333,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = mg_verbosity[0];
 
 
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
@@ -359,8 +362,12 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 int main(int argc, char **argv)
 {
-  // We give here the default value. Any better place??
-  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) mu_factor[i] = 1.;
+  // We give here the default value to some of the array
+  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+    mg_verbosity[i] = QUDA_SILENT;
+    setup_inv[i] = QUDA_BICGSTAB_INVERTER;
+    mu_factor[i] = 1.;
+  }
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){

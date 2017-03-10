@@ -94,8 +94,12 @@ namespace quda {
 
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
       diracParam.kappa = param.matResidual->Expose()->Kappa();
-      diracParam.mu = param.matResidual->Expose()->Mu()*( param.level==0 ? param.mg_global.mu_factor[param.level+1] :
-							  (param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level]));
+      diracParam.mu = param.matResidual->Expose()->Mu();
+
+      if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MAT_SOLUTION) {
+	diracParam.mu *= ( param.level==0 ? param.mg_global.mu_factor[param.level+1] :
+			   (param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level]));
+      }
 
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
@@ -162,7 +166,7 @@ namespace quda {
 	param_coarse_solver->global_reduction = true;
 	param_coarse_solver->compute_true_res = false;
 	param_coarse_solver->delta = 1e-8;
-	param_coarse_solver->verbosity_precondition = QUDA_SILENT;
+	param_coarse_solver->verbosity_precondition = param.mg_global.verbosity[param.level+1];
 	param_coarse_solver->pipeline = 5;
 
 	// need this to ensure we don't use half precision on the preconditioner in GCR
@@ -732,7 +736,7 @@ namespace quda {
     solverParam.tol = 5e-6;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7; 
-    solverParam.inv_type = param.mg_global.setup_inv_type;
+    solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
     solverParam.Nkrylov = 4;
     solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTABL_INVERTER ? 4 : 0); // pipeline != 0 breaks BICGSTAB
     
