@@ -863,27 +863,20 @@ namespace quda {
 
     const complex<Float> In(0., 1.);
 
-    if (nSpin == 2) {
-      for (int parity=0; parity<2; parity++) {
-        for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+	for(int s = 0; s < nSpin/2; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
-            arg.X(0,parity,x_cb,1,1,c,c) -= arg.mu*In;
+            arg.X(0,parity,x_cb,s,s,c,c) += arg.mu*In;
           } //Color
-        } // x_cb
-      } //parity
-    } else {
-      for (int parity=0; parity<2; parity++) {
-        for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+	} //Spin
+	for(int s = nSpin/2; s < nSpin; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
-            arg.X(0,parity,x_cb,1,1,c,c) += arg.mu*In;
-            arg.X(0,parity,x_cb,2,2,c,c) -= arg.mu*In;
-            arg.X(0,parity,x_cb,3,3,c,c) -= arg.mu*In;
+            arg.X(0,parity,x_cb,s,s,c,c) -= arg.mu*In;
           } //Color
-        } // x_cb
-      } //parity
-    }
+	} //Spin
+      } // x_cb
+    } //parity
   }
 
   //Adds the twisted-mass term to the coarse local term.
@@ -895,9 +888,14 @@ namespace quda {
 
     const complex<Float> In(0.,1.);
 
-    for(int s = 0; s < nSpin; s++) { //Spin
+    for(int s = 0; s < nSpin/2; s++) { //Spin
       for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
        arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) += arg.mu*In;
+      } //Color
+    } //Spin
+    for(int s = nSpin/2; s < nSpin; s++) { //Spin
+      for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
+       arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) -= arg.mu*In;
       } //Color
     } //Spin
    }
@@ -1661,6 +1659,7 @@ namespace quda {
     cudaDeviceSynchronize(); checkCudaError();
 
     if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC) {
+      printfQuda("Adding mu = %e\n",arg.mu);
       y.setComputeType(COMPUTE_TMDIAGONAL);
       y.apply(0);
     }
