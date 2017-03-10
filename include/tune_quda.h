@@ -169,7 +169,7 @@ namespace quda {
       int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
       //int n = snprintf(aux, QUDA_TUNE_AUX_STR_LENGTH, "threads=%d,prec=%lu,stride=%d,geometery=%d",
       //	       arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
-      if (n < 0 || n >= 512) errorQuda("Error writing auxiliary string");
+      if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
     }
 
   public:
@@ -325,10 +325,10 @@ namespace quda {
     virtual unsigned int sharedBytesPerThread() const { return 0; }
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    const unsigned int vector_length;
+    unsigned int vector_length_y;
 
   public:
-    TunableVectorY(unsigned int vector_length) : vector_length(vector_length) { }
+    TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -343,13 +343,13 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length) {
+	if (param.block.y < vector_length_y) {
 	  param.block.y++;
-	  param.grid.y = (vector_length + param.block.y - 1) / param.block.y;
+	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
 	} else { // we have run off the end so let's reset
 	  param.block.y = 1;
-	  param.grid.y = vector_length;
+	  param.grid.y = vector_length_y;
 	  return false;
 	}
       }
@@ -359,7 +359,7 @@ namespace quda {
     {
       Tunable::initTuneParam(param);
       param.block.y = 1;
-      param.grid.y = vector_length;
+      param.grid.y = vector_length_y;
     }
 
     /** sets default values for when tuning is disabled */
@@ -367,14 +367,15 @@ namespace quda {
     {
       Tunable::defaultTuneParam(param);
       param.block.y = 1;
-      param.grid.y = vector_length;
+      param.grid.y = vector_length_y;
     }
 
+    void resizeVector(int y) { vector_length_y = y;  }
   };
 
   class TunableVectorYZ : public TunableVectorY {
 
-    const unsigned vector_length_z;
+    mutable unsigned vector_length_z;
 
   public:
     TunableVectorYZ(unsigned int vector_length_y, unsigned int vector_length_z)
@@ -419,6 +420,8 @@ namespace quda {
       param.block.z = 1;
       param.grid.z = vector_length_z;
     }
+
+    void resizeVector(int y, int z) { vector_length_z = z;  TunableVectorY::resizeVector(y); }
   };
 
   void loadTuneCache();

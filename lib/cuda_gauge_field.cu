@@ -15,7 +15,7 @@ namespace quda {
       errorQuda("QDP ordering only supported for reference fields");
     }
 
-    if (order == QUDA_MILC_GAUGE_ORDER || order == QUDA_QDP_GAUGE_ORDER ||
+    if (order == QUDA_QDP_GAUGE_ORDER ||
 	order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_TIFR_PADDED_GAUGE_ORDER ||
 	order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_CPS_WILSON_GAUGE_ORDER)
       errorQuda("Field ordering %d presently disabled for this type", order);
@@ -25,10 +25,12 @@ namespace quda {
 	ghostExchange == QUDA_GHOST_EXCHANGE_PAD &&
 	isNative()) {
       bool pad_check = true;
-      for (int i=0; i<nDim; i++)
+      for (int i=0; i<nDim; i++) {
 	if (pad < nFace*surfaceCB[i]) pad_check = false;
-      if (!pad_check)
-	errorQuda("cudaGaugeField being constructed with insufficient padding\n");
+	if (!pad_check)
+	  errorQuda("cudaGaugeField being constructed with insufficient padding (%d < %d)\n",
+		    pad, nFace*surfaceCB[i]);
+      }
     }
 #endif
 
@@ -419,9 +421,11 @@ namespace quda {
     }
 
     if (typeid(src) == typeid(cudaGaugeField)) {
+
       // copy field and ghost zone into this field
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
           static_cast<const cudaGaugeField&>(src).gauge);
+
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
 	void *buffer = pool_pinned_malloc(bytes);

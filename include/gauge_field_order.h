@@ -292,11 +292,10 @@ namespace quda {
 	const int nDim;
 	const int geometry;
 	static constexpr int nColorCoarse = nColor / nSpinCoarse;
+	QudaFieldLocation location;
 
 	const Accessor<Float,nColor,order> accessor;
 	const GhostAccessor<Float,nColor,order> ghostAccessor;
-
-	QudaFieldLocation location;
 
       public:
 	/**
@@ -305,6 +304,7 @@ namespace quda {
 	 */
       FieldOrder(GaugeField &U, void *gauge_=0, void **ghost_=0)
       : volumeCB(U.VolumeCB()), nDim(U.Ndim()), geometry(U.Geometry()),
+	  location(U.Location()),
 	  accessor(U, gauge_, ghost_), ghostAccessor(U, gauge_, ghost_)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO)
@@ -454,16 +454,10 @@ namespace quda {
 	 * @return L2 norm squared
 	 */
 	__host__ double norm2(int dim) const {
-	  cudaPointerAttributes attributes;
-	  cudaPointerGetAttributes(&attributes, accessor.u);
-	  const QudaFieldLocation location = (attributes.memoryType == cudaMemoryTypeDevice) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
-
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
 	    return accessor.device_norm2(dim);
 	  } else {
-	    cudaDeviceSynchronize();
-	    cudaGetLastError(); // clear error state if CPU non CUDA allocation
 	    // do simple norm on host memory
 	    double nrm2 = 0.0;
 	    for (int parity=0; parity<2; parity++)

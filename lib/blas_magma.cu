@@ -1013,30 +1013,29 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 #define FLOPS_ZGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 #define FLOPS_CGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 
-void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch)
+void BlasMagmaArgs::BatchInvertMatrix(void *Ainv, void* A, const int n, const int batch, QudaFieldLocation location)
 {
 #ifdef MAGMA_LIB
-  printfQuda("%s with n=%d and batch=%d\n", __func__, n, batch);
-
   magma_queue_t queue = 0;
 
   size_t size = 2*n*n*prec*batch;
-  void *A_d = device_malloc(size);
-  void *Ainv_d = device_malloc(size);
-  qudaMemcpy(A_d, A_h, size, cudaMemcpyHostToDevice);
 
-  magma_int_t **dipiv_array = static_cast<magma_int_t**>(device_malloc(batch*sizeof(magma_int_t*)));
-  magma_int_t *dipiv_tmp = static_cast<magma_int_t*>(device_malloc(batch*n*sizeof(magma_int_t)));
+  void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A : pool_device_malloc(size);
+  void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
+  if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, cudaMemcpyHostToDevice);
+
+  magma_int_t **dipiv_array = static_cast<magma_int_t**>(pool_device_malloc(batch*sizeof(magma_int_t*)));
+  magma_int_t *dipiv_tmp = static_cast<magma_int_t*>(pool_device_malloc(batch*n*sizeof(magma_int_t)));
   set_ipointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
 
-  magma_int_t *dinfo_array = static_cast<magma_int_t*>(device_malloc(batch*sizeof(magma_int_t)));
+  magma_int_t *dinfo_array = static_cast<magma_int_t*>(pool_device_malloc(batch*sizeof(magma_int_t)));
   magma_int_t *info_array = static_cast<magma_int_t*>(safe_malloc(batch*sizeof(magma_int_t)));
   magma_int_t err;
 
   // FIXME do this in pipelined fashion to reduce memory overhead.
   if (prec == 4) {
-    magmaFloatComplex **A_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
-    magmaFloatComplex **Ainv_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
+    magmaFloatComplex **A_array = static_cast<magmaFloatComplex**>(pool_device_malloc(batch*sizeof(magmaFloatComplex*)));
+    magmaFloatComplex **Ainv_array = static_cast<magmaFloatComplex**>(pool_device_malloc(batch*sizeof(magmaFloatComplex*)));
 
     cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
     cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
@@ -1055,7 +1054,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
       if (info_array[i] < 0) {
 	errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
       } else if (info_array[i] > 0) {
-	errorQuda("%d factorization completed but the factor U is exactly singular", i);
+	warningQuda("%d factorization completed but the factor U is exactly singular", i);
       }
     }
 
@@ -1077,13 +1076,13 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
       }
     }
 
-    device_free(Ainv_array);
-    device_free(A_array);
+    pool_device_free(Ainv_array);
+    pool_device_free(A_array);
   } else if (prec == 8) {
-    magmaDoubleComplex **A_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
+    magmaDoubleComplex **A_array = static_cast<magmaDoubleComplex**>(pool_device_malloc(batch*sizeof(magmaDoubleComplex*)));
     zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
 
-    magmaDoubleComplex **Ainv_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
+    magmaDoubleComplex **Ainv_array = static_cast<magmaDoubleComplex**>(pool_device_malloc(batch*sizeof(magmaDoubleComplex*)));
     zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
 
     double magma_time = magma_sync_wtime(queue);
@@ -1121,20 +1120,22 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
       }
     }
 
-    device_free(Ainv_array);
-    device_free(A_array);
+    pool_device_free(Ainv_array);
+    pool_device_free(A_array);
   } else {
     errorQuda("%s not implemented for precision=%d", __func__, prec);
   }
 
-  qudaMemcpy(Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);
+  if (location == QUDA_CPU_FIELD_LOCATION) {
+    qudaMemcpy(Ainv, Ainv_d, size, cudaMemcpyDeviceToHost);
+    pool_device_free(Ainv_d);
+    pool_device_free(A_d);
+  }
 
-  device_free(dipiv_tmp);
-  device_free(dipiv_array);
-  device_free(dinfo_array);
+  pool_device_free(dipiv_tmp);
+  pool_device_free(dipiv_array);
+  pool_device_free(dinfo_array);
   host_free(info_array);
-  device_free(Ainv_d);
-  device_free(A_d);
 
 #endif
   return;

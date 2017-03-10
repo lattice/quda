@@ -22,7 +22,9 @@ namespace quda {
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
     typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
-    const ColorSpinorField &v = T.Vectors();
+    Location(Y,X,Xinv,Yhat,uv,av,g,c);
+
+    const ColorSpinorField &v = T.Vectors(g.Location());
     int dummy = 0;
     v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
@@ -52,6 +54,7 @@ namespace quda {
 
     if (coarseColor == 2) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+#if 0
     } else if (coarseColor == 4) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,4,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
     } else if (coarseColor == 8) {
@@ -62,10 +65,13 @@ namespace quda {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,16,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
     } else if (coarseColor == 20) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,20,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+#endif
     } else if (coarseColor == 24) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+#if 0
     } else if (coarseColor == 32) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,32,coarseSpin>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+#endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -99,6 +105,8 @@ namespace quda {
     //If c == NULL, then this is standard Wilson.  csOrder is dummy and will not matter      
     if (c.Order() == QUDA_PACKED_CLOVER_ORDER) {
       calculateY<Float,csOrder,gOrder,QUDA_PACKED_CLOVER_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+    } else if (c.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
+      calculateY<Float,csOrder,gOrder,QUDA_FLOAT4_CLOVER_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
     } else {
       errorQuda("Unsupported field order %d\n", c.Order());
     }
@@ -109,6 +117,8 @@ namespace quda {
 		  const GaugeField &g, const CloverField &c, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
     if (g.FieldOrder() == QUDA_QDP_GAUGE_ORDER) {
       calculateY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+    } else if (g.FieldOrder() == QUDA_FLOAT2_GAUGE_ORDER) {
+      calculateY<Float,csOrder,QUDA_FLOAT2_GAUGE_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
     } else {
       errorQuda("Unsupported field order %d\n", g.FieldOrder());
     }
@@ -117,12 +127,14 @@ namespace quda {
  template <typename Float>
  void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
 		 const GaugeField &g, const CloverField &c, double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
-    if (T.Vectors().FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      calculateY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
-    } else {
-      errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
-    }
-  }
+   if (T.Vectors(Y.Location()).FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+     calculateY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+   } else if (T.Vectors(Y.Location()).FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+     calculateY<Float,QUDA_FLOAT2_FIELD_ORDER>(Y, X, Xinv, Yhat, uv, av, T, g, c, kappa, mu, dirac, matpc);
+   } else {
+     errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
+   }
+ }
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
@@ -152,43 +164,37 @@ namespace quda {
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
 		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+
     QudaPrecision precision = Y.Precision();
-    //First make a cpu gauge field from the cuda gauge field
-    int pad = 0;
-    GaugeFieldParam gf_param(gauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
-    gf_param.order = QUDA_QDP_GAUGE_ORDER;
-    gf_param.fixed = gauge.GaugeFixed();
-    gf_param.link_type = gauge.LinkType();
-    gf_param.t_boundary = gauge.TBoundary();
-    gf_param.anisotropy = gauge.Anisotropy();
-    gf_param.gauge = NULL;
-    gf_param.create = QUDA_NULL_FIELD_CREATE;
-    gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gf_param.nFace = 1;
+    QudaFieldLocation location = Location(Y, X, Xinv, Yhat);
 
-    cpuGaugeField g(gf_param);
+    GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
+    CloverField *C = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaCloverField*>(clover) : nullptr;
 
-    //Copy the cuda gauge field to the cpu
-    gauge.saveCPUField(g);
+    if (location == QUDA_CPU_FIELD_LOCATION) {
+      //First make a cpu gauge field from the cuda gauge field
+      int pad = 0;
+      GaugeFieldParam gf_param(gauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
+      gf_param.order = QUDA_QDP_GAUGE_ORDER;
+      gf_param.fixed = gauge.GaugeFixed();
+      gf_param.link_type = gauge.LinkType();
+      gf_param.t_boundary = gauge.TBoundary();
+      gf_param.anisotropy = gauge.Anisotropy();
+      gf_param.gauge = NULL;
+      gf_param.create = QUDA_NULL_FIELD_CREATE;
+      gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      gf_param.nFace = 1;
+      gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-    //Create a field UV which holds U*V.  Has the same structure as V.
-    ColorSpinorParam UVparam(T.Vectors());
-    UVparam.create = QUDA_ZERO_FIELD_CREATE;
-    UVparam.location = QUDA_CPU_FIELD_LOCATION;
+      U = new cpuGaugeField(gf_param);
 
-    ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
+      //Copy the cuda gauge field to the cpu
+      gauge.saveCPUField(*static_cast<cpuGaugeField*>(U));
+    }
 
-    // if we are coarsening a preconditioned clover or twisted-mass operator we need
-    // an additional vector to store the cloverInv * V field, else just alias v
-    ColorSpinorField *av = ((matpc != QUDA_MATPC_INVALID && clover) || (dirac == QUDA_TWISTED_MASSPC_DIRAC)) ? ColorSpinorField::Create(UVparam) :
-      &const_cast<ColorSpinorField&>(T.Vectors());
-
-    //If the fine lattice operator is the clover operator, copy the cudaCloverField to cpuCloverField
-
-    //Create a cpuCloverField from the cudaCloverField
     CloverFieldParam cf_param;
     cf_param.nDim = 4;
-    cf_param.pad = pad;
+    cf_param.pad = 0;
     cf_param.precision = clover ? clover->Precision() : QUDA_INVALID_PRECISION;
 
     // if we have no clover term then create an empty clover field
@@ -204,12 +210,34 @@ namespace quda {
     cf_param.create = QUDA_NULL_FIELD_CREATE;
     cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
 
-    cpuCloverField c(cf_param);
-    if (clover) clover->saveCPUField(c);
-    calculateY(Y, X, Xinv, Yhat, *uv, *av, T, g, c, kappa, mu, dirac, matpc);
+    if (location == QUDA_CUDA_FIELD_LOCATION && !clover) {
+      // create a dummy cudaCloverField if one is not defined
+      C = new cudaCloverField(cf_param);
+    } else if (location == QUDA_CPU_FIELD_LOCATION) {
+      //Create a cpuCloverField from the cudaCloverField
+      C = new cpuCloverField(cf_param);
+      if (clover) clover->saveCPUField(*static_cast<cpuCloverField*>(C));
+    }
 
-    if (&T.Vectors() != av) delete av;
+    //Create a field UV which holds U*V.  Has the same structure as V.
+    ColorSpinorParam UVparam(T.Vectors(location));
+    UVparam.create = QUDA_ZERO_FIELD_CREATE;
+    UVparam.location = location;
+
+    ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
+
+    // if we are coarsening a preconditioned clover or twisted-mass operator we need
+    // an additional vector to store the cloverInv * V field, else just alias v
+    ColorSpinorField *av = ((matpc != QUDA_MATPC_INVALID && clover) || (dirac == QUDA_TWISTED_MASSPC_DIRAC)) ? ColorSpinorField::Create(UVparam) :
+      &const_cast<ColorSpinorField&>(T.Vectors(location));
+
+    calculateY(Y, X, Xinv, Yhat, *uv, *av, T, *U, *C, kappa, mu, dirac, matpc);
+
+    if (&T.Vectors(location) != av) delete av;
     delete uv;
+
+    if (C != clover) delete C;
+    if (U != &gauge) delete U;
   }
 
 } //namespace quda

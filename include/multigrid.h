@@ -368,7 +368,7 @@ namespace quda {
      even-odd preconditioned and we coarsen the full operator.
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
-		      const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
+		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
 		      double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**

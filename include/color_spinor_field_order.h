@@ -104,6 +104,7 @@ namespace quda {
       const GhostAccessorCB<Float,nSpin,nColor,nVec,order> ghostAccessor;
       const int siteSubset;
       const int nParity;
+      const QudaFieldLocation location;
 
     public:
       /** 
@@ -116,7 +117,7 @@ namespace quda {
 	volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
 	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
-	accessor(field), ghostAccessor(field)
+	location(field.Location()), accessor(field), ghostAccessor(field)
       { 
 	for (int d=0; d<4; d++) {
 	  void * const *_ghost = ghost_ ? ghost_ : field.Ghost();
@@ -270,10 +271,6 @@ namespace quda {
        * @return L2 norm squared
       */
       __host__ double norm2() const {
-	cudaPointerAttributes attributes;
-	cudaPointerGetAttributes(&attributes, v);
-	const QudaFieldLocation location = (attributes.memoryType == cudaMemoryTypeDevice) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
-
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust::device_ptr<complex<Float> > ptr(v);
 	  return thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor, square<Float>(), 0.0, thrust::plus<Float>());

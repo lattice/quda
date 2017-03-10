@@ -88,8 +88,6 @@ namespace quda {
     X_h = new cpuGaugeField(gParam);
     Xinv_h = new cpuGaugeField(gParam);
 
-    dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer,kappa,Mu());
-
     if (enable_gpu) {
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
       gParam.nFace = 1;
@@ -99,8 +97,6 @@ namespace quda {
       gParam.pad = gParam.nFace * pad;
       Y_d = new cudaGaugeField(gParam);
       Yhat_d = new cudaGaugeField(gParam);
-      Y_d->copy(*Y_h);
-      Yhat_d->copy(*Yhat_h);
 
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       gParam.nFace = 0;
@@ -110,9 +106,27 @@ namespace quda {
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       X_d = new cudaGaugeField(gParam);
       Xinv_d = new cudaGaugeField(gParam);
-      X_d->copy(*X_h);
-      Xinv_d->copy(*Xinv_h);
     }
+
+    bool gpu_setup = true;
+
+    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*Xinv_d,*Yhat_d,*transfer,kappa,Mu());
+    else dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer,kappa,Mu());
+
+    if (enable_gpu) {
+      if (gpu_setup) {
+	Y_h->copy(*Y_d);
+	Yhat_h->copy(*Yhat_d);
+	X_h->copy(*X_d);
+	Xinv_h->copy(*Xinv_d);
+      } else {
+	Y_d->copy(*Y_h);
+	Yhat_d->copy(*Yhat_h);
+	X_d->copy(*X_h);
+	Xinv_d->copy(*Xinv_h);
+      }
+    }
+
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -209,7 +223,11 @@ namespace quda {
   void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const
   {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+    if (Location(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+    } else {
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+    }
   }
 
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu) : DiracCoarse(param, enable_gpu)
@@ -377,7 +395,11 @@ namespace quda {
   //pass the fine clover fields, though they are actually ignored.
   void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu) const
   {
-    CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, 0.0, QUDA_COARSEPC_DIRAC, matpcType);
+    if (Location(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, 0.0, QUDA_COARSEPC_DIRAC, matpcType);
+    } else {
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, 0.0, QUDA_COARSEPC_DIRAC, matpcType);
+    }
   }
 
 }
