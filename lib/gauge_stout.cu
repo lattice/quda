@@ -35,10 +35,10 @@ namespace quda {
     }
   };
 
-
+  
   template <typename Float, typename GaugeOr, typename GaugeDs, typename Float2>
   __host__ __device__ void computeStaple(GaugeSTOUTArg<Float,GaugeOr,GaugeDs>& arg, int idx, int parity, int dir, Matrix<Float2,3> &staple) {
-
+    
     typedef Matrix<complex<Float>,3> Link;
     // compute spacetime dimensions and parity
 
@@ -302,7 +302,7 @@ namespace quda {
 #ifdef GPU_GAUGE_TOOLS
 
     if(dataOr.Precision() != dataDs.Precision()) {
-      errorQuda("Oriign and destination fields must have the same precision\n");
+      errorQuda("Origin and destination fields must have the same precision\n");
     }
 
     if(dataDs.Precision() == QUDA_HALF_PRECISION){
