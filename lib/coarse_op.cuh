@@ -736,7 +736,7 @@ namespace quda {
 
 
   template<bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ void computeCoarseClover(Arg &arg, int parity, int x_cb) {
+  __device__ __host__ void computeCoarseClover(Arg &arg, int parity, int x_cb, int ic_c) {
 
     const int nDim = 4;
 
@@ -756,8 +756,8 @@ namespace quda {
 
     coord[0] /= 2;
 
-    complex<Float> X[coarseSpin*coarseSpin*coarseColor*coarseColor];
-    for (int i=0; i<coarseSpin*coarseSpin*coarseColor*coarseColor; i++) X[i] = 0.0;
+    complex<Float> X[coarseSpin*coarseSpin*coarseColor];
+    for (int i=0; i<coarseSpin*coarseSpin*coarseColor; i++) X[i] = 0.0;
 
     if (!from_coarse) {
       //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
@@ -766,16 +766,16 @@ namespace quda {
 	//On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
 	//in the same chiral block.
 	for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column
-	  for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
+	  //for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
 	    for(int jc_c = 0; jc_c < coarseColor; jc_c++) { //Coarse Color column
 	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
 		for(int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-		  X[ ((s_c*coarseSpin + s_c)*coarseColor + ic_c)*coarseColor + jc_c] +=
+		  X[ (s_c*coarseSpin + s_c)*coarseColor + jc_c] +=
 		    conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
 		} //Fine color column
 	      }  //Fine color row
 	    } //Coarse Color column
-	  } //Coarse Color row
+	    //} //Coarse Color row
 	}  //Fine spin column
       } //Fine spin
     } else {
@@ -783,27 +783,27 @@ namespace quda {
       //N.B. assumes that no further spin blocking is done in this case.
       for(int s = 0; s < fineSpin; s++) { //Loop over spin row
 	for(int s_col = 0; s_col < fineSpin; s_col++) { //Loop over spin column
-	  for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
+	  //for(int ic_c = 0; ic_c < coarseColor; ic_c++) { //Coarse Color row
 	    for(int jc_c = 0; jc_c <coarseColor; jc_c++) { //Coarse Color column
 	      for(int ic = 0; ic < fineColor; ic++) { //Sum over fine color row
 		for(int jc = 0; jc < fineColor; jc++) {  //Sum over fine color column
-		  X[ ((s*coarseSpin + s_col)*coarseColor + ic_c)*coarseColor + jc_c] +=
+		  X[ (s*coarseSpin + s_col)*coarseColor + jc_c] +=
 		    conj(arg.V(parity, x_cb, s, ic, ic_c)) * arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, jc_c);
 		} //Fine color column
 	      }  //Fine color row
 	    } //Coarse Color column
-	  } //Coarse Color row
+	    //} //Coarse Color row
 	}  //Fine spin column
       } //Fine spin
     }
 
     for (int si = 0; si < coarseSpin; si++) {
       for (int sj = 0; sj < coarseSpin; sj++) {
-	for (int ic = 0; ic < coarseColor; ic++) {
+	//for (int ic = 0; ic < coarseColor; ic++) {
 	  for (int jc = 0; jc < coarseColor; jc++) {
-	    arg.X.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic,jc,X[((si*coarseSpin+sj)*coarseColor+ic)*coarseColor+jc]);
+	    arg.X.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc,X[(si*coarseSpin+sj)*coarseColor+jc]);
 	  }
-	}
+	  //}
       }
     }
 
@@ -813,7 +813,9 @@ namespace quda {
   void ComputeCoarseCloverCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
-	computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb);
+	for (int ic_c=0; ic_c<coarseColor; ic_c++) {
+	  computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c);
+	}
       } // c/b volume
     } // parity
   }
@@ -823,7 +825,9 @@ namespace quda {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb);
+    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
+    if (ic_c >= coarseColor) return;
+    computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c);
   }
 
 
@@ -1227,6 +1231,7 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_VUV:
+      case COMPUTE_COARSE_CLOVER:
 	resizeVector(2,coarseColor);
 	break;
       default:
@@ -1439,7 +1444,7 @@ namespace quda {
     virtual ~CalculateYhat() { }
 
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	CalculateYhatCPU<Float,n,Arg>(arg);
       } else {
