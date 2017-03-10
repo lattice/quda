@@ -254,6 +254,7 @@
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
+
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #define GHOSTSPINORTEX param.ghostTex
@@ -262,25 +263,26 @@
 #define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
+
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
 #define INTERTEX param.out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
+
 #ifdef USE_TEXTURE_OBJECTS
 #define INTERTEX param.outTex
 #else
 #define INTERTEX interTexDouble
 #endif
 #endif
+
 #define WRITE_FLAVOR_SPINOR WRITE_FLAVOR_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
+
 #if (DD_XPAY!=0)
 #if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
 #define ACCUMTEX param.x
-#define READ_ACCUM READ_ACCUM_DOUBLE
-//!
-#define ASSN_ACCUM ASSN_ACCUM_DOUBLE
 #define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_DOUBLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -288,18 +290,12 @@
 #else
 #define ACCUMTEX accumTexDouble
 #endif // USE_TEXTURE_OBJECTS
-#define READ_ACCUM READ_ACCUM_DOUBLE_TEX
-//!
-#define ASSN_ACCUM ASSN_ACCUM_DOUBLE_TEX
 #define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_DOUBLE_TEX
 #endif
-
 #endif
 
 #define SPINOR_HOP 12
-
 #elif (DD_PREC==1) // single-precision fields
-
 #define TPROJSCALE tProjScale_f
 
 // single-precision gauge field
@@ -321,7 +317,6 @@
 #endif // USE_TEXTURE_OBJECTS
 #endif
 
-
 // single-precision spinor fields
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_SINGLE
@@ -332,6 +327,7 @@
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
+
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
 #define GHOSTSPINORTEX param.ghostTex
@@ -340,6 +336,7 @@
 #define GHOSTSPINORTEX ghostSpinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
+
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
 #define INTERTEX param.out
@@ -351,13 +348,11 @@
 #define INTERTEX interTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
+
 #define WRITE_FLAVOR_SPINOR WRITE_FLAVOR_SPINOR_FLOAT4
 #if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX param.x
-#define READ_ACCUM READ_ACCUM_SINGLE
-//!
-#define ASSN_ACCUM ASSN_ACCUM_SINGLE
 #define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_SINGLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -365,17 +360,12 @@
 #else
 #define ACCUMTEX accumTexSingle
 #endif // USE_TEXTURE_OBJECTS
-#define READ_ACCUM READ_ACCUM_SINGLE_TEX
-//!
-#define ASSN_ACCUM ASSN_ACCUM_SINGLE_TEX
 #define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_SINGLE_TEX
 #endif
 #endif
 
 #define SPINOR_HOP 6
-
 #else             // half-precision fields
-
 #define TPROJSCALE tProjScale_f
 
 // half-precision gauge field
@@ -397,7 +387,6 @@
 #endif // USE_TEXTURE_OBJECTS
 #endif
 
-
 // half-precision spinor fields
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
 #define READ_SPINOR READ_SPINOR_HALF
@@ -416,6 +405,7 @@
 #define GHOSTSPINORTEX ghostSpinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
+
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
 #define INTERTEX param.out
@@ -427,13 +417,12 @@
 #define INTERTEX interTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
+
 #define WRITE_FLAVOR_SPINOR WRITE_FLAVOR_SPINOR_SHORT4
+
 #if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX param.x
-#define READ_ACCUM READ_ACCUM_HALF
-//!
-#define ASSN_ACCUM ASSN_ACCUM_HALF
 #define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_HALF
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -441,12 +430,8 @@
 #else
 #define ACCUMTEX accumTexHalf
 #endif // USE_TEXTURE_OBJECTS
-#define READ_ACCUM READ_ACCUM_HALF_TEX
-//!
-#define ASSN_ACCUM ASSN_ACCUM_HALF_TEX
 #define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_HALF_TEX
 #endif
-
 #endif
 
 #define SPINOR_HOP 6
@@ -455,7 +440,6 @@
 
 #define DD_CONCAT(n,p,r,d,x) n ## p ## r ## d ## x ## Kernel
 #define DD_FUNC(n,p,r,d,x) DD_CONCAT(n,p,r,d,x)
-
 
 // define the kernel
 template <KernelType kernel_type>

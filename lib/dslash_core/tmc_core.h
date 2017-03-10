@@ -4988,10 +4988,10 @@
   spinorFloat a30_re = -reg##1_00_re + reg##1_20_re;\
   spinorFloat a30_im = -reg##1_00_im + reg##1_20_im;\
   \
-  reg##1_00_re = a00_re;  reg##1_00_im = a00_im;\
-  reg##1_10_re = a10_re;  reg##1_10_im = a10_im;\
-  reg##1_20_re = a20_re;  reg##1_20_im = a20_im;\
-  reg##1_30_re = a30_re;  reg##1_30_im = a30_im;\
+  reg##1_00_re = 2.*a00_re;  reg##1_00_im = 2.*a00_im;\
+  reg##1_10_re = 2.*a10_re;  reg##1_10_im = 2.*a10_im;\
+  reg##1_20_re = 2.*a20_re;  reg##1_20_im = 2.*a20_im;\
+  reg##1_30_re = 2.*a30_re;  reg##1_30_im = 2.*a30_im;\
 }\
 \
 {\
@@ -5004,10 +5004,10 @@
   spinorFloat a31_re = -reg##1_01_re + reg##1_21_re;\
   spinorFloat a31_im = -reg##1_01_im + reg##1_21_im;\
   \
-  reg##1_01_re = a01_re;  reg##1_01_im = a01_im;\
-  reg##1_11_re = a11_re;  reg##1_11_im = a11_im;\
-  reg##1_21_re = a21_re;  reg##1_21_im = a21_im;\
-  reg##1_31_re = a31_re;  reg##1_31_im = a31_im;\
+  reg##1_01_re = 2.*a01_re;  reg##1_01_im = 2.*a01_im;\
+  reg##1_11_re = 2.*a11_re;  reg##1_11_im = 2.*a11_im;\
+  reg##1_21_re = 2.*a21_re;  reg##1_21_im = 2.*a21_im;\
+  reg##1_31_re = 2.*a31_re;  reg##1_31_im = 2.*a31_im;\
 }\
 \
 {\
@@ -5020,10 +5020,10 @@
   spinorFloat a32_re = -reg##1_02_re + reg##1_22_re;\
   spinorFloat a32_im = -reg##1_02_im + reg##1_22_im;\
   \
-  reg##1_02_re = a02_re;  reg##1_02_im = a02_im;\
-  reg##1_12_re = a12_re;  reg##1_12_im = a12_im;\
-  reg##1_22_re = a22_re;  reg##1_22_im = a22_im;\
-  reg##1_32_re = a32_re;  reg##1_32_im = a32_im;\
+  reg##1_02_re = 2.*a02_re;  reg##1_02_im = 2.*a02_im;\
+  reg##1_12_re = 2.*a12_re;  reg##1_12_im = 2.*a12_im;\
+  reg##1_22_re = 2.*a22_re;  reg##1_22_im = 2.*a22_im;\
+  reg##1_32_re = 2.*a32_re;  reg##1_32_im = 2.*a32_im;\
 }\
 /* Flavor 2 */\
 {\
@@ -5036,10 +5036,10 @@
   spinorFloat a30_re = -reg##2_00_re + reg##2_20_re;\
   spinorFloat a30_im = -reg##2_00_im + reg##2_20_im;\
   \
-  reg##2_00_re = a00_re;  reg##2_00_im = a00_im;\
-  reg##2_10_re = a10_re;  reg##2_10_im = a10_im;\
-  reg##2_20_re = a20_re;  reg##2_20_im = a20_im;\
-  reg##2_30_re = a30_re;  reg##2_30_im = a30_im;\
+  reg##2_00_re = 2.*a00_re;  reg##2_00_im = 2.*a00_im;\
+  reg##2_10_re = 2.*a10_re;  reg##2_10_im = 2.*a10_im;\
+  reg##2_20_re = 2.*a20_re;  reg##2_20_im = 2.*a20_im;\
+  reg##2_30_re = 2.*a30_re;  reg##2_30_im = 2.*a30_im;\
 }\
 \
 {\
@@ -5052,10 +5052,10 @@
   spinorFloat a31_re = -reg##2_01_re + reg##2_21_re;\
   spinorFloat a31_im = -reg##2_01_im + reg##2_21_im;\
   \
-  reg##2_01_re = a01_re;  reg##2_01_im = a01_im;\
-  reg##2_11_re = a11_re;  reg##2_11_im = a11_im;\
-  reg##2_21_re = a21_re;  reg##2_21_im = a21_im;\
-  reg##2_31_re = a31_re;  reg##2_31_im = a31_im;\
+  reg##2_01_re = 2.*a01_re;  reg##2_01_im = 2.*a01_im;\
+  reg##2_11_re = 2.*a11_re;  reg##2_11_im = 2.*a11_im;\
+  reg##2_21_re = 2.*a21_re;  reg##2_21_im = 2.*a21_im;\
+  reg##2_31_re = 2.*a31_re;  reg##2_31_im = 2.*a31_im;\
 }\
 \
 {\
@@ -5068,10 +5068,10 @@
   spinorFloat a32_re = -reg##2_02_re + reg##2_22_re;\
   spinorFloat a32_im = -reg##2_02_im + reg##2_22_im;\
   \
-  reg##2_02_re = a02_re;  reg##2_02_im = a02_im;\
-  reg##2_12_re = a12_re;  reg##2_12_im = a12_im;\
-  reg##2_22_re = a22_re;  reg##2_22_im = a22_im;\
-  reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
+  reg##2_02_re = 2.*a02_re;  reg##2_02_im = 2.*a02_im;\
+  reg##2_12_re = 2.*a12_re;  reg##2_12_im = 2.*a12_im;\
+  reg##2_22_re = 2.*a22_re;  reg##2_22_im = 2.*a22_im;\
+  reg##2_32_re = 2.*a32_re;  reg##2_32_im = 2.*a32_im;\
 }\
 
 #define APPLY_CLOVER_NDEG_TWIST_DYN_INV(c, a, b, reg)\
@@ -6470,10 +6470,10 @@
   spinorFloat a30_re = -reg##1_00_re + reg##1_20_re;\
   spinorFloat a30_im = -reg##1_00_im + reg##1_20_im;\
   \
-  reg##1_00_re = a00_re;  reg##1_00_im = a00_im;\
-  reg##1_10_re = a10_re;  reg##1_10_im = a10_im;\
-  reg##1_20_re = a20_re;  reg##1_20_im = a20_im;\
-  reg##1_30_re = a30_re;  reg##1_30_im = a30_im;\
+  reg##1_00_re = 2.*a00_re;  reg##1_00_im = 2.*a00_im;\
+  reg##1_10_re = 2.*a10_re;  reg##1_10_im = 2.*a10_im;\
+  reg##1_20_re = 2.*a20_re;  reg##1_20_im = 2.*a20_im;\
+  reg##1_30_re = 2.*a30_re;  reg##1_30_im = 2.*a30_im;\
 }\
 \
 {\
@@ -6486,10 +6486,10 @@
   spinorFloat a31_re = -reg##1_01_re + reg##1_21_re;\
   spinorFloat a31_im = -reg##1_01_im + reg##1_21_im;\
   \
-  reg##1_01_re = a01_re;  reg##1_01_im = a01_im;\
-  reg##1_11_re = a11_re;  reg##1_11_im = a11_im;\
-  reg##1_21_re = a21_re;  reg##1_21_im = a21_im;\
-  reg##1_31_re = a31_re;  reg##1_31_im = a31_im;\
+  reg##1_01_re = 2.*a01_re;  reg##1_01_im = 2.*a01_im;\
+  reg##1_11_re = 2.*a11_re;  reg##1_11_im = 2.*a11_im;\
+  reg##1_21_re = 2.*a21_re;  reg##1_21_im = 2.*a21_im;\
+  reg##1_31_re = 2.*a31_re;  reg##1_31_im = 2.*a31_im;\
 }\
 \
 {\
@@ -6502,10 +6502,10 @@
   spinorFloat a32_re = -reg##1_02_re + reg##1_22_re;\
   spinorFloat a32_im = -reg##1_02_im + reg##1_22_im;\
   \
-  reg##1_02_re = a02_re;  reg##1_02_im = a02_im;\
-  reg##1_12_re = a12_re;  reg##1_12_im = a12_im;\
-  reg##1_22_re = a22_re;  reg##1_22_im = a22_im;\
-  reg##1_32_re = a32_re;  reg##1_32_im = a32_im;\
+  reg##1_02_re = 2.*a02_re;  reg##1_02_im = 2.*a02_im;\
+  reg##1_12_re = 2.*a12_re;  reg##1_12_im = 2.*a12_im;\
+  reg##1_22_re = 2.*a22_re;  reg##1_22_im = 2.*a22_im;\
+  reg##1_32_re = 2.*a32_re;  reg##1_32_im = 2.*a32_im;\
 }\
 /* Flavor 2 */\
 {\
@@ -6518,10 +6518,10 @@
   spinorFloat a30_re = -reg##2_00_re + reg##2_20_re;\
   spinorFloat a30_im = -reg##2_00_im + reg##2_20_im;\
   \
-  reg##2_00_re = a00_re;  reg##2_00_im = a00_im;\
-  reg##2_10_re = a10_re;  reg##2_10_im = a10_im;\
-  reg##2_20_re = a20_re;  reg##2_20_im = a20_im;\
-  reg##2_30_re = a30_re;  reg##2_30_im = a30_im;\
+  reg##2_00_re = 2.*a00_re;  reg##2_00_im = 2.*a00_im;\
+  reg##2_10_re = 2.*a10_re;  reg##2_10_im = 2.*a10_im;\
+  reg##2_20_re = 2.*a20_re;  reg##2_20_im = 2.*a20_im;\
+  reg##2_30_re = 2.*a30_re;  reg##2_30_im = 2.*a30_im;\
 }\
 \
 {\
@@ -6534,10 +6534,10 @@
   spinorFloat a31_re = -reg##2_01_re + reg##2_21_re;\
   spinorFloat a31_im = -reg##2_01_im + reg##2_21_im;\
   \
-  reg##2_01_re = a01_re;  reg##2_01_im = a01_im;\
-  reg##2_11_re = a11_re;  reg##2_11_im = a11_im;\
-  reg##2_21_re = a21_re;  reg##2_21_im = a21_im;\
-  reg##2_31_re = a31_re;  reg##2_31_im = a31_im;\
+  reg##2_01_re = 2.*a01_re;  reg##2_01_im = 2.*a01_im;\
+  reg##2_11_re = 2.*a11_re;  reg##2_11_im = 2.*a11_im;\
+  reg##2_21_re = 2.*a21_re;  reg##2_21_im = 2.*a21_im;\
+  reg##2_31_re = 2.*a31_re;  reg##2_31_im = 2.*a31_im;\
 }\
 \
 {\
@@ -6550,10 +6550,10 @@
   spinorFloat a32_re = -reg##2_02_re + reg##2_22_re;\
   spinorFloat a32_im = -reg##2_02_im + reg##2_22_im;\
   \
-  reg##2_02_re = a02_re;  reg##2_02_im = a02_im;\
-  reg##2_12_re = a12_re;  reg##2_12_im = a12_im;\
-  reg##2_22_re = a22_re;  reg##2_22_im = a22_im;\
-  reg##2_32_re = a32_re;  reg##2_32_im = a32_im;\
+  reg##2_02_re = 2.*a02_re;  reg##2_02_im = 2.*a02_im;\
+  reg##2_12_re = 2.*a12_re;  reg##2_12_im = 2.*a12_im;\
+  reg##2_22_re = 2.*a22_re;  reg##2_22_im = 2.*a22_im;\
+  reg##2_32_re = 2.*a32_re;  reg##2_32_im = 2.*a32_im;\
 }\
 \
 

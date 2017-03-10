@@ -3853,6 +3853,7 @@ case EXTERIOR_KERNEL_Y:
 if (!incomplete)
 #endif // MULTI_GPU
 {
+#if !defined(CLOVER_TWIST_INV_DSLASH)
 #ifdef SPINOR_DOUBLE
   spinorFloat a = param.a;
   spinorFloat b = param.b;
@@ -3860,13 +3861,13 @@ if (!incomplete)
   spinorFloat a = param.a_f;
   spinorFloat b = param.b_f;
 #endif
+#endif
 #ifdef DSLASH_XPAY
 #ifdef SPINOR_DOUBLE
-  spinorFloat c = param.c;
+  spinorFloat d = param.c;
 #else
-  spinorFloat c = param.c_f;
+  spinorFloat d = param.c_f;
 #endif
-  
   READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, param.fl_stride)
 
 #ifndef CLOVER_TWIST_INV_DSLASH
@@ -3881,56 +3882,55 @@ if (!incomplete)
   APPLY_CLOVER_NDEG_TWIST(c, -a, b, acc);
 #endif
 #endif
+  o1_00_re = d*o1_00_re + acc1_00_re;
+  o1_00_im = d*o1_00_im + acc1_00_im;
+  o1_01_re = d*o1_01_re + acc1_01_re;
+  o1_01_im = d*o1_01_im + acc1_01_im;
+  o1_02_re = d*o1_02_re + acc1_02_re;
+  o1_02_im = d*o1_02_im + acc1_02_im;
+  o1_10_re = d*o1_10_re + acc1_10_re;
+  o1_10_im = d*o1_10_im + acc1_10_im;
+  o1_11_re = d*o1_11_re + acc1_11_re;
+  o1_11_im = d*o1_11_im + acc1_11_im;
+  o1_12_re = d*o1_12_re + acc1_12_re;
+  o1_12_im = d*o1_12_im + acc1_12_im;
+  o1_20_re = d*o1_20_re + acc1_20_re;
+  o1_20_im = d*o1_20_im + acc1_20_im;
+  o1_21_re = d*o1_21_re + acc1_21_re;
+  o1_21_im = d*o1_21_im + acc1_21_im;
+  o1_22_re = d*o1_22_re + acc1_22_re;
+  o1_22_im = d*o1_22_im + acc1_22_im;
+  o1_30_re = d*o1_30_re + acc1_30_re;
+  o1_30_im = d*o1_30_im + acc1_30_im;
+  o1_31_re = d*o1_31_re + acc1_31_re;
+  o1_31_im = d*o1_31_im + acc1_31_im;
+  o1_32_re = d*o1_32_re + acc1_32_re;
+  o1_32_im = d*o1_32_im + acc1_32_im;
 
-  o1_00_re = c*o1_00_re + acc1_00_re;
-  o1_00_im = c*o1_00_im + acc1_00_im;
-  o1_01_re = c*o1_01_re + acc1_01_re;
-  o1_01_im = c*o1_01_im + acc1_01_im;
-  o1_02_re = c*o1_02_re + acc1_02_re;
-  o1_02_im = c*o1_02_im + acc1_02_im;
-  o1_10_re = c*o1_10_re + acc1_10_re;
-  o1_10_im = c*o1_10_im + acc1_10_im;
-  o1_11_re = c*o1_11_re + acc1_11_re;
-  o1_11_im = c*o1_11_im + acc1_11_im;
-  o1_12_re = c*o1_12_re + acc1_12_re;
-  o1_12_im = c*o1_12_im + acc1_12_im;
-  o1_20_re = c*o1_20_re + acc1_20_re;
-  o1_20_im = c*o1_20_im + acc1_20_im;
-  o1_21_re = c*o1_21_re + acc1_21_re;
-  o1_21_im = c*o1_21_im + acc1_21_im;
-  o1_22_re = c*o1_22_re + acc1_22_re;
-  o1_22_im = c*o1_22_im + acc1_22_im;
-  o1_30_re = c*o1_30_re + acc1_30_re;
-  o1_30_im = c*o1_30_im + acc1_30_im;
-  o1_31_re = c*o1_31_re + acc1_31_re;
-  o1_31_im = c*o1_31_im + acc1_31_im;
-  o1_32_re = c*o1_32_re + acc1_32_re;
-  o1_32_im = c*o1_32_im + acc1_32_im;
-
-  o2_00_re = c*o2_00_re + acc2_00_re;
-  o2_00_im = c*o2_00_im + acc2_00_im;
-  o2_01_re = c*o2_01_re + acc2_01_re;
-  o2_01_im = c*o2_01_im + acc2_01_im;
-  o2_02_re = c*o2_02_re + acc2_02_re;
-  o2_02_im = c*o2_02_im + acc2_02_im;
-  o2_10_re = c*o2_10_re + acc2_10_re;
-  o2_10_im = c*o2_10_im + acc2_10_im;
-  o2_11_re = c*o2_11_re + acc2_11_re;
-  o2_11_im = c*o2_11_im + acc2_11_im;
-  o2_12_re = c*o2_12_re + acc2_12_re;
-  o2_12_im = c*o2_12_im + acc2_12_im;
-  o2_20_re = c*o2_20_re + acc2_20_re;
-  o2_20_im = c*o2_20_im + acc2_20_im;
-  o2_21_re = c*o2_21_re + acc2_21_re;
-  o2_21_im = c*o2_21_im + acc2_21_im;
-  o2_22_re = c*o2_22_re + acc2_22_re;
-  o2_22_im = c*o2_22_im + acc2_22_im;
-  o2_30_re = c*o2_30_re + acc2_30_re;
-  o2_30_im = c*o2_30_im + acc2_30_im;
-  o2_31_re = c*o2_31_re + acc2_31_re;
-  o2_31_im = c*o2_31_im + acc2_31_im;
-  o2_32_re = c*o2_32_re + acc2_32_re;
-  o2_32_im = c*o2_32_im + acc2_32_im;
+  o2_00_re = d*o2_00_re + acc2_00_re;
+  o2_00_im = d*o2_00_im + acc2_00_im;
+  o2_01_re = d*o2_01_re + acc2_01_re;
+  o2_01_im = d*o2_01_im + acc2_01_im;
+  o2_02_re = d*o2_02_re + acc2_02_re;
+  o2_02_im = d*o2_02_im + acc2_02_im;
+  o2_10_re = d*o2_10_re + acc2_10_re;
+  o2_10_im = d*o2_10_im + acc2_10_im;
+  o2_11_re = d*o2_11_re + acc2_11_re;
+  o2_11_im = d*o2_11_im + acc2_11_im;
+  o2_12_re = d*o2_12_re + acc2_12_re;
+  o2_12_im = d*o2_12_im + acc2_12_im;
+  o2_20_re = d*o2_20_re + acc2_20_re;
+  o2_20_im = d*o2_20_im + acc2_20_im;
+  o2_21_re = d*o2_21_re + acc2_21_re;
+  o2_21_im = d*o2_21_im + acc2_21_im;
+  o2_22_re = d*o2_22_re + acc2_22_re;
+  o2_22_im = d*o2_22_im + acc2_22_im;
+  o2_30_re = d*o2_30_re + acc2_30_re;
+  o2_30_im = d*o2_30_im + acc2_30_im;
+  o2_31_re = d*o2_31_re + acc2_31_re;
+  o2_31_im = d*o2_31_im + acc2_31_im;
+  o2_32_re = d*o2_32_re + acc2_32_re;
+  o2_32_im = d*o2_32_im + acc2_32_im;
 #else //no XPAY
 #ifndef CLOVER_TWIST_INV_DSLASH
 #ifndef DYNAMIC_CLOVER

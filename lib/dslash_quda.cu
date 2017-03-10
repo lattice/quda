@@ -545,7 +545,7 @@ class TwistCloverGamma5Cuda : public Tunable {
 	dslashParam.fl_stride = in->VolumeCB();
 #endif
       } else {//twist doublet
-	dslashParam.a = kappa, dslashParam.b = mu, dslashParam.c = epsilon;
+	dslashParam.c = kappa, dslashParam.a = mu, dslashParam.b = -epsilon;
 #if (defined GPU_TWISTED_CLOVER_DIRAC) || (defined GPU_NDEG_TWISTED_CLOVER_DIRAC)
 	dslashParam.fl_stride = in->VolumeCB()/2;
 #endif
@@ -566,7 +566,7 @@ class TwistCloverGamma5Cuda : public Tunable {
 
     void apply(const cudaStream_t &stream)
     {
-#if defined(GPU_TWISTED_CLOVER_DIRAC)
+#if (defined GPU_TWISTED_CLOVER_DIRAC) || (defined GPU_NDEG_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)

@@ -265,8 +265,8 @@ namespace quda {
 
   void ndegTwistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover *clover, const FullClover *cloverInv,
 			       const cudaColorSpinorField *in, const int parity, const int dagger, 
-			       const cudaColorSpinorField *x, const QudaTwistCloverDslashType type, const double &kappa, const double &mu, 
-			       const double &epsilon, const double &k,  const int *commOverride, TimeProfile &profile)
+			       const cudaColorSpinorField *x, const QudaTwistCloverDslashType type, const double &mu, 
+			       const double &epsilon, const double &kappa, const double &k,  const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
     inSpinor->allocateGhostBuffer(1);
@@ -310,15 +310,15 @@ namespace quda {
 	
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new NdegTwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, (float*)cloverNormP,
-								    (double2*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
+								    (double2*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, mu, epsilon, kappa, k, dagger);
 	  
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new NdegTwistedCloverDslashCuda<float4,float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), (float4*)cloverP, (float*)cloverNormP,
-								 (float4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
+								 (float4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, mu, epsilon, kappa, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new NdegTwistedCloverDslashCuda<short4,short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), (short4*)cloverP, (float*)cloverNormP,
-								 (short4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
+								 (short4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, mu, epsilon, kappa, k, dagger);
     }
 
 #ifndef GPU_COMMS
