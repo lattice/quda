@@ -180,17 +180,29 @@ set(CPU_ARCH x86_64)
 # we need to check for some packages
 find_package(PythonInterp)
 
+
 if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
   find_package(CUDAWrapper)
   set(USING_CUDA_LANG_SUPPORT True)
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED True)
 else()
-  set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
-  mark_as_advanced(CUDA_HOST_COMPILER)
-  find_package(CUDA REQUIRED)
-  set(USING_CUDA_LANG_SUPPORT False)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+    #Switch CUDA_HOST_COMPILER to g++
+    message(WARNING "QUDA's CUDA_HOST_COMPILER must be g++ with Intel builds. Please ensure your default g++ version is sufficient for compilation.")
+    set(CUDA_HOST_COMPILER "g++" CACHE FILEPATH "Host side compiler used by NVCC with Intel builds")
+    mark_as_advanced(CUDA_HOST_COMPILER)
+    find_package(CUDA REQUIRED)
+    set(USING_CUDA_LANG_SUPPORT False)
+  else()
+    set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
+    mark_as_advanced(CUDA_HOST_COMPILER)
+    find_package(CUDA REQUIRED)
+    set(USING_CUDA_LANG_SUPPORT False)
+  endif()
 endif()
+
+
 
 find_package(Threads REQUIRED)
 
