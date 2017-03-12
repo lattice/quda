@@ -5539,13 +5539,14 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     gParam.r[dir] = R[dir];
   }
 
+  if (gaugeSmeared != NULL) delete gaugeSmeared;
+
   gaugeSmeared = new cudaGaugeField(gParam);
 
   copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 
-  cudaGaugeField *cudaGaugeTemp = NULL;
-  cudaGaugeTemp = new cudaGaugeField(gParam);
+  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
@@ -5553,9 +5554,9 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
-      cudaGaugeTemp->copy(*gaugeSmeared);
-      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
-      APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha);
+    cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+    APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha);
   }
 
   delete cudaGaugeTemp;
@@ -5590,8 +5591,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 
-  cudaGaugeField *cudaGaugeTemp = NULL;
-  cudaGaugeTemp = new cudaGaugeField(gParam);
+  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);

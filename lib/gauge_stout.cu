@@ -232,7 +232,7 @@ namespace quda {
       }
 
       long long flops() const { return 3*(2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
-      long long bytes() const { return 3*((1+2*6)*arg.dest.Bytes()+arg.origin.Bytes())*arg.threads; } // Only correct if there is no link reconstruction
+      long long bytes() const { return 3*((1+2*6)*arg.origin.Bytes()+arg.dest.Bytes())*arg.threads; }
     }; // GaugeSTOUT
 
   template<typename Float,typename GaugeOr, typename GaugeDs>

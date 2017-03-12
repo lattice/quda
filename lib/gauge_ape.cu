@@ -129,7 +129,7 @@ namespace quda {
       // Get link U
       U = arg.origin(dir, linkIndexShift(x,dx,X), parity);
       
-      S  = S * (arg.alpha/((Float) (2.*(3. - 1.))));
+      S = S * (arg.alpha/((Float) (2.*(3. - 1.))));
       setIdentity(&I);
       
       TestU  = I*(1.-arg.alpha) + S*conj(U);
@@ -170,9 +170,9 @@ namespace quda {
       aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
       return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
     }
-    //DMH: Is this the same as Stout? I suspect not...
+
     long long flops() const { return 3*(2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 3*((1+2*6)*arg.dest.Bytes()+arg.origin.Bytes())*arg.threads; } // Only correct if there is no link reconstruction
+    long long bytes() const { return 3*((1+2*6)*arg.origin.Bytes()+arg.dest.Bytes())*arg.threads; }
   }; // GaugeAPE
   
   template<typename Float,typename GaugeOr, typename GaugeDs>
