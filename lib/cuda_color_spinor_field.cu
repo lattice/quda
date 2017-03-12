@@ -2015,5 +2015,16 @@ namespace quda {
     *this = tmp;
   }
 
+  void cudaColorSpinorField::PrintVector(unsigned int i) {
+    ColorSpinorParam param(*this);
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.location = QUDA_CPU_FIELD_LOCATION;
+    param.create = QUDA_NULL_FIELD_CREATE;
+
+    cpuColorSpinorField tmp(param);
+    tmp = *this;
+    tmp.PrintVector(i);
+  }
+
 
 } // namespace quda

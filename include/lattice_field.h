@@ -318,19 +318,19 @@ namespace quda {
        @return The total storage allocated
     */
     size_t GBytes() const { return total_bytes / (1<<30); }
-    
+
     /**
        Check that the metadata of *this and a are compatible
        @param a The LatticeField to which we are comparing
     */
     void checkField(const LatticeField &a) const;
-    
+
     /**
        Read in the field specified by filenemae
        @param filename The name of the file to read
     */
     virtual void read(char *filename);
-    
+
     /**
        Write the field in the file specified by filename
        @param filename The name of the file to write
@@ -360,7 +360,6 @@ namespace quda {
     const char *VolString() const { return vol_string; }
   };
   
-  
   /**
      @brief Helper function for determining if the location of the fields is the same.
      @param[in] a Input field
@@ -370,7 +369,7 @@ namespace quda {
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b) {
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations do not match");
+    else errorQuda("Locations %d %d do not match", a.Location(), b.Location());
     return location;
   }
 
@@ -384,6 +383,31 @@ namespace quda {
   template <typename... Args>
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b, const Args &... args) {
     return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,args...));
+  }
+
+  /**
+     @brief Helper function for determining if the precision of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If precision is unique return the precision
+   */
+  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b) {
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
+    if (a.Precision() == b.Precision()) precision = a.Precision();
+    else errorQuda("Precisions %d %d do not match", a.Precision(), b.Precision());
+    return precision;
+  }
+
+  /**
+     @brief Helper function for determining if the precision of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check precision on
+     @return If precision is unique return the precision
+   */
+  template <typename... Args>
+  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b, const Args &... args) {
+    return static_cast<QudaPrecision>(Precision(a,b) & Precision(a,args...));
   }
 
   /**

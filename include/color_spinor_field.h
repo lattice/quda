@@ -425,6 +425,8 @@ namespace quda {
 
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
+    virtual void PrintVector(unsigned int x) = 0;
+
     /**
      * Compute the n-dimensional site index given the 1-d offset index
      * @param y n-dimensional site index
@@ -724,6 +726,8 @@ namespace quda {
     void getTexObjectInfo() const;
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
+
+    void PrintVector(unsigned int x);
   };
 
   // CPU implementation
