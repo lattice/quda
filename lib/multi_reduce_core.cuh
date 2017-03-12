@@ -23,7 +23,7 @@ __shared__ static bool isLastBlockDone;
 
 // This is also defined in multi_blas_core.cuh.
 // We may need to put it in one, more common place.
-#define MAX_MULTI_BLAS_N 4 //16
+#define MAX_MULTI_BLAS_N 8
 
 /**
    @brief Parameter struct for generic multi-blas kernel.
@@ -78,7 +78,7 @@ static signed char *Cmatrix_h;
 
 // 'sum' should be an array of length NXZ...?
 template<int k, int NXZ, typename FloatN, int M, typename ReduceType, typename Arg>
-  __device__ inline void compute(ReduceType *sum, Arg &arg, int idx, int parity) {
+  __device__ inline void compute(ReduceType sum[NXZ], Arg &arg, int idx, int parity) {
 
   constexpr int kmod = k; // there's an old warning about silencing an out-of-bounds compiler warning,
                           // but I never seem to get it, and I'd need to compare against NYW anyway,
@@ -133,6 +133,7 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
   // Is there an array version of ::quda::zero, warp_reduce, and reduce?
   // I know I can just loop int l = 0 to NXZ-1, not sure if that's smart...
   ReduceType sum[NXZ];
+#pragma unroll
   for (int l=0; l < NXZ; l++) ::quda::zero(sum[l]);
 
   if (k >= arg.NYW) return;
@@ -142,11 +143,11 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
   case  1: compute< 1,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case  2: compute< 2,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case  3: compute< 3,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
-  /*case  4: compute< 4,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  case  4: compute< 4,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case  5: compute< 5,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case  6: compute< 6,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case  7: compute< 7,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
-  case  8: compute< 8,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+  /*case  8: compute< 8,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case  9: compute< 9,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case 10: compute<10,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
   case 11: compute<11,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
@@ -158,8 +159,10 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
 
 // ESW: Need to check indexing ()
 #ifdef WARP_MULTI_REDUCE
+#pragma unroll
   for (int l=0; l < NXZ; l++) ::quda::warp_reduce<ReduceType>(arg, sum[l], arg.NYW*(l + parity*NXZ) + k);
 #else
+#pragma unroll
   for (int l=0; l < NXZ; l++) ::quda::reduce<block_size, ReduceType>(arg, sum[l], arg.NYW*(l + parity*NXZ) + k);
 #endif
 
@@ -300,7 +303,7 @@ public:
 
   void defaultTuneParam(TuneParam &param) const {
     Tunable::defaultTuneParam(param);
-    param.grid.y = 1;
+    param.block.y = 1;
     param.grid.y = NYW;
     param.grid.z = nParity;
   }

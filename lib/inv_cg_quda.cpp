@@ -405,23 +405,23 @@ typedef Matrix<Complex, Dynamic, Dynamic, ColMajor> MatrixBCG;
 #ifdef BLOCKSOLVER_MULTIREDUCE
 void printmat(const char* label, MatrixBCG& mat)
 {
-  //printfQuda("\n%s\n", label);
-  //std::cout << mat;
-  //printfQuda("\n");
+  printfQuda("\n%s\n", label);
+  std::cout << mat;
+  printfQuda("\n");
 }
 
 void printmat(const char* label, Map<MatrixBCG>& mat)
 {
-  //printfQuda("\n%s\n", label);
-  //std::cout << mat;
-  //printfQuda("\n");
+  printfQuda("\n%s\n", label);
+  std::cout << mat;
+  printfQuda("\n");
 }
 #else
 void printmat(const char* label, MatrixXcd& mat)
 {
-  //printfQuda("\n%s\n", label);
-  //std::cout << mat;
-  //printfQuda("\n");
+  printfQuda("\n%s\n", label);
+  std::cout << mat;
+  printfQuda("\n");
 }
 #endif
 
@@ -526,7 +526,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
 #endif
-  printmat("r2", r2);
+  //printmat("r2", r2);
 
   csParam.setPrecision(param.precision_sloppy);
   // tmp2 only needed for multi-gpu Wilson-like kernels
@@ -705,7 +705,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     #endif
-    printmat("pAp", pAp);
+    //printmat("pAp", pAp);
   
 
     // update Xsloppy
@@ -745,7 +745,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     #endif
-    printmat("r2", r2);
+    //printmat("r2", r2);
   
     // Cholesky decomposition
     L = r2.llt().matrixL();// retrieve factor L  in the decomposition

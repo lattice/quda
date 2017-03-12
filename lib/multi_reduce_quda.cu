@@ -155,7 +155,7 @@ namespace quda {
         reduce::multiReduceCuda<8,double,QudaSumFloat,Dot,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
-      case 9:
+      /*case 9:
         reduce::multiReduceCuda<9,double,QudaSumFloat,Dot,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
         break;
@@ -186,7 +186,7 @@ namespace quda {
       case 16:
         reduce::multiReduceCuda<16,double,QudaSumFloat,Dot,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
+        break;*/
       default:
         errorQuda("Unsupported vector size");
         break;
@@ -246,7 +246,7 @@ namespace quda {
 
       // if (y.size() > 16), we need to split and recurse in y. 
       // 16 is because of the MAX_MULTI_BLAS in multi_reduce_core.cuh, along with the switch statement up to 15.
-      if (y.size() > 4) // using 4 just for compile time at the moment. 
+      if (y.size() > 8) // CHANGE HERE FOR COMPILE TIME
       {
         // Do the recurse first.
 
@@ -264,7 +264,7 @@ namespace quda {
 
         reduce::coeff_array<Complex> a, b, c;
 
-        switch(x.size()){
+        switch(x.size()){ // COMMENT HERE FOR COMPILE TIME
         case 1:
           reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
@@ -281,7 +281,7 @@ namespace quda {
           reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
-        /*case 5:
+        case 5:
           reduce::multiReduceCuda<5,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
@@ -296,6 +296,38 @@ namespace quda {
         case 8:
           reduce::multiReduceCuda<8,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
+          break;
+        /*case 9:
+          reduce::multiReduceCuda<9,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
+          break;
+        case 10:
+          reduce::multiReduceCuda<10,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
+          break;
+        case 11:
+          reduce::multiReduceCuda<11,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
+          break;
+        case 12:
+          reduce::multiReduceCuda<12,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
+          break;
+        case 13:
+          reduce::multiReduceCuda<13,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
+          break;
+        case 14:
+          reduce::multiReduceCuda<14,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
+          break;
+        case 15:
+          reduce::multiReduceCuda<15,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
+          break;
+        case 16:
+          reduce::multiReduceCuda<16,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
+      (cdot, a, b, c, x, y, x, y);
           break;*/
         default:
           // split the problem and recurse. Splitting in x requires
@@ -328,8 +360,8 @@ namespace quda {
           delete[] tmpmajor;
           break;
         }
-        // if x.size() > 4, we directly ran the reduce kernel. We perform the row-to-column-major transpose here.
-        if (x.size() <= 4)
+        // if x.size() > 16, we directly ran the reduce kernel. We perform the row-to-column-major transpose here.
+        if (x.size() <= 8) // COMMENT HERE FOR COMPILE TIME
         {
           const unsigned int xlen = x.size();
           const unsigned int ylen = y.size();
