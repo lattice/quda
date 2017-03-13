@@ -273,9 +273,9 @@ namespace quda {
       __host__ double norm2() const {
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust::device_ptr<complex<Float> > ptr(v);
-	  return thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor, square<Float>(), 0.0, thrust::plus<Float>());
+	  return thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec, square<Float>(), 0.0, thrust::plus<Float>());
 	} else {
-	  return thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor, square<Float>(), 0.0, thrust::plus<Float>());
+	  return thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec, square<Float>(), 0.0, thrust::plus<Float>());
 	}
       }
 
