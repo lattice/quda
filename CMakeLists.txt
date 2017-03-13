@@ -180,9 +180,6 @@ set(CPU_ARCH x86_64)
 # we need to check for some packages
 find_package(PythonInterp)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-  message(SEND_ERROR "QUDA is not compatible with Intel host compilers.")
-endif()
 
 if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
   find_package(CUDAWrapper)
@@ -190,12 +187,17 @@ if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED True)
 else()
-  set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")    
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+    #Switch CUDA_HOST_COMPILER to g++
+    message(WARNING "QUDA's CUDA_HOST_COMPILER must be g++ with Intel builds. Please ensure your default g++ version is sufficient for compilation.")
+    set(CUDA_HOST_COMPILER "g++" CACHE FILEPATH "Host side compiler used by NVCC with Intel builds")
+  else()
+    set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
+  endif()
   mark_as_advanced(CUDA_HOST_COMPILER)
   find_package(CUDA REQUIRED)
   set(USING_CUDA_LANG_SUPPORT False)
 endif()
-
 
 
 
@@ -219,7 +221,6 @@ if(QUDA_MPI)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
-  message("DEBUG ${MPI_CXX_INCLUDE_PATH}")
 endif()
 
 if(QUDA_QMP)
