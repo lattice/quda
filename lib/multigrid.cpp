@@ -95,11 +95,7 @@ namespace quda {
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
       diracParam.kappa = param.matResidual->Expose()->Kappa();
       diracParam.mu = param.matResidual->Expose()->Mu();
-
-      if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MAT_SOLUTION) {
-	diracParam.mu *= ( param.level==0 ? param.mg_global.mu_factor[param.level+1] :
-			   (param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level]));
-      }
+      diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
 
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
@@ -785,11 +781,12 @@ namespace quda {
     const Dirac &diracSloppy = *(param.matSmoothSloppy->Expose());
     DiracMdagM mdagmSloppy(diracSloppy);
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
-      if(param.level == 0)
-	solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
-      else { // at the moment mdag is not implemented for the coarse operator
+      // at the moment mdag is not implemented for the preconditioned coarse operator
+      if(param.level > 0 && param.mg_global.coarse_grid_solution_type[param.level] == QUDA_MATPC_SOLUTION) {
 	solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
 	solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      } else {
+	solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
       }
     } else {
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
