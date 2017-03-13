@@ -189,11 +189,12 @@ namespace quda {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = (x*2 + chirality)*N*N + N + 2*k;
-          complex<Float> tmp(a[parity][idx], a[parity][idx+1]);
-          return tmp;
+          return complex<Float>(a[parity][idx], a[parity][idx+1]);
 	} else {
-	  // requesting upper triangular so return conjugate transpose
-	  return conj(operator()(parity,x,s_col,s_row,c_col,c_row) );
+	  // switch coordinates to count from bottom right instead of top left of matrix
+	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+          int idx = (x*2 + chirality)*N*N + N + 2*k;
+          return complex<Float>(a[parity][idx], -a[parity][idx+1]);
 	}
       }
 
