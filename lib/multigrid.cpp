@@ -411,25 +411,11 @@ namespace quda {
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
-    {
-      printfQuda("emulated\n");
-      ColorSpinorParam param(*x_coarse);
-      param.location = QUDA_CPU_FIELD_LOCATION;
-      param.create = QUDA_NULL_FIELD_CREATE;
-      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    printfQuda("emulated\n");
+    for (int x=0; x<x_coarse->Volume(); x++) tmp1->PrintVector(x);
 
-      cpuColorSpinorField *v1 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(param));
-      *v1 = *x_coarse;
-      for (int x=0; x<x_coarse->Volume(); x++) v1->PrintVector(x);
-
-      printfQuda("actual\n");
-      cpuColorSpinorField *v2 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(param));
-      *v2 = *r_coarse;
-      for (int x=0; x<r_coarse->Volume(); x++) v2->PrintVector(x);
-
-      delete v1;
-      delete v2;
-    }
+    printfQuda("actual\n");
+    for (int x=0; x<r_coarse->Volume(); x++) tmp2->PrintVector(x);
 #endif
 
     printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
@@ -450,6 +436,36 @@ namespace quda {
     printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
     
+#if 0
+    // here we check that the Hermitian conjugate operator is working
+    // as expected for both the smoother and residual Dirac operators
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      const Dirac &diracS = *(param.matSmooth->Expose());
+      diracS.MdagM(tmp2->Even(), tmp1->Odd());
+      Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
+      double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+		 real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed");
+
+      const Dirac &diracR = *(param.matResidual->Expose());
+      diracR.MdagM(*tmp2, *tmp1);
+      dot = cDotProduct(*tmp2,*tmp1);
+      deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      printfQuda("Residual normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+		 real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed");
+    } else {
+      const Dirac &dirac = *(param.matResidual->Expose());
+      dirac.MdagM(*tmp2, *tmp1);
+      Complex dot = cDotProduct(*tmp2,*tmp1);
+      double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+		 real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed");
+    }
+#endif
+
 #ifdef ARPACK_LIB
     printfQuda("\n");
     printfQuda("Check eigenvector overlap for level %d\n", param.level );

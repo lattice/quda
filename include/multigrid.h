@@ -328,7 +328,7 @@ namespace quda {
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
-		   bool dslash=true, bool clover=true);
+		   bool dslash=true, bool clover=true, bool dagger=false);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
