@@ -71,7 +71,7 @@ namespace quda {
 
     Complex *projm  = new Complex [param.ld*param.cur_dim];
 
-#ifdef USE_MAGMA 
+#ifdef MAGMA_LIB 
     memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
     double *evals = new double[param.ld];
 
@@ -157,7 +157,17 @@ namespace quda {
 
     if(!param.use_inv_ritz) 
     {
+#ifdef MAGMA_LIB
       magma_Xgesv(vec, param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
+#else
+      Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+      Map<VectorXcd, Unaligned, DynamicStride> vec_ (vec, param.cur_dim);
+
+      VectorXcd  vec2_(param.cur_dim);
+
+      vec2_ = projm_.colPivHouseholderQr().solve(vec_);
+      vec_  = vec2_ 
+#endif
     }
     else
     {
@@ -305,8 +315,18 @@ namespace quda {
      Complex *projm  = (Complex*)mapped_malloc(param.ld*param.cur_dim * sizeof(Complex));
      memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
 
-
+#ifdef MAGMA_LIB
+     cudaHostRegister(static_cast<void *>(projm), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
      magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
+     cudaHostUnregister(projm);
+#else
+     Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+     Map<VectorXcd, Unaligned, DynamicStride> evals_(eval, param.cur_dim);
+
+     SelfAdjointEigenSolver<MatrixXcd> es(projm_);
+
+     evals = es.eigenvalues();
+#endif
 
      //reset projection matrix:
      for(int i = 0; i < param.cur_dim; i++)

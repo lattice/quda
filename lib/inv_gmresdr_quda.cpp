@@ -28,6 +28,11 @@ See also: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES 
 */
 
 namespace quda {
+//Notes:
+//GMResDR does not require large m (and esp. nev), so this will use normal LAPACK routines.
+//TODO : 
+//Control precision of Vm/Zm (?)
+//Proj cycles
 
     using namespace blas;
 
@@ -72,6 +77,7 @@ namespace quda {
          ritzVecs.setZero();
          H.setZero();
          eta.setZero();
+         //memset(c, 0, (args.m+1) * sizeof(Complex));//already done within ritzVecs
        }
 
        ~GMResDRArgs(){ }
@@ -468,18 +474,20 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     const double tol_threshold     = 1.2;
-    const double det_max_deviation = 0.8;
+    const double det_max_deviation = 0.4;
+
+    ColorSpinorField *ep = nullptr;
 
     if (!init) {
 
       gmresdr_args = new GMResDRArgs(param.m, param.nev);
 
       ColorSpinorParam csParam(b);
-
-      yp = ColorSpinorField::Create(b); 
-      rp = ColorSpinorField::Create(b); 
-
       csParam.create = QUDA_ZERO_FIELD_CREATE;
+      rp = ColorSpinorField::Create(csParam);
+      yp = ColorSpinorField::Create(csParam); 
+      ep = ColorSpinorField::Create(csParam); 
+
       csParam.setPrecision(param.precision_sloppy);
 
       tmpp     = ColorSpinorField::Create(csParam);
@@ -510,6 +518,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     ColorSpinorField &r   = *rp;
     ColorSpinorField &y   = *yp;
+    ColorSpinorField &e   = *ep;
+
     ColorSpinorField &rSloppy = *r_sloppy;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -520,24 +530,23 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
     double normb = norm2( b );
     double stop  = param.tol*param.tol* normb;  
 
-    mat(r, x, y);
+    mat(r, x);
     
     double r2 = xmyNorm(b, r);
-    double b2     = r2;
-
+    double b2 = r2;
     args.c[0] = Complex(sqrt(r2), 0.0);
 
     printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
 
 
     if(param.precision_sloppy != param.precision) {
+      blas::axpy(1.0 / args.c[0].real(), r, y);
       blas::copy(rSloppy, r);
-
-      blas::ax(1.0 / args.c[0].real(), r);   
-      Vm->Component(0) = r;
+      blas::copy(Vm->Component(0), y);
+      blas::zero(y);
     } else {
       blas::zero(Vm->Component(0));
-      blas::axpy(1.0 / args.c[0].real(), rSloppy, Vm->Component(0));   
+      blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));   
     }
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -550,33 +559,33 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
 
-   int restart_idx = 0, j = 0, check_interval = 4;
+    int restart_idx = 0, j = 0, check_interval = 4;
 
-   DenseMatrix Gm = DenseMatrix::Zero(args.k+1, args.k+1);
+    DenseMatrix Gm = DenseMatrix::Zero(args.k+1, args.k+1);
 
-   while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
-   {
-     tot_iters += FlexArnoldiProcedure(j, (j == 0));
-     UpdateSolution(&x, r_sloppy, !(j == 0));
+    while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
+    {
+      tot_iters += FlexArnoldiProcedure(j, (j == 0));
+      UpdateSolution(&e, r_sloppy, !(j == 0));
 
-     r2 = norm2(rSloppy);
+      r2 = norm2(rSloppy);
 
-     bool   do_clean_restart = false;
-     double ext_r2 = 1.0;
+      bool   do_clean_restart = false;
+      double ext_r2 = 1.0;
 
-     if((restart_idx+1) % check_interval) {
-       mat(r, x, y);
-       ext_r2 = xmyNorm(b, r);
+      if((restart_idx+1) % check_interval) {
+        mat(y, e);
+        ext_r2 = xmyNorm(r, y);
 
-       for(int l = 0; l < args.k+1; l++) {
+        for(int l = 0; l < args.k+1; l++) {
 
-         const int cdot_pipeline_length  = 1;
-         int offset = 0;
+          const int cdot_pipeline_length  = 4;
+          int offset = 0;
 
-         Complex *col = Gm.col(l).data();
+          Complex *col = Gm.col(l).data();
 
-         do {
-           const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
+          do {
+            const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
 
             std::vector<cudaColorSpinorField*> v1_;
             std::vector<cudaColorSpinorField*> v2_;
@@ -602,7 +611,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
        Gm.setZero();
 
-       do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || (norm(detGm) > det_max_deviation);
+       do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
      }
 
      if( ((restart_idx != param.deflation_grid-1) && !do_clean_restart) ) {
@@ -613,9 +622,13 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      } else {
 
        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
-
        args.ResetArgs();
-       memset(args.c, 0, (args.m+1) * sizeof(Complex));
+
+       //update solution:
+       xpy(e, x);
+       r = y;
+       zero(e);
+
        args.c[0] = Complex(sqrt(ext_r2), 0.0);
        blas::zero(Vm->Component(0));
        blas::axpy(1.0 / args.c[0].real(), rSloppy, Vm->Component(0));
@@ -627,6 +640,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    }
 
+   //final solution:
+   xpy(e, x);
+
    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
@@ -635,7 +651,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    param.gflops = gflops;
    param.iter += tot_iters;
 
-   mat(r, x, y);
+   mat(r, x);
 
    param.true_res = sqrt(xmyNorm(b, r) / b2);
 
@@ -647,6 +663,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
    param.rhs_idx += 1;
+
+   if(ep) delete ep;
 
    return;
  }
