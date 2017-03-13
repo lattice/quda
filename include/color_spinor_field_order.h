@@ -23,7 +23,7 @@ namespace quda {
 
   namespace colorspinor {
 
-    template<typename Float> struct square { __host__ __device__ Float operator()(quda::complex<Float> x) { return norm(x); } };
+    template<typename ReduceType, typename Float> struct square { __host__ __device__ ReduceType operator()(quda::complex<Float> x) { return static_cast<ReduceType>(norm(x)); } };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB { 
       AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
@@ -271,12 +271,17 @@ namespace quda {
        * @return L2 norm squared
       */
       __host__ double norm2() const {
+	double nrm2 = 0;
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust::device_ptr<complex<Float> > ptr(v);
-	  return thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec, square<Float>(), 0.0, thrust::plus<Float>());
+	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
+					  square<double,Float>(), 0.0, thrust::plus<double>());
 	} else {
-	  return thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec, square<Float>(), 0.0, thrust::plus<Float>());
+	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
+					  square<double,Float>(), 0.0, thrust::plus<double>());
 	}
+	comm_allreduce(&nrm2);
+	return nrm2;
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(Float); }
