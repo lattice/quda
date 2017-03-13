@@ -49,7 +49,7 @@ namespace quda {
       int ghostOffset[4];
       GhostAccessorCB(const ColorSpinorField &a) {
 	for (int d=0; d<4; d++) {
-	  ghostOffset[d] = a.Nface()*a.SurfaceCB(d)*a.Ncolor()*a.Nspin();
+	  ghostOffset[d] = a.Nface()*a.SurfaceCB(d)*nColor*nSpin*nVec;
 	}
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
@@ -82,7 +82,7 @@ namespace quda {
       GhostAccessorCB(const ColorSpinorField &a) {
 	for (int d=0; d<4; d++) {
 	  faceVolumeCB[d] = a.Nface()*a.SurfaceCB(d);
-	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin;
+	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
 	}
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
