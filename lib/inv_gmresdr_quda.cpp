@@ -45,6 +45,9 @@ namespace quda {
     using VectorSet       = MatrixXcd;
     using Vector          = VectorXcd;
 
+//special types needed for compatibility with QUDA blas:
+    using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
+
     struct SortedEvals{
 
       double _val;
@@ -236,14 +239,17 @@ namespace quda {
       delete Vm;
       Vm = nullptr;
 
-      if(K) delete Zm;
-
       if (param.precision_sloppy != param.precision)  delete r_sloppy;
 
       if(K && (param.precision_precondition != param.precision_sloppy))
       {
         delete r_pre;
         delete p_pre;
+      }
+
+      if(K) {
+        delete Zm;
+        delete K;
       }
 
       delete tmpp;
@@ -315,13 +321,11 @@ namespace quda {
 
    ColorSpinorFieldSet *Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
-   std::vector<ColorSpinorField*> V(Vm->Components());
+   std::vector<ColorSpinorField*> vkp1(Vkp1->Components());
+   std::vector<ColorSpinorField*> vm  (Vm->Components());
 
-   for(int i = 0; i < (args.k+1); i++)
-   {
-     std::vector<ColorSpinorField*> Vi(Vkp1->Components().begin()+i,Vkp1->Components().begin()+i+1);
-     blas::caxpy(static_cast<Complex*>(Qkp1.col(i).data()), V , Vi);
-   }
+   RowMajorDenseMatrix Alpha(Qkp1);//convert Qkp1 to Row-major format first  
+   blas::caxpy(static_cast<Complex*>(Alpha.data()), vm , vkp1); 
 
    for(int i = 0; i < (args.m+1); i++)
    {
@@ -335,15 +339,11 @@ namespace quda {
 
    if( Zm->V() != Vm->V() )
    {
-     DenseMatrix Qk = Qkp1.topLeftCorner(args.m,args.k);
+     std::vector<ColorSpinorField*> z (Zm->Components());
+     std::vector<ColorSpinorField*> vk(Vkp1->Components().begin(),Vkp1->Components().begin()+args.k);
 
-     std::vector<ColorSpinorField*> Z(Zm->Components());
-
-     for(int i = 0; i < args.k; i++)
-     {
-       std::vector<ColorSpinorField*> Vi(Vkp1->Components().begin()+i,Vkp1->Components().begin()+i+1);
-       blas::caxpy(static_cast<Complex*>(Qkp1.col(i).data()), Z , Vi);
-     }
+     RowMajorDenseMatrix Beta(Qkp1.topLeftCorner(args.m,args.k));
+     blas::caxpy(static_cast<Complex*>(Beta.data()), z , vk);
 
      for(int i = 0; i < (args.m); i++)
      {

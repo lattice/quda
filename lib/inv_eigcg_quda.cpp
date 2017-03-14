@@ -40,6 +40,9 @@ namespace quda {
    using Vector          = VectorXcd;
    using RealVector      = VectorXd;
 
+//special types needed for compatibility with QUDA blas:
+   using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
+
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
 
    class EigCGArgs{
@@ -250,6 +253,8 @@ namespace quda {
       if(K) {
         delete r_pre;
         delete p_pre;
+
+        delete K;
       }
   
       delete eigcg_args;
@@ -273,6 +278,7 @@ namespace quda {
 
     ColorSpinorFieldSet *V2k = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
     //Restart V:
+#if 0 //old code
     {
       std::vector<ColorSpinorField*> vm(Vm->Components().begin(),Vm->Components().end());
       for(int i = 0; i < 2*args.k; i++) 
@@ -281,6 +287,12 @@ namespace quda {
          blas::caxpy( static_cast<Complex*>(args.ritzVecs.col(i).data()), vm , v2k ); 
       }
     }
+#endif
+    std::vector<ColorSpinorField*> vm (Vm->Components());
+    std::vector<ColorSpinorField*> v2k(V2k->Components());
+    
+    RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
+    blas::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
 
     for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), V2k->Component(i));
 
