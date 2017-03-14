@@ -251,6 +251,7 @@ namespace quda {
          param.siteSubset = QUDA_PARITY_SITE_SUBSET;
          param.nDim = nDim;
          memcpy(param.x, x, nDim*sizeof(int));
+         param.x[4] = 1;
          param.create = QUDA_REFERENCE_FIELD_CREATE;
          param.v = v;
          param.norm = norm;
@@ -477,7 +478,7 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    // if (!composite_descr.is_composite || composite_descr.is_component)
       destroyTexObject();
 #endif
 
