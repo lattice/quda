@@ -90,102 +90,23 @@ namespace quda {
   __global__ void GenericPackGhostKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.volumeCB) return;
-    const int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    const int parity = (arg.nParity == 2) ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-    const int color_block = (blockDim.z*blockIdx.z + threadIdx.z)*Mc;
+    const int color_block = (blockDim.y*blockIdx.y + threadIdx.y)*Mc;
     if (color_block >= Nc) return;
     packGhost<Float,Ns,Nc,Mc>(arg, x_cb, parity, spinor_parity, color_block);
   }
 
   template <typename Float, int Ns, int Nc, int Mc, typename Arg>
-  class GenericPackGhostLauncher : public Tunable {
-
-  protected:
+  class GenericPackGhostLauncher : public TunableVectorYZ {
     Arg &arg;
     const ColorSpinorField &meta;
-
-    long long flops() const { return 0; }
-    long long bytes() const {
-      // FIXME take into account paritioning
-      size_t totalBytes = 0;
-      for (int d=0; d<4; d++) {
-	if (!comm_dim_partitioned(d)) continue;
-	totalBytes += 2*arg.nFace*2*Ns*Nc*meta.SurfaceCB(d)*meta.Precision();
-      }
-      return totalBytes;
-    }
-
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
-
-    bool advanceBlockDim(TuneParam &param) const
-    {
-      dim3 block = param.block;
-      dim3 grid = param.grid;
-      bool ret = Tunable::advanceBlockDim(param);
-      param.block.y = block.y; param.block.z = block.z;
-      param.grid.y = grid.y; param.grid.z = grid.z;
-
-      if (ret) { // we advanced the block.x so we're done
-	return true;
-      } else { // block.x (spacetime) was reset
-
-	// y thread dimension corresponds to parity
-	// z thread dimension corresponds to block color (spin is kept thread local)
-	if (param.block.y == 1 && arg.nParity == 2) { // advance parity
-	  param.block.y = arg.nParity;
-	  param.grid.y = 1;
-	  return true;
-	} else {
-	  // reset parity
-	  param.block.y = 1;
-	  param.grid.y = arg.nParity;
-
-	  // let's try to block-color
-	  while(param.block.z <= Nc/Mc) {
-	    param.block.z++;
-	    if ( (Nc/Mc) % param.block.z == 0) {
-	      param.grid.z = (Nc/Mc) / param.block.z;
-	      break;
-	    }
-	  }
-
-	  // we can advance block-color since this is valid
-	  if (param.block.z <= Nc/Mc) { //
-	    return true;
-	  } else { // we have run off the end so let's reset
-	    param.block.z = 1;
-	    param.grid.z = Nc/Mc;
-	    return false;
-	  }
-
-	}
-      }
-    }
-
-    virtual void initTuneParam(TuneParam &param) const
-    {
-      Tunable::initTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = arg.nParity;
-      param.block.z = 1;
-      param.grid.z = Nc/Mc;
-    }
-
-    /** sets default values for when tuning is disabled */
-    virtual void defaultTuneParam(TuneParam &param) const
-    {
-      Tunable::defaultTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = arg.nParity;
-      param.block.z = 1;
-      param.grid.z = Nc/Mc;
-    }
+    bool tuneGridDim() const { return false; }
 
   public:
-    GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta) : arg(arg), meta(meta) {
+    GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta)
+      : TunableVectorYZ(Nc/Mc, arg.nParity), arg(arg), meta(meta) {
       strcpy(aux, meta.AuxString());
 #ifdef MULTI_GPU
       char comm[5];
@@ -212,6 +133,16 @@ namespace quda {
 
     TuneKey tuneKey() const {
       return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString());
+    }
+
+    long long flops() const { return 0; }
+    long long bytes() const {
+      size_t totalBytes = 0;
+      for (int d=0; d<4; d++) {
+	if (!comm_dim_partitioned(d)) continue;
+	totalBytes += 2*arg.nFace*2*Ns*Nc*meta.SurfaceCB(d)*meta.Precision();
+      }
+      return totalBytes;
     }
   };
 
