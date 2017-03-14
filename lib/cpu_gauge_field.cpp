@@ -140,8 +140,8 @@ namespace quda {
     for (int d=0; d<nDim; d++) host_free(send[d]);
   }
 
-  // This does the opposite of exchnageGhost and sends back the ghost
-  // zone to the node from which it came and injeccts it back into the
+  // This does the opposite of exchangeGhost and sends back the ghost
+  // zone to the node from which it came and injects it back into the
   // field
   void cpuGaugeField::injectGhost() {
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)

@@ -88,7 +88,7 @@ namespace quda {
 
   namespace gauge {
 
-    template<typename Float> struct square { __host__ __device__ Float operator()(quda::complex<Float> x) { return norm(x); } };
+    template<typename ReduceType, typename Float> struct square { __host__ __device__ ReduceType operator()(quda::complex<Float> x) { return static_cast<ReduceType>(norm(x)); } };
 
     template<typename Float, int nColor, QudaGaugeFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
@@ -137,7 +137,7 @@ namespace quda {
 #endif
       }
 
-      __host__ Float device_norm2(int dim) const {
+      __host__ double device_norm2(int dim) const {
 	errorQuda("Not implemented");
 	return 0.0;
       }
@@ -188,7 +188,7 @@ namespace quda {
 #endif
       }
 
-      __host__ Float device_norm2(int dim) const {
+      __host__ double device_norm2(int dim) const {
 	errorQuda("Not implemented");
 	return 0.0;
       }
@@ -252,15 +252,15 @@ namespace quda {
 #endif
       }
 
-      __host__ Float device_norm2(int dim) const {
+      __host__ double device_norm2(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
 	thrust::device_ptr<complex<Float> > ptr(u);
-	Float even = thrust::transform_reduce(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					      square<Float>(), 0.0, thrust::plus<Float>());
-	Float odd  = thrust::transform_reduce(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					      ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
-					      square<Float>(), 0.0, thrust::plus<Float>());
+	double even = thrust::transform_reduce(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
+					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
+					       square<double,Float>(), 0.0, thrust::plus<double>());
+	double odd  = thrust::transform_reduce(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
+					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
+					       square<double,Float>(), 0.0, thrust::plus<double>());
 	return even + odd;
       }
     };
@@ -454,20 +454,21 @@ namespace quda {
 	 * @return L2 norm squared
 	 */
 	__host__ double norm2(int dim) const {
+	  double nrm2 = 0;
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
-	    return accessor.device_norm2(dim);
+	    nrm2 = accessor.device_norm2(dim);
 	  } else {
 	    // do simple norm on host memory
-	    double nrm2 = 0.0;
 	    for (int parity=0; parity<2; parity++)
 	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
 		for (int row=0; row<nColor; row++)
 		  for (int col=0; col<nColor; col++)
 		    nrm2 += norm((*this)(dim,parity,x_cb,row,col));
 	      }
-	    return nrm2;
 	  }
+	  comm_allreduce(&nrm2);
+	  return nrm2;
 	}
 
 	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
