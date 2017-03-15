@@ -400,11 +400,11 @@ namespace quda {
   //pass the fine clover fields, though they are actually ignored.
   void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const
   {
-    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (Location(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     } else {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     }
   }
 
