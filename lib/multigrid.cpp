@@ -781,13 +781,12 @@ namespace quda {
     const Dirac &diracSloppy = *(param.matSmoothSloppy->Expose());
     DiracMdagM mdagmSloppy(diracSloppy);
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
-      // at the moment mdag is not implemented for the preconditioned coarse operator
-      if(param.level > 0 && param.mg_global.coarse_grid_solution_type[param.level] == QUDA_MATPC_SOLUTION) {
-	solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
-	solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
-      } else {
-	solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
-      }
+      solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
+    } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
+      solverParam.inv_type_precondition = param.mg_global.smoother[param.level];
+      solverParam.tol_precondition = param.mg_global.smoother_tol[param.level];
+      solverParam.maxiter_precondition = param.mg_global.nu_pre[param.level]+param.mg_global.nu_post[param.level];
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     } else {
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
