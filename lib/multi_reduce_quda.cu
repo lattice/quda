@@ -59,6 +59,7 @@ namespace quda {
     namespace reduce {
 
       namespace multi {
+#define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
 #include <texture.h>
       }
 
@@ -192,6 +193,9 @@ namespace quda {
         break;
     }
 #endif // SSTEP
+    // do a single multi-node reduction only once we have computed all local dot products
+    const int Nreduce = x.size()*y.size();
+    reduceDoubleArray((double*)result, Nreduce);
   }
 
 
@@ -244,12 +248,9 @@ namespace quda {
     // There's a function below called 'cDotProduct' that flips it to row major.
     void cDotProduct_recurse(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
 
-      // if (y.size() > 16), we need to split and recurse in y. 
-      // 16 is because of the MAX_MULTI_BLAS in multi_reduce_core.cuh, along with the switch statement up to 15.
-      if (y.size() > 8) // CHANGE HERE FOR COMPILE TIME
+      if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, split and recurse
       {
         // Do the recurse first.
-
         Complex* result0 = &result[0];
         Complex* result1 = &result[x.size()*(y.size()/2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
@@ -269,66 +270,96 @@ namespace quda {
           reduce::multiReduceCuda<1,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 2
         case 2:
           reduce::multiReduceCuda<2,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 3
         case 3:
           reduce::multiReduceCuda<3,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 4
         case 4:
           reduce::multiReduceCuda<4,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 5
         case 5:
           reduce::multiReduceCuda<5,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 6
         case 6:
           reduce::multiReduceCuda<6,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 7
         case 7:
           reduce::multiReduceCuda<7,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 8
         case 8:
           reduce::multiReduceCuda<8,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
   	  (cdot, a, b, c, x, y, x, y);
           break;
-        /*case 9:
+#if MAX_MULTI_BLAS_N >= 9
+	case 9:
           reduce::multiReduceCuda<9,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
       (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 10
         case 10:
           reduce::multiReduceCuda<10,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
       (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 11
         case 11:
           reduce::multiReduceCuda<11,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
       (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 12
         case 12:
           reduce::multiReduceCuda<12,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
       (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 13
         case 13:
           reduce::multiReduceCuda<13,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
       (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 14
         case 14:
           reduce::multiReduceCuda<14,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
       (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 15
         case 15:
           reduce::multiReduceCuda<15,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
       (cdot, a, b, c, x, y, x, y);
           break;
+#if MAX_MULTI_BLAS_N >= 16
         case 16:
           reduce::multiReduceCuda<16,double2,QudaSumFloat2,Cdot,0,0,0,0,false>
-      (cdot, a, b, c, x, y, x, y);
-          break;*/
+	    (cdot, a, b, c, x, y, x, y);
+          break;
+#endif //16
+#endif //15
+#endif //14
+#endif //13
+#endif //12
+#endif //11
+#endif //10
+#endif // 9
+#endif // 8
+#endif // 7
+#endif // 6
+#endif // 5
+#endif // 4
+#endif // 3
+#endif // 2
         default:
           // split the problem and recurse. Splitting in x requires
           // memory reshuffling (unless y = 1).
@@ -360,8 +391,9 @@ namespace quda {
           delete[] tmpmajor;
           break;
         }
-        // if x.size() > 16, we directly ran the reduce kernel. We perform the row-to-column-major transpose here.
-        if (x.size() <= 8) // COMMENT HERE FOR COMPILE TIME
+
+	// we are at the leaf of the binary tree (e.g., we ran the kernel): perform the row-to-column-major transpose here.
+        if (x.size() <= MAX_MULTI_BLAS_N)
         {
           const unsigned int xlen = x.size();
           const unsigned int ylen = y.size();
@@ -374,15 +406,11 @@ namespace quda {
     }
 
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
-      //Complex* recurs = new Complex[x.size()*y.size()];
       cDotProduct_recurse(result, x, y);
-      /*
-      // Switch to row-major. 
-      const unsigned int xlen = x.size();
-      const unsigned int ylen = y.size();
-      for (unsigned int j = 0; j < xlen; j++)
-        for (unsigned int i = 0; i < ylen; i++)
-          result[i*xlen+j] = recurs[j*ylen+i];*/
+
+      // do a single multi-node reduction only once we have computed all local dot products
+      const int Nreduce = 2*x.size()*y.size();
+      reduceDoubleArray((double*)result, Nreduce);
     }
 
    } // namespace blas

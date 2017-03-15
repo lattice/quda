@@ -69,9 +69,5 @@ template<int NXZ, typename doubleN, typename ReduceType,
     } else { errorQuda("nSpin=%d is not supported\n", x[0]->Nspin()); }
   }
 
-  // now do multi-node reduction
-  const int Nreduce = NXZ*NYW*(sizeof(doubleN)/sizeof(double));
-  reduceDoubleArray((double*)result, Nreduce);
-
   return;
 }

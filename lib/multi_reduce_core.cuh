@@ -23,7 +23,7 @@ __shared__ static bool isLastBlockDone;
 
 // This is also defined in multi_blas_core.cuh.
 // We may need to put it in one, more common place.
-#define MAX_MULTI_BLAS_N 8
+#define MAX_MULTI_BLAS_N 4
 
 /**
    @brief Parameter struct for generic multi-blas kernel.
@@ -47,9 +47,8 @@ template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY,
   SpinorW W[MAX_MULTI_BLAS_N];
   Reducer  r;
   const int length;
-  const int nParity;
- MultiReduceArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Reducer r, int NYW, int length, int nParity)
-   : NYW(NYW), r(r), length(length), nParity(nParity) {
+ MultiReduceArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Reducer r, int NYW, int length)
+   : NYW(NYW), r(r), length(length) {
 
     for (int i=0; i<NXZ; ++i)
     {
@@ -140,21 +139,51 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
 
   switch(k) {
   case  0: compute< 0,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 2
   case  1: compute< 1,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 3
   case  2: compute< 2,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 4
   case  3: compute< 3,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 5
   case  4: compute< 4,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 6
   case  5: compute< 5,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 7
   case  6: compute< 6,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 8
   case  7: compute< 7,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
-  /*case  8: compute< 8,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 9
+  case  8: compute< 8,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 10
   case  9: compute< 9,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 11
   case 10: compute<10,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 12
   case 11: compute<11,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 13
   case 12: compute<12,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 14
   case 13: compute<13,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 15
   case 14: compute<14,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
-  case 15: compute<15,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;*/
+#if MAX_MULTI_BLAS_N >= 16
+  case 15: compute<15,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#endif //16
+#endif //15
+#endif //14
+#endif //13
+#endif //12
+#endif //11
+#endif //10
+#endif //9
+#endif //8
+#endif //7
+#endif //6
+#endif //5
+#endif //4
+#endif //3
+#endif //2
   }
 
 // ESW: Need to check indexing ()
@@ -172,7 +201,7 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
   typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
   void multiReduceLaunch(doubleN result[],
 			 MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> &arg,
-			 const TuneParam &tp, const cudaStream_t &stream){
+			 const TuneParam &tp, const cudaStream_t &stream) {
 
   if(tp.grid.x > REDUCE_MAX_BLOCKS)
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
@@ -181,7 +210,7 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
 #ifdef WARP_MULTI_REDUCE
   multiReduceKernel<ReduceType,FloatN,M,NXZ><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #else
-  LAUNCH_KERNEL(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
+  LAUNCH_KERNEL_LOCAL_PARITY(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
 #endif
   
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
@@ -196,7 +225,7 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
   // from the buffer reduces go into.
   for(int i=0; i<NXZ*arg.NYW; ++i) {
     result[i] = set(((ReduceType*)getHostReduceBuffer())[i]);
-    if (arg.nParity==2) sum(result[i],((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+i]);
+    if (tp.grid.z==2) sum(result[i],((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+i]);
   }
 }
 
@@ -245,10 +274,14 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
     return false;
   }
 
+  // we only launch thread blocks up to size 512 since the autoner
+  // tuner favours smaller blocks and this helps with compile time
+  unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
+
 public:
   MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],
     Reducer &r, int NYW, int length, int nParity, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
-    : NYW(NYW), arg(X, Y, Z, W, r, NYW, length/nParity, nParity), nParity(nParity), result(result),
+    : NYW(NYW), arg(X, Y, Z, W, r, NYW, length/nParity), nParity(nParity), result(result),
       Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { ; }
 
   inline TuneKey tuneKey() const {
@@ -258,8 +291,6 @@ public:
     strcat(name, typeid(arg.r).name());
     return TuneKey(blasStrings.vol_str, name, blasStrings.aux_tmp);
   }
-
-  unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock; }
 
   void apply(const cudaStream_t &stream){
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -324,7 +355,7 @@ public:
 
   // Need to check this!
   // The NYW seems right?
-  long long flops() const { return NYW*NXZ*arg.r.flops()*vec_length<FloatN>::value*arg.length*nParity*M; }
+    long long flops() const { return NYW*NXZ*arg.r.flops()*vec_length<FloatN>::value*(long long)arg.length*nParity*M; }
   long long bytes() const {
     size_t bytes = NYW*NXZ*arg.X[0].Precision()*vec_length<FloatN>::value*M;
     if (arg.X[0].Precision() == QUDA_HALF_PRECISION) bytes += NYW*NXZ*sizeof(float);
@@ -358,6 +389,7 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
   const int N_MAX = NXZ > NYW ? NXZ : NYW;
   const int N_MIN = NXZ < NYW ? NXZ : NYW;
 
+  static_assert(MAX_MULTI_BLAS_N <= 16, "MAX_MULTI_BLAS_N exceeds maximum size 16");
   if (N_MAX > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N_MAX, MAX_MULTI_BLAS_N);
 
   if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
@@ -418,7 +450,6 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
   multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
   multi::Spinor<RegType,StoreType,M,writeW,3> W[MAX_MULTI_BLAS_N];
 
-  //MWFIXME (copied from multi_blas_core.cuh)
   for (int i=0; i<NXZ; i++) {
     X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
     Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));
