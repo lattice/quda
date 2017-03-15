@@ -186,7 +186,6 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
 #endif //2
   }
 
-// ESW: Need to check indexing ()
 #ifdef WARP_MULTI_REDUCE
 #pragma unroll
   for (int l=0; l < NXZ; l++) ::quda::warp_reduce<ReduceType>(arg, sum[l], arg.NYW*(l + parity*NXZ) + k);
@@ -280,9 +279,9 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
 
 public:
   MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],
-    Reducer &r, int NYW, int length, int nParity, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
+		  Reducer &r, int NYW, int length, int nParity, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
     : NYW(NYW), arg(X, Y, Z, W, r, NYW, length/nParity), nParity(nParity), result(result),
-      Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { ; }
+      Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { }
 
   inline TuneKey tuneKey() const {
     char name[TuneKey::name_n];
@@ -389,6 +388,7 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
   const int N_MAX = NXZ > NYW ? NXZ : NYW;
   const int N_MIN = NXZ < NYW ? NXZ : NYW;
 
+  static_assert(MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N <= QUDA_MAX_MULTI_REDUCE, "MAX_MULTI_BLAS_N^2 exceeds maximum number of reduction");
   static_assert(MAX_MULTI_BLAS_N <= 16, "MAX_MULTI_BLAS_N exceeds maximum size 16");
   if (N_MAX > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N_MAX, MAX_MULTI_BLAS_N);
 
@@ -458,6 +458,19 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
     Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i]));
     W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
   }
+
+  // since the block dot product and the block norm use the same functors, we need to distinguish them
+  bool is_norm = false;
+  if (NXZ==NYW) {
+    is_norm = true;
+    for (int i=0; i<NXZ; i++) {
+      if (x[i]->V() != y[i]->V() || x[i]->V() != z[i]->V() || x[i]->V() != w[i]->V()) {
+	is_norm = false;
+	break;
+      }
+    }
+  }
+  if (is_norm) strcat(blasStrings.aux_tmp, ",norm");
 
   Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
 
