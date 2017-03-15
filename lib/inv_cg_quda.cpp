@@ -590,6 +590,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   ColorSpinorField* rpnew = ColorSpinorField::Create(rSloppy, csParam);
   ColorSpinorField &rnew = *rpnew;
 
+  ColorSpinorParam cs5dParam(p);
+  cs5dParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  cs5dParam.x[4] = param.num_src;
+  cs5dParam.is_composite = false;
+  
+  cudaColorSpinorField Ap5d(Ap,cs5dParam); 
+  cudaColorSpinorField p5d(p,cs5dParam); 
+  cudaColorSpinorField tmp5d(tmp,cs5dParam); 
+  cudaColorSpinorField tmp25d(tmp2,cs5dParam);  
+
   if (&x != &xSloppy) {
     blas::copy(y, x);
     blas::zero(xSloppy);
@@ -695,11 +705,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   while ( !allconverged && k < param.maxiter ) {
     // PUSH_RANGE("Dslash",1)
-     // for(int i=0; i<param.num_src; i++){
-     //  matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
-     // }
+     for(int i=0; i<param.num_src; i++){
+      matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
+     }
 
-    matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
+    matSloppy(Ap5d, p5d, tmp5d, tmp25d);  // tmp as tmp
     
     // POP_RANGE
 

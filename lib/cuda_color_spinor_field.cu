@@ -93,7 +93,8 @@ namespace quda {
          (param.create == QUDA_REFERENCE_FIELD_CREATE && (param.is_composite || param.is_component))) {
       reset(param);
     } else {
-      errorQuda("Undefined behaviour"); // else silent bug possible?
+      // errorQuda("Undefined behaviour"); // else silent bug possible?
+      reset(param);
     }
 
     // This must be set before create is called
