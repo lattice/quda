@@ -2696,7 +2696,7 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // download source
   printfQuda("Setup b\n");
   ColorSpinorParam cudaParam(cpuParam, *param);
-  cudaParam.x[4] = param->num_src;
+  // cudaParam.x[4] = param->num_src;
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.is_composite = true;
   cudaParam.composite_dim = param->num_src;
