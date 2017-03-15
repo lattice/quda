@@ -122,7 +122,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = X1*X2*X3/2;
 
-  inv_param->verbosity = QUDA_DEBUG_VERBOSE;
+  inv_param->verbosity = QUDA_VERBOSE;
   inv_param->mass = mass;
 
   // outer solver parameters

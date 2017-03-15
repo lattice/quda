@@ -20,6 +20,7 @@
 #include <Eigen/Dense>
 #endif
 
+#define MWVERBOSE
 
 namespace quda {
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -145,6 +146,10 @@ namespace quda {
     csParam.setPrecision(param.precision_sloppy);
     ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
     ColorSpinorField &p = *pp;
+
+
+
+
 
     if (&x != &xSloppy) {
       blas::copy(y, x);
@@ -720,6 +725,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         if (i!=j) pAp(j,i) = std::conj(pAp(i,j));
       }
     }
+    std::cout << " pAp " << std::endl << pAp << std::endl;
 
     // update Xsloppy
     alpha = pAp.inverse() * C;
