@@ -987,13 +987,6 @@ extern "C" {
   void performSTOUTnStep(unsigned int nSteps, double rho);
 
   /**
-   * Performs Coulomb gauge fixing on gaugePrecise and stores it in gaugeFixed
-   * @param nSteps Number of steps to apply.
-   * @param omega over relaxation parameter
-   * @param theta gauge fixing quality
-   */
-
-  /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeCuda();
