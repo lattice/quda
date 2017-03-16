@@ -541,7 +541,7 @@ namespace quda {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	coarseDslash<Float,F,G,nDim,Ns,Nc,Mc,dslash,clover,dagger>(arg);
       } else {
-        TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO /*getTuning()*/, getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	switch (tp.aux.y) { // dimension gather parallelisation
 	case 1:
