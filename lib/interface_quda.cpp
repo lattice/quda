@@ -129,6 +129,7 @@ cudaGaugeField *gaugeLongSloppy = NULL;
 cudaGaugeField *gaugeLongPrecondition = NULL;
 
 cudaGaugeField *gaugeSmeared = NULL;
+cudaGaugeField *gaugeFixed = NULL;
 
 cudaCloverField *cloverPrecise = NULL;
 cudaCloverField *cloverSloppy = NULL;
@@ -1005,8 +1006,10 @@ void freeGaugeQuda(void)
   gaugeFatExtended = NULL;
 
   if (gaugeSmeared) delete gaugeSmeared;
+  if (gaugeFixed) delete gaugeFixed;
 
   gaugeSmeared = NULL;
+  gaugeFixed = NULL;
   // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
   if (extendedGaugeResident) {
     delete extendedGaugeResident;
@@ -1251,8 +1254,10 @@ void endQuda(void)
     profileContract.Print();
     profileCovDev.Print();
     profilePlaq.Print();
+    //profileLinkTr.Print();
     profileAPE.Print();
     profileSTOUT.Print();
+    //profileCoulombGf.Print();
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
@@ -5676,10 +5681,15 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-
-int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
-  const unsigned int verbose_interval, const double relax_boost, const double tolerance, const unsigned int reunit_interval, \
-  const unsigned int  stopWtheta, QudaGaugeParam* param , double* timeinfo)
+int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  
+			      const unsigned int Nsteps,
+			      const unsigned int verbose_interval, 
+			      const double relax_boost, 
+			      const double tolerance, 
+			      const unsigned int reunit_interval,
+			      const unsigned int stopWtheta, 
+			      QudaGaugeParam* param, 
+			      double* timeinfo)
 {
 
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5719,8 +5729,11 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
   if(comm_size() == 1){
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
-      reunit_interval, stopWtheta);
+
+    gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, 
+		   verbose_interval, relax_boost, 
+		   tolerance, reunit_interval, stopWtheta);
+    
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
     checkCudaError();
     // copy the gauge field back to the host
@@ -5745,8 +5758,10 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
     cudaInGaugeEx->exchangeExtendedGhost(R,redundant_comms);
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugefixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
-      reunit_interval, stopWtheta);
+    
+    gaugefixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, 
+		   relax_boost, tolerance, reunit_interval, stopWtheta);
+   
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     checkCudaError();
@@ -5758,9 +5773,12 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
 #else
   // perform the update
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
-    reunit_interval, stopWtheta);
+
+  gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, 
+		 relax_boost, tolerance, reunit_interval, stopWtheta);
+
   GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
+
   // copy the gauge field back to the host
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_D2H);
 #endif
@@ -5788,9 +5806,99 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
   return 0;
 }
 
+void performGaugeFixingOVRnStep(const unsigned int gauge_dir,
+				const unsigned int nSteps,
+				const unsigned int verbose_interval, 
+				const double relax_boost, 
+				const double tolerance, 
+				const unsigned int reunit_interval,
+				const unsigned int stopWtheta,
+				const bool make_resident)
+{
+  
+  GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_TOTAL);
 
+  if (gaugePrecise == NULL) {
+    errorQuda("Gauge field must be loaded");
+  }
 
+  int pad = 0;
+  int y[4];
 
+#ifdef MULTI_GPU
+  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+  GaugeFieldParam gParam(y, gaugePrecise->Precision(), 
+			 gaugePrecise->Reconstruct(), pad, 
+			 QUDA_VECTOR_GEOMETRY, 
+			 QUDA_GHOST_EXCHANGE_EXTENDED);
+#else
+  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
+  GaugeFieldParam gParam(y, gaugePrecise->Precision(), 
+			 gaugePrecise->Reconstruct(), pad, 
+			 QUDA_VECTOR_GEOMETRY, 
+			 QUDA_GHOST_EXCHANGE_NO);
+#endif
+
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.order = gaugePrecise->Order();
+  gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  gParam.t_boundary = gaugePrecise->TBoundary();
+  gParam.nFace = 1;
+  gParam.tadpole = gaugePrecise->Tadpole();
+
+#ifdef MULTI_GPU
+  for(int dir=0; dir<4; ++dir) gParam.r[dir] = R[dir];
+#endif
+
+  if (gaugeFixed != NULL) {
+    delete gaugeFixed;
+  }
+
+  gaugeFixed = new cudaGaugeField(gParam);
+
+#ifdef MULTI_GPU
+  copyExtendedGauge(*gaugeFixed, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  gaugeFixed->exchangeExtendedGhost(R,redundant_comms);
+#else
+  gaugeFixed->copy(*gaugePrecise);
+#endif
+
+  cudaGaugeField *cudaGaugeTemp = NULL;
+  cudaGaugeTemp = new cudaGaugeField(gParam);
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after 0 %s OVR Gf steps: %le\n", (gauge_dir==3 ? "Coulomb" : "Landau"), plq.x);
+  }
+
+  for (unsigned int i=0; i<nSteps; i++) {
+      cudaGaugeTemp->copy(*gaugeFixed);
+#ifdef MULTI_GPU
+      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+#endif
+    gaugefixingOVR(*gaugeFixed, gauge_dir, nSteps, verbose_interval, 
+		   relax_boost, tolerance, reunit_interval, stopWtheta);
+  }
+  
+#ifdef MULTI_GPU
+  gaugeFixed->exchangeExtendedGhost(R,redundant_comms);
+#endif
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d %s OVR Gf steps: %le\n", nSteps, (gauge_dir==3 ? "Coulomb" : "Landau"), plq.x);
+  }  
+  
+  if (make_resident) {
+    if (gaugePrecise != NULL) delete gaugePrecise;
+    gaugePrecise = gaugeFixed;
+  } else {
+    delete cudaGaugeTemp;
+  }
+  GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+ 
 int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
   const unsigned int verbose_interval, const double alpha, const unsigned int autotune, const double tolerance, \
   const unsigned int  stopWtheta, QudaGaugeParam* param , double* timeinfo)

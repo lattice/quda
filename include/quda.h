@@ -987,6 +987,13 @@ extern "C" {
   void performSTOUTnStep(unsigned int nSteps, double rho);
 
   /**
+   * Performs Coulomb gauge fixing on gaugePrecise and stores it in gaugeFixed
+   * @param nSteps Number of steps to apply.
+   * @param omega over relaxation parameter
+   * @param theta gauge fixing quality
+   */
+
+  /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeCuda();
@@ -1038,6 +1045,28 @@ extern "C" {
                       QudaGaugeParam* param,
                       double* timeinfo);
 
+  /**
+   * @brief Gauge fixing with overrelaxation. Support for single and multi GPU.
+   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
+   * @param[in] Nsteps, maximum number of steps to perform FMR search for minimal gauge
+   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
+   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
+   * @param[in] tolerance, torelance value to stop the method.
+   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
+   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] make_resident, if true, deletes gaugePrecise and makes gaugeFixed the resident gauge. 
+   */
+
+  void performGaugeFixingOVRnStep(const unsigned int gauge_dir,
+				  const unsigned int Nsteps,
+				  const unsigned int verbose_interval,
+				  const double relax_boost,
+				  const double tolerance,
+				  const unsigned int reunit_interval,
+				  const unsigned int stopWtheta,
+				  const bool make_resident);
+  
+  
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

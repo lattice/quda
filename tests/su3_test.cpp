@@ -136,6 +136,9 @@ void SU3test(int argc, char **argv) {
   plaqQuda(plaq);
   printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
+  // Smearing tests
+  //----------------------------------------------------------------------
+  
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1). 
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
@@ -162,9 +165,49 @@ void SU3test(int argc, char **argv) {
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for APE = %g secs\n", time0);
+
+#ifdef GPU_GAUGE_ALG  
+  // Gauge fixing tests
+  //----------------------------------------------------------------------
+
+  unsigned int gauge_dir;
+  nSteps = 1;
+  unsigned int verbose_interval = 100;
+  double omega = 1.45;
+  double theta = 1.0e-13;
+  unsigned int reunit_interval = 100;
+  unsigned int stopWtheta = 1;
+  bool make_resident = false;
+
+  //Coulomb
+  gauge_dir = 3;
+  // start the timer
+  time0 = -((double)clock());
+  performGaugeFixingOVRnStep(gauge_dir, nSteps, verbose_interval, omega, 
+			     theta, reunit_interval, stopWtheta,
+			     make_resident);
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for single CoulombGf step = %g secs\n", time0);
+
+  //Landau
+  gauge_dir = 4;
+  // start the timer
+  time0 = -((double)clock());
+  performGaugeFixingOVRnStep(gauge_dir, nSteps, verbose_interval, omega, 
+			     theta, reunit_interval, stopWtheta,
+			     make_resident);
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for single LandauGf step = %g secs\n", time0);
   
 #else
-  printf("Skipping plaquette tests since gauge tools have not been compiled\n");
+  printf("Skipping gauge fixing tests since gauge algorithms have not been compiled\n");
+#endif
+#else
+  printf("Skipping plaquette and smearing tests since gauge tools have not been compiled\n");
 #endif
   
   check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
