@@ -108,7 +108,7 @@ namespace quda {
       Xinv_d = new cudaGaugeField(gParam);
     }
 
-    bool gpu_setup = false;
+    bool gpu_setup = true;
 
     if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*Xinv_d,*Yhat_d,*transfer);
     else dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer);

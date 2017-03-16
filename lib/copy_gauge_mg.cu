@@ -17,9 +17,15 @@ namespace quda {
     if (out.isNative()) {
 
 #ifdef FINE_GRAINED_ACCESS
-      typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER> G;
-      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(), faceVolumeCB,
-					 out.Ndim(), out.Geometry(), out, location, type);
+      if (outGhost) {
+	typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,false> G;
+	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(), faceVolumeCB,
+					   out.Ndim(), out.Geometry(), out, location, type);
+      } else {
+	typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,true> G;
+	copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(), faceVolumeCB,
+					   out.Ndim(), out.Geometry(), out, location, type);
+      }
 #else
       typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO,length>::type G;
       copyGauge<FloatOut,FloatIn,length>
@@ -67,8 +73,13 @@ namespace quda {
     // reconstruction only supported on FloatN fields currently
     if (in.isNative()) {      
 #ifdef FINE_GRAINED_ACCESS
-      typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER> G;
-      copyGaugeMG<FloatOut,FloatIn,length> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, location, Out, outGhost, type);
+      if (inGhost) {
+	typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,false> G;
+	copyGaugeMG<FloatOut,FloatIn,length> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, location, Out, outGhost, type);
+      } else {
+	typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER,true> G;
+	copyGaugeMG<FloatOut,FloatIn,length> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, location, Out, outGhost, type);
+      }
 #else
       typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO,length>::type G;
       copyGaugeMG<FloatOut,FloatIn,length> (G(in, In,inGhost), out, location, Out, outGhost, type);

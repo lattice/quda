@@ -189,7 +189,7 @@ namespace quda {
     }
   }
 
-  // This does the opposite of exchnageGhost and sends back the ghost
+  // This does the opposite of exchangeGhost and sends back the ghost
   // zone to the node from which it came and injects it back into the
   // field
   void cudaGaugeField::injectGhost() {

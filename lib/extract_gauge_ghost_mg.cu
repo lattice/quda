@@ -22,7 +22,7 @@ namespace quda {
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 #ifdef FINE_GRAINED_ACCESS
-	typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_FLOAT2_GAUGE_ORDER> G;
+	typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false> G;
 	extractGhost<Float,length>(G(const_cast<GaugeField&>(u), 0, (void**)Ghost), u, location, extract);
 #else
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,length>::type G;

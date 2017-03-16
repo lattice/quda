@@ -100,7 +100,8 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor, QudaGaugeFieldOrder order> struct GhostAccessor {
+    template<typename Float, int nColor, QudaGaugeFieldOrder order, bool native_ghost>
+    struct GhostAccessor {
       mutable complex<Float> dummy;
       GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
 	errorQuda("Not implemented for order=%d", order);
@@ -143,8 +144,8 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor>
-      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> {
+    template<typename Float, int nColor, bool native_ghost>
+      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> {
       complex<Float> *ghost[4];
       int ghostOffset[4];
       GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
@@ -154,7 +155,7 @@ namespace quda {
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
       }
-      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> &a) {
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> &a) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
@@ -194,8 +195,8 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor>
-      struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> {
+    template<typename Float, int nColor, bool native_ghost>
+      struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> {
       complex<Float> *ghost[4];
       int ghostOffset[4];
       GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
@@ -205,7 +206,7 @@ namespace quda {
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
       }
-      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> &a) {
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> &a) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
@@ -265,16 +266,36 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor>
-      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> {
+    template<typename Float, int nColor, bool native_ghost>
+      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> {
+      complex<Float> *ghost[4];
       const int volumeCB;
+      int ghostVolumeCB[4];
       Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> accessor;
     GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-      : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_) {  }
-    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
-      : volumeCB(a.volumeCB), accessor(a.accessor) {  }
+      : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_)
+      {
+	if (!native_ghost) assert(ghost_ != nullptr);
+	for (int d=0; d<4; d++) {
+	  ghost[d] = !native_ghost ? static_cast<complex<Float>*>(ghost_[d]) : nullptr;
+	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
+	}
+      }
+    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> &a)
+      : volumeCB(a.volumeCB), accessor(a.accessor)
+      {
+	for (int d=0; d<4; d++) {
+	  ghost[d] = a.ghost[d];
+	  ghostVolumeCB[d] = a.ghostVolumeCB[d];
+	}
+      }
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x_cb, int row, int col) const
-      { return accessor(d, parity, x_cb+volumeCB, row, col); }
+      {
+	if (native_ghost)
+	  return accessor(d, parity, x_cb+volumeCB, row, col);
+	else
+	  return ghost[d][ ((parity*nColor + row)*nColor+col)*ghostVolumeCB[d] + x_cb ];
+      }
     };
 
 
@@ -283,7 +304,7 @@ namespace quda {
        deploy for a specifc field ordering, the two operator()
        accessors have to be specialized for that ordering.
      */
-    template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order>
+  template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost=true>
       struct FieldOrder {
 
       protected:
@@ -295,7 +316,7 @@ namespace quda {
 	QudaFieldLocation location;
 
 	const Accessor<Float,nColor,order> accessor;
-	const GhostAccessor<Float,nColor,order> ghostAccessor;
+	const GhostAccessor<Float,nColor,order,native_ghost> ghostAccessor;
 
       public:
 	/**
