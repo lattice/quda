@@ -185,8 +185,15 @@ if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
   set(USING_CUDA_LANG_SUPPORT True)
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED True)
-  if ((NOT CMAKE_CUDA_HOST_COMPILER) AND (CMAKE_CXX_COMPILER_ID MATCHES "Intel"))
-     message(FATAL_ERROR "QUDA's CMAKE_CUDA_HOST_COMPILER must not be Intel builds. Please set CMAKE_CUDA_HOST_COMPILER to a compatible CXX compiler (g++,clang++).")
+  execute_process(
+    COMMAND "${CUDA_HOST_COMPILER}"
+    -V
+    OUTPUT_VARIABLE output ERROR_VARIABLE output
+    RESULT_VARIABLE result
+    TIMEOUT 10
+    )
+  if (output MATCHES "Intel")
+    message(FATAL_ERROR "QUDA's CUDA_HOST_COMPILER must not be Intel builds. Please set CUDA_HOST_COMPILER to a compatible CXX compiler (g++,clang++).")
   endif()
 else()
   mark_as_advanced(CUDA_HOST_COMPILER)
