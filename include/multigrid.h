@@ -341,6 +341,7 @@ namespace quda {
      @param clover[in] Clover field on fine grid (optional)
      @param kappa[in] Kappa parameter
      @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
+     @param mu_factor[in] Multiplicative factor for the mu parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
@@ -348,7 +349,7 @@ namespace quda {
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
-		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
+		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
@@ -362,6 +363,7 @@ namespace quda {
      @param cloverInv[in] Clover inverse field on fine grid
      @param kappa[in] Kappa parameter
      @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
+     @param mu_factor[in] Multiplicative factor for the mu parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
@@ -369,7 +371,7 @@ namespace quda {
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
 		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
-		      double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
+		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      This is an object that captures an entire MG preconditioner
