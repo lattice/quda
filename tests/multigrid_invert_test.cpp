@@ -62,6 +62,8 @@ extern double mu_factor[QUDA_MAX_MG_LEVEL];
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
 extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
+extern double setup_tol;
+extern double omega;
 extern QudaInverterType smoother_type;
 
 extern QudaMatPCType matpc_type;
@@ -215,6 +217,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     }
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
+    mg_param.setup_tol[i] = setup_tol;
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.nu_pre[i] = nu_pre;
@@ -241,7 +244,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // use single parity injection into the coarse grid
     mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
-    mg_param.omega[i] = 0.85; // over/under relaxation factor
+    mg_param.omega[i] = omega; // over/under relaxation factor
 
     mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
   }

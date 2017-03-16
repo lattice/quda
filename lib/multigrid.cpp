@@ -745,7 +745,7 @@ namespace quda {
 
     // set null-space generation options - need to expose these
     solverParam.maxiter = 500;
-    solverParam.tol = 5e-6;
+    solverParam.tol = param.mg_global.setup_tol[param.level];
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7; 
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
@@ -781,11 +781,13 @@ namespace quda {
     const Dirac &diracSloppy = *(param.matSmoothSloppy->Expose());
     DiracMdagM mdagmSloppy(diracSloppy);
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
+      solverParam.maxiter = 2000;
       solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
       solverParam.inv_type_precondition = param.mg_global.smoother[param.level];
       solverParam.tol_precondition = param.mg_global.smoother_tol[param.level];
       solverParam.maxiter_precondition = param.mg_global.nu_pre[param.level]+param.mg_global.nu_post[param.level];
+      solverParam.precondition_cycle = 1;
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     } else {
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);

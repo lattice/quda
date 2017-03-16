@@ -503,6 +503,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #else
     P(setup_inv_type[i], QUDA_INVALID_INVERTER);
 #endif
+#ifdef INIT_PARAM
+    P(setup_tol[i], 5e-6);
+#else
+    P(setup_tol[i], INVALID_DOUBLE);
+#endif
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
 

@@ -1607,6 +1607,8 @@ int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
+double setup_tol = 5e-6;
+double omega = 0.85;
 QudaInverterType smoother_type = QUDA_MR_INVERTER;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
@@ -1680,6 +1682,8 @@ void usage(char** argv )
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
+  printf("    --mg-setup-tol                            # The tolerance to use for the setup of multigrid (default 5e-6)\n");
+  printf("    --mg-omega                                # The over/under relaxation factor for the smoother of multigrid (default 0.85)\n");
   printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
@@ -2367,6 +2371,28 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     setup_inv[level] = get_solver_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    setup_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-omega") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    omega = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
