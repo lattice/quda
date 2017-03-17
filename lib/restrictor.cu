@@ -307,6 +307,9 @@ namespace quda {
 	  } else if (block_size == 54) {  // for 3x3x3x4 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,54>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (block_size == 64) {  // for 2x4x4x4 aggregates
+	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,64>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (block_size == 100) {  // for 5x5x2x4 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,100>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -415,8 +418,8 @@ namespace quda {
 		const int *fine_to_coarse, const int *coarse_to_fine, int parity) {
 
     // for fine grids (Nc=3) have more parallelism so can use more coarse strategy
-    constexpr int coarse_colors_per_thread = fineColor != 3 ? 2 :
-      coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
+    constexpr int coarse_colors_per_thread = fineColor != 3 ? 2 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
+    //coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
 
     RestrictLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread>
       restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);

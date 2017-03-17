@@ -220,6 +220,12 @@ namespace quda {
 
   }
 
+  // defined in cudaGaugeField
+  void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
+  void **create_ghost_buffer(size_t bytes[], QudaGaugeFieldOrder order);
+  void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
+  void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order);
+
   void cpuGaugeField::copy(const GaugeField &src) {
     if (this == &src) return;
 
@@ -234,14 +240,48 @@ namespace quda {
     }
 
     if (typeid(src) == typeid(cudaGaugeField)) {
-      if (!src.isNative()) errorQuda("Only native order is supported");
-      void *buffer = pool_pinned_malloc(src.Bytes());
-      // this copies over both even and odd
-      qudaMemcpy(buffer, static_cast<const cudaGaugeField&>(src).Gauge_p(),
-		 src.Bytes(), cudaMemcpyDeviceToHost);
 
-      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
-      pool_pinned_free(buffer);
+      if (reorder_location() == QUDA_CPU_FIELD_LOCATION) {
+
+	if (!src.isNative()) errorQuda("Only native order is supported");
+	void *buffer = pool_pinned_malloc(src.Bytes());
+	// this copies over both even and odd
+	qudaMemcpy(buffer, static_cast<const cudaGaugeField&>(src).Gauge_p(),
+		   src.Bytes(), cudaMemcpyDeviceToHost);
+
+	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
+	pool_pinned_free(buffer);
+
+      } else { // else on the GPU
+
+	void *buffer = create_gauge_buffer(bytes, order, geometry);
+	size_t ghost_bytes[4];
+	int dstNinternal = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : 2*nColor*nColor;
+	for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * dstNinternal * precision;
+	void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, order) : nullptr;
+
+	if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	  copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0, ghost_buffer, 0);
+	} else {
+	  copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0);
+	}
+
+	if (order == QUDA_QDP_GAUGE_ORDER) {
+	  for (int d=0; d<geometry; d++) {
+	    qudaMemcpy(((void**)gauge)[d], ((void**)buffer)[d], bytes/geometry, cudaMemcpyDeviceToHost);
+	  }
+	} else {
+	  qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
+	}
+
+	if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+	  for (int d=0; d<4; d++)
+	    qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
+
+	free_gauge_buffer(buffer, order, geometry);
+	if (nFace > 0) free_ghost_buffer(ghost_buffer, order);
+      }
+
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge,
