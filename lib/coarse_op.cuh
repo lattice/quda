@@ -895,12 +895,12 @@ namespace quda {
 
     for(int s = 0; s < nSpin/2; s++) { //Spin
       for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
-       arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) += mu;
+       arg.X(0,parity,x_cb,s,s,ic_c,ic_c) += mu;
       } //Color
     } //Spin
     for(int s = nSpin/2; s < nSpin; s++) { //Spin
       for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
-       arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) -= mu;
+       arg.X(0,parity,x_cb,s,s,ic_c,ic_c) -= mu;
       } //Color
     } //Spin
    }
