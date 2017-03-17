@@ -70,9 +70,11 @@ namespace quda {
 
     constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
 
+    complex<Float> UV[uvSpin][fineColor];
+
     for(int s = 0; s < uvSpin; s++) {
       for(int c = 0; c < fineColor; c++) {
-	arg.UV(parity,x_cb,s,c,ic_c) = static_cast<Float>(0.0);
+	UV[s][c] = static_cast<Float>(0.0);
       }
     }
 
@@ -84,13 +86,11 @@ namespace quda {
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse)
-	      arg.UV(parity, x_cb, s, ic, ic_c) +=
-		arg.U(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
+	      UV[s][ic] += arg.U(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
 	    else
 	      for (int s_col=0; s_col<fineSpin; s_col++) {
 		// on the coarse lattice if forwards then use the forwards links
-		arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) +=
-		  arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) *
+		UV[s_col*fineSpin+s][ic] += arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) *
 		  W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c);
 	      } // which chiral block
 	  }  //Fine color columns
@@ -104,11 +104,11 @@ namespace quda {
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse)
-	      arg.UV(parity, x_cb, s, ic, ic_c) += arg.U(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y_cb, s, jc, ic_c);
+	      UV[s][ic] += arg.U(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y_cb, s, jc, ic_c);
 	    else
 	      for (int s_col=0; s_col<fineSpin; s_col++) {
 		// on the coarse lattice if forwards then use the forwards links
-		arg.UV(parity, x_cb, s_col*fineSpin+s, ic, ic_c) +=
+		UV[s_col*fineSpin+s][ic] +=
 		  arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc) *
 		  W((parity+1)&1, y_cb, s_col, jc, ic_c);
 	      } // which chiral block
@@ -117,6 +117,14 @@ namespace quda {
       }  //Fine Spin
 
     }
+
+
+    for(int s = 0; s < uvSpin; s++) {
+      for(int c = 0; c < fineColor; c++) {
+	arg.UV(parity,x_cb,s,c,ic_c) = UV[s][c];
+      }
+    }
+
 
   } // computeUV
 
@@ -941,7 +949,7 @@ namespace quda {
       switch (type) {
       case COMPUTE_UV:
 	// when fine operator is coarse take into account that the link matrix has spin dependence
-	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * !from_coarse ? 1 : fineSpin;
+	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * (!from_coarse ? 1 : fineSpin);
 	break;
       case COMPUTE_AV:
       case COMPUTE_TMAV:
@@ -984,7 +992,7 @@ namespace quda {
       long long bytes_ = 0;
       switch (type) {
       case COMPUTE_UV:
-	bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes();
+	bytes_ = arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
 	break;
       case COMPUTE_AV:
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes();
