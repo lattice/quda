@@ -201,6 +201,8 @@ module quda_fortran
      QudaInverterType :: inv_type_precondition
 
      integer(8) :: preconditioner ! pointer to preconditioner instance
+     integer(8) :: preconditionerUP ! pointer to preconditioner instance
+     integer(8) :: preconditionerDN ! pointer to preconditioner instance
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition
