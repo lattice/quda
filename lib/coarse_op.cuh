@@ -32,14 +32,15 @@ namespace quda {
 
     Float kappa;                /** kappa value */
     Float mu;                   /** mu value */
+    Float mu_factor;            /** multiplicative factor for mu applied when mu is added to the operator */
 
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
     CalculateYArg(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinor &V,
-		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
+		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, double mu_factor, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
       : Y(Y), X(X), Xinv(Xinv), UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)),
-	fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
+	mu_factor(static_cast<Float>(mu_factor)), fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
     {
       if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
 	errorQuda("Gamma basis %d not supported", V.GammaBasis());
@@ -865,29 +866,22 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void AddCoarseTmDiagonalCPU(Arg &arg) {
 
-    const complex<Float> In(0., 1.);
+    const complex<Float> mu(0., arg.mu*arg.mu_factor);
 
-    if (nSpin == 2) {
-      for (int parity=0; parity<2; parity++) {
-        for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+	for(int s = 0; s < nSpin/2; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
-            arg.X(0,parity,x_cb,1,1,c,c) -= arg.mu*In;
+            arg.X(0,parity,x_cb,s,s,c,c) += mu;
           } //Color
-        } // x_cb
-      } //parity
-    } else {
-      for (int parity=0; parity<2; parity++) {
-        for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+	} //Spin
+	for(int s = nSpin/2; s < nSpin; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X(0,parity,x_cb,0,0,c,c) += arg.mu*In;
-            arg.X(0,parity,x_cb,1,1,c,c) += arg.mu*In;
-            arg.X(0,parity,x_cb,2,2,c,c) -= arg.mu*In;
-            arg.X(0,parity,x_cb,3,3,c,c) -= arg.mu*In;
+            arg.X(0,parity,x_cb,s,s,c,c) -= mu;
           } //Color
-        } // x_cb
-      } //parity
-    }
+	} //Spin
+      } // x_cb
+    } //parity
   }
 
   //Adds the twisted-mass term to the coarse local term.
@@ -897,11 +891,16 @@ namespace quda {
     if (x_cb >= arg.coarseVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
 
-    const complex<Float> In(0.,1.);
+    const complex<Float> mu(0., arg.mu*arg.mu_factor);
 
-    for(int s = 0; s < nSpin; s++) { //Spin
+    for(int s = 0; s < nSpin/2; s++) { //Spin
       for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
-       arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) += arg.mu*In;
+       arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) += mu;
+      } //Color
+    } //Spin
+    for(int s = nSpin/2; s < nSpin; s++) { //Spin
+      for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
+       arg.X(0,parity,x_cb,s,((s+2)%4),ic_c,ic_c) -= mu;
       } //Color
     } //Spin
    }
@@ -1495,7 +1494,7 @@ namespace quda {
 	   QudaGaugeFieldOrder gOrder, typename F, typename Ftmp, typename coarseGauge, typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, Ftmp &UV, F &AV, F &V, fineGauge &G, fineClover &C, fineClover &Cinv,
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, ColorSpinorField &av, const ColorSpinorField &v,
-		  double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc) {
+		  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -1527,7 +1526,7 @@ namespace quda {
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     typedef CalculateYArg<Float,coarseGauge,fineGauge,F,Ftmp,fineClover> Arg;
-    Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, x_size, xc_size, geo_bs, spin_bs);
+    Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, mu_factor, x_size, xc_size, geo_bs, spin_bs);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v, Y_, X_, Xinv_);
 
     QudaFieldLocation location = Location(Y_, X_, Xinv_, Yhat_, av, v);
@@ -1665,7 +1664,10 @@ namespace quda {
 
     cudaDeviceSynchronize(); checkCudaError();
 
-    if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
+    if (arg.mu*arg.mu_factor!=0 || dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
+      if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC)
+	arg.mu_factor += 1.;
+      printfQuda("Adding mu = %e\n",arg.mu*arg.mu_factor);
       y.setComputeType(COMPUTE_TMDIAGONAL);
       y.apply(0);
     }

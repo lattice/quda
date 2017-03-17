@@ -5,7 +5,7 @@
 namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
-    : Dirac(param), transfer(param.transfer), dirac(param.dirac),
+    : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Yhat_h(nullptr),
       Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr), Yhat_d(nullptr),
       enable_gpu(enable_gpu), init(true)
@@ -16,7 +16,7 @@ namespace quda {
   DiracCoarse::DiracCoarse(const DiracParam &param,
 			   cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h, cpuGaugeField *Yhat_h,   // cpu link fields
 			   cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d, cudaGaugeField *Yhat_d) // gpu link field
-    : Dirac(param), transfer(nullptr), dirac(nullptr),
+    : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(nullptr), dirac(nullptr),
       Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Yhat_h(Yhat_h),
       Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d), Yhat_d(Yhat_d),
       enable_gpu(Y_d && X_d && Xinv_d), init(false)
@@ -25,7 +25,7 @@ namespace quda {
   }
 
   DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param)
-    : Dirac(param), transfer(param.transfer), dirac(param.dirac),
+    : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Yhat_h(dirac.Yhat_h),
       Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d), Yhat_d(dirac.Yhat_d),
       enable_gpu(dirac.enable_gpu), init(false)
@@ -110,8 +110,8 @@ namespace quda {
 
     bool gpu_setup = true;
 
-    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*Xinv_d,*Yhat_d,*transfer);
-    else dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer);
+    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*Xinv_d,*Yhat_d,*transfer,kappa,Mu(),MuFactor());
+    else dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer,kappa,Mu(),MuFactor());
 
     if (enable_gpu) {
       if (gpu_setup) {
@@ -223,12 +223,13 @@ namespace quda {
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const
   {
+    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (Location(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, 0.0, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     } else {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, 0.0, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     }
   }
 
@@ -397,12 +398,13 @@ namespace quda {
   //Make the coarse operator one level down.  For the preconditioned
   //operator we are coarsening the Yhat links, not the Y links.  We
   //pass the fine clover fields, though they are actually ignored.
-  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const
+  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const
   {
+    double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (Location(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, 0.0, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     } else {
-      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, 0.0, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     }
   }
 

@@ -186,10 +186,10 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, mu_factor, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracTwistedMassPC::DiracTwistedMassPC(const DiracTwistedMassPC &dirac) : DiracTwistedMass(dirac) { }
@@ -545,9 +545,9 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, -mu_factor, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
   }
 } // namespace quda

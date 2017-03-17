@@ -1604,6 +1604,11 @@ int mg_levels = 2;
 
 int nu_pre = 2;
 int nu_post = 2;
+double mu_factor[QUDA_MAX_MG_LEVEL] = { };
+QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
+QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
+double setup_tol = 5e-6;
+double omega = 0.85;
 QudaInverterType smoother_type = QUDA_MR_INVERTER;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
@@ -1676,12 +1681,17 @@ void usage(char** argv )
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
+  printf("    --mg-setup-tol                            # The tolerance to use for the setup of multigrid (default 5e-6)\n");
+  printf("    --mg-omega                                # The over/under relaxation factor for the smoother of multigrid (default 0.85)\n");
   printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
+  printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
+  printf("    --mg-vebosity <level verb>                # The verbosity to use on each level of the multigrid (default silent)\n");
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --help                                    # Print out this message\n");
@@ -2349,6 +2359,62 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-setup-inv") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_inv[level] = get_solver_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    setup_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-omega") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    omega = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-verbosity") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_verbosity[level] = get_verbosity_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-smoother") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2413,6 +2479,24 @@ int process_command_line_option(int argc, char** argv, int* idx)
     mass= atof(argv[i+1]);
     i++;
     ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-mu-factor") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    double factor =  atof(argv[i+1]);
+    mu_factor[level] = factor;
+    i++;
+    ret=0;
     goto out;
   }
 
