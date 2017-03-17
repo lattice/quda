@@ -97,6 +97,7 @@ namespace quda {
        This is top level instantiation done when we start creating the multigrid operator.
      */
     MGParam(QudaMultigridParam &param,
+	    void *mg_instance,
 	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix *matResidual,
 	    DiracMatrix *matSmooth,
@@ -130,6 +131,7 @@ namespace quda {
       }
 
     MGParam(const MGParam &param, 
+	    void *mg_instance,
 	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix *matResidual,
 	    DiracMatrix *matSmooth,
@@ -259,7 +261,7 @@ namespace quda {
       @param param MGParam struct that defines all meta data
       @param profile Timeprofile instance used to profile
     */
-    MG(MGParam &param, TimeProfile &profile);
+    MG(MGParam &param, void *mg_instance, TimeProfile &profile);
 
     /**
        Destructor for MG class. Frees any existing coarse grid MG
@@ -395,7 +397,7 @@ namespace quda {
     MG *mg;
     TimeProfile &profile;
 
-    multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile);
+    multigrid_solver(QudaMultigridParam &mg_param, void *mg_instance, TimeProfile &profile);
 
     virtual ~multigrid_solver()
     {

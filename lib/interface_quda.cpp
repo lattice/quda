@@ -2167,7 +2167,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
+multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, void *mg_instance, TimeProfile &profile)
   : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
@@ -2218,28 +2218,48 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
   mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
-  printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
-
-  ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
-  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuParam.precision = param->cuda_prec_sloppy;
-  B.resize(mg_param.n_vec[0]);
-  for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
-
+  // If this if the first preconditioner instance, allocate
+  // space for Nvec null space vectors and compute them. If not, 
+  // they will be referenced in MGParam (lib/multigrid.cpp)
+  if(mg_instance == NULL) {
+    printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
+    
+    ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+    cpuParam.precision = param->cuda_prec_sloppy;
+    B.resize(mg_param.n_vec[0]);
+    for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
+  }
+    
   // fill out the MG parameters for the fine level
-  mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
+  mgParam = new MGParam(mg_param, mg_instance, B, m, mSmooth, mSmoothSloppy);
 
-  mg = new MG(*mgParam, profile);
+  mg = new MG(*mgParam, mg_instance, profile);
   mgParam->updateInvertParam(*param);
   profile.TPSTOP(QUDA_PROFILE_INIT);
 }
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
+  void *mg_instance = NULL;
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  openMagma();
+  
+  multigrid_solver *mg = new multigrid_solver(*mg_param, mg_instance, profileInvert);
+
+  closeMagma();
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  saveProfile(__func__);
+  flushProfile();
+  return static_cast<void*>(mg);
+}
+
+void* newMultigridQudaNullRef(QudaMultigridParam *mg_param, void *mg_instance) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
   openMagma();
 
-  multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
-
+  multigrid_solver *mg = new multigrid_solver(*mg_param, mg_instance, profileInvert);
+  
   closeMagma();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
