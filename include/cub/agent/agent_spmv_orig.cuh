@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -748,7 +748,7 @@ struct AgentSpmv
         }
 
         // Return the tile's running carry-out
-        KeyValuePairT tile_carry = {tile_num_rows, 0.0};
+        KeyValuePairT tile_carry(tile_num_rows, 0.0);
         return tile_carry;
     }
 */
