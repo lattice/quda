@@ -199,8 +199,11 @@ namespace quda {
   void DiracCoarse::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset1 = newTmp(&tmp1, in);
+    if (tmp1->SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Temporary vector is not full-site vector");
+
     M(*tmp1, in);
-    Mdag(out,*tmp1);
+    Mdag(out, *tmp1);
+
     deleteTmp(&tmp1, reset1);
   }
 
@@ -271,10 +274,12 @@ namespace quda {
 
   void DiracCoarsePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if (in.SiteSubset() == QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot apply preconditioned operator to full field");
-
     bool reset1 = newTmp(&tmp1, in);
+
+    if (in.SiteSubset() == QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET ||
+	tmp1->SiteSubset() == QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot apply preconditioned operator to full field (subsets = %d %d %d)",
+		in.SiteSubset(), out.SiteSubset(), tmp1->SiteSubset());
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // DiracCoarsePC::Dslash applies A^{-1}Dslash

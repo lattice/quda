@@ -48,7 +48,7 @@ namespace quda {
   extern __shared__ float s[];
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_stride, int thread_dir, int thread_dim, bool dagger>
   __device__ __host__ inline void applyDslash(complex<Float> out[], DslashCoarseArg<Float,F,G> &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset) {
-    const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
+    const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
     int coord[5];
     getCoords(coord, x_cb, arg.dim, parity);
@@ -81,7 +81,7 @@ namespace quda {
 		  out[color_local] += arg.Y(d+4, parity, x_cb, row, col)
 		    * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 		else
-		  out[color_local] += conj(arg.Y(d, parity, x_cb, col, row))
+		  out[color_local] += arg.Y(d, parity, x_cb, row, col)
 		    * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	    }
@@ -100,7 +100,7 @@ namespace quda {
 		  out[color_local] += arg.Y(d+4, parity, x_cb, row, col)
 		    * arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 		else
-		  out[color_local] += conj(arg.Y(d, parity, x_cb, col, row))
+		  out[color_local] += arg.Y(d, parity, x_cb, row, col)
 		    * arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	    }
@@ -140,10 +140,10 @@ namespace quda {
 	      for (int c_col=0; c_col<Nc; c_col+=color_stride) {
 		int col = s_col*Nc + c_col + color_offset;
 		if (!dagger)
-		  out[color_local] += conj(arg.Y.Ghost(d, (parity+1)&1, ghost_idx, col, row))
+		  out[color_local] += conj(arg.Y.Ghost(d, 1-parity, ghost_idx, col, row))
 		    * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 		else
-		  out[color_local] += arg.Y.Ghost(d+4, (parity+1)&1, ghost_idx, row, col)
+		  out[color_local] += conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row))
 		    * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	  }
@@ -158,10 +158,10 @@ namespace quda {
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) {
 		int col = s_col*Nc + c_col + color_offset;
 		if (!dagger)
-		  out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row))
+		  out[color_local] += conj(arg.Y(d, 1-parity, gauge_idx, col, row))
 		    * arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 		else
-		  out[color_local] += arg.Y(d+4, (parity+1)&1, gauge_idx, row, col)
+		  out[color_local] += conj(arg.Y(d+4, 1-parity, gauge_idx, col, row))
 		    * arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
 	  }
@@ -244,9 +244,11 @@ namespace quda {
 	  //Factor of kappa and diagonal addition now incorporated in X
 	  int col = s_col*Nc + c_col + color_offset;
 	  if (!dagger) {
-	    out[color_local] += arg.X(0, parity, x_cb, row, col) * arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset);
+	    out[color_local] += arg.X(0, parity, x_cb, row, col)
+	      * arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	  } else {
-	    out[color_local] += conj(arg.X(0, parity, x_cb, col, row)) * arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset);
+	    out[color_local] += conj(arg.X(0, parity, x_cb, col, row))
+	      * arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	  }
 	}
     }
