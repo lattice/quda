@@ -10,7 +10,7 @@ namespace quda {
 
   static bool debug = false;
 
-  MG::MG(MGParam &param, TimeProfile &profile_global)
+  MG::MG(MGParam &param, void *mg_, TimeProfile &profile_global)
     : Solver(param, profile), param(param), transfer(0), presmoother(0), postsmoother(0),
       profile_global(profile_global),
       profile( "MG level " + std::to_string(param.level+1), false ),
@@ -18,6 +18,8 @@ namespace quda {
       param_coarse(nullptr), param_presmooth(nullptr), param_postsmooth(nullptr),
       r(nullptr), r_coarse(nullptr), x_coarse(nullptr), tmp_coarse(nullptr),
       diracCoarseResidual(nullptr), diracCoarseSmoother(nullptr), matCoarseResidual(nullptr), matCoarseSmoother(nullptr) {
+
+    multigrid_solver *mg_instance = (multigrid_solver*)mg_;
 
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
@@ -27,7 +29,12 @@ namespace quda {
 
     if (param.level < param.Nlevel-1) {
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-	if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) generateNullVectors(param.B);
+	// If previous MG preconditioner exists, reference its null space.
+	// If not, generate or load.
+	if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
+	  if (mg_instance == NULL) generateNullVectors(param.B);
+	  else { for (unsigned int i=0; i<mg_instance->mgParam->B.size(); i++ ) param.B[i] = mg_instance->mgParam->B[i]; }
+	}
       } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
 	loadVectors(param.B);
       }
@@ -134,11 +141,11 @@ namespace quda {
 
       // create the next multigrid level
       printfQuda("Creating next multigrid level\n");
-      param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level+1);
+      param_coarse = new MGParam(param, mg_, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level+1);
       param_coarse->fine = this;
       param_coarse->delta = 1e-20;
 
-      coarse = new MG(*param_coarse, profile_global);
+      coarse = new MG(*param_coarse, mg_, profile_global);
 
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 

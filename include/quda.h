@@ -234,6 +234,8 @@ extern "C" {
 
     /** Preconditioner instance, e.g., multigrid */
     void *preconditioner;
+    void *preconditionerUP;
+    void *preconditionerDN;
 
     /**
       Dirac Dslash used in preconditioner
@@ -682,6 +684,17 @@ extern "C" {
    *               storage and solver parameters
    */
   void* newMultigridQuda(QudaMultigridParam *param);
+
+  /**
+   * If mg_instance is NULL, it will continue as newMultigridQuda.
+   * If not, it will neither allocate memory for, nor calculate 
+   * the null space vectors, but simply reference them then 
+   * recalculate the coarse grid(s).
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters for new mg
+   * @param mg_instance Pointer to instance of previous multigrid_solver
+   */
+  void* newMultigridQudaNullRef(QudaMultigridParam *param, void *mg_instance);
 
   /**
    * @brief Free resources allocated by the multigrid solver

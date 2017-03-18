@@ -480,8 +480,27 @@ int main(int argc, char **argv)
   inv_param.solve_type = solve_type; // restore actual solve_type we want to do
 
   // setup the multigrid solver
-  void *mg_preconditioner = newMultigridQuda(&mg_param);
-  inv_param.preconditioner = mg_preconditioner;
+  void *mg_preconditioner;
+  void *mg_preconditionerUP;
+  void *mg_preconditionerDN;
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if(inv_param.mu > 0) {
+      mg_preconditionerUP = newMultigridQuda(&mg_param);
+      inv_param.preconditionerUP = mg_preconditionerUP;
+      mg_param.invert_param->mu *= -1.0;
+      mg_preconditionerDN = newMultigridQudaNullRef(&mg_param, (void*)mg_preconditionerUP);
+    } else {
+      mg_preconditionerDN = newMultigridQuda(&mg_param);
+      inv_param.preconditionerDN = mg_preconditionerDN;
+      mg_param.invert_param->mu *= -1.0;
+      mg_preconditionerUP = newMultigridQudaNullRef(&mg_param, (void*)mg_preconditionerDN);
+    }
+    mg_param.invert_param->mu *= -1.0;
+  }
+  else {
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  }
 
   const int nSrc = 1;
   for (int i=0; i<nSrc; i++) {
@@ -502,7 +521,12 @@ int main(int argc, char **argv)
   }
 
   // free the multigrid solver
-  destroyMultigridQuda(mg_preconditioner);
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    destroyMultigridQuda(mg_preconditionerUP);
+    destroyMultigridQuda(mg_preconditionerDN);
+  } else {
+    destroyMultigridQuda(mg_preconditioner);
+  }
 
 
 

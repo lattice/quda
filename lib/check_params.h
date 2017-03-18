@@ -324,6 +324,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(inv_type_precondition, QUDA_INVALID_INVERTER);
   P(preconditioner, 0);
+  P(preconditionerUP, 0);
+  P(preconditionerDN, 0);
   P(tol_precondition, INVALID_DOUBLE);
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
