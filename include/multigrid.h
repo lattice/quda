@@ -68,6 +68,9 @@ namespace quda {
     /** Whether to use global or local (node) reductions */
     QudaBoolean global_reduction;
 
+    /** Whether to generate/load or reference the null space */
+    bool reference_null;
+
     /** The Dirac operator to use for residual computation */
     DiracMatrix *matResidual;
 
@@ -114,6 +117,7 @@ namespace quda {
       smoother_tol(param.smoother_tol[level]),
       cycle_type(param.cycle_type[level]),
       global_reduction(param.global_reduction[level]),
+      reference_null(false),
       matResidual(matResidual),
       matSmooth(matSmooth),
       matSmoothSloppy(matSmoothSloppy),
@@ -149,6 +153,7 @@ namespace quda {
       smoother_tol(param.mg_global.smoother_tol[level]),
       cycle_type(param.mg_global.cycle_type[level]),
       global_reduction(param.mg_global.global_reduction[level]),
+      reference_null(false),
       matResidual(matResidual),
       matSmooth(matSmooth),
       matSmoothSloppy(matSmoothSloppy),
@@ -393,6 +398,8 @@ namespace quda {
     MGParam *mgParam;
 
     MG *mg;
+    MG *mgArray[2];
+
     TimeProfile &profile;
 
     multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile);
@@ -400,7 +407,12 @@ namespace quda {
     virtual ~multigrid_solver()
     {
       profile.TPSTART(QUDA_PROFILE_FREE);
-      if (mg) delete mg;
+      if (mgParam->mg_global.invert_param->dslash_type == QUDA_TWISTED_MASS_DSLASH ||
+	  mgParam->mg_global.invert_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ){
+	for (unsigned int i=0; i<2; i++) if(mgArray[i]) delete mgArray[i];
+      } else {
+	if (mg) delete mg;
+      }
 
       if (mgParam) delete mgParam;
 
@@ -413,6 +425,7 @@ namespace quda {
       if (d) delete d;
       if (dSmooth) delete dSmooth;
       if (dSmoothSloppy && dSmoothSloppy != dSmooth) delete dSmoothSloppy;
+
       profile.TPSTOP(QUDA_PROFILE_FREE);
     }
   };

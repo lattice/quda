@@ -2212,25 +2212,51 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   dSmooth = Dirac::create(diracSmoothParam);
   mSmooth = new DiracM(*dSmooth);
 
-  // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
-  DiracParam diracSmoothSloppyParam;
-  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
-  dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
-  mSmoothSloppy = new DiracM(*dSmoothSloppy);
+  //Detect if using Twisted operator
+  if (mg_param.invert_param->dslash_type == QUDA_TWISTED_MASS_DSLASH ||
+      mg_param.invert_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    for (int j=0; j<2; j++) {
+      if (B.size() != (unsigned int)mg_param.n_vec[0]) {	
+	//This is the first call, we must generate or load the null space.
+	printfQuda("Creating vector of null space fields of length %d for twist %s\n", 
+		   mg_param.n_vec[0], (mg_param.invert_param->mu > 0) ? "UP" : "DOWN");
+	
+	ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
+	cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+	cpuParam.precision = param->cuda_prec_sloppy;
+	B.resize(mg_param.n_vec[0]);
+	for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
+      } else {
+	//This is a subsequent call, we reference the null space.
+	printfQuda("Referencing null space fields of length %d for twist %s\n", 
+		   mg_param.n_vec[0], (mg_param.invert_param->mu < 0) ? "UP" : "DOWN");
+      }
 
-  printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
+      // fill out the MG parameters for the fine level
+      mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
+      if (j == 0) mgParam->reference_null = false;
+      else mgParam->reference_null = true;
+      
+      mgArray[j] = new MG(*mgParam, profile);
+      mgParam->updateInvertParam(*param);
+    }
+  } else {
+    
+    printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
+    
+    ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+    cpuParam.precision = param->cuda_prec_sloppy;
+    B.resize(mg_param.n_vec[0]);
+    for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
+    
+    // fill out the MG parameters for the fine level
+    mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
+    mgParam->reference_null = false;    
+    mg = new MG(*mgParam, profile);
 
-  ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
-  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuParam.precision = param->cuda_prec_sloppy;
-  B.resize(mg_param.n_vec[0]);
-  for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
-
-  // fill out the MG parameters for the fine level
-  mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
-
-  mg = new MG(*mgParam, profile);
-  mgParam->updateInvertParam(*param);
+    mgParam->updateInvertParam(*param);
+  }    
   profile.TPSTOP(QUDA_PROFILE_INIT);
 }
 
@@ -2504,11 +2530,35 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    SolverParam solverParam(*param);
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
-    solverParam.updateInvertParam(*param);
-    delete solve;
+    //Detect if using Twisted operator
+    if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH ||
+	param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+
+      if(param->mu > 0) {
+	printfQuda("UP type solve\n");
+	((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mgArray[0];
+	SolverParam solverParamU(*param);
+	Solver *solveU = Solver::create(solverParamU, m, mSloppy, mPre, profileInvert);
+	(*solveU)(*out, *in);
+	solverParamU.updateInvertParam(*param);
+	delete solveU;
+      } else {
+	printfQuda("DOWN type solve\n");
+	((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mgArray[1];
+	SolverParam solverParamD(*param);
+	Solver *solveD = Solver::create(solverParamD, m, mSloppy, mPre, profileInvert);
+	(*solveD)(*out, *in);
+	solverParamD.updateInvertParam(*param);
+	delete solveD;
+      }
+      ((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mg;
+    } else {
+      SolverParam solverParam(*param);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      (*solve)(*out, *in);
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    }
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);

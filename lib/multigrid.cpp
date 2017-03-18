@@ -26,7 +26,7 @@ namespace quda {
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
 
     if (param.level < param.Nlevel-1) {
-      if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+      if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES && (param.reference_null == false)) {
 	if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) generateNullVectors(param.B);
       } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
 	loadVectors(param.B);
@@ -95,6 +95,10 @@ namespace quda {
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
       diracParam.kappa = param.matResidual->Expose()->Kappa();
       diracParam.mu = param.matResidual->Expose()->Mu();
+      if (param.reference_null == true) {
+	//Must be calculating for opposite twist
+	diracParam.mu *= -1.0;
+      }
       diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
 
       diracParam.dagger = QUDA_DAG_NO;
