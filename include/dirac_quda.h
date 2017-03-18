@@ -151,7 +151,7 @@ namespace quda {
 
     QudaMatPCType getMatPCType() const { return matpcType; }
     int getStencilSteps() const;
-    void Dagger(QudaDagType dag) { dagger = dag; }
+    void Dagger(QudaDagType dag) const { dagger = dag; }
 
     /**
      * @brief Create the coarse operator (virtual parent)
