@@ -116,6 +116,8 @@ set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
 
+set(QUDA_MAGMAHOME "" CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
+
 #######################################################################
 #QUDA ADVANCED OPTIONS
 # that ususally should not be changed by users
@@ -142,6 +144,7 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
+set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
@@ -162,6 +165,7 @@ mark_as_advanced(QUDA_DEVICE_PACK)
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
+mark_as_advanced(QUDA_ALTRELIABLE)
 mark_as_advanced(QUDA_MULTIGRID)
 
 #######################################################################
@@ -230,12 +234,18 @@ endif()
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(MAGMA  magma)
-  include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
-  message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
-  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  if("${QUDA_MAGMAHOME}" STREQUAL "")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MAGMA  magma)
+    include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
+    message("${MAGMA_INCLUDEDIR}")
+    find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  else()
+    # prefer static library
+    FIND_LIBRARY(MAGMA_LIB libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
+    include_directories(SYSTEM ${QUDA_MAGMAHOME}/include)
+  endif()  
 endif(QUDA_MAGMA)
 
 # This selects arpack or parpack for Multi GPU
@@ -274,7 +284,10 @@ if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
-  set(QUDA_NVTX ON)
+endif()
+
+if(QUDA_ALTRELIABLE)
+  add_definitions(-DALTRELIABE)
 endif()
 
 if(QUDA_EIGEN)

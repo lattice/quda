@@ -147,7 +147,7 @@ int main(int argc, char **argv)
     inv_param.mu = 0.12;
     inv_param.epsilon = 0.1385;
     //inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
-    inv_param.twist_flavor = QUDA_TWIST_PLUS;
+    inv_param.twist_flavor = QUDA_TWIST_SINGLET;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     inv_param.mass = 0.02;
@@ -472,7 +472,7 @@ int main(int argc, char **argv)
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-	if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
+	if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) 
 	  tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
 	else
 	{
@@ -504,7 +504,7 @@ int main(int argc, char **argv)
     } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
-	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
+	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);

@@ -1321,7 +1321,7 @@ namespace quda {
       break;
     case QUDA_TWISTED_MASS_DSLASH:
       diracParam.type = pc ? QUDA_TWISTED_MASSPC_DIRAC : QUDA_TWISTED_MASS_DIRAC;
-      if (inv_param->twist_flavor == QUDA_TWIST_MINUS || inv_param->twist_flavor == QUDA_TWIST_PLUS) {
+      if (inv_param->twist_flavor == QUDA_TWIST_SINGLET) {
 	diracParam.Ls = 1;
 	diracParam.epsilon = 0.0;
       } else {
@@ -1331,7 +1331,7 @@ namespace quda {
       break;
     case QUDA_TWISTED_CLOVER_DSLASH:
       diracParam.type = pc ? QUDA_TWISTED_CLOVERPC_DIRAC : QUDA_TWISTED_CLOVER_DIRAC;
-      if (inv_param->twist_flavor == QUDA_TWIST_MINUS || inv_param->twist_flavor == QUDA_TWIST_PLUS)  {
+      if (inv_param->twist_flavor == QUDA_TWIST_SINGLET)  {
 	diracParam.Ls = 1;
 	diracParam.epsilon = 0.0;
       } else {

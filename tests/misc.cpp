@@ -1048,12 +1048,10 @@ get_solve_str(QudaSolveType type)
 QudaTwistFlavorType
 get_flavor_type(char* s)
 {
-  QudaTwistFlavorType ret =  QUDA_TWIST_MINUS;
+  QudaTwistFlavorType ret =  QUDA_TWIST_SINGLET;
   
-  if (strcmp(s, "minus") == 0){
-    ret = QUDA_TWIST_MINUS;
-  }else if (strcmp(s, "plus") == 0){
-    ret = QUDA_TWIST_PLUS;
+  if (strcmp(s, "singlet") == 0){
+    ret = QUDA_TWIST_SINGLET;
   }else if (strcmp(s, "deg-doublet") == 0){
     ret = QUDA_TWIST_DEG_DOUBLET;
   }else if (strcmp(s, "nondeg-doublet") == 0){
@@ -1074,11 +1072,8 @@ get_flavor_str(QudaTwistFlavorType type)
   const char* ret;
   
   switch(type) {
-  case QUDA_TWIST_MINUS:
-    ret = "minus";
-    break;
-  case QUDA_TWIST_PLUS:
-    ret = "plus";
+  case QUDA_TWIST_SINGLET:
+    ret = "singlet";
     break;
   case QUDA_TWIST_DEG_DOUBLET:
     ret = "deg-doublet";
