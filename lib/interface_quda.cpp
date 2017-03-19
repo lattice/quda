@@ -2540,23 +2540,24 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH ||
 	param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 
-      if(param->mu > 0) {
-	printfQuda("UP type solve\n");
-	((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mgArray[0];
-	SolverParam solverParamU(*param);
-	Solver *solveU = Solver::create(solverParamU, m, mSloppy, mPre, profileInvert);
-	(*solveU)(*out, *in);
-	solverParamU.updateInvertParam(*param);
-	delete solveU;
-      } else {
-	printfQuda("DOWN type solve\n");
-	((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mgArray[1];
-	SolverParam solverParamD(*param);
-	Solver *solveD = Solver::create(solverParamD, m, mSloppy, mPre, profileInvert);
-	(*solveD)(*out, *in);
-	solverParamD.updateInvertParam(*param);
-	delete solveD;
-      }
+      if(param->mu < 0) param->mu *= -1.0;
+      printfQuda("UP type solve\n");
+      ((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mgArray[0];
+      SolverParam solverParamU(*param);
+      Solver *solveU = Solver::create(solverParamU, m, mSloppy, mPre, profileInvert);
+      (*solveU)(*out, *in);
+      solverParamU.updateInvertParam(*param);
+      delete solveU;
+      
+      param->mu *= -1.0;
+      printfQuda("DOWN type solve\n");
+      ((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mgArray[1];
+      SolverParam solverParamD(*param);
+      Solver *solveD = Solver::create(solverParamD, m, mSloppy, mPre, profileInvert);
+      (*solveD)(*out, *in);
+      solverParamD.updateInvertParam(*param);
+      delete solveD;
+      
       ((multigrid_solver*)param->preconditioner)->mg = ((multigrid_solver*)param->preconditioner)->mg;
     } else {
       SolverParam solverParam(*param);
