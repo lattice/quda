@@ -2212,11 +2212,17 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   dSmooth = Dirac::create(diracSmoothParam);
   mSmooth = new DiracM(*dSmooth);
 
+  // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
+  DiracParam diracSmoothSloppyParam;
+  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
+  dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
+  mSmoothSloppy = new DiracM(*dSmoothSloppy);
+
   //Detect if using Twisted operator
   if (mg_param.invert_param->dslash_type == QUDA_TWISTED_MASS_DSLASH ||
       mg_param.invert_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     for (int j=0; j<2; j++) {
-      if (B.size() != (unsigned int)mg_param.n_vec[0]) {	
+      if (j == 0) {	
 	//This is the first call, we must generate or load the null space.
 	printfQuda("Creating vector of null space fields of length %d for twist %s\n", 
 		   mg_param.n_vec[0], (mg_param.invert_param->mu > 0) ? "UP" : "DOWN");
@@ -2231,7 +2237,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 	printfQuda("Referencing null space fields of length %d for twist %s\n", 
 		   mg_param.n_vec[0], (mg_param.invert_param->mu < 0) ? "UP" : "DOWN");
       }
-
+      
       // fill out the MG parameters for the fine level
       mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
       if (j == 0) mgParam->reference_null = false;

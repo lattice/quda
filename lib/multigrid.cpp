@@ -26,7 +26,7 @@ namespace quda {
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
 
     if (param.level < param.Nlevel-1) {
-      if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES && (param.reference_null == false)) {
+      if ((param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) && (param.reference_null == false)) {
 	if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) generateNullVectors(param.B);
       } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
 	loadVectors(param.B);
