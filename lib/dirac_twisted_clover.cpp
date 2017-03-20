@@ -57,16 +57,15 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
-    if (in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS)
+    if (in.TwistFlavor() == QUDA_TWIST_SINGLET)
       {
 
 	FullClover *cs = new FullClover(clover, false);
 	FullClover *cI = new FullClover(clover, true);
 
-	double flavor_mu = in.TwistFlavor() * mu;
 	twistCloverGamma5Cuda(&static_cast<cudaColorSpinorField&>(out),
 			      &static_cast<const cudaColorSpinorField&>(in),
-			      dagger, kappa, flavor_mu, 0.0, twistType, cs, cI, parity);
+			      dagger, kappa, mu, 0.0, twistType, cs, cI, parity);
 
 	if (twistType == QUDA_TWIST_GAMMA5_INVERSE)
 	  flops += 1056ll*in.Volume();
@@ -110,8 +109,8 @@ namespace quda {
     FullClover *cs = new FullClover(clover, false);
     FullClover *cI = new FullClover(clover, true);
 
-    if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
-      double a = 2.0 * kappa * in.TwistFlavor() * mu;//for direct twist (must be daggered separately)  
+    if(in.TwistFlavor() == QUDA_TWIST_SINGLET){
+      double a = 2.0 * kappa * mu;//for direct twist (must be daggered separately)  
       twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out.Odd()),
 			      *gauge, cs, cI, &static_cast<const cudaColorSpinorField&>(in.Even()),
 			      QUDA_ODD_PARITY, dagger, &static_cast<const cudaColorSpinorField&>(in.Odd()),
@@ -204,8 +203,8 @@ namespace quda {
     FullClover *cs = new FullClover(clover, false);
     FullClover *cI = new FullClover(clover, true);
 
-    if (in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
-      double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist (not daggered)
+    if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+      double a = -2.0 * kappa * mu;  //for invert twist (not daggered)
       double b = 1.;// / (1.0 + a*a);                     //for invert twist 
       if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 	twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
@@ -242,7 +241,7 @@ namespace quda {
     FullClover *cs = new FullClover(clover, false);
     FullClover *cI = new FullClover(clover, true);
 
-    if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
+    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist
       //      double b = k / (1.0 + a*a);                     //for invert twist	NO HABRÍA QUE APLICAR CLOVER_TWIST_INV???
       double b = k;                     //for invert twist	NO HABRÍA QUE APLICAR CLOVER_TWIST_INV???
@@ -277,7 +276,7 @@ namespace quda {
     FullClover *cs = new FullClover(clover, false);
     FullClover *cI = new FullClover(clover, true);
 
-    if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
+    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
 	if (dagger) {
 	  TwistCloverInv(*tmp1, in, QUDA_EVEN_PARITY);
@@ -352,7 +351,7 @@ namespace quda {
     bool reset = newTmp(&tmp1, b.Even());
   
     // we desire solution to full system
-    if(b.TwistFlavor() == QUDA_TWIST_PLUS || b.TwistFlavor() == QUDA_TWIST_MINUS){  
+    if(b.TwistFlavor() == QUDA_TWIST_SINGLET) {  
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
         src = &(x.Odd());
@@ -402,7 +401,7 @@ namespace quda {
     bool reset = newTmp(&tmp1, b.Even());
 
     // create full solution
-    if(b.TwistFlavor() == QUDA_TWIST_PLUS || b.TwistFlavor() == QUDA_TWIST_MINUS){    
+    if(b.TwistFlavor() == QUDA_TWIST_SINGLET) {    
       if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
         DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);

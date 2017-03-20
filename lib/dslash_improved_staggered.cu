@@ -55,13 +55,6 @@ namespace quda {
 
   using namespace improvedstaggered;
 
-  template<typename T> struct RealType {};
-  template<> struct RealType<double2> { typedef double type; };
-  template<> struct RealType<float2> { typedef float type; };
-  template<> struct RealType<float4> { typedef float type; };
-  template<> struct RealType<short2> { typedef short type; };
-  template<> struct RealType<short4> { typedef short type; };
-
 #ifdef GPU_STAGGERED_DIRAC
   template <typename sFloat, typename fatGFloat, typename longGFloat, typename phaseFloat>
   class StaggeredDslashCuda : public DslashCuda {
@@ -143,9 +136,9 @@ namespace quda {
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       const unsigned int y_length = nSrc / param.aux.y; // y-thread dimension is nSrc / register block size
       // first try to advance block.y
-      if (param.block.y < y_length && param.block.y < deviceProp.maxThreadsDim[1] &&
+      if (param.block.y < y_length && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
 	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
-	  (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
+	  (param.block.x*(param.block.y+1u)) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	param.block.y++;
 	param.grid.y = (y_length + param.block.y - 1) / param.block.y;
 	return true;

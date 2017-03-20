@@ -57,7 +57,7 @@ using namespace gauge;
     unsigned int minThreads() const { return arg.threads; }
 
   public:
-    MomAction(MomActionArg<Mom> &arg) : arg(arg), meta(meta) {}
+    MomAction(MomActionArg<Mom> &arg, const GaugeField &meta) : arg(arg), meta(meta) {}
     virtual ~MomAction () { }
 
     void apply(const cudaStream_t &stream){
@@ -83,7 +83,7 @@ using namespace gauge;
   template<typename Float, typename Mom>
   void momAction(const Mom mom, const GaugeField& meta, double &action) {
     MomActionArg<Mom> arg(mom, meta);
-    MomAction<Float,Mom> momAction(arg);
+    MomAction<Float,Mom> momAction(arg, meta);
 
     momAction.apply(0);
     cudaDeviceSynchronize();

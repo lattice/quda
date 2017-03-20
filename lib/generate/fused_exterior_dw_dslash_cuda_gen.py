@@ -528,11 +528,11 @@ def gen(dir, pack_only=False):
     str += "#endif\n\n"
     str += "\n"
     if dir % 2 == 0:
-        if domain_wall: str += "const int ga_idx = sid % Vh;\n"
+        if domain_wall: str += "const int ga_idx = sid % param.volume4CB;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
-        if domain_wall: str += "const int ga_idx = Vh+(face_idx % ghostFace[" + `dir/2` + "]);\n"
-        else: str += "const int ga_idx = Vh+face_idx;\n"
+        if domain_wall: str += "const int ga_idx = param.volume4CB+(face_idx % ghostFace[" + `dir/2` + "]);\n"
+        else: str += "const int ga_idx = param.volume4CB+face_idx;\n"
     str += "\n"
 
     # scan the projector to determine which loads are required

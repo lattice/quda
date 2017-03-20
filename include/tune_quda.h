@@ -401,7 +401,6 @@ namespace quda {
 	// we can advance spin/block-color since this is valid
 	if (param.block.z < vector_length_z) {
 	  param.block.z++;
-
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return true;
 	} else { // we have run off the end so let's reset

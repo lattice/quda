@@ -575,8 +575,8 @@ namespace quda {
 
       if(commDimTotal){
         arg.kernelType = OPROD_EXTERIOR_KERNEL;
-        unsigned int completeSum=0;
-        while(completeSum < commDimTotal){
+        int completeSum=0;
+        while (completeSum < commDimTotal){
 
           for(int i=3; i>=0; i--){
             if(!commDimPartitioned(i)) continue;

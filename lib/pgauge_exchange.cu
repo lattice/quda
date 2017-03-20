@@ -131,7 +131,7 @@ namespace quda {
     }
     else{
       for ( int i = 0; i < NElems / 2; ++i ) ((Complex*)tmp)[i] = array[idx + size * i];
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0);
+      arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }
   }

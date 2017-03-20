@@ -19,7 +19,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
-	fat_force_quda.o llfat_quda_itf.o llfat_quda.o			\
+	fat_force_quda.o llfat_quda.o					\
 	gauge_force.o field_strength_tensor.o clover_quda.o	\
 	dslash_quda.o covDev.o dslash_wilson.o dslash_clover.o		\
 	dslash_clover_asym.o dslash_twisted_mass.o			\
@@ -37,7 +37,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_hs.o copy_color_spinor_hh.o			\
 	extract_gauge_ghost_extended.o copy_gauge_double.o		\
 	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
-	copy_clover.o staggered_oprod.o staggered_oprod_new.o 		\
+	copy_clover.o staggered_oprod.o	staggered_oprod_new.o		\
 	clover_trace_quda.o						\
 	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
@@ -51,7 +51,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
-	quda_memcpy.o ${QIO_UTIL}
+	quda_memcpy.o quda_arpack_interface.o ${QIO_UTIL}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -66,7 +66,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
 	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
 	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
-	qio_util.h
+	qio_util.h quda_arpack_interface.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
@@ -86,7 +86,7 @@ DSLASH_INLN = dslash_constants.h dslash_textures.h io_spinor.h	\
 
 # files containing complex macros and other code fragments to be inlined,
 # found in lib/
-QUDA_INLN = check_params.h quda_matrix.h force_common.h llfat_core.h	\
+QUDA_INLN = check_params.h quda_matrix.h force_common.h 		\
 	hisq_force_macros.h read_clover.h                               \
 	read_gauge.h svd_quda.h dslash_init.cuh
 

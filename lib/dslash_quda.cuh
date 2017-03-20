@@ -29,9 +29,9 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
 #define MORE_GENERIC_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (typeid(sFloat) == typeid(double2)) {				\
     EVEN_MORE_GENERIC_DSLASH(FUNC, D, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
-  } else if (typeid(sFloat) == typeid(float4)|| typeid(sFloat) == typeid(float2)) { \
+  } else if (typeid(sFloat) == typeid(float4) || typeid(sFloat) == typeid(float2)) { \
     EVEN_MORE_GENERIC_DSLASH(FUNC, S, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
-  } else if (typeid(sFloat)==typeid(short4) || typeid(sFloat)==typeid(short2)) { \
+  } else if (typeid(sFloat) == typeid(short4) || typeid(sFloat) == typeid(short2)) { \
     EVEN_MORE_GENERIC_DSLASH(FUNC, H, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   } else {								\
     errorQuda("Undefined precision type");				\

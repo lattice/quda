@@ -105,6 +105,13 @@ recommended that MAGMA 1.7.x is used, though versions are 1.5.x and
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
 configure option --with-magma=MAGMA_PATH.
 
+Version 0.9.x of QUDA includes interface for the external (P)ARPACK 
+library for eigenvector computing. (P)ARPACK is available, e.g., from 
+https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using 
+CMake option -DQUDA_ARPACK=ON. Note that with a multi-gpu option, the build 
+system will automatically use PARPACK library. For GNU make build approach, 
+(P)ARPACK is enabled using the configure option --with-arpack=ARPACK_PATH.
+
 If Fortran interface support is desired, the F90 environment variable
 should be set when configure is invoked, and "make fortran" must be
 run explicitly, since the Fortran interface modules are not built by

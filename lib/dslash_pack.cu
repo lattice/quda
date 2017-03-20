@@ -1863,7 +1863,7 @@ namespace quda {
       packFaceStaggered(ghost_buf, in, zero_copy, nFace, dagger, parity, dim, face_num, stream);
     } else if (a!=0.0 || b!=0.0) {
       // Need to update this logic for other multi-src dslash packing
-      if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS) {
+      if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
 	packTwistedFaceWilson(ghost_buf, in, zero_copy, dagger, parity, a, b, stream);
       } else {
 	errorQuda("Cannot perform twisted packing for the spinor.");

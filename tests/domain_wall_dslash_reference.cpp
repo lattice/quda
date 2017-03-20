@@ -505,6 +505,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
 #else
 
     GaugeFieldParam gauge_field_param(gauge, gauge_param);
+    gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cpuGaugeField cpu(gauge_field_param);
     void **ghostGauge = (void**)cpu.Ghost();    
   
@@ -565,6 +566,7 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
 #else
 
     GaugeFieldParam gauge_field_param(gauge, gauge_param);
+    gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cpuGaugeField cpu(gauge_field_param);
     void **ghostGauge = (void**)cpu.Ghost();    
   

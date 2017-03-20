@@ -12,7 +12,7 @@ using namespace quda;
    @file cub_helper.cuh
 
    @section Description
- 
+
    Provides helper functors for custom datatypes for cub algorithms.
  */
 
@@ -48,6 +48,15 @@ namespace quda {
     }
   };
 
+  /**
+     Helper functor for doubledouble4 addition reduction.
+  */
+  template <>
+  struct Summ<double4>{
+    __host__ __device__ __forceinline__ double4 operator() (const double4 &a, const double4 &b){
+      return make_double4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+    }
+  };
 
   template <typename T>
   struct ReduceArg {
@@ -57,7 +66,7 @@ namespace quda {
     ReduceArg() :
       partial(static_cast<T*>(blas::getDeviceReduceBuffer())),
       result_d(static_cast<T*>(blas::getMappedHostReduceBuffer())),
-      result_h(static_cast<T*>(blas::getHostReduceBuffer())) 
+      result_h(static_cast<T*>(blas::getHostReduceBuffer()))
     {
       //  write reduction to GPU memory if asynchronous
       if (commAsyncReduction()) result_d = partial;

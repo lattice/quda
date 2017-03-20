@@ -175,7 +175,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   inv_param->dslash_type = dslash_type;
 
-  inv_param->sp_pad = X1*X2*X3/2;
+  inv_param->sp_pad = 0;// X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   inv_param->input_location = QUDA_CPU_FIELD_LOCATION;
@@ -266,11 +266,13 @@ invert_test(void)
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = (void**)cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
