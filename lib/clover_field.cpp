@@ -156,7 +156,7 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
 					void *field, void *norm) {
-    if (order == QUDA_FLOAT2_CLOVER_ORDER || order == QUDA_FLOAT4_CLOVER_ORDER) {
+    if (isNative()) {
       // create the texture for the field components
       
       cudaChannelFormatDesc desc;
@@ -211,7 +211,7 @@ namespace quda {
   }
 
   void cudaCloverField::destroyTexObject() {
-    if (order == QUDA_FLOAT2_CLOVER_ORDER || order == QUDA_FLOAT4_CLOVER_ORDER) {
+    if (isNative()) {
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
       cudaDestroyTextureObject(evenInvTex);

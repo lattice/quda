@@ -216,6 +216,7 @@ namespace quda {
 
     if (location == QUDA_CUDA_FIELD_LOCATION && !clover) {
       // create a dummy cudaCloverField if one is not defined
+      cf_param.order = QUDA_INVALID_CLOVER_ORDER;
       C = new cudaCloverField(cf_param);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
       //Create a cpuCloverField from the cudaCloverField
