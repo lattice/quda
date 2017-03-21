@@ -751,7 +751,7 @@ namespace quda {
     solverParam.delta = 1e-7; 
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
     solverParam.Nkrylov = 4;
-    solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTABL_INVERTER ? 4 : 0); // pipeline != 0 breaks BICGSTAB
+    solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // pipeline != 0 breaks BICGSTAB
     
     if (param.level == 0) { // this enables half precision on the fine grid only if set
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
@@ -783,6 +783,7 @@ namespace quda {
     DiracMdagM mdagmSloppy(diracSloppy);
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
       solverParam.maxiter = 2000;
+      solverParam.compute_true_res = false; // computing the true residual makes xmyNorm throw error on the coarse levels
       solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
       solverParam.inv_type_precondition = param.mg_global.smoother[param.level];
