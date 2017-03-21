@@ -368,6 +368,11 @@
 #define QUDA_FORWARDS  +1
 #define QUDA_BOTH_DIRS 2
 
+#define QudaLinkDirection integer(4)
+#define QUDA_LINK_BACKWARDS 0
+#define QUDA_LINK_FORWARDS 1
+#define QUDA_LINK_BIDIRECTIONAL 2
+
 #define QudaFieldGeometry integer(4)
 #define QUDA_SCALAR_GEOMETRY 1
 #define QUDA_VECTOR_GEOMETRY 4

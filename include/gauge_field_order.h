@@ -146,17 +146,22 @@ namespace quda {
 
     template<typename Float, int nColor, bool native_ghost>
       struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> {
-      complex<Float> *ghost[4];
-      int ghostOffset[4];
+      complex<Float> *ghost[8];
+      int ghostOffset[8];
       GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
 	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+
+	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+	    ghost_ ? static_cast<complex<Float>*>(ghost_[d+4]) :
+	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d+4]));
+	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
       }
       GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> &a) {
-	for (int d=0; d<4; d++) {
+	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
@@ -197,17 +202,22 @@ namespace quda {
 
     template<typename Float, int nColor, bool native_ghost>
       struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> {
-      complex<Float> *ghost[4];
-      int ghostOffset[4];
+      complex<Float> *ghost[8];
+      int ghostOffset[8];
       GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
 	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+
+	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+	    ghost_ ? static_cast<complex<Float>*>(ghost_[d+4]) :
+	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d+4]));
+	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
       }
       GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> &a) {
-	for (int d=0; d<4; d++) {
+	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
@@ -268,9 +278,9 @@ namespace quda {
 
     template<typename Float, int nColor, bool native_ghost>
       struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> {
-      complex<Float> *ghost[4];
+      complex<Float> *ghost[8];
       const int volumeCB;
-      int ghostVolumeCB[4];
+      int ghostVolumeCB[8];
       Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> accessor;
     GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
       : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_)
@@ -279,12 +289,14 @@ namespace quda {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = !native_ghost ? static_cast<complex<Float>*>(ghost_[d]) : nullptr;
 	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
+	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<Float>*>(ghost_[d+4]) : nullptr;
+	  ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
 	}
       }
     GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> &a)
       : volumeCB(a.volumeCB), accessor(a.accessor)
       {
-	for (int d=0; d<4; d++) {
+	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostVolumeCB[d] = a.ghostVolumeCB[d];
 	}
@@ -292,7 +304,7 @@ namespace quda {
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x_cb, int row, int col) const
       {
 	if (native_ghost)
-	  return accessor(d, parity, x_cb+volumeCB, row, col);
+	  return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
 	else
 	  return ghost[d][ ((parity*nColor + row)*nColor+col)*ghostVolumeCB[d] + x_cb ];
       }
@@ -868,6 +880,9 @@ namespace quda {
 	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
 	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
       {
+	if (geometry == QUDA_COARSE_GEOMETRY)
+	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
+
 	static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
 		       "staggered phase only presently supported for 18 and 12 reconstruct");
 	for (int i=0; i<4; i++) {
@@ -1114,6 +1129,9 @@ namespace quda {
 
       LegacyOrder(const GaugeField &u, Float **ghost_)
       : volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()), hasPhase(0) {
+	if (geometry == QUDA_COARSE_GEOMETRY)
+	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
+
 	for (int i=0; i<4; i++) {
 	  ghost[i] = (ghost_) ? ghost_[i] : (Float*)(u.Ghost()[i]);
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth

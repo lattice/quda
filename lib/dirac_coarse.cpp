@@ -94,7 +94,7 @@ namespace quda {
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
       gParam.geometry = QUDA_COARSE_GEOMETRY;
       int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
-      gParam.pad = gParam.nFace * pad;
+      gParam.pad = gParam.nFace * pad * 2; // factor of 2 since we have to store bi-directional ghost zone
       Y_d = new cudaGaugeField(gParam);
       Yhat_d = new cudaGaugeField(gParam);
 
