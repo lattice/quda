@@ -494,10 +494,10 @@ namespace quda {
   using Eigen::ColMajor;
   using Eigen::Dynamic; 
 
-// Convenience. By default, Eigen matrices are column major.
-// We switch to row major because cDotProduct returns in row major.
-typedef Matrix<Complex, Dynamic, Dynamic, ColMajor> MatrixBCG;
-#else
+  // Convenience. By default, Eigen matrices are column major.
+  // We switch to row major because cDotProduct returns in row major.
+  typedef Matrix<Complex, Dynamic, Dynamic, ColMajor> MatrixBCG;
+#elif defined(BLOCKSOLVER)
   using Eigen::MatrixXcd;
 #endif
 
@@ -516,7 +516,7 @@ void printmat(const char* label, Map<MatrixBCG>& mat)
   std::cout << mat;
   printfQuda("\n");
 }
-#else
+#elif defined(BLOCKSOLVER)
 void printmat(const char* label, MatrixXcd& mat)
 {
   printfQuda("\n%s\n", label);
