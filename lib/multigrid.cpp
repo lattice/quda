@@ -796,7 +796,7 @@ namespace quda {
     }
 
     // Initializing to random vector and allocating B_gpu
-    for(int i=0; i<B.size(); i++) {
+    for(int i=0; i<(int)B.size(); i++) {
       B[i]->Source(QUDA_RANDOM_SOURCE);
       B_gpu.push_back(ColorSpinorField::Create(csParam));
       *B_gpu[i] = *B[i];
@@ -805,7 +805,7 @@ namespace quda {
     for(int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
       // global orthonormalization of the initial null-space vectors
       if(param.mg_global.pre_orthonormalize) {
-	for(int i=0; i<B.size(); i++) {
+	for(int i=0; i<(int)B.size(); i++) {
 	  for (int j=0; j<i; j++) {
 	    Complex alpha = cDotProduct(*B_gpu[j], *B_gpu[i]);// <j,i>
 	    caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
@@ -817,7 +817,7 @@ namespace quda {
       }
 
       // launch solver for each source
-      for(int i=0; i<B.size(); i++) {
+      for(int i=0; i<(int)B.size(); i++) {
 	ColorSpinorField *x = B_gpu[i];
 	if(param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
 	  *b = *x;  // inverting against the vector
@@ -839,7 +839,7 @@ namespace quda {
 
       // global orthonormalization of the generated null-space vectors
       if(param.mg_global.post_orthonormalize) {
-	for(int i=0; i<B.size(); i++) {
+	for(int i=0; i<(int)B.size(); i++) {
 	  for (int j=0; j<i; j++) {
 	    Complex alpha = cDotProduct(*B_gpu[j], *B_gpu[i]);// <j,i>
 	    caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
