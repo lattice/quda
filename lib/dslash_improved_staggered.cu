@@ -106,6 +106,7 @@ namespace quda {
 	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	  break;
 	}
+#ifdef BLOCKSOLVER
       case 2:
 	{
 	  constexpr int register_block_size = 2;
@@ -124,6 +125,19 @@ namespace quda {
 	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	  break;
 	}
+      case 5:
+	{
+	  constexpr int register_block_size = 5;
+	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 6:
+	{
+	  constexpr int register_block_size = 6;
+	  IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+#endif // BLOCKSOLVER
       default:
 	errorQuda("Register blocking factor %d not supported", tp.aux.y);
       }
@@ -157,14 +171,17 @@ namespace quda {
         param.aux.x++;
 	return true;
       }
-#endif
+#endif // SWIZZLE
       param.aux.x = 1;
+
+#ifdef BLOCKSOLVER // register tiling of multi-src dslash only enabled if compiling the block solver
       for (unsigned int register_block=param.aux.y+1; register_block <= max_register_block && register_block <= nSrc; register_block++) {
 	if (nSrc % register_block == 0) { // register block size must be a divisor of 5-th dimention
 	  param.aux.y = register_block;
 	  return true;
 	}
       }
+#endif // BLOCKSOLVER
       param.aux.y = 1;
       return false;
     }
