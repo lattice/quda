@@ -10,19 +10,19 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
 #define EVEN_MORE_GENERIC_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 12 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 8 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 12 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 8 ## DAG ## X ## Kernel<kernel_type,register_block_size> <<<gridDim, blockDim, shared, stream>>> (param); \
     }									\
   }
 
@@ -31,7 +31,7 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
     EVEN_MORE_GENERIC_DSLASH(FUNC, D, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   } else if (typeid(sFloat) == typeid(float4) || typeid(sFloat) == typeid(float2)) { \
     EVEN_MORE_GENERIC_DSLASH(FUNC, S, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
-  } else if (typeid(sFloat)==typeid(short4) || typeid(sFloat) == typeid(short2)) { \
+  } else if (typeid(sFloat) == typeid(short4) || typeid(sFloat) == typeid(short2)) { \
     EVEN_MORE_GENERIC_DSLASH(FUNC, H, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   } else {								\
     errorQuda("Undefined precision type");				\
@@ -41,28 +41,28 @@ void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
 #define EVEN_MORE_GENERIC_STAGGERED_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 18 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 13 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 12 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 9 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 8 ## DAG ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     }									\
   } else {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 18 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
-      FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 13 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
-      FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ## 12 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
-      FUNC ## FLOAT ## 18 ## 9 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
+      FUNC ## FLOAT ## 18 ##  9 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
-      FUNC ## FLOAT ## 18 ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> (param); \
-    }                                                                   \
+      FUNC ## FLOAT ## 18 ##  8 ## DAG ## X ## Kernel<kernel_type,register_block_size><<<gridDim, blockDim, shared, stream>>> (param); \
+    }									\
   }
 
 #define MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \

@@ -88,15 +88,29 @@ namespace quda {
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
 
+    static unsigned int setBlockThreshold() {
+      char *threshold_char = getenv("QUDA_TUNING_THRESHOLD");
+      int threshold = deviceProp.maxThreadsDim[0];
+      if (threshold_char) {
+	threshold = atoi(threshold_char);
+	if (threshold > deviceProp.maxThreadsDim[0])
+	  errorQuda("Invalid QUDA_TUNING_THRESHOLD %d", threshold);
+      }
+      return threshold;
+    }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
+      const static unsigned int block_threshold = setBlockThreshold();
       const unsigned int max_threads = maxBlockSize();
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       const int step = blockStep();
       bool ret;
 
-      param.block.x += step;
+      // increment by step if less than threshold else double
+      param.block.x = param.block.x < block_threshold ? param.block.x+step : param.block.x*2;
+
       int nthreads = param.block.x*param.block.y*param.block.z;
       if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared) {
 

@@ -1030,7 +1030,7 @@ TEST_P(BlasTest, verify) {
   // failed without running
   double deviation =  skip_kernel(prec,kernel) ? 1.0 : test(kernel);
   printfQuda("%-35s error = %e\n", names[kernel], deviation);
-  double tol = (prec == 2 ? 1e-11 : (prec == 1 ? 1e-5 : 1e-3));
+  double tol = (prec == 2 ? 1e-10 : (prec == 1 ? 1e-5 : 1e-3));
   tol = (kernel < 2) ? 1e-4 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }

@@ -93,7 +93,8 @@ namespace quda {
          (param.create == QUDA_REFERENCE_FIELD_CREATE && (param.is_composite || param.is_component))) {
       reset(param);
     } else {
-      errorQuda("Undefined behaviour"); // else silent bug possible?
+      // errorQuda("Undefined behaviour"); // else silent bug possible?
+      reset(param);
     }
 
     // This must be set before create is called
@@ -251,6 +252,7 @@ namespace quda {
          param.siteSubset = QUDA_PARITY_SITE_SUBSET;
          param.nDim = nDim;
          memcpy(param.x, x, nDim*sizeof(int));
+         param.x[4] = 1;
          param.create = QUDA_REFERENCE_FIELD_CREATE;
          param.v = v;
          param.norm = norm;
@@ -288,7 +290,7 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    // if (!composite_descr.is_composite || composite_descr.is_component)
       createTexObject();
 #endif
   }
@@ -477,7 +479,7 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    // if (!composite_descr.is_composite || composite_descr.is_component)
       destroyTexObject();
 #endif
 
@@ -491,7 +493,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::zeroPad() {
-    size_t pad_bytes = (stride - volume) * precision * fieldOrder;
+    size_t pad_bytes = 0;//(stride - volume) * precision * fieldOrder;
     int Npad = nColor * nSpin * 2 / fieldOrder;
 
     if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:

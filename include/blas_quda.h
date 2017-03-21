@@ -92,7 +92,7 @@ namespace quda {
     void tripleCGUpdate(const double &alpha, const double &beta, ColorSpinorField &q,
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-
+    double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
@@ -141,7 +141,7 @@ namespace quda {
     */
     void axpyBzpcx(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
 		   const double *b, ColorSpinorField &z, const double *c);
-    
+
     /**
        @brief Compute the vectorized "caxpyBxpz" over the set of
        ColorSpinorFields, where the second and third vector, y and z, is constant over the
@@ -150,7 +150,7 @@ namespace quda {
        y = a * x + y
        z = b * x + z
 
-       The dimensions of a, b are the same as the size of x, 
+       The dimensions of a, b are the same as the size of x,
        with a maximum size of 16.
 
        @param a[in] Array of coefficients

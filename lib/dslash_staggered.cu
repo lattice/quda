@@ -31,7 +31,7 @@
 #include <sys/time.h>
 #include <blas_quda.h>
 #include <face_quda.h>
-
+#include <complex_quda.h>
 #include <inline_ptx.h>
 
 namespace quda {
@@ -61,6 +61,7 @@ namespace quda {
 
   private:
     const unsigned int nSrc;
+    const unsigned int max_register_block = 4;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -92,23 +93,67 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dslashParam.swizzle = tp.aux.x;
-      STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+      switch(tp.aux.y) {
+      case 1:
+	{
+	  constexpr int register_block_size = 1;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+#ifdef BLOCKSOLVER
+      case 2:
+	{
+	  constexpr int register_block_size = 2;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 3:
+	{
+	  constexpr int register_block_size = 3;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 4:
+	{
+	  constexpr int register_block_size = 4;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 5:
+	{
+	  constexpr int register_block_size = 5;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+      case 6:
+	{
+	  constexpr int register_block_size = 6;
+	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
+	  break;
+	}
+#endif // BLOCKSOLVER
+      default:
+	errorQuda("Register blocking factor %d not supported", tp.aux.y);
+      }
     }
 
     bool advanceBlockDim(TuneParam &param) const
     {
+      // note here we assume that the register block size is constant
+      // (auxiliary dimension is advanced slower than block/grid dimensions)
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-      // first try to advance block.y (number of right-hand sides per block)
-      if (param.block.y < nSrc && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
+      const unsigned int y_length = nSrc / param.aux.y; // y-thread dimension is nSrc / register block size
+      // first try to advance block.y
+      if (param.block.y < y_length && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
 	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
 	  (param.block.x*(param.block.y+1u)) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	param.block.y++;
-	param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
+	param.grid.y = (y_length + param.block.y - 1) / param.block.y;
 	return true;
-      } else {
+      } else { // if can't advance, reset and advance block.x
 	bool rtn = DslashCuda::advanceBlockDim(param);
 	param.block.y = 1;
-	param.grid.y = nSrc;
+	param.grid.y = y_length;
 	return rtn;
       }
     }
@@ -119,13 +164,20 @@ namespace quda {
       if (param.aux.x < 2*deviceProp.multiProcessorCount) {
         param.aux.x++;
 	return true;
-      } else {
-        param.aux.x = 1;
-	return false;
       }
-#else
+#endif // SWIZZLE
+      param.aux.x = 1;
+
+#ifdef BLOCKSOLVER // register tiling of multi-src dslash only enabled if compiling the block solver
+      for (unsigned int register_block=param.aux.y+1; register_block <= max_register_block && register_block <= nSrc; register_block++) {
+	if (nSrc % register_block == 0) { // register block size must be a divisor of 5-th dimention
+	  param.aux.y = register_block;
+	  return true;
+	}
+      }
+#endif // BLOCKSOLVER
+      param.aux.y = 1;
       return false;
-#endif
     }
 
     void initTuneParam(TuneParam &param) const
@@ -134,6 +186,7 @@ namespace quda {
       param.block.y = 1;
       param.grid.y = nSrc;
       param.aux.x = 1;
+      param.aux.y = 1;
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
