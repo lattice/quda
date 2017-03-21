@@ -492,6 +492,24 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   int n_level = param->n_level;
 #endif
 
+#ifdef INIT_PARAM
+  P(setup_type, QUDA_NULL_VECTOR_SETUP);
+#else
+  P(setup_type, QUDA_INVALID_SETUP_TYPE);
+#endif
+
+#ifdef INIT_PARAM
+  P(pre_orthonormalize, QUDA_BOOLEAN_NO);
+#else
+  P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(post_orthonormalize, QUDA_BOOLEAN_YES);
+#else
+  P(post_orthonormalize, QUDA_BOOLEAN_INVALID);
+#endif
+
   for (int i=0; i<n_level; i++) {
 #ifdef INIT_PARAM
     P(verbosity[i], QUDA_SILENT);
@@ -502,6 +520,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
 #else
     P(setup_inv_type[i], QUDA_INVALID_INVERTER);
+#endif
+#ifdef INIT_PARAM
+    P(num_setup_iter[i], 1);
+#else
+    P(num_setup_iter[i], INVALID_INT);
 #endif
 #ifdef INIT_PARAM
     P(setup_tol[i], 5e-6);

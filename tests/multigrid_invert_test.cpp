@@ -62,7 +62,11 @@ extern double mu_factor[QUDA_MAX_MG_LEVEL];
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
 extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
+extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol;
+extern QudaSetupType setup_type;
+extern bool pre_orthonormalize;
+extern bool post_orthonormalize;
 extern double omega;
 extern QudaInverterType smoother_type;
 
@@ -217,6 +221,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     }
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
+    mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol;
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
@@ -251,6 +256,10 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
+
+  mg_param.setup_type = setup_type;
+  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
   // coarse grid solver is GCR
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
@@ -369,6 +378,7 @@ int main(int argc, char **argv)
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SILENT;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
+    num_setup_iter[i] = 1;
     mu_factor[i] = 1.;
   }
 

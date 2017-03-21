@@ -796,40 +796,66 @@ namespace quda {
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
 
-    // Generate sources and launch solver for each source:
-    for(unsigned int i=0; i<B.size(); i++) {
-      B[i]->Source(QUDA_RANDOM_SOURCE); //random initial guess
-
+    // Initializing to random vector and allocating B_gpu
+    for(int i=0; i<B.size(); i++) {
+      B[i]->Source(QUDA_RANDOM_SOURCE);
       B_gpu.push_back(ColorSpinorField::Create(csParam));
-      ColorSpinorField *x = B_gpu[i];
-      *x = *B[i]; // copy initial guess to GPU:
+      *B_gpu[i] = *B[i];
+    }
 
-      zero(*b); // need zero rhs
-
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
-
-      ColorSpinorField *out=nullptr, *in=nullptr;
-      dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
-      (*solve)(*out, *in);
-      dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
-
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
-
-      // global orthonormalization of the generated null-space vectors
-      for (int i=0; B_gpu[i] != x; ++i) {
-	Complex alpha = cDotProduct(*B_gpu[i], *x);//<j,i>
-	caxpy(-alpha, *B_gpu[i], *x); //i-<j,i>j
+    for(int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
+      // global orthonormalization of the initial null-space vectors
+      if(param.mg_global.pre_orthonormalize) {
+	for(int i=0; i<B.size(); i++) {
+	  for (int j=0; j<i; j++) {
+	    Complex alpha = cDotProduct(*B_gpu[j], *B_gpu[i]);// <j,i>
+	    caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
+	  }
+	  double nrm2 = norm2(*B_gpu[i]);
+	  if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B_gpu[i]);// i/<i,i>
+	  else errorQuda("\nCannot normalize %u vector\n", i);
+	}
       }
 
-      double nrm2 = norm2(*x);
-      if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *x);
-      else errorQuda("\nCannot orthogonalize %u vector\n", i);
+      // launch solver for each source
+      for(int i=0; i<B.size(); i++) {
+	ColorSpinorField *x = B_gpu[i];
+	if(param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
+	  *b = *x;  // inverting against the vector
+	  zero(*x); // with zero initial guess
+	} else {
+	  zero(*b); // zero rhs
+	}
 
+	/*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Initial guess = %g\n", norm2(*x));
+	/*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Initial rhs = %g\n", norm2(*b));
+
+	ColorSpinorField *out=nullptr, *in=nullptr;
+	dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
+	(*solve)(*out, *in);
+	dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
+
+	/*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Solution = %g\n", norm2(*x));
+      }
+
+      // global orthonormalization of the generated null-space vectors
+      if(param.mg_global.post_orthonormalize) {
+	for(int i=0; i<B.size(); i++) {
+	  for (int j=0; j<i; j++) {
+	    Complex alpha = cDotProduct(*B_gpu[j], *B_gpu[i]);// <j,i>
+	    caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
+	  }
+	  double nrm2 = norm2(*B_gpu[i]);
+	  if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B_gpu[i]);// i/<i,i>
+	  else errorQuda("\nCannot normalize %u vector\n", i);
+	}
+      }
     }
 
     delete solve;
     delete b;
 
+    // storing and freeing B_gpu
     for (int i=0; i<(int)B.size(); i++) {
       *B[i] = *B_gpu[i];
       delete B_gpu[i];

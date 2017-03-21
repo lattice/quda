@@ -402,6 +402,12 @@ extern "C" {
     QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
   } QudaComputeNullVector;
 
+  typedef enum QudaSetupType_s {
+    QUDA_NULL_VECTOR_SETUP,
+    QUDA_TEST_VECTOR_SETUP,
+    QUDA_INVALID_SETUP_TYPE = QUDA_INVALID_ENUM
+  } QudaSetupType;
+
   typedef enum QudaBoolean_s {
     QUDA_BOOLEAN_NO = 0,
     QUDA_BOOLEAN_YES = 1,
