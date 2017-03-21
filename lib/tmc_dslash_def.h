@@ -448,7 +448,7 @@
 #define DD_FUNC(n,p,r,d,x) DD_CONCAT(n,p,r,d,x)
 
 // define the kernel
-template <KernelType kernel_type>
+template <KernelType kernel_type, int register_block_size=1>
 __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
@@ -475,7 +475,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(c
 
 #ifdef MULTI_GPU
 template <>
-__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL,1>
 (const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
@@ -512,7 +512,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #undef DD_NAME_F 
 #define DD_NAME_F twistedCloverDslashTwist
   
-template <KernelType kernel_type>
+template <KernelType kernel_type, int register_block_size=1>
 __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
@@ -541,7 +541,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(c
 
 #ifdef MULTI_GPU
 template <>
-__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+__global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL,1>
 (const DslashParam param) {
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
@@ -581,7 +581,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #undef DD_NAME_F 
 #define DD_NAME_F twistedCloverDslashTwist
   
-template <KernelType kernel_type>
+template <KernelType kernel_type, int register_block_size=1>
 __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 (DslashParam param) {
 

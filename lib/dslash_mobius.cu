@@ -179,6 +179,7 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      constexpr int register_block_size = 1;
       
       switch(DS_type){
       case 0:

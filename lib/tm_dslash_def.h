@@ -371,7 +371,7 @@
 
 // define the kernel
 //!051013
-template <KernelType kernel_type>
+template <KernelType kernel_type, int register_block_size=1>
 __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
@@ -398,7 +398,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(c
 
 #ifdef MULTI_GPU
 template <>
-__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL,1>
      (const DslashParam param) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
@@ -435,7 +435,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #undef DD_NAME_F 
 #define DD_NAME_F twistedMassDslashTwist
   
-template <KernelType kernel_type>
+template <KernelType kernel_type, int register_block_size=1>
 __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
@@ -463,7 +463,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(c
 }
 
 template <>
-__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL,1>
      (const DslashParam param) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
@@ -502,7 +502,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<E
 #undef DD_NAME_F 
 #define DD_NAME_F twistedMassDslashTwist
   
-template <KernelType kernel_type>
+template <KernelType kernel_type, int register_block_size=1>
 __global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
 #ifdef GPU_TWISTED_MASS_DIRAC
