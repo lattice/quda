@@ -419,7 +419,13 @@ extern "C" {
     QUDA_FORWARDS = +1,
     QUDA_BOTH_DIRS = 2
   } QudaDirection;
-  
+
+  typedef enum QudaLinkDirection_s {
+    QUDA_LINK_BACKWARDS,
+    QUDA_LINK_FORWARDS,
+    QUDA_LINK_BIDIRECTIONAL
+  } QudaLinkDirection;
+
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,

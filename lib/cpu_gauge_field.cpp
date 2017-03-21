@@ -74,14 +74,15 @@ namespace quda {
       // Ghost zone is always 2-dimensional    
       for (int i=0; i<nDim; i++) {
 	size_t nbytes = nFace * surface[i] * nInternal * precision;
-	ghost[i] = nbytes ? safe_malloc(nbytes) : 0;
-      }  
+	ghost[i] = nbytes ? safe_malloc(nbytes) : nullptr;
+	ghost[i+4] = (nbytes && geometry == QUDA_COARSE_GEOMETRY) ? safe_malloc(nbytes) : nullptr;
+      }
 
       if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
 	// exchange the boundaries if a non-trivial field
 	if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE &&
 	    (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY) )
-	  exchangeGhost();
+	  exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
       }
     }
 
@@ -118,34 +119,52 @@ namespace quda {
     if (link_type != QUDA_ASQTAD_MOM_LINKS) {
       for (int i=0; i<nDim; i++) {
 	if (ghost[i]) host_free(ghost[i]);
+	if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) host_free(ghost[i+4]);
       }
     }
   }
 
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
-  void cpuGaugeField::exchangeGhost() {
+  void cpuGaugeField::exchangeGhost(QudaLinkDirection link_direction) {
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
       errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
-    void *send[QUDA_MAX_DIM];
-    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
+    if ( (link_direction == QUDA_LINK_BIDIRECTIONAL || link_direction == QUDA_LINK_FORWARDS) && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Cannot request exchange of forward links on non-coarse geometry");
 
-    // get the links into contiguous buffers
-    extractGaugeGhost(*this, send, true);
+    void *send[2*QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) {
+      send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
+      if (geometry == QUDA_COARSE_GEOMETRY) send[d+4] = safe_malloc(nFace*surface[d]*nInternal*precision);
+    }
 
-    // communicate between nodes
-    exchange(ghost, send, QUDA_FORWARDS);
+    if (link_direction == QUDA_LINK_BACKWARDS || link_direction == QUDA_LINK_BIDIRECTIONAL) {
+      // get the links into contiguous buffers
+      extractGaugeGhost(*this, send, true);
 
-    for (int d=0; d<nDim; d++) host_free(send[d]);
+      // communicate between nodes
+      exchange(ghost, send, QUDA_FORWARDS);
+    }
+
+    // repeat if requested and links are bi-directional
+    if (link_direction == QUDA_LINK_FORWARDS || link_direction == QUDA_LINK_BIDIRECTIONAL) {
+      extractGaugeGhost(*this, send, true, nDim);
+      exchange(ghost+nDim, send+nDim, QUDA_FORWARDS);
+    }
+
+    for (int d=0; d<geometry; d++) host_free(send[d]);
   }
 
   // This does the opposite of exchangeGhost and sends back the ghost
   // zone to the node from which it came and injects it back into the
   // field
-  void cpuGaugeField::injectGhost() {
+  void cpuGaugeField::injectGhost(QudaLinkDirection link_direction) {
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
       errorQuda("Cannot exchange for %d geometry gauge field", geometry);
+
+    if (link_direction != QUDA_LINK_BACKWARDS)
+      errorQuda("link_direction = %d not supported", link_direction);
 
     void *recv[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) recv[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
@@ -222,9 +241,9 @@ namespace quda {
 
   // defined in cudaGaugeField
   void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
-  void **create_ghost_buffer(size_t bytes[], QudaGaugeFieldOrder order);
+  void **create_ghost_buffer(size_t bytes[], QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
   void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
-  void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order);
+  void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry);
 
   void cpuGaugeField::copy(const GaugeField &src) {
     if (this == &src) return;
@@ -255,13 +274,14 @@ namespace quda {
       } else { // else on the GPU
 
 	void *buffer = create_gauge_buffer(bytes, order, geometry);
-	size_t ghost_bytes[4];
+	size_t ghost_bytes[8];
 	int dstNinternal = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : 2*nColor*nColor;
-	for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * dstNinternal * precision;
-	void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, order) : nullptr;
+	for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * dstNinternal * precision;
+	void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, order, geometry) : nullptr;
 
 	if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	  copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0, ghost_buffer, 0);
+	  if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0, ghost_buffer, 0, 3); // forwards links if bi-directional
 	} else {
 	  copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, buffer, 0);
 	}
@@ -275,11 +295,11 @@ namespace quda {
 	}
 
 	if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	  for (int d=0; d<4; d++)
+	  for (int d=0; d<geometry; d++)
 	    qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
 
 	free_gauge_buffer(buffer, order, geometry);
-	if (nFace > 0) free_ghost_buffer(ghost_buffer, order);
+	if (nFace > 0) free_ghost_buffer(ghost_buffer, order, geometry);
       }
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
@@ -293,7 +313,7 @@ namespace quda {
     // if we have copied from a source without a pad then we need to exchange
     if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD &&
 	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
-      exchangeGhost();
+      exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
     }
 
     checkCudaError();

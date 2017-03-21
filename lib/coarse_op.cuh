@@ -1355,13 +1355,13 @@ namespace quda {
   template<typename Float, int n, typename Arg>
   __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i) {
 
-    // first do the backwards links Y^{+\mu} * X^{-\dagger}
     int coord[5];
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
     const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
+    // first do the backwards links Y^{+\mu} * X^{-\dagger}
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
 
       for(int j = 0; j<n; j++) {
@@ -1396,7 +1396,6 @@ namespace quda {
   template<typename Float, int n, typename Arg>
   void CalculateYhatCPU(Arg &arg) {
 
-    // first do the backwards links Y^{+\mu} * X^{-\dagger}
     for (int d=0; d<4; d++) {
       for (int parity=0; parity<2; parity++) {
 	for (int x_cb=0; x_cb<arg.Y.VolumeCB(); x_cb++) {
@@ -1704,13 +1703,12 @@ namespace quda {
       errorQuda("Unsupported location=%d and order=%d", X_.Location(), X_.Order());
     }
 
-    // now exchange Y halos for multi-process dslash
-    Y_.exchangeGhost();
+    // now exchange Y halos of both forwads and backwards links for multi-process dslash
+    Y_.exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
 
     // compute the preconditioned links
     // Yhat_back(x-\mu) = Y_back(x-\mu) * Xinv^dagger(x) (positive projector)
     // Yhat_fwd(x) = Xinv(x) * Y_fwd(x)                  (negative projector)
-
     {
       // use spin-ignorant accessor to make multiplication simpler
       // also with new accessor we ensure we're accessing the same ghost buffer in Y_ as was just exchanged
@@ -1731,7 +1729,12 @@ namespace quda {
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
-    Yhat_.injectGhost();
+    // need to put this in the bulk of the previous node - but only send backwards the backwards links to and not overwrite the forwards bulk
+    Yhat_.injectGhost(QUDA_LINK_BACKWARDS);
+
+    // exchange forwards links for multi-process dslash dagger
+    // need to put this in the ghost zone of the next node - but only send forwards the forwards links and not overwrite the backwards ghost
+    Yhat_.exchangeGhost(QUDA_LINK_FORWARDS);
 
   }
 

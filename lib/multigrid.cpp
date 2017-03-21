@@ -434,36 +434,34 @@ namespace quda {
     
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
-    if (comm_size() == 1) { // FIXME - only wokring for single process
-      if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-	const Dirac &diracS = *(param.matSmooth->Expose());
-	diracS.MdagM(tmp2->Even(), tmp1->Odd());
-	Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
-	double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-	printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-		   real(dot), imag(dot), deviation);
-	if (deviation > tol) errorQuda("failed");
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      const Dirac &diracS = *(param.matSmooth->Expose());
+      diracS.MdagM(tmp2->Even(), tmp1->Odd());
+      Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
+      double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+		 real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed");
 
-	const Dirac &diracR = *(param.matResidual->Expose());
-	diracR.MdagM(*tmp2, *tmp1);
-	dot = cDotProduct(*tmp2,*tmp1);
+      const Dirac &diracR = *(param.matResidual->Expose());
+      diracR.MdagM(*tmp2, *tmp1);
+      dot = cDotProduct(*tmp2,*tmp1);
 
-	deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-	printfQuda("Residual normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-		   real(dot), imag(dot), deviation);
-	if (deviation > tol) errorQuda("failed");
-      } else {
-	const Dirac &dirac = *(param.matResidual->Expose());
+      deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      printfQuda("Residual normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+		 real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed");
+    } else {
+      const Dirac &dirac = *(param.matResidual->Expose());
 
-	dirac.MdagM(*tmp2, *tmp1);
-	Complex dot = cDotProduct(*tmp1,*tmp2);
+      dirac.MdagM(*tmp2, *tmp1);
+      Complex dot = cDotProduct(*tmp1,*tmp2);
 
-	double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-	printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-		   real(dot), imag(dot), deviation);
-	if (deviation > tol) errorQuda("failed");
-      }
-    } // comm_rank==1
+      double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+		 real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed");
+    }
 
 #ifdef ARPACK_LIB
     printfQuda("\n");
