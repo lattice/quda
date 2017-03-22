@@ -533,27 +533,17 @@ namespace quda {
     }
 
   public:
-    DslashCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		 const GaugeField &Y, const GaugeField &X, double kappa, int parity)
+    inline DslashCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
+			const GaugeField &Y, const GaugeField &X, double kappa, int parity)
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
       nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1)
     {
-
       strcpy(aux, out.AuxString());
-#ifdef MULTI_GPU
-      char comm[5];
-      comm[0] = (comm_dim_partitioned(0) ? '1' : '0');
-      comm[1] = (comm_dim_partitioned(1) ? '1' : '0');
-      comm[2] = (comm_dim_partitioned(2) ? '1' : '0');
-      comm[3] = (comm_dim_partitioned(3) ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
-#endif
+      strcat(aux, comm_dim_partitioned_string());
     }
     virtual ~DslashCoarse() { }
 
-    void apply(const cudaStream_t &stream) {
+    inline void apply(const cudaStream_t &stream) {
 
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
 
@@ -564,7 +554,7 @@ namespace quda {
 	coarseDslash<Float,nDim,Ns,Nc,Mc,dslash,clover,dagger>(arg);
       } else {
 
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	if (out.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
 	  errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
@@ -631,8 +621,8 @@ namespace quda {
 
 
   template <typename Float, int coarseColor, int coarseSpin>
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger) {
+  inline void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
+			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger) {
 
     const int colors_per_thread = 1;
     const int nDim = 4;
@@ -676,8 +666,8 @@ namespace quda {
 
   // template on the number of coarse colors
   template <typename Float>
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger) {
+  inline void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
+			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger) {
 
     if (Y.FieldOrder() != X.FieldOrder())
       errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
@@ -736,11 +726,11 @@ namespace quda {
     bool clover;
     bool dagger;
 
-    DslashCoarseLaunch(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		       const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger)
+    inline DslashCoarseLaunch(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
+			      const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger)
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity), dslash(dslash), clover(clover), dagger(dagger) { }
 
-    void operator()() {
+    inline void operator()() {
 #ifdef GPU_MULTIGRID
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
@@ -788,22 +778,13 @@ namespace quda {
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
  public:
-   DslashCoarsePolicyTune(DslashCoarseLaunch &dslash) : dslash(dslash)
+   inline DslashCoarsePolicyTune(DslashCoarseLaunch &dslash) : dslash(dslash)
    {
       strcpy(aux,"policy,");
       if (dslash.dslash) strcat(aux,"dslash");
       strcat(aux, dslash.clover ? "clover," : ",");
       strcat(aux,dslash.inA.AuxString());
-#ifdef MULTI_GPU
-      char comm[5];
-      comm[0] = (comm_dim_partitioned(0) ? '1' : '0');
-      comm[1] = (comm_dim_partitioned(1) ? '1' : '0');
-      comm[2] = (comm_dim_partitioned(2) ? '1' : '0');
-      comm[3] = (comm_dim_partitioned(3) ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
-#endif
+      strcat(aux,comm_dim_partitioned_string());
 
      // before we do policy tuning we must ensure the kernel
      // constituents have been tuned since we can't do nested tuning
@@ -817,8 +798,8 @@ namespace quda {
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
-   void apply(const cudaStream_t &stream) {
-     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+   inline void apply(const cudaStream_t &stream) {
+     tuneLaunch(*this, getTuning(), getVerbosity());
      dslash();
    }
 
