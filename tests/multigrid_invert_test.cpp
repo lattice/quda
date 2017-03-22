@@ -69,6 +69,7 @@ extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
 extern double omega;
 extern QudaInverterType smoother_type;
+extern QudaInverterType coarsest_solver;
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -261,8 +262,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
-  // coarse grid solver is GCR
-  mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
+  // coarsest grid solver
+  mg_param.smoother[mg_levels-1] = coarsest_solver;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;

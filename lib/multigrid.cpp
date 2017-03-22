@@ -239,15 +239,25 @@ namespace quda {
       param_presmooth->pipeline = 8;
     }
 
-    presmoother = Solver::create(*param_presmooth, *param.matSmooth,
-				 *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    if(param_presmooth->inv_type == QUDA_CG_INVERTER) {
+      param_presmooth->compute_true_res = false;
+      presmoother = Solver::create(*param_presmooth, *param.mdagmSmooth,
+				   *param.mdagmSmoothSloppy, *param.mdagmSmoothSloppy, profile);
+    } else
+      presmoother = Solver::create(*param_presmooth, *param.matSmooth,
+				   *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       param_postsmooth->maxiter = param.nu_post;
-      postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
-				    *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      if(param_postsmooth->inv_type == QUDA_CG_INVERTER) {
+	param_postsmooth->compute_true_res = false;
+	postsmoother = Solver::create(*param_postsmooth, *param.mdagmSmooth,
+				     *param.mdagmSmoothSloppy, *param.mdagmSmoothSloppy, profile);
+      } else
+	postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
+				      *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
   }
 
@@ -566,6 +576,10 @@ namespace quda {
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
       else b_tilde = &b;
 
+      if(param.smoother == QUDA_CG_INVERTER) {
+	cudaColorSpinorField tmp(*in);
+	dirac.Mdag(*in, tmp);
+      }
       (*presmoother)(*out, *in);
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
@@ -621,6 +635,10 @@ namespace quda {
 
       //dirac.prepare(in, out, solution, residual, inner_solution_type);
       // we should keep a copy of the prepared right hand side as we've already destroyed it
+      if(param.smoother == QUDA_CG_INVERTER) {
+	cudaColorSpinorField tmp(*in);
+	dirac.Mdag(*in, tmp);
+      }
       (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
 
       dirac.reconstruct(x, b, outer_solution_type);
@@ -631,6 +649,10 @@ namespace quda {
       ColorSpinorField *out=nullptr, *in=nullptr;
 
       dirac.prepare(in, out, x, b, outer_solution_type);
+      if(param.smoother == QUDA_CG_INVERTER) {
+	cudaColorSpinorField tmp(*in);
+	dirac.Mdag(*in, tmp);
+      }
       (*presmoother)(*out, *in);
       dirac.reconstruct(x, b, outer_solution_type);
     }
@@ -776,15 +798,12 @@ namespace quda {
 
     std::vector<ColorSpinorField*> B_gpu;
 
-    const Dirac &dirac = *(param.matSmooth->Expose());
     Solver *solve;
-    DiracMdagM mdagm(dirac);
-    const Dirac &diracSloppy = *(param.matSmoothSloppy->Expose());
-    DiracMdagM mdagmSloppy(diracSloppy);
+    const Dirac &dirac = *(param.matSmooth->Expose());
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
       solverParam.maxiter = 2000;
       solverParam.compute_true_res = false; // computing the true residual makes xmyNorm throw error on the coarse levels
-      solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
+      solve = Solver::create(solverParam, *param.mdagmSmooth, *param.mdagmSmoothSloppy, *param.mdagmSmoothSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
       solverParam.inv_type_precondition = param.mg_global.smoother[param.level];
       solverParam.tol_precondition = param.mg_global.smoother_tol[param.level];
@@ -831,6 +850,10 @@ namespace quda {
 
 	ColorSpinorField *out=nullptr, *in=nullptr;
 	dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
+	if(param.mg_global.setup_type != QUDA_NULL_VECTOR_SETUP && solverParam.inv_type == QUDA_CG_INVERTER) {
+	  cudaColorSpinorField tmp(*in);
+	  dirac.Mdag(*in, tmp);
+	}
 	(*solve)(*out, *in);
 	dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
