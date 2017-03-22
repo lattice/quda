@@ -151,6 +151,9 @@ namespace quda {
     /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset;
 
+    /** Type of ghost exchange to perform */
+    QudaGhostExchange ghostExchange;
+
     /** Pinned-memory buffer that is used by all derived classes */
     static void *bufferPinned[2]; 
 
@@ -178,7 +181,6 @@ namespace quda {
     /** Resize the device-memory buffer */
     void resizeBufferDevice(size_t bytes) const;
 
-
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
 
     /** The number of dimensions we partition for communication */
@@ -202,6 +204,11 @@ namespace quda {
     void *from_back_face[2][QUDA_MAX_DIM];
     void *from_fwd_face[2][QUDA_MAX_DIM];
     
+    /**
+       Double buffered static GPU halo receive buffer
+     */
+    static void *ghost_field[2];
+
     /** Message handles for receiving from forwards */
     MsgHandle ***mh_recv_fwd[2];
 
@@ -214,14 +221,53 @@ namespace quda {
     /** Message handles for sending backwards */
     MsgHandle ***mh_send_back[2];
     
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Local copy of event used for peer-to-peer synchronization */
+    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+
+    /** Remote copy of event used for peer-to-peer synchronization */
+    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+
+    /** Remote ghost pointer for sending ghost to */
+    static void* fwdGhostSendDest[2][QUDA_MAX_DIM];
+
+    /** Remote ghost pointer for sending ghost to */
+    static void* backGhostSendDest[2][QUDA_MAX_DIM];
+
+    /** Whether we have initialized communication for this field */
+    bool initComms;
+
+    /** Whether we have initialized peer-to-peer communication */
+    static bool initIPCComms;
+
     /** Used as a label in the autotuner */
     char vol_string[TuneKey::volume_n];
     
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
-
-    /** Type of ghost exchange to perform */
-    QudaGhostExchange ghostExchange;
 
   public:
 
@@ -240,6 +286,41 @@ namespace quda {
        Free the pinned-memory buffer
     */
     static void freeBuffer(int index=0);
+
+    /**
+       Create the inter-process communication handlers
+    */
+    void createIPCComms();
+
+    /**
+       Destroy the statically allocated inter-process communication handlers
+    */
+    static void destroyIPCComms();
+
+    /**
+       Helper function to determine if local-to-remote (send) peer-to-peer copy is complete
+    */
+    inline bool ipcCopyComplete(int dir, int dim);
+
+    /**
+       Helper function to determine if local-to-remote (receive) peer-to-peer copy is complete
+    */
+    inline bool ipcRemoteCopyComplete(int dir, int dim);
+
+    /**
+       Handle to remote copy event used for peer-to-peer synchronization
+    */
+    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+
+    /**
+       Static variable that is determined which ghost buffer we are using
+     */
+    static int bufferIndex;
+
+    /**
+       Bool which is triggered if the ghost field is reset
+    */
+    static bool ghost_field_reset;
 
     /**
        @return The dimension of the lattice 
