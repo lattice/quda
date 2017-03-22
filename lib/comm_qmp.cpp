@@ -19,6 +19,8 @@ static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
 
+static char partition_string[16] = ",comm";
+
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
 // performance we just call MPI directly
@@ -114,6 +116,14 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   comm_peer2peer_init(hostname_recv_buf);
 
   host_free(hostname_recv_buf);
+
+  char comm[5];
+  comm[0] = (comm_dim_partitioned(0) ? '1' : '0');
+  comm[1] = (comm_dim_partitioned(1) ? '1' : '0');
+  comm[2] = (comm_dim_partitioned(2) ? '1' : '0');
+  comm[3] = (comm_dim_partitioned(3) ? '1' : '0');
+  comm[4] = '\0';
+  strcat(partition_string, comm);
 }
 
 
@@ -343,8 +353,12 @@ void comm_barrier(void)
 
 void comm_abort(int status)
 {
-  #ifdef HOST_DEBUG
+#ifdef HOST_DEBUG
   raise(SIGINT);
-  #endif
+#endif
   QMP_abort(status);
+}
+
+const char* comm_dim_partitioned_string() {
+  return partition_string;
 }

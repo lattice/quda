@@ -528,11 +528,6 @@ namespace quda {
 
       tunable.checkLaunchParam(param);
 
-#ifdef LAUNCH_TIMER
-      launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
-      launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
-#endif
-
 #ifdef PTHREADS
       //pthread_mutex_unlock(&pthread_mutex);
       //tally--;
@@ -541,6 +536,10 @@ namespace quda {
       // we could be tuning outside of the current scope
       if (!tuning && profile_count) param.n_calls++;
 
+#ifdef LAUNCH_TIMER
+      launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
+      launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
+#endif
       return param;
     }
 
