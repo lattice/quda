@@ -343,7 +343,7 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length_y) {
+	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1]) {
 	  param.block.y++;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
@@ -394,7 +394,7 @@ namespace quda {
       } else { // block.x/block.y (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.z < vector_length_z) {
+	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[1]) {
 	  param.block.z++;
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return true;

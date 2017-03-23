@@ -6,7 +6,7 @@
 #include <csignal>
 #include <comm_quda.h>
 
-static char partition_string[16] = ",comm=0000";
+static char partition_string[16] = ",comm=0000=";
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
