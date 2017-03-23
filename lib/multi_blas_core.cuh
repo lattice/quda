@@ -1,4 +1,4 @@
-#define MAX_MULTI_BLAS_N 16
+#define MAX_MULTI_BLAS_N 4
 
 /**
    @brief Parameter struct for generic multi-blas kernel.
@@ -89,21 +89,51 @@ __global__ void multiblasKernel(MultiBlasArg<NXZ,SpinorX,SpinorY,SpinorZ,SpinorW
 
   switch(k) {
   case  0: compute< 0,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 2
   case  1: compute< 1,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 3
   case  2: compute< 2,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 4
   case  3: compute< 3,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 5
   case  4: compute< 4,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 6
   case  5: compute< 5,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 7
   case  6: compute< 6,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 8
   case  7: compute< 7,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 9
   case  8: compute< 8,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 10
   case  9: compute< 9,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 11
   case 10: compute<10,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 12
   case 11: compute<11,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 13
   case 12: compute<12,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 14
   case 13: compute<13,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 15
   case 14: compute<14,NXZ,FloatN,M>(arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 16
   case 15: compute<15,NXZ,FloatN,M>(arg,i,parity); break;
+#endif //16
+#endif //15
+#endif //14
+#endif //13
+#endif //12
+#endif //11
+#endif //10
+#endif //9
+#endif //8
+#endif //7
+#endif //6
+#endif //5
+#endif //4
+#endif //3
+#endif //2
   }
 
 }
@@ -289,6 +319,8 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
   //MWFIXME
   for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
   for (int i=0; i<NYW; i++) { Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i])); W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));}
+
+  // if block caxpy is an 'outer product of caxpy' where 'x'
 
   Functor<NXZ,Float2, RegType> f(a, b, c, NYW);
 
