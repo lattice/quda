@@ -33,6 +33,10 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision prec;
 extern QudaPrecision prec_sloppy;
 extern double anisotropy;
+extern double tol;
+extern double tol_hq;
+extern int niter;
+extern int FMRiter;
 
 extern char latfile[];
 
@@ -52,7 +56,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   
   gauge_param.cpu_prec = cpu_prec;
 
@@ -132,9 +136,29 @@ void SU3test(int argc, char **argv) {
   saveGaugeQuda(new_gauge, &gauge_param);
 
 #ifdef GPU_GAUGE_TOOLS
+
+  // Plaquette tests
+  //----------------------------------------------------------------------
+
+  // Plaquette action
   double plaq[3];
+  // start the timer
+  double time0 = -((double)clock());
   plaqQuda(plaq);
-  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printf("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e). Done in %g secs\n", plaq[0], plaq[1], plaq[2], time0);
+
+  // Topological charge
+  double qCharge;
+  // start the timer
+  time0 = -((double)clock());
+  qCharge = qChargeCuda();
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printf("Computed topological charge is %.16e Done in %g secs\n", qCharge, time0);
 
   // Smearing tests
   //----------------------------------------------------------------------
@@ -144,18 +168,21 @@ void SU3test(int argc, char **argv) {
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
   unsigned int nSteps = 50;
   double coeff_APE = 0.6;
-  double coeff_STOUT = coeff_APE/(2*(4-1));
+  //double coeff_STOUT = coeff_APE/(2*(4-1));
+  double coeff_STOUT = 0.001;
   QudaVerbosity verbosity = QUDA_VERBOSE;
   setVerbosity(verbosity);
   
   //STOUT
   // start the timer
-  double time0 = -((double)clock());
+  time0 = -((double)clock());
   performSTOUTnStep(nSteps, coeff_STOUT);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
+  qCharge = qChargeCuda();
   printfQuda("Total time for STOUT = %g secs\n", time0);
+  printf("Computed topological charge after is %.16e \n", qCharge);
 
   //APE
   // start the timer
@@ -164,17 +191,20 @@ void SU3test(int argc, char **argv) {
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
+  qCharge = qChargeCuda();
   printfQuda("Total time for APE = %g secs\n", time0);
+  printf("Computed topological charge after is %.16e \n", qCharge);
 
 #ifdef GPU_GAUGE_ALG  
   // Gauge fixing tests
   //----------------------------------------------------------------------
 
   unsigned int gauge_dir;
-  nSteps = 1;
+  unsigned int GfSteps = niter;
+  unsigned int iter = FMRiter;
   unsigned int verbose_interval = 100;
-  double omega = 1.45;
-  double theta = 1.0e-13;
+  double omega = tol_hq;
+  double theta = tol;
   unsigned int reunit_interval = 100;
   unsigned int stopWtheta = 1;
   bool make_resident = false;
@@ -183,25 +213,34 @@ void SU3test(int argc, char **argv) {
   gauge_dir = 3;
   // start the timer
   time0 = -((double)clock());
-  performGaugeFixingOVRnStep(gauge_dir, nSteps, verbose_interval, omega, 
+  performGaugeFixingOVRnStep(gauge_dir, GfSteps, iter, verbose_interval, omega, 
 			     theta, reunit_interval, stopWtheta,
 			     make_resident);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for single CoulombGf step = %g secs\n", time0);
+  plaqQuda(plaq);
+  printf("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e). Done in %g secs\n", plaq[0], plaq[1], plaq[2], time0);
+  qCharge = qChargeCuda();
+  printf("Computed topological charge is %.16e \n", qCharge);
 
   //Landau
   gauge_dir = 4;
+  theta *= tdim;
   // start the timer
   time0 = -((double)clock());
-  performGaugeFixingOVRnStep(gauge_dir, nSteps, verbose_interval, omega, 
+  performGaugeFixingOVRnStep(gauge_dir, GfSteps, iter, verbose_interval, omega, 
 			     theta, reunit_interval, stopWtheta,
 			     make_resident);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for single LandauGf step = %g secs\n", time0);
+  plaqQuda(plaq);
+  printf("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e). Done in %g secs\n", plaq[0], plaq[1], plaq[2], time0);
+  qCharge = qChargeCuda();
+  printf("Computed topological charge is %.16e \n", qCharge);
   
 #else
   printf("Skipping gauge fixing tests since gauge algorithms have not been compiled\n");

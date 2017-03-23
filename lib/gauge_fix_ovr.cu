@@ -206,7 +206,7 @@ namespace quda {
   /**
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
-  template <typename Gauge>
+  template <typename Gauge, int gauge_dir>
   struct GaugeFixQualityArg : public ReduceArg<double2> {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
@@ -214,16 +214,18 @@ namespace quda {
     int border[4];
 #endif
     Gauge dataOr;
+    int ts = 0;
     GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data)
       : ReduceArg<double2>(), dataOr(dataOr) {
 
-      for ( int dir = 0; dir < 4; ++dir ) {
+      for ( int dir = 0; dir < gauge_dir; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
-      #ifdef MULTI_GPU
-        border[dir] = data.R()[dir];
-      #endif
+#if defined (MULTI_GPU) && (comm_size !=1)
+	border[dir] = data.R()[dir];
+#endif
       }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
+      threads = X[0]*X[1]*X[2]/2;
+      if( gauge_dir == 4 ) threads *= X[3];
     }
     double getAction(){ return result_h[0].x; }
     double getTheta(){ return result_h[0].y; }
@@ -234,34 +236,45 @@ namespace quda {
    * @brief Measure gauge fixing quality
    */
   template<int blockSize, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFix_quality(GaugeFixQualityArg<Gauge> argQ){
+  __global__ void computeFix_quality(GaugeFixQualityArg<Gauge,gauge_dir> argQ){
     typedef complex<Float> Cmplx;
 
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
-
+    
     double2 data = make_double2(0.0,0.0);
     if ( idx < argQ.threads ) {
       int X[4];
-    #pragma unroll
+#pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
-
+      
       int x[4];
       getCoords(x, idx, X, parity);
-#ifdef MULTI_GPU
-    #pragma unroll
+      if(gauge_dir == 3) {
+	if( (argQ.ts)%2 != 0) parity == 0 ? parity = 1 : parity = 0;
+      }
+      if(gauge_dir == 3) x[3] = (argQ.ts);
+      
+      //printf("argQ.ts = %d (%d,%d,%d,%d) PARITY = %d\n", 
+      //argQ.ts, x[3], x[2], x[1], x[0], parity);
+#if defined (MULTI_GPU) && (comm_size !=1)
+#pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) {
-        x[dr] += argQ.border[dr];
-        X[dr] += 2 * argQ.border[dr];
+	x[dr] += argQ.border[dr];
+	X[dr] += 2 * argQ.border[dr];
+	//printf("DR = %d BORDER[%d] = %d  x[%d] = %d  X[%d] = %d\n  argQ.ts = %d (%d,%d,%d,%d) PARITY = %d", 
+	//dr, dr, argQ.border[dr], dr, x[dr], dr, X[dr], argQ.ts, x[3], x[2], x[1], x[0], parity);
       }
 #endif
       Matrix<Cmplx,3> delta;
       setZero(&delta);
       idx = linkIndex(x,X);
+      //printf("IDX = %d (%d,%d,%d,%d) PARITY = %d\n", 
+      //idx, x[3], x[2], x[1], x[0], parity);
       //load upward links
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
         Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),idx, mu, parity);
+        argQ.dataOr.load((Float*)(U.data), idx, mu, parity);
         delta -= U;
       }
       //18*gauge_dir
@@ -270,7 +283,7 @@ namespace quda {
       //load downward links
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
         Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),linkIndexM1(x,X,mu), mu, 1 - parity);
+	argQ.dataOr.load((Float*)(U.data),linkIndexM1(x,X,mu),mu,1 - parity);
         delta += U;
       }
       //18*gauge_dir
@@ -291,24 +304,28 @@ namespace quda {
    */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixQuality : TunableLocalParity {
-    GaugeFixQualityArg<Gauge> argQ;
+    GaugeFixQualityArg<Gauge,gauge_dir> argQ;
     mutable char aux_string[128]; // used as a label in the autotuner
     private:
 
     unsigned int minThreads() const { return argQ.threads; }
 
     public:
-    GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
+    GaugeFixQuality(GaugeFixQualityArg<Gauge,gauge_dir> &argQ) : argQ(argQ) { }
     ~GaugeFixQuality () { }
 
+    void changeArgQ(GaugeFixQualityArg<Gauge,gauge_dir> &argQ_new) {
+      argQ.ts = argQ_new.ts;
+    }
+    
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
       cudaDeviceSynchronize();
-      if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
-      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads * comm_size());
+      if (comm_size() != 1) comm_allreduce_array((double*)argQ.result_h, 2);
+      argQ.result_h[0].x /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
+      argQ.result_h[0].y /= (double)(3 * 2 * argQ.threads * comm_size());
     }
 
     TuneKey tuneKey() const {
@@ -357,14 +374,14 @@ namespace quda {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
-      #ifdef MULTI_GPU
-        border[dir] = data.R()[dir];
-      #endif
+#if defined (MULTI_GPU) && (comm_size !=1)
+	border[dir] = data.R()[dir];
+#endif
       }
       threads = X[0] * X[1] * X[2] * X[3] >> 1;
     }
   };
-
+  
 
 
 
@@ -385,16 +402,16 @@ namespace quda {
       int X[4];
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
-
+      
       int x[4];
       getCoords(x, idx, X, parity);
-  #ifdef MULTI_GPU
-    #pragma unroll
+#if defined (MULTI_GPU) && (comm_size !=1)
+#pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) {
-        x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
+	x[dr] += arg.border[dr];
+	X[dr] += 2 * arg.border[dr];
       }
-  #endif
+#endif
       int mu = (threadIdx.x / blockSize);
       int oddbit = parity;
       if ( threadIdx.x >= blockSize * 4 ) {
@@ -423,13 +440,13 @@ namespace quda {
 
       int x[4];
       getCoords(x, idx, X, parity);
-  #ifdef MULTI_GPU
-    #pragma unroll
+#if defined (MULTI_GPU) && (comm_size !=1)
+#pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) {
-        x[dr] += arg.border[dr];
-        X[dr] += 2 * arg.border[dr];
+	x[dr] += arg.border[dr];
+	X[dr] += 2 * arg.border[dr];
       }
-  #endif
+#endif
       int mu = (threadIdx.x / blockSize);
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       Matrix<Cmplx,3> link;
@@ -601,8 +618,8 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << Tunable::paramString(param) << ", atomicadd=" << param.block.z;
+      std::stringstream ps(Tunable::paramString(param));
+      ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
 
@@ -625,36 +642,31 @@ namespace quda {
 
 
 
-#ifdef MULTI_GPU
+#if defined (MULTI_GPU) && (comm_size !=1)
   template <typename Float, typename Gauge>
   struct GaugeFixInteriorPointsArg {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
-#ifdef MULTI_GPU
     int border[4];
-#endif
     Gauge dataOr;
     cudaGaugeField &data;
     const Float relax_boost;
     GaugeFixInteriorPointsArg(Gauge & dataOr, cudaGaugeField & data, const Float relax_boost)
       : dataOr(dataOr), data(data), relax_boost(relax_boost) {
-
-#ifdef MULTI_GPU
+      
       for ( int dir = 0; dir < 4; ++dir ) {
-        if ( comm_dim_partitioned(dir)) border[dir] = data.R()[dir] + 1;  //skip BORDER_RADIUS + face border point
-        else border[dir] = 0;
+	if ( comm_dim_partitioned(dir)) border[dir] = data.R()[dir] + 1;  //skip BORDER_RADIUS + face border point
+	else border[dir] = 0;
       }
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir] - border[dir] * 2;
-#else
-      for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-#endif
+      
       threads = X[0] * X[1] * X[2] * X[3] >> 1;
     }
   };
-
-
-
-
+  
+  
+  
+  
   /**
    * @brief Kernel to perform gauge fixing with overrelaxation in the interior points for multi-GPU implementation
    */
@@ -668,7 +680,6 @@ namespace quda {
 #pragma unroll
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     int x[4];
-#ifdef MULTI_GPU
     int za = (idx / (X[0] / 2));
     int zb =  (za / X[1]);
     x[1] = za - zb * X[1];
@@ -683,11 +694,8 @@ namespace quda {
       x[dr] += arg.border[dr];
       X[dr] += 2 * arg.border[dr];
     }
-#else
-    getCoords(x, idx, X, parity);
-#endif
     int mu = (threadIdx.x / blockSize);
-
+    
     // 8 threads per lattice site
     if ( ImplementationType < 3 ) {
       if ( threadIdx.x >= blockSize * 4 ) {
@@ -879,8 +887,8 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << Tunable::paramString(param) << ", atomicadd=" << param.block.z;
+      std::stringstream ps(Tunable::paramString(param));
+      ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
 
@@ -1159,8 +1167,8 @@ namespace quda {
     }
 
     std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << Tunable::paramString(param) << ", atomicadd=" << param.block.z;
+      std::stringstream ps(Tunable::paramString(param));
+      ps << ", atomicadd=" << param.block.z;
       return ps.str();
     }
 
@@ -1197,21 +1205,17 @@ namespace quda {
   template <typename Gauge>
   struct GaugeFixUnPackArg {
     int X[4]; // grid dimensions
-#ifdef MULTI_GPU
     int border[4];
-#endif
     Gauge dataOr;
     GaugeFixUnPackArg(Gauge & dataOr, cudaGaugeField & data)
       : dataOr(dataOr) {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
-      #ifdef MULTI_GPU
-        border[dir] = data.R()[dir];
-      #endif
+	border[dir] = data.R()[dir];
       }
     }
   };
-
+  
 
   template<int NElems, typename Float, typename Gauge, bool pack>
   __global__ void Kernel_UnPackGhost(int size, GaugeFixUnPackArg<Gauge> arg, complex<Float> *array, int parity, int face, int dir){
@@ -1380,8 +1384,8 @@ namespace quda {
 
 
 
-    printfQuda("\tOverrelaxation boost parameter: %lf\n", (double)relax_boost);
-    printfQuda("\tStop criterium: %lf\n", tolerance);
+    printfQuda("\tOverrelaxation boost parameter: %.3f\n", (double)relax_boost);
+    printfQuda("\tStop criterium: %.16e\n", tolerance);
     if ( stopWtheta ) printfQuda("\tStop criterium method: theta\n");
     else printfQuda("\tStop criterium method: Delta\n");
     printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
@@ -1404,10 +1408,10 @@ namespace quda {
     cudaMemset(num_failures_dev, 0, sizeof(int));
     if ( num_failures_dev == NULL ) errorQuda("cudaMalloc failed for dev_pointer\n");
 
-    GaugeFixQualityArg<Gauge> argQ(dataOr, data);
-    GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ);
-
-
+    GaugeFixQualityArg<Gauge,gauge_dir> argQ(dataOr, data);
+    GaugeFixQuality<Float,Gauge,gauge_dir> GaugeFixQuality(argQ);
+    
+    
     GaugeFixArg<Float, Gauge> arg(dataOr, data, relax_boost);
     GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg);
 
@@ -1415,7 +1419,7 @@ namespace quda {
 
 
 
-#ifdef MULTI_GPU
+#if defined (MULTI_GPU) && (comm_size !=1)
     void *send[4];
     void *recv[4];
     void *sendg[4];
@@ -1453,7 +1457,7 @@ namespace quda {
         }
         faceVolumeCB[i] = faceVolume[i] / 2;
       }
-
+      
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
         offset[d] = faceVolumeCB[d] * NElems;
@@ -1464,26 +1468,26 @@ namespace quda {
         recvg_d[d] = device_malloc(bytes[d]);
         cudaStreamCreate(&GFStream[d]);
         cudaStreamCreate(&GFStream[4 + d]);
-      #ifndef GPU_COMMS
+#ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
-      #endif
+#endif
         block[d] = make_uint3(128, 1, 1);
         grid[d] = make_uint3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
       }
       cudaStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
-      #ifdef GPU_COMMS
+#ifdef GPU_COMMS
         recv[d] = recv_d[d];
         send[d] = send_d[d];
         recvg[d] = recvg_d[d];
         sendg[d] = sendg_d[d];
-      #else
+#else
         recv[d] = hostbuffer_h[d];
         send[d] = static_cast<char*>(hostbuffer_h[d]) + bytes[d];
         recvg[d] = static_cast<char*>(hostbuffer_h[d]) + 3 * bytes[d];
         sendg[d] = static_cast<char*>(hostbuffer_h[d]) + 2 * bytes[d];
-      #endif
+#endif
         mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
         mh_recv_fwd[d]  = comm_declare_receive_relative(recvg[d], d, +1, bytes[d]);
         mh_send_back[d] = comm_declare_send_relative(sendg[d], d, -1, bytes[d]);
@@ -1495,15 +1499,39 @@ namespace quda {
     GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder);
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
     GaugeFixInteriorPoints<Float,Gauge, gauge_dir> gfixIntPoints(argInt);
-  #endif
+#endif
+    
+    double action0 = 0.0;
+    if(gauge_dir == 4) {
+      argQ.ts = 0;
+      GaugeFixQuality.changeArgQ(argQ);
+      GaugeFixQuality.apply(0);
+      flop += (double)GaugeFixQuality.flops();
+      byte += (double)GaugeFixQuality.bytes();
+      action0 = argQ.getAction();
+      printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    }
+    double action0_Cg[data.X()[3]];
+    double theta0_Cg[data.X()[3]];
+    for(int j=0; j<data.X()[3]; j++) {
+      action0_Cg[j] = 0.0;
+      theta0_Cg[j] = 0.0;
+    }
+    if(gauge_dir == 3) {
+      printfQuda("Step: 0 ----------------------------------------------------------------------\n");
+      for(int j=0; j<data.X()[3]; j++) {
+	argQ.ts = j;
+	GaugeFixQuality.changeArgQ(argQ);
+	GaugeFixQuality.apply(0);
+	flop += (double)GaugeFixQuality.flops();
+	byte += (double)GaugeFixQuality.bytes();
 
-    GaugeFixQuality.apply(0);
-    flop += (double)GaugeFixQuality.flops();
-    byte += (double)GaugeFixQuality.bytes();
-    double action0 = argQ.getAction();
-    printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
-
-
+	action0_Cg[j] = argQ.getAction();
+	theta0_Cg[j]  = argQ.getTheta();
+	printfQuda("Step: %d RB: %.2f TS: %d LT: %.16e\ttheta: %.16e\n", 0, relax_boost, j, action0_Cg[j], theta0_Cg[j]);
+      }
+    }
+    
     unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
@@ -1516,12 +1544,7 @@ namespace quda {
     int iter = 0;
     for ( iter = 0; iter < Nsteps; iter++ ) {
       for ( int p = 0; p < 2; p++ ) {
-      #ifndef MULTI_GPU
-        gaugeFix.setParity(p);
-        gaugeFix.apply(0);
-        flop += (double)gaugeFix.flops();
-        byte += (double)gaugeFix.bytes();
-      #else
+#if defined (MULTI_GPU) && (comm_size !=1)
         if ( !comm_partitioned() ) {
           gaugeFix.setParity(p);
           gaugeFix.apply(0);
@@ -1550,7 +1573,7 @@ namespace quda {
             //extract bottom ghost
             Kernel_UnPackGhost<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
-        #ifdef GPU_COMMS
+#ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             cudaStreamSynchronize(GFStream[d]);
@@ -1558,7 +1581,7 @@ namespace quda {
             cudaStreamSynchronize(GFStream[4 + d]);
             comm_start(mh_send_back[d]);
           }
-        #else
+#else
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[d]);
@@ -1567,11 +1590,11 @@ namespace quda {
             if ( !commDimPartitioned(d)) continue;
             cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[4 + d]);
           }
-        #endif
+#endif
           //compute interior points
           gfixIntPoints.apply(GFStream[8]);
 
-        #ifndef GPU_COMMS
+#ifndef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             cudaStreamSynchronize(GFStream[d]);
@@ -1589,19 +1612,19 @@ namespace quda {
             comm_wait(mh_recv_fwd[d]);
             cudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[4 + d]);
           }
-        #endif
+#endif
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-          #ifdef GPU_COMMS
+#ifdef GPU_COMMS
             comm_wait(mh_recv_back[d]);
-          #endif
+#endif
             Kernel_UnPackGhost<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-          #ifdef GPU_COMMS
+#ifdef GPU_COMMS
             comm_wait(mh_recv_fwd[d]);
-          #endif
+#endif
             Kernel_UnPackTop<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
@@ -1613,7 +1636,12 @@ namespace quda {
           }
           cudaStreamSynchronize(GFStream[8]);
         }
-      #endif
+#else
+        gaugeFix.setParity(p);
+        gaugeFix.apply(0);
+        flop += (double)gaugeFix.flops();
+        byte += (double)gaugeFix.bytes();
+#endif
         /*gaugeFix.setParity(p);
            gaugeFix.apply(0);
            flop += (double)gaugeFix.flops();
@@ -1672,21 +1700,85 @@ namespace quda {
         flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
         byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
       }
-      GaugeFixQuality.apply(0);
-      flop += (double)GaugeFixQuality.flops();
-      byte += (double)GaugeFixQuality.bytes();
-      double action = argQ.getAction();
-      double diff = abs(action0 - action);
-      if ((iter % verbose_interval) == (verbose_interval - 1))
-        printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
-      if ( stopWtheta ) {
-        if ( argQ.getTheta() < tolerance ) break;
+
+      double action = 0.0;
+      double diff = 0.0;
+
+      double action_Cg[data.X()[3]];
+      double diffLT_Cg[data.X()[3]];
+      double theta_Cg[data.X()[3]];
+      double diffT_Cg[data.X()[3]];
+      if ((iter % verbose_interval) == (verbose_interval - 1)) {
+	if(gauge_dir == 4) {
+	  argQ.ts = 0;
+	  GaugeFixQuality.changeArgQ(argQ);
+	  GaugeFixQuality.apply(0);
+	  flop += (double)GaugeFixQuality.flops();
+	  byte += (double)GaugeFixQuality.bytes();
+	  action = argQ.getAction();
+
+	  diff = abs(action0 - action);
+	  printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+	}
+	
+	if(gauge_dir == 3) {
+	  for(int j=0; j<data.X()[3]; j++) {
+	    action_Cg[j] = 0.0;
+	    diffLT_Cg[j] = 0.0;
+	    theta_Cg[j] = 0.0;
+	    diffT_Cg[j] = 0.0;
+	  }
+	  printfQuda("Step: %d --------------------------------------------"
+		     "--------------------------\n", iter + 1);
+	  for(int j=0; j<data.X()[3]; j++) {
+	    argQ.ts = j;
+	    GaugeFixQuality.changeArgQ(argQ);
+	    GaugeFixQuality.apply(0);
+	    flop += (double)GaugeFixQuality.flops();
+	    byte += (double)GaugeFixQuality.bytes();
+
+	    action_Cg[j] = argQ.getAction();
+	    diffLT_Cg[j] = abs(action0_Cg[j] - action_Cg[j]);
+
+	    theta_Cg[j] = argQ.getTheta();
+	    diffT_Cg[j] = abs(theta0_Cg[j] - theta_Cg[j]);
+	    printfQuda("Step: %d RB: %.2f TS: %d LT: %.16e\ttheta: %.16e\tDeltaLT: %.16e\tDeltaT: %.16e\n", 
+		       iter + 1, relax_boost, j, action_Cg[j], theta_Cg[j], diffLT_Cg[j], diffT_Cg[j]);
+	  }
+	}
+	if(gauge_dir == 4) {
+	  if ( stopWtheta ) {
+	    if ( argQ.getTheta() < tolerance ) break;
+	  }
+	  else{
+	    if ( diff < tolerance ) break;
+	  }
+	  action0 = action;
+	}
+	if(gauge_dir == 3) {
+	  double sum = 0.0;
+	  if ( stopWtheta ) {
+	    for(int j=0; j<data.X()[3]; j++) {
+	      sum += theta_Cg[j];
+	    }
+	    printf("Theta sum = %.16e Tol = %.16e\n", sum, tolerance);
+	    if ( sum < tolerance ) break;	    
+	  }
+	  else{
+	    for(int j=0; j<data.X()[3]; j++) {
+	      sum += diffLT_Cg[j];
+	    }
+	    printf("DeltaLT sum = %.16e Tol = %.16e\n", sum, tolerance);
+	    if ( sum  < tolerance ) break;	    
+	  }
+	  for(int j=0; j<data.X()[3]; j++) {
+	    action0_Cg[j] = action_Cg[j];
+	    theta0_Cg[j] = theta_Cg[j];
+	  }
+	}      
       }
-      else{
-        if ( diff < tolerance ) break;
-      }
-      action0 = action;
     }
+    
     if ((iter % reunit_interval) != 0 )  {
       unitarizeLinks(data, data, num_failures_dev);
       qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1700,15 +1792,50 @@ namespace quda {
       byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
     }
     if ((iter % verbose_interval) != 0 ) {
-      GaugeFixQuality.apply(0);
-      flop += (double)GaugeFixQuality.flops();
-      byte += (double)GaugeFixQuality.bytes();
-      double action = argQ.getAction();
-      double diff = abs(action0 - action);
-      printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      double action = 0.0;
+      double diff = 0.0;
+
+      double action_Cg[data.X()[3]];
+      double diffLT_Cg[data.X()[3]];
+      double theta_Cg[data.X()[3]];
+      double diffT_Cg[data.X()[3]];
+      if(gauge_dir == 4) {
+	GaugeFixQuality.apply(0);
+	flop += (double)GaugeFixQuality.flops();
+	byte += (double)GaugeFixQuality.bytes();
+	action = argQ.getAction();
+	diff = abs(action0 - action);
+	printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      }
+      
+      if(gauge_dir == 3) {
+	for(int j=0; j<data.X()[3]; j++) {
+	  action_Cg[j] = 0.0;
+	  diffLT_Cg[j] = 0.0;
+	  theta_Cg[j] = 0.0;
+	  diffT_Cg[j] = 0.0;
+	}
+	printfQuda("Step: %d -----------------------------------------------"
+		   "------------------------------------------\n", iter + 1);
+	for(int j=0; j<data.X()[3]; j++) {
+	  argQ.ts = j;
+	  GaugeFixQuality.changeArgQ(argQ);
+	  GaugeFixQuality.apply(0);
+	  flop += (double)GaugeFixQuality.flops();
+	  byte += (double)GaugeFixQuality.bytes();
+
+	  action_Cg[j] = argQ.getAction();
+	  diffLT_Cg[j] = abs(action0_Cg[j] - action_Cg[j]);
+	  theta_Cg[j] = argQ.getTheta();
+	  diffT_Cg[j] = abs(theta0_Cg[j] - theta_Cg[j]);
+
+	  printfQuda("Step: %d RB: %.2f TS: %d LT: %.16e\ttheta: %.16e\tDeltaLT: %.16e\tDeltaT: %.16e\n", 
+		     iter +1, relax_boost, j, action_Cg[j], theta_Cg[j], diffLT_Cg[j], diffT_Cg[j]);
+	}
+      }
     }
     cudaFree(num_failures_dev);
-  #ifdef MULTI_GPU
+#if defined (MULTI_GPU) && (comm_size !=1)
     if ( comm_partitioned() ) {
       data.exchangeExtendedGhost(data.R(),false);
       for ( int d = 0; d < 4; d++ ) {

@@ -1041,7 +1041,8 @@ extern "C" {
   /**
    * @brief Gauge fixing with overrelaxation. Support for single and multi GPU.
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] Nsteps, maximum number of steps to perform FMR search for minimal gauge
+   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] FMRiter, maximum number of steps to perform FMR search for minimal gauge
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
    * @param[in] tolerance, torelance value to stop the method.
@@ -1052,9 +1053,10 @@ extern "C" {
 
   void performGaugeFixingOVRnStep(const unsigned int gauge_dir,
 				  const unsigned int Nsteps,
+				  const unsigned int FMRiter,
 				  const unsigned int verbose_interval,
 				  const double relax_boost,
-				  const double tolerance,
+				  double tolerance,
 				  const unsigned int reunit_interval,
 				  const unsigned int stopWtheta,
 				  const bool make_resident);

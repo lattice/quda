@@ -5637,36 +5637,37 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 #ifdef MULTI_GPU
   for(int dir=0; dir<4; ++dir) gParam.r[dir] = R[dir];
 #endif
-
+  
   if (gaugeSmeared != NULL) {
     delete gaugeSmeared;
   }
 
   gaugeSmeared = new cudaGaugeField(gParam);
-
+  
 #ifdef MULTI_GPU
   copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 #else
-  gaugeSmeared->copy(*gaugePrecise);
+  if(gaugeFixed) gaugeSmeared->copy(*gaugeFixed);
+  else gaugeSmeared->copy(*gaugePrecise);
 #endif
 
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);
-
+  
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
     printfQuda("Plaquette after 0 STOUT steps: %le\n", plq.x);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
-      cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->copy(*gaugeSmeared);
 #ifdef MULTI_GPU
-      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
 #endif
-      STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, QUDA_CUDA_FIELD_LOCATION);
+    STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, QUDA_CUDA_FIELD_LOCATION);
   }
-
+  
   delete cudaGaugeTemp;
 
 #ifdef MULTI_GPU
@@ -5807,10 +5808,11 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,
 }
 
 void performGaugeFixingOVRnStep(const unsigned int gauge_dir,
-				const unsigned int nSteps,
+				const unsigned int GfSteps,
+				const unsigned int FMRiter,
 				const unsigned int verbose_interval, 
-				const double relax_boost, 
-				const double tolerance, 
+				double relax_boost, 
+				double tolerance, 
 				const unsigned int reunit_interval,
 				const unsigned int stopWtheta,
 				const bool make_resident)
@@ -5826,18 +5828,29 @@ void performGaugeFixingOVRnStep(const unsigned int gauge_dir,
   int y[4];
 
 #ifdef MULTI_GPU
+  //Set up for multi GPU
   for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
   GaugeFieldParam gParam(y, gaugePrecise->Precision(), 
 			 gaugePrecise->Reconstruct(), pad, 
 			 QUDA_VECTOR_GEOMETRY, 
 			 QUDA_GHOST_EXCHANGE_EXTENDED);
+  
+  if(comm_size() == 1){
+    //Alter set up for single GPU
+    for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  }
+  
 #else
+  //Set up for single GPU
   for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
   GaugeFieldParam gParam(y, gaugePrecise->Precision(), 
 			 gaugePrecise->Reconstruct(), pad, 
 			 QUDA_VECTOR_GEOMETRY, 
 			 QUDA_GHOST_EXCHANGE_NO);
 #endif
+  
+
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.order = gaugePrecise->Order();
@@ -5855,48 +5868,52 @@ void performGaugeFixingOVRnStep(const unsigned int gauge_dir,
   }
 
   gaugeFixed = new cudaGaugeField(gParam);
-
+  
 #ifdef MULTI_GPU
   copyExtendedGauge(*gaugeFixed, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   gaugeFixed->exchangeExtendedGhost(R,redundant_comms);
 #else
   gaugeFixed->copy(*gaugePrecise);
 #endif
-
-  cudaGaugeField *cudaGaugeTemp = NULL;
-  cudaGaugeTemp = new cudaGaugeField(gParam);
-
+  
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
     printfQuda("Plaquette after 0 %s OVR Gf steps: %le\n", (gauge_dir==3 ? "Coulomb" : "Landau"), plq.x);
   }
-
-  for (unsigned int i=0; i<nSteps; i++) {
-      cudaGaugeTemp->copy(*gaugeFixed);
-#ifdef MULTI_GPU
-      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
-#endif
-    gaugefixingOVR(*gaugeFixed, gauge_dir, nSteps, verbose_interval, 
-		   relax_boost, tolerance, reunit_interval, stopWtheta);
-  }
   
-#ifdef MULTI_GPU
-  gaugeFixed->exchangeExtendedGhost(R,redundant_comms);
-#endif
-
-  if (getVerbosity() == QUDA_VERBOSE) {
-    double3 plq = plaquette(*gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after %d %s OVR Gf steps: %le\n", nSteps, (gauge_dir==3 ? "Coulomb" : "Landau"), plq.x);
-  }  
   
-  if (make_resident) {
-    if (gaugePrecise != NULL) delete gaugePrecise;
-    gaugePrecise = gaugeFixed;
-  } else {
+  double relax_boost0 = relax_boost;
+  for (unsigned int i=0; i<FMRiter; i++) {
+    if (FMRiter > 1) {
+      relax_boost = relax_boost0 + i*((2.0 - relax_boost0)/FMRiter);
+    }    
+    cudaGaugeField *cudaGaugeTemp = NULL;
+    cudaGaugeTemp = new cudaGaugeField(gParam);
+#ifdef MULTI_GPU
+    copyExtendedGauge(*cudaGaugeTemp, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+#else
+    cudaGaugeTemp->copy(*gaugePrecise);
+#endif
+    gaugefixingOVR(*cudaGaugeTemp, gauge_dir, GfSteps, verbose_interval, 
+      relax_boost, tolerance, reunit_interval, stopWtheta);
+#ifdef MULTI_GPU
+    copyExtendedGauge(*gaugeFixed, *cudaGaugeTemp, QUDA_CUDA_FIELD_LOCATION);
+    gaugeFixed->exchangeExtendedGhost(R,redundant_comms);
+#else
+    gaugeFixed->copy(*cudaGaugeTemp);
+#endif
     delete cudaGaugeTemp;
   }
+    
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d %s OVR Gf steps: %le\n", GfSteps, (gauge_dir==3 ? "Coulomb" : "Landau"), plq.x);
+  }  
+    
   GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+    
 
  
 int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
@@ -6010,17 +6027,27 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
 double qChargeCuda ()
 {
   cudaGaugeField *data = NULL;
-
+  
 #ifndef MULTI_GPU
-  if (!gaugeSmeared)
+  if (!gaugeSmeared && !gaugeFixed) {
     data = gaugePrecise;
-  else
+    printfQuda("qCharge for gaugePrecise\n");
+  }
+  else if(gaugeFixed){
+    data = gaugeFixed;
+    printfQuda("qCharge for gaugeFixed\n");
+  }
+  else {
     data = gaugeSmeared;
+    printfQuda("qCharge for gaugeSmeared\n");
+  }
 #else
-  if ((!gaugeSmeared) && (extendedGaugeResident)) {
+  if ((!gaugeSmeared && !gaugeFixed) && (extendedGaugeResident)) {
     data = extendedGaugeResident;
+    printfQuda("qCharge for gaugePrecise (extended resident)\n");
   } else {
-    if (!gaugeSmeared) {
+    if (!gaugeSmeared && !gaugeFixed) {
+      printfQuda("qCharge for gaugePrecise\n");
       int y[4];
       for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
       int pad = 0;
@@ -6040,22 +6067,29 @@ double qChargeCuda ()
       data->exchangeExtendedGhost(R,redundant_comms);
       extendedGaugeResident = data;
       cudaDeviceSynchronize();
-    } else {
+    } else if (gaugeFixed) {
+      data = gaugeFixed;
+      printfQuda("qCharge for gaugeFixed\n");
+    }
+    else {
       data = gaugeSmeared;
+      printfQuda("qCharge for gaugeSmeared\n");
     }
   }
-                                 // Do we keep the smeared extended field on memory, or the unsmeared one?
+  
+  // Do we keep the smeared extended field on memory, or the unsmeared one?
 #endif
-
+  
   GaugeField *gauge = data;
   // create the Fmunu field
-
+  
   GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
   tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField Fmunu(tensorParam);
-
+  
   computeFmunu(Fmunu, *data, QUDA_CUDA_FIELD_LOCATION);
   return quda::computeQCharge(Fmunu, QUDA_CUDA_FIELD_LOCATION);
 }
+ 
