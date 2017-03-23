@@ -804,7 +804,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
      }
 
-    matSloppy(Ap5d, p5d, tmp5d, tmp25d);  // tmp as tmp
+    // matSloppy(Ap5d, p5d, tmp5d, tmp25d);  // tmp as tmp
     
     // POP_RANGE
 
