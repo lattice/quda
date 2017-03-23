@@ -1054,14 +1054,7 @@ namespace quda {
 	meta(meta), Y(Y), X(X), Xinv(Xinv), dim(0), dir(QUDA_BACKWARDS)
     {
       strcpy(aux, meta.AuxString());
-      char comm[5];
-      comm[0] = (arg.comm_dim[0] ? '1' : '0');
-      comm[1] = (arg.comm_dim[1] ? '1' : '0');
-      comm[2] = (arg.comm_dim[2] ? '1' : '0');
-      comm[3] = (arg.comm_dim[3] ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
+      strcat(aux,comm_dim_partitioned_string());
     }
     virtual ~CalculateY() { }
 
@@ -1437,15 +1430,7 @@ namespace quda {
   public:
     CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4), arg(arg), meta(meta)
     {
-      strcpy(aux, "");
-      char comm[5];
-      comm[0] = (arg.comm_dim[0] ? '1' : '0');
-      comm[1] = (arg.comm_dim[1] ? '1' : '0');
-      comm[2] = (arg.comm_dim[2] ? '1' : '0');
-      comm[3] = (arg.comm_dim[3] ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
+      strcpy(aux,comm_dim_partitioned_string());
     }
     virtual ~CalculateYhat() { }
 
@@ -1466,7 +1451,7 @@ namespace quda {
     TuneKey tuneKey() const {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
-      strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? "GPU" : ",CPU");
+      strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
       return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
     }
   };
