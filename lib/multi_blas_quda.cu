@@ -89,7 +89,7 @@ namespace quda {
     template<int NXZ, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
       const int NYW;
-      Float2 a[MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N];
+      Float2 a[MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N];
       // ignore parameter arrays since we place them in constant memory
       multicaxpy_(const coeff_array<Complex> &a, const coeff_array<Complex> &b,
 		  const coeff_array<Complex> &c, int NYW) : NYW(NYW)
