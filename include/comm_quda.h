@@ -120,6 +120,12 @@ extern "C" {
    */
   int comm_partitioned();
 
+  /**
+     @brief Return a string that defines the comm partitioning (used as a tuneKey)
+     @return String specifying comm partitioning
+  */
+  const char* comm_dim_partitioned_string();
+
   /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
 
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);

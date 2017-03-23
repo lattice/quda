@@ -6,6 +6,8 @@
 #include <csignal>
 #include <comm_quda.h>
 
+static char partition_string[16] = ",comm=0000";
+
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
   Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
@@ -57,8 +59,12 @@ void comm_broadcast(void *data, size_t nbytes) {}
 void comm_barrier(void) {}
 
 void comm_abort(int status) {
-  #ifdef HOST_DEBUG
+#ifdef HOST_DEBUG
   raise(SIGINT);
-  #endif
+#endif
   exit(status);
+}
+
+const char* comm_dim_partitioned_string() {
+  return partition_string;
 }

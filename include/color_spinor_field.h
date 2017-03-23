@@ -337,7 +337,7 @@ namespace quda {
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-    const char *AuxString() const { return aux_string; }
+    inline const char *AuxString() const { return aux_string; }
 
     void* V() {return v;}
     const void* V() const {return v;}

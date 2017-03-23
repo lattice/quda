@@ -357,7 +357,7 @@ namespace quda {
     { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
-    const char *VolString() const { return vol_string; }
+    inline const char *VolString() const { return vol_string; }
   };
   
   /**

@@ -2,6 +2,7 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <tune_quda.h>
+#include <fast_intdiv.h>
 
 namespace quda {
 
@@ -11,7 +12,7 @@ namespace quda {
     Field field;
     void **ghost;
     const void *v;
-    int X[QUDA_MAX_DIM];
+    int_fastdiv X[QUDA_MAX_DIM];
     const int volumeCB;
     const int nDim;
     const int nFace;
@@ -33,8 +34,8 @@ namespace quda {
 	dagger(dagger),
 	pc_type(a.DWFPCtype())
     {
-      for (int d=0; d<nDim; d++) X[d] = a.X(d);
-      X[0] *= (nParity == 1) ? 2 : 1; // set to full lattice dimensions
+      X[0] = ((nParity == 1) ? 2 : 1) * a.X(0); // set to full lattice dimensions
+      for (int d=1; d<nDim; d++) X[d] = a.X(d);
       X[4] = (nDim == 5) ? a.X(4) : 1; // set fifth dimension correctly
       for (int i=0; i<4; i++) {
 	commDim[i] = comm_dim_partitioned(i);
@@ -42,19 +43,19 @@ namespace quda {
     }
   };
 
-  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity, int color_block) {
+  template <typename Float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
+  __device__ __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity, int spin_block, int color_block) {
     typedef typename mapper<Float>::type RegType;
 
-    const int *X = arg.X;
     int x[5] = { };
-    if (arg.nDim == 5) getCoords5(x, cb_idx, X, parity, arg.pc_type);
-    else getCoords(x, cb_idx, X, parity);
+    if (nDim == 5) getCoords5(x, cb_idx, arg.X, parity, arg.pc_type);
+    else getCoords(x, cb_idx, arg.X, parity);
 
 #pragma unroll
     for (int dim=0; dim<4; dim++) {
       if (arg.commDim[dim] && x[dim] < arg.nFace){
-	for (int s=0; s<Ns; s++) {
+	for (int spin_local=0; spin_local<Ms; spin_local++) {
+	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
 	    arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), s, c)
@@ -63,8 +64,9 @@ namespace quda {
 	}
       }
       
-      if (arg.commDim[dim] && x[dim] >= X[dim] - arg.nFace){
-	for (int s=0; s<Ns; s++) {
+      if (arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace){
+	for (int spin_local=0; spin_local<Ms; spin_local++) {
+	  int s = spin_block + spin_local;
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
 	    arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), s, c)
@@ -75,29 +77,33 @@ namespace quda {
     }
   }
 
-  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
+  template <typename Float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
   void GenericPackGhost(Arg &arg) {
     for (int parity=0; parity<arg.nParity; parity++) {
       parity = (arg.nParity == 2) ? parity : arg.parity;
       const int spinor_parity = (arg.nParity == 2) ? parity : 0;
       for (int i=0; i<arg.volumeCB; i++)
-	for (int color_block=0; color_block<Nc; color_block+=Mc)
-	  packGhost<Float,Ns,Nc,Mc>(arg, i, parity, spinor_parity, color_block);
+	for (int spin_block=0; spin_block<Ns; spin_block+=Ms)
+	  for (int color_block=0; color_block<Nc; color_block+=Mc)
+	    packGhost<Float,Ns,Ms,Nc,Mc,nDim>(arg, i, parity, spinor_parity, spin_block, color_block);
     }
   }
 
-  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
+  template <typename Float, int Ns, int Ms, int Nc, int Mc, int nDim, typename Arg>
   __global__ void GenericPackGhostKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.volumeCB) return;
+
     const int parity = (arg.nParity == 2) ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-    const int color_block = (blockDim.y*blockIdx.y + threadIdx.y)*Mc;
-    if (color_block >= Nc) return;
-    packGhost<Float,Ns,Nc,Mc>(arg, x_cb, parity, spinor_parity, color_block);
+    const int spin_color_block = (blockDim.y*blockIdx.y + threadIdx.y)*Ms*Mc;
+    if (spin_color_block >= Ns*Nc) return;
+    const int spin_block = spin_color_block / Nc;
+    const int color_block = spin_color_block % Nc;
+    packGhost<Float,Ns,Ms,Nc,Mc,nDim>(arg, x_cb, parity, spinor_parity, spin_block, color_block);
   }
 
-  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
+  template <typename Float, int Ns, int Ms, int Nc, int Mc, typename Arg>
   class GenericPackGhostLauncher : public TunableVectorYZ {
     Arg &arg;
     const ColorSpinorField &meta;
@@ -105,29 +111,22 @@ namespace quda {
     bool tuneGridDim() const { return false; }
 
   public:
-    GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta)
-      : TunableVectorYZ(Nc/Mc, arg.nParity), arg(arg), meta(meta) {
+    inline GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta)
+      : TunableVectorYZ((Ns/Ms)*(Nc/Mc), arg.nParity), arg(arg), meta(meta) {
       strcpy(aux, meta.AuxString());
-#ifdef MULTI_GPU
-      char comm[5];
-      comm[0] = (arg.commDim[0] ? '1' : '0');
-      comm[1] = (arg.commDim[1] ? '1' : '0');
-      comm[2] = (arg.commDim[2] ? '1' : '0');
-      comm[3] = (arg.commDim[3] ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
-#endif
+      strcat(aux,comm_dim_partitioned_string());
     }
 
     virtual ~GenericPackGhostLauncher() { }
 
-    void apply(const cudaStream_t &stream) {
+    inline void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	GenericPackGhost<Float,Ns,Nc,Mc,Arg>(arg);
+	if (arg.nDim == 5) GenericPackGhost<Float,Ns,Ms,Nc,Mc,5,Arg>(arg);
+	else GenericPackGhost<Float,Ns,Ms,Nc,Mc,4,Arg>(arg);
       } else {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	GenericPackGhostKernel<Float,Ns,Nc,Mc,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	if (arg.nDim == 5) GenericPackGhostKernel<Float,Ns,Ms,Nc,Mc,5,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	else GenericPackGhostKernel<Float,Ns,Ms,Nc,Mc,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
 
@@ -147,19 +146,20 @@ namespace quda {
   };
 
   template <typename Float, QudaFieldOrder order, int Ns, int Nc>
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
     typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
     Q field(a, 0, ghost);
 
-    const int colors_per_thread = 1;
+    constexpr int spins_per_thread = Ns >= 2 ? 2 : 1;
+    constexpr int colors_per_thread = 1;
     PackGhostArg<Q> arg(field, ghost, a, parity, dagger);
-    GenericPackGhostLauncher<Float,Ns,Nc,colors_per_thread,PackGhostArg<Q> > launch(arg, a);
+    GenericPackGhostLauncher<Float,Ns,spins_per_thread,Nc,colors_per_thread,PackGhostArg<Q> > launch(arg, a);
     launch.apply(0);
   }
 
   template <typename Float, QudaFieldOrder order, int Ns>
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
     
     if (a.Ncolor() == 2) {
       genericPackGhost<Float,order,Ns,2>(ghost, a, parity, dagger);
@@ -204,7 +204,7 @@ namespace quda {
   }
 
   template <typename Float, QudaFieldOrder order>
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
     if (a.Nspin() == 4) {
       genericPackGhost<Float,order,4>(ghost, a, parity, dagger);
@@ -221,7 +221,7 @@ namespace quda {
   }
 
   template <typename Float>
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
     if (a.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       genericPackGhost<Float,QUDA_FLOAT2_FIELD_ORDER>(ghost, a, parity, dagger);
