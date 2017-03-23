@@ -270,6 +270,7 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * A = new quda::Complex[Nsrc*Msrc];
   quda::Complex * B = new quda::Complex[Nsrc*Msrc];
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -439,11 +440,11 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 39:
-      for (int i=0; i < niter; ++i) blas::caxpyBxpz(a2, *xD, *yD, b2, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpyBzpx(a2, *xD, *yD, b2, *zD);
       break;
 
     case 40:
-      for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), xmD->Components());
+      for (int i=0; i < niter; ++i) blas::cDotProduct(A2, xmD->Components(), xmD->Components());
       break;
 
     case 41:
@@ -464,6 +465,7 @@ double benchmark(int kernel, const int niter) {
   delete[] A;
   delete[] B;
   delete[] C;
+  delete[] A2;
   double secs = runTime / 1000;
   return secs;
 }
@@ -478,10 +480,16 @@ double test(int kernel) {
   quda::Complex * A = new quda::Complex[Nsrc*Msrc];
   quda::Complex * B = new quda::Complex[Nsrc*Msrc];
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
+  quda::Complex * B2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   for(int i=0; i < Nsrc*Msrc; i++){
     A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
     B[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
     C[i] = a2*  (1.0*((M_PI/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
+  }
+  for(int i=0; i < Nsrc*Nsrc; i++){
+    A2[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
+    B2[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
   }
   // A[0] = a2;
   // A[1] = 0.;
@@ -855,12 +863,12 @@ double test(int kernel) {
 
   case 40:
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    blas::cDotProduct(A, xmD->Components(), xmD->Components());
+    blas::cDotProduct(A2, xmD->Components(), xmD->Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
-	B[j*Nsrc+i] = blas::cDotProduct(xmD->Component(i), xmD->Component(j));
-	error += fabs(A[i] - B[i])/fabs(B[i]);
+	B2[j*Nsrc+i] = blas::cDotProduct(xmD->Component(i), xmD->Component(j));
+	error += fabs(A2[i] - B2[i])/fabs(B[i]);
       }
     }
     error /= Nsrc*Nsrc;
@@ -886,6 +894,8 @@ double test(int kernel) {
   delete[] A;
   delete[] B;
   delete[] C;
+  delete[] A2;
+  delete[] B2;
   return error;
 }
 
