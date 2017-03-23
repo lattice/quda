@@ -23,9 +23,10 @@
 // do loops over dot products.
 // this is more here for development convenience.
 #define BLOCKSOLVER_MULTIREDUCE
+//#define BLOCKSOLVER_VERBOSE
 #endif
 
-#define MWVERBOSE
+
 
 namespace quda {
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -505,23 +506,29 @@ namespace quda {
 #ifdef BLOCKSOLVER_MULTIREDUCE
 void printmat(const char* label, MatrixBCG& mat)
 {
+  #ifdef BLOCKSOLVER_VERBOSE
   printfQuda("\n%s\n", label);
   std::cout << mat;
   printfQuda("\n");
+  #endif
 }
 
 void printmat(const char* label, Map<MatrixBCG>& mat)
 {
+  #ifdef BLOCKSOLVER_VERBOSE
   printfQuda("\n%s\n", label);
   std::cout << mat;
   printfQuda("\n");
+  #endif
 }
 #elif defined(BLOCKSOLVER)
 void printmat(const char* label, MatrixXcd& mat)
 {
+  #ifdef BLOCKSOLVER_VERBOSE
   printfQuda("\n%s\n", label);
   std::cout << mat;
   printfQuda("\n");
+  #endif
 }
 #endif
 
@@ -598,7 +605,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixBCG S = MatrixBCG::Identity(param.num_src,param.num_src);
   quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
 
-#ifdef MWVERBOSE
+#ifdef BLOCKSOLVER_VERBOSE
   Complex* pTp_raw = new Complex[param.num_src*param.num_src];
   Map<MatrixBCG> pTp(pTp_raw,param.num_src,param.num_src);
 #endif
@@ -711,7 +718,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd pAp = MatrixXcd::Identity(param.num_src,param.num_src);
   quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
 
-  #ifdef MWVERBOSE
+  #ifdef BLOCKSOLVER_VERBOSE
   MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
   #endif
   #endif 
@@ -762,7 +769,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd Linv = C.inverse();
 #endif
 
-  #ifdef MWVERBOSE
+  #ifdef BLOCKSOLVER_VERBOSE
   std::cout << "r2\n " << r2 << std::endl;
   std::cout << "L\n " << L.adjoint() << std::endl;
   #endif
@@ -782,7 +789,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::copy(rSloppy.Component(i), p.Component(i));
   }
 
-  #ifdef MWVERBOSE
+  #ifdef BLOCKSOLVER_VERBOSE
   #ifdef BLOCKSOLVER_MULTIREDUCE
   blas::cDotProduct(pTp_raw, p.Components(), p.Components());
   #else
@@ -873,7 +880,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpy(AC,rnew,rSloppy);
 
-    #ifdef MWVERBOSE
+    #ifdef BLOCKSOLVER_VERBOSE
     #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::cDotProduct(pTp_raw, rSloppy.Components(), rSloppy.Components());
     #else
@@ -908,7 +915,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // update C
     C = S * C;
 
-    #ifdef MWVERBOSE
+    #ifdef BLOCKSOLVER_VERBOSE
     #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::cDotProduct(pTp_raw, p.Components(), p.Components());
     #else
@@ -1043,7 +1050,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
 
-  #ifdef MWVERBOSE
+  #ifdef BLOCKSOLVER_VERBOSE
   MatrixXcd b2m(param.num_src,param.num_src);
   // just to check details of b
   for(int i=0; i<param.num_src; i++){
@@ -1248,7 +1255,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #endif
   // end ignore Gram-Schmidt for now
 
-  #ifdef MWVERBOSE
+  #ifdef BLOCKSOLVER_VERBOSE
   for(int i=0; i<param.num_src; i++){
     for(int j=0; j<param.num_src; j++){
       pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
@@ -1284,7 +1291,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
 
       alpha = pAp.inverse() * gamma.adjoint().inverse() * r2;
-      #ifdef MWVERBOSE
+      #ifdef BLOCKSOLVER_VERBOSE
       std::cout << "alpha\n" << alpha << std::endl;
 
       if(k==1){
@@ -1339,7 +1346,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     if ( !(updateR || updateX )) {
 
       beta = gamma * r2_old.inverse() * sigma;
-      #ifdef MWVERBOSE
+      #ifdef BLOCKSOLVER_VERBOSE
       std::cout << "beta\n" << beta << std::endl;
       #endif
       if (param.pipeline && !breakdown)
@@ -1400,7 +1407,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         }
         #endif
 
-        #ifdef MWVERBOSE
+        #ifdef BLOCKSOLVER_VERBOSE
         for(int i=0; i<param.num_src; i++){
           for(int j=0; j<param.num_src; j++){
             pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
