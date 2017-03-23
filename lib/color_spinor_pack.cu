@@ -96,10 +96,10 @@ namespace quda {
 
     const int parity = (arg.nParity == 2) ? blockDim.z*blockIdx.z + threadIdx.z : arg.parity;
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-    const int spin_color_block = (blockDim.y*blockIdx.y + threadIdx.y)*Ms*Mc;
-    if (spin_color_block >= Ns*Nc) return;
-    const int spin_block = spin_color_block / Nc;
-    const int color_block = spin_color_block % Nc;
+    const int spin_color_block = blockDim.y*blockIdx.y + threadIdx.y;
+    if (spin_color_block >= (Ns/Ms)*(Nc/Mc)) return; // ensure only valid threads
+    const int spin_block = (spin_color_block / (Nc / Mc)) * Ms;
+    const int color_block = (spin_color_block % (Nc / Mc)) * Mc;
     packGhost<Float,Ns,Ms,Nc,Mc,nDim>(arg, x_cb, parity, spinor_parity, spin_block, color_block);
   }
 
@@ -131,7 +131,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString());
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
     long long flops() const { return 0; }
@@ -151,7 +151,7 @@ namespace quda {
     typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
     Q field(a, 0, ghost);
 
-    constexpr int spins_per_thread = Ns >= 2 ? 2 : 1;
+    constexpr int spins_per_thread = 1; // make this autotunable
     constexpr int colors_per_thread = 1;
     PackGhostArg<Q> arg(field, ghost, a, parity, dagger);
     GenericPackGhostLauncher<Float,Ns,spins_per_thread,Nc,colors_per_thread,PackGhostArg<Q> > launch(arg, a);
