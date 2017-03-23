@@ -238,6 +238,9 @@ namespace quda {
     /** Projected source vector for preconditioned syste, else just points to source */
     ColorSpinorField *b_tilde;
 
+    /** Source prepared for inversion with CG */
+    ColorSpinorField *b_mdag;
+
     /** Coarse residual vector */
     ColorSpinorField *r_coarse;
 
