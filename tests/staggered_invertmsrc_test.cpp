@@ -311,9 +311,9 @@ invert_test(void)
   int ret = 0;
 
 
-
   switch(test_type){
     case 0: //even
+      {
       if(inv_type == QUDA_GCR_INVERTER){
       	inv_param.inv_type = QUDA_GCR_INVERTER;
       	inv_param.gcrNkrylov = 50;
@@ -321,14 +321,12 @@ invert_test(void)
 	inv_param.inv_type = QUDA_PCG_INVERTER;
       }
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-      #define NUM_SRC 20
       inv_param.num_src=Nsrc; // number of spinors to apply to simultaneously
-      void* outArray[NUM_SRC];
-      void* inArray[NUM_SRC];
-      int len;
+      void **outArray = new void*[Nsrc];
+      void **inArray = new void*[Nsrc];
 
-      cpuColorSpinorField* spinorOutArray[NUM_SRC];
-      cpuColorSpinorField* spinorInArray[NUM_SRC];
+      cpuColorSpinorField **spinorOutArray = new cpuColorSpinorField*[Nsrc];
+      cpuColorSpinorField **spinorInArray = new cpuColorSpinorField*[Nsrc];
       spinorOutArray[0] = out;
       spinorInArray[0] = in;
       // in = new cpuColorSpinorField(csParam);
@@ -363,7 +361,6 @@ invert_test(void)
       time0 /= CLOCKS_PER_SEC;
 
 
-
 #ifdef MULTI_GPU
       matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
           out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
@@ -378,7 +375,11 @@ invert_test(void)
       for(int i=1; i < inv_param.num_src;i++) delete spinorOutArray[i];
       for(int i=1; i < inv_param.num_src;i++) delete spinorInArray[i];
 
-
+      delete []outArray;
+      delete []inArray;
+      delete []spinorOutArray;
+      delete []spinorInArray;
+      }
       break;
 
     case 1: //odd
