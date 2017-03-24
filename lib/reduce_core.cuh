@@ -1,9 +1,11 @@
 __host__ __device__ inline double set(double &x) { return x;}
 __host__ __device__ inline double2 set(double2 &x) { return x;}
 __host__ __device__ inline double3 set(double3 &x) { return x;}
+__host__ __device__ inline double4 set(double4 &x) { return x;}
 __host__ __device__ inline void sum(double &a, double &b) { a += b; }
 __host__ __device__ inline void sum(double2 &a, double2 &b) { a.x += b.x; a.y += b.y; }
 __host__ __device__ inline void sum(double3 &a, double3 &b) { a.x += b.x; a.y += b.y; a.z += b.z; }
+__host__ __device__ inline void sum(double4 &a, double4 &b) { a.x += b.x; a.y += b.y; a.z += b.z; a.w += b.w; }
 
 #ifdef QUAD_SUM
 __host__ __device__ inline double set(doubledouble &a) { return a.head(); }
