@@ -61,10 +61,8 @@ namespace quda {
 	csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 	b_tilde = ColorSpinorField::Create(csParam);
       }
-      // in case of CG we allocate b_mdag. We do it after b_tilde so it has the right size in case of PC
-      if (param.smoother == QUDA_CG_INVERTER) {
-	b_mdag = ColorSpinorField::Create(csParam);
-      }
+      // in case of CG we will allocate b_mdag
+      b_mdag = nullptr;
     }
 
     // if not on the coarsest level, construct it
@@ -304,7 +302,7 @@ namespace quda {
     destroySmoother();
 
     if (b_tilde && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) delete b_tilde;
-    if (b_mdag && param.smoother == QUDA_CG_INVERTER) delete b_mdag;
+    if (b_mdag) delete b_mdag;
     if (r) delete r;
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
@@ -582,11 +580,21 @@ namespace quda {
       else b_tilde = &b;
 
       if(param.smoother == QUDA_CG_INVERTER) {
+	if(!b_mdag) { // we allocate it just the first time
+	  ColorSpinorParam param(*in);
+	  b_mdag = ColorSpinorField::Create(param);
+	}
 	dirac.Mdag(*b_mdag, *in);
       } else {
+	if(b_mdag) { // should not be allocated. Maybe the param.smoother has been changed
+	  delete b_mdag;
+	}
 	b_mdag=in;
       }
       (*presmoother)(*out, *b_mdag);
+      if(param.smoother != QUDA_CG_INVERTER) {
+	b_mdag=nullptr;
+      }
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
       dirac.reconstruct(solution, b, inner_solution_type);
@@ -639,14 +647,25 @@ namespace quda {
 	in = r;
       }
 
-      //dirac.prepare(in, out, solution, residual, inner_solution_type);
       // we should keep a copy of the prepared right hand side as we've already destroyed it
+      //dirac.prepare(in, out, solution, residual, inner_solution_type);
+
       if(param.smoother == QUDA_CG_INVERTER) {
+	if(!b_mdag) { // we allocate it just the first time
+	  ColorSpinorParam param(*in);
+	  b_mdag = ColorSpinorField::Create(param);
+	}
 	dirac.Mdag(*b_mdag, *in);
       } else {
+	if(b_mdag) { // should not be allocated. Maybe the param.smoother has been changed
+	  delete b_mdag;
+	}
 	b_mdag=in;
       }
       (*postsmoother)(*out, *b_mdag); // for inner solve preconditioned, in the should be the original prepared rhs
+      if(param.smoother != QUDA_CG_INVERTER) {
+	b_mdag=nullptr;
+      }
 
       dirac.reconstruct(x, b, outer_solution_type);
 
@@ -657,11 +676,21 @@ namespace quda {
 
       dirac.prepare(in, out, x, b, outer_solution_type);
       if(param.smoother == QUDA_CG_INVERTER) {
+	if(!b_mdag) { // we allocate it just the first time
+	  ColorSpinorParam param(*in);
+	  b_mdag = ColorSpinorField::Create(param);
+	}
 	dirac.Mdag(*b_mdag, *in);
       } else {
+	if(b_mdag) { // should not be allocated. Maybe the param.smoother has been changed
+	  delete b_mdag;
+	}
 	b_mdag=in;
       }
       (*presmoother)(*out, *b_mdag);
+      if(param.smoother != QUDA_CG_INVERTER) {
+	b_mdag=nullptr;
+      }
       dirac.reconstruct(x, b, outer_solution_type);
     }
 
