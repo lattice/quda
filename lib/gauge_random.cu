@@ -14,7 +14,7 @@ namespace quda {
 #ifdef GPU_GAUGE_TOOLS
 
   template <typename Gauge>
-  struct GaugeRandomArg {
+  struct GaugeGaussArg {
     int threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
@@ -22,7 +22,7 @@ namespace quda {
     Gauge dataDs;
     RNG rngstate;
     
-    GaugeRandomArg(const Gauge &dataDs, const GaugeField &data, RNG &rngstate)
+    GaugeGaussArg(const Gauge &dataDs, const GaugeField &data, RNG &rngstate)
       : dataDs(dataDs), rngstate(rngstate)
     {
       int R = 0;
@@ -38,19 +38,45 @@ namespace quda {
 
 
   template<typename Float>
-  __device__ __host__  Matrix<complex<Float>,3> genRandomSU3(cuRNGState &localState){
+  __device__ __host__  Matrix<complex<Float>,3> genGaussSU3(cuRNGState &localState){
        Matrix<complex<Float>, 3> ret;
-       for (int i = 0; i < 3; i++)
-	   for (int j = 0; j < 3; j++){
 	       //ret(i,j) = 0.0;
-	       ret(i,j) = complex<Float>( (Float)(Random<Float>(localState) - 0.5), (Float)(Random<Float>(localState) - 0.5) );
-	   }
+	       //ret(i,j) = complex<Float>( (Float)(Random<Float>(localState) - 0.5), (Float)(Random<Float>(localState) - 0.5) );
+
+       Float  rand1[4], rand2[4], phi[4], radius[4], temp1[4], temp2[4];
+
+       for (int i=0; i<4; ++i)
+       {
+	   rand1[i]= Random<Float>(localState);
+	   rand2[i]= Random<Float>(localState);
+       }
+
+       for (int i=0; i<4; ++i)
+       {
+	   phi[i]=2.0*M_PI*rand1[i];
+	   rand2[i] = rand2[i];
+	   radius[i]=sqrt( -log(rand2[i]) );
+
+	   temp1[i] = radius[i]*cos(phi[i]);
+	   temp2[i] = radius[i]*sin(phi[i]);
+       }
+
+       ret(0,0) = complex<Float>( temp1[2] + 1./sqrt(3.0)*temp2[3], 0.0);
+       ret(0,1) = complex<Float>( temp1[0], -temp1[1]);
+       ret(0,2) = complex<Float>( temp1[3], -temp2[0]);
+       ret(1,0) = complex<Float>( temp1[0], temp1[1] );
+       ret(1,1) = complex<Float>( -temp1[2] + 1./sqrt(3.0) * temp2[3], 0.0 );
+       ret(1,2) = complex<Float>( temp2[1], -temp2[2] );
+       ret(2,0) = complex<Float>( temp1[3], temp2[0] );
+       ret(2,1) = complex<Float>( temp2[1], temp2[2] );
+       ret(2,2) = complex<Float>( - 2./sqrt(3.0) * temp2[3], 0.0 );
+
        return ret;
   }
 
 
   template<typename Float, typename Gauge>
-  __global__ void computeGenRandom(GaugeRandomArg<Gauge> arg){
+  __global__ void computeGenGauss(GaugeGaussArg<Gauge> arg){
     typedef Matrix<complex<Float>,3> Link;
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y + blockIdx.y*blockDim.y;
@@ -67,7 +93,7 @@ namespace quda {
 	for(int mu = 0; mu < 4; mu++){
 	    cuRNGState localState = arg.rngstate.State()[idx + parity*arg.threads];
 
-	    Link U = genRandomSU3<Float>(localState);
+	    Link U = genGaussSU3<Float>(localState);
 
 	    arg.rngstate.State()[ idx + parity*arg.threads ] = localState;
 	    arg.dataDs(mu, linkIndexShift(x,dx,arg.X), parity) = U;
@@ -77,8 +103,8 @@ namespace quda {
   }
 
   template<typename Float, typename Gauge>
-    class GaugeRandom : TunableVectorY {
-      GaugeRandomArg<Gauge> arg;
+    class GaugeGauss : TunableVectorY {
+      GaugeGaussArg<Gauge> arg;
       GaugeField &gf;
 
       private:
@@ -86,15 +112,15 @@ namespace quda {
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
 
       public:
-      GaugeRandom(GaugeRandomArg<Gauge> &arg, GaugeField &gf)
+      GaugeGauss(GaugeGaussArg<Gauge> &arg, GaugeField &gf)
         : TunableVectorY(2), arg(arg), gf(gf){}
-      ~GaugeRandom () { }
+      ~GaugeGauss () { }
 
       void apply(const cudaStream_t &stream){
         if(gf.Location() == QUDA_CUDA_FIELD_LOCATION){
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-          computeGenRandom<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          computeGenGauss<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 	  cudaDeviceSynchronize();
         } else {
           errorQuda("Randomize GaugeFields on CPU not supported yet\n");
@@ -124,27 +150,27 @@ namespace quda {
     }; 
 
   template<typename Float, typename Gauge>
-  void genRandom(const Gauge dataDs, GaugeField& data, RNG &rngstate) {
-      GaugeRandomArg<Gauge> arg(dataDs, data, rngstate);
-      GaugeRandom<Float,Gauge> gaugeRandom(arg, data);
-      gaugeRandom.apply(0);
+  void genGauss(const Gauge dataDs, GaugeField& data, RNG &rngstate) {
+      GaugeGaussArg<Gauge> arg(dataDs, data, rngstate);
+      GaugeGauss<Float,Gauge> gaugeGauss(arg, data);
+      gaugeGauss.apply(0);
 
     }
 
 
 
   template<typename Float>
-  void gaugeRandom(GaugeField &dataDs, RNG &rngstate) {
+  void gaugeGauss(GaugeField &dataDs, RNG &rngstate) {
 
       if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-	  genRandom<Float>(Gauge(dataDs), dataDs, rngstate);
+	  genGauss<Float>(Gauge(dataDs), dataDs, rngstate);
       }else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-	  genRandom<Float>(Gauge(dataDs), dataDs, rngstate);
+	  genGauss<Float>(Gauge(dataDs), dataDs, rngstate);
       }else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-	  genRandom<Float>(Gauge(dataDs), dataDs, rngstate);
+	  genGauss<Float>(Gauge(dataDs), dataDs, rngstate);
       }else{
 	  errorQuda("Reconstruction type %d of origin gauge field not supported", dataDs.Reconstruct());
       }
@@ -153,7 +179,7 @@ namespace quda {
 
 #endif
 
-  void gaugeRandom(GaugeField &dataDs, RNG &rngstate) {
+  void gaugeGauss(GaugeField &dataDs, RNG &rngstate) {
 
 #ifdef GPU_GAUGE_TOOLS
 
@@ -165,9 +191,9 @@ namespace quda {
 	  errorQuda("Order %d with %d reconstruct not supported", dataDs.Order(), dataDs.Reconstruct());
 
       if (dataDs.Precision() == QUDA_SINGLE_PRECISION){
-	  gaugeRandom<float>(dataDs, rngstate);
+	  gaugeGauss<float>(dataDs, rngstate);
       } else if(dataDs.Precision() == QUDA_DOUBLE_PRECISION) {
-	  gaugeRandom<double>(dataDs, rngstate);
+	  gaugeGauss<double>(dataDs, rngstate);
       } else {
 	  errorQuda("Precision %d not supported", dataDs.Precision());
       }

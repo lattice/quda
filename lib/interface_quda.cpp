@@ -206,8 +206,8 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
-//!<Profiler for randomQuda
-static TimeProfile profileRandom("randomQuda");
+//!<Profiler for gaussQuda
+static TimeProfile profileGauss("gaussQuda");
 
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
@@ -5469,27 +5469,29 @@ void set_kernel_pack_t_(int* pack)
 
 
 
-void randomGaugeQuda()
+void gaussGaugeQuda(long seed)
 {
-  profileRandom.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 
-  profileRandom.TPSTART(QUDA_PROFILE_INIT);
+  profileGauss.TPSTART(QUDA_PROFILE_INIT);
   if (!gaugePrecise)
-    errorQuda("Cannot generate Random GaugeField as there is no resident gauge field");
+    errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
 
   cudaGaugeField *data = NULL;
   data = gaugePrecise;
 
-  profileRandom.TPSTOP(QUDA_PROFILE_INIT);
+  profileGauss.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileRandom.TPSTART(QUDA_PROFILE_COMPUTE);
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
   std::cout << "VOLUME " << data->Volume() << " " << data->X()[0] << std::endl;
-  RNG* randstates = new RNG(data->Volume(), 1234, data->X());
+  RNG* randstates = new RNG(data->Volume(), seed, data->X());
   randstates->Init();
-  quda::gaugeRandom(*data, *randstates);
-  profileRandom.TPSTOP(QUDA_PROFILE_COMPUTE);
+  quda::gaugeGauss(*data, *randstates);
+  randstates->Release();
+  delete randstates;
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  profileRandom.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
   
   if (extendedGaugeResident) {
 

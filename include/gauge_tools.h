@@ -14,8 +14,12 @@ namespace quda {
 
 
 
+  /** Generate Gaussian distributed GaugeField
+   * @param dataDs The GaugeField
+   * @param rngstate random states
+   */
 
-  void gaugeRandom(GaugeField &dataDs, RNG &rngstate);
+  void gaugeGauss(GaugeField &dataDs, RNG &rngstate);
   
   /**
      Apply APE smearing to the gauge field

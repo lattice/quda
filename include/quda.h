@@ -986,7 +986,12 @@ extern "C" {
    */
   void performSTOUTnStep(unsigned int nSteps, double rho);
 
-  void randomGaugeQuda();
+  /**
+   * Generate Gaussian distributed gauge field
+   * @param seed Seed
+   */
+
+  void gaussGaugeQuda(long seed);
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
