@@ -34,7 +34,7 @@ extern QudaPrecision prec;
 extern QudaPrecision prec_sloppy;
 extern double anisotropy;
 extern double tol;
-extern double tol_hq;
+extern double rb_omega;
 extern int niter;
 extern int FMRiter;
 
@@ -203,7 +203,7 @@ void SU3test(int argc, char **argv) {
   unsigned int GfSteps = niter;
   unsigned int iter = FMRiter;
   unsigned int verbose_interval = 100;
-  double omega = tol_hq;
+  double omega = rb_omega;
   double theta = tol;
   unsigned int reunit_interval = 100;
   unsigned int stopWtheta = 1;

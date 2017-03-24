@@ -1807,22 +1807,23 @@ namespace quda {
 	  printfQuda("Step: %d --------------------------------------------"
 		     "--------------------------\n", iter + 1);
 	  for(int j=0; j<data.X()[3]; j++) {
+	    argQ.ts = j;
+	    GaugeFixQuality.changeArgQ(argQ);
+	    GaugeFixQuality.apply(0);
+	    flop += (double)GaugeFixQuality.flops();
+	    byte += (double)GaugeFixQuality.bytes();
+	    
+	    action_Cg[j] = argQ.getAction();
+	    diffLT_Cg[j] = abs(action0_Cg[j] - action_Cg[j]);
+	    
+	    theta_Cg[j] = argQ.getTheta();
+	    diffT_Cg[j] = abs(theta0_Cg[j] - theta_Cg[j]);
 	    if(Cg_arr[j] == true) {
-	      argQ.ts = j;
-	      GaugeFixQuality.changeArgQ(argQ);
-	      GaugeFixQuality.apply(0);
-	      flop += (double)GaugeFixQuality.flops();
-	      byte += (double)GaugeFixQuality.bytes();
-	      
-	      action_Cg[j] = argQ.getAction();
-	      diffLT_Cg[j] = abs(action0_Cg[j] - action_Cg[j]);
-	      
-	      theta_Cg[j] = argQ.getTheta();
-	      diffT_Cg[j] = abs(theta0_Cg[j] - theta_Cg[j]);
 	      printfQuda("Step: %d RB: %.2f TS: %d LT: %.16e\ttheta: %.16e\tDeltaLT: %.16e\tDeltaT: %.16e\n", 
 			 iter + 1, relax_boost, j, action_Cg[j], theta_Cg[j], diffLT_Cg[j], diffT_Cg[j]);
-	    }else {
-	      printfQuda("COMPLETE RB: %.2f TS: %d LT: %.16e\ttheta: %.16e\tDeltaLT: %.16e\tDeltaT: %.16e\n", relax_boost, j, action_Cg[j], theta_Cg[j]);
+	    }
+	    else {
+	      printfQuda("COMPLETE RB: %.2f TS: %d LT: %.16e\ttheta: %.16e\n", relax_boost, j, action_Cg[j], theta_Cg[j]);
 	    }
 	  }
 	}
@@ -1848,7 +1849,7 @@ namespace quda {
 	  else{
 	    for(int j=0; j<data.X()[3]; j++) {
 	      sum += diffLT_Cg[j];
-	      if(diffLT_Cg[j] < tolerance) Cg_arr[j] = false;
+	      if(diffLT_Cg[j] < data.X()[3]*tolerance) Cg_arr[j] = false;
 	    }
 	    printf("DeltaLT sum = %.16e Tol = %.16e\n", sum, tolerance);
 	    if ( sum  < data.X()[3]*tolerance ) break;	    

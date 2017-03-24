@@ -1610,7 +1610,8 @@ bool generate_all_levels = true;
 
 int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
 
-int FMRiter = 0;
+int FMRiter = 1;
+double rb_omega = 1.0;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1686,7 +1687,8 @@ void usage(char** argv )
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
-  printf("    --FMRiter <n>                             # How many EXTRA gauge fixing interations to attempt (set to 0 for single gauge fix)\n");  
+  printf("    --FMRiter <n>                             # How many gauge fixing iterations to attempt (set to 1 for single gauge fix)\n");  
+  printf("    --rb-omega <n>                            # The relaxation boost parameter for OVR gauge fixing (default 1.0)\n");  
   printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv); 
@@ -2531,6 +2533,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     FMRiter = atoi(argv[i+1]);
+    if (FMRiter < 1 || FMRiter > 1e6){
+      printf("ERROR: invalid number of FMR iterations (%d)\n", FMRiter);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--rb-omega") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    rb_omega = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2539,7 +2555,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
  out:
   *idx = i;
   return ret ;
-
+  
 }
 
 
