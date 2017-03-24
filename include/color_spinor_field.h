@@ -448,6 +448,23 @@ namespace quda {
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
+
+   /**
+    * 
+    * Currently, this is needed to convert 5-d into 4-d parity  field and vice versa
+    */
+
+    void ReduceDimensionality() {nDim   -= 1; x[nDim] = 1;}//that is, after reduction/extension 5d direction is trivial
+    void ExtendDimensionality() {x[nDim] = 1; nDim   += 1;}
+ 
+    void ExtendLastDimension() {
+      if(composite_descr.is_composite && (x[nDim-1] == 1)) {
+        x[nDim-1] = composite_descr.dim;
+      } else {
+        errorQuda("Cannot apply extension of dimension size.\n");
+      }
+    } 
+
   };
 
   // CUDA implementation

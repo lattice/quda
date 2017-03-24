@@ -414,7 +414,8 @@ public:
 #endif // MULTI_GPU
     fillAux(KERNEL_POLICY, "policy");
 
-    dslashParam.sp_stride = in->Stride();
+    //dslashParam.sp_stride = in->Stride();
+    dslashParam.sp_stride = in->IsComposite() ? in->ComponentStride() : in->Stride();
 
     // this sets the communications pattern for the packing kernel
     setPackComms(dslashParam.commDim);

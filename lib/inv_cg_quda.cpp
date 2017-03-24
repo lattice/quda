@@ -564,6 +564,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   b2avg = b2avg / param.num_src;
 
+  csParam.is_composite  = true;
+  csParam.composite_dim = param.num_src;
+  csParam.nDim = 5;
+  csParam.x[4] = 1;
+
   ColorSpinorParam csParam(x);
   if (!init) {
     csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -582,11 +587,18 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   ColorSpinorField &Ap = *App;
   ColorSpinorField &tmp = *tmpp;
 
+  r.ExtendLastDimension();
+  y.ExtendLastDimension();
+  Ap.ExtendLastDimension();
+  tmp.ExtendLastDimension();
+
   // calculate residuals for all vectors
-  for(int i=0; i<param.num_src; i++){
-    mat(r.Component(i), x.Component(i), y.Component(i));
-    blas::xmyNorm(b.Component(i), r.Component(i));
-  }
+  //for(int i=0; i<param.num_src; i++){
+  //  mat(r.Component(i), x.Component(i), y.Component(i));
+  //  blas::xmyNorm(b.Component(i), r.Component(i));
+  //}
+  mat(r, x, y);
+  blas::xpay(b, -1.0, r);
 
 #ifdef BLOCKSOLVER_MULTIREDUCE
   // Set up eigen matrices here.
@@ -640,9 +652,18 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   csParam.setPrecision(param.precision_sloppy);
   // tmp2 only needed for multi-gpu Wilson-like kernels
-  ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp2 = *tmp2_p;
+  //ColorSpinorField *tmp2_p = !mat.isStaggered() ?
+  //ColorSpinorField::Create(x, csParam) : &tmp;
+  //ColorSpinorField &tmp2 = *tmp2_p;
+  ColorSpinorField *tmp2_p = nullptr;
+
+  if(!mat.isStaggered()){
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    tmp2_p =  ColorSpinorField::Create(csParam);
+    tmp2_p->ExtendLastDimension();
+  } else {
+    tmp2_p = &tmp;
+  }
 
   ColorSpinorField *r_sloppy;
   if (param.precision_sloppy == x.Precision()) {
@@ -651,6 +672,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // will that work ?
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r_sloppy = ColorSpinorField::Create(r, csParam);
+    r_sloppy->ExtendLastDimension();
     blas::copy(*r_sloppy, r);
   }
 
@@ -659,16 +681,27 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
     x_sloppy = &x;
   } else {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    x_sloppy = ColorSpinorField::Create(x, csParam);
+//FIXME: this won't work due to different dimensionality
+    //csParam.create = QUDA_COPY_FIELD_CREATE;
+    //x_sloppy = ColorSpinorField::Create(x, csParam);
+
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    x_sloppy = ColorSpinorField::Create(csParam);
+    x_sloppy->ExtendLastDimension();
+    *x_sloppy = x;
   }
 
   // additional high-precision temporary if Wilson and mixed-precision
   csParam.setPrecision(param.precision);
-  ColorSpinorField *tmp3_p =
-  (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp3 = *tmp3_p;
+
+  ColorSpinorField *tmp3_p = nullptr;
+  if(param.precision != param.precision_sloppy && !mat.isStaggered()){
+    //csParam.create = QUDA_ZERO_FIELD_CREATE;
+    tmp3_p =  ColorSpinorField::Create(x, csParam); //ColorSpinorField::Create(csParam);
+    tmp3_p->ExtendLastDimension();
+  } else {
+    tmp3_p = &tmp;
+  }
 
   ColorSpinorField &xSloppy = *x_sloppy;
   ColorSpinorField &rSloppy = *r_sloppy;
@@ -677,18 +710,20 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   csParam.setPrecision(param.precision_sloppy);
   ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
   ColorSpinorField &p = *pp;
+  p.ExtendLastDimension();
   ColorSpinorField* rpnew = ColorSpinorField::Create(rSloppy, csParam);
   ColorSpinorField &rnew = *rpnew;
+  rnew.ExtendLastDimension();
 
-  ColorSpinorParam cs5dParam(p);
-  cs5dParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  cs5dParam.x[4] = param.num_src;
-  cs5dParam.is_composite = false;
+  //ColorSpinorParam cs5dParam(p);
+  //cs5dParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  //cs5dParam.x[4] = param.num_src;
+  //cs5dParam.is_composite = false;
   
-  cudaColorSpinorField Ap5d(Ap,cs5dParam); 
-  cudaColorSpinorField p5d(p,cs5dParam); 
-  cudaColorSpinorField tmp5d(tmp,cs5dParam); 
-  cudaColorSpinorField tmp25d(tmp2,cs5dParam);  
+  //cudaColorSpinorField Ap5d(Ap,cs5dParam); 
+  //cudaColorSpinorField p5d(p,cs5dParam); 
+  //cudaColorSpinorField tmp5d(tmp,cs5dParam); 
+  //cudaColorSpinorField tmp25d(tmp2,cs5dParam);  
 
   if (&x != &xSloppy) {
     blas::copy(y, x);
@@ -806,12 +841,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   while ( !allconverged && k < param.maxiter ) {
     // PUSH_RANGE("Dslash",1)
-     for(int i=0; i<param.num_src; i++){
-      matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
-     }
-
-    // matSloppy(Ap5d, p5d, tmp5d, tmp25d);  // tmp as tmp
-    
+    //for(int i=0; i<param.num_src; i++){
+    // matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
+    //}
+    matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
+   
     // POP_RANGE
 
     // calculate pAp

@@ -821,7 +821,7 @@ namespace quda {
     
       size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
       size_t dpitch = x4*len;
-      size_t spitch = stride*Nvec*precision;
+      size_t spitch = composite_descr.is_composite ? composite_descr.stride*Nvec*precision : stride*Nvec*precision;
 
       // QUDA Memcpy NPad's worth. 
       //  -- Dest will point to the right beginning PAD. 
@@ -829,7 +829,7 @@ namespace quda {
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
       for (int s=0; s<x4; s++) { // loop over multiple 4-d volumes (if they exist)
 	void *dst = (char*)ghost_spinor + s*len;
-	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	void *src = composite_descr.is_composite ? (char*)v + (offset + s*composite_descr.volumeCB*Npad)*Nvec*precision : (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
 	cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
 	if (precision == QUDA_HALF_PRECISION) {
@@ -1643,11 +1643,11 @@ namespace quda {
 
 	size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
 	size_t dpitch = x4*len;
-	size_t spitch = stride*Nvec*precision;
+        size_t spitch = composite_descr.is_composite ? composite_descr.stride*Nvec*precision : stride*Nvec*precision;
 
 	for (int s=0; s<x4; s++) {
 	  void *dst = (char*)ghost_dst + s*len;
-	  void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	  void *src = composite_descr.is_composite ? (char*)v + (offset + s*composite_descr.volumeCB*Npad)*Nvec*precision : (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
 	  // start the copy
 	  cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 

@@ -2696,23 +2696,25 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   // download source
   printfQuda("Setup b\n");
   ColorSpinorParam cudaParam(cpuParam, *param);
-  // cudaParam.x[4] = param->num_src;
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.nDim = 5;//just to be sure
+  cudaParam.x[4] = 1;//set 1, then this will be converted to param->num_src 
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+
   cudaParam.is_composite = true;
   cudaParam.composite_dim = param->num_src;
 
   printfQuda("Create b \n");
   ColorSpinorField *b = ColorSpinorField::Create(cudaParam);
 
-
-
-
   for(int i=0; i < param->num_src; i++) {
     b->Component(i) = *h_b[i];
   }
+
+  b->ExtendLastDimension();//ok, now cudaParam.x[4] = cudaParam.composite_dim, so we have correct 5-d field
+
   printfQuda("Done b \n");
 
-    ColorSpinorField *x;
+  ColorSpinorField *x = nullptr;
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
@@ -2736,6 +2738,8 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       printfQuda("Done x \n");
  // solution
   }
+
+  x->ExtendLastDimension();//ok, now cudaParam.x[4] = cudaParam.composite_dim, so we have correct 5-d field
 
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
 

@@ -324,6 +324,8 @@ namespace quda {
     dslashParam.gauge_stride = fatGauge.Stride();
     dslashParam.long_gauge_stride = longGauge.Stride();
     dslashParam.fat_link_max = fatGauge.LinkMax();
+    dslashParam.is_composite = out->IsComposite();//TODO: also one needs to check somewhere that both 'in' and 'out' are composite fields
+    dslashParam.composite_Vh = out->IsComposite() ? out->Component(0).ComponentVolumeCB() : 0 ;
 
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary

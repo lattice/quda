@@ -212,6 +212,9 @@ namespace quda {
     dslashParam.parity = parity;
     dslashParam.gauge_stride = gauge.Stride();
     dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
+    dslashParam.is_composite = out->IsComposite();//TODO: also one needs to check somewhere that both 'in' and 'out' are composite fields
+    dslashParam.composite_Vh = out->IsComposite() ? out->Component(0).ComponentVolumeCB() : 0 ;
+
     // in the solver for the improved staggered action
 
     for(int i=0;i<4;i++){
