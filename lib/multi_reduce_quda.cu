@@ -257,7 +257,6 @@ namespace quda {
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
         cDotProduct(result0, x, y0);
         cDotProduct(result1, x, y1);
-
       }
       else
       {

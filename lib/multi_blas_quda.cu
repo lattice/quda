@@ -89,16 +89,10 @@ namespace quda {
     template<int NXZ, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
       const int NYW;
-      Float2 a[MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N];
       // ignore parameter arrays since we place them in constant memory
       multicaxpy_(const coeff_array<Complex> &a, const coeff_array<Complex> &b,
 		  const coeff_array<Complex> &c, int NYW) : NYW(NYW)
-      {
-        for (int i=0; i<NXZ*NYW; i++)
-        {
-          this->a[i] = make_Float2<Float2>(a.data[i]);
-        }
-      }
+      { }
 
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       {
@@ -343,9 +337,6 @@ namespace quda {
 
     void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy(a, x.Components(), y.Components()); }
 
-    // Remark: multi_axpyBzpcx is currently likely broken since recursive
-    //         multireduce hasn't been put in yet. Yell at weinbe2 on github to
-    //         fix that. It only effects multishift CG.
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
     */
@@ -420,22 +411,22 @@ namespace quda {
     {
       typedef typename scalar<Float2>::type real;
       const int NYW;
-      Float2 a[MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N];
 
       multi_caxpyBxpz_(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) : NYW(NYW)
-      {
-        // copy arguments into the functor
-        for (int i=0; i<NXZ; i++)
-        {
-          this->a[i] = make_Float2<Float2>(a.data[i]);
-          this->b[i] = make_Float2<Float2>(b.data[i]);
-        }
-      }
+      { }
       
       // i loops over NYW, j loops over NXZ
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       {
+#ifdef __CUDA_ARCH__
+	Float2 *a = reinterpret_cast<Float2*>(Amatrix_d); // fetch coefficient matrix from constant memory
+	Float2 *b = reinterpret_cast<Float2*>(Bmatrix_d); // fetch coefficient matrix from constant memory
+        _caxpy(a[MAX_MULTI_BLAS_N*j], x, y); _caxpy(b[MAX_MULTI_BLAS_N*j], x, w); // b/c we swizzled z into w.
+#else
+	Float2 *a = reinterpret_cast<Float2*>(Amatrix_h);
+	Float2 *b = reinterpret_cast<Float2*>(Bmatrix_h);
         _caxpy(a[j], x, y); _caxpy(b[j], x, w); // b/c we swizzled z into w.
+#endif
       }
       int streams() { return 4*NYW + NXZ; } //! total number of input and output streams
       int flops() { return 8*NXZ*NYW; } //! flops per real element
@@ -460,8 +451,8 @@ namespace quda {
         // we're reading from x
         std::vector<ColorSpinorField*> &x = x_;
 
-        // we will carry the parameter arrays into the functor
-        coeff_array<Complex> a(a_,false), b(b_,false), c; 
+        // put a and b into constant space
+        coeff_array<Complex> a(a_,true), b(b_,true), c;
 
         if (x[0]->Precision() != y[0]->Precision() )
         {
