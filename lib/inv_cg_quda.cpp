@@ -26,7 +26,7 @@
 //#define BLOCKSOLVER_VERBOSE
 #endif
 
-
+#define QUDA_MAX_BLOCK_SRC 128
 
 namespace quda {
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -542,9 +542,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   profile.TPSTART(QUDA_PROFILE_INIT);
 
+  if (param.num_src > QUDA_MAX_BLOCK_SRC)
+    errorQuda("Requested number of right-hand sides %d exceeds max %d\n", param.num_src, QUDA_MAX_BLOCK_SRC);
+
   // Check to see that we're not trying to invert on a zero-field source
   //MW: it might be useful to check what to do here.
-  double b2[QUDA_MAX_MULTI_SHIFT];
+  double b2[QUDA_MAX_BLOCK_SRC];
   double b2avg=0;
   for(int i=0; i< param.num_src; i++){
     b2[i]=blas::norm2(b.Component(i));
@@ -701,7 +704,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTOP(QUDA_PROFILE_INIT);
   profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-  double stop[QUDA_MAX_MULTI_SHIFT];
+  double stop[QUDA_MAX_BLOCK_SRC];
 
   for(int i = 0; i < param.num_src; i++){
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
@@ -726,10 +729,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   //FIXME:reliable updates currently not implemented
   /*
-  double rNorm[QUDA_MAX_MULTI_SHIFT];
-  double r0Norm[QUDA_MAX_MULTI_SHIFT];
-  double maxrx[QUDA_MAX_MULTI_SHIFT];
-  double maxrr[QUDA_MAX_MULTI_SHIFT];
+  double rNorm[QUDA_MAX_BLOCK_SRC];
+  double r0Norm[QUDA_MAX_BLOCK_SRC];
+  double maxrx[QUDA_MAX_BLOCK_SRC];
+  double maxrr[QUDA_MAX_BLOCK_SRC];
 
   for(int i = 0; i < param.num_src; i++){
     rNorm[i] = sqrt(r2(i,i).real());
@@ -750,7 +753,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   PrintStats("CG", k, r2avg / param.num_src, b2avg, 0.);
   bool allconverged = true;
-  bool converged[QUDA_MAX_MULTI_SHIFT];
+  bool converged[QUDA_MAX_BLOCK_SRC];
   for(int i=0; i<param.num_src; i++){
     converged[i] = convergence(r2(i,i).real(), 0., stop[i], param.tol_hq);
     allconverged = allconverged && converged[i];
@@ -1019,6 +1022,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   profile.TPSTART(QUDA_PROFILE_INIT);
 
+  if (param.num_src > QUDA_MAX_BLOCK_SRC)
+    errorQuda("Requested number of right-hand sides %d exceeds max %d\n", param.num_src, QUDA_MAX_BLOCK_SRC);
+
   using Eigen::MatrixXcd;
   MatrixXcd mPAP(param.num_src,param.num_src);
   MatrixXcd mRR(param.num_src,param.num_src);
@@ -1026,7 +1032,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   // Check to see that we're not trying to invert on a zero-field source
   //MW: it might be useful to check what to do here.
-  double b2[QUDA_MAX_MULTI_SHIFT];
+  double b2[QUDA_MAX_BLOCK_SRC];
   double b2avg=0;
   double r2avg=0;
   for(int i=0; i< param.num_src; i++){
@@ -1078,7 +1084,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     mat(r.Component(i), x.Component(i), y.Component(i));
   }
 
-  // double r2[QUDA_MAX_MULTI_SHIFT];
+  // double r2[QUDA_MAX_BLOCK_SRC];
   MatrixXcd r2(param.num_src,param.num_src);
   for(int i=0; i<param.num_src; i++){
     r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
@@ -1152,9 +1158,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   MatrixXcd r2_old(param.num_src, param.num_src);
-  double heavy_quark_res[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark res idual
-  double heavy_quark_res_old[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark residual
-  double stop[QUDA_MAX_MULTI_SHIFT];
+  double heavy_quark_res[QUDA_MAX_BLOCK_SRC] = {0.0};  // heavy quark res idual
+  double heavy_quark_res_old[QUDA_MAX_BLOCK_SRC] = {0.0};  // heavy quark residual
+  double stop[QUDA_MAX_BLOCK_SRC];
 
   for(int i = 0; i < param.num_src; i++){
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
@@ -1174,10 +1180,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd pTp(param.num_src, param.num_src);
   int rUpdate = 0;
 
-  double rNorm[QUDA_MAX_MULTI_SHIFT];
-  double r0Norm[QUDA_MAX_MULTI_SHIFT];
-  double maxrx[QUDA_MAX_MULTI_SHIFT];
-  double maxrr[QUDA_MAX_MULTI_SHIFT];
+  double rNorm[QUDA_MAX_BLOCK_SRC];
+  double r0Norm[QUDA_MAX_BLOCK_SRC];
+  double maxrx[QUDA_MAX_BLOCK_SRC];
+  double maxrr[QUDA_MAX_BLOCK_SRC];
 
   for(int i = 0; i < param.num_src; i++){
     rNorm[i] = sqrt(r2(i,i).real());
@@ -1217,7 +1223,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   PrintStats("CG", k, r2avg, b2avg, heavy_quark_res[0]);
   int steps_since_reliable = 1;
   bool allconverged = true;
-  bool converged[QUDA_MAX_MULTI_SHIFT];
+  bool converged[QUDA_MAX_BLOCK_SRC];
   for(int i=0; i<param.num_src; i++){
     converged[i] = convergence(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
     allconverged = allconverged && converged[i];
