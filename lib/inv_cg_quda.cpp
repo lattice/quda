@@ -648,9 +648,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // will that work ?
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r_sloppy = ColorSpinorField::Create(r, csParam);
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
-    }
+    blas::copy(*r_sloppy, r);
   }
 
 
@@ -707,7 +705,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   for(int i = 0; i < param.num_src; i++){
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
-    }
+  }
 
   #ifndef BLOCKSOLVER_MULTIREDUCE  // Otherwise it's done above. 
   // Eigen Matrices instead of scalars
@@ -785,9 +783,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   blas::caxpy(AC,r,p);
 
   // set rsloppy to to QR decompoistion of r (p)
-  for(int i=0; i< param.num_src; i++){
-    blas::copy(rSloppy.Component(i), p.Component(i));
-  }
+  blas::copy(rSloppy, p);
 
   #ifdef BLOCKSOLVER_VERBOSE
   #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -850,9 +846,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
     // orthorgonalize R
     // copy rSloppy to rnew as temporary
-    for(int i=0; i< param.num_src; i++){
-      blas::copy(rnew.Component(i), rSloppy.Component(i));
-    }
+    blas::copy(rnew, rSloppy);
+
 #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::cDotProduct(r2_raw, r.Components(), r.Components());
 #else
@@ -897,9 +892,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
     // update p
     // use rnew as temporary again for summing up
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(rnew.Component(i),rSloppy.Component(i));
-    }
+    blas::copy(rnew,rSloppy);
+
     // temporary hack
     for(int i=0; i<param.num_src; i++){
       for(int j=0;j<param.num_src; j++){
@@ -908,9 +902,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpy(AC,p,rnew);
     // set p = rnew
-    for(int i=0; i < param.num_src; i++){
-      blas::copy(p.Component(i),rnew.Component(i));
-    }
+    blas::copy(p, rnew);
 
     // update C
     C = S * C;
@@ -1115,9 +1107,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // will that work ?
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r_sloppy = ColorSpinorField::Create(r, csParam);
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
-    }
+    blas::copy(*r_sloppy, r); //nop when these pointers alias
   }
 
 
@@ -1382,9 +1372,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         }
         // now need to do something with the p's
 
-        for(int i=0; i< param.num_src; i++){
-          blas::copy(p.Component(i), pnew.Component(i));
-        }
+	blas::copy(p, pnew);
 
 
         #ifdef BLOCKCG_GS
@@ -1451,10 +1439,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
       }
 
-      for(int i=0; i<param.num_src; i++){
-        blas::copy(rSloppy.Component(i), r.Component(i)); //nop when these pointers alias
-        blas::zero(xSloppy.Component(i));
-      }
+      blas::copy(rSloppy, r); //nop when these pointers alias
+      blas::zero(xSloppy);
 
       // calculate new reliable HQ resididual
       if (use_heavy_quark_res){
