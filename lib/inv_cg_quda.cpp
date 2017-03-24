@@ -564,12 +564,13 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   b2avg = b2avg / param.num_src;
 
+  ColorSpinorParam csParam(x);
+
   csParam.is_composite  = true;
   csParam.composite_dim = param.num_src;
   csParam.nDim = 5;
   csParam.x[4] = 1;
 
-  ColorSpinorParam csParam(x);
   if (!init) {
     csParam.create = QUDA_COPY_FIELD_CREATE;
     rp = ColorSpinorField::Create(b, csParam);
@@ -665,6 +666,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     tmp2_p = &tmp;
   }
 
+  ColorSpinorField &tmp2 = *tmp2_p;
+
   ColorSpinorField *r_sloppy;
   if (param.precision_sloppy == x.Precision()) {
     r_sloppy = &r;
@@ -702,6 +705,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   } else {
     tmp3_p = &tmp;
   }
+
+  ColorSpinorField &tmp3 = *tmp3_p;
 
   ColorSpinorField &xSloppy = *x_sloppy;
   ColorSpinorField &rSloppy = *r_sloppy;
