@@ -868,7 +868,7 @@ double test(int kernel) {
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
 	B2[j*Nsrc+i] = blas::cDotProduct(xmD->Component(i), xmD->Component(j));
-	error += fabs(A2[i] - B2[i])/fabs(B[i]);
+	error += fabs(A2[j*Nsrc+i] - B2[j*Nsrc+i])/fabs(B2[j*Nsrc+i]);
       }
     }
     error /= Nsrc*Nsrc;
@@ -882,7 +882,7 @@ double test(int kernel) {
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
 	B[j*Nsrc+i] = blas::cDotProduct(xmD->Component(i), ymD->Component(j));
-	error += fabs(A[i] - B[i])/fabs(B[i]);
+	error += fabs(A[j*Nsrc+i] - B[j*Nsrc+i])/fabs(B[j*Nsrc+i]);
       }
     }
     error /= Nsrc*Msrc;
