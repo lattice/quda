@@ -443,7 +443,7 @@ namespace quda {
       }
     }
     printfQuda("L2 relative deviation = %e\n\n", deviation);
-    //if (deviation > tol) errorQuda("failed");
+    if (deviation > tol) errorQuda("failed");
     
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
