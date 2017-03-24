@@ -1085,10 +1085,9 @@ void qudaInvertMsrc(int external_precision,
     invalidate_quda_gauge = false;
   }
 
-  int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
   void** sln_pointer = (void**)malloc(num_src*sizeof(void*));
-  // int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
-  void** src_pointer = (void**)malloc(num_src*sizeof(void*));;//(char*)source + quark_offset;
+  void** src_pointer = (void**)malloc(num_src*sizeof(void*));
+  int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
 
   for(int i=0; i<num_src; ++i) sln_pointer[i] = (char*)solutionArray[i] + quark_offset;
   for(int i=0; i<num_src; ++i) src_pointer[i] = (char*)sourceArray[i] + quark_offset;
