@@ -70,6 +70,7 @@ extern bool post_orthonormalize;
 extern double omega;
 extern QudaInverterType smoother_type;
 extern QudaInverterType coarsest_solver;
+extern double coarsest_tol;
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -264,6 +265,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   // coarsest grid solver
   mg_param.smoother[mg_levels-1] = coarsest_solver;
+  mg_param.smoother_tol[mg_levels-1] = coarsest_tol == 0 ? tol_hq : coarsest_tol;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
