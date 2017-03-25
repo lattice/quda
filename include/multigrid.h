@@ -77,12 +77,6 @@ namespace quda {
     /** The sloppy Dirac operator to use for smoothing */
     DiracMatrix *matSmoothSloppy;
 
-    /** The squared Dirac operator to use in case of CG */
-    DiracMdagM *mdagmSmooth;
-
-    /** The squared sloppy Dirac operator to use in case of CG */
-    DiracMdagM *mdagmSmoothSloppy;
-
     /** What type of smoother to use */
     QudaInverterType smoother;
 
@@ -133,9 +127,6 @@ namespace quda {
 
 	// set the smoother relaxation factor
 	omega = param.omega[level];
-
-	mdagmSmooth = new DiracMdagM(matSmooth->Expose());
-	mdagmSmoothSloppy = new DiracMdagM(matSmoothSloppy->Expose());
       }
 
     MGParam(const MGParam &param, 
@@ -171,9 +162,6 @@ namespace quda {
 
 	// set the smoother relaxation factor
 	omega = param.mg_global.omega[level];
-
-	mdagmSmooth = new DiracMdagM(matSmooth->Expose());
-	mdagmSmoothSloppy = new DiracMdagM(matSmoothSloppy->Expose());
       }
 
   };
@@ -237,9 +225,6 @@ namespace quda {
 
     /** Projected source vector for preconditioned syste, else just points to source */
     ColorSpinorField *b_tilde;
-
-    /** Source prepared for inversion with CG */
-    ColorSpinorField *b_mdag;
 
     /** Coarse residual vector */
     ColorSpinorField *r_coarse;

@@ -61,8 +61,6 @@ namespace quda {
 	csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 	b_tilde = ColorSpinorField::Create(csParam);
       }
-      // in case of CG we will allocate b_mdag
-      b_mdag = nullptr;
     }
 
     // if not on the coarsest level, construct it
@@ -241,25 +239,15 @@ namespace quda {
       param_presmooth->pipeline = 8;
     }
 
-    if(param_presmooth->inv_type == QUDA_CG_INVERTER) {
-      param_presmooth->compute_true_res = false;
-      presmoother = Solver::create(*param_presmooth, *param.mdagmSmooth,
-				   *param.mdagmSmoothSloppy, *param.mdagmSmoothSloppy, profile);
-    } else
-      presmoother = Solver::create(*param_presmooth, *param.matSmooth,
-				   *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    presmoother = Solver::create(*param_presmooth, *param.matSmooth,
+				 *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       param_postsmooth->maxiter = param.nu_post;
-      if(param_postsmooth->inv_type == QUDA_CG_INVERTER) {
-	param_postsmooth->compute_true_res = false;
-	postsmoother = Solver::create(*param_postsmooth, *param.mdagmSmooth,
-				     *param.mdagmSmoothSloppy, *param.mdagmSmoothSloppy, profile);
-      } else
-	postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
-				      *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
+				    *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
   }
 
@@ -302,7 +290,6 @@ namespace quda {
     destroySmoother();
 
     if (b_tilde && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) delete b_tilde;
-    if (b_mdag) delete b_mdag;
     if (r) delete r;
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
@@ -579,22 +566,7 @@ namespace quda {
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
       else b_tilde = &b;
 
-      if(param.smoother == QUDA_CG_INVERTER) {
-	if(!b_mdag) { // we allocate it just the first time
-	  ColorSpinorParam param(*in);
-	  b_mdag = ColorSpinorField::Create(param);
-	}
-	dirac.Mdag(*b_mdag, *in);
-      } else {
-	if(b_mdag) { // should not be allocated. Maybe the param.smoother has been changed
-	  delete b_mdag;
-	}
-	b_mdag=in;
-      }
-      (*presmoother)(*out, *b_mdag);
-      if(param.smoother != QUDA_CG_INVERTER) {
-	b_mdag=nullptr;
-      }
+      (*presmoother)(*out, *in);
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
       dirac.reconstruct(solution, b, inner_solution_type);
@@ -602,8 +574,8 @@ namespace quda {
       // if using preconditioned smoother then need to reconstruct full residual
       // FIXME extend this check for precision, Schwarz, etc.
       bool use_solver_residual =
-	( ((param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION) ||
-	   (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION)) && param.smoother != QUDA_CG_INVERTER )
+	( (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION) ||
+	  (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION) )
 	? true : false;
 
       // FIXME this is currently borked if inner solver is preconditioned
@@ -650,22 +622,7 @@ namespace quda {
       // we should keep a copy of the prepared right hand side as we've already destroyed it
       //dirac.prepare(in, out, solution, residual, inner_solution_type);
 
-      if(param.smoother == QUDA_CG_INVERTER) {
-	if(!b_mdag) { // we allocate it just the first time
-	  ColorSpinorParam param(*in);
-	  b_mdag = ColorSpinorField::Create(param);
-	}
-	dirac.Mdag(*b_mdag, *in);
-      } else {
-	if(b_mdag) { // should not be allocated. Maybe the param.smoother has been changed
-	  delete b_mdag;
-	}
-	b_mdag=in;
-      }
-      (*postsmoother)(*out, *b_mdag); // for inner solve preconditioned, in the should be the original prepared rhs
-      if(param.smoother != QUDA_CG_INVERTER) {
-	b_mdag=nullptr;
-      }
+      (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
 
       dirac.reconstruct(x, b, outer_solution_type);
 
@@ -675,22 +632,7 @@ namespace quda {
       ColorSpinorField *out=nullptr, *in=nullptr;
 
       dirac.prepare(in, out, x, b, outer_solution_type);
-      if(param.smoother == QUDA_CG_INVERTER) {
-	if(!b_mdag) { // we allocate it just the first time
-	  ColorSpinorParam param(*in);
-	  b_mdag = ColorSpinorField::Create(param);
-	}
-	dirac.Mdag(*b_mdag, *in);
-      } else {
-	if(b_mdag) { // should not be allocated. Maybe the param.smoother has been changed
-	  delete b_mdag;
-	}
-	b_mdag=in;
-      }
-      (*presmoother)(*out, *b_mdag);
-      if(param.smoother != QUDA_CG_INVERTER) {
-	b_mdag=nullptr;
-      }
+      (*presmoother)(*out, *in);
       dirac.reconstruct(x, b, outer_solution_type);
     }
 
@@ -836,11 +778,13 @@ namespace quda {
     std::vector<ColorSpinorField*> B_gpu;
 
     Solver *solve;
+    DiracMdagM *mdagm = new DiracMdagM(param.matSmooth->Expose());
+    DiracMdagM *mdagmSloppy = new DiracMdagM(param.matSmoothSloppy->Expose());
     const Dirac &dirac = *(param.matSmooth->Expose());
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
       solverParam.maxiter = 2000;
       solverParam.compute_true_res = false; // computing the true residual makes xmyNorm throw error on the coarse levels
-      solve = Solver::create(solverParam, *param.mdagmSmooth, *param.mdagmSmoothSloppy, *param.mdagmSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
       solverParam.inv_type_precondition = param.mg_global.smoother[param.level];
       solverParam.tol_precondition = param.mg_global.smoother_tol[param.level];
@@ -882,17 +826,12 @@ namespace quda {
 	  zero(*b); // zero rhs
 	}
 
-	/*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Initial guess = %g\n", norm2(*x));
-	/*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Initial rhs = %g\n", norm2(*b));
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(*b));
 
-	ColorSpinorField *out=nullptr, *in=nullptr, *source;
+	ColorSpinorField *out=nullptr, *in=nullptr;
 	dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
-	if(param.mg_global.setup_type != QUDA_NULL_VECTOR_SETUP && solverParam.inv_type == QUDA_CG_INVERTER) {
-	  dirac.Mdag(*source, *in);
-	} else {
-	  source = in;
-	}
-	(*solve)(*out, *source);
+	(*solve)(*out, *in);
 	dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
 	/*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Solution = %g\n", norm2(*x));
@@ -913,6 +852,8 @@ namespace quda {
     }
 
     delete solve;
+    delete mdagm;
+    delete mdagmSloppy;
     delete b;
 
     // storing and freeing B_gpu
