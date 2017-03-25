@@ -65,6 +65,13 @@ namespace quda {
     CG::operator()(*xp,b);
 
     mmdag.Expose()->Mdag(x,*xp);
+
+    // with preserve_source == QUDA_PRESERVE_SOURCE_NO; b is expected to be the residual.
+    // here the residual is the same of CG, so one could improve this computing it in CG directly (ref. MR)
+    if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+      mmdag.Expose()->M(*xp, x);
+      blas::axpby(-1.0, *xp, 1.0, b);
+    }
   }
 
   CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -97,13 +104,22 @@ namespace quda {
     if (param.compute_true_res) {
       // compute the true residuals
       const double b2 = blas::norm2(b);
+      double r2;
       mdagm.Expose()->M(*bp, x);
-      const double r2 = blas::xmyNorm(b, *bp) / b2;
+      if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+	blas::axpby(-1.0, *bp, 1.0, b);
+	r2 = blas::norm2(b) / b2;
+      } else {
+	r2 = blas::xmyNorm(b, *bp) / b2;
+      }
       param.true_res = sqrt(r2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, *bp).z);
 
       PrintSummary("CGNR", param.iter - iter0, r2, b2);
+    } else if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+      mdagm.Expose()->M(*bp, x);
+      blas::axpby(-1.0, *bp, 1.0, b);
     }
+
   }
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
