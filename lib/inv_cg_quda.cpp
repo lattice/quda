@@ -1004,8 +1004,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
   // compute the true residuals
+  mat(r, x, y, tmp3);
   for(int i=0; i<param.num_src; i++){
-    mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
+    //mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
     param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
     param.true_res_offset[i] = param.true_res;
@@ -1605,8 +1606,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
   // compute the true residuals
+  mat(r, x, y, tmp3);
   for(int i=0; i<param.num_src; i++){
-    mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
+    //mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
     param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
     param.true_res_offset[i] = param.true_res;
