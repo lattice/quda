@@ -1616,6 +1616,7 @@ double omega = 0.85;
 QudaInverterType smoother_type = QUDA_MR_INVERTER;
 QudaInverterType coarsest_solver = QUDA_GCR_INVERTER;
 double coarsest_tol = 0; // if 0, then we use tolhq
+int coarsest_maxiter = 1000;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 
@@ -1697,6 +1698,7 @@ void usage(char** argv )
   printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
   printf("    --mg-coarsest-solver                      # The solver to use in the coarsest level of multigrid (default gcr)\n");
   printf("    --mg-coarsest-tol                         # The solver tolerance to use in the coarsest level of multigrid (default tolhq)\n");
+  printf("    --mg-coarsest-maxiter                     # The solver maxiter to use in the coarsest level of multigrid (default 1000)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
@@ -2526,6 +2528,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     coarsest_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarsest-maxiter") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    coarsest_maxiter = atoi(argv[i+1]);
     i++;
     ret = 0;
     goto out;

@@ -225,6 +225,7 @@ namespace quda {
     param_presmooth->Nkrylov = 4;
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
+    param_presmooth->compute_true_res = false;
     if (param.level == 0) {
        param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
        param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
@@ -232,7 +233,7 @@ namespace quda {
 
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 20;
-      param_presmooth->maxiter = 1000;
+      param_presmooth->maxiter = param.nu_pre + param.nu_post;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-8;
       param_presmooth->compute_true_res = false;
@@ -245,6 +246,8 @@ namespace quda {
     if (param.level < param.Nlevel-1) { //Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      // At the moment CGNE doesn't hold well an initial guess
+      if(param.smoother == QUDA_CGNE_INVERTER) param_presmooth->inv_type = QUDA_MR_INVERTER;
       param_postsmooth->maxiter = param.nu_post;
       postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
 				    *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
