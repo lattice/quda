@@ -205,10 +205,17 @@ namespace quda {
 
 
     // compute initial residual
-    mat(r, x, y, tmp3);
-    double r2 = blas::xmyNorm(b, r);
-    if (b2 == 0) {
-      b2 = r2;
+    double r2 = 0;
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      mat(r, x, y, tmp3);
+      r2 = blas::xmyNorm(b, r);
+      if (b2 == 0) {
+	b2 = r2;
+      }
+    } else {
+      if (&r != &b) blas::copy(r, b);
+      r2 = b2;
+      blas::zero(x);
     }
 
     csParam.setPrecision(param.precision_sloppy);
