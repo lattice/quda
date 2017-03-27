@@ -21,9 +21,7 @@ __shared__ static bool isLastBlockDone;
 
 #include <launch_kernel.cuh>
 
-// This is also defined in multi_blas_core.cuh.
-// We may need to put it in one, more common place.
-#define MAX_MULTI_BLAS_N 4
+
 
 /**
    @brief Parameter struct for generic multi-blas kernel.

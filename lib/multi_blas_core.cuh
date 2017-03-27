@@ -1,5 +1,3 @@
-#define MAX_MULTI_BLAS_N 4
-
 /**
    @brief Parameter struct for generic multi-blas kernel.
    @tparam NXZ is dimension of input vectors: X,Z
