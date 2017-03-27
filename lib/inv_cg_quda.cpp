@@ -611,17 +611,22 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // Allocate some raw memory for each matrix we need raw pointers for.
   Complex* r2_raw = new Complex[param.num_src*param.num_src];
   Complex* pAp_raw = new Complex[param.num_src*param.num_src];
+  Complex* alpha_raw = new Complex[param.num_src*param.num_src];
+  Complex* beta_raw = new Complex[param.num_src*param.num_src];
+  Complex* Linv_raw = new Complex[param.num_src*param.num_src];
+  Complex* Sdagger_raw = new Complex[param.num_src*param.num_src];
 
   // Create maps. This forces the above pointers to be used under the hood.
   Map<MatrixBCG> r2(r2_raw, param.num_src, param.num_src);
   Map<MatrixBCG> pAp(pAp_raw, param.num_src, param.num_src);
+  Map<MatrixBCG> alpha(alpha_raw, param.num_src, param.num_src);
+  Map<MatrixBCG> beta(beta_raw, param.num_src, param.num_src);
+  Map<MatrixBCG> Linv(Linv_raw, param.num_src, param.num_src);
+  Map<MatrixBCG> Sdagger(Sdagger_raw, param.num_src, param.num_src);
 
   // Create other non-mapped matrices.
-  MatrixBCG alpha = MatrixBCG::Zero(param.num_src,param.num_src);
-  MatrixBCG beta = MatrixBCG::Zero(param.num_src,param.num_src);
   MatrixBCG C = MatrixBCG::Zero(param.num_src,param.num_src);
   MatrixBCG S = MatrixBCG::Identity(param.num_src,param.num_src);
-  quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
 
 #ifdef BLOCKSOLVER_VERBOSE
   Complex* pTp_raw = new Complex[param.num_src*param.num_src];
@@ -805,7 +810,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 #ifdef BLOCKSOLVER_MULTIREDUCE
   MatrixBCG L = r2.llt().matrixL();
   C = L.adjoint();
-  MatrixBCG Linv = C.inverse();
+  Linv = C.inverse();
 #else
   MatrixXcd L = r2.llt().matrixL();//// retrieve factor L  in the decomposition
   C = L.adjoint();
@@ -818,6 +823,13 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #endif
 
   // set p to QR decompsition of r
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  for (int i = 0; i < param.num_src; i++)
+  {
+    blas::zero(p.Component(i));
+  }
+  blas::caxpy(Linv_raw,r,p); // Would benefit from a 'caxy' function
+#else
   // temporary hack - use AC to pass matrix arguments to multiblas
   for(int i=0; i<param.num_src; i++){
     blas::zero(p.Component(i));
@@ -825,7 +837,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       AC[i*param.num_src + j] = Linv(i,j);
     }
   }
-  blas::caxpy(AC,r,p);
+  blas::caxpy(AC,r,p); // Would benefit from a 'caxy' function
+#endif
 
   // set rsloppy to to QR decompoistion of r (p)
   blas::copy(rSloppy, p);
@@ -870,6 +883,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
     // update Xsloppy
     alpha = pAp.inverse() * C;
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::caxpy(alpha_raw, p, xSloppy);
+#else
     // temporary hack using AC
     for(int i = 0; i < param.num_src; i++){
       for(int j = 0; j < param.num_src; j++){
@@ -877,8 +893,13 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     blas::caxpy(AC,p,xSloppy);
+#endif
 
     // update rSloppy
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    beta = -pAp.inverse();
+    blas::caxpy(beta_raw, Ap, rSloppy);
+#else
     beta = pAp.inverse();
     // temporary hack
     for(int i=0; i<param.num_src; i++){
@@ -887,6 +908,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     blas::caxpy(AC,Ap,rSloppy);
+#endif
 
     // orthorgonalize R
     // copy rSloppy to rnew as temporary
@@ -910,6 +932,13 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     L = r2.llt().matrixL();// retrieve factor L  in the decomposition
     S = L.adjoint();
     Linv = S.inverse();
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    for (int i = 0; i < param.num_src; i++)
+    {
+      blas::zero(rSloppy.Component(i));
+    }
+    blas::caxpy(Linv_raw, rnew, rSloppy); // would benefit from a 'caxy'
+#else
     // temporary hack
     for(int i=0; i<param.num_src; i++){
       blas::zero(rSloppy.Component(i));
@@ -917,7 +946,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*param.num_src + j] = Linv(i,j);
       }
     }
-    blas::caxpy(AC,rnew,rSloppy);
+    blas::caxpy(AC,rnew,rSloppy);  // would benefit from a 'caxy'
+#endif
 
     #ifdef BLOCKSOLVER_VERBOSE
     #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -939,12 +969,17 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::copy(rnew,rSloppy);
 
     // temporary hack
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    Sdagger = S.adjoint();
+    blas::caxpy(Sdagger_raw,p,rnew);
+#else
     for(int i=0; i<param.num_src; i++){
       for(int j=0;j<param.num_src; j++){
         AC[i*param.num_src + j] = std::conj(S(j,i));
       }
     }
     blas::caxpy(AC,p,rnew);
+#endif
     // set p = rnew
     blas::copy(p, rnew);
 
@@ -1033,10 +1068,15 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   delete rpnew;
   delete pp;
-  delete[] AC;
 #ifdef BLOCKSOLVER_MULTIREDUCE
   delete[] r2_raw;
   delete[] pAp_raw;
+  delete[] alpha_raw;
+  delete[] beta_raw;
+  delete[] Linv_raw;
+  delete[] Sdagger_raw;
+#else
+  delete[] AC;
 #endif
   profile.TPSTOP(QUDA_PROFILE_FREE);
 
