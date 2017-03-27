@@ -255,8 +255,8 @@ namespace quda {
         Complex* result1 = &result[x.size()*(y.size()/2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
-        cDotProduct(result0, x, y0);
-        cDotProduct(result1, x, y1);
+        cDotProduct_recurse(result0, x, y0);
+        cDotProduct_recurse(result1, x, y1);
       }
       else
       {
@@ -370,8 +370,8 @@ namespace quda {
           std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
           std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
-          cDotProduct(result0, x0, y);
-          cDotProduct(result1, x1, y);
+          cDotProduct_recurse(result0, x0, y);
+          cDotProduct_recurse(result1, x1, y);
 
           const unsigned int xlen0 = x.size()/2;
           const unsigned int xlen1 = x.size() - xlen0;
@@ -405,11 +405,34 @@ namespace quda {
     }
 
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
-      cDotProduct_recurse(result, x, y);
+      /*cDotProduct_recurse(result, x, y);
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();
       reduceDoubleArray((double*)result, Nreduce);
+      */
+
+      Complex* result_tmp = new Complex[x.size()*y.size()];
+      for (unsigned int i = 0; i < x.size()*y.size(); i++)
+        result_tmp[i] = 0.0;
+
+      // cDotProduct_recurse returns a column-major matrix. 
+      // To be consistent with the multi-blas functions, we should
+      // switch this to row-major. 
+      cDotProduct_recurse(result_tmp, x, y);
+
+      // do a single multi-node reduction only once we have computed all local dot products
+      const int Nreduce = 2*x.size()*y.size();
+      reduceDoubleArray((double*)result_tmp, Nreduce);
+
+      // Switch from col-major to row-major. 
+      const unsigned int xlen = x.size();
+      const unsigned int ylen = y.size();
+      for (unsigned int j = 0; j < xlen; j++)
+        for (unsigned int i = 0; i < ylen; i++)
+          result[j*ylen+i] = result_tmp[i*xlen + j];
+
+      delete[] result_tmp;
     }
 
    } // namespace blas

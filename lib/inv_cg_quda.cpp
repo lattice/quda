@@ -493,11 +493,13 @@ namespace quda {
   using Eigen::Matrix;
   using Eigen::Map;
   using Eigen::ColMajor;
+  using Eigen::RowMajor;
   using Eigen::Dynamic; 
 
   // Convenience. By default, Eigen matrices are column major.
-  // We switch to row major because cDotProduct returns in row major.
-  typedef Matrix<Complex, Dynamic, Dynamic, ColMajor> MatrixBCG;
+  // We switch to row major because cDotProduct and
+  // the multi-blas routines use row
+  typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> MatrixBCG;
 #elif defined(BLOCKSOLVER)
   using Eigen::MatrixXcd;
 #endif
