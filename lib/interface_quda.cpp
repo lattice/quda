@@ -5471,6 +5471,7 @@ void set_kernel_pack_t_(int* pack)
 
 void gaussGaugeQuda(long seed)
 {
+#ifdef GPU_GAUGE_TOOLS
   profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 
   profileGauss.TPSTART(QUDA_PROFILE_INIT);
@@ -5483,7 +5484,6 @@ void gaussGaugeQuda(long seed)
   profileGauss.TPSTOP(QUDA_PROFILE_INIT);
 
   profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
-  std::cout << "VOLUME " << data->Volume() << " " << data->X()[0] << std::endl;
   RNG* randstates = new RNG(data->Volume(), seed, data->X());
   randstates->Init();
   quda::gaugeGauss(*data, *randstates);
@@ -5498,7 +5498,9 @@ void gaussGaugeQuda(long seed)
     extendedGaugeResident = gaugePrecise;
     extendedGaugeResident -> exchangeExtendedGhost(R,redundant_comms);
   }
-  return;
+#else
+  errorQuda("Gauge tools are not build");
+#endif
 }
 
 

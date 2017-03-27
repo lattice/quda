@@ -12,8 +12,7 @@
 
 namespace quda {
 
-#if defined(GPU_GAUGE_ALG) || defined(GPU_GAUGE_TOOlS)
-  
+#if defined(GPU_GAUGE_ALG) || defined(GPU_GAUGE_TOOLS)
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
 
 
