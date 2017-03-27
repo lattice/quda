@@ -18,12 +18,10 @@ namespace quda {
      @param dataDs Output smeared field
      @param dataOr Input gauge field
      @param alpha smearing parameter
-     @param location Location of the computation
   */
   void APEStep (GaugeField &dataDs,
 		const GaugeField& dataOr,
-		double alpha,
-		QudaFieldLocation location);
+		double alpha);
 
   /**
      Apply STOUT smearing to the gauge field
@@ -31,12 +29,10 @@ namespace quda {
      @param dataDs Output smeared field
      @param dataOr Input gauge field
      @param rho smearing parameter
-     @param location Location of the computation
   */
   void STOUTStep (GaugeField &dataDs,
-		const GaugeField& dataOr,
-		double rho,
-		QudaFieldLocation location);
+		  const GaugeField& dataOr,
+		  double rho);
 
 
   /**

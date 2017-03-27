@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
-set(CMAKE_CXX_STANDARD_REQUIRED 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_STANDARD 11)
 # disable in source builds
 # this is only a temporary fix, but for now we need it as cmake will
