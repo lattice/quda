@@ -39,6 +39,11 @@ namespace quda {
       delete yp;
       delete App;
       delete tmpp;
+#ifdef BLOCKSOLVER
+      delete x_sloppy_savedp;
+      delete pp;
+      delete qp;
+#endif
       init = false;
     }
   }
@@ -492,7 +497,6 @@ namespace quda {
 #ifdef BLOCKSOLVER_MULTIREDUCE
   using Eigen::Matrix;
   using Eigen::Map;
-  using Eigen::ColMajor;
   using Eigen::RowMajor;
   using Eigen::Dynamic; 
 
@@ -580,6 +584,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     yp = ColorSpinorField::Create(b, csParam);
     // sloppy fields
     csParam.setPrecision(param.precision_sloppy);
+    x_sloppy_savedp = ColorSpinorField::Create(csParam);
+    pp = ColorSpinorField::Create(csParam);
+    qp = ColorSpinorField::Create(csParam);
     App = ColorSpinorField::Create(csParam);
     tmpp = ColorSpinorField::Create(csParam);
     init = true;
@@ -587,21 +594,54 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   }
   ColorSpinorField &r = *rp;
   ColorSpinorField &y = *yp;
+  ColorSpinorField &x_sloppy_saved = *x_sloppy_savedp;
+  ColorSpinorField &p = *pp;
+  ColorSpinorField &q = *qp;
   ColorSpinorField &Ap = *App;
   ColorSpinorField &tmp = *tmpp;
 
+  ColorSpinorField *x_sloppyp; // Gets assigned below.
+
   r.ExtendLastDimension();
   y.ExtendLastDimension();
+  x_sloppy_saved.ExtendLastDimension();
+  p.ExtendLastDimension();
+  q.ExtendLastDimension();
   Ap.ExtendLastDimension();
   tmp.ExtendLastDimension();
+
 
   // calculate residuals for all vectors
   //for(int i=0; i<param.num_src; i++){
   //  mat(r.Component(i), x.Component(i), y.Component(i));
   //  blas::xmyNorm(b.Component(i), r.Component(i));
   //}
+  // Step 2: R = AX - B, using Y as a temporary with the right precision.
   mat(r, x, y);
   blas::xpay(b, -1.0, r);
+
+  // Step 3: Y = X
+  blas::copy(y, x);
+
+  // Step 4: Xs = 0
+  // Set field aliasing according to whether
+  // we're doing mixed precision or not. Based
+  // on BiCGstab-L conventions.
+  if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator)
+  {
+    x_sloppyp = &x; // s_sloppy and x point to the same vector in memory.
+    blas::zero(*x_sloppyp); // x_sloppy is zeroed out (and, by extension, so is x)
+  }
+  else
+  {
+    x_sloppyp = x_sloppy_savedp; // x_sloppy point to saved x_sloppy memory.
+                                 // x_sloppy_savedp was already zero.
+  }
+  // No need to alias r---we need a separate q, which is analagous
+  // to an 'r_sloppy' in other algorithms.
+
+  // Syntatic sugar.
+  ColorSpinorField &x_sloppy = *x_sloppyp;
 
 #ifdef BLOCKSOLVER_MULTIREDUCE
   // Set up eigen matrices here.
@@ -609,7 +649,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // https://eigen.tuxfamily.org/dox/group__TutorialMapClass.html
 
   // Allocate some raw memory for each matrix we need raw pointers for.
-  Complex* r2_raw = new Complex[param.num_src*param.num_src];
+  Complex* H_raw = new Complex[param.num_src*param.num_src];
   Complex* pAp_raw = new Complex[param.num_src*param.num_src];
   Complex* alpha_raw = new Complex[param.num_src*param.num_src];
   Complex* beta_raw = new Complex[param.num_src*param.num_src];
@@ -617,7 +657,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   Complex* Sdagger_raw = new Complex[param.num_src*param.num_src];
 
   // Create maps. This forces the above pointers to be used under the hood.
-  Map<MatrixBCG> r2(r2_raw, param.num_src, param.num_src);
+  Map<MatrixBCG> H(H_raw, param.num_src, param.num_src);
   Map<MatrixBCG> pAp(pAp_raw, param.num_src, param.num_src);
   Map<MatrixBCG> alpha(alpha_raw, param.num_src, param.num_src);
   Map<MatrixBCG> beta(beta_raw, param.num_src, param.num_src);
@@ -625,38 +665,54 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   Map<MatrixBCG> Sdagger(Sdagger_raw, param.num_src, param.num_src);
 
   // Create other non-mapped matrices.
+  MatrixBCG L = MatrixBCG::Zero(param.num_src,param.num_src);
   MatrixBCG C = MatrixBCG::Zero(param.num_src,param.num_src);
-  MatrixBCG S = MatrixBCG::Identity(param.num_src,param.num_src);
+  MatrixBCG S = MatrixBCG::Identity(param.num_src,param.num_src); // Step 10: S = I
 
 #ifdef BLOCKSOLVER_VERBOSE
   Complex* pTp_raw = new Complex[param.num_src*param.num_src];
   Map<MatrixBCG> pTp(pTp_raw,param.num_src,param.num_src);
 #endif
-#endif // BLOCKSOLVER_MULTIREDUCE
+#else
+  // Eigen Matrices instead of scalars
+  MatrixXcd H = MatrixXcd::Zero(param.num_src, param.num_src);
+  MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
+  MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
+  MatrixXcd C = MatrixXcd::Zero(param.num_src,param.num_src);
+  MatrixXcd S = MatrixXcd::Identity(param.num_src,param.num_src); // Step 10: S = I
+  MatrixXcd Sdagger = MatrixXcd::Identity(param.num_src,param.num_src);
+  MatrixXcd L = MatrixXcd::Zero(param.num_src, param.num_src);
+  MatrixXcd Linv = MatrixXcd::Zero(param.num_src, param.num_src);
+  MatrixXcd pAp = MatrixXcd::Identity(param.num_src,param.num_src);
+  quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
 
-  // initialize r2 matrix
+  #ifdef BLOCKSOLVER_VERBOSE
+  MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
+  #endif
+#endif 
+
+  // Step 5: H = (R)^\dagger R
   double r2avg=0;
 #ifdef BLOCKSOLVER_MULTIREDUCE
-  blas::cDotProduct(r2_raw, r.Components(), r.Components());
+  blas::cDotProduct(H_raw, r.Components(), r.Components());
   for (int i = 0; i < param.num_src; i++)
   {
-    r2avg += r2(i,i).real();
-    printfQuda("r2[%i] %e\n", i, r2(i,i).real());
+    r2avg += H(i,i).real();
+    printfQuda("r2[%i] %e\n", i, H(i,i).real());
   }
 #else
-  MatrixXcd r2(param.num_src, param.num_src);
   for(int i=0; i<param.num_src; i++){
     for(int j=i; j < param.num_src; j++){
-      r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-      if (i!=j) r2(j,i) = std::conj(r2(i,j));
+      H(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+      if (i!=j) H(j,i) = std::conj(H(i,j));
       if (i==j) {
-        r2avg += r2(i,i).real();
-        printfQuda("r2[%i] %e\n", i, r2(i,i).real());
+        r2avg += H(i,i).real();
+        printfQuda("r2[%i] %e\n", i, H(i,i).real());
       }
     }
   }
 #endif
-  //printmat("r2", r2);
+  //printmat("r2", H);
 
   csParam.setPrecision(param.precision_sloppy);
   // tmp2 only needed for multi-gpu Wilson-like kernels
@@ -675,32 +731,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   ColorSpinorField &tmp2 = *tmp2_p;
 
-  ColorSpinorField *r_sloppy;
-  if (param.precision_sloppy == x.Precision()) {
-    r_sloppy = &r;
-  } else {
-    // will that work ?
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    r_sloppy = ColorSpinorField::Create(r, csParam);
-    r_sloppy->ExtendLastDimension();
-    blas::copy(*r_sloppy, r);
-  }
-
-
-  ColorSpinorField *x_sloppy;
-  if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
-    x_sloppy = &x;
-  } else {
-//FIXME: this won't work due to different dimensionality
-    //csParam.create = QUDA_COPY_FIELD_CREATE;
-    //x_sloppy = ColorSpinorField::Create(x, csParam);
-
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    x_sloppy = ColorSpinorField::Create(csParam);
-    x_sloppy->ExtendLastDimension();
-    *x_sloppy = x;
-  }
-
   // additional high-precision temporary if Wilson and mixed-precision
   csParam.setPrecision(param.precision);
 
@@ -715,18 +745,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   ColorSpinorField &tmp3 = *tmp3_p;
 
-  ColorSpinorField &xSloppy = *x_sloppy;
-  ColorSpinorField &rSloppy = *r_sloppy;
-
-  csParam.create = QUDA_COPY_FIELD_CREATE;
-  csParam.setPrecision(param.precision_sloppy);
-  ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &p = *pp;
-  p.ExtendLastDimension();
-  ColorSpinorField* rpnew = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &rnew = *rpnew;
-  rnew.ExtendLastDimension();
-
   //ColorSpinorParam cs5dParam(p);
   //cs5dParam.create = QUDA_REFERENCE_FIELD_CREATE;
   //cs5dParam.x[4] = param.num_src;
@@ -736,13 +754,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   //cudaColorSpinorField p5d(p,cs5dParam); 
   //cudaColorSpinorField tmp5d(tmp,cs5dParam); 
   //cudaColorSpinorField tmp25d(tmp2,cs5dParam);  
-
-  if (&x != &xSloppy) {
-    blas::copy(y, x);
-    blas::zero(xSloppy);
-  } else {
-    blas::zero(y);
-  }
 
   const bool use_heavy_quark_res =
   (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -756,23 +767,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   for(int i = 0; i < param.num_src; i++){
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
   }
-
-  #ifndef BLOCKSOLVER_MULTIREDUCE  // Otherwise it's done above. 
-  // Eigen Matrices instead of scalars
-  MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
-  MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
-  MatrixXcd C = MatrixXcd::Zero(param.num_src,param.num_src);
-  MatrixXcd S = MatrixXcd::Identity(param.num_src,param.num_src);
-  MatrixXcd pAp = MatrixXcd::Identity(param.num_src,param.num_src);
-  quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
-
-  #ifdef BLOCKSOLVER_VERBOSE
-  MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
-  #endif
-  #endif 
-
-
-
 
   //FIXME:reliable updates currently not implemented
   /*
@@ -802,46 +796,44 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   bool allconverged = true;
   bool converged[QUDA_MAX_BLOCK_SRC];
   for(int i=0; i<param.num_src; i++){
-    converged[i] = convergence(r2(i,i).real(), 0., stop[i], param.tol_hq);
+    converged[i] = convergence(H(i,i).real(), 0., stop[i], param.tol_hq);
     allconverged = allconverged && converged[i];
   }
 
-  // CHolesky decomposition
-#ifdef BLOCKSOLVER_MULTIREDUCE
-  MatrixBCG L = r2.llt().matrixL();
+  // Step 6: L L^\dagger = H, Cholesky decomposition, L lower left triangular
+  // Step 7: C = L^\dagger, C upper right triangular.
+  // Set Linv = C.inverse() for convenience in the next step.
+  L = H.llt().matrixL(); // retrieve factor L in the decomposition
   C = L.adjoint();
   Linv = C.inverse();
-#else
-  MatrixXcd L = r2.llt().matrixL();//// retrieve factor L  in the decomposition
-  C = L.adjoint();
-  MatrixXcd Linv = C.inverse();
-#endif
 
   #ifdef BLOCKSOLVER_VERBOSE
-  std::cout << "r2\n " << r2 << std::endl;
+  std::cout << "r2\n " << H << std::endl;
   std::cout << "L\n " << L.adjoint() << std::endl;
   #endif
 
-  // set p to QR decompsition of r
+  // Step 8: finally set Q to thin QR decompsition of R.
 #ifdef BLOCKSOLVER_MULTIREDUCE
   for (int i = 0; i < param.num_src; i++)
   {
-    blas::zero(p.Component(i));
+    blas::zero(q.Component(i));
   }
-  blas::caxpy(Linv_raw,r,p); // Would benefit from a 'caxy' function
+  blas::copy(tmp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
+  blas::caxpy(Linv_raw,tmp,q); // Would benefit from a 'caxy' function to avoid setting 'q' to zero.
 #else
   // temporary hack - use AC to pass matrix arguments to multiblas
   for(int i=0; i<param.num_src; i++){
-    blas::zero(p.Component(i));
+    blas::zero(q.Component(i));
     for(int j=0;j<param.num_src; j++){
       AC[i*param.num_src + j] = Linv(i,j);
     }
   }
-  blas::caxpy(AC,r,p); // Would benefit from a 'caxy' function
+  blas::copy(tmp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
+  blas::caxpy(AC,tmp,q); // Would benefit from a 'caxy' function to avoid setting 'q' to zero.
 #endif
 
-  // set rsloppy to to QR decompoistion of r (p)
-  blas::copy(rSloppy, p);
+  // Step 9: P = Q; additionally set P to thin QR decompoistion of r
+  blas::copy(p, q);
 
   #ifdef BLOCKSOLVER_VERBOSE
   #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -859,16 +851,20 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   std::cout << " C " << std::endl << C << std::endl;
   #endif
 
+  // Step 10 was set S to the identity, but we took care of that
+  // when we initialized all of the matrices. 
+
   while ( !allconverged && k < param.maxiter ) {
     // PUSH_RANGE("Dslash",1)
     //for(int i=0; i<param.num_src; i++){
     // matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
     //}
+    // Step 12: Compute Ap.
     matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
    
     // POP_RANGE
 
-    // calculate pAp
+    // Step 13: calculate pAp = P^\dagger Ap
 #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::cDotProduct(pAp_raw, p.Components(), Ap.Components());
 #else
@@ -881,10 +877,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 #endif
     //printmat("pAp", pAp);
 
-    // update Xsloppy
+    // Step 14: Compute beta = pAp^(-1)
+    // For convenience, we stick a minus sign on it now.
+    beta = -pAp.inverse();
+
+    // Step 15: Compute alpha = beta * C
     alpha = pAp.inverse() * C;
+
+    // Step 16: update Xsloppy = Xsloppy + P alpha
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::caxpy(alpha_raw, p, xSloppy);
+    blas::caxpy(alpha_raw, p, x_sloppy);
 #else
     // temporary hack using AC
     for(int i = 0; i < param.num_src; i++){
@@ -892,98 +894,107 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*param.num_src + j] = alpha(i,j);
       }
     }
-    blas::caxpy(AC,p,xSloppy);
+    blas::caxpy(AC,p,x_sloppy);
 #endif
 
+    // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
     // update rSloppy
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    beta = -pAp.inverse();
-    blas::caxpy(beta_raw, Ap, rSloppy);
+    blas::caxpy(beta_raw, Ap, q);
 #else
-    beta = pAp.inverse();
     // temporary hack
     for(int i=0; i<param.num_src; i++){
       for(int j=0;j<param.num_src; j++){
-        AC[i*param.num_src + j] = -beta(i,j);
+        AC[i*param.num_src + j] = beta(i,j);
       }
     }
-    blas::caxpy(AC,Ap,rSloppy);
+    blas::caxpy(AC,Ap,q);
 #endif
 
-    // orthorgonalize R
-    // copy rSloppy to rnew as temporary
-    blas::copy(rnew, rSloppy);
-
+    // Orthogonalize Q via a thin QR decomposition.
+    // Step 18: H = Q^\dagger Q
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::cDotProduct(r2_raw, r.Components(), r.Components());
+    blas::cDotProduct(H_raw, q.Components(), q.Components());
 #else
     printfQuda("Iteration %d\n",k);
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
-        r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+        H(i,j) = blas::cDotProduct(q.Component(i),q.Component(j));
         //printfQuda("r2(%d,%d) = %.15e + I %.15e\n", i, j, real(r2(i,j)), imag(r2(i,j)));
-        if (i!=j) r2(j,i) = std::conj(r2(i,j));
+        if (i!=j) H(j,i) = std::conj(H(i,j));
       }
     }
 #endif
-    //printmat("r2", r2);
+    //printmat("r2", H);
   
-    // Cholesky decomposition
-    L = r2.llt().matrixL();// retrieve factor L  in the decomposition
+    // Step 19: L L^\dagger = H; Cholesky decomposition of H, L is lower left triangular.
+    L = H.llt().matrixL();// retrieve factor L  in the decomposition
+    
+    // Step 20: S = L^\dagger
     S = L.adjoint();
+
+    // Steps 21 and 22 would require a block-cax and a block-cxpay. 
+    // In theory, since the 'a' matrices are upper right triangular,
+    // this should be possible even with recursion. For now, we use
+    // some extra temporary variables to get the job done.
+    // It really should be:
+    // Step 21: Q = Q S^{-1}
+    // Step 22: P = Q + P S^\dagger
+    // But that'd just be too easy, wouldn't it?
+
     Linv = S.inverse();
 #ifdef BLOCKSOLVER_MULTIREDUCE
     for (int i = 0; i < param.num_src; i++)
     {
-      blas::zero(rSloppy.Component(i));
+      blas::zero(tmp.Component(i));
     }
-    blas::caxpy(Linv_raw, rnew, rSloppy); // would benefit from a 'caxy'
+    blas::caxpy(Linv_raw, q, tmp); // would benefit from a 'caxy'
 #else
     // temporary hack
     for(int i=0; i<param.num_src; i++){
-      blas::zero(rSloppy.Component(i));
+      blas::zero(tmp.Component(i));
       for(int j=0;j<param.num_src; j++){
         AC[i*param.num_src + j] = Linv(i,j);
       }
     }
-    blas::caxpy(AC,rnew,rSloppy);  // would benefit from a 'caxy'
+    blas::caxpy(AC,q,tmp);  // would benefit from a 'caxy'
 #endif
+
+    blas::copy(q, tmp);
 
     #ifdef BLOCKSOLVER_VERBOSE
     #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::cDotProduct(pTp_raw, rSloppy.Components(), rSloppy.Components());
+    blas::cDotProduct(pTp_raw, q.Components(), q.Components());
     #else
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
-        pTp(i,j) = blas::cDotProduct(rSloppy.Component(i), rSloppy.Component(j));
+        pTp(i,j) = blas::cDotProduct(q.Component(i), q.Component(j));
       }
     }
     #endif
     
-    std::cout << " rTr " << std::endl << pTp << std::endl;
+    std::cout << " qTq " << std::endl << pTp << std::endl;
     std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
     #endif
 
-    // update p
-    // use rnew as temporary again for summing up
-    blas::copy(rnew,rSloppy);
-
-    // temporary hack
 #ifdef BLOCKSOLVER_MULTIREDUCE
     Sdagger = S.adjoint();
-    blas::caxpy(Sdagger_raw,p,rnew);
+    blas::caxpy(Sdagger_raw,p,tmp);
 #else
+    // temporary hack
     for(int i=0; i<param.num_src; i++){
       for(int j=0;j<param.num_src; j++){
         AC[i*param.num_src + j] = std::conj(S(j,i));
       }
     }
-    blas::caxpy(AC,p,rnew);
+    blas::caxpy(AC,p,tmp);
 #endif
-    // set p = rnew
-    blas::copy(p, rnew);
+    
+    blas::copy(p, tmp);
 
-    // update C
+    // Done with step 21 and 22 foolery.
+
+    // Step 23: update C = S * C
     C = S * C;
 
     #ifdef BLOCKSOLVER_VERBOSE
@@ -1001,30 +1012,36 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     std::cout <<  "S " << S<<  std::endl << "C " << C << std::endl;
     #endif
 
-    // calculate the residuals for all shifts
+    // Step 24: calculate the residuals for all shifts
     r2avg=0;
     for (int j=0; j<param.num_src; j++ ){
-      r2(j,j) = C(0,j)*conj(C(0,j));
+      H(j,j) = C(0,j)*conj(C(0,j));
       for(int i=1; i < param.num_src; i++)
-      r2(j,j) += C(i,j) * conj(C(i,j));
-      r2avg += r2(j,j).real();
+        H(j,j) += C(i,j) * conj(C(i,j));
+      r2avg += H(j,j).real();
     }
 
     k++;
     PrintStats("CG", k, r2avg / param.num_src, b2avg, 0);
-    // check convergence
+    // Step 25: check convergence
     allconverged = true;
     for(int i=0; i<param.num_src; i++){
-      converged[i] = convergence(r2(i,i).real(), 0, stop[i], param.tol_hq);
+      converged[i] = convergence(H(i,i).real(), 0, stop[i], param.tol_hq);
       allconverged = allconverged && converged[i];
     }
 
 
   }
 
-  for(int i=0; i<param.num_src; i++){
+  // We've converged!
+  // Step 27: Update Xs into Y.
+  blas::xpy(x_sloppy, y);
+  /*for(int i=0; i<param.num_src; i++){
     blas::xpy(y.Component(i), xSloppy.Component(i));
-  }
+  }*/
+
+  // And copy the final answer into X!
+  blas::copy(x, y);
 
   profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -1049,7 +1066,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2(i,i).real(), b2[i]);
+    PrintSummary("CG", k, H(i,i).real(), b2[i]);
   }
 
   // reset the flops counters
@@ -1063,13 +1080,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if (&tmp3 != &tmp) delete tmp3_p;
   if (&tmp2 != &tmp) delete tmp2_p;
 
-  if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
-  if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
 
-  delete rpnew;
-  delete pp;
 #ifdef BLOCKSOLVER_MULTIREDUCE
-  delete[] r2_raw;
+  delete[] H_raw;
   delete[] pAp_raw;
   delete[] alpha_raw;
   delete[] beta_raw;
