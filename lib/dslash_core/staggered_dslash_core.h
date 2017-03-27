@@ -209,7 +209,7 @@ if (threadId.z & 1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if ( (kernel_type == EXTERIOR_KERNEL_X)){
 	int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;
@@ -239,7 +239,7 @@ if (threadId.z & 1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if ( (kernel_type == EXTERIOR_KERNEL_X)){
 	int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;
@@ -287,7 +287,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_X){
 	nbr_idx1 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
@@ -318,7 +318,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_X){
 	nbr_idx3 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
@@ -364,7 +364,7 @@ if (threadIdx.z & 1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Y) {
 	nbr_idx1 = param.ghostOffset[1][1] +  (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
@@ -394,7 +394,7 @@ if (threadIdx.z & 1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Y){
 	nbr_idx3 = param.ghostOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1]+ space_con;
@@ -439,7 +439,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Y) {
 	nbr_idx1 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
@@ -470,7 +470,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Y){
 	nbr_idx3 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
@@ -515,7 +515,7 @@ if (threadIdx.z&1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Z) {
 	nbr_idx1 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
@@ -545,7 +545,7 @@ if (threadIdx.z&1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Z){
 	nbr_idx3 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2]+ space_con;
@@ -593,7 +593,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Z){
 	nbr_idx1 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2]+ space_con;
@@ -624,7 +624,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_Z){
 	nbr_idx3 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + y[2]*ghostFace[2]+ space_con;
@@ -669,7 +669,7 @@ if (threadIdx.z & 1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_T){
 	nbr_idx1 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3]+ space_con;
@@ -700,7 +700,7 @@ if (threadIdx.z & 1)
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_T) {
 	nbr_idx3 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3]+ space_con;
@@ -746,7 +746,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_T){
 	nbr_idx1 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3]+ space_con;
@@ -777,7 +777,7 @@ if (!(threadIdx.z & 1))
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       if (kernel_type == EXTERIOR_KERNEL_T) {
 	nbr_idx3 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + y[3]*ghostFace[3]+ space_con;
@@ -839,6 +839,9 @@ spinorFloat a = param.a_f;
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
   for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
+#endif
     READ_ACCUM(tmp,ACCUMTEX,idx + (src_idx+reg_src)*block_src_offset*Volh);
     for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i] + a*tmp[i];
   }
@@ -849,6 +852,9 @@ if (kernel_type == INTERIOR_KERNEL){
 }
 #else
  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = half_idx + (src_idx+reg_src)*Volh;
+#endif
    READ_ACCUM(tmp,ACCUMTEX, half_idx+(src_idx+reg_src)*block_src_offset*Volh);
    for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i] + a*tmp[i];
  }
@@ -858,6 +864,9 @@ if (kernel_type == INTERIOR_KERNEL){
 #ifdef MULTI_GPU
  if (kernel_type != INTERIOR_KERNEL) {
    for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
+#endif
      READ_AND_SUM_SPINOR(O[reg_src], INTERTEX, idx + (src_idx+reg_src)*block_src_offset*Volh);
    }
  }
@@ -865,6 +874,9 @@ if (kernel_type == INTERIOR_KERNEL){
 
 // write spinor field back to device memory
   for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
+#endif
     WRITE_SPINOR(param.out, O[reg_src], idx + (src_idx+reg_src)*block_src_offset*Volh, param.sp_stride);
   }
 
@@ -931,7 +943,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       int space_con = ((y[3]*X[2]+y[2])*X[1]+y[1])/2;
@@ -956,7 +968,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       int space_con = ((y[3]*X[2]+y[2])*X[1] + y[1])/2;
@@ -996,7 +1008,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + (y[0]+NFACE-1)*ghostFace[0] + space_con;
@@ -1022,7 +1034,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx3 = param.ghostOffset[0][0] + (src_idx+reg_src)*NFACE*ghostFace[0] + y[0]*ghostFace[0] + space_con;
@@ -1059,7 +1071,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
@@ -1084,7 +1096,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx3 = param.ghostOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-3))*ghostFace[1] + space_con;
@@ -1122,7 +1134,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]+NFACE-1)*ghostFace[1] + space_con;
@@ -1148,7 +1160,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx3 = param.ghostOffset[1][0] + (src_idx+reg_src)*NFACE*ghostFace[1] + y[1]*ghostFace[1] + space_con;
@@ -1187,7 +1199,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-1))*ghostFace[2] + space_con;
@@ -1212,7 +1224,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx3 = param.ghostOffset[2][1] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]-(X[2]-3))*ghostFace[2] + space_con;
@@ -1252,7 +1264,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + (y[2]+NFACE-1)*ghostFace[2] + space_con;
@@ -1278,7 +1290,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx3 = param.ghostOffset[2][0] + (src_idx+reg_src)*NFACE*ghostFace[2] + y[2]*ghostFace[2] + space_con;
@@ -1316,7 +1328,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-1))*ghostFace[3] + space_con;
@@ -1342,7 +1354,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx3 = param.ghostOffset[3][1] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]-(X[3]-3))*ghostFace[3] + space_con;
@@ -1380,7 +1392,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = nbr_idx1;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + (y[3]+NFACE-1)*ghostFace[3] + space_con;
@@ -1406,7 +1418,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx3 = nbr_idx3;
+      int norm_idx3 = sp_idx_3rd_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx3 = param.ghostOffset[3][0] + (src_idx+reg_src)*NFACE*ghostFace[3] + y[3]*ghostFace[3] + space_con;
@@ -1439,6 +1451,9 @@ if (kernel_type == INTERIOR_KERNEL){
 
   if (active){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
+#if (DD_PREC == 2) //half precision
+      int norm_idx1 = half_idx+(src_idx+reg_src)*Volh;
+#endif
       READ_AND_SUM_SPINOR(O[reg_src], INTERTEX, half_idx+(src_idx+reg_src)*block_src_offset*Volh);
       WRITE_SPINOR(param.out, O[reg_src], half_idx+(src_idx+reg_src)*block_src_offset*Volh, param.sp_stride);
     }

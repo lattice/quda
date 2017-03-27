@@ -661,7 +661,7 @@
   for (int i=0; i<3; i++) c[i] = fmaxf(fabsf(OUT[i].x), fabsf(OUT[i].y)); \
   c[0] = fmaxf(c[0], c[1]);						\
   c[0] = fmaxf(c[0], c[2]);						\
-  out ## Norm[sid] = c[0];						\
+  out ## Norm[norm_idx1] = c[0];						\
   float scale = __fdividef(MAX_SHORT, c[0]);				\
   for (int i=0; i<3; i++) {						\
     OUT[i] *= scale;							\
@@ -682,7 +682,7 @@
   for (int i=0; i<3; i++) c[i] = fmaxf(fabsf(OUT[i].x), fabsf(OUT[i].y)); \
   c[0] = fmaxf(c[0], c[1]);						\
   c[0] = fmaxf(c[0], c[2]);						\
-  out ## Norm[sid] = c[0];						\
+  out ## Norm[norm_idx1] = c[0];						\
   float scale = __fdividef(MAX_SHORT, c[0]);				\
   for (int i=0; i<3; i++) {						\
     OUT[i] *= scale;							\
@@ -700,7 +700,7 @@
   }
 
 #define READ_AND_SUM_ST_SPINOR_HALF_TEX_(O,spinor,sid) {		\
-  float C = TEX1DFETCH(float, (spinor##Norm), sid);			\
+  float C = TEX1DFETCH(float, (spinor##Norm), norm_idx1);			\
   for (int i=0; i<3; i++) {						\
     float2 tmp = TEX1DFETCH(float2, (spinor), sid + i*(param.sp_stride)); \
     O[i] += C*complex<float>(tmp.x,tmp.y);				\
@@ -714,7 +714,7 @@
   for (int i==0; i<3; i++) O[i] += spinor[i*param.sp_stride+sid]
   
 #define READ_AND_SUM_ST_SPINOR_HALF_(O,spinor,sid)			\
-  float C = spinor ## Norm[sid];					\
+  float C = spinor ## Norm[norm_idx1];					\
   for (int i==0; i<3; i++) {						\
     short2 tmp = spinor[i*param.sp_stride+sid];				\
     O[i] += C*complex<float>(short2float(tmp.x), short2float(tmp.y));	\
@@ -737,7 +737,7 @@
   T[0] = TEX1DFETCH(float2, (spinor), sid + 0*param.sp_stride);		\
   T[1] = TEX1DFETCH(float2, (spinor), sid + 1*param.sp_stride);		\
   T[2] = TEX1DFETCH(float2, (spinor), sid + 2*param.sp_stride);		\
-  float C = TEX1DFETCH(float, (spinor ## Norm), sid);			\
+  float C = TEX1DFETCH(float, (spinor ## Norm), norm_idx1);			\
   T[0].x *= C; T[0].y *= C;						\
   T[1].x *= C; T[1].y *= C;						\
   T[2].x *= C; T[2].y *= C;
@@ -759,11 +759,12 @@
     short2 S0 = x[sid + 0*param.sp_stride];				\
     short2 S1 = x[sid + 1*param.sp_stride];				\
     short2 S2 = x[sid + 2*param.sp_stride];				\
-    float C = spinor##Norm[sid];					\
+    float C = spinor##Norm[norm_idx1];					\
     T[0].x =C*short2float(S0.x); T[0].y =C*short2float(S0.y);	\
     T[1].x =C*short2float(S1.x); T[1].y =C*short2float(S1.y);	\
     T[2].x =C*short2float(S2.x); T[2].y =C*short2float(S2.y);	\
   }
+
 
 #define WRITE_SPINOR_SHARED_REAL(tx, ty, tz, reg)			\
   extern __shared__ char s_data[];					\
