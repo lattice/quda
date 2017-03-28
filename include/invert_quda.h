@@ -406,6 +406,8 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
     void solve(ColorSpinorField& out, ColorSpinorField& in);
+
+    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
   };
 
 

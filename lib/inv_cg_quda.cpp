@@ -24,6 +24,13 @@
 // this is more here for development convenience.
 #define BLOCKSOLVER_MULTIREDUCE
 //#define BLOCKSOLVER_VERBOSE
+
+// If defined, trigger a reliable updated whenever _any_ residual
+// becomes small enough. Otherwise, trigger a reliable update
+// when _all_ residuals become small enough (which is consistent with
+// the algorithm stopping condition). Ultimately, this is using a
+// min function versus a max function, so it's not a hard swap.
+// #define BLOCKSOLVER_RELIABLE_POLICY_MIN
 #endif
 
 #define QUDA_MAX_BLOCK_SRC 128
@@ -538,6 +545,23 @@ void printmat(const char* label, MatrixXcd& mat)
 }
 #endif
 
+// Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
+// Technically, there are ways to check both 'x' and 'r' for reliable updates...
+// the current status in blockCG is to just look for reliable updates in 'r'.
+int CG::block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+  // reliable updates
+  rNorm = sqrt(r2);
+  if (rNorm > maxrx) maxrx = rNorm;
+  if (rNorm > maxrr) maxrr = rNorm;
+  //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
+  //int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0
+  int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+  
+  //printf("reliable %d %e %e %e %e\n", updateR, rNorm, maxrx, maxrr, r2);
+
+  return updateR;
+}
+
 void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #ifndef BLOCKSOLVER
   errorQuda("QUDA_BLOCKSOLVER not built.");
@@ -610,7 +634,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   Ap.ExtendLastDimension();
   tmp.ExtendLastDimension();
 
-
   // calculate residuals for all vectors
   //for(int i=0; i<param.num_src; i++){
   //  mat(r.Component(i), x.Component(i), y.Component(i));
@@ -667,6 +690,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // Create other non-mapped matrices.
   MatrixBCG L = MatrixBCG::Zero(param.num_src,param.num_src);
   MatrixBCG C = MatrixBCG::Zero(param.num_src,param.num_src);
+  MatrixBCG C_old = MatrixBCG::Zero(param.num_src,param.num_src);
   MatrixBCG S = MatrixBCG::Identity(param.num_src,param.num_src); // Step 10: S = I
 
 #ifdef BLOCKSOLVER_VERBOSE
@@ -679,6 +703,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
   MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
   MatrixXcd C = MatrixXcd::Zero(param.num_src,param.num_src);
+  MatrixXcd C_old = MatrixXcd::Zero(param.num_src,param.num_src);
   MatrixXcd S = MatrixXcd::Identity(param.num_src,param.num_src); // Step 10: S = I
   MatrixXcd Sdagger = MatrixXcd::Identity(param.num_src,param.num_src);
   MatrixXcd L = MatrixXcd::Zero(param.num_src, param.num_src);
@@ -712,7 +737,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
 #endif
-  //printmat("r2", H);
+  printmat("r2", H);
 
   csParam.setPrecision(param.precision_sloppy);
   // tmp2 only needed for multi-gpu Wilson-like kernels
@@ -768,29 +793,17 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
   }
 
-  //FIXME:reliable updates currently not implemented
-  /*
-  double rNorm[QUDA_MAX_BLOCK_SRC];
-  double r0Norm[QUDA_MAX_BLOCK_SRC];
-  double maxrx[QUDA_MAX_BLOCK_SRC];
-  double maxrr[QUDA_MAX_BLOCK_SRC];
-
-  for(int i = 0; i < param.num_src; i++){
-    rNorm[i] = sqrt(r2(i,i).real());
-    r0Norm[i] = rNorm[i];
-    maxrx[i] = rNorm[i];
-    maxrr[i] = rNorm[i];
-  }
-  bool L2breakdown = false;
-  int rUpdate = 0;
-  nt steps_since_reliable = 1;
-  */
-
   profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profile.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::flops = 0;
 
   int k = 0;
+
+#ifdef BLOCKSOLVER_RELIABLE_POLICY_MIN
+  double rNorm = 1e30; // reliable update policy is to use the smallest residual.
+#else
+  double rNorm = 0.0; // reliable update policy is to use the largest residual.
+#endif
 
   PrintStats("CG", k, r2avg / param.num_src, b2avg, 0.);
   bool allconverged = true;
@@ -798,7 +811,25 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   for(int i=0; i<param.num_src; i++){
     converged[i] = convergence(H(i,i).real(), 0., stop[i], param.tol_hq);
     allconverged = allconverged && converged[i];
+#ifdef BLOCKSOLVER_RELIABLE_POLICY_MIN
+    if (rNorm > sqrt(H(i,i).real())) rNorm = sqrt(H(i,i).real());
+#else
+    if (rNorm < sqrt(H(i,i).real())) rNorm = sqrt(H(i,i).real());
+#endif
   }
+
+  //double r0Norm = rNorm;
+  double maxrx = rNorm;
+  double maxrr = rNorm;
+  double delta = param.delta;
+  printfQuda("Reliable update delta = %.8f\n", delta);
+
+  int rUpdate = 0;
+  //int steps_since_reliable = 1;
+
+  // Only matters for heavy quark residuals, which we don't have enabled
+  // in blockCG (yet).
+  //bool L2breakdown = false;
 
   // Step 6: L L^\dagger = H, Cholesky decomposition, L lower left triangular
   // Step 7: C = L^\dagger, C upper right triangular.
@@ -814,10 +845,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   // Step 8: finally set Q to thin QR decompsition of R.
 #ifdef BLOCKSOLVER_MULTIREDUCE
-  for (int i = 0; i < param.num_src; i++)
-  {
-    blas::zero(q.Component(i));
-  }
+  blas::zero(q);
   blas::copy(tmp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
   blas::caxpy(Linv_raw,tmp,q); // Would benefit from a 'caxy' function to avoid setting 'q' to zero.
 #else
@@ -875,7 +903,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
 #endif
-    //printmat("pAp", pAp);
+    printmat("pAp", pAp);
 
     // Step 14: Compute beta = pAp^(-1)
     // For convenience, we stick a minus sign on it now.
@@ -925,7 +953,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
 #endif
-    //printmat("r2", H);
+    printmat("r2", H);
   
     // Step 19: L L^\dagger = H; Cholesky decomposition of H, L is lower left triangular.
     L = H.llt().matrixL();// retrieve factor L  in the decomposition
@@ -933,14 +961,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // Step 20: S = L^\dagger
     S = L.adjoint();
 
-    // Steps 21 and 22 would require a block-cax and a block-cxpay. 
-    // In theory, since the 'a' matrices are upper right triangular,
-    // this should be possible even with recursion. For now, we use
-    // some extra temporary variables to get the job done.
+    // Step 21 requires a block-cax. We don't have that yet, 
+    // so we use an extra temporary variable and an extra copy
+    // to get the job done.
     // It really should be:
     // Step 21: Q = Q S^{-1}
-    // Step 22: P = Q + P S^\dagger
-    // But that'd just be too easy, wouldn't it?
 
     Linv = S.inverse();
 #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -956,9 +981,144 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpy(AC,q,tmp);  // would benefit from a 'caxy'
 #endif
+    blas::copy(q, tmp);  // Made to sidestep issues.
 
-    blas::copy(q, tmp);
+    // Step 22: Back up C (we need to have it if we trigger a reliable update)
+    C_old = C;
 
+    // Step 23: Update C. C = S * C_old. This will get overridden if we
+    // trigger a reliable update.
+    C = S * C;
+
+    // Step 24: calculate the residuals for all shifts. We use these
+    // to determine if we need to do a reliable update, and if we do,
+    // these values get recomputed.
+#ifdef BLOCKSOLVER_RELIABLE_POLICY_MIN
+    double r2 = 1e30; // reliable update policy is to use the smallest residual.
+#else
+    double r2 = 0.0; // reliable update policy is to use the largest residual.
+#endif
+
+    r2avg=0;
+    for (int j=0; j<param.num_src; j++ ){
+      H(j,j) = C(0,j)*conj(C(0,j));
+      for(int i=1; i < param.num_src; i++)
+        H(j,j) += C(i,j) * conj(C(i,j));
+      r2avg += H(j,j).real();
+#ifdef BLOCKSOLVER_RELIABLE_POLICY_MIN
+      if (r2 > H(j,j).real()) r2 = H(j,j).real();
+  #else
+      if (r2 < H(j,j).real()) r2 = H(j,j).real();
+  #endif
+    }
+
+    //bool did_reliable = false;
+    if (block_reliable(rNorm, maxrx, maxrr, r2, delta))
+    {
+      //did_reliable = true;
+      printfQuda("Triggered a reliable update on iteration %d!\n", k);
+      // This was in the BiCGstab(-L) reliable updates, but I don't
+      // think it's necessary... blas::xpy should support updating
+      // y from a lower precision vector.
+      //if (x.Precision() != x_sloppy.Precision())
+      //{
+      //  blas::copy(x, x_sloppy);
+      //}
+
+      // Reliable updates step 2: Y = Y + X_s
+      blas::xpy(x_sloppy, y);
+
+      // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
+      mat(r, y, x);
+      blas::xpay(b, -1.0, r);
+
+      // Reliable updates step 3: X_s = 0.
+      // If x.Precision() == x_sloppy.Precision(), they refer
+      // to the same pointer under the hood.
+      // x gets used as a temporary in mat(r,y,x) above.
+      // That's why we need to wait to zero 'x_sloppy' until here.
+      blas::zero(x_sloppy);
+
+      // Reliable updates step 5: H = (R)^\dagger R
+      r2avg=0;
+#ifdef BLOCKSOLVER_MULTIREDUCE
+      blas::cDotProduct(H_raw, r.Components(), r.Components());
+      for (int i = 0; i < param.num_src; i++)
+      {
+        r2avg += H(i,i).real();
+        printfQuda("r2[%i] %e\n", i, H(i,i).real());
+      }
+#else
+      for(int i=0; i<param.num_src; i++){
+        for(int j=i; j < param.num_src; j++){
+          H(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
+          if (i!=j) H(j,i) = std::conj(H(i,j));
+          if (i==j) {
+            r2avg += H(i,i).real();
+            printfQuda("r2[%i] %e\n", i, H(i,i).real());
+          }
+        }
+      }
+#endif
+      printmat("reliable r2", H);
+
+      // Reliable updates step 6: L L^\dagger = H, Cholesky decomposition, L lower left triangular
+      // Reliable updates step 7: C = L^\dagger, C upper right triangular.
+      // Set Linv = C.inverse() for convenience in the next step.
+      L = H.llt().matrixL(); // retrieve factor L in the decomposition
+      C = L.adjoint();
+      Linv = C.inverse();
+
+#ifdef BLOCKSOLVER_VERBOSE
+      std::cout << "r2\n " << H << std::endl;
+      std::cout << "L\n " << L.adjoint() << std::endl;
+#endif
+
+      // Reliable updates step 8: set Q to thin QR decompsition of R.
+#ifdef BLOCKSOLVER_MULTIREDUCE
+      blas::zero(q);
+      blas::copy(tmp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
+      blas::caxpy(Linv_raw,tmp,q); // Would benefit from a 'caxy' function to avoid setting 'q' to zero.
+#else
+      // temporary hack - use AC to pass matrix arguments to multiblas
+      for(int i=0; i<param.num_src; i++){
+        blas::zero(q.Component(i));
+        for(int j=0;j<param.num_src; j++){
+          AC[i*param.num_src + j] = Linv(i,j);
+        }
+      }
+      blas::copy(tmp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
+      blas::caxpy(AC,tmp,q); // Would benefit from a 'caxy' function to avoid setting 'q' to zero.
+#endif
+      // We need this for updating p below.
+      blas::copy(tmp,q);
+
+      // Reliable updates step 9: Set S = C * C_old^{-1} (equation 6.1 in the blockCGrQ paper)
+      S = C * C_old.inverse();
+
+      // Reliable updates step 10: Recompute residuals, reset rNorm, etc.
+#ifdef BLOCKSOLVER_RELIABLE_POLICY_MIN
+      rNorm = 1e30; // reliable update policy is to use the smallest residual.
+#else
+      rNorm = 0.0; // reliable update policy is to use the largest residual.
+#endif
+      allconverged = true;
+      for(int i=0; i<param.num_src; i++){
+        converged[i] = convergence(H(i,i).real(), 0., stop[i], param.tol_hq);
+        allconverged = allconverged && converged[i];
+#ifdef BLOCKSOLVER_RELIABLE_POLICY_MIN
+        if (rNorm > sqrt(H(i,i).real())) rNorm = sqrt(H(i,i).real());
+#else
+        if (rNorm < sqrt(H(i,i).real())) rNorm = sqrt(H(i,i).real());
+#endif
+      }
+      maxrx = rNorm;
+      maxrr = rNorm;
+      rUpdate++;
+
+    } // end reliable.
+
+    // Debug print of Q.
     #ifdef BLOCKSOLVER_VERBOSE
     #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::cDotProduct(pTp_raw, q.Components(), q.Components());
@@ -969,11 +1129,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     #endif
-    
     std::cout << " qTq " << std::endl << pTp << std::endl;
     std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
     #endif
 
+    // Step 28 would require a block-cxpay. 
+    // It really should be:
+    // Step 28: P = Q + P S^\dagger
+    // But that'd just be too easy, wouldn't it?
+
+    // Recall tmp currently contains a copy of Q.
 #ifdef BLOCKSOLVER_MULTIREDUCE
     Sdagger = S.adjoint();
     blas::caxpy(Sdagger_raw,p,tmp);
@@ -986,13 +1151,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpy(AC,p,tmp);
 #endif
-    
+
     blas::copy(p, tmp);
 
-    // Done with step 21 and 22 foolery.
+    // Done with step 28.
 
-    // Step 23: update C = S * C
-    C = S * C;
 
     #ifdef BLOCKSOLVER_VERBOSE
     #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -1009,18 +1172,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     std::cout <<  "S " << S<<  std::endl << "C " << C << std::endl;
     #endif
 
-    // Step 24: calculate the residuals for all shifts
-    r2avg=0;
-    for (int j=0; j<param.num_src; j++ ){
-      H(j,j) = C(0,j)*conj(C(0,j));
-      for(int i=1; i < param.num_src; i++)
-        H(j,j) += C(i,j) * conj(C(i,j));
-      r2avg += H(j,j).real();
-    }
-
     k++;
     PrintStats("CG", k, r2avg / param.num_src, b2avg, 0);
-    // Step 25: check convergence
+    // Step 29: update the convergence check. H will contain the right
+    // thing whether or not we triggered a reliable update.
     allconverged = true;
     for(int i=0; i<param.num_src; i++){
       converged[i] = convergence(H(i,i).real(), 0, stop[i], param.tol_hq);
@@ -1033,9 +1188,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // We've converged!
   // Step 27: Update Xs into Y.
   blas::xpy(x_sloppy, y);
-  /*for(int i=0; i<param.num_src; i++){
-    blas::xpy(y.Component(i), xSloppy.Component(i));
-  }*/
 
   // And copy the final answer into X!
   blas::copy(x, y);
