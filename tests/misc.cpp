@@ -1133,6 +1133,12 @@ get_solver_type(char* s)
     ret = QUDA_CGNE_INVERTER;
   } else if (strcmp(s, "cgnr") == 0){
     ret = QUDA_CGNR_INVERTER;
+  } else if (strcmp(s, "cg3") == 0){
+    ret = QUDA_CG3_INVERTER;
+  } else if (strcmp(s, "cg3ne") == 0){
+    ret = QUDA_CG3NE_INVERTER;
+  } else if (strcmp(s, "cg3nr") == 0){
+    ret = QUDA_CG3NR_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);
