@@ -371,8 +371,7 @@ struct coeff_array {
 
 
 template <typename doubleN, typename ReduceType, typename RegType, typename StoreType,
-  int M, int NXZ, template <int MXZ, typename ReducerType, typename Float, typename FloatN> class Reducer,
-  int writeX, int writeY, int writeZ, int writeW, typename T>
+	  int M, int NXZ, template <int MXZ, typename ReducerType, typename Float, typename FloatN> class Reducer, typename write, typename T>
   void multiReduceCuda(doubleN result[], const reduce::coeff_array<T> &a, const reduce::coeff_array<T> &b, const reduce::coeff_array<T> &c,
 			  std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
 			  std::vector<ColorSpinorField*>& z, std::vector<ColorSpinorField*>& w,
@@ -444,9 +443,9 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
   strcpy(blasStrings.aux_tmp, x[0]->AuxString());
 
   multi::SpinorTexture<RegType,StoreType,M,0> X[NXZ];
-  multi::Spinor<RegType,StoreType,M,writeY,1> Y[MAX_MULTI_BLAS_N];
+  multi::Spinor<RegType,StoreType,M,write::Y,1> Y[MAX_MULTI_BLAS_N];
   multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
-  multi::Spinor<RegType,StoreType,M,writeW,3> W[MAX_MULTI_BLAS_N];
+  multi::Spinor<RegType,StoreType,M,write::W,3> W[MAX_MULTI_BLAS_N];
 
   for (int i=0; i<NXZ; i++) {
     X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
@@ -474,10 +473,10 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
 
   MultiReduceCuda<NXZ,doubleN,ReduceType,RegType,M,
 		  multi::SpinorTexture<RegType,StoreType,M,0>,
-      multi::Spinor<RegType,StoreType,M,writeY,1>,
-      multi::SpinorTexture<RegType,StoreType,M,2>,
-      multi::Spinor<RegType,StoreType,M,writeW,3>,
-      decltype(r) >
+		  multi::Spinor<RegType,StoreType,M,write::Y,1>,
+		  multi::SpinorTexture<RegType,StoreType,M,2>,
+		  multi::Spinor<RegType,StoreType,M,write::W,3>,
+		  decltype(r) >
     reduce(result, X, Y, Z, W, r, NYW, length, x[0]->SiteSubset(), y, w);
     reduce.apply(*blas::getStream());
 

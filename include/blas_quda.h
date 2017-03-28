@@ -163,7 +163,25 @@ namespace quda {
 		   const Complex *b_, ColorSpinorField &z_);
 
     void reDotProduct(double* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+
+    /**
+       @brief Computes the matrix of inner products between the vector set a and the vector set b
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+
+    /**
+       @brief Computes the matrix of inner products between the vector set a and the vector set b, and copies b into c
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+       @param c[out] set of output ColorSpinorFields
+    */
+    void cDotProductCopy(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b, std::vector<ColorSpinorField*>& c);
 
   } // namespace blas
 
