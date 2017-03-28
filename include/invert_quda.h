@@ -405,6 +405,26 @@ namespace quda {
     void solve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
+
+
+  class CG3 : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    // pointers to fields to avoid multiple creation overhead
+    ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp, *tmp2Sp;
+    bool init;
+
+  public:
+    CG3(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CG3();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+
+
   class CGNE : public CG {
 
   private:

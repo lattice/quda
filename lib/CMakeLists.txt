@@ -6,6 +6,7 @@ set (QUDA_OBJS
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu
+  inv_cg3_quda.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
