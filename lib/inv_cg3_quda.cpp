@@ -146,7 +146,7 @@ namespace quda {
       blas::zero(x);
       if (mixed_precision) {
         blas::zero(y);
-        blas::zero(x);
+        blas::zero(xS);
       }
     }
     blas::copy(rS, r);
