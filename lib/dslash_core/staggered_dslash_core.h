@@ -1071,7 +1071,7 @@ if (kernel_type == INTERIOR_KERNEL){
     for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
       int nbr_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*block_src_offset*Volh;
 #if (DD_PREC == 2) //half precision
-      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)Volh;
+      int norm_idx1 = sp_idx_1st_nbr + (src_idx+reg_src)*Volh;
 #endif
       active = true;
       nbr_idx1 = param.ghostOffset[1][1] + (src_idx+reg_src)*NFACE*ghostFace[1] + (y[1]-(X[1]-1))*ghostFace[1] + space_con;
