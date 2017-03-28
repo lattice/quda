@@ -773,6 +773,71 @@ namespace quda {
 
 #endif
 
+    /**
+       double quadrupleCG3InitNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
+        tmpx = x;
+        tmpy = y;
+        x = b*(x + a*y) + (1.-b)*z;
+        y = b*(y + a*v) + (1.-b)*w;
+        z = tmpx;
+        w = tmpy;
+        norm2(y);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      quadrupleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        z = x;
+        w = y;
+        x += a.x*y;
+        y -= a.x*v;
+        norm2_<ReduceType>(sum,y);
+      }
+      static int streams() { return 6; } //! total number of input and output streams
+      static int flops() { return 6; } //! flops per element check if it's right
+    };
+
+    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
+      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3InitNorm_,1,1,1,1,0,false>
+	(make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, w, v);
+    }
+
+
+    /**
+       double quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
+        tmpx = x;
+        tmpy = y;
+        x = b*(x + a*y) + (1.-b)*z;
+        y = b*(y + a*v) + (1.-b)*w;
+        z = tmpx;
+        w = tmpy;
+        norm2(y);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a,b;
+      quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      FloatN tmpx, tmpy;
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        tmpx = x;
+        tmpy = y;
+        x = b.x*(x + a.x*y) + b.y*z;
+        y = b.x*(y - a.x*v) + b.y*w;
+        z = tmpx;
+        w = tmpy;
+        norm2_<ReduceType>(sum,y);
+      }
+      static int streams() { return 7; } //! total number of input and output streams
+      static int flops() { return 16; } //! flops per element check if it's right
+    };
+
+    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
+      return reduce::reduceCuda<double,QudaSumFloat,quadrupleCG3UpdateNorm_,1,1,1,1,0,false>
+	(make_double2(a, 0.0), make_double2(b, 1.-b), x, y, z, w, v);
+    }
+
+
    } // namespace blas
 
 } // namespace quda
