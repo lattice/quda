@@ -261,8 +261,8 @@ namespace quda {
           mat(r, y, x, tmp); //  here we can use x as tmp
           r2 = blas::xmyNorm(b, r);
           if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
-          param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-          param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+          param.true_res = sqrt(r2 / b2);
+          param.true_res_hq = heavy_quark_res;
           blas::copy(rS, r);
           blas::axpy(-1., xS, xS_old);
           blas::zero(xS);
