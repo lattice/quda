@@ -425,6 +425,22 @@ namespace quda {
 
 
 
+  class CG3NE : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    // pointers to fields to avoid multiple creation overhead
+    ColorSpinorField *yp, *rp, *tmpp, *AdagrSp, *AAdagrSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp;
+    bool init;
+
+  public:
+    CG3NE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CG3NE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
   class CGNE : public CG {
 
   private:
