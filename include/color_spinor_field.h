@@ -451,11 +451,21 @@ namespace quda {
 
    /**
     * 
-    * Currently, this is needed to convert 5-d into 4-d parity  field and vice versa
+    * Currently, this is needed to convert 5-d into 4-d parity field and vice versa
     */
 
-    void ReduceDimensionality() {nDim   -= 1; x[nDim] = 1;}//that is, after reduction/extension 5d direction is trivial
-    void ExtendDimensionality() {x[nDim] = 1; nDim   += 1;}
+    void ReduceDimensionality() {
+      if (nDim-1 < 1) errorQuda("Cannot reduce field dimension less than 1");
+      nDim--;
+      x[nDim] = 1; //that is, after reduction/extension 5d direction is trivial
+      setTuningString();
+    }
+    void ExtendDimensionality() {
+      if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
+      x[nDim] = 1;
+      nDim++;
+      setTuningString();
+    }
  
     void ExtendLastDimension() {
       if(composite_descr.is_composite && (x[nDim-1] == 1)) {
@@ -463,6 +473,7 @@ namespace quda {
       } else {
         errorQuda("Cannot apply extension of dimension size.\n");
       }
+      setTuningString();
     } 
 
   };
