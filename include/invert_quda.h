@@ -394,7 +394,7 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *App, *tmpp;
+    ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     bool init;
 
   public:
