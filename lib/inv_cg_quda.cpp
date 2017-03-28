@@ -944,10 +944,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
     Linv = S.inverse();
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    for (int i = 0; i < param.num_src; i++)
-    {
-      blas::zero(tmp.Component(i));
-    }
+    blas::zero(tmp);
     blas::caxpy(Linv_raw, q, tmp); // would benefit from a 'caxy'
 #else
     // temporary hack
