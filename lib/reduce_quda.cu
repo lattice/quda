@@ -837,6 +837,56 @@ namespace quda {
 	(make_double2(a, 0.0), make_double2(b, 1.-b), x, y, z, w, v);
     }
 
+    /**
+       void doubleCG3InitNorm(d a, V x, V y, V z){}
+        y = x;
+        x -= a.x*z;
+        norm2(x);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct doubleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      doubleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+        y = x;
+        x -= a.x*z;
+        norm2_<ReduceType>(sum,x);
+      }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 5; } //! flops per element
+    };
+
+    double doubleCG3InitNorm(double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
+        (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
+    }
+
+    /**
+       void doubleCG3UpdateNorm(d a, d b, V x, V y, V z){}
+        tmp = x;
+        x = b.x*(x-a.x*z) + b.y*y;
+        y = tmp;
+        norm2(x);
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct doubleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a, b;
+      doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      FloatN tmp;
+      __device__ __host__ void operator()(ReduceType &sum,FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
+        tmp = x;
+        x = b.x*(x-a.x*z) + b.y*y;
+        y = tmp;
+        norm2_<ReduceType>(sum,x);
+      }
+      static int streams() { return 4; } //! total number of input and output streams
+      static int flops() { return 9; } //! flops per element
+    };
+
+    double doubleCG3UpdateNorm(double &a, double &b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
+        (make_double2(a, 0.0), make_double2(b, 1.0-b), x, y, z, z, z);
+    }
 
    } // namespace blas
 
