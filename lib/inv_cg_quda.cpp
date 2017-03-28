@@ -36,6 +36,76 @@ namespace quda {
     }
   }
 
+  CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(mat.Expose()), init(false) {
+  }
+
+  CGNE::~CGNE() {
+    if ( init ) {
+      delete xp;
+      init = false;
+    }
+  }
+
+  // CGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
+  void CGNE::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+
+    if (!init) {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      xp = ColorSpinorField::Create(x, csParam);
+
+      init = true;
+
+    } else if(param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      warningQuda("Initial guess may not work as expected with CGNE\n");
+      *xp = x;
+    }
+
+    CG::operator()(*xp,b);
+
+    mmdag.Expose()->Mdag(x,*xp);
+  }
+
+  CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(mat.Expose()), init(false) {
+  }
+
+  CGNR::~CGNR() {
+    if ( init ) {
+      delete bp;
+      init = false;
+    }
+  }
+
+  // CGNR: Mdag M x = Mdag b is solved.
+  void CGNR::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    const int iter0 = param.iter;
+
+    if (!init) {
+      ColorSpinorParam csParam(b);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      bp = ColorSpinorField::Create(csParam);
+
+      init = true;
+
+    }
+
+    mdagm.Expose()->Mdag(*bp,b);
+    CG::operator()(x,*bp);
+
+    if (param.compute_true_res) {
+      // compute the true residuals
+      const double b2 = blas::norm2(b);
+      mdagm.Expose()->M(*bp, x);
+      const double r2 = blas::xmyNorm(b, *bp) / b2;
+      param.true_res = sqrt(r2);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, *bp).z);
+
+      PrintSummary("CGNR", param.iter - iter0, r2, b2);
+    }
+  }
+
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
