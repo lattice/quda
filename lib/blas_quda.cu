@@ -629,7 +629,7 @@ namespace quda {
       static int flops() { return 3; } //! flops per element
     };
 
-    void doubleCG3Init(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
 	blasCuda<doubleCG3Init_,1,1,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0),
                                          make_double2(0.0, 0.0), x, y, z, z);
     }
@@ -654,7 +654,7 @@ namespace quda {
       static int flops() { return 7; } //! flops per element
     };
 
-    void doubleCG3Update(const double &a, const double &b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
 	blasCuda<doubleCG3Update_,1,1,0,0>(make_double2(a, 0.0), make_double2(b, 1.0-b),
                                            make_double2(0.0, 0.0), x, y, z, z);
     }

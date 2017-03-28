@@ -856,7 +856,7 @@ namespace quda {
       static int flops() { return 5; } //! flops per element
     };
 
-    double doubleCG3InitNorm(double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
       return reduce::reduceCuda<double,QudaSumFloat,doubleCG3InitNorm_,1,1,0,0,0,false>
         (make_double2(a, 0.0), make_double2(0.0, 0.0), x, y, z, z, z);
     }
@@ -883,7 +883,7 @@ namespace quda {
       static int flops() { return 9; } //! flops per element
     };
 
-    double doubleCG3UpdateNorm(double &a, double &b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
       return reduce::reduceCuda<double,QudaSumFloat,doubleCG3UpdateNorm_,1,1,0,0,0,false>
         (make_double2(a, 0.0), make_double2(b, 1.0-b), x, y, z, z, z);
     }
