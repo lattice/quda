@@ -25,14 +25,13 @@ namespace quda {
     if ( init ) {
       delete rp;
       delete yp;
-      delete tmpp;
       delete AdagrSp;
       delete AAdagrSp;
+      delete tmpSp;
       if(param.precision != param.precision_sloppy) {
         delete rSp;
         delete xSp;
         delete xS_oldp;
-        delete tmpSp;
         delete rS_oldp;
       }
 
@@ -61,7 +60,7 @@ namespace quda {
       return;
     }
 
-    const bool is_cg3ne = (param.inv_type & QUDA_CG3NE_INVERTER);
+    const bool is_cg3ne = (param.inv_type == QUDA_CG3NE_INVERTER) ? true:false;
     char name[6];
     strcpy(name, is_cg3ne ? "CG3NE" : "CG3NR");
 
@@ -70,7 +69,6 @@ namespace quda {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       rp = ColorSpinorField::Create(csParam);
-      tmpp = ColorSpinorField::Create(csParam);
       yp = ColorSpinorField::Create(csParam);
 
       // Sloppy fields
@@ -78,14 +76,13 @@ namespace quda {
       AdagrSp = ColorSpinorField::Create(csParam);
       AAdagrSp = ColorSpinorField::Create(csParam);
       rS_oldp = ColorSpinorField::Create(csParam);
+      tmpSp = ColorSpinorField::Create(csParam);
       if(mixed_precision) {
         rSp = ColorSpinorField::Create(csParam);
         xSp = ColorSpinorField::Create(csParam);
         xS_oldp = ColorSpinorField::Create(csParam);
-        tmpSp = ColorSpinorField::Create(csParam);
       } else {
         xS_oldp = yp;
-        tmpSp = tmpp;
       }
 
       init = true;
@@ -99,7 +96,6 @@ namespace quda {
     ColorSpinorField &AAdagrS = *AAdagrSp;
     ColorSpinorField &rS_old = *rS_oldp;
     ColorSpinorField &xS_old = *xS_oldp;
-    ColorSpinorField &tmp = *tmpp;
     ColorSpinorField &tmpS = *tmpSp;
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
@@ -146,7 +142,7 @@ namespace quda {
       blas::zero(x);
       if (mixed_precision) {
         blas::zero(y);
-        blas::zero(x);
+        blas::zero(xS);
       }
     }
     blas::copy(rS, r);
@@ -191,21 +187,13 @@ namespace quda {
       // CG3NE step
       if(k==0 || restart) { // First iteration
         if(pipeline) {
-          if(is_cg3ne) {
-            r2 = blas::quadrupleCG3InitNorm(gamma, xS, rS, xS_old, rS_old, AAdagrS);
-          } else {
-            blas::doubleCG3Init(gamma, xS, xS_old, AdagrS);
-            r2 = blas::doubleCG3InitNorm(gamma, rS, rS_old, AAdagrS);
-          }
+          blas::doubleCG3Init(gamma, xS, xS_old, AdagrS);
+          r2 = blas::doubleCG3InitNorm(gamma, rS, rS_old, AAdagrS);
         } else {
           blas::copy(xS_old, xS);
           blas::copy(rS_old, rS);
 
-          if(is_cg3ne) {
-            blas::axpy(gamma, rS, xS);  // x += gamma*r
-          } else {
-            blas::axpy(gamma, AdagrS, xS);  // x += gamma*Adag*r            
-          }
+          blas::axpy(gamma, AdagrS, xS);  // x += gamma*Adag*r            
           r2 = blas::axpyNorm(-gamma, AAdagrS, rS); // r -= gamma*w
         }
         restart = false;
@@ -218,19 +206,11 @@ namespace quda {
         r2_old = r2;
 
         if(pipeline) {
-          if(is_cg3ne) {
-            r2 = blas::quadrupleCG3UpdateNorm(gamma, rho, xS, rS, xS_old, rS_old, AAdagrS);
-          } else {
-            blas::doubleCG3Update(gamma, rho, xS, xS_old, AdagrS);
-            r2 = blas::doubleCG3UpdateNorm(gamma, rho, rS, rS_old, AAdagrS);
-          }
+          blas::doubleCG3Update(gamma, rho, xS, xS_old, AdagrS);
+          r2 = blas::doubleCG3UpdateNorm(gamma, rho, rS, rS_old, AAdagrS);
         } else {
           blas::copy(tmpS, xS);
-          if(is_cg3ne) {
-            blas::axpby(gamma*rho, rS, rho, xS);
-          } else {
-            blas::axpby(gamma*rho, AdagrS, rho, xS);
-          }
+          blas::axpby(gamma*rho, AdagrS, rho, xS);
           blas::axpy(1.-rho, xS_old, xS);
           blas::copy(xS_old, tmpS);
 
@@ -284,7 +264,7 @@ namespace quda {
           // updating the "new" vectors
           blas::copy(x, xS);
           blas::xpy(x, y);
-          mat(r, y, x, tmp); //  here we can use x as tmp
+          mat(r, y, x); //  here we can use x as tmp
           r2 = blas::xmyNorm(b, r);
           if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
           param.true_res = sqrt(r2 / b2);
@@ -349,7 +329,7 @@ namespace quda {
 
     // compute the true residuals
     if (!mixed_precision && param.compute_true_res) {
-      mat(r, x, y, tmp);
+      mat(r, x, y);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
       param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
     }
