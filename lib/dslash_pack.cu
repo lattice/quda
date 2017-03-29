@@ -85,7 +85,8 @@ namespace quda {
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
-    int sp_stride;
+    bool is_composite;
+    int sp_stride;//warning: for composite field, stride of it's 4d component
 
     int_fastdiv swizzle;
   };
@@ -104,6 +105,7 @@ namespace quda {
     output << "ghostFace = {" << param.ghostFace[0] << ","<< param.ghostFace[1] << "," 
 	   << param.ghostFace[2] << "," << param.ghostFace[3] << "}" << std::endl;
     output << "sp_stride = " << param.sp_stride << std::endl;
+    output << "is_composite = " << param.is_composite << std::endl;
     return output;
   }
 
@@ -726,7 +728,9 @@ namespace quda {
 #endif
 
       param.threads = threads();
-      param.sp_stride = in->Stride();
+
+      param.is_composite = in->IsComposite();
+      param.sp_stride = in->IsComposite() ? in->ComponentStride() : in->Stride(); 
 
       int prev = -1; // previous dimension that was partitioned
       for (int i=0; i<4; i++) {
@@ -1049,6 +1053,30 @@ namespace quda {
     outNorm[out_idx] = inNorm[in_idx];
   }
 
+//NEW:
+  template <typename Float2>
+    __device__ void packCompositeFaceStaggeredCore(Float2 *out, float *outNorm, const int out_idx, 
+					  const int out_stride, const Float2 *in, const float *inNorm, 
+					  const int2 in_idx, const PackParam<double2> &param) {
+    const int scal   = param.is_composite ? 3 : 1;
+    const int offset = scal*in_idx.y*(param.volume_4d >> 1);
+    out[out_idx + 0*out_stride] = in[in_idx.x + 0*param.sp_stride + offset];
+    out[out_idx + 1*out_stride] = in[in_idx.x + 1*param.sp_stride + offset];
+    out[out_idx + 2*out_stride] = in[in_idx.x + 2*param.sp_stride + offset];
+  }	
+  template<> 
+    __device__ void packCompositeFaceStaggeredCore(short2 *out, float *outNorm, const int out_idx, 
+					  const int out_stride, const short2 *in, const float *inNorm, 
+					  const int2 in_idx, const PackParam<double2> &param) {
+    const int scal   = param.is_composite ? 3 : 1;
+    const int V4     = (param.volume_4d >> 1);
+    const int offset = scal*in_idx.y*V4;
+    out[out_idx + 0*out_stride] = in[in_idx.x + 0*param.sp_stride + offset];
+    out[out_idx + 1*out_stride] = in[in_idx.x + 1*param.sp_stride + offset];
+    out[out_idx + 2*out_stride] = in[in_idx.x + 2*param.sp_stride + offset];
+    outNorm[out_idx] = inNorm[in_idx.x + in_idx.y*V4];
+  }
+
 
 #else
   __device__ void packFaceStaggeredCore(double2 *out, float *outNorm, const int out_idx, 
@@ -1083,6 +1111,43 @@ namespace quda {
     out[out_idx + 2*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+2*param.sp_stride));
     outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXHALFNORM, in_idx);
   }
+
+//NEW:
+  __device__ void packCompositeFaceStaggeredCore(double2 *out, float *outNorm, const int out_idx, 
+					const int out_stride, const double2 *in, const float *inNorm, 
+					const int2 in_idx, const PackParam<double2> &param) {
+    const int scal   = param.is_composite ? 3 : 1;
+    const int offset = scal*in_idx.y*(param.volume_4d >> 1);
+    out[out_idx + 0*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx.x + 0*param.sp_stride + offset);
+    out[out_idx + 1*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx.x + 1*param.sp_stride + offset);
+    out[out_idx + 2*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx.x + 2*param.sp_stride + offset);
+  }	
+
+  __device__ void packCompositeFaceStaggeredCore(float2 *out, float *outNorm, const int out_idx, 
+					const int out_stride, const float2 *in, 
+					const float *inNorm, const int2 in_idx, 
+					const PackParam<float2> &param) {
+    const int scal   = param.is_composite ? 3 : 1;
+    const int offset = scal*in_idx.y*(param.volume_4d >> 1);
+    out[out_idx + 0*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx.x + 0*param.sp_stride + offset);
+    out[out_idx + 1*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx.x + 1*param.sp_stride + offset);
+    out[out_idx + 2*out_stride] = TEX1DFETCH(float2, SPINORTEXSINGLE, in_idx.x + 2*param.sp_stride + offset);	
+  }
+
+  __device__ void packCompositeFaceStaggeredCore(short2 *out, float *outNorm, const int out_idx, 
+					const int out_stride, const short2 *in, 
+					const float *inNorm, const int2 in_idx, 
+					const PackParam<short2> &param) {
+    const int scal   = param.is_composite ? 3 : 1;
+    const int V4     = (param.volume_4d >> 1);
+    const int offset = scal*in_idx.y*V4; 
+    out[out_idx + 0*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx.x + 0*param.sp_stride + offset));
+    out[out_idx + 1*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx.x + 1*param.sp_stride + offset));
+    out[out_idx + 2*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx.x + 2*param.sp_stride + offset));
+    outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXHALFNORM, in_idx.x + in_idx.y*V4);
+  }
+
+
 #endif
 
 
@@ -1105,48 +1170,48 @@ namespace quda {
       const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[0]) ? 1 : 0) : param.face_num;
       if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[0];
       if (face_num == 0) {
-	const int idx = indexFromFaceIndexStaggered<0,nFace,0>(face_idx,param);
-	packFaceStaggeredCore(param.out[0], param.outNorm[0], face_idx, 
+        const int2 idx = compositeIndexFromFaceIndexStaggered<0,nFace,0>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[0], param.outNorm[0], face_idx, 
 			      Ls*nFace*param.ghostFace[0], param.in, param.inNorm, idx, param);
       } else {
-	const int idx = indexFromFaceIndexStaggered<0,nFace,1>(face_idx,param);
-	packFaceStaggeredCore(param.out[1], param.outNorm[1], face_idx,
+        const int2 idx = compositeIndexFromFaceIndexStaggered<0,nFace,1>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[1], param.outNorm[1], face_idx,
 			      Ls*nFace*param.ghostFace[0], param.in, param.inNorm, idx, param);
       }
     } else if (dim == 1) {
       const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[1]) ? 1 : 0) : param.face_num;
       if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[1];
       if (face_num == 0) {
-	const int idx = indexFromFaceIndexStaggered<1,nFace,0>(face_idx,param);
-	packFaceStaggeredCore(param.out[2], param.outNorm[2], face_idx, 
+        const int2 idx = compositeIndexFromFaceIndexStaggered<1,nFace,0>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[2], param.outNorm[2], face_idx, 
 			      Ls*nFace*param.ghostFace[1], param.in, param.inNorm, idx, param);
       } else {
-	const int idx = indexFromFaceIndexStaggered<1,nFace,1>(face_idx,param);
-	packFaceStaggeredCore(param.out[3], param.outNorm[3], face_idx, 
+ 	const int2 idx = compositeIndexFromFaceIndexStaggered<1,nFace,1>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[3], param.outNorm[3], face_idx, 
 			      Ls*nFace*param.ghostFace[1], param.in, param.inNorm, idx, param);
       }
     } else if (dim == 2) {
       const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[2]) ? 1 : 0) : param.face_num;
       if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[2];
       if (face_num == 0) {
-	const int idx = indexFromFaceIndexStaggered<2,nFace,0>(face_idx,param);
-	packFaceStaggeredCore(param.out[4], param.outNorm[4], face_idx,
+	const int2 idx = compositeIndexFromFaceIndexStaggered<2,nFace,0>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[4], param.outNorm[4], face_idx,
 			      Ls*nFace*param.ghostFace[2], param.in, param.inNorm, idx, param);
       } else {
-	const int idx = indexFromFaceIndexStaggered<2,nFace,1>(face_idx,param);
-	packFaceStaggeredCore(param.out[5], param.outNorm[5], face_idx,
+        const int2 idx = compositeIndexFromFaceIndexStaggered<2,nFace,1>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[5], param.outNorm[5], face_idx,
 			      Ls*nFace*param.ghostFace[2], param.in, param.inNorm, idx, param);
       }
     } else {
       const int face_num = (param.face_num==2) ? ((face_idx >= Ls*nFace*param.ghostFace[3]) ? 1 : 0) : param.face_num;
       if(param.face_num==2) face_idx -= face_num*Ls*nFace*param.ghostFace[3];
       if (face_num == 0) {
-	const int idx = indexFromFaceIndexStaggered<3,nFace,0>(face_idx,param);
-	packFaceStaggeredCore(param.out[6], param.outNorm[6], face_idx,
+	const int2 idx = compositeIndexFromFaceIndexStaggered<3,nFace,0>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[6], param.outNorm[6], face_idx,
 			      Ls*nFace*param.ghostFace[3], param.in, param.inNorm,idx, param);
       } else {
-	const int idx = indexFromFaceIndexStaggered<3,nFace,1>(face_idx,param);
-	packFaceStaggeredCore(param.out[7], param.outNorm[7], face_idx, 
+	const int2 idx = compositeIndexFromFaceIndexStaggered<3,nFace,1>(face_idx,param);
+	packCompositeFaceStaggeredCore(param.out[7], param.outNorm[7], face_idx, 
 			      Ls*nFace*param.ghostFace[3], param.in, param.inNorm, idx, param);
       }
     }
