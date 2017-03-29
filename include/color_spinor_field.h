@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include <lattice_field.h>
+#include <random_quda.h>
 
 namespace quda {
   struct FullClover;
@@ -796,6 +797,9 @@ namespace quda {
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
 
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger);
+
+  void spinorGauss(ColorSpinorField &src, int seed);
+  void spinorGauss(ColorSpinorField &src, RNG& randstates);
 
 } // namespace quda
 

@@ -134,8 +134,8 @@ namespace quda {
         return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
       }
 
-      long long flops() const { return 6ll*2*arg.threads*(3*198+3); }
-      long long bytes() const { return 6ll*4*2*arg.threads*arg.dataDs.Bytes(); } 
+      long long flops() const { return 0; }
+      long long bytes() const { return 0; } 
 
 
       void preTune(){
