@@ -234,6 +234,12 @@ namespace quda {
       check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
     }
+
+    if (IsComposite()) {
+      strcpy(aux_tmp, aux_string);
+      check = snprintf(aux_string, aux_string_n, "%s,composite_dim=%d", aux_tmp, CompositeDim());
+      if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+    }
   }
 
   void ColorSpinorField::destroy() {
