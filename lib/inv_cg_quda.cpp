@@ -545,6 +545,7 @@ void printmat(const char* label, MatrixXcd& mat)
 }
 #endif
 
+
 // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
 // Technically, there are ways to check both 'x' and 'r' for reliable updates...
 // the current status in blockCG is to just look for reliable updates in 'r'.
@@ -900,6 +901,15 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // Step 13: calculate pAp = P^\dagger Ap
 #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::cDotProduct(pAp_raw, pp->Components(), Ap.Components());
+#if 0
+    // hermiticity check
+    for(int i=0; i<param.num_src; i++){
+      for(int j=i; j < param.num_src; j++){
+        if ((fabs(pAp(i,j) - conj(pAp(j,i))) / fabs(pAp(i,j))) > 1e-2)
+	  warningQuda("Violated i=%d j=%d %e %e %e %e", i, j, pAp(i,j).real(), pAp(i,j).imag(), pAp(j,i).real(), pAp(j,i).imag());
+      }
+    }
+#endif
 #else
     for(int i=0; i<param.num_src; i++){
       for(int j=i; j < param.num_src; j++){
@@ -1137,14 +1147,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // but that's difficult for the same
     // reason a block cax is difficult.
     // Instead, we do it by a caxpyz + pointer swap.
-    // caxpyz is currently broken... but the memory
-    // copy + caxpy + pointer swap may be just
-    // as memory cost effective?
-    blas::copy(*tmpp,*qp);
 #ifdef BLOCKSOLVER_MULTIREDUCE
     Sdagger = S.adjoint();
-    blas::caxpy(Sdagger_raw,*pp,*tmpp);
-    //blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
 #else
     // temporary hack
     for(int i=0; i<param.num_src; i++){
@@ -1152,8 +1157,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*param.num_src + j] = std::conj(S(j,i));
       }
     }
-    blas::caxpy(Sdagger_raw,*pp,*tmpp);
-    //blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
+    blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
 #endif
     std::swap(pp,tmpp); // now P contains P.
 

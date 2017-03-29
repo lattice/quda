@@ -610,273 +610,9 @@ __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, Floa
 
     void caxy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxy(a, x.Components(), y.Components()); }
 
-/**
-       Functor to perform the operation z += a * x + y  (complex-valued)
-    */
-    /*
-    template<int NXZ, typename Float2, typename FloatN>
-    struct multicaxpypz_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
-      const int NYW;
-      // ignore parameter arrays since we place them in constant memory
-      multicaxpypz_(const coeff_array<Complex> &a, const coeff_array<Complex> &b,
-      const coeff_array<Complex> &c, int NYW) : NYW(NYW)
-      { }
-
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-      {
-#ifdef __CUDA_ARCH__
-        Float2 *a = reinterpret_cast<Float2*>(Amatrix_d); // fetch coefficient matrix from constant memory
-        w += y; // w because we swizzled.
-        _caxpy(a[MAX_MULTI_BLAS_N*j+i], x, w);
-#else
-        Float2 *a = reinterpret_cast<Float2*>(Amatrix_h);
-        w += y; // w because we swizzled.
-        _caxpy(a[NYW*j+i], x, w);
-#endif
-      }
-
-      // needs to be checked...
-      int streams() { return 3*NYW + 2*NXZ*NYW; } //! total number of input and output streams
-      int flops() { return 5*NXZ*NYW; } //! flops per real element
-    };
-
-    void caxpypz(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z) {
-
-      if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, recurse.
-      {
-        // We need to split up 'a' carefully since it's row-major.
-        Complex* tmpmajor = new Complex[x.size()*y.size()];
-        Complex* tmpmajor0 = &tmpmajor[0];
-        Complex* tmpmajor1 = &tmpmajor[x.size()*(y.size()/2)];
-        std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
-        std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
-
-        std::vector<ColorSpinorField*> z0(z.begin(), z.begin() + z.size()/2);
-        std::vector<ColorSpinorField*> z1(z.begin() + z.size()/2, z.end());
-
-        const unsigned int xlen = x.size();
-        const unsigned int ylen0 = y.size()/2;
-        const unsigned int ylen1 = y.size() - y.size()/2;
-        
-        int count = 0, count0 = 0, count1 = 0;
-        for (unsigned int i = 0; i < xlen; i++)
-        {
-          for (unsigned int j = 0; j < ylen0; j++)
-            tmpmajor0[count0++] = a_[count++];
-          for (unsigned int j = 0; j < ylen1; j++)
-            tmpmajor1[count1++] = a_[count++];
-        }
-
-        caxpypz(tmpmajor0, x, y0, z0);
-        caxpypz(tmpmajor1, x, y1, z1);
-
-        delete[] tmpmajor;
-
-      }
-      else
-      {
-        // mark true since we will copy the "a" matrix into constant memory
-        coeff_array<Complex> a(a_, true), b, c;
-
-        if (x[0]->Precision() == y[0]->Precision())
-        {
-          switch (x.size()) {
-            case 1:
-              multiblasCuda<1,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              multiblasCuda<2,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              multiblasCuda<3,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              multiblasCuda<4,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              multiblasCuda<5,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              multiblasCuda<6,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              multiblasCuda<7,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              multiblasCuda<8,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              multiblasCuda<9,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              multiblasCuda<10,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              multiblasCuda<11,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              multiblasCuda<12,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              multiblasCuda<13,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              multiblasCuda<14,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              multiblasCuda<15,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              multiblasCuda<16,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #endif // 16
-  #endif // 15
-  #endif // 14
-  #endif // 13
-  #endif // 12
-  #endif // 11
-  #endif // 10
-  #endif // 9
-  #endif // 8
-  #endif // 7
-  #endif // 6
-  #endif // 5
-  #endif // 4
-  #endif // 3
-  #endif // 2
-            default:
-              // split the problem in half and recurse
-              const Complex *a0 = &a_[0];
-              const Complex *a1 = &a_[(x.size()/2)*y.size()];
-
-              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
-
-              caxpypz(a0, x0, y, z);
-              caxpypz(a1, x1, y, z);
-              break;
-          }
-        }
-        else // precisions don't agree.
-        {
-          switch (x.size()) {
-            case 1:
-              mixed::multiblasCuda<1,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 2
-            case 2:
-              mixed::multiblasCuda<2,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 3
-            case 3:
-              mixed::multiblasCuda<3,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 4
-            case 4:
-              mixed::multiblasCuda<4,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 5
-            case 5:
-              mixed::multiblasCuda<5,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 6
-            case 6:
-              mixed::multiblasCuda<6,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 7
-            case 7:
-              mixed::multiblasCuda<7,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 8
-            case 8:
-              mixed::multiblasCuda<8,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 9
-            case 9:
-              mixed::multiblasCuda<9,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 10
-            case 10:
-              mixed::multiblasCuda<10,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 11
-            case 11:
-              mixed::multiblasCuda<11,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 12
-            case 12:
-              mixed::multiblasCuda<12,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 13
-            case 13:
-              mixed::multiblasCuda<13,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 14
-            case 14:
-              mixed::multiblasCuda<14,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 15
-            case 15:
-              mixed::multiblasCuda<15,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #if MAX_MULTI_BLAS_N >= 16
-            case 16:
-              mixed::multiblasCuda<16,multicaxpypz_,0,0,0,1>(a, b, c, x, y, x, z);
-              break;
-  #endif // 16
-  #endif // 15
-  #endif // 14
-  #endif // 13
-  #endif // 12
-  #endif // 11
-  #endif // 10
-  #endif // 9
-  #endif // 8
-  #endif // 7
-  #endif // 6
-  #endif // 5
-  #endif // 4
-  #endif // 3
-  #endif // 2
-            default:
-              // split the problem in half and recurse
-              const Complex *a0 = &a_[0];
-              const Complex *a1 = &a_[(x.size()/2)*y.size()];
-
-              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
-
-              caxpypz(a0, x0, y, z); 
-              caxpypz(a1, x1, y, z);
-              break;
-          }
-        }
-      } // end if (y.size() > MAX_MULTI_BLAS_N)
-    }
-
-    void caxpypz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) { caxpypz(a, x.Components(), y.Components(), z.Components()); }
-    */
-
-
-/**
+    /**
        Functor to perform the operation z = a * x + y  (complex-valued)
     */
-    /*
     template<int NXZ, typename Float2, typename FloatN>
     struct multicaxpyz_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
       const int NYW;
@@ -889,20 +625,20 @@ __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, Floa
       {
 #ifdef __CUDA_ARCH__
         Float2 *a = reinterpret_cast<Float2*>(Amatrix_d); // fetch coefficient matrix from constant memory
-        if (j == 0) w=y; else w += y; // w because we swizzled.
+        if (j==0) w = y;
         _caxpy(a[MAX_MULTI_BLAS_N*j+i], x, w);
 #else
         Float2 *a = reinterpret_cast<Float2*>(Amatrix_h);
-        if (j == 0) w=y; else w += y; // w because we swizzled.
+        if (j==0) w = y;
         _caxpy(a[NYW*j+i], x, w);
 #endif
       }
 
-      int streams() { return 3*NYW + 2*NXZ*NYW; } //! total number of input and output streams
-      int flops() { return 5*NXZ*NYW; } //! flops per real element
+      int streams() { return 2*NYW + NXZ*NYW; } //! total number of input and output streams
+      int flops() { return 4*NXZ*NYW; } //! flops per real element
     };
 
-    void caxpyz(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z) {
+    void caxpyz(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z, int i, int j, int pass) {
 
       if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, recurse.
       {
@@ -921,7 +657,7 @@ __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, Floa
         const unsigned int ylen1 = y.size() - y.size()/2;
         
         int count = 0, count0 = 0, count1 = 0;
-        for (unsigned int i = 0; i < xlen; i++)
+        for (unsigned int i_ = 0; i_ < xlen; i_++)
         {
           for (unsigned int j = 0; j < ylen0; j++)
             tmpmajor0[count0++] = a_[count++];
@@ -929,14 +665,23 @@ __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, Floa
             tmpmajor1[count1++] = a_[count++];
         }
 
-        caxpyz(tmpmajor0, x, y0, z0);
-        caxpyz(tmpmajor1, x, y1, z1);
+        caxpyz(tmpmajor0, x, y0, z0, i, 2*j+0, pass);
+        caxpyz(tmpmajor1, x, y1, z1, i, 2*j+1, pass);
 
         delete[] tmpmajor;
-
       }
       else
       {
+	// if at bottom of recursion check where we are
+	if (x.size() <= MAX_MULTI_BLAS_N) {
+	  if (pass==1) {
+	    if (i!=j) caxpy(a_, x, z); // off diagonal
+	    return;
+	  } else {
+	    if (i!=j) return;
+	  }
+	}
+
         // mark true since we will copy the "a" matrix into constant memory
         coeff_array<Complex> a(a_, true), b, c;
 
@@ -1029,8 +774,8 @@ __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, Floa
               std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
               std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
-              caxpyz(a0, x0, y, z);
-              caxpypz(a1, x1, y, z); // b/c we don't want to re-zero z.
+              caxpyz(a0, x0, y, z, 2*i+0, j, pass);
+              caxpyz(a1, x1, y, z, 2*i+1, j, pass); // b/c we don't want to re-zero z.
               break;
           }
         }
@@ -1123,16 +868,25 @@ __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, Floa
               std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
               std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
-              caxpyz(a0, x0, y, z); 
-              caxpypz(a1, x1, y, z); // b/c we don't want to re-zero z.
+              caxpyz(a0, x0, y, z, 2*i+0, j, pass);
+              caxpyz(a1, x1, y, z, 2*i+1, j, pass);
               break;
           }
         }
       } // end if (y.size() > MAX_MULTI_BLAS_N)
     }
 
-    void caxpyz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) { caxpyz(a, x.Components(), y.Components(), z.Components()); }
-    */
+    void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z) {
+      // first pass does the caxpyz on the diagonal
+      caxpyz(a, x, y, z, 0, 0, 0);
+      // second pass does caxpy on the off diagonals
+      caxpyz(a, x, y, z, 0, 0, 1);
+    }
+
+
+    void caxpyz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      caxpyz(a, x.Components(), y.Components(), z.Components());
+    }
 
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
