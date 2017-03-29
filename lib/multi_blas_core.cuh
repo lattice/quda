@@ -362,7 +362,7 @@ void genericMultiBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f)
     if (writeX) errorQuda("writeX not supported in multiblas.");
     if (writeY) Y(parity, x, s, c) = make_Complex(Y2);
 	  // if (writeZ) Z(parity, x, s, c) = make_Complex(Z2);
-    if (writeX) errorQuda("writeZ not supported in multiblas.");
+    if (writeZ) errorQuda("writeZ not supported in multiblas.");
 	  if (writeW) W(parity, x, s, c) = make_Complex(W2);
 	}
       }
