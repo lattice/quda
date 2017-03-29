@@ -137,6 +137,7 @@ namespace quda {
       param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level+1);
       param_coarse->fine = this;
       param_coarse->delta = 1e-20;
+      param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
 
       coarse = new MG(*param_coarse, profile_global);
 
@@ -225,10 +226,12 @@ namespace quda {
     param_presmooth->Nkrylov = 4;
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
-    param_presmooth->compute_true_res = false;
+    param_presmooth->pipeline = 4;
+
     if (param.level == 0) {
-       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
-       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+      param_presmooth->precision = param.mg_global.invert_param->cuda_prec_precondition;
+      param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
+      param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
     }
 
     if (param.level==param.Nlevel-1) {
@@ -756,6 +759,7 @@ namespace quda {
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
     solverParam.Nkrylov = 4;
     solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // pipeline != 0 breaks BICGSTAB
+    solverParam.precision = B[0]->Precision();
     
     if (param.level == 0) { // this enables half precision on the fine grid only if set
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
