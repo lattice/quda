@@ -93,8 +93,8 @@ namespace quda {
       diracParam.transfer = transfer;
 
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
-      diracParam.kappa = param.matResidual->Expose()->Kappa();
-      diracParam.mu = param.matResidual->Expose()->Mu();
+      diracParam.kappa = diracParam.dirac->Kappa();
+      diracParam.mu = diracParam.dirac->Mu();
       diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
 
       diracParam.dagger = QUDA_DAG_NO;
@@ -199,6 +199,68 @@ namespace quda {
     profile.TPRESET();
 
     setOutputPrefix("");
+  }
+
+  void MG::updateCoarseOperator() {
+
+    // for reporting level 1 is the fine level but internally use level 0 for indexing
+    sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+    setOutputPrefix(prefix);
+    printfQuda("Updating operator on level %d of %d levels\n", param.level+2, param.Nlevel);
+
+    // free the previous dirac operators
+    if (matCoarseResidual) delete matCoarseResidual;
+    if (matCoarseSmoother) delete matCoarseSmoother;
+    if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
+
+    if (diracCoarseResidual) delete diracCoarseResidual;
+    if (diracCoarseSmoother) delete diracCoarseSmoother;
+    // At the moment diracCoarseSmootherSloppy is aliased to diracCoarseSmoother
+    //if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
+
+    // check if we are coarsening the preconditioned system then
+    bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
+    QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+
+    // create coarse grid operator
+    DiracParam diracParam;
+    diracParam.transfer = transfer;
+
+    diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
+    diracParam.kappa = diracParam.dirac->Kappa();
+    diracParam.mu = diracParam.dirac->Mu();
+    diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
+
+    diracParam.dagger = QUDA_DAG_NO;
+    diracParam.matpcType = matpc_type;
+    diracParam.tmp1 = tmp_coarse;
+    // use even-odd preconditioning for the coarse grid solver
+    diracCoarseResidual = new DiracCoarse(diracParam);
+
+    // create smoothing operators
+    diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
+    diracParam.type = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? QUDA_COARSEPC_DIRAC : QUDA_COARSE_DIRAC;
+    diracParam.tmp1 = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? &(tmp_coarse->Even()) : tmp_coarse;
+    diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
+      new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
+      new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+    diracCoarseSmootherSloppy = diracCoarseSmoother;  // for coarse grids these always alias for now (FIXME half precision support for coarse op)
+
+    matCoarseResidual = new DiracM(*diracCoarseResidual);
+    matCoarseSmoother = new DiracM(*diracCoarseSmoother);
+    matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
+
+    coarse->param.matResidual = matCoarseResidual;
+    coarse->param.matSmooth = matCoarseSmoother;
+    coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;
+
+    coarse->destroySmoother();
+    coarse->createSmoother();
+
+    // if not on the coarsest level, update next
+    if (param.level < param.Nlevel-1) {
+      coarse->updateCoarseOperator();
+    }
   }
 
   void MG::reset() {
@@ -790,7 +852,6 @@ namespace quda {
     const Dirac &dirac = *(param.matSmooth->Expose());
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
       solverParam.maxiter = 2000;
-      solverParam.compute_true_res = false; // computing the true residual makes xmyNorm throw error on the coarse levels
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
       solverParam.inv_type_precondition = param.mg_global.smoother[param.level];

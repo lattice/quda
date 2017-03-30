@@ -268,6 +268,11 @@ namespace quda {
     virtual ~MG();
 
     /**
+       @brief Update coarse operator (recursive call from fine to coarsest level)
+    */
+    void updateCoarseOperator();
+
+    /**
        @brief Create the smoothers
     */
     void createSmoother();
