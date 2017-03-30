@@ -16,8 +16,6 @@
 
 #include <iostream>
 
-#define QUDA_MAX_BLOCK_SRC 64
-
 #ifdef BLOCKSOLVER
 #include <Eigen/Dense>
 
@@ -1436,24 +1434,22 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   dslash::aux_worker = NULL;
 
-  // compute the true residuals
-  mat(r, x, y, tmp3);
-  for(int i=0; i<nsrc; i++){
+  if (param.compute_true_res) {
+    // compute the true residuals
+    mat(r, x, y, tmp3);
+    for (int i=0; i<nsrc; i++){
+      param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
+      param.true_res_offset[i] = param.true_res;
+      param.true_res_hq_offset[i] = param.true_res_hq;
+    }
+  }
 
-    //mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
-    param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
-    param.true_res_offset[i] = param.true_res;
-    param.true_res_hq_offset[i] = param.true_res_hq;
-
+  for (int i=0; i<nsrc; i++) {
     std::stringstream str;
     str << "Block-CG " << i;
     PrintSummary(str.str().c_str(), k, H(i,i).real(), b2[i]);
-
-    printfQuda("%d done\n", i);
   }
-
-  printfQuda("reset\n");
 
   // reset the flops counters
   blas::flops = 0;
@@ -1463,11 +1459,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profile.TPSTART(QUDA_PROFILE_FREE);
 
-  printfQuda("delete\n");
-
   if (&tmp3 != tmp_matsloppyp) delete tmp3_p;
-
-  printfQuda("delete\n");
   if (&tmp2 != tmp_matsloppyp) delete tmp2_p;
 
   profile.TPSTOP(QUDA_PROFILE_FREE);
