@@ -678,6 +678,8 @@ namespace quda {
     };
 
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r) {
+      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
+      if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
       double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,HeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, r, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
@@ -718,6 +720,8 @@ namespace quda {
 
     double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y,
 				      ColorSpinorField &r) {
+      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
+      if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
       double3 rtn = reduce::reduceCuda<double3,QudaSumFloat3,xpyHeavyQuarkResidualNorm_,0,0,0,0,0,true>
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
