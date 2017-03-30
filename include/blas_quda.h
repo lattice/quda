@@ -232,6 +232,18 @@ namespace quda {
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
 
     /**
+       @brief Computes the matrix of inner products between the vector
+       set a and the vector set b.  This routine is specifically for
+       the case where the result matrix is guarantted to be Hermitian.
+       Requires a.size()==b.size().
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    void hDotProduct(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+
+    /**
        @brief Computes the matrix of inner products between the vector set a and the vector set b, and copies b into c
 
        @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])

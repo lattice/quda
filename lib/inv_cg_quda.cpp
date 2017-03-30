@@ -727,7 +727,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // Step 5: H = (R)^\dagger R
   double r2avg=0;
 #ifdef BLOCKSOLVER_MULTIREDUCE
-  blas::cDotProduct(H_raw, r.Components(), r.Components());
+  blas::hDotProduct(H_raw, r.Components(), r.Components());
+
   for (int i = 0; i < param.num_src; i++)
   {
     r2avg += H(i,i).real();
@@ -869,21 +870,21 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // Step 9: P = Q; additionally set P to thin QR decompoistion of r
   blas::copy(*pp, *qp);
 
-  #ifdef BLOCKSOLVER_VERBOSE
-  #ifdef BLOCKSOLVER_MULTIREDUCE
-  blas::cDotProduct(pTp_raw, pp->Components(), pp->Components());
-  #else
+#ifdef BLOCKSOLVER_VERBOSE
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  blas::hDotProduct(pTp_raw, pp->Components(), pp->Components());
+#else
   for(int i=0; i<param.num_src; i++){
     for(int j=0; j<param.num_src; j++){
       pTp(i,j) = blas::cDotProduct(pp->Component(i), pp->Component(j));
     }
   }
-  #endif
+#endif
 
   std::cout << " pTp  " << std::endl << pTp << std::endl;
   std::cout << " L " << std::endl << L.adjoint() << std::endl;
   std::cout << " C " << std::endl << C << std::endl;
-  #endif
+#endif
 
   // Step 10 was set S to the identity, but we took care of that
   // when we initialized all of the matrices. 
@@ -900,7 +901,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
     // Step 13: calculate pAp = P^\dagger Ap
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::cDotProduct(pAp_raw, pp->Components(), Ap.Components());
+    blas::hDotProduct(pAp_raw, pp->Components(), Ap.Components());
 #if 0
     // hermiticity check
     for(int i=0; i<param.num_src; i++){
@@ -957,7 +958,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     // Orthogonalize Q via a thin QR decomposition.
     // Step 18: H = Q^\dagger Q
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::cDotProduct(H_raw, qp->Components(), qp->Components());
+    blas::hDotProduct(H_raw, qp->Components(), qp->Components());
 #else
     printfQuda("Iteration %d\n",k);
     for(int i=0; i<param.num_src; i++){
@@ -1055,7 +1056,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       // Reliable updates step 5: H = (R)^\dagger R
       r2avg=0;
 #ifdef BLOCKSOLVER_MULTIREDUCE
-      blas::cDotProduct(H_raw, r.Components(), r.Components());
+      blas::hDotProduct(H_raw, r.Components(), r.Components());
       for (int i = 0; i < param.num_src; i++)
       {
         r2avg += H(i,i).real();
@@ -1128,19 +1129,19 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     } // end reliable.
 
     // Debug print of Q.
-    #ifdef BLOCKSOLVER_VERBOSE
-    #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::cDotProduct(pTp_raw, qp->Components(), qp->Components());
-    #else
+#ifdef BLOCKSOLVER_VERBOSE
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::hDotProduct(pTp_raw, qp->Components(), qp->Components());
+#else
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
         pTp(i,j) = blas::cDotProduct(qp->Component(i), qp->Component(j));
       }
     }
-    #endif
+#endif
     std::cout << " qTq " << std::endl << pTp << std::endl;
     std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
-    #endif
+#endif
 
     // Step 28: P = Q + P S^\dagger
     // This would be best done with a cxpay,
@@ -1221,20 +1222,20 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }*/
     // End test...
 
-    #ifdef BLOCKSOLVER_VERBOSE
-    #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::cDotProduct(pTp_raw, pp->Components(), pp->Components());
-    #else
+#ifdef BLOCKSOLVER_VERBOSE
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::hDotProduct(pTp_raw, pp->Components(), pp->Components());
+#else
     for(int i=0; i<param.num_src; i++){
       for(int j=0; j<param.num_src; j++){
         pTp(i,j) = blas::cDotProduct(pp->Component(i), pp->Component(j));
       }
     }
-    #endif
+#endif
 
     std::cout << " pTp " << std::endl << pTp << std::endl;
     std::cout <<  "S " << S<<  std::endl << "C " << C << std::endl;
-    #endif
+#endif
 
     k++;
     PrintStats("CG", k, r2avg / param.num_src, b2avg, 0);

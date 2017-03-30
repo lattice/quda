@@ -253,6 +253,17 @@ namespace quda {
     };
 
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
+    struct Hdot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+      typedef typename scalar<Float2>::type real;
+      const int NYW;
+      Hdot(const reduce::coeff_array<Complex> &a, const reduce::coeff_array<Complex> &b, const reduce::coeff_array<Complex> &c, int NYW) : NYW(NYW) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      { if (i>=j) cdot_<ReduceType>(sum,x,y); }
+      static int streams() { return 2; } //! total number of input and output streams
+      static int flops() { return 4; } //! flops per element
+    };
+
+    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
     struct CdotCopy : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
       typedef typename scalar<Float2>::type real;
       const int NYW;
@@ -268,7 +279,7 @@ namespace quda {
     template <template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal, typename writeDiagonal,
 	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal, typename writeOffDiagonal>
     void cDotProduct_recurse(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
-			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i, int j) {
+			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i, int j, bool hermitian) {
 
       if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, split and recurse
       {
@@ -279,12 +290,17 @@ namespace quda {
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
         std::vector<ColorSpinorField*> w0(w.begin(), w.begin() + w.size()/2);
         std::vector<ColorSpinorField*> w1(w.begin() + w.size()/2, w.end());
-        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x, y0, z, w0, i, 2*j+0);
-        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x, y1, z, w1, i, 2*j+1);
+        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x, y0, z, w0, i, 2*j+0, hermitian);
+        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x, y1, z, w1, i, 2*j+1, hermitian);
       }
       else
       {
         double2* cdot = new double2[x.size()*y.size()];
+
+	// if at bottom of recursion, return if on lower left
+	if (x.size() <= MAX_MULTI_BLAS_N && hermitian) {
+	  if (j < i) { return; }
+	}
 
         reduce::coeff_array<Complex> a, b, c;
 
@@ -396,8 +412,8 @@ namespace quda {
           std::vector<ColorSpinorField*> z0(z.begin(), z.begin() + z.size()/2);
           std::vector<ColorSpinorField*> z1(z.begin() + z.size()/2, z.end());
 
-          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x0, y, z0, w, 2*i+0, j);
-          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x1, y, z1, w, 2*i+1, j);
+          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x0, y, z0, w, 2*i+0, j, hermitian);
+          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x1, y, z1, w, 2*i+1, j, hermitian);
 
           const unsigned int xlen0 = x.size()/2;
           const unsigned int xlen1 = x.size() - xlen0;
@@ -438,7 +454,7 @@ namespace quda {
       // cDotProduct_recurse returns a column-major matrix.
       // To be consistent with the multi-blas functions, we should
       // switch this to row-major.
-      cDotProduct_recurse<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> >(result_tmp, x, y, x, y, 0, 0);
+      cDotProduct_recurse<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> >(result_tmp, x, y, x, y, 0, 0, false);
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();
@@ -450,6 +466,34 @@ namespace quda {
       for (unsigned int j = 0; j < xlen; j++)
         for (unsigned int i = 0; i < ylen; i++)
           result[j*ylen+i] = result_tmp[i*xlen + j];
+
+      delete[] result_tmp;
+    }
+
+    void hDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
+
+      Complex* result_tmp = new Complex[x.size()*y.size()];
+      for (unsigned int i = 0; i < x.size()*y.size(); i++)
+        result_tmp[i] = 0.0;
+
+      // cDotProduct_recurse returns a column-major matrix.
+      // To be consistent with the multi-blas functions, we should
+      // switch this to row-major.
+      cDotProduct_recurse<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> >(result_tmp, x, y, x, y, 0, 0, true);
+
+      // do a single multi-node reduction only once we have computed all local dot products
+      const int Nreduce = 2*x.size()*y.size();
+      reduceDoubleArray((double*)result_tmp, Nreduce);
+
+      // Switch from col-major to row-major
+      const unsigned int xlen = x.size();
+      const unsigned int ylen = y.size();
+      for (unsigned int j = 0; j < xlen; j++)
+        for (unsigned int i = j; i < ylen; i++) {
+          result[j*ylen+i] = result_tmp[i*xlen + j];
+          result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
+	}
 
       delete[] result_tmp;
     }
@@ -466,7 +510,7 @@ namespace quda {
         result_tmp[i] = 0.0;
 
       // When recursing, only the diagonal tiles will do the copy, the rest just do the outer product
-      cDotProduct_recurse<CdotCopy,write<0,0,0,1>,Cdot,write<0,0,0,0> >(result_tmp, x, y, x, z, 0, 0);
+      cDotProduct_recurse<CdotCopy,write<0,0,0,1>,Cdot,write<0,0,0,0> >(result_tmp, x, y, x, z, 0, 0, false);
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();
