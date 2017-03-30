@@ -633,9 +633,11 @@ class BlockCGUpdate : public Worker {
 
       // Only update if there are things to apply.
       // Update 1 through n_count-1, as well as n_count if update_per_apply_blah_blah = 0.
+      PUSH_RANGE("BLAS",2)
       if ((count != n_update-1 && update_per_apply != 0) || update_per_apply_on_last == 0)
       {
         std::vector<ColorSpinorField*> curr_p((*pp)->Components().begin() + count*update_per_apply, (*pp)->Components().begin() + (count+1)*update_per_apply);
+
 #ifdef BLOCKSOLVER_MULTIREDUCE
         blas::caxpy(&alpha[count*update_per_apply*n_rhs], curr_p, x_sloppyp->Components());
 #else
@@ -657,6 +659,7 @@ class BlockCGUpdate : public Worker {
         blas::caxpy(AC, curr_p, x_sloppyp->Components());
 #endif
       }
+      POP_RANGE
       
       if (++count == n_update) count = 0;
       
