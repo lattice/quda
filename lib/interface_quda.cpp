@@ -2582,6 +2582,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  */
 void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
 {
+  bool kernel_pack_old = getKernelPackT();
+  setKernelPackT(true);
 
   // currently that code is just a copy of invertQuda and cannot work
 
@@ -2931,6 +2933,8 @@ for(int i=0; i < param->num_src; i++) {
   saveTuneCache();
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  setKernelPackT(kernel_pack_old);
 }
 
 
