@@ -666,7 +666,7 @@ namespace quda {
     }
 
     // always initialize the ghost send pointers
-    int Nint = nColor * nSpin * 2 / (nSpin == 4 ? 2 : 1); // number of internal degrees of freedom
+    int Nint = nColor * nSpin * 2 / (nSpin == 4 ? 2 : 1); // number of internal degrees of freedom (assumes spin projection)
     size_t offset = 0;
     for (int i=0; i<4; i++) {
       if (!commDimPartitioned(i)) continue;
@@ -792,14 +792,10 @@ namespace quda {
     
     if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
-      size_t bytes = nFace*Nint*ghostFace[dim]*precision;
-
-      if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
-
       void* gpu_buf = 
 	(dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[bufferIndex][dim] : this->fwdGhostFaceBuffer[bufferIndex][dim];
 
-      cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream);
+      cudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], cudaMemcpyDeviceToHost, *stream);
 
     } else if (this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET) { // do multiple cudaMemcpys
 
@@ -897,18 +893,12 @@ namespace quda {
 					 const int dim, const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
   {
-
-    int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
-
-    int len = nFace*ghostFace[dim]*Nint*precision;
     const void *src = ghost_spinor;
   
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
     void *ghost_dst = (char*)ghost_field[bufferIndex] + precision*ghost_offset;
 
-    if (precision == QUDA_HALF_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
-
-    cudaMemcpyAsync(ghost_dst, src, len, cudaMemcpyHostToDevice, *stream);
+    cudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], cudaMemcpyHostToDevice, *stream);
   }
 
 
@@ -999,14 +989,8 @@ namespace quda {
       // nbytes is the size in bytes of each face
       size_t nbytes[QUDA_MAX_DIM];
       
-      // The number of degrees of freedom per site for the given
-      // field.  Currently assumes spin projection of a Wilson-like
-      // field (so half the number of degrees of freedom).
-      int Ndof = (2 * nSpin * nColor) / (nSpin==4 ? 2 : 1);
-
       for (int i=0; i<nDimComms; i++) {
-	nbytes[i] = maxNface*surfaceCB[i]*Ndof*precision;
-	if (precision == QUDA_HALF_PRECISION) nbytes[i] += maxNface*surfaceCB[i]*sizeof(float);
+	nbytes[i] = ghost_face_bytes[i];
 	if (!commDimPartitioned(i)) continue;
 	faceBytes += 2*nbytes[i];
       }
