@@ -25,6 +25,11 @@
 #define BLOCKSOLVER_MULTIREDUCE
 //#define BLOCKSOLVER_VERBOSE
 
+// Explicitly reorthogonalize Q^\dagger P on reliable update.
+//#define BLOCKSOLVER_EXPLICIT_QP_ORTHO
+// Explicitly make pAp Hermitian every time it is computed.
+//#define BLOCKSOLVER_EXPLICIT_PAP_HERMITIAN
+
 // If defined, trigger a reliable updated whenever _any_ residual
 // becomes small enough. Otherwise, trigger a reliable update
 // when _all_ residuals become small enough (which is consistent with
@@ -50,6 +55,7 @@ namespace quda {
       delete x_sloppy_savedp;
       delete pp;
       delete qp;
+      delete tmp_matsloppyp;
 #endif
       init = false;
     }
@@ -546,6 +552,113 @@ void printmat(const char* label, MatrixXcd& mat)
 #endif
 
 
+/**
+     The following code is based on Kate's worker class in Multi-CG.
+     
+     This worker class is used to perform the update of X_sloppy,
+     UNLESS a reliable update is triggered. X_sloppy is updated
+     via a block caxpy: X_sloppy += P \alpha.
+     We can accomodate multiple comms-compute overlaps
+     by partitioning the block caxpy w/respect to P, because
+     this doesn't require any memory shuffling of the dense, square
+     matrix alpha. This results in improved strong scaling for
+     blockCG. 
+
+     See paragraphs 2 and 3 in the comments on the Worker class in
+     Multi-CG for more remarks. 
+*/
+class BlockCGUpdate : public Worker {
+
+    ColorSpinorField* x_sloppyp;
+    ColorSpinorField** pp; // double pointer because pp participates in pointer swapping
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    Complex* alpha;
+#else
+    Complex* AC;
+    MatrixXcd* alpha;
+#endif
+
+    /**
+       How many RHS we're solving.
+    */
+    unsigned int n_rhs;
+
+    /**
+       How much to partition the shifted update. For now, we assume
+       we always need to partition into two pieces (since BiCGstab-L
+       should only be getting even/odd preconditioned operators).
+    */
+    int n_update; 
+
+  public:
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, Complex* alpha) :
+#else
+    BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, MatrixXcd* alpha) :
+#endif
+      x_sloppyp(x_sloppyp), pp(pp), alpha(alpha), n_rhs((*pp)->Components().size()),
+      n_update( x_sloppyp->Nspin()==4 ? 4 : 2 )
+    {
+#ifndef BLOCKSOLVER_MULTIREDUCE
+      AC = new Complex[n_rhs*n_rhs];
+#endif
+    }
+    ~BlockCGUpdate() {
+#ifndef BLOCKSOLVER_MULTIREDUCE
+      delete[] AC;
+#endif
+    }
+    
+
+    // note that we can't set the stream parameter here so it is
+    // ignored.  This is more of a future design direction to consider
+    void apply(const cudaStream_t &stream) {      
+      static int count = 0;
+
+      // How many to update per apply.
+      const int update_per_apply = n_rhs/n_update;
+
+      // If the number of updates doesn't evenly divide into n_rhs, there's leftover.
+      const int update_per_apply_on_last = n_rhs - n_update*update_per_apply;
+
+      // Only update if there are things to apply.
+      // Update 1 through n_count-1, as well as n_count if update_per_apply_blah_blah = 0.
+      if ((count != n_update-1 && update_per_apply != 0) || update_per_apply_on_last == 0)
+      {
+        std::vector<ColorSpinorField*> curr_p((*pp)->Components().begin() + count*update_per_apply, (*pp)->Components().begin() + (count+1)*update_per_apply);
+#ifdef BLOCKSOLVER_MULTIREDUCE
+        blas::caxpy(&alpha[count*update_per_apply*n_rhs], curr_p, x_sloppyp->Components());
+#else
+        for (int i = 0; i < update_per_apply; i++)
+          for (int j = 0; j < n_rhs; j++)
+            AC[i*n_rhs + j] = alpha(i + count*update_per_apply, j);
+        blas::caxpy(AC, curr_p, x_sloppyp->Components());
+#endif
+      }
+      else if (count == n_update-1) // we're updating the leftover.
+      {
+        std::vector<ColorSpinorField*> curr_p((*pp)->Components().begin() + count*update_per_apply, (*pp)->Components().end());
+#ifdef BLOCKSOLVER_MULTIREDUCE
+        blas::caxpy(&alpha[count*update_per_apply*n_rhs], curr_p, x_sloppyp->Components());
+#else
+        for (int i = 0; i < update_per_apply_on_last; i++)
+          for (int j = 0; j < n_rhs; j++)
+            AC[i*n_rhs + j] = alpha(i + count*update_per_apply, j);
+        blas::caxpy(AC, curr_p, x_sloppyp->Components());
+#endif
+      }
+      
+      if (++count == n_update) count = 0;
+      
+    }
+    
+  };
+
+  // this is the Worker pointer that the dslash uses to launch the shifted updates
+  namespace dslash {
+    extern Worker* aux_worker;
+  } 
+
 // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
 // Technically, there are ways to check both 'x' and 'r' for reliable updates...
 // the current status in blockCG is to just look for reliable updates in 'r'.
@@ -614,33 +727,26 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     qp = ColorSpinorField::Create(csParam);
     App = ColorSpinorField::Create(csParam);
     tmpp = ColorSpinorField::Create(csParam);
+    tmp_matsloppyp = ColorSpinorField::Create(csParam);
     init = true;
 
   }
   ColorSpinorField &r = *rp;
   ColorSpinorField &y = *yp;
   ColorSpinorField &x_sloppy_saved = *x_sloppy_savedp;
-  //ColorSpinorField &p = *pp; // We do pointer swapping,
-  //ColorSpinorField &q = *qp; // can't have these refs.
   ColorSpinorField &Ap = *App;
-  //ColorSpinorField &tmp = *tmpp;
+  ColorSpinorField &tmp_matsloppy = *tmp_matsloppyp;
 
   ColorSpinorField *x_sloppyp; // Gets assigned below.
 
   r.ExtendLastDimension();
   y.ExtendLastDimension();
   x_sloppy_saved.ExtendLastDimension();
-  //p.ExtendLastDimension();
-  //q.ExtendLastDimension();
   Ap.ExtendLastDimension();
-  //tmp.ExtendLastDimension();
   pp->ExtendLastDimension();
   qp->ExtendLastDimension();
   tmpp->ExtendLastDimension();
-
-  ColorSpinorField *p_save = pp;
-  ColorSpinorField *q_save = qp;
-  ColorSpinorField *tmp_save = tmpp;
+  tmp_matsloppy.ExtendLastDimension();
 
   // calculate residuals for all vectors
   //for(int i=0; i<param.num_src; i++){
@@ -760,7 +866,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     tmp2_p =  ColorSpinorField::Create(csParam);
     tmp2_p->ExtendLastDimension();
   } else {
-    tmp2_p = tmpp;
+    tmp2_p = tmp_matsloppyp;
   }
 
   ColorSpinorField &tmp2 = *tmp2_p;
@@ -774,7 +880,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     tmp3_p =  ColorSpinorField::Create(x, csParam); //ColorSpinorField::Create(csParam);
     tmp3_p->ExtendLastDimension();
   } else {
-    tmp3_p = tmpp;
+    tmp3_p = tmp_matsloppyp;
   }
 
   ColorSpinorField &tmp3 = *tmp3_p;
@@ -792,6 +898,14 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   const bool use_heavy_quark_res =
   (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
   if(use_heavy_quark_res) errorQuda("ERROR: heavy quark residual not supported in block solver");
+
+  // Create the worker class for updating x_sloppy. 
+  // When we hit matSloppy, tmpp contains P.
+#ifdef BLOCKSOLVER_MULTIREDUCE
+  BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, alpha_raw);
+#else
+  BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, &alpha);
+#endif
 
   profile.TPSTOP(QUDA_PROFILE_INIT);
   profile.TPSTART(QUDA_PROFILE_PREAMBLE);
@@ -889,14 +1003,27 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // Step 10 was set S to the identity, but we took care of that
   // when we initialized all of the matrices. 
 
+  bool just_reliable_updated = false; 
   while ( !allconverged && k < param.maxiter ) {
     // PUSH_RANGE("Dslash",1)
     //for(int i=0; i<param.num_src; i++){
     // matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
     //}
+
+    // Prepare to overlap some compute with comms.
+    if (k > 0 && !just_reliable_updated)
+    {
+      dslash::aux_worker = &blockcg_update;
+    }
+    else
+    {
+      dslash::aux_worker = NULL;
+      just_reliable_updated = false;
+    }
+
     // Step 12: Compute Ap.
-    matSloppy(Ap, *pp, *tmpp, tmp2);  // tmp as tmp
-   
+    matSloppy(Ap, *pp, tmp_matsloppy, tmp2);
+
     // POP_RANGE
 
     // Step 13: calculate pAp = P^\dagger Ap
@@ -921,6 +1048,11 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 #endif
     printmat("pAp", pAp);
 
+#ifdef BLOCKSOLVER_EXPLICIT_PAP_HERMITIAN
+    H = 0.5*(pAp + pAp.adjoint().eval());
+    pAp = H;
+#endif
+
     // Step 14: Compute beta = pAp^(-1)
     // For convenience, we stick a minus sign on it now.
     beta = -pAp.inverse();
@@ -929,6 +1061,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     alpha = pAp.inverse() * C;
 
     // Step 16: update Xsloppy = Xsloppy + P alpha
+    // This step now gets overlapped with the
+    // comms in matSloppy. 
+/*
 #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::caxpy(alpha_raw, *pp, x_sloppy);
 #else
@@ -940,6 +1075,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpy(AC,*pp,x_sloppy);
 #endif
+*/
 
     // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
     // update rSloppy
@@ -1026,10 +1162,14 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   #endif
     }
 
-    //bool did_reliable = false;
+#ifdef BLOCKSOLVER_EXPLICIT_QP_ORTHO
+    bool did_reliable = false;
+#endif
     if (block_reliable(rNorm, maxrx, maxrr, r2, delta))
     {
-      //did_reliable = true;
+#ifdef BLOCKSOLVER_EXPLICIT_QP_ORTHO
+      did_reliable = true;
+#endif
       printfQuda("Triggered a reliable update on iteration %d!\n", k);
       // This was in the BiCGstab(-L) reliable updates, but I don't
       // think it's necessary... blas::xpy should support updating
@@ -1039,8 +1179,26 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       //  blas::copy(x, x_sloppy);
       //}
 
+      // If we triggered a reliable update, we need
+      // to do this X update now.
+      // Step 16: update Xsloppy = Xsloppy + P alpha
+#ifdef BLOCKSOLVER_MULTIREDUCE
+      blas::caxpy(alpha_raw, *pp, x_sloppy);
+#else
+      // temporary hack using AC
+      for(int i = 0; i < param.num_src; i++){
+        for(int j = 0; j < param.num_src; j++){
+          AC[i*param.num_src + j] = alpha(i,j);
+        }
+      }
+      blas::caxpy(AC,*pp,x_sloppy);
+#endif
+
       // Reliable updates step 2: Y = Y + X_s
       blas::xpy(x_sloppy, y);
+
+      // Don't do aux work!
+      dslash::aux_worker = NULL;
 
       // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
       mat(r, y, x);
@@ -1126,6 +1284,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       maxrr = rNorm;
       rUpdate++;
 
+      just_reliable_updated = true; 
+
     } // end reliable.
 
     // Debug print of Q.
@@ -1160,22 +1320,23 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
 #endif
-    std::swap(pp,tmpp); // now P contains P.
+    std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
 
     // Done with step 28.
 
-    /*if (did_reliable)
+#ifdef BLOCKSOLVER_EXPLICIT_QP_ORTHO
+    if (did_reliable)
     {
       // Let's try to explicitly restore Q^\dagger P = I.
       Complex* O_raw = new Complex[param.num_src*param.num_src];
 #ifdef BLOCKSOLVER_MULTIREDUCE
       Map<MatrixBCG> O(O_raw, param.num_src, param.num_src);
-      blas::cDotProduct(O_raw, q.Components(), p.Components());
+      blas::cDotProduct(O_raw, qp->Components(), pp->Components());
 #else
       MatrixXcd O = MatrixXcd::Zero(param.num_src, param.num_src);
       for(int i=0; i<param.num_src; i++){
         for(int j=0; j<param.num_src; j++){
-          O(i,j) = blas::cDotProduct(q.Component(i), p.Component(j));
+          O(i,j) = blas::cDotProduct(qp->Component(i), pp->Component(j));
         }
       }
 #endif
@@ -1189,38 +1350,35 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 #endif
       O = -O;
       std::cout << "BLAH\n" << O << "\n";
-      blas::zero(tmp);
 #ifdef BLOCKSOLVER_MULTIREDUCE
-      blas::caxpy(O_raw, q, tmp);
+      blas::caxpy(O_raw, *qp, *pp);
 #else
       // temporary hack
       for(int i=0; i<param.num_src; i++){
         for(int j=0;j<param.num_src; j++){
-          blas::zero(tmp.Component(j));
-          blas::caxpy(O(i,j),q.Component(i),tmp.Component(j));
-          blas::caxpy(1.0,tmp.Component(j),p.Component(j));
+          blas::caxpy(O(i,j),qp->Component(i),pp->Component(j));
         }
       }
 #endif
-      //blas::caxpy(1.0,tmp,p);
       
 
       // Check...
-      O = MatrixXcd::Zero(param.num_src, param.num_src);
 #ifdef BLOCKSOLVER_MULTIREDUCE
-      blas::cDotProduct(O_raw, q.Components(), p.Components());
+      blas::cDotProduct(O_raw, qp->Components(), pp->Components());
 #else
       for(int i=0; i<param.num_src; i++){
         for(int j=0; j<param.num_src; j++){
-          O(i,j) = blas::cDotProduct(q.Component(i), p.Component(j));
+          O(i,j) = blas::cDotProduct(qp->Component(i), pp->Component(j));
         }
       }
 #endif
       printfQuda("Updated Q^\\dagger P:\n");
       std::cout << O << "\n";
       delete[] O_raw;
-    }*/
+    }
     // End test...
+#endif // BLOCKSOLVER_EXPLICIT_QP_ORTHO
+
 
 #ifdef BLOCKSOLVER_VERBOSE
 #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -1250,6 +1408,29 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   }
 
+  // Because we're overlapping communication w/ comms, 
+  // x_sloppy doesn't get updated until the next iteration
+  // (unless we happened ot hit a reliable update on the
+  // last iteration).
+  // However, we converged... so we never hit the next iteration.
+  // We need to take care of this last update now.
+  // Step ??: update Xsloppy = Xsloppy + P alpha
+  // But remember tmpp holds the old P. 
+  if (!just_reliable_updated)
+  {
+#ifdef BLOCKSOLVER_MULTIREDUCE
+    blas::caxpy(alpha_raw, *tmpp, x_sloppy);
+#else
+    // temporary hack using AC
+    for(int i = 0; i < param.num_src; i++){
+      for(int j = 0; j < param.num_src; j++){
+        AC[i*param.num_src + j] = alpha(i,j);
+      }
+    }
+    blas::caxpy(AC,*tmpp,x_sloppy);
+#endif
+  }
+
   // We've converged!
   // Step 27: Update Xs into Y.
   blas::xpy(x_sloppy, y);
@@ -1268,8 +1449,10 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if (k == param.maxiter)
   warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-  // if (getVerbosity() >= QUDA_VERBOSE)
-  // printfQuda("CG: Reliable updates = %d\n", rUpdate);
+  if (getVerbosity() >= QUDA_VERBOSE)
+   printfQuda("CG: Reliable updates = %d\n", rUpdate);
+
+  dslash::aux_worker = NULL;
 
   // compute the true residuals
   mat(r, x, y, tmp3);
@@ -1291,12 +1474,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profile.TPSTART(QUDA_PROFILE_FREE);
 
-  pp = p_save;
-  qp = q_save;
-  tmpp = tmp_save;
-
-  if (&tmp3 != tmpp) delete tmp3_p;
-  if (&tmp2 != tmpp) delete tmp2_p;
+  if (&tmp3 != tmp_matsloppyp) delete tmp3_p;
+  if (&tmp2 != tmp_matsloppyp) delete tmp2_p;
 
 
 #ifdef BLOCKSOLVER_MULTIREDUCE

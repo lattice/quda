@@ -396,7 +396,7 @@ namespace quda {
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *App, *tmpp;
 #ifdef BLOCKSOLVER
-    ColorSpinorField *x_sloppy_savedp, *pp, *qp;
+    ColorSpinorField *x_sloppy_savedp, *pp, *qp, *tmp_matsloppyp;
 #endif
     bool init;
 
