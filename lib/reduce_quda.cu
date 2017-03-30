@@ -774,13 +774,11 @@ namespace quda {
 #endif
 
     /**
-       double quadrupleCG3InitNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
-        tmpx = x;
-        tmpy = y;
-        x = b*(x + a*y) + (1.-b)*z;
-        y = b*(y + a*v) + (1.-b)*w;
-        z = tmpx;
-        w = tmpy;
+       double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}
+        z = x;
+        w = y;
+        x += a*y;
+        y -= a*v;
         norm2(y);
     */
     template <typename ReduceType, typename Float2, typename FloatN>
@@ -808,8 +806,8 @@ namespace quda {
        double quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
         tmpx = x;
         tmpy = y;
-        x = b*(x + a*y) + (1.-b)*z;
-        y = b*(y + a*v) + (1.-b)*w;
+        x = b*(x + a*y) + (1-b)*z;
+        y = b*(y + a*v) + (1-b)*w;
         z = tmpx;
         w = tmpy;
         norm2(y);
@@ -818,7 +816,7 @@ namespace quda {
     struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a,b;
       quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmpx, tmpy;
+      FloatN tmpx{}, tmpy{};
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
         tmpx = x;
         tmpy = y;
@@ -840,7 +838,7 @@ namespace quda {
     /**
        void doubleCG3InitNorm(d a, V x, V y, V z){}
         y = x;
-        x -= a.x*z;
+        x -= a*z;
         norm2(x);
     */
     template <typename ReduceType, typename Float2, typename FloatN>
@@ -864,7 +862,7 @@ namespace quda {
     /**
        void doubleCG3UpdateNorm(d a, d b, V x, V y, V z){}
         tmp = x;
-        x = b.x*(x-a.x*z) + b.y*y;
+        x = b*(x-a*z) + (1-b)*y;
         y = tmp;
         norm2(x);
     */
@@ -872,7 +870,7 @@ namespace quda {
     struct doubleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Float2 a, b;
       doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmp;
+      FloatN tmp{};
       __device__ __host__ void operator()(ReduceType &sum,FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { 
         tmp = x;
         x = b.x*(x-a.x*z) + b.y*y;

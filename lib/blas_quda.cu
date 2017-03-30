@@ -644,7 +644,7 @@ namespace quda {
     struct doubleCG3Update_ : public BlasFunctor<Float2,FloatN> {
       Float2 a, b;
       doubleCG3Update_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      FloatN tmp;
+      FloatN tmp{};
       __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) {
         tmp = x;
         x = b.x*(x+a.x*z) + b.y*y;
