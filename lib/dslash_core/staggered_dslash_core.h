@@ -142,12 +142,11 @@ if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
   const int X1X0 = X[1]*X[0];
   const int X2X1X0 = X[2]*X1X0;
-#ifdef MULTI_GPU
 #if (DD_IMPROVED == 1)
   const int X3X1X0 = X[3]*X1X0;
 #endif
   const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
-#endif
+
 
   int za,zb; 
   int x0h;
@@ -274,13 +273,17 @@ if (!(threadIdx.z & 1))
 #endif
   int dir =1;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[2] + y[2])*X[1] + y[1]) >>1;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || y[0] >= 1)) || (kernel_type == EXTERIOR_KERNEL_X && y[0] < 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[0]==0) ? full_idx+(X[0]-1) : full_idx-1) >> 1;
+#ifdef MULTI_GPU
     int fat_idx = (y[0]-1 < 0) ? (half_volume + space_con ) : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
+#endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, sp_idx_1st_nbr, fat_sign);
 
@@ -310,7 +313,11 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[0]<3) ? full_idx+(X[0]-3): full_idx-3)>>1; 
+#ifdef MULTI_GPU
     int long_idx = (y[0]-3 < 0) ? (half_volume + y[0]*(X[3]*X[2]*(X[1]>>1)) + space_con) : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
+#endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 		
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 		
     RECONSTRUCT_LONG_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, long_sign);
@@ -352,8 +359,8 @@ if (threadIdx.z & 1)
 
   int ga_idx = idx;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[2]+y[2])*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] < (X[1]-1)))|| (kernel_type == EXTERIOR_KERNEL_Y && y[1] >= (X[1]-1)))
 #endif
   {
@@ -426,13 +433,17 @@ if (!(threadIdx.z & 1))
 #endif
 
   int dir=3;
+  int space_con = (y[3]*X[2]*X[0] + y[2]*X[0] + y[0]) >>1;
 #ifdef MULTI_GPU
-  int space_con = (y[3]*X[2]*X[0] + y[2]*X[0] + y[0]) >>1;    
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || y[1] >= 1)) || (kernel_type == EXTERIOR_KERNEL_Y && y[1] < 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[1]==0)    ? full_idx+(X1X0-X[0]) : full_idx-X[0]) >> 1;
+#ifdef MULTI_GPU
     int fat_idx = (y[1]-1 < 0) ? (half_volume + space_con) : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
+#endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, sp_idx_1st_nbr, fat_sign);
 
@@ -462,7 +473,11 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[1] < 3) ? full_idx + (X[1]-3)*X[0]: full_idx -3*X[0] )>> 1; 
+#ifdef MULTI_GPU
     int long_idx = (y[1]-3 < 0) ? (half_volume + y[1]*(X[3]*X[2]*X[0] >> 1) + space_con) : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
+#endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 
     RECONSTRUCT_LONG_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,long_sign);
@@ -503,8 +518,8 @@ if (threadIdx.z&1)
 
   int ga_idx = idx;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[1]+y[1])*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || y[2] < (X[2]-1)))|| (kernel_type == EXTERIOR_KERNEL_Z && y[2] >= (X[2]-1)))
 #endif
   {
@@ -580,13 +595,17 @@ if (!(threadIdx.z & 1))
 
   int dir = 5;
 
-#ifdef MULTI_GPU
   int space_con = ((y[3]*X[1] + y[1])*X[0] + y[0]) >>1;    
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || y[2] >= 1)) || (kernel_type == EXTERIOR_KERNEL_Z && y[2] < 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[2]==0)    ? full_idx+(X[2]-1)*X1X0 : full_idx-X1X0) >> 1;
+#ifdef MULTI_GPU
     int fat_idx = (y[2]-1 < 0) ? (half_volume + space_con) : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
+#endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, sp_idx_1st_nbr, fat_sign);
 
@@ -616,7 +635,11 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[2] <3) ? full_idx + (X[2]-3)*X1X0: full_idx - 3*X1X0)>>1;
+#ifdef MULTI_GPU
     int long_idx = (y[2]-3 < 0) ? (half_volume + y[2]*(X3X1X0 >> 1) + space_con) : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
+#endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);         
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);         
     RECONSTRUCT_LONG_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,long_sign);
@@ -657,8 +680,8 @@ if (threadIdx.z & 1)
 
   int ga_idx = idx;
 
-#ifdef MULTI_GPU
   int space_con = (y[2]*X1X0+y[1]*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || y[3] < (X[3]-1)))|| (kernel_type == EXTERIOR_KERNEL_T && y[3] >= (X[3]-1)))
 #endif
   {    
@@ -733,13 +756,17 @@ if (!(threadIdx.z & 1))
 
   int dir = 7;
 
-#ifdef MULTI_GPU
   int space_con = (y[2]*X1X0+y[1]*X[0]+y[0])/2;
+#ifdef MULTI_GPU
   if ((kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || y[3] >= 1)) || (kernel_type == EXTERIOR_KERNEL_T && y[3] < 1))
 #endif
   {
     int sp_idx_1st_nbr = ((y[3]==0) ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
+#ifdef MULTI_GPU
     int fat_idx = (kernel_type == EXTERIOR_KERNEL_T && y[3] - 1 < 0) ? half_volume + space_con : sp_idx_1st_nbr;
+#else
+    int fat_idx = sp_idx_1st_nbr;
+#endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, sp_idx_1st_nbr, fat_sign);
 
@@ -769,7 +796,11 @@ if (!(threadIdx.z & 1))
 #endif
   {
     int sp_idx_3rd_nbr = ((y[3]<3) ? full_idx + (X[3]-3)*X2X1X0: full_idx - 3*X2X1X0) >> 1;
+#ifdef MULTI_GPU
     int long_idx = (kernel_type == EXTERIOR_KERNEL_T && y[3] - 3 < 0) ? half_volume + y[3]*ghostFace[3]+ space_con : sp_idx_3rd_nbr;
+#else
+    int long_idx = sp_idx_3rd_nbr;
+#endif
     READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);
     READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);
     RECONSTRUCT_LONG_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, long_sign);
@@ -882,7 +913,9 @@ if (kernel_type == INTERIOR_KERNEL){
 
 }
 
-} else { // else fused exterior
+} 
+#ifdef MULTI_GPU
+else { // else fused exterior
   
   const int X1X0 = X[1]*X[0];
   const int X2X1X0 = X[2]*X1X0;
@@ -1460,6 +1493,7 @@ if (kernel_type == INTERIOR_KERNEL){
   }
 
  }
+#endif // MULTI_GPU
 
 // undefine to prevent warning when precision is changed
 #undef time_boundary
