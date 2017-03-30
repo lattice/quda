@@ -1201,6 +1201,21 @@ get_solver_str(QudaInverterType type)
   case QUDA_BICGSTABL_INVERTER:
     ret = "bicgstab-l";
     break;
+  case QUDA_CGNE_INVERTER:
+    ret = "cgne";
+    break;
+  case QUDA_CGNR_INVERTER:
+    ret = "cgnr";
+    break;
+  case QUDA_CG3_INVERTER:
+    ret = "cg3";
+    break;
+  case QUDA_CG3NE_INVERTER:
+    ret = "cg3ne";
+    break;
+  case QUDA_CG3NR_INVERTER:
+    ret = "cg3nr";
+    break;
   default:
     ret = "unknown";
     errorQuda("Error: invalid solver type %d\n", type);
