@@ -29,7 +29,6 @@
 #include <quda_internal.h>
 #include <dslash_quda.h>
 #include <sys/time.h>
-#include <blas_quda.h>
 #include <face_quda.h>
 #include <complex_quda.h>
 #include <inline_ptx.h>
@@ -119,6 +118,7 @@ namespace quda {
 	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	  break;
 	}
+#if 0 // disable these for now for compile time
       case 5:
 	{
 	  constexpr int register_block_size = 5;
@@ -131,6 +131,7 @@ namespace quda {
 	  STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
 	  break;
 	}
+#endif // 0
 #endif // BLOCKSOLVER
       default:
 	errorQuda("Register blocking factor %d not supported", tp.aux.y);
