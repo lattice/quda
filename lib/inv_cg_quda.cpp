@@ -1442,6 +1442,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+  printfQuda("Block-CG: Convergence in %d iterations, %f seconds\n", k, param.secs);
+
   double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
   param.gflops = gflops;
   param.iter += k;

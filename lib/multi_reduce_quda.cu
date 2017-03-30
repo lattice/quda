@@ -246,19 +246,8 @@ namespace quda {
       typedef typename scalar<Float2>::type real;
       const int NYW;
       Cdot(const reduce::coeff_array<Complex> &a, const reduce::coeff_array<Complex> &b, const reduce::coeff_array<Complex> &c, int NYW) : NYW(NYW) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       { cdot_<ReduceType>(sum,x,y); }
-      static int streams() { return 2; } //! total number of input and output streams
-      static int flops() { return 4; } //! flops per element
-    };
-
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
-    struct Hdot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
-      typedef typename scalar<Float2>::type real;
-      const int NYW;
-      Hdot(const reduce::coeff_array<Complex> &a, const reduce::coeff_array<Complex> &b, const reduce::coeff_array<Complex> &c, int NYW) : NYW(NYW) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-      { if (i>=j) cdot_<ReduceType>(sum,x,y); }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
     };
@@ -268,7 +257,7 @@ namespace quda {
       typedef typename scalar<Float2>::type real;
       const int NYW;
       CdotCopy(const reduce::coeff_array<Complex> &a, const reduce::coeff_array<Complex> &b, const reduce::coeff_array<Complex> &c, int NYW) : NYW(NYW) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
       { cdot_<ReduceType>(sum,x,y); if (i==j) w = y;}
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 4; } //! flops per element
