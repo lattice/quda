@@ -76,6 +76,14 @@ namespace quda {
       report("BICGSTABL");
       solver = new BiCGstabL(mat, matSloppy, param, profile);
       break;
+    case QUDA_CGNE_INVERTER:
+      report("CGNE");
+      solver = new CGNE(mat, matSloppy, param, profile);
+      break;
+    case QUDA_CGNR_INVERTER:
+      report("CGNR");
+      solver = new CGNR(mat, matSloppy, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }

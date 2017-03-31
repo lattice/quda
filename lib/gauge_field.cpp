@@ -4,7 +4,7 @@
 
 namespace quda {
 
-  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(),
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u),
     nColor(3),
     nFace(u.Nface()),
     reconstruct(u.Reconstruct()),
@@ -19,24 +19,11 @@ namespace quda {
     create(QUDA_NULL_FIELD_CREATE),
     geometry(u.Geometry()),
     compute_fat_link_max(false),
-    ghostExchange(u.GhostExchange()),
     staggeredPhaseType(u.StaggeredPhase()),
     staggeredPhaseApplied(u.StaggeredPhaseApplied()),
     staggered_u1_emulation(u.StaggeredU1Emulation()),
     staggered_2link_term(u.Staggered2LinkTerm()),
-    i_mu(u.iMu())
-      {
-	precision = u.Precision();
-	nDim = u.Ndim();
-	pad = u.Pad();
-	siteSubset = QUDA_FULL_SITE_SUBSET;
-
-	for(int dir=0; dir<nDim; ++dir) {
-	  x[dir] = u.X()[dir];
-	  r[dir] = u.R()[dir];
-	}
-      }
-
+    i_mu(u.iMu()) { }
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
     LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
@@ -44,7 +31,7 @@ namespace quda {
     nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
     order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
-    create(param.create), ghostExchange(param.ghostExchange), 
+    create(param.create),  
     staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), staggered_u1_emulation(param.staggered_u1_emulation), staggered_2link_term(param.staggered_2link_term), i_mu(param.i_mu)
   {
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
@@ -74,13 +61,6 @@ namespace quda {
       real_length = 2*nDim*volume*nInternal;
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     }
-
-    if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
-      for (int d=0; d<nDim; d++) r[d] = param.r[d];
-    } else {
-      for (int d=0; d<nDim; d++) r[d] = 0;
-    }
-
 
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.  
@@ -228,16 +208,22 @@ namespace quda {
 
   }
 
-  void GaugeField::checkField(const GaugeField &a) {
-    LatticeField::checkField(a);
-    if (a.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, a.link_type);
-    if (a.nColor != nColor) errorQuda("nColor does not match %d %d", nColor, a.nColor);
-    if (a.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, a.nFace);
-    if (a.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, a.fixed);
-    if (a.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, a.t_boundary);
-    if (a.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, a.anisotropy);
-    if (a.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, a.tadpole);
-    //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale); 
+  void GaugeField::checkField(const LatticeField &l) const {
+    LatticeField::checkField(l);
+    try {
+      const GaugeField &g = dynamic_cast<const GaugeField&>(l);
+      if (g.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, g.link_type);
+      if (g.nColor != nColor) errorQuda("nColor does not match %d %d", nColor, g.nColor);
+      if (g.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, g.nFace);
+      if (g.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, g.fixed);
+      if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
+      if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
+      if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
+      //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale);
+    }
+    catch(std::bad_cast &e) {
+      errorQuda("Failed to cast reference to GaugeField");
+    }
   }
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param) {
@@ -257,10 +243,6 @@ namespace quda {
     output << "scale = " << param.scale << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
-    output << "ghostExchange = " << param.ghostExchange << std::endl;
-    for (int i=0; i<param.nDim; i++) {
-      output << "r[" << i << "] = " << param.r[i] << std::endl;    
-    }
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
     output << "staggeredPhaseApplied = " << param.staggeredPhaseApplied << std::endl;
 

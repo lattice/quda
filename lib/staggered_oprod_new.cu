@@ -80,7 +80,7 @@ namespace quda {
       StaggeredOprodArg(const unsigned int parity,
 			const unsigned int dir,
 			const unsigned int *ghostOffset,
-			const unsigned int displaceement,
+			const unsigned int displacement,
 			const KernelType& kernelType,
 			const int nFace,
 			const double coeff[2],

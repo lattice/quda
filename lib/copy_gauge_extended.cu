@@ -129,7 +129,6 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	if(arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
 	else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);

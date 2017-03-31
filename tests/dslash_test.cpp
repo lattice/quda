@@ -268,7 +268,7 @@ void init(int argc, char **argv) {
 //ndeg_tm    
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     csParam.twistFlavor = inv_param.twist_flavor;
-    csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) ? 4 : 5;
+    csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_SINGLET) ? 4 : 5;
     csParam.x[4] = inv_param.Ls;    
   }
 
@@ -670,7 +670,7 @@ void dslashRef() {
   } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     switch (test_type) {
     case 0:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)
 	tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
@@ -687,7 +687,7 @@ void dslashRef() {
       }
       break;
     case 1:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)      
 	tm_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
@@ -703,7 +703,7 @@ void dslashRef() {
       }	
       break;
     case 2:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)      
 	tm_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
@@ -719,7 +719,7 @@ void dslashRef() {
       }
       break;
     case 3:    
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) { 
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) { 
 	tm_matpc(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
 	tm_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
@@ -743,7 +743,7 @@ void dslashRef() {
       }
       break;
     case 4:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
 	tm_mat(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	     dagger, inv_param.cpu_prec, gauge_param);
 	tm_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
@@ -773,25 +773,25 @@ void dslashRef() {
   } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     switch (test_type) {
     case 0:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)
 	tmc_dslash(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
         errorQuda("Not supported\n");
       break;
     case 1:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)      
 	tmc_matpc(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
         errorQuda("Not supported\n");
       break;
     case 2:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)      
 	tmc_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
       else
         errorQuda("Not supported\n");
       break;
     case 3:    
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
 	tmc_matpc(spinorTmp->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 	       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
 	tmc_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
@@ -800,7 +800,7 @@ void dslashRef() {
         errorQuda("Not supported\n");
       break;
     case 4:
-      if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {
+      if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
 	tmc_mat(spinorTmp->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
 	tmc_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, not_dagger, inv_param.cpu_prec, gauge_param);
       } else

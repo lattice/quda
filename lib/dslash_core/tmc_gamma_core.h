@@ -733,10 +733,11 @@ __global__ void twistCloverGamma5InvKernel<double2>(DslashParam param)
    double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17;
 
    //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+   double a = param.a;
 #ifndef DYNAMIC_CLOVER
-   APPLY_CLOVER_TWIST_INV(cd, cdinv, param.a, S);
+   APPLY_CLOVER_TWIST_INV(cd, cdinv, a, S);
 #else
-   APPLY_CLOVER_TWIST_DYN_INV(cd, param.a, S);
+   APPLY_CLOVER_TWIST_DYN_INV(cd, a, S);
 #endif
 
    double2 *spinor = (double2*)param.out;
@@ -886,10 +887,11 @@ __global__ void twistCloverGamma5InvKernel<float4>(DslashParam param)
    float4 C0, C1, C2, C3, C4, C5, C6, C7, C8;
 
    //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+   float a = param.a_f;
 #ifndef DYNAMIC_CLOVER
-   APPLY_CLOVER_TWIST_INV(c, cinv, param.a, S);
+   APPLY_CLOVER_TWIST_INV(c, cinv, a, S);
 #else
-   APPLY_CLOVER_TWIST_DYN_INV(c, param.a, S);
+   APPLY_CLOVER_TWIST_DYN_INV(c, a, S);
 #endif
    
    float4 *spinor = (float4*)param.out;
@@ -1041,10 +1043,11 @@ __global__ void twistCloverGamma5InvKernel<short4>(DslashParam param)
    float K;
 
    //apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+   float a = param.a_f;
 #ifndef DYNAMIC_CLOVER
-   APPLY_CLOVER_TWIST_INV(c, cinv, param.a_f, S);
+   APPLY_CLOVER_TWIST_INV(c, cinv, a, S);
 #else
-   APPLY_CLOVER_TWIST_DYN_INV(c, param.a_f, S);
+   APPLY_CLOVER_TWIST_DYN_INV(c, a, S);
 #endif
    
    float k0  = fmaxf(fabsf(I0.x), fabsf(I0.y));			

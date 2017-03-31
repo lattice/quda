@@ -15,9 +15,9 @@ namespace quda {
       errorQuda("QDP ordering only supported for reference fields");
     }
 
-    if (order == QUDA_QDP_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER ||
-	order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER ||
-	order == QUDA_CPS_WILSON_GAUGE_ORDER) 
+    if (order == QUDA_MILC_GAUGE_ORDER || order == QUDA_QDP_GAUGE_ORDER ||
+	order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_TIFR_PADDED_GAUGE_ORDER ||
+	order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_CPS_WILSON_GAUGE_ORDER)
       errorQuda("Field ordering %d presently disabled for this type", order);
 
 #ifdef MULTI_GPU
@@ -381,10 +381,10 @@ namespace quda {
   void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
     if (order == QUDA_QDP_GAUGE_ORDER) {
       void **buffer = new void*[geometry];
-      for (int d=0; d<geometry; d++) buffer[d] = device_malloc(bytes/geometry);
+      for (int d=0; d<geometry; d++) buffer[d] = pool_device_malloc(bytes/geometry);
       return ((void*)buffer);
     } else {
-      return device_malloc(bytes);
+      return pool_device_malloc(bytes);
     }
 
   }
@@ -393,7 +393,7 @@ namespace quda {
 
     if (order > 4) {
       void **buffer = new void*[4];
-      for (int d=0; d<4; d++) buffer[d] = device_malloc(bytes[d]);
+      for (int d=0; d<4; d++) buffer[d] = pool_device_malloc(bytes[d]);
       return buffer;
     } else {
       return 0;
@@ -403,16 +403,16 @@ namespace quda {
 
   void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
     if (order == QUDA_QDP_GAUGE_ORDER) {
-      for (int d=0; d<geometry; d++) device_free(((void**)buffer)[d]);
+      for (int d=0; d<geometry; d++) pool_device_free(((void**)buffer)[d]);
       delete []((void**)buffer);
     } else {
-      device_free(buffer);
+      pool_device_free(buffer);
     }
   }
 
   void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order) {
     if (order > 4) {
-      for (int d=0; d<4; d++) device_free(buffer[d]);
+      for (int d=0; d<4; d++) pool_device_free(buffer[d]);
       delete []buffer;
     }
   }
@@ -437,8 +437,13 @@ namespace quda {
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do reorder on the CPU
 	void *buffer = pool_pinned_malloc(bytes);
-	// copy field and ghost zone into buffer
-	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
+
+	if (src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	  // copy field and ghost zone into buffer
+	  copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
+	} else {
+	  copyExtendedGauge(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, static_cast<const cpuGaugeField&>(src).gauge);
+	}
 
 	// this copies over both even and odd
 	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
@@ -463,7 +468,11 @@ namespace quda {
 	  for (int d=0; d<4; d++)
 	    qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
 
-	copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
+	if (src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	  copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
+	} else {
+	  copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
+	}
 	free_gauge_buffer(buffer, src.Order(), src.Geometry());
 	if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order());
       } // reorder_location
@@ -484,9 +493,9 @@ namespace quda {
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const
   {
-    QudaFieldLocation pack_location = reorder_location();
+    static_cast<LatticeField&>(cpu).checkField(*this);
 
-    if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
+    if (reorder_location() == QUDA_CUDA_FIELD_LOCATION) {
 
       void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
 
@@ -496,7 +505,11 @@ namespace quda {
       for (int d=0; d<4; d++) ghost_bytes[d] = nFace * surface[d] * cpuNinternal * cpu.Precision();
       void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, cpu.Order()) : nullptr;
 
-      copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge, ghost_buffer, 0);
+      if (cpu.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge, ghost_buffer, 0);
+      } else {
+	copyExtendedGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge);
+      }
 
       if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
 	for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDeviceToHost);
@@ -512,15 +525,20 @@ namespace quda {
       free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
       if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order());
 
-    } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
+    } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
 
       void *buffer = pool_pinned_malloc(bytes);
       qudaMemcpy(buffer, gauge, bytes, cudaMemcpyDeviceToHost);
-      copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, buffer);
+
+      if (cpu.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, buffer);
+      } else {
+	copyExtendedGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, buffer);
+      }
       pool_pinned_free(buffer);
 
     } else {
-      errorQuda("Invalid pack location %d", pack_location);
+      errorQuda("Invalid pack location %d", reorder_location());
     }
 
     cpu.staggeredPhaseApplied = staggeredPhaseApplied;
