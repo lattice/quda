@@ -466,13 +466,13 @@ namespace quda {
     virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL)
+    virtual void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
     { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL)
+    virtual int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL)
+    virtual void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)

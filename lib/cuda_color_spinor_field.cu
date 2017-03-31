@@ -1131,7 +1131,7 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
+  void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr) {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return;
@@ -1140,6 +1140,9 @@ namespace quda {
       if (comm_peer2peer_enabled(1,dim)) {
 	// receive from the processor in the +1 direction
 	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
+      } else if (gdr) {
+        // Prepost receive
+        comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
         // Prepost receive
         comm_start(mh_recv_fwd[bufferIndex][dim]);
@@ -1148,6 +1151,8 @@ namespace quda {
       // Prepost receive
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
+      } else if (gdr) {
+        comm_start(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
         comm_start(mh_recv_back[bufferIndex][dim]);
       }
@@ -1155,7 +1160,7 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, cudaStream_t* stream_p) {
+  void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr) {
 
     int dim = d/2;
     int dir = d%2;
@@ -1166,8 +1171,12 @@ namespace quda {
     int Npad = Nint/Nvec;
 
     if (!comm_peer2peer_enabled(dir,dim)) {
-      if (dir == 0) comm_start(mh_send_back[bufferIndex][dim]);
-      else comm_start(mh_send_fwd[bufferIndex][dim]);
+      if (dir == 0)
+	if (gdr) comm_start(mh_send_rdma_back[bufferIndex][dim]);
+	else comm_start(mh_send_back[bufferIndex][dim]);
+      else
+	if (gdr) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
+	else comm_start(mh_send_fwd[bufferIndex][dim]);
     } else { // doing peer-to-peer
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + d;
 
@@ -1280,9 +1289,9 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
-    recvStart(nFace, dir, dagger, stream_p);
-    sendStart(nFace, dir, dagger, stream_p);
+  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr) {
+    recvStart(nFace, dir, dagger, stream_p, gdr);
+    sendStart(nFace, dir, dagger, stream_p, gdr);
   }
 
 
@@ -1291,7 +1300,7 @@ namespace quda {
   static bool complete_send_fwd[QUDA_MAX_DIM] = { };
   static bool complete_send_back[QUDA_MAX_DIM] = { };
 
-  int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p) {
+  int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p, bool gdr) {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return 0;
@@ -1300,12 +1309,16 @@ namespace quda {
 
       if (comm_peer2peer_enabled(1,dim)) {
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
+      } else if (gdr) {
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
       }
 
       if (comm_peer2peer_enabled(0,dim)) {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
+      } else if (gdr) {
+	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_rdma_back[bufferIndex][dim]);
       } else {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][dim]);
       }
@@ -1320,12 +1333,16 @@ namespace quda {
 
       if (comm_peer2peer_enabled(0,dim)) {
 	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
+      } else if (gdr) {
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
 	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
       }
 
       if (comm_peer2peer_enabled(1,dim)) {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
+      } else if (!gdr) {
+	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
       }
@@ -1341,7 +1358,7 @@ namespace quda {
     return 0;
   }
 
-  void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger, cudaStream_t *stream_p) {
+  void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger, cudaStream_t *stream_p, bool gdr) {
     int dim = dir / 2;
     if (!commDimPartitioned(dim)) return;
 
@@ -1350,6 +1367,8 @@ namespace quda {
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
+      } else if (gdr) {
+	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
 	comm_wait(mh_recv_fwd[bufferIndex][dim]);
       }
@@ -1357,6 +1376,8 @@ namespace quda {
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
 	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+      } else if (gdr) {
+	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
       } else {
 	comm_wait(mh_send_back[bufferIndex][dim]);
       }
@@ -1364,6 +1385,8 @@ namespace quda {
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
 	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+      } else if (gdr) {
+	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
 	comm_wait(mh_recv_back[bufferIndex][dim]);
       }
@@ -1371,6 +1394,8 @@ namespace quda {
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
+      } else if (gdr) {
+	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
 	comm_wait(mh_send_fwd[bufferIndex][dim]);
       }
