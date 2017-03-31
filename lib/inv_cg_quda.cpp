@@ -1363,7 +1363,6 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
-    blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
     POP_RANGE
 #endif
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
