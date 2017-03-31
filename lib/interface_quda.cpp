@@ -2231,6 +2231,9 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
   profile.TPSTOP(QUDA_PROFILE_INIT);
 }
 
@@ -2322,6 +2325,9 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
 
   printfQuda("update completed\n");
   setOutputPrefix("");
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
