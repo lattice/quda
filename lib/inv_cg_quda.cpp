@@ -977,9 +977,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   #ifdef BLOCKSOLVER_VERBOSE
   std::cout << "r2\n " << H << std::endl;
   std::cout << "L\n " << L.adjoint() << std::endl;
-  #endif
-
   std::cout << "Linv = \n" << Linv << "\n";
+  #endif
 
   // Step 8: finally set Q to thin QR decompsition of R.
   //blas::zero(*qp); // guaranteed to be zero at start.
