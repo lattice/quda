@@ -179,6 +179,13 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   peer2peer_init = true;
 
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    printfQuda("Enabling GPU-Direct RDMA access\n");
+  } else {
+    printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
+
   checkCudaError();
   return;
 }

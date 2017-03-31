@@ -148,6 +148,11 @@ extern "C" {
   bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
+     Query if GPU Direct RDMA communication is enabled
+  */
+  bool comm_gdr_enabled();
+
+  /**
      Create a persistent message handler for a relative send
      @param buffer Buffer from which message will be sent
      @param dim Dimension in which message will be sent
