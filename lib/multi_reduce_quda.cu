@@ -268,7 +268,7 @@ namespace quda {
     template <template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal, typename writeDiagonal,
 	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal, typename writeOffDiagonal>
     void cDotProduct_recurse(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
-			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i, int j, bool hermitian) {
+			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i_idx, int j_idx, bool hermitian) {
 
       if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, split and recurse
       {
@@ -279,8 +279,8 @@ namespace quda {
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
         std::vector<ColorSpinorField*> w0(w.begin(), w.begin() + w.size()/2);
         std::vector<ColorSpinorField*> w1(w.begin() + w.size()/2, w.end());
-        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x, y0, z, w0, i, 2*j+0, hermitian);
-        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x, y1, z, w1, i, 2*j+1, hermitian);
+        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x, y0, z, w0, i_idx, 2*j_idx+0, hermitian);
+        cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x, y1, z, w1, i_idx, 2*j_idx+1, hermitian);
       }
       else
       {
@@ -288,7 +288,7 @@ namespace quda {
 
 	// if at bottom of recursion, return if on lower left
 	if (x.size() <= MAX_MULTI_BLAS_N && hermitian) {
-	  if (j < i) { return; }
+	  if (j_idx < i_idx) { return; }
 	}
 
         reduce::coeff_array<Complex> a, b, c;
@@ -296,82 +296,82 @@ namespace quda {
         switch(x.size()){ // COMMENT HERE FOR COMPILE TIME
         case 1:
           reduce::multiReduceCuda<1,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 2
         case 2:
           reduce::multiReduceCuda<2,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 3
         case 3:
           reduce::multiReduceCuda<3,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 4
         case 4:
           reduce::multiReduceCuda<4,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 5
         case 5:
           reduce::multiReduceCuda<5,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 6
         case 6:
           reduce::multiReduceCuda<6,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 7
         case 7:
           reduce::multiReduceCuda<7,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 8
         case 8:
           reduce::multiReduceCuda<8,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 9
 	case 9:
           reduce::multiReduceCuda<9,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 10
         case 10:
           reduce::multiReduceCuda<10,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 11
         case 11:
           reduce::multiReduceCuda<11,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 12
         case 12:
           reduce::multiReduceCuda<12,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 13
         case 13:
           reduce::multiReduceCuda<13,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 14
         case 14:
           reduce::multiReduceCuda<14,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 15
         case 15:
           reduce::multiReduceCuda<15,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #if MAX_MULTI_BLAS_N >= 16
         case 16:
           reduce::multiReduceCuda<16,double2,QudaSumFloat2,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal,false>
-	    (cdot, a, b, c, x, y, z, w, i, j);
+	    (cdot, a, b, c, x, y, z, w, i_idx, j_idx );
           break;
 #endif //16
 #endif //15
@@ -401,8 +401,8 @@ namespace quda {
           std::vector<ColorSpinorField*> z0(z.begin(), z.begin() + z.size()/2);
           std::vector<ColorSpinorField*> z1(z.begin() + z.size()/2, z.end());
 
-          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x0, y, z0, w, 2*i+0, j, hermitian);
-          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x1, y, z1, w, 2*i+1, j, hermitian);
+          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x0, y, z0, w, 2*i_idx+0, j_idx, hermitian);
+          cDotProduct_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x1, y, z1, w, 2*i_idx+1, j_idx, hermitian);
 
           const unsigned int xlen0 = x.size()/2;
           const unsigned int xlen1 = x.size() - xlen0;
