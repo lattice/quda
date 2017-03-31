@@ -945,10 +945,13 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   std::cout << "L\n " << L.adjoint() << std::endl;
   #endif
 
+  std::cout << "Linv = \n" << Linv << "\n";
+
   // Step 8: finally set Q to thin QR decompsition of R.
+  //blas::zero(*qp); // guaranteed to be zero at start.
 #ifdef BLOCKSOLVER_MULTIREDUCE
   blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-  blas::caxy(Linv_raw,*tmpp,*qp); 
+  blas::caxpy_U(Linv_raw,tmpp->Components(),qp->Components());  // C is upper triangular, so its inverse is.
 #else
   // temporary hack - use AC to pass matrix arguments to multiblas
   for(int i=0; i<nsrc; i++){
@@ -957,8 +960,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
   blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-  blas::caxy(AC,*tmpp,*qp);
+  blas::caxpy_U(AC,*tmpp,*qp); // C is upper triangular, so its inverse is.
 #endif
+
 
   // Step 9: P = Q; additionally set P to thin QR decompoistion of r
   blas::copy(*pp, *qp);
@@ -1099,8 +1103,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // swap.
 
     Linv = S.inverse();
+    blas::zero(*tmpp);
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::caxy(Linv_raw, *qp, *tmpp); // tmp is acting as Q.
+    blas::caxpy_U(Linv_raw, *qp, *tmpp); // tmp is acting as Q.
 #else
     // temporary hack
     for(int i=0; i<nsrc; i++){
@@ -1108,7 +1113,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*nsrc + j] = Linv(i,j);
       }
     }
-    blas::caxy(AC,*qp,*tmpp); // tmp is acting as Q.
+    blas::caxpy_U(AC,*qp,*tmpp); // tmp is acting as Q.
 #endif
     std::swap(qp, tmpp); // now Q actually is Q. tmp is the old Q.
 
@@ -1226,9 +1231,10 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #endif
 
       // Reliable updates step 8: set Q to thin QR decompsition of R.
+      blas::zero(*qp);
 #ifdef BLOCKSOLVER_MULTIREDUCE
       blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-      blas::caxy(Linv_raw,*tmpp,*qp);
+      blas::caxpy_U(Linv_raw,*tmpp,*qp);
 #else
       // temporary hack - use AC to pass matrix arguments to multiblas
       for(int i=0; i<nsrc; i++){
@@ -1237,7 +1243,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         }
       }
       blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-      blas::caxy(AC,*tmpp,*qp); 
+      blas::caxpy_U(AC,*tmpp,*qp); 
 #endif
 
       // Reliable updates step 9: Set S = C * C_old^{-1} (equation 6.1 in the blockCGrQ paper)
@@ -1289,7 +1295,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // Instead, we do it by a caxpyz + pointer swap.
 #ifdef BLOCKSOLVER_MULTIREDUCE
     Sdagger = S.adjoint();
-    blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
 #else
     // temporary hack
     for(int i=0; i<nsrc; i++){
@@ -1297,7 +1303,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*nsrc + j] = std::conj(S(j,i));
       }
     }
-    blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
+    blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
 #endif
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
 
@@ -1479,8 +1485,19 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   switch (param.num_src) {
   case  1: solve_n< 1>(x, b); break;
   case  2: solve_n< 2>(x, b); break;
+  case  3: solve_n< 3>(x, b); break;
   case  4: solve_n< 4>(x, b); break;
+  case  5: solve_n< 5>(x, b); break;
+  case  6: solve_n< 6>(x, b); break;
+  case  7: solve_n< 7>(x, b); break;
   case  8: solve_n< 8>(x, b); break;
+  case  9: solve_n< 9>(x, b); break;
+  case 10: solve_n<10>(x, b); break;
+  case 11: solve_n<11>(x, b); break;
+  case 12: solve_n<12>(x, b); break;
+  case 13: solve_n<13>(x, b); break;
+  case 14: solve_n<14>(x, b); break;
+  case 15: solve_n<15>(x, b); break;
   case 16: solve_n<16>(x, b); break;
   case 24: solve_n<24>(x, b); break;
   case 32: solve_n<32>(x, b); break;
