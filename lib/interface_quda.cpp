@@ -2309,10 +2309,6 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   mg->mgParam->matSmooth = mg->mSmooth;
   mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
 
-  // recreate the smoothers on the fine level
-  mg->mg->destroySmoother();
-  mg->mg->createSmoother();
-
   mg->mgParam->updateInvertParam(*param);
   if(mg->mgParam->mg_global.invert_param != param)
     mg->mgParam->mg_global.invert_param = param;
