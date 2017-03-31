@@ -1496,7 +1496,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   { // temporary addition for SC'17
     comm_allreduce(&gflops);
-    printfQuda("Block-CG: Convergence in %d iterations, %f seconds, GFLOPS = %g\n", k, param.secs, gflops / param.secs);
+    printfQuda("Block-CG(%d): Convergence in %d iterations, %f seconds, GFLOPS = %g\n", nsrc, k, param.secs, gflops / param.secs);
   }
 
   if (k == param.maxiter)
