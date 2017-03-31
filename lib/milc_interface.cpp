@@ -1026,13 +1026,33 @@ void qudaInvertMsrc(int external_precision,
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy;
 
-  if(inv_args.mixed_precision == 2){
-    device_precision_sloppy = QUDA_HALF_PRECISION;
-  }else if(inv_args.mixed_precision == 1){
-    device_precision_sloppy = QUDA_SINGLE_PRECISION;
-  }else{
-    device_precision_sloppy = device_precision;
+  char *quda_milc_sloppy = getenv("QUDA_MILC_SLOPPY");
+  if (quda_milc_sloppy == NULL) {
+    printfQuda("Environment variable QUDA_MILC_SLOPPY is not set\n");
+    if (inv_args.mixed_precision == 2) {
+      device_precision_sloppy = QUDA_HALF_PRECISION;
+    } else if (inv_args.mixed_precision == 1) {
+      device_precision_sloppy = QUDA_SINGLE_PRECISION;
+    } else {
+      device_precision_sloppy = device_precision;
+    }
+  } else {
+    int quda_milc_sloppy_int = atoi(quda_milc_sloppy);
+    if (quda_milc_sloppy_int < 0 || quda_milc_sloppy_int > 2) {
+      errorQuda("Environment variable QUDA_MILC_SLOPPY needs to be either 0, 1, 2 (sloppy=default,single,half)\n");
+    }
+    if (quda_milc_sloppy_int == 2) {
+      device_precision_sloppy = QUDA_HALF_PRECISION;
+      printfQuda("Setting QUDA sloopy precision to half.\n");
+    } else if (quda_milc_sloppy_int == 1) {
+      device_precision_sloppy = QUDA_SINGLE_PRECISION;
+      printfQuda("Setting QUDA sloopy precision to single.\n");
+    } else {
+      device_precision_sloppy = device_precision;
+    }
   }
+
+
 
 
 
