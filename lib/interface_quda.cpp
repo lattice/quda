@@ -2253,6 +2253,8 @@ void destroyMultigridQuda(void *mg) {
 }
 
 void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
+
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
   multigrid_solver *mg = static_cast<multigrid_solver*>(mg_);
   checkMultigridParam(mg_param);
 
@@ -2312,18 +2314,15 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   if(mg->mgParam->mg_global.invert_param != param)
     mg->mgParam->mg_global.invert_param = param;
 
-  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
   openMagma();
 
   mg->mg->updateCoarseOperator();
 
   closeMagma();
-  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-  saveProfile(__func__);
-  flushProfile();
 
   printfQuda("update completed\n");
   setOutputPrefix("");
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
