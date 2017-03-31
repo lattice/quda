@@ -36,6 +36,31 @@
 // the algorithm stopping condition). Ultimately, this is using a
 // min function versus a max function, so it's not a hard swap.
 // #define BLOCKSOLVER_RELIABLE_POLICY_MIN
+
+#ifdef BLOCKSOLVER_NVTX
+#include "nvToolsExt.h"
+static const uint32_t cg_nvtx_colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+static constexpr int cg_nvtx_num_colors = sizeof(cg_nvtx_colors)/sizeof(uint32_t);
+#define PUSH_RANGE(name,cid) { \
+    static int color_id = cid; \
+    color_id = color_id%cg_nvtx_num_colors;\
+    nvtxEventAttributes_t eventAttrib = {0}; \
+    eventAttrib.version = NVTX_VERSION; \
+    eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+    eventAttrib.colorType = NVTX_COLOR_ARGB; \
+    eventAttrib.color = cg_nvtx_colors[color_id]; \
+    eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+    eventAttrib.message.ascii = name; \
+    eventAttrib.category = cid;\
+    nvtxRangePushEx(&eventAttrib); \
+}
+#define POP_RANGE nvtxRangePop();
+#else
+#define PUSH_RANGE(name,cid)
+#define POP_RANGE
+#endif
+
+
 #endif
 
 namespace quda {
@@ -460,12 +485,18 @@ namespace quda {
     blas::xpy(y, x);
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
     param.gflops = gflops;
     param.iter += k;
+
+    { // temporary addition for SC'17
+      comm_allreduce(&gflops);
+      printfQuda("CG: Convergence in %d iterations, %f seconds, GFLOPS = %g\n", k, param.secs, gflops / param.secs);
+    }
 
     if (k == param.maxiter)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -1003,12 +1034,12 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       dslash::aux_worker = NULL;
       just_reliable_updated = false;
     }
-
+    PUSH_RANGE("Dslash_sloppy",0)
     // Step 12: Compute Ap.
     matSloppy(Ap, *pp, tmp_matsloppy, tmp2);
+    POP_RANGE
 
-    // POP_RANGE
-
+    PUSH_RANGE("Reduction",1)
     // Step 13: calculate pAp = P^\dagger Ap
 #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::hDotProduct(pAp_raw, pp->Components(), Ap.Components());
@@ -1029,8 +1060,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
 #endif
+    POP_RANGE
     printmat("pAp", pAp);
-
+    PUSH_RANGE("Eigen",3)
 #ifdef BLOCKSOLVER_EXPLICIT_PAP_HERMITIAN
     H = 0.5*(pAp + pAp.adjoint().eval());
     pAp = H;
@@ -1042,7 +1074,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
     // Step 15: Compute alpha = beta * C
     alpha = pAp.inverse() * C;
-
+    POP_RANGE
     // Step 16: update Xsloppy = Xsloppy + P alpha
     // This step now gets overlapped with the
     // comms in matSloppy. 
@@ -1062,6 +1094,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
     // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
     // update rSloppy
+    PUSH_RANGE("BLAS",2)
 #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::caxpy(beta_raw, Ap, *qp);
 #else
@@ -1073,7 +1106,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpy(AC,Ap,*qp);
 #endif
+    POP_RANGE
 
+    PUSH_RANGE("Reduction",1)
     // Orthogonalize Q via a thin QR decomposition.
     // Step 18: H = Q^\dagger Q
 #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -1089,7 +1124,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     }
 #endif
     printmat("r2", H);
-  
+  POP_RANGE
+  PUSH_RANGE("Eigen",3)
     // Step 19: L L^\dagger = H; Cholesky decomposition of H, L is lower left triangular.
     L = H.llt().matrixL();// retrieve factor L  in the decomposition
     
@@ -1104,6 +1140,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
     Linv = S.inverse();
     blas::zero(*tmpp);
+  POP_RANGE
+  PUSH_RANGE("BLAS",2)
+  blas::zero(*tmpp);
 #ifdef BLOCKSOLVER_MULTIREDUCE
     blas::caxpy_U(Linv_raw, *qp, *tmpp); // tmp is acting as Q.
 #else
@@ -1115,8 +1154,10 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     }
     blas::caxpy_U(AC,*qp,*tmpp); // tmp is acting as Q.
 #endif
+    POP_RANGE
     std::swap(qp, tmpp); // now Q actually is Q. tmp is the old Q.
 
+    PUSH_RANGE("Eigen",3)
     // Step 22: Back up C (we need to have it if we trigger a reliable update)
     C_old = C;
 
@@ -1145,7 +1186,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       if (r2 < H(j,j).real()) r2 = H(j,j).real();
   #endif
     }
-
+    POP_RANGE
 #ifdef BLOCKSOLVER_EXPLICIT_QP_ORTHO
     bool did_reliable = false;
 #endif
@@ -1166,6 +1207,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       // If we triggered a reliable update, we need
       // to do this X update now.
       // Step 16: update Xsloppy = Xsloppy + P alpha
+      PUSH_RANGE("BLAS",1)
 #ifdef BLOCKSOLVER_MULTIREDUCE
       blas::caxpy(alpha_raw, *pp, x_sloppy);
 #else
@@ -1180,12 +1222,15 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
       // Reliable updates step 2: Y = Y + X_s
       blas::xpy(x_sloppy, y);
-
+      POP_RANGE
       // Don't do aux work!
       dslash::aux_worker = NULL;
 
+      PUSH_RANGE("Dslash",4)
       // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
       mat(r, y, x);
+      POP_RANGE
+      PUSH_RANGE("BLAS",2)
       blas::xpay(b, -1.0, r);
 
       // Reliable updates step 3: X_s = 0.
@@ -1194,9 +1239,10 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       // x gets used as a temporary in mat(r,y,x) above.
       // That's why we need to wait to zero 'x_sloppy' until here.
       blas::zero(x_sloppy);
-
+      POP_RANGE
       // Reliable updates step 5: H = (R)^\dagger R
       r2avg=0;
+      PUSH_RANGE("Reduction",1)
 #ifdef BLOCKSOLVER_MULTIREDUCE
       blas::hDotProduct(H_raw, r.Components(), r.Components());
       for (int i = 0; i < nsrc; i++)
@@ -1216,6 +1262,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         }
       }
 #endif
+      POP_RANGE
+      PUSH_RANGE("Eigen",3)
       printmat("reliable r2", H);
 
       // Reliable updates step 6: L L^\dagger = H, Cholesky decomposition, L lower left triangular
@@ -1224,12 +1272,14 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       L = H.llt().matrixL(); // retrieve factor L in the decomposition
       C = L.adjoint();
       Linv = C.inverse();
+      POP_RANGE
 
 #ifdef BLOCKSOLVER_VERBOSE
       std::cout << "r2\n " << H << std::endl;
       std::cout << "L\n " << L.adjoint() << std::endl;
 #endif
 
+      PUSH_RANGE("BLAS",2)
       // Reliable updates step 8: set Q to thin QR decompsition of R.
       blas::zero(*qp);
 #ifdef BLOCKSOLVER_MULTIREDUCE
@@ -1245,9 +1295,12 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
       blas::caxpy_U(AC,*tmpp,*qp); 
 #endif
+      POP_RANGE
+      PUSH_RANGE("Eigen",3)
 
       // Reliable updates step 9: Set S = C * C_old^{-1} (equation 6.1 in the blockCGrQ paper)
       S = C * C_old.inverse();
+      POP_RANGE
 
       // Reliable updates step 10: Recompute residuals, reset rNorm, etc.
 #ifdef BLOCKSOLVER_RELIABLE_POLICY_MIN
@@ -1293,10 +1346,16 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // but that's difficult for the same
     // reason a block cax is difficult.
     // Instead, we do it by a caxpyz + pointer swap.
+
 #ifdef BLOCKSOLVER_MULTIREDUCE
+    PUSH_RANGE("Eigen",3)
     Sdagger = S.adjoint();
+    POP_RANGE
+    PUSH_RANGE("BLAS",2)
     blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    POP_RANGE
 #else
+    PUSH_RANGE("BLAS",2)
     // temporary hack
     for(int i=0; i<nsrc; i++){
       for(int j=0;j<nsrc; j++){
@@ -1304,6 +1363,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
     blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
+    blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
+    POP_RANGE
 #endif
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
 
@@ -1325,6 +1386,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         }
       }
 #endif
+
       printfQuda("Current Q^\\dagger P:\n");
       std::cout << O << "\n";
       
@@ -1426,11 +1488,15 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-  printfQuda("Block-CG: Convergence in %d iterations, %f seconds\n", k, param.secs);
 
   double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
   param.gflops = gflops;
   param.iter += k;
+
+  { // temporary addition for SC'17
+    comm_allreduce(&gflops);
+    printfQuda("Block-CG: Convergence in %d iterations, %f seconds, GFLOPS = %g\n", k, param.secs, gflops / param.secs);
+  }
 
   if (k == param.maxiter)
   warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -1505,8 +1571,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   default:
     errorQuda("Block-CG with dimension %d not supported", param.num_src);
   }
-
-  printfQuda("solver end\n");
 
 #endif
 
