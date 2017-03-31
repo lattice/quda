@@ -1341,7 +1341,7 @@ namespace quda {
 
       if (comm_peer2peer_enabled(1,dim)) {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
-      } else if (!gdr) {
+      } else if (gdr) {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
