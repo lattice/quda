@@ -259,6 +259,50 @@ namespace quda {
       coarse->param.matSmooth = matCoarseSmoother;
       coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;
 
+      // if on the second to bottom level then we can just use the coarse solver as is
+      if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE || param.level == param.Nlevel-2) {
+	coarse_solver = coarse;
+	printfQuda("Assigned coarse solver to coarse MG operator\n");
+      } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
+        if (param_coarse_solver) delete param_coarse_solver;
+        if (coarse_solver) delete coarse_solver;
+
+	param_coarse_solver = new SolverParam(param);
+
+	param_coarse_solver->inv_type = QUDA_GCR_INVERTER;
+	param_coarse_solver->inv_type_precondition = QUDA_MG_INVERTER;
+	param_coarse_solver->preconditioner = coarse;
+
+	param_coarse_solver->is_preconditioner = false;
+	param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
+	param_coarse_solver->maxiter = 11; // FIXME - dirty hack
+	param_coarse_solver->Nkrylov = 10;
+	param_coarse_solver->tol = param.mg_global.smoother_tol[param.level+1];
+	param_coarse_solver->global_reduction = true;
+	param_coarse_solver->compute_true_res = false;
+	param_coarse_solver->delta = 1e-8;
+	param_coarse_solver->verbosity_precondition = param.mg_global.verbosity[param.level+1];
+	param_coarse_solver->pipeline = 5;
+
+	// need this to ensure we don't use half precision on the preconditioner in GCR
+	param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
+
+	if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
+	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
+	} else {
+	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
+	}
+
+	printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
+      } else {
+	errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
+      }
+
       coarse->destroySmoother();
       coarse->createSmoother();
 

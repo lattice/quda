@@ -153,7 +153,7 @@ namespace quda {
   }
 
   void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_) {
-    if (site_subset == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
+    if (site_subset_ == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
     parity = parity_;
 
     if (site_subset == site_subset_) return;
