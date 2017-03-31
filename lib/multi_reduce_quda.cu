@@ -278,7 +278,7 @@ namespace quda {
     template <template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal, typename writeDiagonal,
 	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal, typename writeOffDiagonal>
     void multiReduce_recurse(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
-			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i_idx, int j_idx, bool hermitian, unsigned int tile_size=MAX_MULTI_BLAS_N) {
+			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i_idx, int j_idx, bool hermitian, unsigned int tile_size) {
 
       if (y.size() > tile_size) // if greater than max single-kernel size, split and recurse
       {
@@ -456,73 +456,95 @@ namespace quda {
       Complex *result;
       vec &x, &y, &z, &w;
       bool hermitian;
+      bool Anorm;
 
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-      static const int max_tile_size = MAX_MULTI_BLAS_N;
+      int max_tile_size;
 
     public:
-      TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian)
-	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian)
+      TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
+	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
       {
-	strcpy(aux, "policy,");
-	strcat(aux, x[0]->AuxString());
-	strcat(aux, ",");
-	strcat(aux, y[0]->AuxString());
-	sprintf(aux, "%s,n=%lu,m=%lu", aux, x.size(), y.size());
+      	strcpy(aux, "policy,");
+      	strcat(aux, x[0]->AuxString());
+      	strcat(aux, ",");
+      	strcat(aux, y[0]->AuxString());
+        if (hermitian) strcat(aux, ",hermitian");
+        if (Anorm) strcat(aux, ",Anorm"); 
+      	sprintf(aux, "%s,n=%lu,m=%lu", aux, x.size(), y.size());
 
-	// before we do policy tuning we must ensure the kernel
-	// constituents have been tuned since we can't do nested tuning
-	// FIXME this will break if the kernels are destructive - which they aren't here
-	if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
-	  disableProfileCount();
+        // max_tile_size should be set to the largest power of 2 less than
+        // MAX_MULTI_BLAS_N, since we have a requirement that the
+        // tile size is a power of 2.
+        unsigned int max_count = 0;
+        unsigned int tile_size_tmp = MAX_MULTI_BLAS_N;
+        while (tile_size_tmp != 1) { tile_size_tmp = tile_size_tmp >> 1; max_count++; }
+        tile_size_tmp = 1;
+        for (int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
+        max_tile_size = tile_size_tmp; 
 
-	  for (unsigned int tile_size=1; tile_size <= max_tile_size && tile_size <= x.size() && tile_size <= y.size(); tile_size*=2) {
-	    multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-	      (result, x, y, z, w, 0, 0, hermitian, tile_size);
-	  }
 
-	  enableProfileCount();
-	  setPolicyTuning(true);
-	}
+
+      	// before we do policy tuning we must ensure the kernel
+      	// constituents have been tuned since we can't do nested tuning
+      	// FIXME this will break if the kernels are destructive - which they aren't here
+      	if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+      	  disableProfileCount(); // purely for profiling reasons, don't want to profile tunings. 
+
+          // Make sure constituents are tuned. 
+      	  for (unsigned int tile_size=1; tile_size <= max_tile_size && tile_size <= x.size() && tile_size <= y.size(); tile_size*=2) {
+      	    multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+      	      (result, x, y, z, w, 0, 0, hermitian, tile_size);
+      	  }
+
+      	  enableProfileCount();
+      	  setPolicyTuning(true);
+      	}
       }
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+        TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity()); 
+        //TuneParam tp = tuneLaunch(*this, (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) ? QUDA_TUNE_YES : QUDA_TUNE_NO, getVerbosity()); // replace QUDA_TUNE_NO w/ getTuning()
 
-	multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-	  (result, x, y, z, w, 0, 0, hermitian, tp.aux.x);
+        // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
+        // it contains blocksize, grid size, etc. Since we're only tuning
+        // a policy, we don't care about those sizes. That's why we only
+        // tune "aux.x", which is the tile size. 
+        multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+          (result, x, y, z, w, 0, 0, hermitian, tp.aux.x);
       }
 
       // aux.x is the tile size
       bool advanceAux(TuneParam &param) const
       {
-	param.aux.x *= 2; // only tune powers of two (FIXME)
-	if (param.aux.x <= max_tile_size && param.aux.x <= (int)x.size() && param.aux.x <= (int)y.size()) {
-	  return true;
-	} else {
-	  param.aux.x = 1; // reset to the beginning
-	  return false;
-	}
+      	param.aux.x *= 2; // only tune powers of two (FIXME)
+      	if (param.aux.x <= max_tile_size && param.aux.x <= (int)x.size() && param.aux.x <= (int)y.size()) {
+      	  return true;
+      	} else {
+      	  param.aux.x = 1; // reset to the beginning (which we'd need for multi-dimensional tuning)
+      	  return false;
+      	}
       }
 
       bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
       void initTuneParam(TuneParam &param) const  {
-	Tunable::initTuneParam(param);
-	param.aux.x = 1; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
+      	Tunable::initTuneParam(param);
+      	param.aux.x = 1; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
       }
 
       void defaultTuneParam(TuneParam &param) const  {
-	Tunable::defaultTuneParam(param); // default is max tile size
-	param.aux.x = MAX_MULTI_BLAS_N; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
+      	Tunable::defaultTuneParam(param); // default is max tile size
+        // max_tile_size is MAX_MULTI_BLAS_N rounded down to the nearest power of 2.
+      	param.aux.x = max_tile_size; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
       }
 
       TuneKey tuneKey() const {
-	return TuneKey(x[0]->VolString(), typeid(*this).name(), aux);
+        return TuneKey(x[0]->VolString(), typeid(*this).name(), aux);
       }
 
       long long flops() const { return 0; } // FIXME
@@ -562,7 +584,7 @@ namespace quda {
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      TileSizeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, true);
+      TileSizeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, true, false); // last false is b/c L2 norm
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -577,6 +599,32 @@ namespace quda {
           result[j*ylen+i] = result_tmp[i*xlen + j];
           result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
 	}
+
+      delete[] result_tmp;
+    }
+
+    // for (p, Ap) norms in CG which are Hermitian. 
+    void hDotProduct_Anorm(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
+
+      Complex* result_tmp = new Complex[x.size()*y.size()];
+      for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
+
+      TileSizeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, true, true); // last true is b/c A norm
+      tile.apply(0);
+
+      // do a single multi-node reduction only once we have computed all local dot products
+      const int Nreduce = 2*x.size()*y.size();
+      reduceDoubleArray((double*)result_tmp, Nreduce); // FIXME - could optimize this for Hermiticity as well
+
+      // Switch from col-major to row-major
+      const unsigned int xlen = x.size();
+      const unsigned int ylen = y.size();
+      for (unsigned int j = 0; j < xlen; j++)
+        for (unsigned int i = j; i < ylen; i++) {
+          result[j*ylen+i] = result_tmp[i*xlen + j];
+          result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
+  }
 
       delete[] result_tmp;
     }

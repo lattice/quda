@@ -1044,7 +1044,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     PUSH_RANGE("Reduction",1)
     // Step 13: calculate pAp = P^\dagger Ap
 #ifdef BLOCKSOLVER_MULTIREDUCE
-    blas::hDotProduct(pAp_raw, pp->Components(), Ap.Components());
+    blas::hDotProduct_Anorm(pAp_raw, pp->Components(), Ap.Components());
 #if 0
     // hermiticity check
     for(int i=0; i<nsrc; i++){
@@ -1075,7 +1075,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     beta = -pAp.inverse();
 
     // Step 15: Compute alpha = beta * C
-    alpha = pAp.inverse() * C;
+    alpha = - beta * C;
     POP_RANGE
     // Step 16: update Xsloppy = Xsloppy + P alpha
     // This step now gets overlapped with the
@@ -1568,6 +1568,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   case 16: solve_n<16>(x, b); break;
   case 24: solve_n<24>(x, b); break;
   case 32: solve_n<32>(x, b); break;
+  case 48: solve_n<48>(x, b); break; 
   case 64: solve_n<64>(x, b); break;
   default:
     errorQuda("Block-CG with dimension %d not supported", param.num_src);
