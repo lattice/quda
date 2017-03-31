@@ -192,35 +192,69 @@ namespace quda {
        faces we can send.
     */
 
-    /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *my_face[2];
-    void *my_face_d[2]; // mapped version of the above
-    void *my_fwd_face[2][QUDA_MAX_DIM];
-    void *my_back_face[2][QUDA_MAX_DIM];
+    /**
+       Double buffered static GPU halo send buffer
+    */
+    static void *ghostFaceBuffer[2];
 
-    /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *from_face[2];
-    void *from_face_d[2]; // mapped version of the above
-    void *from_back_face[2][QUDA_MAX_DIM];
-    void *from_fwd_face[2][QUDA_MAX_DIM];
-    
     /**
        Double buffered static GPU halo receive buffer
      */
     static void *ghost_field[2];
 
+    /**
+       Double buffered static pinned send/recv buffers
+    */
+    static void *ghost_pinned_h[2];
+
+    /**
+       Mapped version of ghost_pinned
+    */
+    static void *ghost_pinned_d[2];
+
+    /** Pinned memory buffer used for sending all messages */
+    void *my_face[2];
+    void *my_face_d[2]; // mapped version of the above
+
+    /** Local pointers to the my_face buffer */
+    void *my_fwd_face[2][QUDA_MAX_DIM];
+    void *my_back_face[2][QUDA_MAX_DIM];
+
+    void *my_fwd_face_rdma[2][QUDA_MAX_DIM];
+    void *my_back_face_rdma[2][QUDA_MAX_DIM];
+
+    /** Memory buffer used for sending all messages */
+    void *from_face[2];
+    void *from_face_d[2]; // mapped version of the above
+    void *from_back_face[2][QUDA_MAX_DIM];
+    void *from_fwd_face[2][QUDA_MAX_DIM];
+    void *from_back_face_rdma[2][QUDA_MAX_DIM];
+    void *from_fwd_face_rdma[2][QUDA_MAX_DIM];
+    
     /** Message handles for receiving from forwards */
-    MsgHandle ***mh_recv_fwd[2];
+    MsgHandle *mh_recv_fwd[2][QUDA_MAX_DIM];
 
     /** Message handles for receiving from backwards */
-    MsgHandle ***mh_recv_back[2];
+    MsgHandle *mh_recv_back[2][QUDA_MAX_DIM];
 
     /** Message handles for sending forwards */
-    MsgHandle ***mh_send_fwd[2];
+    MsgHandle *mh_send_fwd[2][QUDA_MAX_DIM];
 
     /** Message handles for sending backwards */
-    MsgHandle ***mh_send_back[2];
-    
+    MsgHandle *mh_send_back[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma receiving from forwards */
+    MsgHandle *mh_recv_rdma_fwd[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma receiving from backwards */
+    MsgHandle *mh_recv_rdma_back[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma sending to forwards */
+    MsgHandle *mh_send_rdma_fwd[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma sending to backwards */
+    MsgHandle *mh_send_rdma_back[2][QUDA_MAX_DIM];
+
     /** Peer-to-peer message handler for signaling event posting */
     static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
 
@@ -276,6 +310,13 @@ namespace quda {
        @param param Contains the metadata for creating the LatticeField
     */
     LatticeField(const LatticeFieldParam &param);
+
+    /**
+       Constructor for creating a LatticeField from another LatticeField
+       @param field Instance of LatticeField from which we are
+       inheriting metadata
+    */
+    LatticeField(const LatticeField &field);
 
     /**
        Destructor for LatticeField

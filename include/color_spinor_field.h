@@ -266,8 +266,6 @@ namespace quda {
 
     // multi-GPU parameters
 
-    int nFaceComms; // number of faces allocated
-
     void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
@@ -474,28 +472,14 @@ namespace quda {
     void destroyGhostTexObject();
 #endif
 
-#ifdef GPU_COMMS  // This is a hack for half precision.
-    // Since the ghost data and ghost norm data are not contiguous,
-    // separate MPI calls are needed when using GPUDirect RDMA.
-    void *my_fwd_norm_face[2][QUDA_MAX_DIM];
-    void *my_back_norm_face[2][QUDA_MAX_DIM];
-    void *from_fwd_norm_face[2][QUDA_MAX_DIM];
-    void *from_back_norm_face[2][QUDA_MAX_DIM];
-
-    MsgHandle ***mh_recv_norm_fwd[2];
-    MsgHandle ***mh_recv_norm_back[2];
-    MsgHandle ***mh_send_norm_fwd[2];
-    MsgHandle ***mh_send_norm_back[2];
-#endif
-
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
-    void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
-    static void *ghostFaceBuffer[2]; // GPU halo send buffer
-    static void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    static void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static bool initGhostFaceBuffer;
+
+    void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
+    void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
 
     void create(const QudaFieldCreate);
     void destroy();

@@ -32,7 +32,15 @@ namespace quda {
   cudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
   cudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
+  void *LatticeField::ghost_pinned_h[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_pinned_d[2] = {nullptr, nullptr};
+
+  // gpu ghost receive buffer
   void *LatticeField::ghost_field[2] = {nullptr, nullptr};
+
+  // gpu ghost send buffer
+  void *LatticeField::ghostFaceBuffer[2] = {nullptr, nullptr};
+
   bool LatticeField::ghost_field_reset = false;
 
   void* LatticeField::fwdGhostSendDest[2][QUDA_MAX_DIM];
@@ -62,6 +70,35 @@ namespace quda {
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
 	surface[i] *= param.x[j];
+      }
+    }
+
+    if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
+    volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    stride = volumeCB + pad;
+
+    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
+    for (int i=0; i<nDim; i++)
+      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
+
+    // for 5-dimensional fields, we only communicate in the space-time dimensions
+    nDimComms = nDim == 5 ? 4 : nDim;
+
+    setTuningString();
+  }
+
+  LatticeField::LatticeField(const LatticeField &field)
+    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
+      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), initComms(false)
+  {
+    for (int i=0; i<nDim; i++) {
+      x[i] = field.x[i];
+      r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
+      volume *= field.x[i];
+      surface[i] = 1;
+      for (int j=0; j<nDim; j++) {
+	if (i==j) continue;
+	surface[i] *= field.x[j];
       }
     }
 

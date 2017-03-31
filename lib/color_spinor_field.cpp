@@ -15,7 +15,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), v(0), norm(0), nFaceComms(0),
+    : LatticeField(param), init(false), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
       ghost_length(0), ghost_norm_length(0),
       bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
@@ -28,7 +28,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), v(0), norm(0), nFaceComms(0),
+    : LatticeField(field), init(false), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
       ghost_length(0), ghost_norm_length(0),
       bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
