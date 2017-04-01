@@ -22,8 +22,8 @@
 // define this to use multi-functions, otherwise it'll
 // do loops over dot products.
 // this is more here for development convenience.
-#define BLOCKSOLVER_MULTIFUNCTIONS
-#define BLOCKSOLVE_DSLASH5D
+//#define BLOCKSOLVER_MULTIFUNCTIONS
+//#define BLOCKSOLVE_DSLASH5D
 //#define BLOCKSOLVER_VERBOSE
 
 // Explicitly reorthogonalize Q^\dagger P on reliable update.
@@ -585,7 +585,7 @@ class BlockCGUpdate : public Worker {
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     Complex* alpha;
 #else
-    MatrixXcd* alpha;
+    MatrixXcd &alpha;
 #endif
 
     /**
@@ -604,7 +604,7 @@ class BlockCGUpdate : public Worker {
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, Complex* alpha) :
 #else
-    BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, MatrixXcd* alpha) :
+    BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, MatrixXcd& alpha) :
 #endif
       x_sloppyp(x_sloppyp), pp(pp), alpha(alpha), n_rhs((*pp)->Components().size()),
       n_update( x_sloppyp->Nspin()==4 ? 4 : 2 )
@@ -635,7 +635,7 @@ class BlockCGUpdate : public Worker {
 #else
         for (int i = 0; i < update_per_apply; i++)
           for (int j = 0; j < n_rhs; j++)
-            blas::caxpy(alpha(i+count*update_per_apply, j), curr_p[i+count*update_per_apply], x_sloppy->Component(j));
+            blas::caxpy(alpha(i+count*update_per_apply, j), *(curr_p[i+count*update_per_apply]), x_sloppyp->Component(j));
 #endif
       }
       else if (count == n_update-1) // we're updating the leftover.
@@ -646,7 +646,7 @@ class BlockCGUpdate : public Worker {
 #else
         for (int i = 0; i < update_per_apply_on_last; i++)
           for (int j = 0; j < n_rhs; j++)
-            blas::caxpy(alpha(i+count*update_per_apply,j), curr_p[i+count*update_per_apply], x_sloppyp->Component(j));
+            blas::caxpy(alpha(i+count*update_per_apply,j), *(curr_p[i+count*update_per_apply]), x_sloppyp->Component(j));
 #endif
       }
       POP_RANGE
@@ -932,7 +932,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
   BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, alpha_raw);
 #else
-  BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, &alpha);
+  BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, alpha);
 #endif
 
   profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -1155,7 +1155,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #else
     for(int i=0; i<nsrc; i++){
       for(int j=i;j<nsrc; j++){
-        blas::caxpy(Linv(i,j), qp->Component(i), tempp->Component(j));
+        blas::caxpy(Linv(i,j), qp->Component(i), tmpp->Component(j));
       }
     }
 #endif
@@ -1319,9 +1319,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #else
       // temporary hack - use AC to pass matrix arguments to multiblas
       for(int i=0; i<nsrc; i++){
-        blas::copy(tmpp->Component(i), r->Component(i));
+        blas::copy(tmpp->Component(i), r.Component(i));
         for(int j=i;j<nsrc; j++){
-          blas::caxpy(Linv(i,j), tmp->Component(i), q->Component(j));
+          blas::caxpy(Linv(i,j), tmpp->Component(i), qp->Component(j));
         }
       }
 #endif
@@ -1511,7 +1511,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::xpy(x_sloppy, y);
 #else
-  if (int i = 0; i < nsrc; i++)
+  for (int i = 0; i < nsrc; i++)
     blas::xpy(x_sloppy.Component(i), y.Component(i));
 #endif
 
