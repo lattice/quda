@@ -745,7 +745,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   qp->ExtendLastDimension();
   tmpp->ExtendLastDimension();
   tmp_matsloppy.ExtendLastDimension();
-
+  
   csParam.setPrecision(param.precision_sloppy);
   // tmp2 only needed for multi-gpu Wilson-like kernels
   //ColorSpinorField *tmp2_p = !mat.isStaggered() ?
@@ -755,7 +755,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   if(!mat.isStaggered()){
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    tmp2_p =  ColorSpinorField::Create(csParam);
+    tmp2_p =  ColorSpinorField::Create(x, csParam);
     tmp2_p->ExtendLastDimension();
   } else {
     tmp2_p = tmp_matsloppyp;
