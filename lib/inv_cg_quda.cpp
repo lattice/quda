@@ -666,13 +666,13 @@ class BlockCGUpdate : public Worker {
 #else // BLOCKSOLVE_DSLASH5D
       if (count == 0)
       {
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
         std::vector<ColorSpinorField*> curr_p;
         curr_p.push_back(&(*pp)->Component(curr_update));
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
         blas::caxpy(&alpha[curr_update*n_rhs], curr_p, x_sloppyp->Components());
 #else
         for (int j = 0; j < n_rhs; j++)
-            blas::caxpy(alpha(curr_update,j), curr_p, x_sloppyp->Component(j));
+            blas::caxpy(alpha(curr_update,j), (*pp)->Component(curr_update), x_sloppyp->Component(j));
 #endif
         if (++curr_update == n_rhs) curr_update = 0;
       }
