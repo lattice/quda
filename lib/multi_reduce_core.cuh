@@ -22,7 +22,6 @@ __shared__ static bool isLastBlockDone;
 #include <launch_kernel.cuh>
 
 
-
 /**
    @brief Parameter struct for generic multi-blas kernel.
    @tparam NXZ is dimension of input vectors: X,Z,V
@@ -36,7 +35,7 @@ __shared__ static bool isLastBlockDone;
 */
 template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY, 
   typename SpinorZ, typename SpinorW, typename Reducer>
-  struct MultiReduceArg : public ReduceArg<ReduceType> {
+struct MultiReduceArg : public ReduceArg<vector_type<ReduceType,NXZ> > {
 
   const int NYW;
   SpinorX X[NXZ];
@@ -72,10 +71,9 @@ static signed char *Amatrix_h;
 static signed char *Bmatrix_h;
 static signed char *Cmatrix_h;
 
-
 // 'sum' should be an array of length NXZ...?
 template<int k, int NXZ, typename FloatN, int M, typename ReduceType, typename Arg>
-  __device__ inline void compute(ReduceType sum[NXZ], Arg &arg, int idx, int parity) {
+__device__ inline void compute(vector_type<ReduceType,NXZ> &sum, Arg &arg, int idx, int parity) {
 
   constexpr int kmod = k; // there's an old warning about silencing an out-of-bounds compiler warning,
                           // but I never seem to get it, and I'd need to compare against NYW anyway,
@@ -126,14 +124,9 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
   unsigned int k = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned int parity = blockIdx.z;
 
-  // We need an array of sum.
-  // Is there an array version of ::quda::zero, warp_reduce, and reduce?
-  // I know I can just loop int l = 0 to NXZ-1, not sure if that's smart...
-  ReduceType sum[NXZ];
-#pragma unroll
-  for (int l=0; l < NXZ; l++) ::quda::zero(sum[l]);
+  if (k >= arg.NYW) return; // safe since k are different thread blocks
 
-  if (k >= arg.NYW) return;
+  vector_type<ReduceType,NXZ> sum;
 
   switch(k) {
   case  0: compute< 0,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
@@ -182,14 +175,12 @@ template<typename ReduceType, typename FloatN, int M, int NXZ,
 #endif //4
 #endif //3
 #endif //2
-  }
+}
 
 #ifdef WARP_MULTI_REDUCE
-#pragma unroll
-  for (int l=0; l < NXZ; l++) ::quda::warp_reduce<ReduceType>(arg, sum[l], arg.NYW*(l + parity*NXZ) + k);
+  ::quda::warp_reduce<vector_type<ReduceType,NXZ> >(arg, sum, arg.NYW*parity + k);
 #else
-#pragma unroll
-  for (int l=0; l < NXZ; l++) ::quda::reduce<block_size, ReduceType>(arg, sum[l], arg.NYW*(l + parity*NXZ) + k);
+  ::quda::reduce<block_size, vector_type<ReduceType,NXZ> >(arg, sum, arg.NYW*parity + k);
 #endif
 
 } // multiReduceKernel
@@ -216,13 +207,14 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
     while(cudaSuccess != cudaEventQuery(*getReduceEvent())) {}
   } else
 #endif
-    { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
-  
-  // ESW: This is then where the results get copied into the 'result' array 
-  // from the buffer reduces go into.
-  for(int i=0; i<NXZ*arg.NYW; ++i) {
-    result[i] = set(((ReduceType*)getHostReduceBuffer())[i]);
-    if (tp.grid.z==2) sum(result[i],((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+i]);
+    { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
+
+  // need to transpose for same order with vector thread reduction
+  for (int i=0; i<NXZ; i++) {
+    for (int j=0; j<arg.NYW; j++) {
+      result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[j*NXZ+i]);
+      if (tp.grid.z==2) result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
+    }
   }
 }
 
@@ -273,7 +265,7 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
 
   // we only launch thread blocks up to size 512 since the autoner
   // tuner favours smaller blocks and this helps with compile time
-  unsigned int maxBlockSize() const { return 32; } // HARD CODE TEMPORARY HACK FIX }
+  unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
 
 public:
   MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],

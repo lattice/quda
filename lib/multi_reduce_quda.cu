@@ -482,9 +482,8 @@ namespace quda {
         unsigned int tile_size_tmp = MAX_MULTI_BLAS_N;
         while (tile_size_tmp != 1) { tile_size_tmp = tile_size_tmp >> 1; max_count++; }
         tile_size_tmp = 1;
-        for (int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
+        for (unsigned int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
         max_tile_size = tile_size_tmp; 
-
 
 
       	// before we do policy tuning we must ensure the kernel
@@ -507,9 +506,7 @@ namespace quda {
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
       void apply(const cudaStream_t &stream) {
-        //TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity()); 
-        // Use the above line to not use tile size tuning.
-        TuneParam tp = tuneLaunch(*this, (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) ? QUDA_TUNE_YES : QUDA_TUNE_NO, getVerbosity()); // replace QUDA_TUNE_NO w/ getTuning()
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
         // it contains blocksize, grid size, etc. Since we're only tuning
