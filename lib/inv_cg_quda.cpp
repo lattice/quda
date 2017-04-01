@@ -635,7 +635,7 @@ class BlockCGUpdate : public Worker {
 #else
         for (int i = 0; i < update_per_apply; i++)
           for (int j = 0; j < n_rhs; j++)
-            blas::caxpy(alpha(i+count*update_per_apply, j), *(curr_p[i+count*update_per_apply]), x_sloppyp->Component(j));
+            blas::caxpy(alpha(i+count*update_per_apply, j), *(curr_p[i]), x_sloppyp->Component(j));
 #endif
       }
       else if (count == n_update-1) // we're updating the leftover.
@@ -646,7 +646,7 @@ class BlockCGUpdate : public Worker {
 #else
         for (int i = 0; i < update_per_apply_on_last; i++)
           for (int j = 0; j < n_rhs; j++)
-            blas::caxpy(alpha(i+count*update_per_apply,j), *(curr_p[i+count*update_per_apply]), x_sloppyp->Component(j));
+            blas::caxpy(alpha(i+count*update_per_apply,j), *(curr_p[i]), x_sloppyp->Component(j));
 #endif
       }
       POP_RANGE
