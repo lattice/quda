@@ -111,6 +111,9 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
+      // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+      dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
+      dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
 #ifdef SHARED_WILSON_DSLASH
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
@@ -188,14 +191,8 @@ namespace quda {
       dslash = new NdegTwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
     }
 
-#ifndef GPU_COMMS
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
     dslash_policy.apply(0);
-#else
-    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
-    delete dslashImp;
-#endif
 
     delete dslash;
 

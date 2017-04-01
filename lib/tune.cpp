@@ -73,11 +73,11 @@ namespace quda {
       ls.str(line);
       ls >> v >> n >> a >> param.block.x >> param.block.y >> param.block.z;
       check = snprintf(key.volume, key.volume_n, "%s", v.c_str());
-      if (check < 0 || check >= key.volume_n) errorQuda("Error writing volume string");
+      if (check < 0 || check >= key.volume_n) errorQuda("Error writing volume string (check = %d)", check);
       check = snprintf(key.name, key.name_n, "%s", n.c_str());
-      if (check < 0 || check >= key.name_n) errorQuda("Error writing name string");
+      if (check < 0 || check >= key.name_n) errorQuda("Error writing name string (check=%d)", check);
       check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
-      if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string");
+      if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string (check=%d)", check);
       ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes >> param.aux.x >> param.aux.y >> param.aux.z >> param.aux.w >> param.time;
       ls.ignore(1); // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
@@ -528,11 +528,6 @@ namespace quda {
 
       tunable.checkLaunchParam(param);
 
-#ifdef LAUNCH_TIMER
-      launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
-      launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
-#endif
-
 #ifdef PTHREADS
       //pthread_mutex_unlock(&pthread_mutex);
       //tally--;
@@ -541,6 +536,10 @@ namespace quda {
       // we could be tuning outside of the current scope
       if (!tuning && profile_count) param.n_calls++;
 
+#ifdef LAUNCH_TIMER
+      launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
+      launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
+#endif
       return param;
     }
 

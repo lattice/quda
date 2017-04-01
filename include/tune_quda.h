@@ -26,14 +26,14 @@ namespace quda {
     float time;
     long long n_calls;
 
-  TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
+    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
       aux = make_int4(1,1,1,1);
     }
 
-    TuneParam(const TuneParam &param)
+    inline TuneParam(const TuneParam &param)
       : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
 
-    TuneParam& operator=(const TuneParam &param) {
+    inline TuneParam& operator=(const TuneParam &param) {
       if (&param != this) {
 	block = param.block;
 	grid = param.grid;
@@ -46,6 +46,14 @@ namespace quda {
       return *this;
     }
 
+    friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
+      output << "block = (" << param.block.x << ", " << param.block.y << ", " << param.block.z << ")" << std::endl;
+      output << "grid = (" << param.grid.x << ", " << param.grid.y << ", " << param.grid.z << ")" << std::endl;
+      output << "shared_bytes = " << param.shared_bytes << std::endl;
+      output << "aux = (" << param.aux.x << ", " << param.aux.y << ", " << param.aux.z << ")" << std::endl;
+      output << param.comment << std::endl;
+      return output;
+    }
   };
 
 
@@ -175,7 +183,7 @@ namespace quda {
       int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
       //int n = snprintf(aux, QUDA_TUNE_AUX_STR_LENGTH, "threads=%d,prec=%lu,stride=%d,geometery=%d",
       //	       arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
-      if (n < 0 || n >= 512) errorQuda("Error writing auxiliary string");
+      if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
     }
 
   public:
@@ -331,10 +339,10 @@ namespace quda {
     virtual unsigned int sharedBytesPerThread() const { return 0; }
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-    const unsigned int vector_length;
+    unsigned int vector_length_y;
 
   public:
-    TunableVectorY(unsigned int vector_length) : vector_length(vector_length) { }
+    TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -349,13 +357,13 @@ namespace quda {
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length) {
+	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1]) {
 	  param.block.y++;
-	  param.grid.y = (vector_length + param.block.y - 1) / param.block.y;
+	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
 	} else { // we have run off the end so let's reset
 	  param.block.y = 1;
-	  param.grid.y = vector_length;
+	  param.grid.y = vector_length_y;
 	  return false;
 	}
       }
@@ -365,7 +373,7 @@ namespace quda {
     {
       Tunable::initTuneParam(param);
       param.block.y = 1;
-      param.grid.y = vector_length;
+      param.grid.y = vector_length_y;
     }
 
     /** sets default values for when tuning is disabled */
@@ -373,14 +381,15 @@ namespace quda {
     {
       Tunable::defaultTuneParam(param);
       param.block.y = 1;
-      param.grid.y = vector_length;
+      param.grid.y = vector_length_y;
     }
 
+    void resizeVector(int y) { vector_length_y = y;  }
   };
 
   class TunableVectorYZ : public TunableVectorY {
 
-    const unsigned vector_length_z;
+    mutable unsigned vector_length_z;
 
   public:
     TunableVectorYZ(unsigned int vector_length_y, unsigned int vector_length_z)
@@ -399,7 +408,7 @@ namespace quda {
       } else { // block.x/block.y (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.z < vector_length_z) {
+	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[1]) {
 	  param.block.z++;
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return true;
@@ -425,6 +434,8 @@ namespace quda {
       param.block.z = 1;
       param.grid.z = vector_length_z;
     }
+
+    void resizeVector(int y, int z) { vector_length_z = z;  TunableVectorY::resizeVector(y); }
   };
 
   void loadTuneCache();

@@ -12,10 +12,12 @@ namespace quda {
     unsigned short C[nDim];
     int f[nDim][nDim];
     bool localParity[nDim];
+    int faceVolumeCB[nDim];
     int commDim[QUDA_MAX_DIM];
+    const int offset;
     ExtractGhostArg(const Order &order, const GaugeField &u, const int *A_,
-		    const int *B_, const int *C_, const int f_[nDim][nDim], const int *localParity_) 
-      : order(order), nFace(u.Nface()) {
+		    const int *B_, const int *C_, const int f_[nDim][nDim], const int *localParity_, int offset)
+      : order(order), nFace(u.Nface()), offset(offset) {
       for (int d=0; d<nDim; d++) {
 	X[d] = u.X()[d];
 	A[d] = A_[d];
@@ -24,6 +26,7 @@ namespace quda {
 	for (int e=0; e<nDim; e++) f[d][e] = f_[d][e];
 	localParity[d] = localParity_[d]; 
 	commDim[d] = comm_dim_partitioned(d);
+	faceVolumeCB[d] = u.SurfaceCB(d)*u.Nface();
       }
     }
   };
@@ -57,24 +60,37 @@ namespace quda {
 		// we only do the extraction for parity we are currently working on
 		int oddness = (a+b+c+d) & 1;
 		if (oddness == parity) {
+#ifdef FINE_GRAINED_ACCESS
+		  for (int i=0; i<gauge::Ncolor(length); i++) {
+		    for (int j=0; j<gauge::Ncolor(length); j++) {
+		      if (extract) {
+			arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, indexGhost, i, j)
+			  = arg.order(dim+arg.offset, parity, indexCB, i, j);
+		      } else { // injection
+			arg.order(dim+arg.offset, parity, indexCB, i, j)
+			  = arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, indexGhost, i, j);
+		      }
+		    }
+		  }
+#else
 		  if (extract) {
 		    RegType u[length];
-		    arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-		    arg.order.saveGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
-		    indexGhost++;
+		    arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
+		    arg.order.saveGhost(u, indexGhost, dim+arg.offset, (parity+arg.localParity[dim])&1);
 		  } else { // injection
 		    RegType u[length];
-		    arg.order.loadGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
-		    arg.order.save(u, indexCB, dim, parity); // save the ghost element to the bulk
-		    indexGhost++;
+		    arg.order.loadGhost(u, indexGhost, dim+arg.offset, (parity+arg.localParity[dim])&1);
+		    arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
 		  }
+#endif
+		  indexGhost++;
 		} // oddness == parity
 	      } // c
 	    } // b
 	  } // a
 	} // d
 
-	assert(indexGhost == arg.order.faceVolumeCB[dim]);
+	assert(indexGhost == arg.faceVolumeCB[dim]);
       } // dim
 
     } // parity
@@ -99,7 +115,7 @@ namespace quda {
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
 	//if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
-	if (X >= 2*arg.order.faceVolumeCB[dim]) continue;
+	if (X >= 2*arg.faceVolumeCB[dim]) continue;
 	// X = ((d * A + a)*B + b)*C + c
 	int dab = X/arg.C[dim];
 	int c = X - dab*arg.C[dim];
@@ -114,15 +130,29 @@ namespace quda {
 	// we only do the extraction for parity we are currently working on
 	int oddness = (a+b+c+d)&1;
 	if (oddness == parity) {
+#ifdef FINE_GRAINED_ACCESS
+	  for (int i=0; i<gauge::Ncolor(length); i++) {
+	    for (int j=0; j<gauge::Ncolor(length); j++) {
+	      if (extract) {
+		arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, X>>1, i, j)
+		  = arg.order(dim+arg.offset, parity, indexCB, i, j);
+	      } else { // injection
+		arg.order(dim+arg.offset, parity, indexCB, i, j)
+		  = arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, X>>1, i, j);
+	      }
+	    }
+	  }
+#else
 	  if (extract) {
 	    RegType u[length];
-	    arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-	    arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
+	    arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
+	    arg.order.saveGhost(u, X>>1, dim+arg.offset, (parity+arg.localParity[dim])&1);
 	  } else {
 	    RegType u[length];
-	    arg.order.loadGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
-	    arg.order.save(u, indexCB, dim, parity); // save the ghost element to the bulk
+	    arg.order.loadGhost(u, X>>1, dim+arg.offset, (parity+arg.localParity[dim])&1);
+	    arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
 	  }
+#endif
 	} // oddness == parity
 
       } // dim
@@ -152,11 +182,14 @@ namespace quda {
       : arg(arg), meta(meta), location(location), extract(extract) {
       int faceMax = 0;
       for (int d=0; d<nDim; d++) 
-	faceMax = (arg.order.faceVolumeCB[d] > faceMax ) 
-	  ? arg.order.faceVolumeCB[d] : faceMax;
+	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
       size = 2 * faceMax; // factor of comes from parity
 
+#ifndef FINE_GRAINED_ACCESS
       writeAuxString("stride=%d", arg.order.stride);
+#else
+      writeAuxString("fine-grained");
+#endif
     }
 
     virtual ~ExtractGhost() { ; }
@@ -182,7 +215,7 @@ namespace quda {
     long long flops() const { return 0; } 
     long long bytes() const { 
       int sites = 0;
-      for (int d=0; d<nDim; d++) sites += arg.order.faceVolumeCB[d];
+      for (int d=0; d<nDim; d++) sites += arg.faceVolumeCB[d];
       return 2 * sites * 2 * arg.order.Bytes(); // parity * sites * i/o * vec size
     } 
   };
@@ -193,7 +226,7 @@ namespace quda {
      NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, typename Order>
-  void extractGhost(Order order, const GaugeField &u, QudaFieldLocation location, bool extract) {
+  void extractGhost(Order order, const GaugeField &u, QudaFieldLocation location, bool extract, int offset) {
     const int *X = u.X();
     const int nFace = u.Nface();
     const int nDim = 4;
@@ -223,7 +256,7 @@ namespace quda {
       //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
-    ExtractGhostArg<Order, nDim> arg(order, u, A, B, C, f, localParity);
+    ExtractGhostArg<Order, nDim> arg(order, u, A, B, C, f, localParity, offset);
     ExtractGhost<Float,length,nDim,Order> extractor(arg, u, location, extract);
     extractor.apply(0);
 
