@@ -22,7 +22,7 @@
 // define this to use multi-functions, otherwise it'll
 // do loops over dot products.
 // this is more here for development convenience.
-//#define BLOCKSOLVER_MULTIFUNCTIONS
+#define BLOCKSOLVER_MULTIFUNCTIONS
 //#define BLOCKSOLVE_DSLASH5D
 //#define BLOCKSOLVER_VERBOSE
 
@@ -758,7 +758,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   for (int i = 0; i < nsrc; i++)
   {
     mat(r.Component(i), x.Component(i), y.Component(i));
-    blas::xpay(b.Component(i), -1.0, r.Component(i));
+    // blas::xpay(b.Component(i), -1.0, r.Component(i));
   }
 #endif
 
@@ -1325,6 +1325,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         }
       }
 #endif
+
       POP_RANGE
       PUSH_RANGE("Eigen",3)
 
