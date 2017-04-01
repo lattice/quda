@@ -507,8 +507,9 @@ namespace quda {
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
       void apply(const cudaStream_t &stream) {
-        TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity()); 
-        //TuneParam tp = tuneLaunch(*this, (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) ? QUDA_TUNE_YES : QUDA_TUNE_NO, getVerbosity()); // replace QUDA_TUNE_NO w/ getTuning()
+        //TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity()); 
+        // Use the above line to not use tile size tuning.
+        TuneParam tp = tuneLaunch(*this, (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) ? QUDA_TUNE_YES : QUDA_TUNE_NO, getVerbosity()); // replace QUDA_TUNE_NO w/ getTuning()
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
         // it contains blocksize, grid size, etc. Since we're only tuning

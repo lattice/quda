@@ -79,9 +79,11 @@ namespace quda {
     void initReduce()
     {
 
-      const int MaxReduce = 16;
-      // reduction buffer size
-      size_t bytes = 2*MaxReduce*3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat); // Factor of N for composite reductions
+      const int MaxReduce = MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N;
+      // reduction buffer size 
+      size_t bytes = 2*2*MaxReduce*4*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat); // Factor of N for composite reductions
+      // second 2 for full fields, MaxReduce is for multi-dim reduce, 4 is for
+      // double4 reductions.
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 

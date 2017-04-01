@@ -273,7 +273,7 @@ template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M,
 
   // we only launch thread blocks up to size 512 since the autoner
   // tuner favours smaller blocks and this helps with compile time
-  unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
+  unsigned int maxBlockSize() const { return 32; } // HARD CODE TEMPORARY HACK FIX }
 
 public:
   MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],
