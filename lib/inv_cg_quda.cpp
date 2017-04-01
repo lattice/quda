@@ -746,6 +746,37 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   tmpp->ExtendLastDimension();
   tmp_matsloppy.ExtendLastDimension();
 
+  csParam.setPrecision(param.precision_sloppy);
+  // tmp2 only needed for multi-gpu Wilson-like kernels
+  //ColorSpinorField *tmp2_p = !mat.isStaggered() ?
+  //ColorSpinorField::Create(x, csParam) : &tmp;
+  //ColorSpinorField &tmp2 = *tmp2_p;
+  ColorSpinorField *tmp2_p = nullptr;
+
+  if(!mat.isStaggered()){
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    tmp2_p =  ColorSpinorField::Create(csParam);
+    tmp2_p->ExtendLastDimension();
+  } else {
+    tmp2_p = tmp_matsloppyp;
+  }
+
+  ColorSpinorField &tmp2 = *tmp2_p;
+
+  // additional high-precision temporary if Wilson and mixed-precision
+  csParam.setPrecision(param.precision);
+
+  ColorSpinorField *tmp3_p = nullptr;
+  if(param.precision != param.precision_sloppy && !mat.isStaggered()){
+    //csParam.create = QUDA_ZERO_FIELD_CREATE;
+    tmp3_p =  ColorSpinorField::Create(x, csParam); //ColorSpinorField::Create(csParam);
+    tmp3_p->ExtendLastDimension();
+  } else {
+    tmp3_p = tmp_matsloppyp;
+  }
+
+  ColorSpinorField &tmp3 = *tmp3_p;
+
   // calculate residuals for all vectors
   //for(int i=0; i<nsrc; i++){
   //  mat(r.Component(i), x.Component(i), y.Component(i));
@@ -753,11 +784,11 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   //}
   // Step 2: R = AX - B, using Y as a temporary with the right precision.
 #ifdef BLOCKSOLVE_DSLASH5D
-  mat(r, x, y);
+  mat(r, x, y, tmp3);
 #else
   for (int i = 0; i < nsrc; i++)
   {
-    mat(r.Component(i), x.Component(i), y.Component(i));
+    mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
     // blas::xpay(b.Component(i), -1.0, r.Component(i));
   }
 #endif
@@ -881,37 +912,6 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   }
 #endif
   printmat("r2", H);
-
-  csParam.setPrecision(param.precision_sloppy);
-  // tmp2 only needed for multi-gpu Wilson-like kernels
-  //ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-  //ColorSpinorField::Create(x, csParam) : &tmp;
-  //ColorSpinorField &tmp2 = *tmp2_p;
-  ColorSpinorField *tmp2_p = nullptr;
-
-  if(!mat.isStaggered()){
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    tmp2_p =  ColorSpinorField::Create(csParam);
-    tmp2_p->ExtendLastDimension();
-  } else {
-    tmp2_p = tmp_matsloppyp;
-  }
-
-  ColorSpinorField &tmp2 = *tmp2_p;
-
-  // additional high-precision temporary if Wilson and mixed-precision
-  csParam.setPrecision(param.precision);
-
-  ColorSpinorField *tmp3_p = nullptr;
-  if(param.precision != param.precision_sloppy && !mat.isStaggered()){
-    //csParam.create = QUDA_ZERO_FIELD_CREATE;
-    tmp3_p =  ColorSpinorField::Create(x, csParam); //ColorSpinorField::Create(csParam);
-    tmp3_p->ExtendLastDimension();
-  } else {
-    tmp3_p = tmp_matsloppyp;
-  }
-
-  ColorSpinorField &tmp3 = *tmp3_p;
 
   //ColorSpinorParam cs5dParam(p);
   //cs5dParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -1245,10 +1245,10 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       PUSH_RANGE("Dslash",4)
       // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
 #ifdef BLOCKSOLVE_DSLASH5D
-      mat(r, y, x);
+      mat(r, y, x, tmp3);
 #else
       for (int i = 0; i < nsrc; i++)
-        mat(r.Component(i), y.Component(i), x.Component(i));
+        mat(r.Component(i), y.Component(i), x.Component(i), tmp3.Component(i));
 #endif
       POP_RANGE
       PUSH_RANGE("BLAS",2)
