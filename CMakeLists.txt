@@ -135,7 +135,6 @@ set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for t
 
 # GPUdirect options
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
-set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
 
 # Packing option
 set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
@@ -158,7 +157,6 @@ mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 mark_as_advanced(QUDA_GPU_DIRECT)
-mark_as_advanced(QUDA_GPU_COMMS)
 
 mark_as_advanced(QUDA_DEVICE_PACK)
 
@@ -389,10 +387,6 @@ endif(NOT QUDA_FERMI_DBLE_TEX)
 if(GPU_DIRECT)
   add_definitions(-DGPU_DIRECT)
 endif(GPU_DIRECT)
-
-if(GPU_COMMS)
-  add_definitions(-DGPU_COMMS)
-endif(GPU_COMMS)
 
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
