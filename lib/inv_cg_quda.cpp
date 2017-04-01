@@ -600,6 +600,13 @@ class BlockCGUpdate : public Worker {
        should only be getting even/odd preconditioned operators).
     */
     int n_update; 
+    
+#ifndef BLOCKSOLVE_DSLASH5D
+    /** 
+       What X we're updating; only relevant when we're looping over rhs.
+    */
+    int curr_update;
+#endif
 
   public:
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
@@ -609,7 +616,12 @@ class BlockCGUpdate : public Worker {
 #endif
       x_sloppyp(x_sloppyp), pp(pp), alpha(alpha), n_rhs((*pp)->Components().size()),
       n_update( x_sloppyp->Nspin()==4 ? 4 : 2 )
+#ifdef BLOCKSOLVE_DSLASH5D
     { ; }
+#else
+    { curr_update = 0; }
+#endif
+    
     ~BlockCGUpdate() { ; }
     
 
@@ -618,6 +630,7 @@ class BlockCGUpdate : public Worker {
     void apply(const cudaStream_t &stream) {      
       static int count = 0;
 
+#ifdef BLOCKSOLVE_DSLASH5D
       // How many to update per apply.
       const int update_per_apply = n_rhs/n_update;
 
@@ -651,6 +664,20 @@ class BlockCGUpdate : public Worker {
 #endif
       }
       POP_RANGE
+#else // BLOCKSOLVE_DSLASH5D
+      if (count == 0)
+      {
+        std::vector<ColorSpinorField*> curr_p;
+        curr_p.push_back(&(*pp)->Component(curr_update));
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
+        blas::caxpy(&alpha[curr_update*n_rhs], curr_p, x_sloppyp->Components());
+#else
+        for (int j = 0; j < n_rhs; j++)
+            blas::caxpy(alpha(curr_update,j), curr_p, x_sloppyp->Component(j));
+#endif
+        if (++curr_update == n_rhs) curr_update = 0;
+      }
+#endif // BLOCKSOLVE_DSLASH5D
       
       if (++count == n_update) count = 0;
       
