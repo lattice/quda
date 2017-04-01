@@ -18,6 +18,7 @@
 
 #ifdef BLOCKSOLVER
 #include <Eigen/Dense>
+#include <cuda_profiler_api.h>
 
 // define this to use multi-functions, otherwise it'll
 // do loops over dot products.
@@ -1033,6 +1034,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   // when we initialized all of the matrices. 
 
   bool just_reliable_updated = false; 
+  cudaProfilerStart();
   while ( !allconverged && k < param.maxiter ) {
     // PUSH_RANGE("Dslash",1)
     //for(int i=0; i<nsrc; i++){
