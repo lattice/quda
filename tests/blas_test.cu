@@ -31,7 +31,7 @@ extern int Msrc;
 
 extern void usage(char** );
 
-const int Nkernels = 42;
+const int Nkernels = 43;
 
 using namespace quda;
 
@@ -449,6 +449,10 @@ double benchmark(int kernel, const int niter) {
 
     case 41:
       for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
+      break;
+
+    case 42:
+      for (int i=0; i < niter; ++i) blas::caxpy(a2, *xmD, *zmD);
       break;
 
     default:
@@ -881,11 +885,28 @@ double test(int kernel) {
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
-	B[i*Nsrc+j] = blas::cDotProduct(xmD->Component(i), ymD->Component(j));
-	error += fabs(A[i*Nsrc+j] - B[i*Nsrc+j])/fabs(B[i*Nsrc+j]);
+	B[i*Msrc+j] = blas::cDotProduct(xmD->Component(i), ymD->Component(j));
+	error += fabs(A[i*Msrc+j] - B[i*Msrc+j])/fabs(B[i*Msrc+j]);
       }
     }
     error /= Nsrc*Msrc;
+    break;
+
+  case 42:
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i=0; i < Nsrc; i++) zmD->Component(i) = *(zmH[i]);
+
+    blas::caxpy(a2, *xmD, *zmD);
+
+    for (int i=0; i < Nsrc; i++){
+      blas::caxpy(a2, *(xmH[i]), *(zmH[i]));
+    }
+
+    error = 0;
+    for (int i=0; i < Nsrc; i++){
+      error+= fabs(blas::norm2((zmD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
+    }
+    error/= Nsrc;
     break;
 
   default:
@@ -943,7 +964,8 @@ const char *names[] = {
   "caxpyBxpz",
   "caxpyBzpx",
   "cDotProductNorm (block)",
-  "cDotProduct (block)"
+  "cDotProduct (block)",
+  "monkey"
 };
 
 int main(int argc, char** argv)
@@ -1088,6 +1110,7 @@ INSTANTIATE_TEST_CASE_P(caxpyBxpz_half, BlasTest, ::testing::Values( make_int2(0
 INSTANTIATE_TEST_CASE_P(caxpyBzpx_half, BlasTest, ::testing::Values( make_int2(0,39) ));
 INSTANTIATE_TEST_CASE_P(multicDotProductNorm_half, BlasTest, ::testing::Values( make_int2(0,40) ));
 INSTANTIATE_TEST_CASE_P(multicDotProduct_half, BlasTest, ::testing::Values( make_int2(0,41) ));
+INSTANTIATE_TEST_CASE_P(caxpy_composite_half, BlasTest, ::testing::Values( make_int2(0,42) ));
 
 // single precision
 INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
@@ -1132,6 +1155,7 @@ INSTANTIATE_TEST_CASE_P(caxpyBxpz_single, BlasTest, ::testing::Values( make_int2
 INSTANTIATE_TEST_CASE_P(caxpyBzpx_single, BlasTest, ::testing::Values( make_int2(1,39) ));
 INSTANTIATE_TEST_CASE_P(multicDotProductNorm_single, BlasTest, ::testing::Values( make_int2(1,40) ));
 INSTANTIATE_TEST_CASE_P(multicDotProduct_single, BlasTest, ::testing::Values( make_int2(1,41) ));
+INSTANTIATE_TEST_CASE_P(caxpy_composite_single, BlasTest, ::testing::Values( make_int2(1,42) ));
 
 // double precision
 INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
@@ -1176,3 +1200,4 @@ INSTANTIATE_TEST_CASE_P(caxpyBxpz_double, BlasTest, ::testing::Values( make_int2
 INSTANTIATE_TEST_CASE_P(caxpyBzpx_double, BlasTest, ::testing::Values( make_int2(2,39) ));
 INSTANTIATE_TEST_CASE_P(multicDotProductNorm_double, BlasTest, ::testing::Values( make_int2(2,40) ));
 INSTANTIATE_TEST_CASE_P(multicDotProduct_double, BlasTest, ::testing::Values( make_int2(2,41) ));
+INSTANTIATE_TEST_CASE_P(caxpy_composite_double, BlasTest, ::testing::Values( make_int2(2,42) ));
