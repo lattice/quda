@@ -164,7 +164,8 @@ namespace quda {
 #ifdef SWIZZLE
       if (dslashParam.kernel_type != INTERIOR_KERNEL) { // only swizzle the halo kernels
 	if (param.aux.x < 2*deviceProp.multiProcessorCount) {
-	  param.aux.x++;
+	  if (param.aux.x==1) param.aux=3;
+	  else param.aux.x+=3;
 	  return true;
 	}
       }
