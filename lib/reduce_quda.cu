@@ -9,6 +9,7 @@
 #endif
 
 #include <cub_helper.cuh>
+#include <algorithm>
 
 template<typename> struct ScalarType { };
 template<> struct ScalarType<double> { typedef double type; };
@@ -35,8 +36,6 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #define QudaSumFloat4 double4
 #endif
 
-
-#define REDUCE_MAX_BLOCKS 65536
 
 void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
   if (a.Precision() != b.Precision())
@@ -78,12 +77,34 @@ namespace quda {
 
     void initReduce()
     {
+      /* we have these different reductions to cater for:
 
-      const int MaxReduce = MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N;
+	 - regular reductions (reduce_quda.cu) where are reducing to a
+           single vector type (max length 4 presently), with possibly
+           parity dimension, and a grid-stride loop with max number of
+           blocks = 2 x SM count
+
+	 - multi-reductions where we are reducing to a matrix of size
+	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
+	   possible parity dimension, and a grid-stride loop with
+	   maximum number of blocks = 2 x SM count
+
+	- inline reductions in kernels where we cannot assume a grid
+           stride loop - hence max blocks is given by the architecture
+           limit
+
+      */
+
+      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount; // FIXME - should set this according to what's used in tune_quda.h
+
+      const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
+      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
+
+      const int max_generic_blocks = 65336; // FIXME - this isn't quite right
+      const int max_generic_reduce = 2 * MAX_MULTI_BLAS_N * max_generic_blocks * 4 * sizeof(QudaSumFloat);
+
       // reduction buffer size 
-      size_t bytes = 2*2*MaxReduce*4*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat); // Factor of N for composite reductions
-      // second 2 for full fields, MaxReduce is for multi-dim reduce, 4 is for
-      // double4 reductions.
+      size_t bytes = std::max(std::max(max_reduce, max_multi_reduce), max_generic_reduce);
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 
