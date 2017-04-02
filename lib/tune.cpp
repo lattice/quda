@@ -231,6 +231,13 @@ namespace quda {
       resource_path = path;
     }
 
+    bool version_check = true;
+    char *override_version_env = getenv("QUDA_TUNE_VERSION_CHECK");
+    if (override_version_env && strcmp(override_version_env,"0") == 0) {
+      version_check = false;
+      warningQuda("Disabling QUDA tunecache version check");
+    }
+
 #ifdef MULTI_GPU
     if (comm_rank() == 0) {
 #endif
@@ -247,15 +254,15 @@ namespace quda {
 	ls >> token;
 	if (token.compare("tunecache")) errorQuda("Bad format in %s", cache_path.c_str());
 	ls >> token;
-	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+	if (version_check && token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 	ls >> token;
 #ifdef GITVERSION
-	if (token.compare(gitversion)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+	if (version_check && token.compare(gitversion)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 #else
-	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+	if (version_check && token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 #endif
 	ls >> token;
-	if (token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+	if (version_check && token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 
 
 	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
