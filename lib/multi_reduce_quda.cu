@@ -33,8 +33,6 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #endif
 
 
-#define REDUCE_MAX_BLOCKS 65536
-
 static void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
   if (a.Precision() != b.Precision())
     errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
@@ -461,7 +459,7 @@ namespace quda {
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-      int max_tile_size;
+      unsigned int max_tile_size;
 
     public:
       TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
@@ -520,7 +518,7 @@ namespace quda {
       bool advanceAux(TuneParam &param) const
       {
       	param.aux.x *= 2; // only tune powers of two (FIXME)
-      	if (param.aux.x <= max_tile_size && param.aux.x <= (int)x.size() && param.aux.x <= (int)y.size()) {
+	if ((unsigned int)param.aux.x <= max_tile_size && param.aux.x <= (int)x.size() && param.aux.x <= (int)y.size()) {
       	  return true;
       	} else {
       	  param.aux.x = 1; // reset to the beginning (which we'd need for multi-dimensional tuning)
