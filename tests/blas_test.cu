@@ -965,7 +965,7 @@ const char *names[] = {
   "caxpyBzpx",
   "cDotProductNorm (block)",
   "cDotProduct (block)",
-  "monkey"
+  "caxpy (composite)"
 };
 
 int main(int argc, char** argv)
