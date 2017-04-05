@@ -1354,7 +1354,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     Sdagger = S.adjoint();
     POP_RANGE
     PUSH_RANGE("BLAS",2)
-    blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    if (just_reliable_updated) blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    else blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
     POP_RANGE
 #else
     PUSH_RANGE("BLAS",2)
@@ -1364,7 +1365,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         AC[i*nsrc + j] = std::conj(S(j,i));
       }
     }
-    blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
+    if (just_reliably_updated) blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
+    else blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
     POP_RANGE
 #endif
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
