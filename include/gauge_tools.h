@@ -34,6 +34,17 @@ namespace quda {
 		  const GaugeField& dataOr,
 		  double rho);
 
+  /**
+     Apply Over Improved STOUT smearing to the gauge field
+
+     @param dataDs Output smeared field
+     @param dataOr Input gauge field
+     @param rho smearing parameter
+  */
+  void OvrImpSTOUTStep (GaugeField &dataDs,
+			const GaugeField& dataOr,
+			double rho, double epsilon);
+
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
