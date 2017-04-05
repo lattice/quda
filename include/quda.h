@@ -990,7 +990,7 @@ extern "C" {
    * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
    * @param nSteps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
-   * @param rho    Epsilon coefficient for Over Improved STOUT smearing.
+   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
    */
   void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
 

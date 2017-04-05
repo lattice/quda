@@ -40,6 +40,7 @@ namespace quda {
      @param dataDs Output smeared field
      @param dataOr Input gauge field
      @param rho smearing parameter
+     @param epsilon smearing parameter
   */
   void OvrImpSTOUTStep (GaugeField &dataDs,
 			const GaugeField& dataOr,
