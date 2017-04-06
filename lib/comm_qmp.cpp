@@ -19,7 +19,8 @@ static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
 
-static char partition_string[16] = ",comm=";
+static char partition_string[16];
+static char topology_string[16];
 
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
