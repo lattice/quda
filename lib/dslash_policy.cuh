@@ -1519,7 +1519,6 @@ struct DslashFactory {
      // before we do policy tuning we must ensure the kernel
      // constituents have been tuned since we can't do nested tuning
      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
-       printfQuda("policy size = %lu\n", policy.size());
        disableProfileCount();
 
        for (auto &i : policy) {
@@ -1578,6 +1577,7 @@ struct DslashFactory {
      KernelType kernel_type = dslashParam.kernel_type;
      dslashParam.kernel_type = KERNEL_POLICY;
      TuneKey key = dslash.tuneKey();
+     strcat(key.aux,comm_dim_topology_string());
      dslashParam.kernel_type = kernel_type;
      return key;
    }

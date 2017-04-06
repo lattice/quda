@@ -117,13 +117,8 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
   host_free(hostname_recv_buf);
 
-  char comm[5];
-  comm[0] = (comm_dim_partitioned(0) ? '1' : '0');
-  comm[1] = (comm_dim_partitioned(1) ? '1' : '0');
-  comm[2] = (comm_dim_partitioned(2) ? '1' : '0');
-  comm[3] = (comm_dim_partitioned(3) ? '1' : '0');
-  comm[4] = '\0';
-  strcat(partition_string, comm);
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
 }
 
 
@@ -368,4 +363,8 @@ void comm_abort(int status)
 
 const char* comm_dim_partitioned_string() {
   return partition_string;
+}
+
+const char* comm_dim_topology_string() {
+  return topology_string;
 }
