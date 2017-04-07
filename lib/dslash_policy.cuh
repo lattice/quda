@@ -168,9 +168,6 @@ struct DslashCuda2 : DslashPolicyImp {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 		
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);	
-
     DslashCommsPattern pattern(dslashParam.commDim);
 
     inputSpinor->streamInit(streams);
@@ -314,8 +311,6 @@ struct DslashPthreads : DslashPolicyImp {
               profile, QUDA_PROFILE_EVENT_RECORD);
     }
 		
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);	
     DslashCommsPattern pattern(dslashParam.commDim);
     inputSpinor->streamInit(streams);
     // and launch the interior dslash kernel
@@ -474,9 +469,6 @@ struct DslashGPUComms : DslashPolicyImp {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);	
-
     DslashCommsPattern pattern(dslashParam.commDim, true);
 
     inputSpinor->streamInit(streams);
@@ -589,8 +581,6 @@ struct DslashFusedGPUComms : DslashPolicyImp {
 
 #ifdef MULTI_GPU
 
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);	
     DslashCommsPattern pattern(dslashParam.commDim, true);
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
@@ -705,8 +695,6 @@ struct DslashFusedExterior : DslashPolicyImp {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 		
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);
     DslashCommsPattern pattern(dslashParam.commDim);
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
@@ -867,8 +855,6 @@ struct DslashAsync : DslashPolicyImp {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);
     DslashCommsPattern pattern(dslashParam.commDim);
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
@@ -1028,8 +1014,6 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);
     DslashCommsPattern pattern(dslashParam.commDim);
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
@@ -1189,8 +1173,6 @@ struct DslashZeroCopy : DslashPolicyImp {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);
     inputSpinor->streamInit(streams);
 
     DslashCommsPattern pattern(dslashParam.commDim);
@@ -1309,8 +1291,6 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
-    inputSpinor->createComms(dslash.Nface()/2);
     inputSpinor->streamInit(streams);
 
     DslashCommsPattern pattern(dslashParam.commDim);

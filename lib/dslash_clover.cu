@@ -179,7 +179,7 @@ namespace quda {
 			TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(1);
+    inSpinor->createComms(1);
 
 #ifdef GPU_CLOVER_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
