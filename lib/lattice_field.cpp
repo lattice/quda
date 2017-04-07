@@ -32,19 +32,18 @@ namespace quda {
   cudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
   cudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
-  void *LatticeField::ghost_pinned_h[2] = {nullptr, nullptr};
-  void *LatticeField::ghost_pinned_d[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_pinned_buffer_h[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_pinned_buffer_hd[2] = {nullptr, nullptr};
 
   // gpu ghost receive buffer
-  void *LatticeField::ghost_field[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_recv_buffer_d[2] = {nullptr, nullptr};
 
   // gpu ghost send buffer
   void *LatticeField::ghost_send_buffer_d[2] = {nullptr, nullptr};
 
   bool LatticeField::ghost_field_reset = false;
 
-  void* LatticeField::fwdGhostSendDest[2][QUDA_MAX_DIM];
-  void* LatticeField::backGhostSendDest[2][QUDA_MAX_DIM];
+  void* LatticeField::ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
   int LatticeField::bufferIndex = 0;
 
@@ -122,7 +121,7 @@ namespace quda {
     if ( initIPCComms && !ghost_field_reset ) return;
 
     if (!initComms) errorQuda("Can only be called after create comms");
-    if ( (!ghost_field[0] || !ghost_field[1]) && comm_size() > 1) errorQuda("ghost_field appears not to be allocated");
+    if ( (!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1) errorQuda("ghost_field appears not to be allocated");
 
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
@@ -144,7 +143,7 @@ namespace quda {
 	  // now send
 	  if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaIpcMemHandle_t ipcLocalGhostDestHandle;
-	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_field[b]);
+	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_recv_buffer_d[b]);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
 						    dim, disp,
 						    sizeof(ipcLocalGhostDestHandle));
@@ -168,11 +167,11 @@ namespace quda {
 	const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
-	  void **ghostDest = (dir==0) ? (&backGhostSendDest[b][dim]) : &(fwdGhostSendDest[b][dim]);
+	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
 	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
 			       cudaIpcMemLazyEnablePeerAccess);
 	}
-	if (num_dir == 1) fwdGhostSendDest[b][dim] = backGhostSendDest[b][dim];
+	if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
       }
     } // buffer index
 
@@ -277,7 +276,7 @@ namespace quda {
 	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
 
 	  // only close this handle if it doesn't alias the back ghost
-	  if (num_dir == 2) cudaIpcCloseMemHandle(fwdGhostSendDest[b][dim]);
+	  if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
 	}
 
 	if (comm_peer2peer_enabled(0,dim)) {
@@ -285,7 +284,7 @@ namespace quda {
 	  comm_free(mh_recv_p2p_back[b][dim]);
 	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
 
-	  cudaIpcCloseMemHandle(backGhostSendDest[b][dim]);
+	  cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
 	}
       } // buffer
     } // iterate over dim

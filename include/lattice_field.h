@@ -200,36 +200,44 @@ namespace quda {
     /**
        Double buffered static GPU halo receive buffer
      */
-    static void *ghost_field[2];
+    static void *ghost_recv_buffer_d[2];
 
     /**
        Double buffered static pinned send/recv buffers
     */
-    static void *ghost_pinned_h[2];
+    static void *ghost_pinned_buffer_h[2];
 
     /**
        Mapped version of ghost_pinned
     */
-    static void *ghost_pinned_d[2];
+    static void *ghost_pinned_buffer_hd[2];
+
+    /**
+       Remove ghost pointer for sending to
+    */
+    static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
     /** Pinned memory buffer used for sending all messages */
-    void *my_face[2];
-    void *my_face_d[2]; // mapped version of the above
+    void *my_face_h[2];
+    /** Mapped version of my_face_h */
+    void *my_face_hd[2];
 
-    /** Local pointers to the my_face buffer */
-    void *my_fwd_face[2][QUDA_MAX_DIM];
-    void *my_back_face[2][QUDA_MAX_DIM];
+    /** Local pointers to the pinned my_face buffer */
+    void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
 
-    void *my_fwd_face_rdma[2][QUDA_MAX_DIM];
-    void *my_back_face_rdma[2][QUDA_MAX_DIM];
+    /** Local pointers to the device ghost_send buffer */
+    void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
 
-    /** Memory buffer used for sending all messages */
-    void *from_face[2];
-    void *from_face_d[2]; // mapped version of the above
-    void *from_back_face[2][QUDA_MAX_DIM];
-    void *from_fwd_face[2][QUDA_MAX_DIM];
-    void *from_back_face_rdma[2][QUDA_MAX_DIM];
-    void *from_fwd_face_rdma[2][QUDA_MAX_DIM];
+    /** Memory buffer used for receiving all messages */
+    void *from_face_h[2];
+    /** Mapped version of from_face_h */
+    void *from_face_hd[2];
+
+    /** Local pointers to the pinned from_face  buffer */
+    void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+
+    /** Local pointers to the device ghost_recv buffer */
+    void *from_face_dim_dir_d[2][QUDA_MAX_DIM][2];
     
     /** Message handles for receiving from forwards */
     MsgHandle *mh_recv_fwd[2][QUDA_MAX_DIM];
@@ -284,12 +292,6 @@ namespace quda {
 
     /** Remote copy of event used for peer-to-peer synchronization */
     static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
-
-    /** Remote ghost pointer for sending ghost to */
-    static void* fwdGhostSendDest[2][QUDA_MAX_DIM];
-
-    /** Remote ghost pointer for sending ghost to */
-    static void* backGhostSendDest[2][QUDA_MAX_DIM];
 
     /** Whether we have initialized communication for this field */
     bool initComms;

@@ -478,8 +478,6 @@ namespace quda {
     static bool initGhostFaceBuffer;
 
     void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
-    void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -623,7 +621,7 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    const void* Ghost2() const { return ghost_field[bufferIndex]; }
+    const void* Ghost2() const { return ghost_recv_buffer_d[bufferIndex]; }
 
     /**
        Do a ghost exchange between neighbouring nodes.  All dimensions
