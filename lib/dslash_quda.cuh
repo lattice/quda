@@ -1,12 +1,5 @@
 //#define DSLASH_TUNE_TILE
 
-static FaceBuffer *face[2];
-
-void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
-  face[0] = (FaceBuffer*)&(Face1); 
-  face[1] = (FaceBuffer*)&(Face2); // nasty
-}
-
 #define EVEN_MORE_GENERIC_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\

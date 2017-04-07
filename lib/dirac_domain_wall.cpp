@@ -32,7 +32,6 @@ namespace quda {
     return *this;
   }
 
-  //!NEW : added setFace(),   domainWallDslashCuda() got an extra argument  
   void DiracDomainWall::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			       const QudaParity parity) const
   {
@@ -40,7 +39,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      domainwall::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
       domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			   &static_cast<const cudaColorSpinorField&>(in), 
 			   parity, dagger, 0, mass, 0, commDim, profile);   
@@ -54,9 +52,6 @@ namespace quda {
     flops += 1320LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
   }
 
-
-
-  //!NEW : added setFace(), domainWallDslashCuda() got an extra argument 
   void DiracDomainWall::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
 				   const QudaParity parity, const ColorSpinorField &x,
 				   const double &k) const
@@ -66,7 +61,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      domainwall::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
       domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			   &static_cast<const cudaColorSpinorField&>(in), 
 			   parity, dagger, 

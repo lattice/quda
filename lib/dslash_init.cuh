@@ -10,5 +10,3 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s,
 
 // this needs to be called for each dslash that has its own namespace
 void initConstants(cudaGaugeField &gauge, TimeProfile &profile);
-
-void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2);
