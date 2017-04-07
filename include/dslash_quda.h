@@ -117,18 +117,26 @@ namespace quda {
   void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger, const double &kappa, const double &mu,
 			     const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity);
 
-  // face packing routines
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int nFace, const int dagger,
+  /**
+     @brief Dslash face packing routine
+     @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
+     @param[in] in Input ColorSpinorField to be packed
+     @param[in] zero_copy Whether we are doing a zero_copy packing or no
+     @param[in] nFace Depth of halo
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] parity Field parity
+     @param[in] dim Which dimensions we are packing
+     @param[in] face_num Are we packing backwards (0), forwards (1) or both directions (2)
+     @param[in] stream Which stream are we executing in
+     @param[in] a Packing coefficient (twisted-mass only)
+     @param[in] b Packing coefficient (twisted-mass only)
+  */
+  void packFace(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &in, bool zero_copy, const int nFace, const int dagger,
 		const int parity, const int dim, const int face_num, const cudaStream_t &stream,
 		const double a=0.0, const double b=0.0);
 
-  void packFaceExtended(void *ghost_buf, cudaColorSpinorField &field, bool zero_copy, const int nFace, const int R[], const int dagger,
+  void packFaceExtended(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &field, bool zero_copy, const int nFace, const int R[], const int dagger,
 			const int parity, const int dim, const int face_num, const cudaStream_t &stream, const bool unpack=false);
-
-  // face packing routines
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, FullClover &clov, FullClover &clovInv,
-		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
-		const cudaStream_t &stream, const double a=0.0);
 
   /**
      out = gamma_5 in

@@ -15,8 +15,6 @@
  */
 
 namespace quda {
-  /** The maximum number of faces that can be exchanged */
-  const int maxNface = 3;
   
   // LatticeField is an abstract base clase for all Field objects.
 
@@ -225,6 +223,9 @@ namespace quda {
     /** Local pointers to the pinned my_face buffer */
     void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
 
+    /** Local pointers to the mapped my_face buffer */
+    void *my_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
+
     /** Local pointers to the device ghost_send buffer */
     void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
 
@@ -233,8 +234,11 @@ namespace quda {
     /** Mapped version of from_face_h */
     void *from_face_hd[2];
 
-    /** Local pointers to the pinned from_face  buffer */
+    /** Local pointers to the pinned from_face buffer */
     void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+
+    /** Local pointers to the mapped from_face buffer */
+    void *from_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
 
     /** Local pointers to the device ghost_recv buffer */
     void *from_face_dim_dir_d[2][QUDA_MAX_DIM][2];

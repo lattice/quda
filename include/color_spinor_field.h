@@ -542,11 +542,11 @@ namespace quda {
       @param b Twisted mass parameter (default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-		   cudaStream_t* stream, void *buffer=0, bool zero_copy=false, double a=0, double b=0);
+		   cudaStream_t* stream, bool zero_copy=false, double a=0, double b=0);
 
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
-			   const int dagger,cudaStream_t* stream, void *buffer=0, bool zero_copy=false);
+			   const int dagger,cudaStream_t* stream, bool zero_copy=false);
 
 
     void packGhost(FullClover &clov, FullClover &clovInv, const int nFace, const QudaParity parity, const int dim,

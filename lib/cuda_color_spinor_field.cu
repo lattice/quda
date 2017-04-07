@@ -725,18 +725,23 @@ namespace quda {
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
                                        const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
-				       void *buffer, bool zero_copy, double a, double b)
+				       bool zero_copy, double a, double b)
   {
 #ifdef MULTI_GPU
-    int face_num;
-    if (dir == QUDA_BACKWARDS) {
-      face_num = 0;
-    }else if (dir == QUDA_FORWARDS) {
-      face_num = 1;
-    }else{
-      face_num = 2;
+    int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
+    void *packBuffer[2*QUDA_MAX_DIM];
+    if (zero_copy) {
+      for (int d=0; d<4; d++) {
+	packBuffer[2*d+0] = my_face_dim_dir_hd[bufferIndex][d][0];
+	packBuffer[2*d+1] = my_face_dim_dir_hd[bufferIndex][d][1];
+      }
+    } else {
+      for (int d=0; d<4; d++) {
+	packBuffer[2*d+0] = my_face_dim_dir_d[bufferIndex][d][0];
+	packBuffer[2*d+1] = my_face_dim_dir_d[bufferIndex][d][1];
+      }
     }
-    void *packBuffer = buffer ? buffer : ghost_send_buffer_d[bufferIndex];
+
     packFace(packBuffer, *this, zero_copy, nFace, dagger, parity, dim, face_num, *stream, a, b);
 #else
     errorQuda("packGhost not built on single-GPU build");
@@ -854,7 +859,6 @@ namespace quda {
   }
 
 
-
   void cudaColorSpinorField::unpackGhost(const void* ghost_spinor, const int nFace, 
 					 const int dim, const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
@@ -873,24 +877,26 @@ namespace quda {
   }
 
 
-
-
-   // pack the ghost zone into a contiguous buffer for communications
+  // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhostExtended(const int nFace, const int R[], const QudaParity parity,
 					       const int dim, const QudaDirection dir,
-					       const int dagger, cudaStream_t *stream,
-					       void *buffer, bool zero_copy)
+					       const int dagger, cudaStream_t *stream, bool zero_copy)
   {
 #ifdef MULTI_GPU
-    int face_num;
-    if (dir == QUDA_BACKWARDS) {
-      face_num = 0;
-    }else if (dir == QUDA_FORWARDS) {
-      face_num = 1;
-    }else{
-      face_num = 2;
+    int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
+    void *packBuffer[2*QUDA_MAX_DIM];
+    if (zero_copy) {
+      for (int d=0; d<4; d++) {
+	packBuffer[2*d+0] = my_face_dim_dir_hd[bufferIndex][d][0];
+	packBuffer[2*d+1] = my_face_dim_dir_hd[bufferIndex][d][1];
+      }
+    } else {
+      for (int d=0; d<4; d++) {
+	packBuffer[2*d+0] = my_face_dim_dir_d[bufferIndex][d][0];
+	packBuffer[2*d+1] = my_face_dim_dir_d[bufferIndex][d][1];
+      }
     }
-    void *packBuffer = buffer ? buffer : ghost_send_buffer_d[bufferIndex];
+
     packFaceExtended(packBuffer, *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream);
 #else
     errorQuda("packGhostExtended not built on single-GPU build");
@@ -904,9 +910,6 @@ namespace quda {
                                                  const int dim, const QudaDirection dir, 
                                                  const int dagger, cudaStream_t* stream, bool zero_copy)
   {
-
-     
-     
     // First call the regular unpackGhost routine to copy data into the `usual' ghost-zone region 
     // of the data array 
     unpackGhost(ghost_spinor, nFace, dim, dir, dagger, stream);
@@ -922,7 +925,20 @@ namespace quda {
     const int face_num = 2;
     const bool unpack = true;
     const int R[4] = {0,0,0,0};
-    packFaceExtended(ghost_send_buffer_d[bufferIndex], *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream, unpack);
+    void *packBuffer[2*QUDA_MAX_DIM];
+    if (zero_copy) {
+      for (int d=0; d<4; d++) {
+	packBuffer[2*d+0] = my_face_dim_dir_hd[bufferIndex][d][0];
+	packBuffer[2*d+1] = my_face_dim_dir_hd[bufferIndex][d][1];
+      }
+    } else {
+      for (int d=0; d<4; d++) {
+	packBuffer[2*d+0] = my_face_dim_dir_d[bufferIndex][d][0];
+	packBuffer[2*d+1] = my_face_dim_dir_d[bufferIndex][d][1];
+      }
+    }
+
+    packFaceExtended(packBuffer, *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream, unpack);
 #else
     errorQuda("unpackGhostExtended not built on single-GPU build");
 #endif
@@ -983,6 +999,9 @@ namespace quda {
 	  my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
 	  from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
 
+	  my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
+	  from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
+
 	  my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
 	  from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
 	} // loop over b
@@ -991,6 +1010,9 @@ namespace quda {
 	for (int b=0; b<2; ++b) {
 	  my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
 	  from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
+
+	  my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
+	  from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
 
 	  my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
 	  from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
@@ -1058,52 +1080,36 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
-				  bool zero_copy, double a, double b) {
-
+  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zero_copy, double a, double b)
+  {
     createComms(nFace); // must call this first
 
     stream = stream_p;
     
     const int dim=-1; // pack all partitioned dimensions
  
-    if (zero_copy) {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_hd[bufferIndex], true, a, b);
-    } else {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[Nstream-1], 0, false, a, b);
-    }
+    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[zero_copy ? 0 : (Nstream-1)], zero_copy, a, b);
   }
 
-  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx, 
-				  bool zeroCopyPack, double a, double b) {
-
+  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx, bool zero_copy, double a, double b)
+  {
     createComms(nFace); // must call this first
 
     const int dim=-1; // pack all partitioned dimensions
  
-    if (zeroCopyPack) {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_hd[bufferIndex], true, a, b);
-    } else {
-      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], 0, false, a, b);
-    }
+    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], zero_copy, a, b);
   }
 
   void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 
                                           const int dagger, const int dim,
-                                          cudaStream_t *stream_p, const bool zero_copy) {
-
+                                          cudaStream_t *stream_p, const bool zero_copy)
+  {
     createComms(nFace); // must call this first
 
     stream = stream_p;
  
-    if (zero_copy) {
-      packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_hd[bufferIndex], true);
-    }else{
-      packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[Nstream-1], 0, false);
-    }
+    packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[zero_copy ? 0 : (Nstream-1)], zero_copy);
   }
-                                                      
-
 
   void cudaColorSpinorField::gather(int nFace, int dagger, int dir, cudaStream_t* stream_p)
   {
