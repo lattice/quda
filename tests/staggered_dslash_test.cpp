@@ -433,6 +433,7 @@ static int dslashTest()
 
     unsigned long long flops = dirac->Flops();
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printfQuda("Effective halo bi-directional bandwidth = %f\n", 1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs);
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
     double spinor_out_norm2 =  blas::norm2(*spinorOut);
