@@ -611,7 +611,7 @@ namespace quda {
 	if (ghost_bytes) {
 	  for (int b=0; b<2; b++) {
 	    device_pinned_free(ghost_field[b]);
-	    device_free(ghostFaceBuffer[b]);
+	    device_free(ghost_send_buffer_d[b]);
 	    host_free(ghost_pinned_h[b]);
 	  }
 	}
@@ -623,7 +623,7 @@ namespace quda {
 	  ghost_field[b] = device_pinned_malloc(ghost_bytes);
 
 	  // gpu send buffset
-	  ghostFaceBuffer[b] = device_malloc(ghost_bytes);
+	  ghost_send_buffer_d[b] = device_malloc(ghost_bytes);
 
 	  // pinned buffer used for sending and receiving
 	  ghost_pinned_h[b] = pinned_malloc(2*ghost_bytes);
@@ -665,11 +665,11 @@ namespace quda {
     if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes || faceBytes > ghostFaceBytes_) {
 
       if (initGhostFaceBuffer) {
-	for (int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]);
+	for (int b=0; b<2; ++b) device_free(ghost_send_buffer_d[b]);
       }
 
       if (faceBytes > 0) {
-	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(faceBytes);
+	for (int b=0; b<2; ++b) ghost_send_buffer_d[b] = device_malloc(faceBytes);
 	initGhostFaceBuffer = true;
 	ghostFaceBytes = faceBytes;
 	ghostFaceBytes_ = faceBytes;
@@ -681,12 +681,12 @@ namespace quda {
     for (int i=0; i<nDimComms; i++) {
       if (comm_dim_partitioned(i)) {
 	// use first buffer for recv and second for send
-	recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
-	send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+	recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[0]) + offset));
+	send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[1]) + offset));
 	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
 
-	recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
-	send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+	recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[0]) + offset));
+	send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[1]) + offset));
 	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
       } else {
 	recv_buf[2*i+0] = nullptr;
@@ -710,8 +710,8 @@ namespace quda {
       ghost_field[b] = nullptr;
 
       // free send buffer
-      if (ghostFaceBuffer[b]) device_free(ghostFaceBuffer[b]);
-      ghostFaceBuffer[b] = nullptr;
+      if (ghost_send_buffer_d[b]) device_free(ghost_send_buffer_d[b]);
+      ghost_send_buffer_d[b] = nullptr;
 
       // free pinned memory buffers
       if (ghost_pinned_h[b]) host_free(ghost_pinned_h[b]);
@@ -736,7 +736,7 @@ namespace quda {
     }else{
       face_num = 2;
     }
-    void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
+    void *packBuffer = buffer ? buffer : ghost_send_buffer_d[bufferIndex];
     packFace(packBuffer, *this, zero_copy, nFace, dagger, parity, dim, face_num, *stream, a, b);
 #else
     errorQuda("packGhost not built on single-GPU build");
@@ -891,7 +891,7 @@ namespace quda {
     }else{
       face_num = 2;
     }
-    void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
+    void *packBuffer = buffer ? buffer : ghost_send_buffer_d[bufferIndex];
     packFaceExtended(packBuffer, *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream);
 #else
     errorQuda("packGhostExtended not built on single-GPU build");
@@ -923,7 +923,7 @@ namespace quda {
     const int face_num = 2;
     const bool unpack = true;
     const int R[4] = {0,0,0,0};
-    packFaceExtended(ghostFaceBuffer[bufferIndex], *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream, unpack);
+    packFaceExtended(ghost_send_buffer_d[bufferIndex], *this, zero_copy, nFace, R, dagger, parity, dim, face_num, *stream, unpack);
 #else
     errorQuda("unpackGhostExtended not built on single-GPU build");
 #endif
@@ -981,7 +981,7 @@ namespace quda {
 	if (!commDimPartitioned(i)) continue;
 
 	for (int b=0; b<2; ++b) {
-	  backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+	  backGhostFaceBuffer[b][i] = (void*)(((char*)ghost_send_buffer_d[b]) + offset);
 
 	  my_back_face[b][i] = static_cast<char*>(my_face[b]) + offset;
 	  from_back_face[b][i] = static_cast<char*>(from_face[b]) + offset;
@@ -992,7 +992,7 @@ namespace quda {
 	offset += ghost_face_bytes[i];
 
 	for (int b=0; b<2; ++b) {
-	  fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+	  fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghost_send_buffer_d[b]) + offset);
 
 	  my_fwd_face[b][i] = static_cast<char*>(my_face[b]) + offset;
 	  from_fwd_face[b][i] = static_cast<char*>(from_face[b]) + offset;

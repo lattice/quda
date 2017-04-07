@@ -195,7 +195,7 @@ namespace quda {
     /**
        Double buffered static GPU halo send buffer
     */
-    static void *ghostFaceBuffer[2];
+    static void *ghost_send_buffer_d[2];
 
     /**
        Double buffered static GPU halo receive buffer

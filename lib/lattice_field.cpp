@@ -39,7 +39,7 @@ namespace quda {
   void *LatticeField::ghost_field[2] = {nullptr, nullptr};
 
   // gpu ghost send buffer
-  void *LatticeField::ghostFaceBuffer[2] = {nullptr, nullptr};
+  void *LatticeField::ghost_send_buffer_d[2] = {nullptr, nullptr};
 
   bool LatticeField::ghost_field_reset = false;
 
