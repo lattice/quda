@@ -375,6 +375,10 @@ namespace quda {
 
 	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
 
+	// second set of ghost texture map to the host-mapped pinned receive buffers
+	resDesc.res.linear.devPtr = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
+	cudaCreateTextureObject(&ghostTex[2+b], &resDesc, &texDesc, NULL);
+
 	if (precision == QUDA_HALF_PRECISION) {
 	  cudaChannelFormatDesc desc;
 	  memset(&desc, 0, sizeof(cudaChannelFormatDesc));
@@ -393,29 +397,32 @@ namespace quda {
 	  texDesc.readMode = cudaReadModeElementType;
 
 	  cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
+
+	  resDesc.res.linear.devPtr = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
+	  cudaCreateTextureObject(&ghostTexNorm[2+b], &resDesc, &texDesc, NULL);
 	}
 
 	ghost_field_tex[b] = ghost_recv_buffer_d[b];
+	ghost_field_tex[2+b] = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
       } // buffer index
 
       ghostTexInit = true;
 
       checkCudaError();
     }
+
   }
 
   void cudaColorSpinorField::destroyTexObject() {
     if (isNative() && texInit) {
       cudaDestroyTextureObject(tex);
       if (ghost_bytes) {
-	cudaDestroyTextureObject(ghostTex[0]);
-	cudaDestroyTextureObject(ghostTex[1]);
+	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
       }
       if (precision == QUDA_HALF_PRECISION) {
         cudaDestroyTextureObject(texNorm);
         if (ghost_bytes) {
-	  cudaDestroyTextureObject(ghostTexNorm[0]);
-	  cudaDestroyTextureObject(ghostTexNorm[1]);
+	  for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
 	}
       }
       texInit = false;
@@ -424,11 +431,9 @@ namespace quda {
 
   void cudaColorSpinorField::destroyGhostTexObject() {
     if (isNative() && ghostTexInit) {
-      cudaDestroyTextureObject(ghostTex[0]);
-      cudaDestroyTextureObject(ghostTex[1]);
+      for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
       if (precision == QUDA_HALF_PRECISION) {
-	cudaDestroyTextureObject(ghostTexNorm[0]);
-	cudaDestroyTextureObject(ghostTexNorm[1]);
+	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
       }
       ghostTexInit = false;
     }

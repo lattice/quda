@@ -442,6 +442,18 @@ public:
   virtual TuneKey tuneKey() const  
   { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
 
+  const char* getAux(KernelType type) const {
+    return aux[type];
+  }
+
+  void setAux(KernelType type, const char *aux_) {
+    strcpy(aux[type], aux_);
+  }
+
+  void augmentAux(KernelType type, const char *extra) {
+    strcat(aux[type], extra);
+  }
+
   virtual int Nface() { return 2; }
 
 #if defined(DSLASH_TUNE_TILE)

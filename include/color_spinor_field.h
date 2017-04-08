@@ -464,8 +464,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
-    cudaTextureObject_t ghostTex[2]; // these are double buffered
-    cudaTextureObject_t ghostTexNorm[2];
+    cudaTextureObject_t ghostTex[4]; // these are double buffered and include pointers to host-mapped variants
+    cudaTextureObject_t ghostTexNorm[4];
     void createTexObject();
     void createGhostTexObject();
     void destroyTexObject();
@@ -477,7 +477,7 @@ namespace quda {
     static size_t ghostFaceBytes;
     static bool initGhostFaceBuffer;
 
-    void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
+    void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -621,7 +621,7 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    const void* Ghost2() const { return ghost_recv_buffer_d[bufferIndex]; }
+    const void* Ghost2() const { return ghost_field_tex[bufferIndex]; }
 
     /**
        Do a ghost exchange between neighbouring nodes.  All dimensions
