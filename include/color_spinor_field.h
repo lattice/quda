@@ -269,19 +269,19 @@ namespace quda {
     void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
-    int ghostFace[QUDA_MAX_DIM];// the size of each face
-    int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
-    int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
+    mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
+    mutable int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
+    mutable int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
-    size_t ghost_length; // length of ghost zone
-    size_t ghost_norm_length; // length of ghost zone for norm
+    mutable size_t ghost_length; // length of ghost zone
+    mutable size_t ghost_norm_length; // length of ghost zone for norm
 
     mutable void *ghost_fixme[2*QUDA_MAX_DIM];
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-    size_t ghost_bytes; // size in bytes of the ghost field
-    size_t ghost_face_bytes[QUDA_MAX_DIM];
+    mutable size_t ghost_bytes; // size in bytes of the ghost field
+    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -297,7 +297,7 @@ namespace quda {
     //
     CompositeColorSpinorField components;
 
-    void createGhostZone(int nFace);
+    void createGhostZone(int nFace, bool spin_project=true) const;
 
     // resets the above attributes based on contents of param
     void reset(const ColorSpinorParam &);
@@ -460,16 +460,16 @@ namespace quda {
     bool init;
 
     bool texInit; // whether a texture object has been created or not
-    bool ghostTexInit; // whether the ghost texture object has been created
+    mutable bool ghostTexInit; // whether the ghost texture object has been created
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
-    cudaTextureObject_t ghostTex[4]; // these are double buffered and include pointers to host-mapped variants
-    cudaTextureObject_t ghostTexNorm[4];
     void createTexObject();
-    void createGhostTexObject();
     void destroyTexObject();
-    void destroyGhostTexObject();
+    mutable cudaTextureObject_t ghostTex[4]; // these are double buffered and variants to host-mapped buffers
+    mutable cudaTextureObject_t ghostTexNorm[4];
+    void createGhostTexObject() const;
+    void destroyGhostTexObject() const;
 #endif
 
     bool reference; // whether the field is a reference or not
@@ -477,7 +477,7 @@ namespace quda {
     static size_t ghostFaceBytes;
     static bool initGhostFaceBuffer;
 
-    void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
+    mutable void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -512,34 +512,43 @@ namespace quda {
 
     void switchBufferPinned();
 
-    /** Create the communication handlers and buffers */
-    void createComms(int nFace);
+    /**
+       @brief Create the communication handlers and buffers
+       @param[in] nFace Depth of each halo
+       @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
+    */
+    void createComms(int nFace, bool spin_project=true);
 
-    /** Destroy the communication handlers and buffers */
+    /**
+       @brief Destroy the communication handlers and buffers
+    */
     void destroyComms();
 
-    /** Allocate the ghost buffers */
-    void allocateGhostBuffer(int nFace);
+    /**
+       @brief Allocate the ghost buffers
+       @param[in] nFace Depth of each halo
+       @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
+    */
+    void allocateGhostBuffer(int nFace, bool spin_project=true) const;
 
-    /** Ghost buffer allocation for the generic packer*/
-    void allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const;
-
-    /** Free statically allocated ghost buffers */
+    /**
+       @brief Free statically allocated ghost buffers
+    */
     static void freeGhostBuffer(void);
 
     /**
-      Packs the cudaColorSpinorField's ghost zone
-      @param nFace How many faces to pack (depth)
-      @param parity Parity of the field
-      @param dim Labels space-time dimensions
-      @param dir Pack data to send in forward of backward directions, or both
-      @param dagger Whether the operator is the Hermitian conjugate or not
-      @param stream Which stream to use for the kernel
-      @param buffer Optional parameter where the ghost should be
-      stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
-      @param zero_copy Whether we are packing directly into zero_copy memory
-      @param a Twisted mass parameter (default=0)
-      @param b Twisted mass parameter (default=0)
+       @brief Packs the cudaColorSpinorField's ghost zone
+       @param[in] nFace How many faces to pack (depth)
+       @param[in] parity Parity of the field
+       @param[in] dim Labels space-time dimensions
+       @param[in] dir Pack data to send in forward of backward directions, or both
+       @param[in] dagger Whether the operator is the Hermitian conjugate or not
+       @param[in] stream Which stream to use for the kernel
+       @param[out] buffer Optional parameter where the ghost should be
+       stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
+       @param[in] zero_copy Whether we are packing directly into zero_copy memory
+       @param[in] a Twisted mass parameter (default=0)
+       @param[in] b Twisted mass parameter (default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
 		   cudaStream_t* stream, bool zero_copy=false, double a=0, double b=0);

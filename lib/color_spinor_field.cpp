@@ -43,7 +43,7 @@ namespace quda {
     destroy();
   }
 
-  void ColorSpinorField::createGhostZone(int nFace) {
+  void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const {
 
     if (typeid(*this) == typeid(cpuColorSpinorField)) {
       ghost_length = 0;
@@ -51,8 +51,8 @@ namespace quda {
       return;
     }
 
-    // For Wilson we half the number of faces since the fields are spin projected.
-    int num_faces = ((nSpin == 1) ? 2 : 1) * nFace;
+    // For Wilson we half the number of effective faces if the fields are spin projected.
+    int num_faces = ((nSpin == 4 && spin_project) ? 1 : 2) * nFace;
     int num_norm_faces = 2*nFace;
 
     // calculate size of ghost zone required
@@ -69,7 +69,6 @@ namespace quda {
 	}
 	ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
 	if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
 	ghostVolume += ghostFace[i];
       }
       if (i==0) {
@@ -104,14 +103,8 @@ namespace quda {
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
-    // ghost zones are calculated on c/b volumes
     ghost_length = ghostVolume*nColor*nSpin*2;
     ghost_norm_length = (precision == QUDA_HALF_PRECISION) ? ghostNormVolume : 0;
-
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      ghost_length *= 2;
-      ghost_norm_length *= 2;
-    }
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
       printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
@@ -120,7 +113,7 @@ namespace quda {
 
     ghost_bytes = (size_t)ghost_length*precision;
     if (precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
-    if (isNative()) ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
+    if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone
 

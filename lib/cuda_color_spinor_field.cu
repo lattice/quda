@@ -337,7 +337,7 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::createGhostTexObject() {
+  void cudaColorSpinorField::createGhostTexObject() const {
     // create the ghost texture object
     if (isNative() && ghost_bytes) {
       if (ghostTexInit) errorQuda("Already bound ghost texture");
@@ -429,7 +429,7 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::destroyGhostTexObject() {
+  void cudaColorSpinorField::destroyGhostTexObject() const {
     if (isNative() && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
       if (precision == QUDA_HALF_PRECISION) {
@@ -591,14 +591,14 @@ namespace quda {
     return;
   }
 
-  void cudaColorSpinorField::allocateGhostBuffer(int nFace) {
+  void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {
 
     if (!comm_partitioned()) {
       for (int i=0; i<4; i++) ghost_face_bytes[i] = 0;
       return;
     }
 
-    createGhostZone(nFace);
+    createGhostZone(nFace, spin_project);
 
     // temporary work around until the ghost buffer for fine and
     // coarse grid are merged: this ensures we reset the fine ghost
@@ -650,57 +650,6 @@ namespace quda {
     if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1]) destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
-  }
-
-  void cudaColorSpinorField::allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const
-  {
-    int num_faces = 1;
-    if (nSpin == 1) num_faces = 3; // staggered
-
-    int spinor_size = 2*nSpin*nColor*precision;
-
-    // resize face only if requested size is larger than previously allocated one
-    size_t faceBytes = 0;
-    for (int i=0; i<nDimComms; i++) {
-      if (comm_dim_partitioned(i)) faceBytes += 2*siteSubset*num_faces*surfaceCB[i]*spinor_size;
-    }
-
-    static size_t ghostFaceBytes_ = 0;
-
-    if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes || faceBytes > ghostFaceBytes_) {
-
-      if (initGhostFaceBuffer) {
-	for (int b=0; b<2; ++b) device_free(ghost_send_buffer_d[b]);
-      }
-
-      if (faceBytes > 0) {
-	for (int b=0; b<2; ++b) ghost_send_buffer_d[b] = device_malloc(faceBytes);
-	initGhostFaceBuffer = true;
-	ghostFaceBytes = faceBytes;
-	ghostFaceBytes_ = faceBytes;
-      }
-
-    }
-
-    size_t offset = 0;
-    for (int i=0; i<nDimComms; i++) {
-      if (comm_dim_partitioned(i)) {
-	// use first buffer for recv and second for send
-	recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[0]) + offset));
-	send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[1]) + offset));
-	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
-
-	recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[0]) + offset));
-	send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghost_send_buffer_d[1]) + offset));
-	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
-      } else {
-	recv_buf[2*i+0] = nullptr;
-	recv_buf[2*i+1] = nullptr;
-	send_buf[2*i+0] = nullptr;
-	send_buf[2*i+1] = nullptr;
-      }
-    }
-
   }
 
   void cudaColorSpinorField::freeGhostBuffer(void)
@@ -952,9 +901,9 @@ namespace quda {
 
   cudaStream_t *stream;
 
-  void cudaColorSpinorField::createComms(int nFace) {
+  void cudaColorSpinorField::createComms(int nFace, bool spin_project) {
 
-    allocateGhostBuffer(nFace); // allocate the ghost buffer if not yet allocated
+    allocateGhostBuffer(nFace,spin_project); // allocate the ghost buffer if not yet allocated
 
     // ascertain if this instance needs its comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
@@ -963,12 +912,9 @@ namespace quda {
 
     if (!initComms || comms_reset) {
 
-      // if we are requesting a new number of faces destroy and start over
-      destroyComms();
+      destroyComms(); // if we are requesting a new number of faces destroy and start over
 
-      if (siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Only supports single parity fields");
-
-      int Nint = nColor * nSpin * 2 / (nSpin == 4 ? 2 : 1); // number of internal degrees of freedom
+      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
 
       for (int i=0; i<nDimComms; i++) { // compute size of ghost buffers required
 	if (!commDimPartitioned(i)) { ghost_face_bytes[i] = 0; continue; }
@@ -1440,17 +1386,20 @@ namespace quda {
   }
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger) const {
-    void **send = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
+    int nFace = (nSpin == 1) ? 3 : 1;
+    const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
-    // allocate ghost buffer if not yet allocated
-    allocateGhostBuffer(send, ghost_fixme);
+    void *send[2*QUDA_MAX_DIM];
+    for (int d=0; d<4; d++) {
+      send[2*d+0] = my_face_dim_dir_d[bufferIndex][d][0];
+      send[2*d+1] = my_face_dim_dir_d[bufferIndex][d][1];
+      ghost_fixme[2*d+0] = from_face_dim_dir_d[bufferIndex][d][0];
+      ghost_fixme[2*d+1] = from_face_dim_dir_d[bufferIndex][d][1];
+    }
 
     genericPackGhost(send, *this, parity, dagger);
 
-    int nFace = (nSpin == 1) ? 3 : 1;
     exchange(ghost_fixme, send, nFace);
-
-    host_free(send);
   }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
