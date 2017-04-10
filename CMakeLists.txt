@@ -116,8 +116,8 @@ set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 set(QUDA_LIMEHOME "" CACHE PATH "path to LIME")
 set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
-
 set(QUDA_MAGMAHOME "" CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
+set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link against magma")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
@@ -245,13 +245,18 @@ if(QUDA_MAGMA)
   find_package(OpenMP)
   if("${QUDA_MAGMAHOME}" STREQUAL "")
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(MAGMA  magma)
+    pkg_check_modules(MAGMA magma)
     include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
     message("${MAGMA_INCLUDEDIR}")
     find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
   else()
     # prefer static library
-    FIND_LIBRARY(MAGMA_LIB libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
+    LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
+    find_library(MAGMA libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
+    # append additional libraries required by magma
+    LIST(APPEND MAGMA ${QUDA_MAGMA_LIBS})
+    # and any additional OpenMP linker flags
+    SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_CXX_FLAGS}" )
     include_directories(SYSTEM ${QUDA_MAGMAHOME}/include)
   endif()  
 endif(QUDA_MAGMA)
