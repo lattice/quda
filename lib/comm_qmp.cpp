@@ -182,7 +182,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     printfQuda("Disabling GPU-Direct RDMA access\n");
   }
 
-  checkCudaError();
+  checkCudaErrorNoSync();
   return;
 }
 
