@@ -410,6 +410,36 @@ namespace quda {
     void solve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
+  class CGNE : public CG {
+
+  private:
+    DiracMMdag mmdag;
+    DiracMMdag mmdagSloppy;
+    ColorSpinorField *xp;
+    bool init;
+
+  public:
+    CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CGNE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CGNR : public CG {
+
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    ColorSpinorField *bp;
+    bool init;
+
+  public:
+    CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CGNR();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
 
 
   class MPCG : public Solver {
