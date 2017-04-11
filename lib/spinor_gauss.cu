@@ -133,27 +133,33 @@ namespace quda {
       }else{
 	  location = QUDA_CPU_FIELD_LOCATION;
       }
-#ifdef GPU_STAGGERED_DIRAC
-      if (src.Precision() == QUDA_SINGLE_PRECISION){
-	  gaussSpinor<float, 1, 3>(src, location, randstates);
-      } else if(src.Precision() == QUDA_DOUBLE_PRECISION) {
-	  gaussSpinor<double, 1, 3>(src, location, randstates);
+      if (src.Ncolor() != 3 ){
+	  errorQuda("%s is not implemented for Ncolor!=3", __func__, src.Nspin());
       }
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
+      if (src.Nspin() == 4 ){
+	  if (src.Precision() == QUDA_SINGLE_PRECISION){
+	      gaussSpinor<float, 4, 3>(src, location, randstates);
+	  } else if(src.Precision() == QUDA_DOUBLE_PRECISION) {
+	      gaussSpinor<double, 4, 3>(src, location, randstates);
+	  }
+      }else if (src.Nspin() == 1 ){
+	  if (src.Precision() == QUDA_SINGLE_PRECISION){
+	      gaussSpinor<float, 1, 3>(src, location, randstates);
+	  } else if(src.Precision() == QUDA_DOUBLE_PRECISION) {
+	      gaussSpinor<double, 1, 3>(src, location, randstates);
+	  }
+      }else{
+	  errorQuda("spinorGauss not implemented for Nspin != 1 or Nspin !=4");
+      }
+
   }
 
   void spinorGauss(ColorSpinorField &src, int seed)
   {
-#ifdef GPU_STAGGERED_DIRAC
       RNG* randstates = new RNG(src.VolumeCB(), seed, src.X());
       randstates->Init();
       spinorGauss(src, *randstates);
       randstates->Release();
       delete randstates;
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
   }
 } // namespace quda
