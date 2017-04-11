@@ -75,7 +75,9 @@ namespace quda {
     memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
     double *evals = new double[param.ld];
 
-    magma_Xheev(projm, param.ld, param.cur_dim, evals, sizeof(Complex));
+    cudaHostRegister(static_cast<void *>(projm), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
+    magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
+    cudaHostUnregister(projm);
 
     delete [] evals;
 #else
