@@ -122,16 +122,11 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
 }
 
-static bool disable_peer_to_peer = false;
-
-bool comm_peer2peer_enabled_global() {
-  return !disable_peer_to_peer;
-}
-
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
 
+  bool disable_peer_to_peer = false;
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
   if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
     if (getVerbosity() > QUDA_SILENT)

@@ -649,7 +649,7 @@ struct DslashFusedGPUComms : DslashPolicyImp {
       } // i
     } // completeSum < pattern.CommDimTotal
 
-    // if peer-2-peer in a given direction then we need to to wait on that copy event
+    // if peer-2-peer in a given direction then we need to wait on that copy event
     for (int i=3; i>=0; i--) {
       if (!commDimPartitioned(i)) continue;
       if (comm_peer2peer_enabled(0,i)) {
@@ -786,7 +786,7 @@ struct DslashFusedExterior : DslashPolicyImp {
     // setup for exterior kernel
     setFusedParam(dslashParam,dslash,faceVolumeCB);
 
-    // if peer-2-peer in a given direction then we need to to wait on that copy event
+    // if peer-2-peer in a given direction then we need to wait on that copy event
     // if any comms is not peer-2-peer then we need to post a scatter event and wait on that
     bool post_scatter_event = false;
     for (int i=3; i>=0; i--) {
@@ -1109,7 +1109,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
     setFusedParam(dslashParam,dslash,faceVolumeCB);
 
-    // if peer-2-peer in a given direction then we need to to wait on that copy event
+    // if peer-2-peer in a given direction then we need to wait on that copy event
     // if any comms is not peer-2-peer then we need to post a scatter event and wait on that
     bool post_scatter_event = false;
     for (int i=3; i>=0; i--) {
@@ -1738,10 +1738,7 @@ struct DslashFactory {
 	 }
 
 	 // if we have p2p for now exclude zero-copy dslash since we can't mix these two
-	 bool p2p = false;
-	 for (int dim=0; dim<4; dim++)
-	   for (int dir=0; dir<2; dir++)
-	     p2p = p2p || comm_peer2peer_enabled(dir,dim);
+	 bool p2p = comm_peer2peer_enabled_global();
 	 config+=p2p;
 
 	 if (!p2p) {
@@ -1812,8 +1809,8 @@ struct DslashFactory {
      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
 
      if (config != tp.aux.y) {
-       errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (%d).  Please delete "
-		 "this file or set the QUDA_RESOURCE_PATH environement variable to point to a new path.",
+       errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
+		 "this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.",
 		 config, tp.aux.y);
      }
 
