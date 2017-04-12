@@ -136,6 +136,16 @@ void SU3test(int argc, char **argv) {
   plaqQuda(plaq);
   printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
+  // Topological charge
+  double qCharge;
+  // start the timer
+  double time0 = -((double)clock());
+  qCharge = qChargeCuda();
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printf("Computed topological charge is %.16e Done in %g secs\n", qCharge, time0);
+
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1). 
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
@@ -147,12 +157,14 @@ void SU3test(int argc, char **argv) {
   
   //STOUT
   // start the timer
-  double time0 = -((double)clock());
+  time0 = -((double)clock());
   performSTOUTnStep(nSteps, coeff_STOUT);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for STOUT = %g secs\n", time0);
+  qCharge = qChargeCuda();
+  printf("Computed topological charge after is %.16e \n", qCharge);
 
   //APE
   // start the timer
@@ -162,7 +174,23 @@ void SU3test(int argc, char **argv) {
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for APE = %g secs\n", time0);
-  
+  qCharge = qChargeCuda();
+  printf("Computed topological charge after is %.16e \n", qCharge);
+
+  //Over Improved STOUT
+  double epsilon = -0.25;
+  coeff_STOUT = 0.06;
+  nSteps = 200;
+  // start the timer
+  time0 = -((double)clock());
+  performOvrImpSTOUTnStep(nSteps, coeff_STOUT, epsilon);  
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
+  qCharge = qChargeCuda();
+  printf("Computed topological charge after is %.16e \n", qCharge);
+
 #else
   printf("Skipping plaquette tests since gauge tools have not been compiled\n");
 #endif
