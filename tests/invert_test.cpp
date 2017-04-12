@@ -62,6 +62,7 @@ extern bool compute_clover;
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
+extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
 
 extern void usage(char** );
@@ -239,6 +240,7 @@ int main(int argc, char **argv)
   inv_param.maxiter = niter;
   inv_param.reliable_delta = 1e-1;
   inv_param.use_sloppy_partial_accumulator = 0;
+  inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.max_res_increase = 1;
 
   // domain decomposition preconditioner parameters
