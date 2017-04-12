@@ -146,6 +146,12 @@ extern "C" {
   void comm_peer2peer_init(const char *hostname_recv_buf);
 
   /**
+     Query if peer-to-peer communication is enabled globally
+     @return Whether peer-to-peer is enabled globally
+  */
+  bool comm_peer2peer_enabled_global();
+
+  /**
      Query if peer-to-peer communication is enabled
      @param dir Direction (0 - backwards, 1 forwards)
      @param dim Dimension (0-3)
