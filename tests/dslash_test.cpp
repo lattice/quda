@@ -985,7 +985,8 @@ int main(int argc, char **argv)
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("Effective halo bi-directional bandwidth = %f\n", 1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs);
+    printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
+	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
 
     double norm2_cpu = blas::norm2(*spinorRef);
     double norm2_cpu_cuda= blas::norm2(*spinorOut);
