@@ -1799,6 +1799,17 @@ struct DslashFactory {
 
 	 int policy_;
 	 while (policy_list >> policy_) {
+	   QudaDslashPolicy dslash_policy = static_cast<QudaDslashPolicy>(policy_);
+
+	   // check this is a valid policy choice
+	   if ( (dslash_policy == QUDA_GPU_COMMS_DSLASH || dslash_policy == QUDA_FUSED_GPU_COMMS_DSLASH) && !comm_gdr_enabled() ) {
+	     errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", dslash_policy);
+	   }
+
+	   if ((dslash_policy == QUDA_ZERO_COPY_DSLASH || dslash_policy == QUDA_FUSED_ZERO_COPY_DSLASH) && comm_peer2peer_enabled_global()) {
+	     errorQuda("Cannot select a zero-copy dslash policy %d unless no peer-to-peer devices are present or peer-to-peer is disabled", dslash_policy);
+	   }
+
 	   policy.push_back(static_cast<QudaDslashPolicy>(policy_));
 	   if (policy_list.peek() == ',') policy_list.ignore();
 	 }
