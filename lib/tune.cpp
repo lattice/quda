@@ -643,6 +643,11 @@ namespace quda {
 
       }
       if (commGlobalReduction()) broadcastTuneCache();
+
+      // check this process is getting the key that is expected
+      if (tunecache.find(key) == tunecache.end()) {
+	errorQuda("Failed to find key entry (%s:%s:%s)", key.name, key.volume, key.aux);
+      }
       param = tunecache[key]; // read this now for all processes
 
     } else if (&tunable != active_tunable) {
