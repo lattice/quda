@@ -1015,6 +1015,14 @@ extern "C" {
   void performSTOUTnStep(unsigned int nSteps, double rho);
 
   /**
+   * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param rho    Rho coefficient for STOUT smearing.
+   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
+   */
+  void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
+
+  /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeCuda();

@@ -213,6 +213,9 @@ static TimeProfile profileAPE("APEQuda");
 //!< Profiler for STOUTQuda
 static TimeProfile profileSTOUT("STOUTQuda");
 
+//!< Profiler for OvrImpSTOUTQuda
+static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
+
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
 
@@ -5365,7 +5368,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after 0 APE steps: %le\n", plq.x);
+    printfQuda("Plaquette after 0 APE steps: %le %le %le\n", plq.x, plq.y, plq.z);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
@@ -5384,7 +5387,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq.x);
+    printfQuda("Plaquette after %d APE steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
 
   profileAPE.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -5440,7 +5443,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after 0 STOUT steps: %le\n", plq.x);
+    printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plq.x, plq.y, plq.z);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
@@ -5459,10 +5462,55 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after %d STOUT steps: %le\n", nSteps, plq.x);
+    printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
 
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+ void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
+{
+  profileOvrImpSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == NULL) errorQuda("Gauge field must be loaded");
+  
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  for(int dir=0; dir<4; ++dir) {
+    gParam.x[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+    gParam.r[dir] = R[dir];
+  }
+
+  if (gaugeSmeared != NULL) delete gaugeSmeared;
+
+  gaugeSmeared = new cudaGaugeField(gParam);
+
+  copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after 0 OvrImpSTOUT steps: %le %le %le\n", plq.x, plq.y, plq.z);
+  }
+
+  for (unsigned int i=0; i<nSteps; i++) {
+    cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+    OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, epsilon);
+  }
+
+  delete cudaGaugeTemp;
+
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
+  }
+
+  profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 
