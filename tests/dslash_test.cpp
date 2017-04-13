@@ -239,12 +239,12 @@ void init(int argc, char **argv) {
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
-    hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
-    hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
+    hostClover = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
+    hostCloverInv = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
   }
 
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
+  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V*gaugeSiteSize*gauge_param.cpu_prec);
 
   ColorSpinorParam csParam;
   
@@ -315,7 +315,7 @@ void init(int argc, char **argv) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
     construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
-    memcpy(hostCloverInv, hostClover, V*cloverSiteSize*inv_param.clover_cpu_prec);
+    memcpy(hostCloverInv, hostClover, (size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
   }
 
   printfQuda("done.\n"); fflush(stdout);
