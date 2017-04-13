@@ -11,7 +11,8 @@
 #define MAX(a, b) (a > b) ? a : b;
 #endif
 
-#define MAGMA_2X //default version version of the MAGMA library
+//#define MAGMA_2X //default version version of the MAGMA library
+#define MAGMA_17
 
 #ifdef MAGMA_LIB
 #include <magma.h>
@@ -1330,7 +1331,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
 void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch)
 {
-#if 0 // def MAGMA_LIB
+#ifdef MAGMA_LIB
   printfQuda("%s with n=%d and batch=%d\n", __func__, n, batch);
 
   magma_queue_t queue = 0;
@@ -1342,7 +1343,11 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
 
   magma_int_t **dipiv_array = static_cast<magma_int_t**>(device_malloc(batch*sizeof(magma_int_t*)));
   magma_int_t *dipiv_tmp = static_cast<magma_int_t*>(device_malloc(batch*n*sizeof(magma_int_t)));
+#ifndef MAGMA_2X
   set_ipointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
+#else
+  magma_iset_pointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
+#endif
 
   magma_int_t *dinfo_array = static_cast<magma_int_t*>(device_malloc(batch*sizeof(magma_int_t)));
   magma_int_t *info_array = static_cast<magma_int_t*>(safe_malloc(batch*sizeof(magma_int_t)));
@@ -1352,10 +1357,13 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
   if (prec == 4) {
     magmaFloatComplex **A_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
     magmaFloatComplex **Ainv_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
-
+#ifndef MAGMA_2X
     cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
     cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
-
+#else
+    magma_cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
+    magma_cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
+#endif
     double magma_time = magma_sync_wtime(queue);
     err = magma_cgetrf_batched(n, n, A_array, n, dipiv_array, dinfo_array, batch, queue);
     //err = magma_cgetrf_nopiv_batched(n, n, A_array, n, dinfo_array, batch, queue); (no getri support for nopiv?)
@@ -1395,11 +1403,16 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
     device_free(Ainv_array);
     device_free(A_array);
   } else if (prec == 8) {
-    magmaDoubleComplex **A_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
-    zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
-
+    magmaDoubleComplex **A_array    = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
     magmaDoubleComplex **Ainv_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
+
+#ifndef MAGMA_2X
+    zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
     zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
+#else
+    magma_zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
+    magma_zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
+#endif
 
     double magma_time = magma_sync_wtime(queue);
     err = magma_zgetrf_batched(n, n, A_array, n, dipiv_array, dinfo_array, batch, queue);

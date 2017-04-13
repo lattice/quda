@@ -216,7 +216,7 @@ namespace quda {
       if (defl) delete defl;
       if (deflParam) delete deflParam;
 
-      delete RV;
+      if (RV) delete RV;
 
       if (m) delete m;
       if (d) delete d;

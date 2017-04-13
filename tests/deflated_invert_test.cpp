@@ -141,23 +141,6 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 #endif
 }
 
-void setDeflationParam(QudaEigParam &df_param) {
-
-  df_param.import_vectors = QUDA_BOOLEAN_NO; 
-  df_param.cuda_prec_ritz = cuda_prec_sloppy;
-
-  df_param.location       = QUDA_CUDA_FIELD_LOCATION;
-  df_param.run_verify     = QUDA_BOOLEAN_NO;
-
-  df_param.nk       = df_param.invert_param->nev;
-  df_param.np       = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
-
-  // set file i/o parameters
-  strcpy(df_param.vec_infile, vec_infile);
-  strcpy(df_param.vec_outfile, vec_outfile);
-
-}
-
 
 void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.Ls = 1;
@@ -230,7 +213,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
     inv_param.nev = 8; 
     inv_param.max_search_dim = 64;
-    inv_param.deflation_grid = 16;//to test the stuff
+    inv_param.deflation_grid = 2;//to test the stuff
     inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
     inv_param.use_reduced_vector_set = true;
@@ -242,19 +225,20 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.eigenval_tol = 1e-2;
   }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    inv_param.nev = 31;
-    inv_param.max_search_dim = 95;
-    inv_param.deflation_grid = 320;//to test the stuff
+    inv_param.nev = 7;
+    inv_param.max_search_dim = 15;
+    inv_param.deflation_grid = 100;//to test the stuff
     inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
   inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = QUDA_VERBOSE; // QUDA_SILENT;
 
 
-  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
-  inv_param.gcrNkrylov = 20;
+//  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
+  inv_param.gcrNkrylov = 6;
   inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine convergence
@@ -272,10 +256,27 @@ void setInvertParam(QudaInvertParam &inv_param) {
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 1;
+  inv_param.tol_precondition = 1e-2;
+  inv_param.maxiter_precondition = 16;
   inv_param.omega = 1.0;
 }
+
+void setDeflationParam(QudaEigParam &df_param) {
+
+  df_param.import_vectors = QUDA_BOOLEAN_NO;
+  df_param.cuda_prec_ritz = cuda_prec_sloppy;
+
+  df_param.location       = QUDA_CUDA_FIELD_LOCATION;
+  df_param.run_verify     = QUDA_BOOLEAN_NO;
+
+  df_param.nk       = df_param.invert_param->nev;
+  df_param.np       = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
+
+  // set file i/o parameters
+  strcpy(df_param.vec_infile, vec_infile);
+  strcpy(df_param.vec_outfile, vec_outfile);
+}
+  
 
 int main(int argc, char **argv)
 {
@@ -382,13 +383,6 @@ int main(int argc, char **argv)
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-//inv_param.inv_type = QUDA_CG_INVERTER;
-//inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-
-  // setup the deflated solver
-  void *df_preconditioner  = newDeflationQuda(&df_param);
-  inv_param.deflation_op   = df_preconditioner;
-
   const int nSrc = 1;
   for (int i=0; i<nSrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
@@ -404,13 +398,15 @@ int main(int argc, char **argv)
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
+    //openMagma();
+    void *df_preconditioner  = newDeflationQuda(&df_param);
+    inv_param.deflation_op   = df_preconditioner;
+
     invertQuda(spinorOut, spinorIn, &inv_param);
+
+    //closeMagma();
+    destroyDeflationQuda(df_preconditioner);    
   }
-
-  // free the multigrid solver
-  //destroyDeflationQuda(df_preconditioner);
-
-
 
   // stop the timer
   time0 += clock();
@@ -430,7 +426,7 @@ int main(int argc, char **argv)
       wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) {
+        if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
           tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
         } else {
           printfQuda("Unsupported dslash_type\n");
@@ -449,7 +445,7 @@ int main(int argc, char **argv)
 		inv_param.cpu_prec, gauge_param);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        if (inv_param.twist_flavor == QUDA_TWIST_MINUS || inv_param.twist_flavor == QUDA_TWIST_PLUS) {
+        if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
           tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                    inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         } else {

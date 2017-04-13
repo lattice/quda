@@ -168,7 +168,7 @@ namespace quda {
       VectorXcd  vec2_(param.cur_dim);
 
       vec2_ = projm_.colPivHouseholderQr().solve(vec_);
-      vec_  = vec2_ 
+      vec_  = vec2_; 
 #endif
     }
     else
@@ -199,7 +199,10 @@ namespace quda {
 
     const int first_idx = param.cur_dim;
 
-    if(param.RV->CompositeDim() < (first_idx+nev) || param.tot_dim < (first_idx+nev)) errorQuda("\nNot enough space to copy %d vectors..\n", param.tot_dim);
+    if(param.RV->CompositeDim() < (first_idx+nev) || param.tot_dim < (first_idx+nev)) { 
+      warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", nev);
+      return;
+    }
 
     for(int i = 0; i < nev; i++) blas::copy(param.RV->Component(first_idx+i), Vm.Component(i));
 
@@ -323,11 +326,11 @@ namespace quda {
      cudaHostUnregister(projm);
 #else
      Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-     Map<VectorXcd, Unaligned, DynamicStride> evals_(eval, param.cur_dim);
+     Map<VectorXd, Unaligned> evals_(evals, param.cur_dim);
 
      SelfAdjointEigenSolver<MatrixXcd> es(projm_);
 
-     evals = es.eigenvalues();
+     evals_ = es.eigenvalues();
 #endif
 
      //reset projection matrix:
