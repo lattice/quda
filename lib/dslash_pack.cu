@@ -810,6 +810,7 @@ namespace quda {
       default:
 	errorQuda("Number of faces not supported");
       }
+#if 0  // FIXME need to support process divergent tuning for different PCIe topologies per GPU
       // record the location of where each pack buffer is in [2*dim+dir] ordering
       // 0 - no packing
       // 1 - pack to local GPU memory
@@ -823,6 +824,7 @@ namespace quda {
       }
       pack_location[8] = '\0';
       strcat(aux,pack_location);
+#endif
     }
 
   public:
