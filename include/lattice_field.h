@@ -465,10 +465,6 @@ namespace quda {
     */
     virtual void write(char *filename);
     
-    virtual void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
-		      double a=0, double b=0)
-    { errorQuda("Not implemented"); }
-
     virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 

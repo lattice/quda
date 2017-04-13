@@ -87,7 +87,7 @@ extern "C" {
   } QudaDslashType;
 
   typedef enum QudaDslashPolicy_s {
-    QUDA_DSLASH2,
+    QUDA_DSLASH,
     QUDA_FUSED_DSLASH,
     QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_GPU_COMMS_DSLASH,

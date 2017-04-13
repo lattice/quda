@@ -133,7 +133,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->maxiter = niter;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
-  inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
+  inv_param->solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param->pipeline = pipeline;
 
   inv_param->Ls = Nsrc;

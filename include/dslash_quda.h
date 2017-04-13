@@ -121,7 +121,7 @@ namespace quda {
      @brief Dslash face packing routine
      @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
      @param[in] in Input ColorSpinorField to be packed
-     @param[in] zero_copy Whether we are doing a zero_copy packing or no
+     @param[in] location Array of locations where the packed fields are (Device, Host or Remote)
      @param[in] nFace Depth of halo
      @param[in] dagger Whether this is for the dagger operator
      @param[in] parity Field parity
@@ -131,12 +131,13 @@ namespace quda {
      @param[in] a Packing coefficient (twisted-mass only)
      @param[in] b Packing coefficient (twisted-mass only)
   */
-  void packFace(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &in, bool zero_copy, const int nFace, const int dagger,
-		const int parity, const int dim, const int face_num, const cudaStream_t &stream,
-		const double a=0.0, const double b=0.0);
+  void packFace(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &in, MemoryLocation location[],
+		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
+		const cudaStream_t &stream, const double a=0.0, const double b=0.0);
 
-  void packFaceExtended(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &field, bool zero_copy, const int nFace, const int R[], const int dagger,
-			const int parity, const int dim, const int face_num, const cudaStream_t &stream, const bool unpack=false);
+  void packFaceExtended(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &field, MemoryLocation location[],
+			const int nFace, const int R[], const int dagger, const int parity, const int dim,
+			const int face_num, const cudaStream_t &stream, const bool unpack=false);
 
   /**
      out = gamma_5 in

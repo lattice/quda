@@ -82,7 +82,7 @@
 #define QUDA_INVALID_DSLASH QUDA_INVALID_ENUM
 
 #define QudaDslashPolicy integer(4)
-#define QUDA_DSLASH2 0
+#define QUDA_DSLASH 0
 #define QUDA_GPU_COMMS_DSLASH 1
 #define QUDA_FUSED_DSLASH 2
 #define QUDA_FUSED_GPU_COMMS_DSLASH 3

@@ -9,6 +9,9 @@
 #include <lattice_field.h>
 
 namespace quda {
+
+  enum MemoryLocation { Device, Host, Remote };
+
   struct FullClover;
 
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
@@ -546,12 +549,12 @@ namespace quda {
        @param[in] stream Which stream to use for the kernel
        @param[out] buffer Optional parameter where the ghost should be
        stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
-       @param[in] zero_copy Whether we are packing directly into zero_copy memory
+       @param[in] location Are we packing directly into local device memory, zero-copy memory or remote memory
        @param[in] a Twisted mass parameter (default=0)
        @param[in] b Twisted mass parameter (default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-		   cudaStream_t* stream, bool zero_copy=false, double a=0, double b=0);
+		   cudaStream_t* stream, MemoryLocation location[2*QUDA_MAX_DIM], double a=0, double b=0);
 
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
@@ -602,17 +605,8 @@ namespace quda {
 
     void streamInit(cudaStream_t *stream_p);
 
-    void pack(int nFace, int parity, int dagger, int stream_idx, bool zeroCopyPack,
-              double a=0, double b=0);
-
-    void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
-	      int stream_idx, bool zeroCopyPack, double a=0);
-
-    void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
-	      double a=0, double b=0);
-
-    void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
-	      cudaStream_t *stream_p, bool zeroCopyPack, double a=0);
+    void pack(int nFace, int parity, int dagger, int stream_idx,
+	      MemoryLocation location[], double a=0, double b=0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger,
         const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
