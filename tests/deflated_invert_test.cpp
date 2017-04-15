@@ -22,7 +22,7 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define NO_PRECOND
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
@@ -134,9 +134,9 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
   int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
   int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
+  int pad_size =std::max(x_face_size, y_face_size);
+  pad_size = std::max(pad_size, z_face_size);
+  pad_size = std::max(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;    
 #endif
 }
@@ -235,9 +235,11 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.verbosity_precondition = QUDA_VERBOSE; // QUDA_SILENT;
 
-
-//  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+#ifdef NO_PRECOND
+  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+#else
   inv_param.inv_type_precondition = QUDA_MR_INVERTER;
+#endif
   inv_param.gcrNkrylov = 6;
   inv_param.tol = tol;
 
@@ -383,7 +385,10 @@ int main(int argc, char **argv)
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-  const int nSrc = 1;
+  void *df_preconditioner  = newDeflationQuda(&df_param);
+  inv_param.deflation_op   = df_preconditioner;
+
+  const int nSrc = 16;
   for (int i=0; i<nSrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
@@ -398,15 +403,10 @@ int main(int argc, char **argv)
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
-    //openMagma();
-    void *df_preconditioner  = newDeflationQuda(&df_param);
-    inv_param.deflation_op   = df_preconditioner;
-
     invertQuda(spinorOut, spinorIn, &inv_param);
-
-    //closeMagma();
-    destroyDeflationQuda(df_preconditioner);    
   }
+
+  destroyDeflationQuda(df_preconditioner);    
 
   // stop the timer
   time0 += clock();

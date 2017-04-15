@@ -77,7 +77,7 @@ namespace quda {
         if(invRitzVals)       delete[]  invRitzVals;
      }
 
-     void ReshapeRitzVectors(const int new_dim, QudaFieldLocation location, QudaPrecision new_ritz_prec = QUDA_INVALID_PRECISION)//reset param.ritz_prec?
+     void ReshapeDeflationSpace(const int new_dim, QudaFieldLocation location, QudaPrecision new_ritz_prec = QUDA_INVALID_PRECISION)//reset param.ritz_prec?
      {
         if(new_dim > tot_dim || (new_dim == cur_dim && new_ritz_prec == QUDA_INVALID_PRECISION)) return;//nothing to do
         //
@@ -97,7 +97,7 @@ namespace quda {
         //
 #else
         /** not implemented yet*/
-        RV.ReshapeCompositeField(new_dim, new_ritz_prec);//delete old pointer and allocate new one. Must be implemented in ColorSpinorField
+        //RV.ReshapeCompositeField(new_dim, new_ritz_prec);//delete old pointer and allocate new one. Must be implemented in ColorSpinorField
 #endif
         cur_dim = new_dim;
 
@@ -181,6 +181,14 @@ namespace quda {
        @param RV Save eigen-space vectors from here
      */
     void saveVectors(ColorSpinorField *RV);
+
+    /**
+       @brief Test whether the deflation space is complete
+       and therefore cannot be further extended      
+       @param RV Save eigen-space vectors from here
+     */
+    bool is_complete() {return (param.cur_dim == param.tot_dim);}
+
 
     /**
        @brief Return the total flops done on this and all coarser levels.

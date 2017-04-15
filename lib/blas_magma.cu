@@ -62,32 +62,38 @@
 
     magma_imalloc_pinned(&ipiv, n);
 
+    void *tmp;
+
+    magma_malloc_pinned((void**)&tmp, ldm*n*sizeof(magmaFloat));
+    memcpy(tmp, Mat, ldm*n*sizeof(magmaFloat));
+
     if ( ptr_attr.memoryType == cudaMemoryTypeDevice ) {
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {  
-         err = magma_cgesv_gpu(n, 1, static_cast<magmaFloatComplex* >(Mat), ldm, ipiv, static_cast<magmaFloatComplex* >(sol), ldn, &info);
+         err = magma_cgesv_gpu(n, 1, static_cast<magmaFloatComplex* >(tmp), ldm, ipiv, static_cast<magmaFloatComplex* >(sol), ldn, &info);
          if(err != 0) errorQuda("\nError in SolveGPUProjMatrix (magma_cgesv_gpu), exit ...\n");
       }
       else
       {
-         err = magma_zgesv_gpu(n, 1, static_cast<magmaDoubleComplex*>(Mat), ldm, ipiv, static_cast<magmaDoubleComplex*>(sol), ldn, &info);
+         err = magma_zgesv_gpu(n, 1, static_cast<magmaDoubleComplex*>(tmp), ldm, ipiv, static_cast<magmaDoubleComplex*>(sol), ldn, &info);
          if(err != 0) errorQuda("\nError in SolveGPUProjMatrix (magma_zgesv_gpu), exit ...\n");
       }
     }  else if ( ptr_attr.memoryType == cudaMemoryTypeHost ) {
 
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {  
-         err = magma_cgesv(n, 1, static_cast<magmaFloatComplex* >(Mat), ldm, ipiv, static_cast<magmaFloatComplex* >(sol), ldn, &info);
+         err = magma_cgesv(n, 1, static_cast<magmaFloatComplex* >(tmp), ldm, ipiv, static_cast<magmaFloatComplex* >(sol), ldn, &info);
          if(err != 0) errorQuda("\nError in SolveGPUProjMatrix (magma_cgesv), exit ...\n");
       }
       else
       {
-         err = magma_zgesv(n, 1, static_cast<magmaDoubleComplex*>(Mat), ldm, ipiv, static_cast<magmaDoubleComplex*>(sol), ldn, &info);
+         err = magma_zgesv(n, 1, static_cast<magmaDoubleComplex*>(tmp), ldm, ipiv, static_cast<magmaDoubleComplex*>(sol), ldn, &info);
          if(err != 0) errorQuda("\nError in SolveGPUProjMatrix (magma_zgesv), exit ...\n");
       }
     }
 
     magma_free_pinned(ipiv);
+    magma_free_pinned(tmp);
 
     return;
   }

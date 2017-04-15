@@ -55,7 +55,9 @@ namespace quda {
 
     QudaPrecision precision;
     QudaSiteSubset siteSubset;
-  
+
+    QudaMemoryType mem_type; 
+ 
     /** The type of ghost exchange to be done with this field */
     QudaGhostExchange ghostExchange;
 
@@ -66,7 +68,7 @@ namespace quda {
        @brief Default constructor for LatticeFieldParam
     */
     LatticeFieldParam()
-    : nDim(4), pad(0), precision(QUDA_INVALID_PRECISION), siteSubset(QUDA_INVALID_SITE_SUBSET),
+    : nDim(4), pad(0), precision(QUDA_INVALID_PRECISION), siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD)
     {
       for (int i=0; i<nDim; i++) {
@@ -85,7 +87,7 @@ namespace quda {
     */
     LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision,
 		      QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD)
-    : nDim(nDim), pad(pad), precision(precision), siteSubset(QUDA_FULL_SITE_SUBSET),
+    : nDim(nDim), pad(pad), precision(precision), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(ghostExchange)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -102,7 +104,7 @@ namespace quda {
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) 
-    : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET),
+    : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_NO)
     {
       for (int i=0; i<nDim; i++) {
@@ -222,6 +224,10 @@ namespace quda {
 
     /** Type of ghost exchange to perform */
     QudaGhostExchange ghostExchange;
+
+    /**
+       The type of allocation we are going to do for this field */
+    QudaMemoryType mem_type;
 
   public:
 

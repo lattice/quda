@@ -538,7 +538,7 @@ namespace quda {
      ColorSpinorField &rProj = *rp_proj;
 
      const double stop = b2*param.tol*param.tol;
-     //start iterative refinement cycles (or just one cycle for full precision solver):
+     //start iterative refinement cycles (or just one eigcg call for full (solo) precision solver):
      do {
        rProj = r;
        blas::zero(eProj);
@@ -548,7 +548,7 @@ namespace quda {
 
        int iters = eigCGsolve(eSloppy, rSloppy);
 
-       if( eigcg_args->restarts > 0 ) defl.increment(*Vm, param.nev);
+       if( eigcg_args->restarts > 0 && !defl.is_complete()) defl.increment(*Vm, param.nev);
        // use mixed blas ??
        e = eSloppy;
        blas::xpy(e, out);
@@ -562,7 +562,7 @@ namespace quda {
        param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
        PrintSummary("EigCG:", iters, r2, b2);
 
-       defl.verify();
+       if( eigcg_args->restarts > 0 && !defl.is_complete()) defl.verify();
      } while ((r2 > stop) && mixed_prec);
 
      if( ep_proj != ep && ep_proj != ep_sloppy ) {
