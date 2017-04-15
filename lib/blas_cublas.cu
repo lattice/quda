@@ -113,7 +113,6 @@ namespace quda {
       pool_device_free(dinfo_array);
       pool_pinned_free(info_array);
 
-#endif
       cudaDeviceSynchronize();
       gettimeofday(&stop, NULL);
       long ds = stop.tv_sec - start.tv_sec;
@@ -122,6 +121,7 @@ namespace quda {
 
       printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n",
 		 time, 1e-9 * flops / time);
+#endif // CUBLAS_LIB
 
       return flops;
     }
