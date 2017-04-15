@@ -278,7 +278,7 @@ endif()
 if (QUDA_MULTIGRID)
   add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
-  LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY}
+  LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
 endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
