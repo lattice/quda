@@ -7,7 +7,7 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <gamma.cuh>
-#include <blas_magma.h>
+#include <blas_cublas.h>
 #include <coarse_op.cuh>
 
 namespace quda {
@@ -195,6 +195,14 @@ namespace quda {
 
       //Copy the cuda gauge field to the cpu
       gauge.saveCPUField(*static_cast<cpuGaugeField*>(U));
+    } else if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
+      //Create a copy of the gauge field with no reconstruction, required for fine-grained access
+      GaugeFieldParam gf_param(gauge);
+      gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
+      gf_param.setPrecision(gf_param.precision);
+      U = new cudaGaugeField(gf_param);
+
+      U->copy(gauge);
     }
 
     CloverFieldParam cf_param;
