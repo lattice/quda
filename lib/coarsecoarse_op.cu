@@ -6,7 +6,7 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <gamma.cuh>
-#include <blas_magma.h>
+#include <blas_cublas.h>
 #include <coarse_op.cuh>
 
 namespace quda {

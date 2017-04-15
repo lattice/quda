@@ -41,7 +41,7 @@ set (QUDA_OBJS
   hisq_paths_force_quda.cu fermion_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
-  ritz_quda.cpp eig_solver.cpp blas_magma.cu misc_helpers.cu
+  ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu misc_helpers.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
