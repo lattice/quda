@@ -196,7 +196,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
-      setTwistPack(true);
+      setKernelPackT(true);
       twist_a = kappa; 
       twist_b = mu;
     }
@@ -226,7 +226,7 @@ namespace quda {
     delete dslash;
 #ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
-      setTwistPack(false);
+      setKernelPackT(false);
       twist_a = 0.0; 
       twist_b = 0.0;
     }

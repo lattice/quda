@@ -164,7 +164,7 @@ struct DslashBasic : DslashPolicyImp {
 
 #ifdef MULTI_GPU
     // Record the start of the dslash if doing communication in T and not kernel packing
-    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) {
+    if (dslashParam.commDim[3] && !getKernelPackT()) {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 		
@@ -181,7 +181,7 @@ struct DslashBasic : DslashPolicyImp {
 
     bool pack = false;
     for (int i=3; i>=0; i--) 
-      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
         { pack = true; break; }
 
     // Initialize pack from source spinor
@@ -199,7 +199,7 @@ struct DslashBasic : DslashPolicyImp {
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-        cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
+        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[0] : dslashStart;
 
         PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
@@ -337,7 +337,7 @@ struct DslashPthreads : DslashPolicyImp {
     }
     bool pack = false;
     for (int i=3; i>=0; i--) 
-      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
         { pack = true; break; }
 
     if (pack){
@@ -360,7 +360,7 @@ struct DslashPthreads : DslashPolicyImp {
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-        cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
+        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[0] : dslashStart;
 
         PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0),
 	        profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -689,7 +689,7 @@ struct DslashFusedExterior : DslashPolicyImp {
 #ifdef MULTI_GPU
     int scatterIndex = -1;
     // Record the start of the dslash if doing communication in T and not kernel packing
-    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
+    if (dslashParam.commDim[3] && !getKernelPackT())
     {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
@@ -705,7 +705,7 @@ struct DslashFusedExterior : DslashPolicyImp {
     }
     bool pack = false;
     for (int i=3; i>=0; i--) 
-      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
         { pack = true; break; }
 
 
@@ -728,7 +728,7 @@ struct DslashFusedExterior : DslashPolicyImp {
       else if (!comm_peer2peer_enabled(1,i)) scatterIndex = 2*i+1;
 
       for (int dir=1; dir>=0; dir--) {
-        cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
+        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[0] : dslashStart;
 
         PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
@@ -851,7 +851,7 @@ struct DslashAsync : DslashPolicyImp {
 
 #ifdef MULTI_GPU
     // Record the start of the dslash if doing communication in T and not kernel packing
-    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) {
+    if (dslashParam.commDim[3] && !getKernelPackT()) {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
@@ -867,7 +867,7 @@ struct DslashAsync : DslashPolicyImp {
 
     bool pack = false;
     for (int i=3; i>=0; i--)
-      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack()))
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
         { pack = true; break; }
 
     // Initialize pack from source spinor
@@ -885,7 +885,7 @@ struct DslashAsync : DslashPolicyImp {
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-        cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
+        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[0] : dslashStart;
 
         PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
@@ -1012,7 +1012,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 #ifdef MULTI_GPU
     int scatterIndex = -1;
     // Record the start of the dslash if doing communication in T and not kernel packing
-    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) {
+    if (dslashParam.commDim[3] && !getKernelPackT()) {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
@@ -1027,7 +1027,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
     }
     bool pack = false;
     for (int i=3; i>=0; i--)
-      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack()))
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT()))
         { pack = true; break; }
 
     // Initialize pack from source spinor
@@ -1049,7 +1049,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
       else if (!comm_peer2peer_enabled(1,i)) scatterIndex = 2*i+1;
 
       for (int dir=1; dir>=0; dir--) {
-        cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
+        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[0] : dslashStart;
 
         PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 

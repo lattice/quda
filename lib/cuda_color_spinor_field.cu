@@ -713,7 +713,7 @@ namespace quda {
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
     int Npad = Nint / Nvec; // number Nvec buffers we have
     
-    if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
 

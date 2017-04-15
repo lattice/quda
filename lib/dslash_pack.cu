@@ -694,11 +694,11 @@ namespace quda {
       if(dim < 0){ // if dim is negative, pack all dimensions
         for (int i=0; i<4; i++) {
           if (!commDim[i]) continue;
-          if ((i==3 && !(getKernelPackT() || getTwistPack()))) continue; 
+          if ( i==3 && !getKernelPackT() ) continue;
           threads += 2*nFace*in->GhostFace()[i]; // 2 for forwards and backwards faces
         }
       }else{ // pack only in dim dimension
-        if(commDim[dim] && dim!=3 || (getKernelPackT() || getTwistPack())){
+        if( commDim[dim] && (dim!=3 || getKernelPackT() )){
           threads = nFace*in->GhostFace()[dim];
           if(face_num==2) threads *= 2; // sending data forwards and backwards
         }
@@ -799,7 +799,7 @@ namespace quda {
       comm[3] = (commDim[3] ? '1' : '0');
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
-      if (getKernelPackT() || getTwistPack()) { strcat(aux,",kernelPackT"); }
+      if (getKernelPackT()) { strcat(aux,",kernelPackT"); }
       switch (nFace) {
       case 1:
 	strcat(aux,",nFace=1,location=");
