@@ -730,7 +730,10 @@ namespace quda {
 			      const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger)
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity), dslash(dslash), clover(clover), dagger(dagger) { }
 
-    inline void operator()() {
+    /**
+       @brief Execute the coarse dslash using the given policy
+     */
+    inline void operator()(int policy) {
 #ifdef GPU_MULTIGRID
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
@@ -740,7 +743,13 @@ namespace quda {
       // check all locations match
       Location(out, inA, inB, Y, X);
 
-      inA.exchangeGhost((QudaParity)(1-parity), dagger);
+      MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
+      MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from
+      for (int i=0; i<2*QUDA_MAX_DIM; i++) {
+	pack_destination[i] = policy == 1 || policy == 3 ? Host : Device;
+	halo_location[i] = policy == 2 || policy == 3 ? Host : Device;
+      }
+      inA.exchangeGhost((QudaParity)(1-parity), dagger, pack_destination, halo_location, false);
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
 
@@ -777,6 +786,8 @@ namespace quda {
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
+   const int n_policy = 4;
+
  public:
    inline DslashCoarsePolicyTune(DslashCoarseLaunch &dslash) : dslash(dslash)
    {
@@ -790,7 +801,7 @@ namespace quda {
      // constituents have been tuned since we can't do nested tuning
      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
        disableProfileCount();
-       dslash();
+       for (int i=0; i<n_policy; i++) dslash(i);
        enableProfileCount();
        setPolicyTuning(true);
      }
@@ -799,13 +810,32 @@ namespace quda {
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
    inline void apply(const cudaStream_t &stream) {
-     tuneLaunch(*this, getTuning(), getVerbosity());
-     dslash();
+     TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
+     dslash(tp.aux.x);
    }
 
    int tuningIter() const { return 10; }
 
-   bool advanceTuneParam(TuneParam &param) const { return false; }
+   bool advanceAux(TuneParam &param) const
+   {
+     if (param.aux.x < n_policy-1) {
+       param.aux.x++; return true;
+     } else {
+       param.aux.x = 0; return false;
+     }
+   }
+
+   bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+
+   void initTuneParam(TuneParam &param) const  {
+     Tunable::initTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
+   }
+
+   void defaultTuneParam(TuneParam &param) const  {
+     Tunable::defaultTuneParam(param);
+     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
+   }
 
    TuneKey tuneKey() const {
      return TuneKey(dslash.inA.VolString(), typeid(*this).name(), aux);
