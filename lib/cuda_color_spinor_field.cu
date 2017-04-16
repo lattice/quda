@@ -1387,21 +1387,102 @@ namespace quda {
     unpackGhostExtended(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, static_cast<QudaParity>(parity), dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/], zero_copy);
   }
  
-  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger) const {
+  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination_,
+					   const MemoryLocation *halo_location_, bool gdr)  const {
+    if (gdr) errorQuda("GDR not yet enabled here");
     int nFace = (nSpin == 1) ? 3 : 1;
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
-    void *send[2*QUDA_MAX_DIM];
-    for (int d=0; d<4; d++) {
-      send[2*d+0] = my_face_dim_dir_d[bufferIndex][d][0];
-      send[2*d+1] = my_face_dim_dir_d[bufferIndex][d][1];
-      ghost_fixme[2*d+0] = from_face_dim_dir_d[bufferIndex][d][0];
-      ghost_fixme[2*d+1] = from_face_dim_dir_d[bufferIndex][d][1];
+    // first set default values to device if needed
+    MemoryLocation pack_destination[2*QUDA_MAX_DIM], halo_location[2*QUDA_MAX_DIM];
+    for (int i=0; i<8; i++) {
+      pack_destination[i] = pack_destination_ ? pack_destination_[i] : Device;
+      halo_location[i] = halo_location_ ? halo_location_[i] : Device;
     }
 
-    genericPackGhost(send, *this, parity, dagger);
+    // If this is set to true, then we are assuming that the send
+    // buffers are in a single contiguous memory space and we çan
+    // aggregate all cudaMemcpys to reduce latency.  This only applies
+    // if the memory locations are all "Device".
+    bool fused_pack_memcpy = true;
 
-    exchange(ghost_fixme, send, nFace);
+    // If this is set to true, then we are assuming that the send
+    // buffers are in a single contiguous memory space and we çan
+    // aggregate all cudaMemcpys to reduce latency.  This only applies
+    // if the memory locations are all "Device".
+    bool fused_halo_memcpy = true;
+
+    // set to true if any of the ghost packing is being done to Host memory
+    bool pack_host = false;
+
+    // set to true if the final halos will be left in Host memory
+    bool halo_host = false;
+
+    void *send[2*QUDA_MAX_DIM];
+    for (int d=0; d<4; d++) {
+      send[2*d+0] = pack_destination[2*d+0] == Host ? my_face_dim_dir_hd[bufferIndex][d][0] : my_face_dim_dir_d[bufferIndex][d][0];
+      send[2*d+1] = pack_destination[2*d+1] == Host ? my_face_dim_dir_hd[bufferIndex][d][1] : my_face_dim_dir_d[bufferIndex][d][1];
+      ghost_buf[2*d+0] = halo_location[2*d+0] == Host ? from_face_dim_dir_hd[bufferIndex][d][0] : from_face_dim_dir_d[bufferIndex][d][0];
+      ghost_buf[2*d+1] = halo_location[2*d+1] == Host ? from_face_dim_dir_hd[bufferIndex][d][1] : from_face_dim_dir_d[bufferIndex][d][1];
+      if (pack_destination[2*d+0] != Device || pack_destination[2*d+1] != Device) fused_pack_memcpy = false;
+      if (halo_location[2*d+0] != Device || halo_location[2*d+1] != Device) fused_halo_memcpy = false;
+
+      if (pack_destination[2*d+0] == Host || pack_destination[2*d+1] == Host) pack_host = true;
+      if (halo_location[2*d+0] == Host || halo_location[2*d+1] == Host) halo_host = true;
+    }
+
+    genericPackGhost(send, *this, parity, dagger); // FIXME: label the packing location
+
+#if 1
+    size_t total_bytes = 0;
+    for (int i=0; i<nDimComms; i++) if (comm_dim_partitioned(i)) total_bytes += 2*ghost_face_bytes[i]; // 2 for fwd/bwd
+
+    if (!fused_pack_memcpy) {
+      for (int i=0; i<nDimComms; i++) {
+	if (comm_dim_partitioned(i)) {
+	  if (pack_destination[2*i+0] == Device) qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
+							    ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	  if (pack_destination[2*i+1] == Device) qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
+							    ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	}
+      }
+    } else if (total_bytes && !pack_host) {
+      qudaMemcpy(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, cudaMemcpyDeviceToHost);
+    }
+
+    if (pack_host) cudaDeviceSynchronize(); // need to make sure packing has finished before kicking off MPI
+
+    for (int i=0; i<nDimComms; i++) {
+      if (comm_dim_partitioned(i)) {
+	comm_start(mh_recv_back[bufferIndex][i]);
+	comm_start(mh_recv_fwd[bufferIndex][i]);
+	comm_start(mh_send_fwd[bufferIndex][i]);
+	comm_start(mh_send_back[bufferIndex][i]);
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_wait(mh_send_fwd[bufferIndex][i]);
+      comm_wait(mh_send_back[bufferIndex][i]);
+      comm_wait(mh_recv_back[bufferIndex][i]);
+      comm_wait(mh_recv_fwd[bufferIndex][i]);
+    }
+
+    if (!fused_halo_memcpy) {
+      for (int i=0; i<nDimComms; i++) {
+	if (!comm_dim_partitioned(i)) continue;
+	if (halo_location[2*i+0] == Device) qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+						       ghost_face_bytes[i], cudaMemcpyHostToDevice);
+	if (halo_location[2*i+1] == Device) qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
+						       ghost_face_bytes[i], cudaMemcpyHostToDevice);
+      }
+    } else if (total_bytes && !halo_host) {
+      qudaMemcpy(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice);
+    }
+#else
+    exchange(ghost_buf, send, nFace);
+#endif
   }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {

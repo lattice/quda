@@ -628,7 +628,7 @@ namespace quda {
   }
 
   void* const* ColorSpinorField::Ghost() const {
-    return ghost_fixme;
+    return ghost_buf;
   }
 
   /*

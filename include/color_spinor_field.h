@@ -279,7 +279,7 @@ namespace quda {
     mutable size_t ghost_length; // length of ghost zone
     mutable size_t ghost_norm_length; // length of ghost zone for norm
 
-    mutable void *ghost_fixme[2*QUDA_MAX_DIM];
+    mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
@@ -364,7 +364,8 @@ namespace quda {
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
      */
-    virtual void exchangeGhost(QudaParity parity, int dagger) const = 0;
+    virtual void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+			       const MemoryLocation *halo_location=nullptr, bool gdr=false) const = 0;
 
     /**
       This function returns true if the field is stored in an internal
@@ -627,11 +628,17 @@ namespace quda {
     const void* Ghost2() const { return ghost_field_tex[bufferIndex]; }
 
     /**
-       Do a ghost exchange between neighbouring nodes.  All dimensions
+       @brief Do a ghost exchange between neighbouring nodes.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
+       @param[in] parity Field parity
+       @param[in] dagger Are we packng for a dagger operator
+       @param[in] pack_destination Are we packing directly into local device memory, zero-copy memory or remote memory
+       @param[in] halo_location Will we read the halo from local device memory, zero-copy memory or remote memory
+       @param[in] gdr Will we do the exchange using GPU pointers are stage in CPU memory
      */
-    void exchangeGhost(QudaParity parity, int dagger) const;
+    void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+		       const MemoryLocation *halo_location=nullptr, bool gdr=false) const;
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
@@ -708,7 +715,18 @@ namespace quda {
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
      */
-    void exchangeGhost(QudaParity parity, int dagger) const;
+    /**
+       @brief Do a ghost exchange between neighbouring nodes.  All dimensions
+       are exchanged and no spin projection is done in the case of
+       Wilson fermions.
+       @param[in] parity Field parity
+       @param[in] dagger Are we packng for a dagger operator
+       @param[in] pack_destination Dummy for cpu variant
+       @param[in] halo_location Dummy for cpu variant
+       @param[in] gdr Dummy for cpu variant
+     */
+    void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+		       const MemoryLocation *halo_location=nullptr, bool gdr=false) const;
 
   };
 
