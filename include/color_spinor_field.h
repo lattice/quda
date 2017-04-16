@@ -742,7 +742,17 @@ namespace quda {
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
 
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger);
+  /**
+     @brief Generic ghost packing routine
+
+     @param[out] ghost Array of packed ghosts with array ordering [2*dim+dir]
+     @param[in] a Input field that is being packed
+     @param[in] parity Which parity are we packing
+     @param[in] dagger Is for a dagger operator (presently ignored)
+     @param[in[ location Array specifiying the memory location of each resulting ghost [2*dim+dir]
+  */
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
+			const int dagger, MemoryLocation *destination=nullptr);
 
 } // namespace quda
 

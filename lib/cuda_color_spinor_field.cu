@@ -1431,7 +1431,7 @@ namespace quda {
       if (halo_location[2*d+0] == Host || halo_location[2*d+1] == Host) halo_host = true;
     }
 
-    genericPackGhost(send, *this, parity, dagger); // FIXME: label the packing location
+    genericPackGhost(send, *this, parity, dagger, pack_destination); // FIXME - need support for asymmetric topologies
 
 #if 1
     size_t total_bytes = 0;

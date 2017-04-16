@@ -746,8 +746,8 @@ namespace quda {
       MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
       MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from
       for (int i=0; i<2*QUDA_MAX_DIM; i++) {
-	pack_destination[i] = policy == 1 || policy == 3 ? Host : Device;
-	halo_location[i] = policy == 2 || policy == 3 ? Host : Device;
+	pack_destination[i] = (policy == 1 || policy == 3) ? Host : Device;
+	halo_location[i] = (policy == 2 || policy == 3) ? Host : Device;
       }
       inA.exchangeGhost((QudaParity)(1-parity), dagger, pack_destination, halo_location, false);
 
