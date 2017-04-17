@@ -150,6 +150,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   inv_param->Nsteps = 2;
 
+  inv_param->compute_true_res = 1;
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
