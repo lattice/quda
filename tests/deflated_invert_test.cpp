@@ -213,7 +213,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
     inv_param.nev = 8; 
     inv_param.max_search_dim = 64;
-    inv_param.deflation_grid = 2;//to test the stuff
+    inv_param.deflation_grid = 16;//to test the stuff
     inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
     inv_param.use_reduced_vector_set = true;
@@ -404,6 +404,7 @@ int main(int argc, char **argv)
     }
 
     invertQuda(spinorOut, spinorIn, &inv_param);
+    printfQuda("\nDone for %d rhs.\n", inv_param.rhs_idx);
   }
 
   destroyDeflationQuda(df_preconditioner);    

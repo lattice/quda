@@ -80,6 +80,10 @@ namespace quda {
       report("EIGCG");
       solver = new IncEigCG(mat, matSloppy, matPrecon, param, profile);
       break;
+    case QUDA_INC_EIGCG_INVERTER:
+      report("INC EIGCG");
+      solver = new IncEigCG(mat, matSloppy, matPrecon, param, profile);
+      break;
     case QUDA_GMRESDR_INVERTER:
       report("GMRESDR");
       if (param.preconditioner) {

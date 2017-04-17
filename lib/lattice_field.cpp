@@ -19,7 +19,7 @@ namespace quda {
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
     : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
-      siteSubset(field.SiteSubset()), mem_type(field.mem_type),  ghostExchange(field.GhostExchange())
+      siteSubset(field.SiteSubset()), mem_type(field.MemType()),  ghostExchange(field.GhostExchange())
   {
     for(int dir=0; dir<nDim; ++dir) {
       x[dir] = field.X()[dir];

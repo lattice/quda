@@ -185,9 +185,13 @@ namespace quda {
     /**
        @brief Test whether the deflation space is complete
        and therefore cannot be further extended      
-       @param RV Save eigen-space vectors from here
      */
     bool is_complete() {return (param.cur_dim == param.tot_dim);}
+
+    /**
+       @brief return deflation space size
+     */
+    int size() {return param.cur_dim;}
 
 
     /**

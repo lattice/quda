@@ -222,12 +222,12 @@ namespace quda {
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
 
-    /** Type of ghost exchange to perform */
-    QudaGhostExchange ghostExchange;
-
     /**
        The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
+
+    /** Type of ghost exchange to perform */
+    QudaGhostExchange ghostExchange;
 
   public:
 
@@ -308,6 +308,11 @@ namespace quda {
        @return Field subset type
      */
     virtual QudaSiteSubset SiteSubset() const { return siteSubset; }
+
+    /**
+       @return Mem type
+     */
+    virtual QudaMemoryType MemType() const { return mem_type; }
 
     /**
        @return The vector storage length used for native fields , 2

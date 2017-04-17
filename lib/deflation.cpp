@@ -232,10 +232,14 @@ namespace quda {
 
     for(int i = 0; i < param.cur_dim; i++) vec[i] = blas::cDotProduct(param.RV->Component(i), *in);//<i, b>
 
-    magma_Xgesv(vec, param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
+    if(!param.use_inv_ritz) 
+    {
+      magma_Xgesv(vec, param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
+    } else {
+      for(int i = 0; i < param.cur_dim; i++) vec[i] *= param.invRitzVals[i];
+    }
 
     for(int i = 0; i < param.cur_dim; i++) blas::caxpy(vec[i], param.RV->Component(i), *out); //a*i+x
-
 
     if(param.RV->Precision() != x.Precision())
     {
@@ -325,15 +329,6 @@ namespace quda {
       param.matProj[i*param.ld+i] = cDotProduct(param.RV->Component(i), *Av);
 
       //off-diagonal (use multiblas):
-#if 0
-      for (int j = 0; j < i; j++)//row id
-      {
-        //
-        alpha[0] = cDotProduct(param.RV->Component(j), *Av)
-        param.matProj[i*param.ld+j] = alpha[0];
-        param.matProj[j*param.ld+i] = conj(alpha[0]);//conj
-      }
-#endif
       offset = 0;
 
       while (offset < i){
@@ -468,9 +463,9 @@ namespace quda {
      memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
 
 #ifdef MAGMA_LIB
-     cudaHostRegister(static_cast<void *>(projm), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
+     //cudaHostRegister(static_cast<void *>(projm), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
      magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
-     cudaHostUnregister(projm);
+     //cudaHostUnregister(projm);
 #else
      Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
      Map<VectorXd, Unaligned> evals_(evals, param.cur_dim);
@@ -480,7 +475,8 @@ namespace quda {
      evals_ = es.eigenvalues();
 #endif
 
-     //reset projection matrix:
+     //reset projection matrix, now we will use inverse ritz values when deflate an initial guess:
+     param.use_inv_ritz = true;
      for(int i = 0; i < param.cur_dim; i++)
      {
        if(fabs(evals[i]) > 1e-16)
@@ -500,51 +496,56 @@ namespace quda {
      csParam.is_composite  = true;
      csParam.composite_dim = max_nev;
 
-     ColorSpinorField *Vm = ColorSpinorField::Create(csParam); //search space for Ritz vectors
+checkCudaError();
 
+     ColorSpinorField *buff = ColorSpinorField::Create(csParam);
 
      int idx       = 0;
      double relerr = 0.0;
 
-     while ((relerr < tol) && (idx < max_nev))//newnev
+     while ((relerr < tol) && (idx < max_nev))
      {
        std::vector<ColorSpinorField*> rv(param.RV->Components().begin(), param.RV->Components().begin() + param.cur_dim);
        std::vector<ColorSpinorField*> res;
        res.push_back(r);
 
-       zero(*r);
+       blas::zero(*r);
 
        blas::caxpy(&projm[idx*param.ld], rv, res);
 
-       blas::copy(Vm->Component(idx), *r);
+       blas::copy(buff->Component(idx), *r);
 
-       param.matDeflation(*Av, *r);
+       if(getVerbosity() >= QUDA_VERBOSE)
+       {
+         param.matDeflation(*Av, *r);
 
-       double3 dotnorm = cDotProductNormA(*r, *Av);
+         double3 dotnorm = cDotProductNormA(*r, *Av);
 
-       double eval = dotnorm.x / dotnorm.z;
+         double eval = dotnorm.x / dotnorm.z;
 
-       blas::xpay(*Av, -eval, *r );
+         blas::xpay(*Av, -eval, *r );
 
-       double relerr = sqrt( norm2(*r) / dotnorm.z );
+         double relerr = sqrt( norm2(*r) / dotnorm.z );
 
-       if(getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
+         printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
+       }
 
        idx += 1;
      }
-
      param.ReshapeDeflationSpace(idx, param.RV->Location());//
 
      //copy all the stuff to cudaRitzVectors set:
-     for(int i = 0; i < idx; i++) blas::copy(param.RV->Component(i), Vm->Component(i));
+     for(int i = 0; i < idx; i++) blas::copy(param.RV->Component(i), buff->Component(i));
 
      //reset current dimension:
-     printfQuda("\nUsed eigenvectors: %d\n", idx);
+     printfQuda("\nReserved eigenvectors: %d\n", idx);
 
      param.cur_dim = idx;//idx never exceeds cur_dim.
 
      free(evals);
      host_free(projm);
+
+     delete buff;
 
      return;
   }

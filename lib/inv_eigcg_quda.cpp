@@ -210,11 +210,34 @@ namespace quda {
     else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
+  // set the required parameters for the initCG solver
+  static void fillInitCGSolverParam(SolverParam &inner, const SolverParam &outer) {
+    inner.iter   = 0;
+    inner.gflops = 0;
+    inner.secs   = 0;
+
+    inner.tol              = outer.tol;
+    inner.maxiter          = outer.maxiter;
+    inner.delta            = outer.delta; 
+    inner.precision        = outer.precision; // preconditioners are uni-precision solvers
+    inner.precision_sloppy = outer.precision_precondition;
+
+    inner.inv_type        = QUDA_CG_INVERTER;       // use CG solver
+    inner.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
+
+    inner.use_sloppy_partial_accumulator= true;
+  }
+
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
-    if((param.rhs_idx < param.deflation_grid))  printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
-    else  errorQuda("\nDeflation space is complete, nothing to do for the eigCG solver.\n");
+    if( param.rhs_idx < param.deflation_grid )  printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
+    else {  
+      printfQuda("\nDeflation space is complete, running initCG solver.\n");
+      fillInitCGSolverParam(Kparam, param);
+      //K = new CG(mat, matPrecon, Kparam, profile);//Preconditioned Mat has comms flag on
+      return;
+    }
 
     fillEigCGInnerSolverParam(Kparam, param);
 
@@ -252,6 +275,8 @@ namespace quda {
         delete K;
       }
       delete eigcg_args;
+    } else if (K) {
+      //delete K; //hack for the init CG solver 
     }
   }
 
@@ -501,15 +526,99 @@ namespace quda {
     return k;
   }
 
+  int IncEigCG::initCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
+    //Start init CG iterations:
+    deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
+    Deflation &defl         = *(defl_p->defl);
+
+    int k = 0;
+#if 0
+
+     double full_tol    = initCGparam.tol;
+     double restart_tol = initCGparam.tol_restart;
+
+     ColorSpinorParam cudaParam(b);
+
+     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+
+     cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam);
+     cudaColorSpinorField tmp (*W, cudaParam);
+
+     Defl(x, b);
+
+     int restart_idx  = 0;
+
+     //launch initCG:
+     while((restart_tol > full_tol) && (restart_idx < param.max_restart_num))//currently just one restart, think about better algorithm for the restarts.
+     {
+       Kparam.tol = restart_tol;
+
+       K = new CG(*mat, *matCGSloppy, Kparam, *profile);
+
+       (*K)(x, b);
+
+       
+
+       //delete initCG;
+       mat(*W, x, tmp);
+
+       blas::xpay(b, -1, *W);
+
+       Defl(*x, *W);
+
+       if(getVerbosity() >= QUDA_VERBOSE)  printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
+         double new_restart_tol = restart_tol*param.inc_tol;
+
+       restart_tol = (new_restart_tol > full_tol) ? new_restart_tol : full_tol;
+
+       restart_idx += 1;
+       param.secs   += Kparam.secs;
+     }
+
+     Kparam.tol = full_tol;
+
+      K = new CG(*mat, *matCGSloppy, initCGparam, *profile);
+
+        (*initCG)(*out, *in);
+
+        delete initCG;
+
+        if(getVerbosity() >= QUDA_VERBOSE)
+        {
+            printfQuda("\ninitCG total stat (%d restarts): %i iter / %g secs = %g Gflops. \n", restart_idx, initCGparam.iter, initCGparam.secs, initCGparam.gflops);
+        }
+
+        //copy solver statistics:
+        param.iter   += initCGparam.iter;
+        //
+        param.secs   += initCGparam.secs;
+        //
+        param.gflops += initCGparam.gflops;
+
+        delete W;
+
+#else
+    x = b;
+#endif
+
+    return k;
+  }
+
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
      const bool mixed_prec = (param.precision != param.precision_sloppy);
      const double b2 = norm2(in);
 
-     //deflate initial guess ('out'-field):
      deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
      Deflation &defl         = *(defl_p->defl);
 
+     //If deflation space is complete: use initCG solver
+     if( defl.is_complete() ) {
+        initCGsolve(out, in);
+        return;
+     }
+
+     //Start (incremental) eigCG solver:
      ColorSpinorParam csParam(in);
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
@@ -518,7 +627,7 @@ namespace quda {
      ColorSpinorField *rp = ColorSpinorField::Create(csParam);//full precision residual
      ColorSpinorField &r = *rp;
 
-    //y = out; r = in;
+     //deflate initial guess ('out'-field):
      mat(r, out, e);
      //
      double r2 = xmyNorm(in, r);
@@ -539,6 +648,7 @@ namespace quda {
 
      const double stop = b2*param.tol*param.tol;
      //start iterative refinement cycles (or just one eigcg call for full (solo) precision solver):
+     int logical_rhs_num = 0;
      do {
        rProj = r;
        blas::zero(eProj);
@@ -548,7 +658,10 @@ namespace quda {
 
        int iters = eigCGsolve(eSloppy, rSloppy);
 
-       if( eigcg_args->restarts > 0 && !defl.is_complete()) defl.increment(*Vm, param.nev);
+       if( eigcg_args->restarts > 0 && !defl.is_complete()) { 
+         defl.increment(*Vm, param.nev);
+         logical_rhs_num = +1;
+       }
        // use mixed blas ??
        e = eSloppy;
        blas::xpy(e, out);
@@ -578,7 +691,17 @@ namespace quda {
        delete rp_sloppy;
      }
 
-     param.rhs_idx += 1;
+     param.rhs_idx += logical_rhs_num;
+
+     if(defl.is_complete()) {
+       if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
+       if(Vm) delete Vm;//safe some space
+       Vm = nullptr;
+
+       const int max_nev = defl.size();//param.m;
+       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);
+       defl.reduce(param.eigenval_tol, max_nev);
+     }
 
      return;
   }
