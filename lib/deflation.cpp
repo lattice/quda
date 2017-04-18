@@ -32,6 +32,7 @@ namespace quda {
       ColorSpinorParam csParam(param.RV->Component(0));
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.location = param.location;
+      csParam.mem_type = QUDA_MEMORY_DEVICE;
       if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
 	// all coarse GPU vectors use FLOAT2 ordering
 	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION ) ?  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
@@ -216,6 +217,8 @@ namespace quda {
       ColorSpinorParam csParam(param.RV->Component(0));
       //Create an eigenvector set:
       csParam.create   = QUDA_ZERO_FIELD_CREATE;
+      //
+      csParam.mem_type = QUDA_MEMORY_DEVICE;
       //
       in   = ColorSpinorField::Create(csParam);
       out  = ColorSpinorField::Create(csParam);
@@ -495,8 +498,6 @@ namespace quda {
      //csParam.setPrecision(search_space_prec);//eigCG internal search space precision: must be adjustable.
      csParam.is_composite  = true;
      csParam.composite_dim = max_nev;
-
-checkCudaError();
 
      ColorSpinorField *buff = ColorSpinorField::Create(csParam);
 

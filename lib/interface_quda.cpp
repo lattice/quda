@@ -2299,6 +2299,15 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
     ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   }
 
+  int ritzVolume = 1;
+  for(int d = 0; d < ritzParam.nDim; d++) ritzVolume *= ritzParam.x[d];
+
+  size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.precision);
+  
+  printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)" , byte_estimate, ritzVolume, ritzParam.precision);
+
+  //ritzParam.mem_type = QUDA_MEMORY_MAPPED;
+
   RV = ColorSpinorField::Create(ritzParam);
 
   deflParam = new DeflationParam(eig_param, RV, *m);

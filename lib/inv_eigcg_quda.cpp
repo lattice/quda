@@ -672,7 +672,7 @@ namespace quda {
 
        if( eigcg_args->restarts > 0 && !defl.is_complete()) { 
          defl.increment(*Vm, param.nev);
-         logical_rhs_num = +1;
+         logical_rhs_num += 1;
        }
        // use mixed blas ??
        e = eSloppy;
