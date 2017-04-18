@@ -93,7 +93,7 @@ static bool InitMagma = false;
 void openMagma() {
 
   if (!InitMagma) {
-    BlasMagmaArgs::OpenMagma();
+    OpenMagma();
     InitMagma = true;
   } else {
     printfQuda("\nMAGMA library was already initialized..\n");
@@ -104,7 +104,7 @@ void openMagma() {
 void closeMagma(){
 
   if (InitMagma) {
-    BlasMagmaArgs::CloseMagma();
+    CloseMagma();
     InitMagma = false;
   } else {
     printfQuda("\nMAGMA library was not initialized..\n");

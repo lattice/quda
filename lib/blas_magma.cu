@@ -350,8 +350,7 @@
   }
 
 
-  void BlasMagmaArgs::OpenMagma(){
-
+  void OpenMagma(){
 #ifdef MAGMA_LIB
     magma_int_t err = magma_init();
 
@@ -364,18 +363,15 @@
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif
-
     return;
   }
 
-  void BlasMagmaArgs::CloseMagma(){
-
+  void CloseMagma(){
 #ifdef MAGMA_LIB
     if(magma_finalize() != MAGMA_SUCCESS) errorQuda("\nError: cannot close MAGMA library\n");
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif
-
     return;
   }
 
@@ -396,7 +392,7 @@
 #define FLOPS_ZGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 #define FLOPS_CGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 
-void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch)
+void magma_batchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch, const int prec)
 {
 #ifdef MAGMA_LIB
   printfQuda("%s with n=%d and batch=%d\n", __func__, n, batch);

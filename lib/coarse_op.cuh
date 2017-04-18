@@ -1470,8 +1470,7 @@ namespace quda {
 
       // invert the clover matrix field
       const int n = X_h->Ncolor();
-      BlasMagmaArgs magma(X_h->Precision());
-      magma.BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume());
+      magma_batchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X_h->Precision());
     }
 
     // now exchange Y halos for multi-process dslash
