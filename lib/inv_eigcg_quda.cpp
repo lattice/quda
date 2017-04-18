@@ -591,6 +591,8 @@ namespace quda {
     (*K)(x, b);
     delete K;
 
+    K = nullptr;
+
     if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
     //
     param.secs   += Kparam.secs;
@@ -619,6 +621,8 @@ namespace quda {
 
      //If deflation space is complete: use initCG solver
      if( defl.is_complete() ) {
+
+        if(K) errorQuda("\nInitCG does not (yet) support preconditioning.\n");
 
         int iters = initCGsolve(out, in);
         param.iter += iters;
