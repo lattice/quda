@@ -225,7 +225,7 @@ namespace quda {
     inner.inv_type        = QUDA_CG_INVERTER;       // use CG solver
     inner.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
 
-    inner.use_sloppy_partial_accumulator= true;
+    inner.use_sloppy_partial_accumulator= outer.use_sloppy_partial_accumulator;
   }
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
@@ -531,75 +531,80 @@ namespace quda {
     deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
     Deflation &defl         = *(defl_p->defl);
 
-    int k = 0;
-#if 0
+    double full_tol    = Kparam.tol;
+    double restart_tol = Kparam.tol_restart;
 
-     double full_tol    = initCGparam.tol;
-     double restart_tol = initCGparam.tol_restart;
+    ColorSpinorParam csParam(x);
 
-     ColorSpinorParam cudaParam(b);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorField *tmpp2 = ColorSpinorField::Create(csParam);//full precision accumulator
+    ColorSpinorField &tmp2  = *tmpp2;
+    ColorSpinorField *rp = ColorSpinorField::Create(csParam);//full precision residual
+    ColorSpinorField &r = *rp;
 
-     cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam);
-     cudaColorSpinorField tmp (*W, cudaParam);
+    csParam.setPrecision(param.precision_ritz);
 
-     Defl(x, b);
+    ColorSpinorField *xp_proj =  ( param.precision_ritz == param.precision ) ? &x : ColorSpinorField::Create(csParam);
+    ColorSpinorField &xProj = *xp_proj;
 
-     int restart_idx  = 0;
+    ColorSpinorField *rp_proj =  ( param.precision_ritz == param.precision ) ? rp : ColorSpinorField::Create(csParam);
+    ColorSpinorField &rProj = *rp_proj;
 
-     //launch initCG:
-     while((restart_tol > full_tol) && (restart_idx < param.max_restart_num))//currently just one restart, think about better algorithm for the restarts.
-     {
-       Kparam.tol = restart_tol;
+    int restart_idx  = 0;
+    int k            = 0;
 
-       K = new CG(*mat, *matCGSloppy, Kparam, *profile);
+    xProj = x;
+    rProj = b; 
+    //launch initCG:
+    while((restart_tol > full_tol) && (restart_idx < param.max_restart_num)) {//currently just one restart, think about better algorithm for the restarts.
 
-       (*K)(x, b);
+      defl(xProj, rProj);
+      x = xProj;      
 
-       
+      Kparam.tol = (restart_tol > full_tol) ? restart_tol : full_tol;
 
-       //delete initCG;
-       mat(*W, x, tmp);
+      K = new CG(mat, matPrecon, Kparam, profile);
+      (*K)(x, b);
+      delete K;
 
-       blas::xpay(b, -1, *W);
+      mat(r, x, tmp2);
+      blas::xpay(b, -1.0, r);
 
-       Defl(*x, *W);
+      xProj = x;
+      rProj = r; 
 
-       if(getVerbosity() >= QUDA_VERBOSE)  printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
-         double new_restart_tol = restart_tol*param.inc_tol;
+      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
 
-       restart_tol = (new_restart_tol > full_tol) ? new_restart_tol : full_tol;
+      restart_tol *= param.inc_tol;
+      restart_idx += 1;
 
-       restart_idx += 1;
-       param.secs   += Kparam.secs;
-     }
+      param.secs   += Kparam.secs;
+    }
 
-     Kparam.tol = full_tol;
+    defl(xProj, rProj);
+    x = xProj;      
 
-      K = new CG(*mat, *matCGSloppy, initCGparam, *profile);
+    Kparam.tol = full_tol;
 
-        (*initCG)(*out, *in);
+    K = new CG(mat, matPrecon, Kparam, profile);
+    (*K)(x, b);
+    delete K;
 
-        delete initCG;
+    if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
+    //
+    param.secs   += Kparam.secs;
+    param.gflops += Kparam.gflops;
 
-        if(getVerbosity() >= QUDA_VERBOSE)
-        {
-            printfQuda("\ninitCG total stat (%d restarts): %i iter / %g secs = %g Gflops. \n", restart_idx, initCGparam.iter, initCGparam.secs, initCGparam.gflops);
-        }
+    k   += Kparam.iter;
 
-        //copy solver statistics:
-        param.iter   += initCGparam.iter;
-        //
-        param.secs   += initCGparam.secs;
-        //
-        param.gflops += initCGparam.gflops;
+    delete rp;
+    delete tmpp2;
 
-        delete W;
-
-#else
-    x = b;
-#endif
+    if( param.precision_ritz != param.precision ) {
+      delete xp_proj;
+      delete rp_proj;
+    }
 
     return k;
   }
@@ -614,7 +619,10 @@ namespace quda {
 
      //If deflation space is complete: use initCG solver
      if( defl.is_complete() ) {
-        initCGsolve(out, in);
+
+        int iters = initCGsolve(out, in);
+        param.iter += iters;
+
         return;
      }
 
