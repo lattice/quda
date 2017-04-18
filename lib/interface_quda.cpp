@@ -789,7 +789,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
   clover_param.twisted = twisted;
-  clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  if (inv_param->twist_flavor == QUDA_TWIST_SINGLET)
+    clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  else 
+    clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*(inv_param->mu*inv_param->mu - inv_param->epsilon*inv_param->epsilon): 0.0;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
   clover_param.pad = inv_param->cl_pad;
