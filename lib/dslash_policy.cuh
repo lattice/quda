@@ -1833,7 +1833,7 @@ struct DslashFactory {
 	 bool p2p = comm_peer2peer_enabled_global();
 	 config+=p2p;
 
-	 if (!p2p) {
+	 if (!p2p && 0) {
 	   policy.push_back(QUDA_ZERO_COPY_DSLASH);
 	   policy.push_back(QUDA_FUSED_ZERO_COPY_DSLASH);
 	 }
