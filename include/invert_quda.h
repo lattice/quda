@@ -866,6 +866,7 @@ namespace quda {
     virtual ~IncEigCG();
 
     void RestartVT(const double beta, const double rho);
+    void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2); 
     //EigCG solver:
     int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //InitCG solver:

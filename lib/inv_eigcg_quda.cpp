@@ -44,6 +44,8 @@ namespace quda {
 
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
 
+   static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow? 
+
    class EigCGArgs{
 
      public:
@@ -58,19 +60,42 @@ namespace quda {
 
        int m;
        int k;
+       int id;//cuurent search spase index
 
        int restarts;
        double global_stop;
+  
+       bool idle_cycle;
 
        EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
-       m(m), k(k), restarts(0), global_stop(0.0) { }
+       m(m), k(k), id(0), restarts(0), global_stop(0.0), idle_cycle(false) { }
 
        ~EigCGArgs() { }
 
-      //methods for constructing Lanczos matrix :
-       inline void ResetArgs() { Tm.setZero(); Tmvals.setZero(); ritzVecs.setZero();}
+       //method for constructing Lanczos matrix :
+       inline void SetLanczos(Complex diag_val, Complex offdiag_val) { 
+         if(idle_cycle) return;
 
-       template<int diag>  inline void SetLanczos(int idx, Complex val){ Tm.diagonal<diag>()[idx] = val; }
+         Tm.diagonal<0>()[id] = diag_val; 
+
+         if (id < (m-1)){ //Load Lanczos off-diagonals:
+           Tm.diagonal<+1>()[id] = offdiag_val; 
+           Tm.diagonal<-1>()[id] = offdiag_val; 
+         }
+
+         id += 1;
+
+         return;
+       }
+
+       inline void ResetArgs() { 
+         id = 0;
+         Tm.setZero(); 
+         Tmvals.setZero(); 
+         ritzVecs.setZero();
+       }
+
+       inline void ResetSearchIdx() {  id = 2*k;  restarts += 1; }
 
        void RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const double inv_sqrt_r2)
        {
@@ -111,6 +136,7 @@ namespace quda {
 
         return;
       }
+
    };
 
    //Rayleigh Ritz procedure:
@@ -323,6 +349,27 @@ namespace quda {
     return;
   }
 
+  void IncEigCG::UpdateVm(ColorSpinorField &res, double beta, double sqrtr2)
+  {
+    EigCGArgs &args = *eigcg_args;
+
+    if(args.idle_cycle) return;//nothing to be done here!
+
+    if (args.id == param.m){//Begin Rayleigh-Ritz block: 
+      //
+      RestartVT(beta, sqrtr2);
+      args.ResetSearchIdx();
+    } else if (args.id == (param.m-1)) {
+      blas::copy(*Az, *Ap);//save current mat-vec result if ready for the restart in the next cycle
+    }
+
+    //load Lanczos basis vector:
+    blas::copy(Vm->Component(args.id), res);//convert arrays
+    //rescale the vector
+    blas::ax(1.0 / sqrtr2, Vm->Component(args.id));
+    
+    return;
+  }
 
 /*
  * This is a solo precision solver.
@@ -426,13 +473,15 @@ namespace quda {
     double pAp;
     double alpha=1.0, alpha_inv=1.0, beta=0.0, alpha_old_inv = 1.0;
 
+    double lanczos_diag, lanczos_offdiag;
+
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     blas::flops = 0;
 
     double rMinvr = blas::reDotProduct(r,*z);
     //Begin EigCG iterations:
-    int k=0, l=0;
+    int k=0;
     args.restarts = 0;
 
     PrintStats("eigCG", k, r2, b2, heavy_quark_res);
@@ -447,19 +496,9 @@ namespace quda {
       alpha         = rMinvr / pAp;
       alpha_inv     = 1.0 / alpha;
 
-      if (l == param.m){//Begin Rayleigh-Ritz block: 
-         //
-         RestartVT(beta, sqrt(r2));
-         l = 2*args.k;
-         //
-         args.restarts += 1;
-      }
-      //load Lanczos basis vector:
-      blas::copy(Vm->Component(l), *z);//convert arrays
-      //rescale the vector
-      blas::ax(1.0 / sqrt(r2), Vm->Component(l));
-      //Load Lanczos diagonal (off-diagonals will be loaded after beta computation)
-      args.SetLanczos<0>(l, (alpha_inv + beta*alpha_old_inv));
+      lanczos_diag  = (alpha_inv + beta*alpha_old_inv);
+
+      UpdateVm(*z, beta, sqrt(r2));
 
       r2 = blas::axpyNorm(-alpha, *Ap, r);
       if( K ) {//apply preconditioner
@@ -477,15 +516,10 @@ namespace quda {
       rMinvr = K ? blas::reDotProduct(r,*z) : r2;
       beta                = rMinvr / rMinvr_old;
       blas::axpyZpbx(alpha, *p, y, *z, beta);
-      //
-      l += 1;
 
-      if ( l == param.m )  blas::copy(*Az, *Ap);//save previous mat-vec result if ready for the restart 
-      else { //Load Lanczos off-diagonals:
-        double off_diagonal = (-sqrt(beta)*alpha_inv);
-        args.SetLanczos<+1>(l-1,off_diagonal);
-        args.SetLanczos<-1>(l-1,off_diagonal);
-      }
+      //
+      lanczos_offdiag  = (-sqrt(beta)*alpha_inv);
+      args.SetLanczos(lanczos_diag, lanczos_offdiag);
 
       k++;
 
@@ -493,6 +527,8 @@ namespace quda {
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
       converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(r2, heavy_quark_res, local_stop, param.tol_hq);
     }
+
+    args.ResetArgs();//eigCG cycle finished.
 
     blas::xpy(y, x);
 
@@ -660,7 +696,8 @@ namespace quda {
 
      const double stop = b2*param.tol*param.tol;
      //start iterative refinement cycles (or just one eigcg call for full (solo) precision solver):
-     int logical_rhs_num = 0;
+     int logical_rhs_id = 0;
+     bool eigcg_cycle    = true; 
      do {
        rProj = r;
        blas::zero(eProj);
@@ -670,9 +707,29 @@ namespace quda {
 
        int iters = eigCGsolve(eSloppy, rSloppy);
 
-       if( eigcg_args->restarts > 0 && !defl.is_complete()) { 
+       bool update_ritz = eigcg_cycle && (eigcg_args->restarts > 0) && !defl.is_complete() && (logical_rhs_id < max_eigcg_cycles); //too uglyyy
+
+       if( update_ritz ) { 
+
          defl.increment(*Vm, param.nev);
-         logical_rhs_num += 1;
+         logical_rhs_id += 1;
+
+       } else { //run PCG instead
+
+         if (param.inv_type_precondition != QUDA_INVALID_INVERTER) {
+
+           if (param.precision_precondition != param.precision_sloppy) {
+             csParam.setPrecision(param.precision_precondition);
+             p_pre = ColorSpinorField::Create(csParam);
+             r_pre = ColorSpinorField::Create(csParam);
+           }
+ 
+           param.inv_type_precondition = QUDA_CG_INVERTER;
+           K = new CG(matPrecon, matPrecon, Kparam, profile);
+           //param.inv_type_precondition = QUDA_MR_INVERTER;
+           //K = new MR(matPrecon, matPrecon, Kparam, profile);
+         }
+         eigcg_cycle = false;
        }
        // use mixed blas ??
        e = eSloppy;
@@ -687,7 +744,7 @@ namespace quda {
        param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
        PrintSummary("EigCG:", iters, r2, b2);
 
-       if( eigcg_args->restarts > 0 && !defl.is_complete()) defl.verify();
+       if( eigcg_cycle &&  (eigcg_args->restarts > 0) && !defl.is_complete() ) defl.verify();
      } while ((r2 > stop) && mixed_prec);
 
      if( ep_proj != ep && ep_proj != ep_sloppy ) {
@@ -703,7 +760,8 @@ namespace quda {
        delete rp_sloppy;
      }
 
-     param.rhs_idx += logical_rhs_num;
+     max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
+     param.rhs_idx += logical_rhs_id;
 
      if(defl.is_complete()) {
        if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
