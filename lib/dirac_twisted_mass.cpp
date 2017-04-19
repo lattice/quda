@@ -248,6 +248,8 @@ namespace quda {
     
         twistGamma5Cuda(static_cast<cudaColorSpinorField*>(doubletTmp),
 			&static_cast<const cudaColorSpinorField&>(in), dagger, a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a      
+
+	// this is just a vectorized Wilson dslash
         NdegTwistedDslash(out, *doubletTmp, parity, QUDA_NONDEG_DSLASH, 0.0, 0.0, 1.0, 0.0);
 
         flops += 1440ll*in.Volume();//as for the asymmetric case
@@ -293,6 +295,8 @@ namespace quda {
         twistGamma5Cuda(static_cast<cudaColorSpinorField*>(doubletTmp),
 			&static_cast<const cudaColorSpinorField&>(in),
 			dagger, -a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a
+
+	// this is just a vectorized Wilson dslash
         NdegTwistedDslashXpay(out, *doubletTmp, x, parity, QUDA_NONDEG_DSLASH, 0.0, 0.0, k, 0.0);
         flops += 1464ll*in.Volume();
         deleteTmp(&doubletTmp, reset);	  
