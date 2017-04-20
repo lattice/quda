@@ -4,6 +4,7 @@
 #include <cub/cub.cuh>
 #include <typeinfo>
 #include <multigrid_helper.cuh>
+#include <fast_intdiv.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 #define SWIZZLE
@@ -28,7 +29,7 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the input field (if single parity)
     const int nParity; // number of parities of input fine field
-    int swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
+    int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
 
     RestrictArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
 		const int *fine_to_coarse, const int *coarse_to_fine, int parity)
