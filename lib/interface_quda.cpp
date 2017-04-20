@@ -1414,7 +1414,8 @@ namespace quda {
 
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    bool comms_flag = (param.inv_type != QUDA_INC_EIGCG_INVERTER) ?  false : (param.rhs_idx < param.deflation_grid) ? false : true ;
+    //bool comms_flag = (param.inv_type != QUDA_INC_EIGCG_INVERTER) ?  false : (param.rhs_idx < param.deflation_grid) ? false : true ;
+    bool comms_flag = (param.inv_type != QUDA_INC_EIGCG_INVERTER) ?  false : true ;//inc eigCG needs 2 sloppy precisions.
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator

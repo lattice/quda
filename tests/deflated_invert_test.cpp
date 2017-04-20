@@ -253,7 +253,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  inv_param.reliable_delta = 1e-1;
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
@@ -388,7 +388,7 @@ int main(int argc, char **argv)
   void *df_preconditioner  = newDeflationQuda(&df_param);
   inv_param.deflation_op   = df_preconditioner;
 
-  const int nSrc = 16;
+  const int nSrc = 8;
   for (int i=0; i<nSrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);

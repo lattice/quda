@@ -76,7 +76,7 @@ namespace quda {
         if(matProj) delete[]  matProj;
         if(invRitzVals)       delete[]  invRitzVals;
      }
-
+#if 0 //we cannot reshape the set here.
      void ReshapeDeflationSpace(const int new_dim, QudaFieldLocation location, QudaPrecision new_ritz_prec = QUDA_INVALID_PRECISION)//reset param.ritz_prec?
      {
         if(new_dim > tot_dim || (new_dim == cur_dim && new_ritz_prec == QUDA_INVALID_PRECISION)) return;//nothing to do
@@ -103,6 +103,7 @@ namespace quda {
 
         return;
      }
+#endif
 
   };
 
@@ -121,11 +122,18 @@ namespace quda {
     /** Prefix label used for printf*/
     char prefix[128];
 
-    /** Residual vector */
+    /** High precision aux field */
     ColorSpinorField *r;
 
-    /** Deflation matrix operation result */
+    /** High precision aux field */
     ColorSpinorField *Av;
+
+    /** Ritz precision residual vector */
+    ColorSpinorField *r_sloppy;
+
+    /** Deflation matrix operation result */
+    ColorSpinorField *Av_sloppy;
+
 
   public:
     /** 

@@ -8,7 +8,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
-#define USE_BLOCK_DEFLATION
+//#define USE_BLOCK_DEFLATION
 
 namespace quda {  
 
@@ -21,28 +21,41 @@ namespace quda {
 
   Deflation::Deflation(DeflationParam &param, TimeProfile &profile)
     : param(param),   profile(profile),
-      r(nullptr), Av(nullptr) {
+      r(nullptr), Av(nullptr), r_sloppy(nullptr), Av_sloppy(nullptr) {
 
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     printfQuda("Creating deflation space of %d vectors.\n", param.tot_dim);
 
     if( param.eig_global.import_vectors ) loadVectors(param.RV);//whether to load eigenvectors
-    // create residual vector
-    {
-      ColorSpinorParam csParam(param.RV->Component(0));
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.location = param.location;
-      csParam.mem_type = QUDA_MEMORY_DEVICE;
-      if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
-	// all coarse GPU vectors use FLOAT2 ordering
-	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION ) ?  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-	csParam.setPrecision(csParam.precision);
-	csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      }
+    // create aux fields
+    ColorSpinorParam csParam(param.RV->Component(0));
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.location = param.location;
+    csParam.mem_type = QUDA_MEMORY_DEVICE;
+    csParam.setPrecision(QUDA_DOUBLE_PRECISION);//accum fields always full precision
 
-      r  = ColorSpinorField::Create(csParam);
-      Av = ColorSpinorField::Create(csParam);
+    if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
+      // all coarse GPU vectors use FLOAT2 ordering
+      csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     }
+
+    r  = ColorSpinorField::Create(csParam);
+    Av = ColorSpinorField::Create(csParam);
+
+    if(param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ) { //allocate sloppy fields
+
+      csParam.setPrecision(param.eig_global.cuda_prec_ritz);//accum fields always full precision
+      if (csParam.location==QUDA_CUDA_FIELD_LOCATION) csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+
+      r_sloppy  = ColorSpinorField::Create(csParam);
+      Av_sloppy = ColorSpinorField::Create(csParam);
+
+    } else {
+      r_sloppy  = r;
+      Av_sloppy = Av;
+    }
+    
 
     printfQuda("Deflation space setup completed\n");
     // now we can run through the verification if requested
@@ -52,8 +65,15 @@ namespace quda {
   }
 
   Deflation::~Deflation() {
+
+    if( param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ) {
+      if (r_sloppy) delete r_sloppy;
+      if (Av_sloppy) delete Av_sloppy;
+    }
+
     if (r)  delete r;
     if (Av) delete Av;
+
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
   }
 
@@ -98,19 +118,21 @@ namespace quda {
 
     for(int i = 0; i < nevs_to_print; i++)
     {
-       blas::caxpy(&projm[i*param.ld], rv, res);//use multiblas here
+       zero(*r);
 
-       param.matDeflation(*Av, *r);
+       blas::caxpy(&projm[i*param.ld], rv, res);//multiblas
 
-       double3 dotnorm = cDotProductNormA(*r, *Av);
+       *r_sloppy = *r;
+
+       param.matDeflation(*Av_sloppy, *r_sloppy);
+
+       double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
 
        double eval = dotnorm.x / dotnorm.z;
 
-       blas::xpay(*Av, -eval, *r );
+       blas::xpay(*Av_sloppy, -eval, *r_sloppy );
 
-       double relerr = sqrt( norm2(*r) / dotnorm.z );
-
-       zero(*r);
+       double relerr = sqrt( norm2(*r_sloppy) / dotnorm.z );
 
        printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i+1, eval, relerr);
     }
@@ -119,8 +141,6 @@ namespace quda {
 
     return;
   }
-
-#ifdef USE_BLOCK_DEFLATION
 
   void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
 
@@ -135,11 +155,12 @@ namespace quda {
 
     printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", sqrt(check_nrm2), param.cur_dim);
 
-    if(param.RV->Precision() != x.Precision() || param.RV->Precision() != b.Precision() ) errorQuda("\nMixing precisions is not supported yet.\n");
-
     const int cdot_length  = 4;
 
     int offset = 0;
+
+    ColorSpinorField *b_sloppy = param.RV->Precision() != b.Precision() ? r_sloppy : &b;
+    *b_sloppy = b;
 
     //Warning! this won't work with arbitrary param.cur_dim, so pipelining is needed, also must be generalized for CPU fields
     do{
@@ -154,7 +175,7 @@ namespace quda {
       for(int i = 0; i < local_length; i++)
       {
         rv_.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(offset+i)));
-        in_.push_back(static_cast<cudaColorSpinorField*>(&b));
+        in_.push_back(static_cast<cudaColorSpinorField*>(b_sloppy));
       }
 
       //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
@@ -187,7 +208,7 @@ namespace quda {
     std::vector<ColorSpinorField*> out_;
     out_.push_back(&x);
 
-    blas::caxpy(vec, rv_, out_); 
+    blas::caxpy(vec, rv_, out_); //multiblas
 
     check_nrm2 = norm2(x);
     printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
@@ -196,72 +217,6 @@ namespace quda {
 
     return;
   }
-
-#else
-
-  void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    blas::zero(x);
-    if(param.cur_dim == 0) return;//nothing to do
-
-    Complex  *vec   = new Complex[param.ld];
-
-    double check_nrm2 = blas::norm2(b);
-    printfQuda("\nSource norm (gpu): %1.15e\n", sqrt(check_nrm2));
-
-    ColorSpinorField *in  = nullptr;
-    ColorSpinorField *out = nullptr;
-
-    if(param.RV->Precision() != x.Precision())
-    {
-
-      ColorSpinorParam csParam(param.RV->Component(0));
-      //Create an eigenvector set:
-      csParam.create   = QUDA_ZERO_FIELD_CREATE;
-      //
-      csParam.mem_type = QUDA_MEMORY_DEVICE;
-      //
-      in   = ColorSpinorField::Create(csParam);
-      out  = ColorSpinorField::Create(csParam);
-      //
-      blas::copy(*out, x);
-      blas::copy(*in, b);
-
-    }
-    else
-    {
-       in  = &b;
-       out = &x;
-    }
-
-    for(int i = 0; i < param.cur_dim; i++) vec[i] = blas::cDotProduct(param.RV->Component(i), *in);//<i, b>
-
-    if(!param.use_inv_ritz) 
-    {
-      magma_Xgesv(vec, param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
-    } else {
-      for(int i = 0; i < param.cur_dim; i++) vec[i] *= param.invRitzVals[i];
-    }
-
-    for(int i = 0; i < param.cur_dim; i++) blas::caxpy(vec[i], param.RV->Component(i), *out); //a*i+x
-
-    if(param.RV->Precision() != x.Precision())
-    {
-      blas::copy(x, *out);
-
-      delete in;
-      delete out;
-    }
-
-    check_nrm2 = blas::norm2(x);
-    printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
-
-    delete [] vec;
-
-    return;
-  }
-#endif
-
-#ifdef USE_BLOCK_DEFLATION
 
   void Deflation::increment(ColorSpinorField &Vm, int nev) {
 
@@ -290,6 +245,9 @@ namespace quda {
 
       int offset = 0;
 
+      ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &param.RV->Component(i);
+      *accum = param.RV->Component(i);
+
       //Warning! this won't work with arbitrary param.cur_dim, so pipelining is needed, also must be generalized for CPU fields
       while (offset < i) {
         
@@ -305,6 +263,7 @@ namespace quda {
         {
           vj_local.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(offset+j)));
           vi_local.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(i)));
+          //vi_local.push_back(static_cast<cudaColorSpinorField*>(accum));
           alpha[j] = 0.0;
         }
 
@@ -313,7 +272,8 @@ namespace quda {
 
         std::vector<ColorSpinorField*> vj_global(param.RV->Components().begin()+offset, param.RV->Components().begin()+offset+local_length);
         std::vector<ColorSpinorField*> vi_global;
-        vi_global.push_back(&param.RV->Component(i));
+        //vi_global.push_back(&param.RV->Component(i));
+        vi_global.push_back(accum);
 
         for(int j = 0; j < local_length; j++) alpha[j] = -alpha[j]; 
 
@@ -322,14 +282,20 @@ namespace quda {
         offset += cdot_pipeline_length;
       }
 
-      alpha[0] = blas::norm2(param.RV->Component(i));
+      //alpha[0] = blas::norm2(param.RV->Component(i));
+      alpha[0] = blas::norm2(*accum);
 
-      if(alpha[0].real() > 1e-16) blas::ax(1.0 /sqrt(alpha[0].real()), param.RV->Component(i));
+      //if(alpha[0].real() > 1e-16) blas::ax(1.0 /sqrt(alpha[0].real()), param.RV->Component(i));
+      if(alpha[0].real() > 1e-16) blas::ax(1.0 /sqrt(alpha[0].real()), *accum);
       else                        errorQuda("\nCannot orthogonalize %dth vector\n", i);
 
-      param.matDeflation(*Av, param.RV->Component(i));//precision must match!
+      param.RV->Component(i) = *accum;
+
+      param.matDeflation(*Av_sloppy, param.RV->Component(i));//precision must match!
       //load diagonal:
-      param.matProj[i*param.ld+i] = cDotProduct(param.RV->Component(i), *Av);
+      //param.matProj[i*param.ld+i] = cDotProduct(param.RV->Component(i), *Av);
+      *Av = *Av_sloppy; 
+      param.matProj[i*param.ld+i] = cDotProduct(*accum, *Av);
 
       //off-diagonal (use multiblas):
       offset = 0;
@@ -346,7 +312,8 @@ namespace quda {
         for(int j = 0; j < local_length; j++)
         {
           vj_local.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(offset+j)));
-          av_local.push_back(static_cast<cudaColorSpinorField*>(Av));
+          av_local.push_back(static_cast<cudaColorSpinorField*>(Av_sloppy));
+          //av_local.push_back(static_cast<cudaColorSpinorField*>(Av));
           alpha[j] = 0.0;
         }
 
@@ -373,84 +340,6 @@ namespace quda {
     return;
   }
 
-#else
-
-  void Deflation::increment(ColorSpinorField &Vm, int newnevs)
-  {
-    printfQuda("\nConstruct projection matrix..\n");
-
-    int addednev = 0;
-
-    const int first_idx = param.cur_dim;
-
-    //if((newnevs + dpar->cur_dim) > dpar->ld) errorQuda("\nIncorrect deflation space...\n"); //nothing to do...
-    if(param.RV->CompositeDim() < (first_idx+newnevs) || param.tot_dim < (first_idx+newnevs)) { 
-      warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", newnevs);
-      return;
-    }
-
-    for(int i = 0; i < newnevs; i++) copy(param.RV->Component(first_idx+i), Vm.Component(i));
-
-    //GS orthogonalization
-    Complex alpha;
-
-    for(int i = param.cur_dim; i < (param.cur_dim + newnevs); i++)
-    {
-      for(int j = 0; j < i; j++)
-      {
-        alpha = cDotProduct(param.RV->Component(j), param.RV->Component(i));//<j,i>
-        Complex scale = Complex(-alpha.real(), -alpha.imag());
-        caxpy(scale, param.RV->Component(j), param.RV->Component(i)); //i-<j,i>j
-      }
-
-      alpha = norm2(param.RV->Component(i));
-      if(alpha.real() > 1e-16)
-      {
-        ax(1.0 /sqrt(alpha.real()), param.RV->Component(i));
-        addednev += 1;
-      }
-      else
-      {
-        errorQuda("\nCannot orthogonalize %dth vector\n", i);
-      }
-    }
-
-    ColorSpinorParam csParam(param.RV->Component(0));
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-    ColorSpinorField *W     = ColorSpinorField::Create(csParam);//?
-    ColorSpinorField *tmp  = ColorSpinorField::Create(csParam);//?
-
-    for (int j = param.cur_dim; j < (param.cur_dim+addednev); j++)//
-    {
-      param.matDeflation(*W, param.RV->Component(j), *tmp);//precision must match!
-
-      //off-diagonal:
-      for (int i = 0; i < j; i++)//row id
-      {
-         alpha  =  cDotProduct(param.RV->Component(i), *W);
-         //
-         param.matProj[j*param.ld+i] = alpha;
-         param.matProj[i*param.ld+j] = conj(alpha);//conj
-      }
-
-      //diagonal:
-      alpha  =  cDotProduct(param.RV->Component(j), *W);
-      //
-      param.matProj[j*param.ld+j] = alpha;
-    }
-
-    param.cur_dim += addednev;
-
-    printfQuda("\n.. done.\n");
-
-    delete W;
-    delete tmp;
-
-    return;
-  }
-
-#endif
 
   void Deflation::reduce(double tol, int max_nev) {
 
@@ -503,6 +392,7 @@ namespace quda {
 
      int idx       = 0;
      double relerr = 0.0;
+     bool do_residual_check = (tol != 0.0); 
 
      while ((relerr < tol) && (idx < max_nev))
      {
@@ -512,35 +402,35 @@ namespace quda {
 
        blas::zero(*r);
 
-       blas::caxpy(&projm[idx*param.ld], rv, res);
+       blas::caxpy(&projm[idx*param.ld], rv, res);//multiblas
 
        blas::copy(buff->Component(idx), *r);
 
-       if(getVerbosity() >= QUDA_VERBOSE)
+       if( do_residual_check ) //if tol=0.0 then disable relative residual norm check
        {
-         param.matDeflation(*Av, *r);
+         *r_sloppy = *r;
+         param.matDeflation(*Av_sloppy, *r_sloppy);
 
-         double3 dotnorm = cDotProductNormA(*r, *Av);
+         double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
 
          double eval = dotnorm.x / dotnorm.z;
 
-         blas::xpay(*Av, -eval, *r );
+         blas::xpay(*Av_sloppy, -eval, *r_sloppy );
 
-         double relerr = sqrt( norm2(*r) / dotnorm.z );
+         relerr = sqrt( norm2(*r_sloppy) / dotnorm.z );
 
-         printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
+         if(getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
        }
 
        idx += 1;
      }
-     param.ReshapeDeflationSpace(idx, param.RV->Location());//
+     //param.ReshapeDeflationSpace(idx, param.RV->Location());//
 
+     printfQuda("\nReserved eigenvectors: %d\n", idx);
      //copy all the stuff to cudaRitzVectors set:
      for(int i = 0; i < idx; i++) blas::copy(param.RV->Component(i), buff->Component(i));
 
      //reset current dimension:
-     printfQuda("\nReserved eigenvectors: %d\n", idx);
-
      param.cur_dim = idx;//idx never exceeds cur_dim.
 
      free(evals);

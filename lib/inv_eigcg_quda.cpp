@@ -65,16 +65,16 @@ namespace quda {
        int restarts;
        double global_stop;
   
-       bool idle_cycle;
+       bool run_residual_correction;//used in mixed precision cycles 
 
        EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
-       m(m), k(k), id(0), restarts(0), global_stop(0.0), idle_cycle(false) { }
+       m(m), k(k), id(0), restarts(0), global_stop(0.0), run_residual_correction(false) { }
 
        ~EigCGArgs() { }
 
        //method for constructing Lanczos matrix :
        inline void SetLanczos(Complex diag_val, Complex offdiag_val) { 
-         if(idle_cycle) return;
+         if(run_residual_correction) return;
 
          Tm.diagonal<0>()[id] = diag_val; 
 
@@ -251,7 +251,7 @@ namespace quda {
     inner.inv_type        = QUDA_CG_INVERTER;       // use CG solver
     inner.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
 
-    inner.use_sloppy_partial_accumulator= outer.use_sloppy_partial_accumulator;
+    inner.use_sloppy_partial_accumulator= false;//outer.use_sloppy_partial_accumulator;
   }
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
@@ -265,7 +265,12 @@ namespace quda {
       return;
     }
 
-    fillEigCGInnerSolverParam(Kparam, param);
+    if ( param.inv_type == QUDA_EIGCG_INVERTER ) {
+      fillEigCGInnerSolverParam(Kparam, param);
+    } else if ( param.inv_type == QUDA_INC_EIGCG_INVERTER ) {
+      if(param.inv_type_precondition != QUDA_INVALID_INVERTER)  errorQuda("preconditioning is not supported for the incremental solver \n");
+      fillInitCGSolverParam(Kparam, param);
+    }
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
       K = new CG(matPrecon, matPrecon, Kparam, profile);
@@ -353,7 +358,7 @@ namespace quda {
   {
     EigCGArgs &args = *eigcg_args;
 
-    if(args.idle_cycle) return;//nothing to be done here!
+    if(args.run_residual_correction) return;
 
     if (args.id == param.m){//Begin Rayleigh-Ritz block: 
       //
@@ -428,6 +433,12 @@ namespace quda {
 
     EigCGArgs &args = *eigcg_args;
 
+    if(args.run_residual_correction && param.inv_type == QUDA_INC_EIGCG_INVERTER) {
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      (*K)(x, b);
+      return Kparam.iter; 
+    }
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &tmp = *tmpp;
@@ -467,8 +478,6 @@ namespace quda {
     double heavy_quark_res = 0.0;  // heavy quark res idual
 
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
-
-    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double pAp;
     double alpha=1.0, alpha_inv=1.0, beta=0.0, alpha_old_inv = 1.0;
@@ -687,50 +696,42 @@ namespace quda {
      ColorSpinorField *rp_sloppy = ( mixed_prec ) ? ColorSpinorField::Create(csParam) : rp;
      ColorSpinorField &rSloppy = *rp_sloppy;
 
-     csParam.setPrecision(param.precision_ritz);
-     ColorSpinorField *ep_proj = ( param.precision_ritz == param.precision_sloppy ) ? ep_sloppy : ( ( param.precision_ritz == param.precision ) ? ep : ColorSpinorField::Create(csParam) );
-     ColorSpinorField &eProj = *ep_proj;
-
-     ColorSpinorField *rp_proj = ( param.precision_ritz == param.precision_sloppy ) ? rp_sloppy : ( ( param.precision_ritz == param.precision ) ? rp : ColorSpinorField::Create(csParam) );
-     ColorSpinorField &rProj = *rp_proj;
-
      const double stop = b2*param.tol*param.tol;
      //start iterative refinement cycles (or just one eigcg call for full (solo) precision solver):
      int logical_rhs_id = 0;
-     bool eigcg_cycle    = true; 
+     bool dcg_cycle    = false; 
      do {
-       rProj = r;
-       blas::zero(eProj);
-       defl(eProj, rProj);
+       blas::zero(e);
+       defl(e, r);
        //
-       eSloppy = eProj, rSloppy = rProj;
+       eSloppy = e, rSloppy = r;
+
+       if( dcg_cycle ) { //run DCG instead
+         if(!K) {
+           Kparam.precision   = param.precision_sloppy;
+           Kparam.tol         = param.cg_iterref_tol;
+           K = new CG(matSloppy, matPrecon, Kparam, profile);   
+         }
+
+         eigcg_args->run_residual_correction = true;      
+         printfQuda("Running DCG correction cycle.\n");
+       }
 
        int iters = eigCGsolve(eSloppy, rSloppy);
 
-       bool update_ritz = eigcg_cycle && (eigcg_args->restarts > 0) && !defl.is_complete() && (logical_rhs_id < max_eigcg_cycles); //too uglyyy
+       bool update_ritz = !dcg_cycle && (eigcg_args->restarts > 1) && !defl.is_complete(); //too uglyyy
 
        if( update_ritz ) { 
 
          defl.increment(*Vm, param.nev);
          logical_rhs_id += 1;
 
-       } else { //run PCG instead
+         dcg_cycle = (logical_rhs_id >= max_eigcg_cycles);
 
-         if (param.inv_type_precondition != QUDA_INVALID_INVERTER) {
-
-           if (param.precision_precondition != param.precision_sloppy) {
-             csParam.setPrecision(param.precision_precondition);
-             p_pre = ColorSpinorField::Create(csParam);
-             r_pre = ColorSpinorField::Create(csParam);
-           }
- 
-           param.inv_type_precondition = QUDA_CG_INVERTER;
-           K = new CG(matPrecon, matPrecon, Kparam, profile);
-           //param.inv_type_precondition = QUDA_MR_INVERTER;
-           //K = new MR(matPrecon, matPrecon, Kparam, profile);
-         }
-         eigcg_cycle = false;
+       } else { //run DCG instead
+         dcg_cycle = true;
        }
+
        // use mixed blas ??
        e = eSloppy;
        blas::xpy(e, out);
@@ -742,15 +743,10 @@ namespace quda {
 
        param.true_res = sqrt(r2 / b2);
        param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
-       PrintSummary("EigCG:", iters, r2, b2);
+       PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2);
 
-       if( eigcg_cycle &&  (eigcg_args->restarts > 0) && !defl.is_complete() ) defl.verify();
+       if( !dcg_cycle &&  (eigcg_args->restarts > 1) && !defl.is_complete() ) defl.verify();
      } while ((r2 > stop) && mixed_prec);
-
-     if( ep_proj != ep && ep_proj != ep_sloppy ) {
-       delete ep_proj;
-       delete rp_proj;
-     }
 
      delete ep;
      delete rp;
@@ -760,7 +756,11 @@ namespace quda {
        delete rp_sloppy;
      }
 
-     max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
+     if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
+       printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
+       max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
+     }
+
      param.rhs_idx += logical_rhs_id;
 
      if(defl.is_complete()) {
