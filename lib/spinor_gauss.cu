@@ -61,7 +61,6 @@ namespace quda {
     class GaussSpinor : Tunable {
     InOrder &in;
     const ColorSpinorField &meta; // this reference is for meta data only
-    QudaFieldLocation location;
     RNG & rngstate;
 
   private:
@@ -73,11 +72,11 @@ namespace quda {
     unsigned int minThreads() const { return meta.VolumeCB(); }
 
   public:
-    GaussSpinor(InOrder &in, const ColorSpinorField &meta, QudaFieldLocation location, RNG &rngstate)
-      : in(in), meta(meta), location(location), rngstate(rngstate){ }
+    GaussSpinor(InOrder &in, const ColorSpinorField &meta, RNG &rngstate)
+      : in(in), meta(meta), rngstate(rngstate){ }
 
     void apply(const cudaStream_t &stream) {
-      if (location == QUDA_CPU_FIELD_LOCATION) {
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	gaussSpinor<FloatIn, Ns, Nc>(in, meta.VolumeCB(), rngstate);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -101,24 +100,23 @@ namespace quda {
   };
 
   template <typename FloatIn, int Ns, int Nc, typename InOrder>
-    void gaussSpinor(InOrder &inOrder, const ColorSpinorField &meta,
-				QudaFieldLocation location, RNG &rngstate) {
-    GaussSpinor<FloatIn, Ns, Nc, InOrder> gauss(inOrder, meta, location, rngstate);
+    void gaussSpinor(InOrder &inOrder, const ColorSpinorField &meta, RNG &rngstate) {
+    GaussSpinor<FloatIn, Ns, Nc, InOrder> gauss(inOrder, meta, rngstate);
     gauss.apply(0);
   }
 
   /** Decide on the input order*/
   template <typename FloatIn, int Ns, int Nc>
-    void gaussSpinor(ColorSpinorField &in, QudaFieldLocation location, RNG &rngstate) {
+    void gaussSpinor(ColorSpinorField &in, RNG &rngstate) {
 
     if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
       ColorSpinor inOrder(in);
-      gaussSpinor<FloatIn,Ns,Nc>(inOrder, in, location, rngstate);
+      gaussSpinor<FloatIn,Ns,Nc>(inOrder, in, rngstate);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
       ColorSpinor inOrder(in);
-      gaussSpinor<FloatIn,Ns,Nc>(inOrder, in, location, rngstate);
+      gaussSpinor<FloatIn,Ns,Nc>(inOrder, in, rngstate);
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
     }
@@ -127,30 +125,24 @@ namespace quda {
 
   void spinorGauss(ColorSpinorField &src, RNG& randstates){
 
-      QudaFieldLocation location;
-      if (typeid(src) == typeid(cudaColorSpinorField)){
-	  location = QUDA_CUDA_FIELD_LOCATION;
-      }else{
-	  location = QUDA_CPU_FIELD_LOCATION;
+    if (src.Ncolor() != 3 ){
+      errorQuda(" is not implemented for Ncolor!=3");
+    }
+    if (src.Nspin() == 4 ){
+      if (src.Precision() == QUDA_SINGLE_PRECISION){
+	gaussSpinor<float, 4, 3>(src, randstates);
+      } else if(src.Precision() == QUDA_DOUBLE_PRECISION) {
+	gaussSpinor<double, 4, 3>(src, randstates);
       }
-      if (src.Ncolor() != 3 ){
-	  errorQuda("%s is not implemented for Ncolor!=3");
+    }else if (src.Nspin() == 1 ){
+      if (src.Precision() == QUDA_SINGLE_PRECISION){
+	gaussSpinor<float, 1, 3>(src, randstates);
+      } else if(src.Precision() == QUDA_DOUBLE_PRECISION) {
+	gaussSpinor<double, 1, 3>(src, randstates);
       }
-      if (src.Nspin() == 4 ){
-	  if (src.Precision() == QUDA_SINGLE_PRECISION){
-	      gaussSpinor<float, 4, 3>(src, location, randstates);
-	  } else if(src.Precision() == QUDA_DOUBLE_PRECISION) {
-	      gaussSpinor<double, 4, 3>(src, location, randstates);
-	  }
-      }else if (src.Nspin() == 1 ){
-	  if (src.Precision() == QUDA_SINGLE_PRECISION){
-	      gaussSpinor<float, 1, 3>(src, location, randstates);
-	  } else if(src.Precision() == QUDA_DOUBLE_PRECISION) {
-	      gaussSpinor<double, 1, 3>(src, location, randstates);
-	  }
-      }else{
-	  errorQuda("spinorGauss not implemented for Nspin != 1 or Nspin !=4");
-      }
+    }else{
+      errorQuda("spinorGauss not implemented for Nspin != 1 or Nspin !=4");
+    }
 
   }
 
