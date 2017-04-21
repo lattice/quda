@@ -967,6 +967,12 @@ extern "C" {
                       const QudaGaugeParam* param);
 
   /**
+   * Generate Gaussian distributed gauge field
+   * @param seed Seed
+   */
+  void gaussGaugeQuda(long seed);
+
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
@@ -987,11 +993,13 @@ extern "C" {
   void performSTOUTnStep(unsigned int nSteps, double rho);
 
   /**
-   * Generate Gaussian distributed gauge field
-   * @param seed Seed
+   * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param rho    Rho coefficient for STOUT smearing.
+   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
    */
+  void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
 
-  void gaussGaugeQuda(long seed);
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
