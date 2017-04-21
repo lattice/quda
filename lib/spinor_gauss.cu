@@ -134,7 +134,7 @@ namespace quda {
 	  location = QUDA_CPU_FIELD_LOCATION;
       }
       if (src.Ncolor() != 3 ){
-	  errorQuda("%s is not implemented for Ncolor!=3", __func__, src.Nspin());
+	  errorQuda("%s is not implemented for Ncolor!=3");
       }
       if (src.Nspin() == 4 ){
 	  if (src.Precision() == QUDA_SINGLE_PRECISION){
