@@ -1341,6 +1341,9 @@ namespace quda {
 	diracParam.epsilon = inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? inv_param->epsilon : 0.0;
       }
       break;
+    case QUDA_LAPLACE_DSLASH:
+      diracParam.type = pc ? QUDA_GAUGE_LAPLACEPC_DIRAC : QUDA_GAUGE_LAPLACE_DIRAC;
+      break;
     default:
       errorQuda("Unsupported dslash_type %d", inv_param->dslash_type);
     }
@@ -1413,6 +1416,7 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     setDiracPreParam(diracPreParam, &param, pc_solve, false);
+
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
