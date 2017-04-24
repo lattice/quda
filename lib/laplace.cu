@@ -3,6 +3,7 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <stencil.h>
+#include <color_spinor.h>
 
 /**
    This is a basic gauged Laplace operator
@@ -20,9 +21,9 @@ namespace quda {
 
     F out;                // output vector field
     const F in;           // input vector field
-    const F x;           // input vector field
-    G U;            // the gauge field
-    const Float kappa;    // kappa parameter = 1/2m
+    const F x;            // inpuot vector when doing xpay
+    const G U;            // the gauge field
+    const Float kappa;    // kappa parameter = 1/(8+m)
     const int parity;     // only use this for single parity fields
     const int nParity;    // number of parities we're working on
     const int nFace;      // hard code to 1 for now
@@ -45,25 +46,25 @@ namespace quda {
   };
 
   /**
-     Applies the Laplace operator
+     Applies the off-diagonal part of the Laplace operator
 
-     @param out The result - kappa * Laplace in
-     @param U The gauge field
-     @param kappa Kappa value
-     @param in The input field
-     @param parity The site parity
-     @param x_cb The checkerboarded site index
+     @param[out] out The out result field
+     @param[in] U The gauge field
+     @param[in] kappa Kappa value
+     @param[in] in The input field
+     @param[in] parity The site parity
+     @param[in] x_cb The checkerboarded site index
    */
   extern __shared__ float s[];
-  template <typename Float, int nDim, int nColor, typename Arg>
-  __device__ __host__ inline void applyLaplace(complex<Float> out[], Arg &arg, int x_cb, int parity) {
+  template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
+  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
-
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
     int coord[4];
     getCoords(coord, x_cb, arg.dim, parity);
 
+#pragma unroll
     for (int d = 0; d<nDim; d++) // loop over dimension
     {
       //Forward gather - compute fwd offset for vector fetch
@@ -73,21 +74,19 @@ namespace quda {
 	const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
 	const Link U = arg.U(d, x_cb, parity);
-
-	complex<Float> in[nColor]; // forward vector ghost
-	arg.in.loadGhost((Float*)in, ghost_idx, d, 1, their_spinor_parity);
-
-	for (int i=0; i<nColor; i++) for (int j=0; j<nColor; j++) out[i] += U(i,j) * in[j];
-	  
-      } else {
+#if 0 // FIXME - why is this slow?
+	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+#else
+	const Vector in;
+	arg.in.loadGhost((Float*)in.data, ghost_idx, d, 1, their_spinor_parity);
+#endif
+	out += U * in;
+	} else {
 
 	const Link U = arg.U(d, x_cb, parity);
+	const Vector in = arg.in(fwd_idx, their_spinor_parity);
 
-	complex<Float> in[nColor];
-	arg.in.load((Float*)in, fwd_idx, their_spinor_parity);
-
-	for (int i=0; i<nColor; i++) for (int j=0; j<nColor; j++) out[i] += U(i,j) * in[j];
-
+	out += U * in;
       }
 
       //Backward gather - compute back offset for spinor and gauge fetch
@@ -97,23 +96,20 @@ namespace quda {
       if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
 	const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
-	Link U;
-	arg.U.loadGhost((Float*)U.data, ghost_idx, d, 1-parity);
-
-	complex<Float> in[nColor];
-	arg.in.loadGhost((Float*)in, ghost_idx, d, 0, their_spinor_parity);
-
-	for (int i=0; i<nColor; i++) for (int j=0; j<nColor; j++) out[i] += conj(U(j,i)) * in[j];
-
+	const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
+#if 0 // FIXME - why is this slow?
+	const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+#else
+	const Vector in;
+	arg.in.loadGhost((Float*)in.data, ghost_idx, d, 0, their_spinor_parity);
+#endif
+	out += conj(U) * in;
       } else {
 	
 	const Link U = arg.U(d, gauge_idx, 1-parity);
+	const Vector in = arg.in(back_idx, their_spinor_parity);
 
-	complex<Float> in[nColor];
-	arg.in.load((Float*)in, back_idx, their_spinor_parity);
-
-	for (int i=0; i<nColor; i++) for (int j=0; j<nColor; j++) out[i] += conj(U(j,i)) * in[j];
-
+	out += conj(U) * in;
       }
     } //nDim
 
@@ -124,17 +120,16 @@ namespace quda {
   template <typename Float, int nDim, int nColor, typename Arg>
   __device__ __host__ inline void laplace(Arg &arg, int x_cb, int parity)
   {
-    complex <Float> out[nColor];
-    for (int c=0; c<nColor; c++) out[c] = 0.0;
+    typedef ColorSpinor<Float,nColor,1> Vector;
+    Vector out;
 
     applyLaplace<Float,nDim,nColor>(out, arg, x_cb, parity);
 
-    complex<Float> x[nColor];
     if (arg.isXpay()) {
-      arg.x.load((Float*)x, x_cb, parity);
-      for (int i=0; i<nColor; i++) out[i] = x[i] + arg.kappa * out[i];
+      Vector x = arg.x(x_cb, parity);
+      out = x + arg.kappa * out;
     }
-    arg.out.save((Float*)out, x_cb, parity);
+    arg.out(x_cb, parity) = out;
   }
 
   // CPU kernel for applying the Laplace operator to a vector
@@ -177,11 +172,12 @@ namespace quda {
 
     long long flops() const
     {
-      return (2*nDim*(8*nColor*nColor)-2*nColor)*arg.nParity*(long long)meta.VolumeCB();
+      return (2*nDim*(8*nColor*nColor)-2*nColor + (arg.isXpay() ? 2*2*nColor : 0) )*arg.nParity*(long long)meta.VolumeCB();
     }
     long long bytes() const
     {
-      return arg.out.Bytes() + 2*nDim*arg.in.Bytes() + arg.nParity*(2*nDim*arg.U.Bytes());
+      return arg.out.Bytes() + 2*nDim*arg.in.Bytes() + arg.nParity*2*nDim*arg.U.Bytes()*meta.VolumeCB() +
+	(arg.isXpay() ? arg.x.Bytes() : 0);
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
