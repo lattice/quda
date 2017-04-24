@@ -1,3 +1,8 @@
+#pragma once
+
+#include <complex_quda.h>
+#include <quda_matrix.h>
+
 /**
  * @file    color_spinor.h
  *
@@ -9,6 +14,9 @@
  */
 namespace quda {
 
+  template<typename Float, typename T> struct colorspinor_wrapper;
+  template<typename Float, typename T> struct colorspinor_ghost_wrapper;
+
   /**
      This is the generic declaration of ColorSpinor.
    */
@@ -17,6 +25,51 @@ namespace quda {
 
       complex<Float> data[Nc*Ns];
 
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>() {
+#pragma unroll
+	for (int i=0; i<Nc*Ns; i++) {
+	  data[i] = 0;
+	}
+      }
+
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const ColorSpinor<Float, Nc, Ns> &a) {
+#pragma unroll
+	for (int i=0; i<Nc*Ns; i++) {
+	  data[i] = a.data[i];
+	}
+      }
+
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator=(const ColorSpinor<Float, Nc, Ns> &a) {
+	if (this != &a) {
+#pragma unroll
+	  for (int i=0; i<Nc*Ns; i++) {
+	    data[i] = a.data[i];
+	  }
+	}
+	return *this;
+      }
+
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator+=(const ColorSpinor<Float, Nc, Ns> &a) {
+	if (this != &a) {
+#pragma unroll
+	  for (int i=0; i<Nc*Ns; i++) {
+	    data[i] += a.data[i];
+	  }
+	}
+	return *this;
+      }
+
+      template<typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+
+      template<typename S>
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+
+      template<typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
+
+      template<typename S>
+      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
     };
 
   /**
@@ -44,6 +97,15 @@ namespace quda {
       if (this != &a) {
 	for (int i=0; i<Nc*Ns; i++) {
 	  data[i] = a.data[i];
+	}
+      }
+      return *this;
+    }
+
+    __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator+=(const ColorSpinor<Float, Nc, 4> &a) {
+      if (this != &a) {
+	for (int i=0; i<Nc*Ns; i++) {
+	  data[i] += a.data[i];
 	}
       }
       return *this;
@@ -344,6 +406,15 @@ namespace quda {
       return *this;
     }
 
+    __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator+=(const ColorSpinor<Float, Nc, 2> &a) {
+      if (this != &a) {
+	for (int i=0; i<Nc*Ns; i++) {
+	  data[i] += a.data[i];
+	}
+      }
+      return *this;
+    }
+
     /** 
 	Spin reconstruct the full Spinor from the projected spinor
 	@param dim Which dimension projector are we using
@@ -500,6 +571,41 @@ namespace quda {
       }
     }
     return out;
+  }
+
+  /**
+     @brief Compute the matrix-vector product y = A * x
+     @param[in] A Input matrix
+     @param[in] x Input vector
+     @return The vector A * x
+  */
+  template<typename Float, int Nc, int Ns> __device__ __host__ inline
+    ColorSpinor<Float,Nc,Ns> operator*(const Matrix<complex<Float>,Nc> &A, const ColorSpinor<Float,Nc,Ns> &x) {
+
+    ColorSpinor<Float,Nc,Ns> y;
+
+#pragma unroll
+    for (int i=0; i<Nc; i++) {
+#pragma unroll
+      for (int s=0; s<Ns; s++) {
+	y.data[s*Nc + i].x  = A(i,0).real() * x.data[s*Nc + 0].real();
+	y.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
+	y.data[s*Nc + i].y  = A(i,0).real() * x.data[s*Nc + 0].imag();
+	y.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
+      }
+#pragma unroll
+      for (int j=1; j<Nc; j++) {
+#pragma unroll
+	for (int s=0; s<Ns; s++) {
+	  y.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
+	  y.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
+	  y.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
+	  y.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
+	}
+      }
+    }
+
+    return y;
   }
 
   
