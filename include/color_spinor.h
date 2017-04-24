@@ -574,6 +574,50 @@ namespace quda {
   }
 
   /**
+     @brief ColorSpinor addition operator
+     @param[in] x Input vector
+     @param[in] y Input vector
+     @return The vector x + y
+  */
+  template<typename Float, int Nc, int Ns> __device__ __host__ inline
+    ColorSpinor<Float,Nc,Ns> operator+(const ColorSpinor<Float,Nc,Ns> &x, const ColorSpinor<Float,Nc,Ns> &y) {
+
+    ColorSpinor<Float,Nc,Ns> z;
+
+#pragma unroll
+    for (int i=0; i<Nc; i++) {
+#pragma unroll
+      for (int s=0; s<Ns; s++) {
+	z.data[s*Nc + i] = x.data[s*Nc + i] + y.data[s*Nc + i];
+      }
+    }
+
+    return z;
+  }
+
+  /**
+     @brief Compute the scalar-vector product y = a * x
+     @param[in] a Input scalar
+     @param[in] x Input vector
+     @return The vector a * x
+  */
+  template<typename Float, int Nc, int Ns, typename S> __device__ __host__ inline
+    ColorSpinor<Float,Nc,Ns> operator*(const S &a, const ColorSpinor<Float,Nc,Ns> &x) {
+
+    ColorSpinor<Float,Nc,Ns> y;
+
+#pragma unroll
+    for (int i=0; i<Nc; i++) {
+#pragma unroll
+      for (int s=0; s<Ns; s++) {
+	y.data[s*Nc + i] = a * x.data[s*Nc + i];
+      }
+    }
+
+    return y;
+  }
+
+  /**
      @brief Compute the matrix-vector product y = A * x
      @param[in] A Input matrix
      @param[in] x Input vector
@@ -608,5 +652,4 @@ namespace quda {
     return y;
   }
 
-  
 } // namespace quda

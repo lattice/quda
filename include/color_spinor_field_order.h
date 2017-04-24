@@ -119,8 +119,8 @@ namespace quda {
     };
 
   /**
-     @brief Copy constructor for the ColorSpinor class with a colorspinor_wrapper input.
-     @param[in] a Input colorspinor_wrapper that we use to fill in this instance
+     @brief Copy constructor for the ColorSpinor class with a colorspinor_ghost_wrapper input.
+     @param[in] a Input colorspinor_ghostwrapper that we use to fill in this instance
   */
   template <typename T, int Nc, int Ns>
     template <typename S>
@@ -129,8 +129,8 @@ namespace quda {
   }
 
   /**
-     @brief Assignment operator for the ColorSpinor class with a colorspinor_wrapper input.
-     @param[in] a Input colorspinor_wrapper that we use to fill in this instance
+     @brief Assignment operator for the ColorSpinor class with a colorspinor_ghost_wrapper input.
+     @param[in] a Input colorspinor_ghost_wrapper that we use to fill in this instance
    */
   template <typename T, int Nc, int Ns>
     template <typename S>
