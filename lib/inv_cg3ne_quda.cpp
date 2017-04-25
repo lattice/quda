@@ -199,9 +199,9 @@ namespace quda {
         restart = false;
       } else {
         if(is_cg3ne) {
-          rho = 1./(1.-gamma*r2/gamma_old/r2_old/rho);
+          rho = rho/(rho-(gamma/gamma_old)*(r2/r2_old));
         } else {
-          rho = 1./(1.-gamma*Ar2/gamma_old/Ar2_old/rho);
+          rho = rho/(rho-(gamma/gamma_old)*(Ar2/Ar2_old));
         }
         r2_old = r2;
 
@@ -251,27 +251,28 @@ namespace quda {
         }
 
         if (update) {
-          /* Do we need to update the old vector here?
-          // updating the "old" vectors
-          blas::copy(x, xS_old);
-          blas::xpy(y, x);
-          mat(r, x, tmp, tmp2); // we need to allocate tmp2
-          r2_old = blas::xmyNorm(b, r);
-          if (use_heavy_quark_res) heavy_quark_res_old = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
-          blas::copy(rS_old, r);
-          blas::axpy(-1., xS, xS_old);
-          */
           // updating the "new" vectors
           blas::copy(x, xS);
           blas::xpy(x, y);
           mat(r, y, x); //  here we can use x as tmp
           r2 = blas::xmyNorm(b, r);
-          if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
           param.true_res = sqrt(r2 / b2);
-          param.true_res_hq = heavy_quark_res;
-          blas::copy(rS, r);
-          blas::axpy(-1., xS, xS_old);
-          blas::zero(xS);
+          if (use_heavy_quark_res) {
+            heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+            param.true_res_hq = heavy_quark_res;
+          }
+          // we update sloppy and old fields
+          if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+            blas::copy(rS, r);
+            blas::axpy(-1., xS, xS_old);
+            if(is_cg3ne) {
+              // we preserve the orthogonality between the previous residual and the new
+              // This is possible only for cg3ne. For cg3nr ArS and ArS_old should be orthogonal
+              Complex rr_old = blas::cDotProduct(rS, rS_old);
+              r2_old = blas::caxpyNorm(-rr_old/r2, rS, rS_old);
+              blas::zero(xS);
+            }
+          }
         }
 
         // break-out check if we have reached the limit of the precision
@@ -309,7 +310,30 @@ namespace quda {
             }
           }
         }
+      } else {
+        if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+          mat(r, x, tmpS);
+          r2 = blas::xmyNorm(b, r);
+          // we update sloppy and old fields
+          if (!convergence(r2, heavy_quark_res, stop, param.tol_hq) and is_cg3ne) {
+            // we preserve the orthogonality between the previous residual and the new
+              // This is possible only for cg3ne. For cg3nr ArS and ArS_old should be orthogonal
+            Complex rr_old = blas::cDotProduct(rS, rS_old);
+            r2_old = blas::caxpyNorm(-rr_old/r2, rS, rS_old);
+          }
+        }
 
+        // break-out check if we have reached the limit of the precision
+        if (r2 > r2_old) {
+          resIncrease++;
+          resIncreaseTotal++;
+          warningQuda("CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+                      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+              warningQuda("CG3: solver exiting due to too many true residual norm increases");
+              break;
+          }
+        }
       }
 
       PrintStats(name, k, r2, b2, heavy_quark_res);
@@ -331,7 +355,7 @@ namespace quda {
     if (!mixed_precision && param.compute_true_res) {
       mat(r, x, y);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      if (use_heavy_quark_res) param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
     }
 
     if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
