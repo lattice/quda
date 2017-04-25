@@ -933,7 +933,7 @@ namespace quda {
       // launch solver for each source
       for(int i=0; i<(int)B.size(); i++) {
 	ColorSpinorField *x = B_gpu[i];
-	if(param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
+	if(si>0 and param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector
 	  *b = *x;  // inverting against the vector
 	  zero(*x); // with zero initial guess
 	} else {
