@@ -30,7 +30,8 @@ namespace quda {
     const int parity; // only use this for single parity fields
     const int nParity; // number of parities we're working on
     const int nFace;  // hard code to 1 for now
-    const int dim[5];   // full lattice dimensions
+    const int_fastdiv X0h; // X[0]/2
+    const int_fastdiv dim[5];   // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;
 
@@ -39,7 +40,7 @@ namespace quda {
       : out(const_cast<ColorSpinorField&>(out)), inA(const_cast<ColorSpinorField&>(inA)),
 	inB(const_cast<ColorSpinorField&>(inB)), Y(const_cast<GaugeField&>(Y)),
 	X(const_cast<GaugeField&>(X)), kappa(kappa), parity(parity),
-	nParity(out.SiteSubset()), nFace(1),
+	nParity(out.SiteSubset()), nFace(1), X0h(out.X(0)/2),
 	dim{ (3-nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(out.VolumeCB()/dim[4])
@@ -75,6 +76,31 @@ namespace quda {
   }
 
   /**
+     Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
+
+     @param x Computed spatial index
+     @param cb_index 1-d checkerboarded index
+     @param X Full lattice dimensions
+     @param parity Site parity
+   */
+  template <typename I>
+  static __device__ __host__ inline void getCoordsCB(int x[], int cb_index, const I X[], const I X0h, int parity) {
+    //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
+    //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
+    //x[1] = (cb_index/(X[0]/2)) % X[1];
+    //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+
+    int za = (cb_index / X0h);
+    int zb =  (za / X[1]);
+    x[1] = (za - zb * X[1]);
+    x[3] = (zb / X[2]);
+    x[2] = (zb - x[3] * X[2]);
+    int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
+    x[0] = (2 * cb_index + x1odd  - za * X[0]);
+    return;
+  }
+
+  /**
      Applies the coarse dslash on a given parity and checkerboard site index
 
      @param out The result - kappa * Dslash in
@@ -90,7 +116,7 @@ namespace quda {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
     int coord[5];
-    getCoords(coord, x_cb, arg.dim, parity);
+    getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
     coord[4] = src_idx;
 
 #ifdef __CUDA_ARCH__
@@ -372,9 +398,15 @@ namespace quda {
     const int color_offset = lane_id / vector_site_width;
 
     // for full fields set parity from y thread index else use arg setting
+#if 0  // disable multi-src since this has a measurable impact on single src performance
     int paritySrc = blockDim.y*blockIdx.y + threadIdx.y;
     int src_idx = (arg.nParity == 2) ? paritySrc / 2 : paritySrc; // maybe want to swap order or source and parity for improved locality of same parity
     int parity = (arg.nParity == 2) ? paritySrc % 2 : arg.parity;
+    if (paritySrc >= arg.nParity * arg.dim[4]) return;
+#else
+    const int src_idx = 0;
+    const int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+#endif
 
     // z thread dimension is (( s*(Nc/Mc) + color_block )*dim_thread_split + dim)*2 + dir
     int sMd = blockDim.z*blockIdx.z + threadIdx.z;
@@ -386,7 +418,6 @@ namespace quda {
     int color_block = (sM % (Nc/Mc)) * Mc;
 
     if (x_cb >= arg.volumeCB) return;
-    if (paritySrc >= arg.nParity * arg.dim[4]) return;
 
     if (dir == 0) {
       if (dim == 0)      coarseDslash<Float,nDim,Ns,Nc,Mc,color_stride,dim_thread_split,dslash,clover,dagger,type,0,0>(arg, x_cb, src_idx, parity, s, color_block, color_offset);
