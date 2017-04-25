@@ -152,6 +152,7 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return matpcType; }
     int getStencilSteps() const;
     void Dagger(QudaDagType dag) const { dagger = dag; }
+    void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
 
     /**
      * @brief Create the coarse operator (virtual parent)
@@ -905,6 +906,8 @@ namespace quda {
   public:
     DiracMatrix(const Dirac &d) : dirac(&d) { }
     DiracMatrix(const Dirac *d) : dirac(d) { }
+    DiracMatrix(const DiracMatrix &mat) : dirac(mat.dirac) { }
+    DiracMatrix(const DiracMatrix *mat) : dirac(mat->dirac) { }
     virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
@@ -912,12 +915,6 @@ namespace quda {
 			    ColorSpinorField &tmp) const = 0;
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in,
 			    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const = 0;
-
-    virtual void dagger(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
-    virtual void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-			ColorSpinorField &tmp) const = 0;
-    virtual void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-			ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const = 0;
 
 
     unsigned long long flops() const { return dirac->Flops(); }
@@ -945,12 +942,12 @@ namespace quda {
   DiracM(const Dirac &d) : DiracMatrix(d) { }
   DiracM(const Dirac *d) : DiracMatrix(d) { }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       bool reset1 = false;
       if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
@@ -958,7 +955,7 @@ namespace quda {
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       bool reset1 = false;
@@ -966,31 +963,6 @@ namespace quda {
       if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
       if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
       dirac->M(out, in);
-      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
-    }
-
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in) const
-    {
-      dirac->Mdag(out, in);
-    }
-
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      bool reset1 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
-      dirac->Mdag(out, in);
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
-    }
-
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-		       ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const 
-    {
-      bool reset1 = false;
-      bool reset2 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
-      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
-      dirac->Mdag(out, in);
       if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
@@ -1010,13 +982,13 @@ namespace quda {
     //! Shift term added onto operator (M^dag M + shift)
     double shift;
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       dirac->tmp1 = &tmp;
       dirac->MdagM(out, in);
@@ -1024,7 +996,7 @@ namespace quda {
       dirac->tmp1 = NULL;
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       dirac->tmp1 = &Tmp1;
@@ -1035,12 +1007,6 @@ namespace quda {
       dirac->tmp1 = NULL;
     }
  
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in) const { (*this)(out,in); }
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-		       ColorSpinorField &tmp) const { (*this)(out,in,tmp); }
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-		       ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const { (*this)(out,in,Tmp1,Tmp2); }
-
     int getStencilSteps() const
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
@@ -1057,13 +1023,13 @@ namespace quda {
     //! Shift term added onto operator (M^dag M + shift)
     double shift;
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MMdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       dirac->tmp1 = &tmp;
       dirac->MMdag(out, in);
@@ -1071,7 +1037,7 @@ namespace quda {
       dirac->tmp1 = NULL;
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       dirac->tmp1 = &Tmp1;
@@ -1081,12 +1047,6 @@ namespace quda {
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }
-
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in) const { (*this)(out,in); }
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-		       ColorSpinorField &tmp) const { (*this)(out,in,tmp); }
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-		       ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const { (*this)(out,in,Tmp1,Tmp2); }
 
     int getStencilSteps() const
     {
@@ -1100,19 +1060,19 @@ namespace quda {
   DiracMdag(const Dirac &d) : DiracMatrix(d) { }
   DiracMdag(const Dirac *d) : DiracMatrix(d) { }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->Mdag(out, in);
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       dirac->tmp1 = &tmp;
       dirac->Mdag(out, in);
       dirac->tmp1 = NULL;
     }
 
-    inline void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       dirac->tmp1 = &Tmp1;
@@ -1122,31 +1082,46 @@ namespace quda {
       dirac->tmp1 = NULL;
     }
 
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in) const
+    int getStencilSteps() const
     {
-      dirac->M(out, in);
+      return dirac->getStencilSteps(); 
+    }
+  };
+
+  class DiracDagger : public DiracMatrix {
+
+  protected:
+    const DiracMatrix &mat;
+
+  public:
+  DiracDagger(const DiracMatrix &mat) : DiracMatrix(mat), mat(mat) { }
+  DiracDagger(const DiracMatrix *mat) : DiracMatrix(mat), mat(*mat) { }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      dirac->flipDagger();
+      mat(out, in);
+      dirac->flipDagger();
     }
 
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
-      dirac->tmp1 = &tmp;
-      dirac->M(out, in);
-      dirac->tmp1 = NULL;
+      dirac->flipDagger();
+      mat(out, in, tmp);
+      dirac->flipDagger();
     }
 
-    inline void dagger(ColorSpinorField &out, const ColorSpinorField &in,
-		       ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+                    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
-      dirac->tmp1 = &Tmp1;
-      dirac->tmp2 = &Tmp2;
-      dirac->M(out, in);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
+      dirac->flipDagger();
+      mat(out, in, Tmp1, Tmp2);
+      dirac->flipDagger();
     }
 
     int getStencilSteps() const
     {
-      return dirac->getStencilSteps(); 
+      return mat.getStencilSteps(); 
     }
   };
 
