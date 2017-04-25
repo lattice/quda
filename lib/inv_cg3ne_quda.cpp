@@ -17,7 +17,7 @@
 namespace quda {
 
   CG3NE::CG3NE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false)
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matDagSloppy(matSloppy), init(false)
   {
   }
 
@@ -173,7 +173,7 @@ namespace quda {
     double rho = 1.0, gamma = 1.0, Ar2 = 1.0;
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
-      matSloppy.dagger(AdagrS, rS, tmpS);
+      matDagSloppy(AdagrS, rS, tmpS);
       matSloppy(AAdagrS, AdagrS, tmpS);
       double gamma_old = gamma;
       double Ar2_old = Ar2;
