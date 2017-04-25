@@ -49,6 +49,7 @@ namespace quda {
     void ax(const double &a, ColorSpinorField &x);
     void xpy(ColorSpinorField &x, ColorSpinorField &y);
     void xpay(ColorSpinorField &x, const double &a, ColorSpinorField &y);
+    void xpayz(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z);
     void mxpy(ColorSpinorField &x, ColorSpinorField &y);
 
     void axpyZpbx(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, const double &b);

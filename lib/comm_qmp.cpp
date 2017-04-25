@@ -19,7 +19,8 @@ static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
 
-static char partition_string[16] = ",comm=";
+static char partition_string[16];
+static char topology_string[16];
 
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
@@ -117,15 +118,9 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
   host_free(hostname_recv_buf);
 
-  char comm[5];
-  comm[0] = (comm_dim_partitioned(0) ? '1' : '0');
-  comm[1] = (comm_dim_partitioned(1) ? '1' : '0');
-  comm[2] = (comm_dim_partitioned(2) ? '1' : '0');
-  comm[3] = (comm_dim_partitioned(3) ? '1' : '0');
-  comm[4] = '\0';
-  strcat(partition_string, comm);
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
 }
-
 
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
@@ -179,7 +174,14 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   peer2peer_init = true;
 
-  checkCudaError();
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    printfQuda("Enabling GPU-Direct RDMA access\n");
+  } else {
+    printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
+
+  checkCudaErrorNoSync();
   return;
 }
 
@@ -361,4 +363,8 @@ void comm_abort(int status)
 
 const char* comm_dim_partitioned_string() {
   return partition_string;
+}
+
+const char* comm_dim_topology_string() {
+  return topology_string;
 }

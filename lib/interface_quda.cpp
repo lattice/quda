@@ -1278,10 +1278,11 @@ void endQuda(void)
 
   assertAllMemFree();
 
-#if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
-  // end this CUDA context
-  cudaDeviceReset();
-#endif
+  char *device_reset_env = getenv("QUDA_DEVICE_RESET");
+  if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
+    // end this CUDA context
+    cudaDeviceReset();
+  }
 
 }
 

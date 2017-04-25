@@ -440,3 +440,36 @@ int comm_partitioned()
   }
   return partitioned;
 }
+
+bool comm_peer2peer_enabled_global() {
+  static bool init = false;
+  static bool p2p_global = false;
+
+  if (!init) {
+    int p2p = 0;
+    for (int dim=0; dim<4; dim++)
+      for (int dir=0; dir<2; dir++)
+	p2p += (int)comm_peer2peer_enabled(dir,dim);
+
+    comm_allreduce_int(&p2p);
+    init = true;
+    p2p_global = p2p > 0 ? true : false;
+  }
+  return p2p_global;
+}
+
+bool comm_gdr_enabled() {
+  static bool gdr_enabled = false;
+#ifdef MULTI_GPU
+  static bool gdr_init = false;
+
+  if (!gdr_init) {
+    char *enable_gdr_env = getenv("QUDA_ENABLE_GDR");
+    if (enable_gdr_env && strcmp(enable_gdr_env, "1") == 0) {
+      gdr_enabled = true;
+    }
+    gdr_init = true;
+  }
+#endif
+  return gdr_enabled;
+}

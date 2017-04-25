@@ -153,7 +153,7 @@
 
 #if (DD_PREC==0) // double-precision fields
 
-#define TPROJSCALE tProjScale
+#define TPROJSCALE param.tProjScale
 
 // double-precision gauge field
 #if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
@@ -222,7 +222,7 @@
 
 #elif (DD_PREC==1) // single-precision fields
 
-#define TPROJSCALE tProjScale_f
+#define TPROJSCALE param.tProjScale_f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
@@ -293,7 +293,7 @@
 
 #else             // half-precision fields
 
-#define TPROJSCALE tProjScale_f
+#define TPROJSCALE param.tProjScale_f
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK

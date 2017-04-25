@@ -104,6 +104,7 @@ module quda_fortran
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
+     integer(4) :: solution_accumulator_pipeline; ! How many direction vectors we accumulate into the solution vector at once
      integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates
      integer(4) :: max_res_increase_total ! Total number of residual increases we tolerate
      integer(4) :: heavy_quark_check ! After how many iterations shall the heavy quark residual be updated

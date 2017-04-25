@@ -224,11 +224,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(reliable_delta, INVALID_DOUBLE);
 #ifdef INIT_PARAM 
   P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
+  P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
   P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
  #else
   P(use_sloppy_partial_accumulator, INVALID_INT);
+  P(solution_accumulator_pipeline, INVALID_INT);
   P(max_res_increase, INVALID_INT);
   P(max_res_increase_total, INVALID_INT);
   P(heavy_quark_check, INVALID_INT);

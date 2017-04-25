@@ -126,6 +126,12 @@ extern "C" {
   */
   const char* comm_dim_partitioned_string();
 
+  /**
+     @brief Return a string that defines the comm topology (for use as a tuneKey)
+     @return String specifying comm topology
+  */
+  const char* comm_dim_topology_string();
+
   /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
 
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
@@ -140,12 +146,23 @@ extern "C" {
   void comm_peer2peer_init(const char *hostname_recv_buf);
 
   /**
+     Query if peer-to-peer communication is enabled globally
+     @return Whether peer-to-peer is enabled globally
+  */
+  bool comm_peer2peer_enabled_global();
+
+  /**
      Query if peer-to-peer communication is enabled
      @param dir Direction (0 - backwards, 1 forwards)
      @param dim Dimension (0-3)
      @return Whether peer-to-peer is enabled
   */
   bool comm_peer2peer_enabled(int dir, int dim);
+
+  /**
+     Query if GPU Direct RDMA communication is enabled
+  */
+  bool comm_gdr_enabled();
 
   /**
      Create a persistent message handler for a relative send

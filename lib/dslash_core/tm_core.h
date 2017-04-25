@@ -958,7 +958,7 @@ __global__ void twistGamma5Kernel<short4,true>(DslashParam param)
    
    float a = param.a_f;
    float b = param.b_f;
-   float c = param.b_f;
+   float c = param.c_f;
 
    int flv1_idx = sid;
    int flv2_idx = sid + param.fl_stride;
