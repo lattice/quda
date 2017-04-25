@@ -27,6 +27,7 @@
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
+#include <random_quda.h>
 
 #include <multigrid.h>
 
@@ -205,11 +206,17 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
+//!<Profiler for gaussQuda
+static TimeProfile profileGauss("gaussQuda");
+
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
 //!< Profiler for STOUTQuda
 static TimeProfile profileSTOUT("STOUTQuda");
+
+//!< Profiler for OvrImpSTOUTQuda
+static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
 
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
@@ -5463,6 +5470,43 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
+
+
+void gaussGaugeQuda(long seed)
+{
+#ifdef GPU_GAUGE_TOOLS
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+
+  profileGauss.TPSTART(QUDA_PROFILE_INIT);
+  if (!gaugePrecise)
+    errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
+
+  cudaGaugeField *data = NULL;
+  data = gaugePrecise;
+
+  profileGauss.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+  RNG* randstates = new RNG(data->Volume(), seed, data->X());
+  randstates->Init();
+  quda::gaugeGauss(*data, *randstates);
+  randstates->Release();
+  delete randstates;
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  if (extendedGaugeResident) {
+
+    extendedGaugeResident = gaugePrecise;
+    extendedGaugeResident -> exchangeExtendedGhost(R,redundant_comms);
+  }
+#else
+  errorQuda("Gauge tools are not build");
+#endif
+}
+
+
 /*
  * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
  */
@@ -5530,72 +5574,42 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 {
   profileAPE.TPSTART(QUDA_PROFILE_TOTAL);
 
-  if (gaugePrecise == NULL) {
-    errorQuda("Gauge field must be loaded");
+  if (gaugePrecise == NULL) errorQuda("Gauge field must be loaded");
+
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  for(int dir=0; dir<4; ++dir) {
+    gParam.x[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+    gParam.r[dir] = R[dir];
   }
 
-  int pad = 0;
-  int y[4];
-
-#ifdef MULTI_GPU
-  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
-  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-                         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
-#else
-  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
-  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-                         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-#endif
-
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.order = gaugePrecise->Order();
-  gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gParam.t_boundary = gaugePrecise->TBoundary();
-  gParam.nFace = 1;
-  gParam.tadpole = gaugePrecise->Tadpole();
-
-#ifdef MULTI_GPU
-  for(int dir=0; dir<4; ++dir) gParam.r[dir] = R[dir];
-#endif
-
-  if (gaugeSmeared != NULL) {
-    delete gaugeSmeared;
-  }
+  if (gaugeSmeared != NULL) delete gaugeSmeared;
 
   gaugeSmeared = new cudaGaugeField(gParam);
 
-#ifdef MULTI_GPU
   copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
-#else
-  gaugeSmeared->copy(*gaugePrecise);
-#endif
 
-  cudaGaugeField *cudaGaugeTemp = NULL;
-  cudaGaugeTemp = new cudaGaugeField(gParam);
+  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after 0 APE steps: %le\n", plq.x);
+    printfQuda("Plaquette after 0 APE steps: %le %le %le\n", plq.x, plq.y, plq.z);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
-      cudaGaugeTemp->copy(*gaugeSmeared);
-#ifdef MULTI_GPU
-      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
-#endif
-      APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha, QUDA_CUDA_FIELD_LOCATION);
+    cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+    APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha);
   }
 
   delete cudaGaugeTemp;
 
-#ifdef MULTI_GPU
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
-#endif
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq.x);
+    printfQuda("Plaquette after %d APE steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
 
   profileAPE.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -5605,75 +5619,90 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 {
   profileSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
 
-  if (gaugePrecise == NULL) {
-    errorQuda("Gauge field must be loaded");
+  if (gaugePrecise == NULL) errorQuda("Gauge field must be loaded");
+
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  for(int dir=0; dir<4; ++dir) {
+    gParam.x[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+    gParam.r[dir] = R[dir];
   }
 
-  int pad = 0;
-  int y[4];
-
-#ifdef MULTI_GPU
-  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
-  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-                         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
-#else
-  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
-  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-                         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-#endif
-
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.order = gaugePrecise->Order();
-  gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gParam.t_boundary = gaugePrecise->TBoundary();
-  gParam.nFace = 1;
-  gParam.tadpole = gaugePrecise->Tadpole();
-
-#ifdef MULTI_GPU
-  for(int dir=0; dir<4; ++dir) gParam.r[dir] = R[dir];
-#endif
-
-  if (gaugeSmeared != NULL) {
-    delete gaugeSmeared;
-  }
+  if (gaugeSmeared != NULL) delete gaugeSmeared;
 
   gaugeSmeared = new cudaGaugeField(gParam);
 
-#ifdef MULTI_GPU
   copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
-#else
-  gaugeSmeared->copy(*gaugePrecise);
-#endif
 
-  cudaGaugeField *cudaGaugeTemp = NULL;
-  cudaGaugeTemp = new cudaGaugeField(gParam);
+  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after 0 STOUT steps: %le\n", plq.x);
+    printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plq.x, plq.y, plq.z);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
-      cudaGaugeTemp->copy(*gaugeSmeared);
-#ifdef MULTI_GPU
-      cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
-#endif
-      STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, QUDA_CUDA_FIELD_LOCATION);
+    cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+    STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
   }
 
   delete cudaGaugeTemp;
 
-#ifdef MULTI_GPU
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
-#endif
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after %d STOUT steps: %le\n", nSteps, plq.x);
+    printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
 
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+ void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
+{
+  profileOvrImpSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == NULL) errorQuda("Gauge field must be loaded");
+  
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  for(int dir=0; dir<4; ++dir) {
+    gParam.x[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+    gParam.r[dir] = R[dir];
+  }
+
+  if (gaugeSmeared != NULL) delete gaugeSmeared;
+
+  gaugeSmeared = new cudaGaugeField(gParam);
+
+  copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after 0 OvrImpSTOUT steps: %le %le %le\n", plq.x, plq.y, plq.z);
+  }
+
+  for (unsigned int i=0; i<nSteps; i++) {
+    cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+    OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, epsilon);
+  }
+
+  delete cudaGaugeTemp;
+
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
+  }
+
+  profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 

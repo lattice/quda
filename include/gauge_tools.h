@@ -1,3 +1,4 @@
+#include <random_quda.h>
 namespace quda {
   /**
      Compute the plaquette of the gauge field
@@ -11,6 +12,14 @@ namespace quda {
   double3 plaquette(const GaugeField& U,
 		    QudaFieldLocation location);
 
+
+
+  /** Generate Gaussian distributed GaugeField
+   * @param dataDs The GaugeField
+   * @param rngstate random states
+   */
+
+  void gaugeGauss(GaugeField &dataDs, RNG &rngstate);
   
   /**
      Apply APE smearing to the gauge field
@@ -18,12 +27,10 @@ namespace quda {
      @param dataDs Output smeared field
      @param dataOr Input gauge field
      @param alpha smearing parameter
-     @param location Location of the computation
   */
   void APEStep (GaugeField &dataDs,
 		const GaugeField& dataOr,
-		double alpha,
-		QudaFieldLocation location);
+		double alpha);
 
   /**
      Apply STOUT smearing to the gauge field
@@ -31,12 +38,22 @@ namespace quda {
      @param dataDs Output smeared field
      @param dataOr Input gauge field
      @param rho smearing parameter
-     @param location Location of the computation
   */
   void STOUTStep (GaugeField &dataDs,
-		const GaugeField& dataOr,
-		double rho,
-		QudaFieldLocation location);
+		  const GaugeField& dataOr,
+		  double rho);
+
+  /**
+     Apply Over Improved STOUT smearing to the gauge field
+
+     @param dataDs Output smeared field
+     @param dataOr Input gauge field
+     @param rho smearing parameter
+     @param epsilon smearing parameter
+  */
+  void OvrImpSTOUTStep (GaugeField &dataDs,
+			const GaugeField& dataOr,
+			double rho, double epsilon);
 
 
   /**
