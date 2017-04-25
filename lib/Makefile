@@ -53,7 +53,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
-	quda_memcpy.o quda_arpack_interface.o ${QIO_UTIL}
+	quda_memcpy.o quda_arpack_interface.o ${QIO_UTIL}		\
+	spinor_gauss.o gauge_random.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
