@@ -868,7 +868,11 @@ namespace quda {
 	pack_destination[i] = (policy == 1 || policy == 3) ? Host : Device;
 	halo_location[i] = (policy == 2 || policy == 3) ? Host : Device;
       }
-      if (dslash && comm_partitioned()) inA.exchangeGhost((QudaParity)(1-parity), dagger, pack_destination, halo_location, false);
+      bool gdr_send = (policy == 4 || policy == 6) ? true : false;
+      bool gdr_recv = (policy == 5 || policy == 6) ? true : false;
+
+      if (dslash && comm_partitioned())
+	inA.exchangeGhost((QudaParity)(1-parity), dagger, pack_destination, halo_location, gdr_send, gdr_recv);
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
 
@@ -900,6 +904,9 @@ namespace quda {
   void enableProfileCount();
   void setPolicyTuning(bool);
 
+  static bool dslash_init = false;
+  static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
+
  class DslashCoarsePolicyTune : public Tunable {
 
    DslashCoarseLaunch &dslash;
@@ -907,10 +914,11 @@ namespace quda {
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-   const int n_policy = 4;
+   const int n_policy;
 
  public:
-   inline DslashCoarsePolicyTune(DslashCoarseLaunch &dslash) : dslash(dslash)
+   inline DslashCoarsePolicyTune(DslashCoarseLaunch &dslash)
+     : dslash(dslash), n_policy( comm_gdr_enabled() ? 7 : 4)
    {
       strcpy(aux,"policy,");
       if (dslash.dslash) strcat(aux,"dslash");
@@ -918,7 +926,13 @@ namespace quda {
       strcat(aux,dslash.inA.AuxString());
       strcat(aux,comm_dim_partitioned_string());
 
-     // before we do policy tuning we must ensure the kernel
+      if (!dslash_init) {
+	config += comm_peer2peer_enabled_global();
+	config += comm_gdr_enabled() * 2;
+	dslash_init = true;
+      }
+
+      // before we do policy tuning we must ensure the kernel
      // constituents have been tuned since we can't do nested tuning
      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
        disableProfileCount();
@@ -932,6 +946,14 @@ namespace quda {
 
    inline void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
+
+     if (config != tp.aux.y) {
+       errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
+		 "this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.",
+		 config, tp.aux.y);
+     }
+
+     if (tp.aux.x >= n_policy) errorQuda("Requested policy that is outside of range");
      dslash(tp.aux.x);
    }
 
@@ -950,12 +972,12 @@ namespace quda {
 
    void initTuneParam(TuneParam &param) const  {
      Tunable::initTuneParam(param);
-     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = 0; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
      Tunable::defaultTuneParam(param);
-     param.aux.x = 0; param.aux.y = 0; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = 0; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
    }
 
    TuneKey tuneKey() const {

@@ -1388,8 +1388,7 @@ namespace quda {
   }
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination_,
-					   const MemoryLocation *halo_location_, bool gdr)  const {
-    if (gdr) errorQuda("GDR not yet enabled here");
+					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv)  const {
     int nFace = (nSpin == 1) ? 3 : 1;
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
@@ -1433,56 +1432,62 @@ namespace quda {
 
     genericPackGhost(send, *this, parity, dagger, pack_destination); // FIXME - need support for asymmetric topologies
 
-#if 1
     size_t total_bytes = 0;
     for (int i=0; i<nDimComms; i++) if (comm_dim_partitioned(i)) total_bytes += 2*ghost_face_bytes[i]; // 2 for fwd/bwd
 
-    if (!fused_pack_memcpy) {
-      for (int i=0; i<nDimComms; i++) {
-	if (comm_dim_partitioned(i)) {
-	  if (pack_destination[2*i+0] == Device) qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
-							    ghost_face_bytes[i], cudaMemcpyDeviceToHost);
-	  if (pack_destination[2*i+1] == Device) qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
-							    ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+    if (!gdr_send)  {
+      if (!fused_pack_memcpy) {
+	for (int i=0; i<nDimComms; i++) {
+	  if (comm_dim_partitioned(i)) {
+	    if (pack_destination[2*i+0] == Device) qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
+							      ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	    if (pack_destination[2*i+1] == Device) qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
+							      ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	  }
 	}
+      } else if (total_bytes && !pack_host) {
+	qudaMemcpy(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, cudaMemcpyDeviceToHost);
       }
-    } else if (total_bytes && !pack_host) {
-      qudaMemcpy(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, cudaMemcpyDeviceToHost);
     }
 
-    if (pack_host) cudaDeviceSynchronize(); // need to make sure packing has finished before kicking off MPI
+    for (int i=0; i<nDimComms; i++) { // prepost receive
+      if (comm_dim_partitioned(i)) {
+	comm_start(gdr_recv ? mh_recv_rdma_back[bufferIndex][i] : mh_recv_back[bufferIndex][i]);
+	comm_start(gdr_recv ? mh_recv_rdma_fwd[bufferIndex][i] : mh_recv_fwd[bufferIndex][i]);
+      }
+    }
+
+    if (gdr_send || pack_host) cudaDeviceSynchronize(); // need to make sure packing has finished before kicking off MPI
 
     for (int i=0; i<nDimComms; i++) {
       if (comm_dim_partitioned(i)) {
-	comm_start(mh_recv_back[bufferIndex][i]);
-	comm_start(mh_recv_fwd[bufferIndex][i]);
-	comm_start(mh_send_fwd[bufferIndex][i]);
-	comm_start(mh_send_back[bufferIndex][i]);
+	comm_start(gdr_send ? mh_send_rdma_fwd[bufferIndex][i] : mh_send_fwd[bufferIndex][i]);
+	comm_start(gdr_send ? mh_send_rdma_back[bufferIndex][i] : mh_send_back[bufferIndex][i]);
       }
     }
 
     for (int i=0; i<nDimComms; i++) {
       if (!comm_dim_partitioned(i)) continue;
-      comm_wait(mh_send_fwd[bufferIndex][i]);
-      comm_wait(mh_send_back[bufferIndex][i]);
-      comm_wait(mh_recv_back[bufferIndex][i]);
-      comm_wait(mh_recv_fwd[bufferIndex][i]);
+      comm_wait(gdr_send ? mh_send_rdma_fwd[bufferIndex][i] : mh_send_fwd[bufferIndex][i]);
+      comm_wait(gdr_send ? mh_send_rdma_back[bufferIndex][i] : mh_send_back[bufferIndex][i]);
+      comm_wait(gdr_recv ? mh_recv_rdma_back[bufferIndex][i] : mh_recv_back[bufferIndex][i]);
+      comm_wait(gdr_recv ? mh_recv_rdma_fwd[bufferIndex][i] : mh_recv_fwd[bufferIndex][i]);
     }
 
-    if (!fused_halo_memcpy) {
-      for (int i=0; i<nDimComms; i++) {
-	if (!comm_dim_partitioned(i)) continue;
-	if (halo_location[2*i+0] == Device) qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-						       ghost_face_bytes[i], cudaMemcpyHostToDevice);
-	if (halo_location[2*i+1] == Device) qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
-						       ghost_face_bytes[i], cudaMemcpyHostToDevice);
+    if (!gdr_recv) {
+      if (!fused_halo_memcpy) {
+	for (int i=0; i<nDimComms; i++) {
+	  if (!comm_dim_partitioned(i)) continue;
+	  if (halo_location[2*i+0] == Device) qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+							 ghost_face_bytes[i], cudaMemcpyHostToDevice);
+	  if (halo_location[2*i+1] == Device) qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
+							 ghost_face_bytes[i], cudaMemcpyHostToDevice);
+	}
+      } else if (total_bytes && !halo_host) {
+	qudaMemcpy(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice);
       }
-    } else if (total_bytes && !halo_host) {
-      qudaMemcpy(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice);
     }
-#else
-    exchange(ghost_buf, send, nFace);
-#endif
+
   }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {

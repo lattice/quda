@@ -363,9 +363,15 @@ namespace quda {
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
+       @param[in] Field parity
+       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] pack_destination Destination of the packing buffer
+       @param[in] halo_location Destination of the halo reading buffer
+       @param[in] gdr_send Are we using GDR for sending
+       @param[in] gdr_recv Are we using GDR for receiving
      */
     virtual void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
-			       const MemoryLocation *halo_location=nullptr, bool gdr=false) const = 0;
+			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const = 0;
 
     /**
       This function returns true if the field is stored in an internal
@@ -628,17 +634,19 @@ namespace quda {
     const void* Ghost2() const { return ghost_field_tex[bufferIndex]; }
 
     /**
-       @brief Do a ghost exchange between neighbouring nodes.  All dimensions
+       @brief This is a unified ghost exchange function for doing a complete
+       halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
-       @param[in] parity Field parity
-       @param[in] dagger Are we packng for a dagger operator
-       @param[in] pack_destination Are we packing directly into local device memory, zero-copy memory or remote memory
-       @param[in] halo_location Will we read the halo from local device memory, zero-copy memory or remote memory
-       @param[in] gdr Will we do the exchange using GPU pointers are stage in CPU memory
+       @param[in] Field parity
+       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] pack_destination Destination of the packing buffer
+       @param[in] halo_location Destination of the halo reading buffer
+       @param[in] gdr_send Are we using GDR for sending
+       @param[in] gdr_recv Are we using GDR for receiving
      */
     void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
@@ -711,22 +719,19 @@ namespace quda {
     void zero();
 
     /**
-       Do a ghost exchange between neighbouring nodes.  All dimensions
+       @brieff This is a unified ghost exchange function for doing a complete
+       halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
-     */
-    /**
-       @brief Do a ghost exchange between neighbouring nodes.  All dimensions
-       are exchanged and no spin projection is done in the case of
-       Wilson fermions.
-       @param[in] parity Field parity
-       @param[in] dagger Are we packng for a dagger operator
-       @param[in] pack_destination Dummy for cpu variant
-       @param[in] halo_location Dummy for cpu variant
-       @param[in] gdr Dummy for cpu variant
+       @param[in] Field parity
+       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] pack_destination Destination of the packing buffer
+       @param[in] halo_location Destination of the halo reading buffer
+       @param[in] gdr_send Dummy for CPU
+       @param[in] gdr_recv Dummy for GPU
      */
     void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
   };
 
