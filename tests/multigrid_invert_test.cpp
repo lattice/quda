@@ -62,9 +62,16 @@ extern double mu_factor[QUDA_MAX_MG_LEVEL];
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
 extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
+extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol;
+extern QudaSetupType setup_type;
+extern bool pre_orthonormalize;
+extern bool post_orthonormalize;
 extern double omega;
 extern QudaInverterType smoother_type;
+extern QudaInverterType coarsest_solver;
+extern double coarsest_tol;
+extern int coarsest_maxiter;
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -217,6 +224,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     }
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
+    mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol;
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
@@ -252,8 +260,15 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
-  // coarse grid solver is GCR
-  mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
+  mg_param.setup_type = setup_type;
+  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+
+  // coarsest grid solver
+  mg_param.smoother[mg_levels-1] = coarsest_solver;
+  mg_param.smoother_tol[mg_levels-1] = coarsest_tol == 0 ? tol_hq : coarsest_tol;
+  mg_param.nu_pre[mg_levels-1] = coarsest_maxiter;
+  mg_param.nu_post[mg_levels-1] = 0;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
@@ -369,6 +384,7 @@ int main(int argc, char **argv)
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SILENT;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
+    num_setup_iter[i] = 1;
     mu_factor[i] = 1.;
   }
 

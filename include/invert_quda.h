@@ -394,7 +394,7 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *App, *tmpp;
+    ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     bool init;
 
   public:
@@ -403,6 +403,72 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
     void solve(ColorSpinorField& out, ColorSpinorField& in);
+  };
+
+
+
+  class CG3 : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    // pointers to fields to avoid multiple creation overhead
+    ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp, *tmp2Sp;
+    bool init;
+
+  public:
+    CG3(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CG3();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+
+
+  class CG3NE : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    // pointers to fields to avoid multiple creation overhead
+    ColorSpinorField *yp, *rp, *AdagrSp, *AAdagrSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp;
+    bool init;
+
+  public:
+    CG3NE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CG3NE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CGNE : public CG {
+
+  private:
+    DiracMMdag mmdag;
+    DiracMMdag mmdagSloppy;
+    ColorSpinorField *xp;
+    bool init;
+
+  public:
+    CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CGNE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CGNR : public CG {
+
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    ColorSpinorField *bp;
+    bool init;
+
+  public:
+    CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CGNR();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
 
