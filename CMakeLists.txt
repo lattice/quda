@@ -110,6 +110,7 @@ set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
 
 # QDPJIT
 set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
+set(QUDA_QDPJITHOME "" CACHE PATH "path to QDPJIT installation")
 
 # Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
@@ -199,6 +200,16 @@ if(QUDA_MPI OR QUDA_QMP)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
+endif()
+
+if(QUDA_QDPJIT)
+  add_definitions(-DUSE_QDPJIT)
+  include_directories(SYSTEM ${QUDA_QDPJITHOME}/include)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  FIND_LIBRARY(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
+  FIND_LIBRARY(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
+  FIND_LIBRARY(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
 if(QUDA_MPI AND QUDA_QMP)
