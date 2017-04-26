@@ -1543,8 +1543,10 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	  // in the below we switch to the mapped ghost buffer and update the tuneKey to reflect this
 	  inputSpinor->bufferIndex += 2;
+#ifdef USE_TEXTURE_OBJECTS
 	  dslashParam.ghostTex = inputSpinor->GhostTex();
 	  dslashParam.ghostTexNorm = inputSpinor->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
 	  char aux_copy[TuneKey::aux_n];
 	  strcpy(aux_copy,dslash.getAux(dslashParam.kernel_type));
 	  dslash.augmentAux(dslashParam.kernel_type, ",zero_copy");
@@ -1554,9 +1556,10 @@ struct DslashZeroCopy : DslashPolicyImp {
 	  // reset to default
 	  dslash.setAux(dslashParam.kernel_type, aux_copy);
 	  inputSpinor->bufferIndex -= 2;
+#ifdef USE_TEXTURE_OBJECTS
 	  dslashParam.ghostTex = inputSpinor->GhostTex();
 	  dslashParam.ghostTexNorm = inputSpinor->GhostTexNorm();
-
+#endif // USE_TEXTURE_OBJECTS
 	  pattern.dslashCompleted[2*i] = 1;
 	}
 
@@ -1678,8 +1681,10 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
       // in the below we switch to the mapped ghost buffer and update the tuneKey to reflect this
       inputSpinor->bufferIndex += 2;
+#ifdef USE_TEXTURE_OBJECTS
       dslashParam.ghostTex = inputSpinor->GhostTex();
       dslashParam.ghostTexNorm = inputSpinor->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
       char aux_copy[TuneKey::aux_n];
       strcpy(aux_copy,dslash.getAux(dslashParam.kernel_type));
       dslash.augmentAux(dslashParam.kernel_type, ",zero_copy");
@@ -1689,8 +1694,10 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
       // reset to default
       dslash.setAux(dslashParam.kernel_type, aux_copy);
       inputSpinor->bufferIndex -= 2;
+#ifdef USE_TEXTURE_OBJECTS
       dslashParam.ghostTex = inputSpinor->GhostTex();
       dslashParam.ghostTexNorm = inputSpinor->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
     }
 
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
