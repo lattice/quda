@@ -40,7 +40,7 @@ namespace quda {
       : out(const_cast<ColorSpinorField&>(out)), inA(const_cast<ColorSpinorField&>(inA)),
 	inB(const_cast<ColorSpinorField&>(inB)), Y(const_cast<GaugeField&>(Y)),
 	X(const_cast<GaugeField&>(X)), kappa(kappa), parity(parity),
-	nParity(out.SiteSubset()), nFace(1), X0h(out.X(0)/2),
+	nParity(out.SiteSubset()), nFace(1), X0h( ((3-nParity) * out.X(0)) /2),
 	dim{ (3-nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(out.VolumeCB()/dim[4])

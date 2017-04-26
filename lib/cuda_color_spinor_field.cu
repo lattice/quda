@@ -616,7 +616,7 @@ namespace quda {
 	if (ghost_bytes) {
 	  for (int b=0; b<2; b++) {
 	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_free(ghost_send_buffer_d[b]);
+	    device_pinned_free(ghost_send_buffer_d[b]);
 	    host_free(ghost_pinned_buffer_h[b]);
 	  }
 	}
@@ -627,8 +627,8 @@ namespace quda {
 	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
 	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
-	  // gpu send buffset
-	  ghost_send_buffer_d[b] = device_malloc(ghost_bytes);
+	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
 	  // pinned buffer used for sending and receiving
 	  ghost_pinned_buffer_h[b] = pinned_malloc(2*ghost_bytes);
@@ -664,7 +664,7 @@ namespace quda {
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) device_free(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
       // free pinned memory buffers
@@ -985,6 +985,8 @@ namespace quda {
 
       } // loop over dimension
 
+      bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled
+
       // initialize the message handlers
       for (int i=0; i<nDimComms; i++) {
 	if (!commDimPartitioned(i)) continue;
@@ -996,11 +998,11 @@ namespace quda {
 	  mh_recv_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
 	  mh_recv_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
 
-	  mh_send_rdma_fwd[b][i] = comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_send_rdma_back[b][i] = comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]);
+	  mh_send_rdma_fwd[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	  mh_send_rdma_back[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
 
-	  mh_recv_rdma_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_recv_rdma_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]);
+	  mh_recv_rdma_fwd[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	  mh_recv_rdma_back[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
 	} // loop over b
 
       } // loop over dimension
@@ -1089,6 +1091,7 @@ namespace quda {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return;
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
 
     if (dir%2 == 0) { // sending backwards
       if (comm_peer2peer_enabled(1,dim)) {
@@ -1119,6 +1122,7 @@ namespace quda {
     int dim = d/2;
     int dir = d%2;
     if (!commDimPartitioned(dim)) return;
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
 
     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
     int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
@@ -1258,6 +1262,7 @@ namespace quda {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return 0;
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
 
     if (dir%2==0) {
 
@@ -1315,6 +1320,7 @@ namespace quda {
   void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger, cudaStream_t *stream_p, bool gdr) {
     int dim = dir / 2;
     if (!commDimPartitioned(dim)) return;
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
 
     if (dir%2==0) {
 
@@ -1389,6 +1395,7 @@ namespace quda {
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination_,
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv)  const {
+    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
     int nFace = (nSpin == 1) ? 3 : 1;
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
