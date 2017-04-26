@@ -265,6 +265,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
@@ -303,6 +304,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
@@ -337,6 +339,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
@@ -379,6 +382,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
+  checkCudaError(); // check and clear error state first
   cudaPointerAttributes attributes;
   cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
   if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
