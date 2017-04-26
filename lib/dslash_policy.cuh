@@ -793,7 +793,7 @@ struct DslashFusedExterior : DslashPolicyImp {
     // if any comms is not peer-2-peer then we need to post a scatter event and wait on that
     bool post_scatter_event = false;
     for (int i=3; i>=0; i--) {
-      if (!commDimPartitioned(i)) continue;
+      if (!dslashParam.commDim[i]) continue;
       if (comm_peer2peer_enabled(0,i)) {
 	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
 		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -1122,7 +1122,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
     // if any comms is not peer-2-peer then we need to post a scatter event and wait on that
     bool post_scatter_event = false;
     for (int i=3; i>=0; i--) {
-      if (!commDimPartitioned(i)) continue;
+      if (!dslashParam.commDim[i]) continue;
       if (comm_peer2peer_enabled(0,i)) {
 	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
 		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -1411,7 +1411,7 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
     // if any comms is not peer-2-peer then we need to post a scatter event and wait on that
     bool post_scatter_event = false;
     for (int i=3; i>=0; i--) {
-      if (!commDimPartitioned(i)) continue;
+      if (!dslashParam.commDim[i]) continue;
       if (comm_peer2peer_enabled(0,i)) {
 	PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
 		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
