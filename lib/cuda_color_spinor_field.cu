@@ -616,7 +616,7 @@ namespace quda {
 	if (ghost_bytes) {
 	  for (int b=0; b<2; b++) {
 	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_free(ghost_send_buffer_d[b]);
+	    device_pinned_free(ghost_send_buffer_d[b]);
 	    host_free(ghost_pinned_buffer_h[b]);
 	  }
 	}
@@ -627,8 +627,8 @@ namespace quda {
 	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
 	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
-	  // gpu send buffset
-	  ghost_send_buffer_d[b] = device_malloc(ghost_bytes);
+	  // gpu send buffset (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
 	  // pinned buffer used for sending and receiving
 	  ghost_pinned_buffer_h[b] = pinned_malloc(2*ghost_bytes);
@@ -664,7 +664,7 @@ namespace quda {
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) device_free(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
       // free pinned memory buffers
