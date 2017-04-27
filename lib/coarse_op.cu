@@ -35,8 +35,6 @@ namespace quda {
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
-      int dummy = 0;
-      v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -68,8 +66,6 @@ namespace quda {
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
-      int dummy = 0;
-      v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -83,6 +79,7 @@ namespace quda {
 
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
 	(yAccessor, xAccessor, xInvAccessor, uvAccessor, avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, Yhat, av, v, kappa, mu, mu_factor, dirac, matpc);
+
     }
 
   }
