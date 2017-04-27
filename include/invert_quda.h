@@ -430,6 +430,7 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    DiracDagger matDagSloppy;
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *AdagrSp, *AAdagrSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp;
     bool init;
