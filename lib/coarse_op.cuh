@@ -1670,7 +1670,6 @@ namespace quda {
 
     // invert the clover matrix field
     const int n = X_.Ncolor();
-    BlasMagmaArgs magma(X_.Precision());
     if (X_.Location() == QUDA_CUDA_FIELD_LOCATION && X_.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       GaugeFieldParam param(X_);
       // need to copy into AoS format for MAGMA
@@ -1678,17 +1677,17 @@ namespace quda {
       cudaGaugeField X(param);
       cudaGaugeField Xinv(param);
       X.copy(X_);
-      magma.BatchInvertMatrix((void*)Xinv.Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X.Location());
+      blas::flops += cublas::BatchInvertMatrix((void*)Xinv.Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X_.Precision(), X.Location());
       Xinv_.copy(Xinv);
     } else if (X_.Location() == QUDA_CPU_FIELD_LOCATION && X_.Order() == QUDA_QDP_GAUGE_ORDER) {
       cpuGaugeField *X_h = static_cast<cpuGaugeField*>(&X_);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv_);
-      magma.BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), QUDA_CPU_FIELD_LOCATION);
+      blas::flops += cublas::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X_.Precision(), QUDA_CPU_FIELD_LOCATION);
     } else {
       errorQuda("Unsupported location=%d and order=%d", X_.Location(), X_.Order());
     }
 
-    // now exchange Y halos of both forwads and backwards links for multi-process dslash
+    // now exchange Y halos of both forwards and backwards links for multi-process dslash
     Y_.exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
 
     // compute the preconditioned links

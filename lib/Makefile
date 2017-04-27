@@ -43,7 +43,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\
-	eig_lanczos_quda.o ritz_quda.o eig_solver.o blas_magma.o	\
+	eig_lanczos_quda.o ritz_quda.o eig_solver.o 			\
+	blas_cublas.o blas_magma.o					\
 	misc_helpers.o inv_mpcg_quda.o inv_mpbicgstab_quda.o		\
 	pgauge_exchange.o pgauge_init.o pgauge_heatbath.o random.o	\
 	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\

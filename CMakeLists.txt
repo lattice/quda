@@ -167,7 +167,6 @@ mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
-mark_as_advanced(QUDA_MULTIGRID)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -290,7 +289,9 @@ if(QUDA_SSTEP)
 endif()
 
 if (QUDA_MULTIGRID)
+  add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
+  LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
 endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)

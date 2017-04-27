@@ -208,8 +208,9 @@ ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MULTIGRID)), yes)
-  NVCCOPT += -DGPU_MULTIGRID
-  COPT += -DGPU_MULTIGRID
+  NVCCOPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  COPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  LIB += -lcublas
 endif
 
 ifeq ($(strip $(BUILD_SSTEP)), yes)
