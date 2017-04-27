@@ -832,6 +832,18 @@ namespace quda {
 
 #endif // GPU_MULTIGRID
 
+  enum DslashCoarsePolicy {
+    DSLASH_COARSE_BASIC,          // stage both sends and recvs in host memory using memcpys
+    DSLASH_COARSE_ZERO_COPY_PACK, // zero copy write pack buffers
+    DSLASH_COARSE_ZERO_COPY_READ, // zero copy read halos in dslash kernel
+    DSLASH_COARSE_ZERO_COPY,      // full zero copy
+    DSLASH_COARSE_GDR_SEND,       // GDR send
+    DSLASH_COARSE_GDR_RECV,       // GDR recv
+    DSLASH_COARSE_GDR,             // full GDR
+    DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV, // zero copy write and GDR recv
+    DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ // GDR send and zero copy read
+  };
+
   struct DslashCoarseLaunch {
 
     ColorSpinorField &out;
@@ -852,7 +864,7 @@ namespace quda {
     /**
        @brief Execute the coarse dslash using the given policy
      */
-    inline void operator()(int policy) {
+    inline void operator()(DslashCoarsePolicy policy) {
 #ifdef GPU_MULTIGRID
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
@@ -865,11 +877,15 @@ namespace quda {
       MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
       MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from
       for (int i=0; i<2*QUDA_MAX_DIM; i++) {
-	pack_destination[i] = (policy == 1 || policy == 3) ? Host : Device;
-	halo_location[i] = (policy == 2 || policy == 3) ? Host : Device;
+	pack_destination[i] = (policy == DSLASH_COARSE_ZERO_COPY_PACK || policy == DSLASH_COARSE_ZERO_COPY ||
+			       policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? Host : Device;
+	halo_location[i] = (policy == DSLASH_COARSE_ZERO_COPY_READ || policy == DSLASH_COARSE_ZERO_COPY ||
+			    policy == DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? Host : Device;
       }
-      bool gdr_send = (policy == 4 || policy == 6) ? true : false;
-      bool gdr_recv = (policy == 5 || policy == 6) ? true : false;
+      bool gdr_send = (policy == DSLASH_COARSE_GDR_SEND || policy == DSLASH_COARSE_GDR ||
+		       policy == DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? true : false;
+      bool gdr_recv = (policy == DSLASH_COARSE_GDR_RECV || policy == DSLASH_COARSE_GDR ||
+		       policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
 
       if (dslash && comm_partitioned())
 	inA.exchangeGhost((QudaParity)(1-parity), dagger, pack_destination, halo_location, gdr_send, gdr_recv);
@@ -889,6 +905,8 @@ namespace quda {
       } else {
 	errorQuda("Unsupported precision %d\n", Y.Precision());
       }
+
+      if (dslash && comm_partitioned()) inA.bufferIndex = (1 - inA.bufferIndex);
 #else
       errorQuda("Multigrid has not been built");
 #endif
@@ -905,6 +923,7 @@ namespace quda {
   void setPolicyTuning(bool);
 
   static bool dslash_init = false;
+  static std::vector<DslashCoarsePolicy> policy;
   static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
 
  class DslashCoarsePolicyTune : public Tunable {
@@ -914,11 +933,8 @@ namespace quda {
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-   const int n_policy;
-
  public:
-   inline DslashCoarsePolicyTune(DslashCoarseLaunch &dslash)
-     : dslash(dslash), n_policy( comm_gdr_enabled() ? 7 : 4)
+   inline DslashCoarsePolicyTune(DslashCoarseLaunch &dslash) : dslash(dslash)
    {
       strcpy(aux,"policy,");
       if (dslash.dslash) strcat(aux,"dslash");
@@ -927,25 +943,50 @@ namespace quda {
       strcat(aux,comm_dim_partitioned_string());
 
       if (!dslash_init) {
+	policy.reserve(9);
+	static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_COARSE_POLICY");
+
+	if (dslash_policy_env) { // set the policies to tune for explicitly
+	  std::stringstream policy_list(dslash_policy_env);
+
+	  int policy_;
+	  while (policy_list >> policy_) {
+	    DslashCoarsePolicy dslash_policy = static_cast<DslashCoarsePolicy>(policy_);
+
+	    // check this is a valid policy choice
+	    if ( (dslash_policy == DSLASH_COARSE_GDR_SEND || dslash_policy == DSLASH_COARSE_GDR_RECV ||
+		  dslash_policy == DSLASH_COARSE_GDR || dslash_policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV ||
+		  dslash_policy == DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) && !comm_gdr_enabled() ) {
+	      errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", dslash_policy);
+	    }
+
+	    policy.push_back(static_cast<DslashCoarsePolicy>(policy_));
+	    if (policy_list.peek() == ',') policy_list.ignore();
+	  }
+	} else {
+	  policy.push_back(DSLASH_COARSE_BASIC);
+	  policy.push_back(DSLASH_COARSE_ZERO_COPY_PACK);
+	}
+
 	config += comm_peer2peer_enabled_global();
 	config += comm_gdr_enabled() * 2;
 	dslash_init = true;
       }
 
       // before we do policy tuning we must ensure the kernel
-     // constituents have been tuned since we can't do nested tuning
-     if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
-       disableProfileCount();
-       for (int i=0; i<n_policy; i++) dslash(i);
-       enableProfileCount();
-       setPolicyTuning(true);
-     }
+      // constituents have been tuned since we can't do nested tuning
+      if (0 && getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+	disableProfileCount();
+	for (auto &i : policy) dslash(i);
+	enableProfileCount();
+	setPolicyTuning(true);
+      }
     }
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
    inline void apply(const cudaStream_t &stream) {
-     TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
+     TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO /*getTuning()*/, getVerbosity());
 
      if (config != tp.aux.y) {
        errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
@@ -953,18 +994,20 @@ namespace quda {
 		 config, tp.aux.y);
      }
 
-     if (tp.aux.x >= n_policy) errorQuda("Requested policy that is outside of range");
-     dslash(tp.aux.x);
+     if (tp.aux.x >= (int)policy.size()) errorQuda("Requested policy that is outside of range");
+     dslash(policy[tp.aux.x]);
    }
 
    int tuningIter() const { return 10; }
 
    bool advanceAux(TuneParam &param) const
    {
-     if (param.aux.x < n_policy-1) {
-       param.aux.x++; return true;
+     if ((unsigned)param.aux.x < policy.size()-1) {
+       param.aux.x++;
+       return true;
      } else {
-       param.aux.x = 0; return false;
+       param.aux.x = 0;
+       return false;
      }
    }
 
