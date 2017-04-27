@@ -54,6 +54,7 @@ extern int mg_levels;
 
 extern bool generate_nullspace;
 extern bool generate_all_levels;
+extern bool verify_results;
 extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
@@ -275,7 +276,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
-  mg_param.run_verify = QUDA_BOOLEAN_YES;
+  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
