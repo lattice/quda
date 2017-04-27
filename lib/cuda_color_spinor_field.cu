@@ -631,7 +631,7 @@ namespace quda {
 	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
 	  // pinned buffer used for sending and receiving
-	  ghost_pinned_buffer_h[b] = pinned_malloc(2*ghost_bytes);
+	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
 
 	  // set the matching device-mapper pointer
 	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
