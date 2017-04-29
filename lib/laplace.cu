@@ -236,11 +236,11 @@ namespace quda {
 		      double kappa, const ColorSpinorField *x, int parity)
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyLaplace<Float,3,QUDA_RECONSTRUCT_NO>(out, in, U, kappa, x, parity);
+      ApplyLaplace<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, kappa, x, parity);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyLaplace<Float,3,QUDA_RECONSTRUCT_12>(out, in, U, kappa, x, parity);
+      ApplyLaplace<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, kappa, x, parity);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyLaplace<Float,3,QUDA_RECONSTRUCT_8>(out, in, U, kappa, x, parity);
+      ApplyLaplace<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, kappa, x, parity);
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }
