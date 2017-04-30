@@ -212,6 +212,11 @@ namespace quda {
    */
   void loadTuneCache()
   {
+    if (getTuning() == QUDA_TUNE_NO) {
+      warningQuda("Autotuning disabled");
+      return;
+    }
+
     char *path;
     struct stat pstat;
     std::string cache_path, line, token;
@@ -219,6 +224,7 @@ namespace quda {
     std::stringstream ls;
 
     path = getenv("QUDA_RESOURCE_PATH");
+
     if (!path) {
       warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
       warningQuda("Caching of tuned parameters will be disabled.");
