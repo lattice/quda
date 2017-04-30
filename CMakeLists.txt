@@ -177,6 +177,16 @@ set(CPU_ARCH x86_64)
 #######################################################################
 # everything below here is processing the setup
 #######################################################################
+include(ExternalProject)
+ExternalProject_Add(Eigen
+  URL http://bitbucket.org/eigen/eigen/get/3.3.3.tar.bz2
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/eigen/
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  PREFIX=${CMAKE_CURRENT_BINARY_DIR}/eigen
+)
+
 
 # we need to check for some packages
 find_package(PythonInterp)
