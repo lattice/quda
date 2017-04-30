@@ -16,9 +16,10 @@
 #include <iostream>
 
 #include <blas_magma.h>
+#ifdef DEFLATEDSOLVER
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-
+#endif
 #include <deflation.h>
 
 

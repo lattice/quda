@@ -2,20 +2,27 @@
 #include <qio_field.h>
 #include <string.h>
 
+#ifdef DEFLATEDSOLVER
+
 #ifdef MAGMA_LIB
 #include <blas_magma.h>
 #endif
+
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+
+#endif
 
 //#define USE_BLOCK_DEFLATION
 
 namespace quda {  
 
   using namespace blas;
+#ifdef DEFLATEDSOLVER
   using namespace Eigen;
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
+#endif
 
   //static bool debug = false;
 
@@ -23,6 +30,9 @@ namespace quda {
     : param(param),   profile(profile),
       r(nullptr), Av(nullptr), r_sloppy(nullptr), Av_sloppy(nullptr) {
 
+#ifndef DEFLATEDSOLVER
+    errorQuda("Deflated solver was not enabled.\n", param.tot_dim);
+#endif
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     printfQuda("Creating deflation space of %d vectors.\n", param.tot_dim);
 
@@ -89,7 +99,7 @@ namespace quda {
    */
 
   void Deflation::verify() {
-
+#ifdef DEFLATEDSOLVER
     const int nevs_to_print = param.cur_dim;
     if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n"); 
 
@@ -138,12 +148,12 @@ namespace quda {
     }
 
     delete [] projm;
-
+#endif
     return;
   }
 
   void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-
+#ifdef DEFLATEDSOLVER
     if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER) 
        errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
@@ -214,12 +224,12 @@ namespace quda {
     printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
 
     delete [] vec;
-
+#endif
     return;
   }
 
   void Deflation::increment(ColorSpinorField &Vm, int nev) {
-
+#ifdef DEFLATEDSOLVER
     if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER) 
        errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
@@ -336,13 +346,13 @@ namespace quda {
     param.cur_dim += nev;
 
     printfQuda("\nNew curr deflation space dim = %d\n", param.cur_dim);
-
+#endif
     return;
   }
 
 
   void Deflation::reduce(double tol, int max_nev) {
-
+#ifdef DEFLATEDSOLVER
      if(param.cur_dim < max_nev)
      {
         printf("\nToo big number of eigenvectors was requested, switched to maximum available number %d\n", param.cur_dim);
@@ -437,7 +447,7 @@ namespace quda {
      host_free(projm);
 
      delete buff;
-
+#endif
      return;
   }
 
