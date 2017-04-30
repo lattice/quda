@@ -31,10 +31,10 @@ A. Stathopolous and K. Orginos, arXiv:0707.0131
 namespace quda {
 
    using namespace blas;
-   using namespace Eigen;
 #ifdef DEFLATEDSOLVER
-   using DynamicStride   = Stride<Dynamic, Dynamic>;
+   using namespace Eigen;
 
+   using DynamicStride   = Stride<Dynamic, Dynamic>;
    using DenseMatrix     = MatrixXcd;
    using VectorSet       = MatrixXcd;
    using Vector          = VectorXcd;
@@ -43,6 +43,7 @@ namespace quda {
 //special types needed for compatibility with QUDA blas:
    using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
 #endif
+
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow? 

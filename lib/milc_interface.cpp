@@ -51,6 +51,8 @@ static bool create_quda_gauge = false;
 
 static bool invalidate_quda_mom = true;
 
+static void *df_preconditioner = NULL;
+
 // set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
 #define MOM_PIPE 0
 
@@ -741,6 +743,27 @@ static void setColorSpinorParams(const int dim[4],
   return;
 }
 
+void setDeflationParam(QudaPrecision ritz_prec,
+                       char vec_infile[],
+                       char vec_outfile[],
+                       QudaEigParam *df_param) 
+{
+
+  df_param->import_vectors = strcmp(vec_infile,"") ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  df_param->cuda_prec_ritz = ritz_prec;
+
+  df_param->location       = QUDA_CUDA_FIELD_LOCATION;
+  df_param->run_verify     = QUDA_BOOLEAN_NO;
+
+  df_param->nk       = df_param->invert_param->nev;
+  df_param->np       = df_param->invert_param->nev*df_param->invert_param->deflation_grid;
+
+  // set file i/o parameters
+  strcpy(df_param->vec_infile, vec_infile);
+  strcpy(df_param->vec_outfile, vec_outfile);
+}
+
+
 
 static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchange, const int dim[4])
 {
@@ -1109,6 +1132,7 @@ void qudaInvertMsrc(int external_precision,
   return;
 } // qudaInvert
 
+
 void qudaEigCGInvert(int external_precision,
     int quda_precision,
     double mass,
@@ -1118,76 +1142,53 @@ void qudaEigCGInvert(int external_precision,
     const void* const fatlink,
     const void* const longlink,
     const double tadpole,
-    void* source,//array of source vectors -> overwritten on exit!
+    void* source,//array of source vectors -> overwritten on exit
     void* solution,//temporary
-    void* ritzVects,//array of ritz vectors
-    double* ritzVals,//array of ritz values
     int ritz_prec,
+    char vec_infile[],
+    char vec_outfile[],
     const int max_search_dim,
     const int nev,
     const int deflation_grid,
     double tol_restart,//e.g.: 5e+3*target_residual
     const int rhs_idx,//current rhs
-    const int last_rhs_flag,//is this the last rhs to solve?
-
+    const int last_rhs_flag,//is this the last rhs to solve
     double* const final_residual,
     double* const final_fermilab_residual,
     int *num_iters)
 {
-  static const QudaVerbosity verbosity = QUDA_VERBOSE; //getVerbosity();
+#ifdef DEFLATEDSOLVER
+  static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
-#if 0
+
   if(target_fermilab_residual == 0 && target_residual == 0){
-    errorQuda("qudaEigCGInvert: requesting zero residual\n");
+    errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
   }
 
-  // const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-  // ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
+  //  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
+  //                                 ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
 
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision_sloppy = QUDA_INVALID_PRECISION;
-  QudaPrecision ritz_precision = (ritz_prec == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;;
+  QudaPrecision device_precision_sloppy;
 
   if(inv_args.mixed_precision == 2){
-    errorQuda("Sloppy half is not supported for eigCG solver\n");
+    device_precision_sloppy = QUDA_HALF_PRECISION;
   }else if(inv_args.mixed_precision == 1){
     device_precision_sloppy = QUDA_SINGLE_PRECISION;
   }else{
     device_precision_sloppy = device_precision;
   }
 
-  QudaPrecision device_precision_precondition = QUDA_HALF_PRECISION;
 
-  if(rhs_idx == 0)
-  {
-     printfQuda("\nOpen MAGMA...\n");
 
-     openMagma();
-
-     QudaGaugeParam gaugeParam = newQudaGaugeParam();
-     // a basic set routine for the gauge parameters
-     setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
-
-     const int fat_pad  = getFatLinkPadding(localDim);
-     const int long_pad = 3*fat_pad;
-
-     gaugeParam.type = QUDA_GENERAL_LINKS;
-     gaugeParam.ga_pad = fat_pad;
-     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
-
-     gaugeParam.type = QUDA_THREE_LINKS;
-     gaugeParam.ga_pad = long_pad;
-     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
-
-     invalidate_quda_gauge = false;
-  }
-
-  QudaInvertParam invertParam = newQudaInvertParam();//no need to create this for every rhs, but let's keep as is.
+  QudaPrecision device_precision_precondition = device_precision_sloppy;
+  QudaGaugeParam gaugeParam = newQudaGaugeParam();
+  // a basic set routine for the gauge parameters
+  setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
+  QudaInvertParam invertParam = newQudaInvertParam();
 
   invertParam.residual_type = static_cast<QudaResidualType_s>(0);
   invertParam.residual_type = (target_residual != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
@@ -1195,44 +1196,89 @@ void qudaEigCGInvert(int external_precision,
 
 
   QudaParity local_parity = inv_args.evenodd;
+  //double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
   double& target_res = target_residual;
   double& target_res_hq = target_fermilab_residual;
   const double reliable_delta = 1e-1;
 
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
-      mass, target_res, target_res_hq, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_INC_EIGCG_INVERTER, &invertParam);
+      mass, target_res, target_res_hq, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
+  invertParam.use_sloppy_partial_accumulator = 0;
+  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
+//!
+  QudaEigParam  df_param = newQudaEigParam();
+  df_param.invertParam = &invParam;
 
-  invertParam.rhs_idx = rhs_idx;
-  //invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
-  invertParam.nev = nev;
-  invertParam.max_search_dim = max_search_dim;
-  invertParam.deflation_grid = deflation_grid;//to test the stuff
-  invertParam.cuda_prec_ritz = ritz_precision;
-  invertParam.tol_restart = (tol_restart > target_residual) ? tol_restart : target_residual;//think about this...
-  //invertParam.use_sloppy_partial_accumulator = 0;
+  invParam.solve_type = QUDA_NORMOP_PC_SOLVE;
+  invParam.nev = nev; 
+  invParam.max_search_dim = 64;//!
+  invParam.deflation_grid = deflation_grid; 
+  invParam.cuda_prec_ritz = ritz_prec;
+  invParam.tol_restart = 5e+3*inv_param.tol;//think about this...
+  invParam.use_reduced_vector_set = true;
+  invParam.use_cg_updates = false;
+  invParam.cg_iterref_tol = 5e-2;
+  invParam.eigcg_max_restarts = 3;
+  invParam.max_restart_num = 3;
+  invParam.inc_tol = 1e-2;
+  invParam.eigenval_tol = 1e-2;
 
-  printfQuda("\nRitz precision %d\n", invertParam.cuda_prec_ritz);
+  invParam.inv_type = QUDA_INC_EIGCG_INVERTER;
 
-  int quark_offset = getColorVectorOffset(local_parity, false, localDim);//gaugeParam.X - > localDim
+  setDeflationParam(ritz_prec, vec_infile, vec_outfile, &df_param);
+//!
 
-  incrementalEigQuda(((char*)solution + quark_offset*host_precision),  ((char*)source + quark_offset*host_precision),  &invertParam, ritzVects, ritzVals);
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+
+  const int fat_pad  = getFatLinkPadding(localDim);
+  const int long_pad = 3*fat_pad;
+
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1  || !canReuseResidentGauge(&invertParam) ) {
+    invalidateGaugeQuda();
+  }
+
+  if((invalidate_quda_gauge || !create_quda_gauge) && (rhs_idx == 0)){//do this for the first RHS
+    gaugeParam.type = QUDA_GENERAL_LINKS;
+    gaugeParam.ga_pad = fat_pad;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
+
+    gaugeParam.type = QUDA_THREE_LINKS;
+    gaugeParam.ga_pad = long_pad;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+
+    invalidate_quda_gauge = false;
+  }
+
+  int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
+
+  if(rhs_idx == 0)
+    df_preconditioner = newDeflationQuda(&df_param);
+    invParam.deflation_op = df_preconditioner;
+  }
+
+
+  invertQuda(((char*)solution + quark_offset*host_precision),
+	     ((char*)source + quark_offset*host_precision),
+	     &invertParam);
+
+  if(last_rhs_flag) destroyDeflationQuda(df_preconditioner);    
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  if(last_rhs_flag)
-  {
-    destroyDeflationQuda(&invertParam, localDim, ritzVects, ritzVals);
+  if(!create_quda_gauge && last_rhs_flag) invalidateGaugeQuda();
 
-    closeMagma();
-    //
-    freeGaugeQuda();
-  }
-#endif
   qudamilc_called<false>(__func__, verbosity);
 
+#else
+  errorQuda("Deflation solver was not built.")
+#endif
   return;
 } // qudaEigCGInvert
 
@@ -1540,13 +1586,11 @@ void qudaEigCGCloverInvert(int external_precision,
     const void* link,
     void* clover, // could be stored in Milc format
     void* cloverInverse,
-
     void* source,//array of source vectors -> overwritten on exit!
     void* solution,//temporary
-
-    void* ritzVects,//array of ritz vectors
-    double* ritzVals,//array of ritz values
     int ritz_prec,
+    char vec_infile[],
+    char vec_outfile[],
     const int max_search_dim,
     const int nev,
     const int deflation_grid,
@@ -1558,95 +1602,77 @@ void qudaEigCGCloverInvert(int external_precision,
     double* const final_fermilab_residual,
     int *num_iters)
 {
+#ifdef DEFLATEDSOLVER
+  qudamilc_called<true>(__func__);
   if(target_fermilab_residual == 0 && target_residual == 0){
-    errorQuda("qudaEigCGCloverInvert: requesting zero residual\n");
+    errorQuda("qudaCloverInvert: requesting zero residual\n");
     exit(1);
   }
 
-  if(inv_args.mixed_precision == 2){
-    //device_precision_sloppy = QUDA_HALF_PRECISION;
-    errorQuda("Sloppy half is not supported for eigCG solver\n");
-  }
-#if 0
-  // if doing a pure double-precision multi-shift solve don't use reliable updates
-  double reliable_delta = (inv_args.mixed_precision == 1 || quda_precision == 1) ? 1e-1 : 0.0;
-  QudaInvertParam invertParam = newQudaInvertParam();
+  if (link && (rhs_idx == 0)) qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
-  invertParam.inv_type           = QUDA_INC_EIGCG_INVERTER;//set it first.
+  if (clover || cloverInverse && (rhs_idx == 0)) {
+    qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
+			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
+  }
+
+  double reliable_delta = 1e-1;
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
+  invertParam.residual_type = static_cast<QudaResidualType_s>(0);
+  invertParam.residual_type = (target_residual != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
+  invertParam.residual_type = (target_fermilab_residual != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
+
+  invertParam.tol =  target_residual;
+  invertParam.tol_hq = target_fermilab_residual;
+  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
+  invertParam.clover_coeff = clover_coeff;
+
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
-  invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
-  invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-  invertParam.use_sloppy_partial_accumulator  = 0;
+  invertParam.matpc_type         = QUDA_MATPC_ODD_ODD;
 
-  setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, 0.0);//??
+//!
+  QudaEigParam  df_param = newQudaEigParam();
+  df_param.invertParam = &invParam;
 
-  invertParam.residual_type = (target_residual != 0) ? QUDA_L2_RELATIVE_RESIDUAL : QUDA_HEAVY_QUARK_RESIDUAL;
-  invertParam.tol = (target_residual != 0) ? target_residual : target_fermilab_residual;
-  invertParam.reliable_delta = reliable_delta;
+  invParam.solve_type = QUDA_NORMOP_PC_SOLVE;
+  invParam.nev = nev; 
+  invParam.max_search_dim = 64;//!
+  invParam.deflation_grid = deflation_grid; 
+  invParam.cuda_prec_ritz = ritz_prec;
+  invParam.tol_restart = 5e+3*inv_param.tol;//think about this...
+  invParam.use_reduced_vector_set = true;
+  invParam.use_cg_updates = false;
+  invParam.cg_iterref_tol = 5e-2;
+  invParam.eigcg_max_restarts = 3;
+  invParam.max_restart_num = 3;
+  invParam.inc_tol = 1e-2;
+  invParam.eigenval_tol = 1e-2;
 
-  //eigcg specific stuff:
-  invertParam.rhs_idx = rhs_idx;
-  invertParam.nev = nev;
-  invertParam.max_search_dim = max_search_dim;
-  invertParam.deflation_grid = deflation_grid;//to test the stuff
-  invertParam.cuda_prec_ritz = invertParam.cuda_prec; //ritz_prec; FOR TEST ONLY!
-  invertParam.tol_restart = (tol_restart > target_residual) ? tol_restart : target_residual;//think about this...
+  invParam.inv_type = QUDA_INC_EIGCG_INVERTER;
 
-  //OK for this version og eigCG (overwrites these parameter)
-  invertParam.cuda_prec_precondition        = QUDA_HALF_PRECISION;
-  invertParam.clover_cuda_prec_precondition = invertParam.cuda_prec_precondition;
-
-  invertParam.compute_clover_trlog = 0;
-  invertParam.clover_coeff         = clover_coeff;
-
+  setDeflationParam(ritz_prec, vec_infile, vec_outfile, &df_param);
+//!
   if(rhs_idx == 0)
-  {
-     printfQuda("\nOpen MAGMA...\n");
-
-     openMagma();
-
-//direct call for loadGaugeQuda:
-     QudaGaugeParam gaugeParam = newQudaGaugeParam();
-
-     setGaugeParams(gaugeParam, localDim,  inv_args, external_precision, quda_precision);
-
-     gaugeParam.cuda_prec_precondition   = invertParam.cuda_prec_precondition;//overwrite this parameter
-
-     loadGaugeQuda(const_cast<void*>(link), &gaugeParam);
-
-     //qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
-
-     if (clover_alloc == 0) {
-       loadCloverQuda( clover, cloverInverse, &invertParam);
-       clover_alloc = 1;
-     } else {
-       errorQuda("Clover term already allocated");
-     }
-
-    //if (compute_trlog) {
-      //trlog[0] = invertParam.trlogA[0];
-      //trlog[1] = invertParam.trlogA[1];
-    //}
+    df_preconditioner = newDeflationQuda(&df_param);
+    invParam.deflation_op = df_preconditioner;
   }
 
-  incrementalEigQuda(solution,  source,  &invertParam, ritzVects, ritzVals);
+  invertQuda(solution, source, &invertParam);
 
-  // return the number of iterations taken by the inverter
+  if(last_rhs_flag) destroyDeflationQuda(df_preconditioner);    
+
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  if(last_rhs_flag)
-  {
-    destroyDeflationQuda(&invertParam, localDim, ritzVects, ritzVals);
-    //
-    closeMagma();
-    //
-    qudaFreeGaugeField();
-    //
-    qudaFreeCloverField();
-  }
+  if (clover || cloverInverse && last_rhs_flag) qudaFreeCloverField();
+  if (link && last_rhs_flag) qudaFreeGaugeField();
+  qudamilc_called<false>(__func__);
+#else
+  errorQuda("Deflation solver was not built.")
 #endif
   return;
 } // qudaEigCGCloverInvert
