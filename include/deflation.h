@@ -4,10 +4,6 @@
 #include <vector>
 #include <complex_quda.h>
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
-
-
 namespace quda {
 
   /**
