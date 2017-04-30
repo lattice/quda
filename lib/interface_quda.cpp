@@ -27,6 +27,7 @@
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
+#include <random_quda.h>
 
 #include <multigrid.h>
 
@@ -206,6 +207,9 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
+
+//!<Profiler for gaussQuda
+static TimeProfile profileGauss("gaussQuda");
 
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
@@ -5265,6 +5269,43 @@ void set_kernel_pack_t_(int* pack)
   bool pack_ = *pack ? true : false;
   setKernelPackT(pack_);
 }
+
+
+
+void gaussGaugeQuda(long seed)
+{
+#ifdef GPU_GAUGE_TOOLS
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+
+  profileGauss.TPSTART(QUDA_PROFILE_INIT);
+  if (!gaugePrecise)
+    errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
+
+  cudaGaugeField *data = NULL;
+  data = gaugePrecise;
+
+  profileGauss.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+  RNG* randstates = new RNG(data->Volume(), seed, data->X());
+  randstates->Init();
+  quda::gaugeGauss(*data, *randstates);
+  randstates->Release();
+  delete randstates;
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  if (extendedGaugeResident) {
+
+    extendedGaugeResident = gaugePrecise;
+    extendedGaugeResident -> exchangeExtendedGhost(R,redundant_comms);
+  }
+#else
+  errorQuda("Gauge tools are not build");
+#endif
+}
+
 
 /*
  * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.

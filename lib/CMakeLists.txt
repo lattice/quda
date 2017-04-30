@@ -17,7 +17,7 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp fat_force_quda.cpp
-  llfat_quda.cu gauge_force.cu
+  llfat_quda.cu gauge_force.cu gauge_random.cu
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu covDev.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
@@ -28,7 +28,7 @@ set (QUDA_OBJS
   multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
-  extract_gauge_ghost_extended.cu copy_color_spinor.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_gauss.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_ss.cu
   copy_color_spinor_sd.cu copy_color_spinor_sh.cu

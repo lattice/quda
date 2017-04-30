@@ -995,6 +995,12 @@ extern "C" {
                       const QudaGaugeParam* param);
 
   /**
+   * Generate Gaussian distributed gauge field
+   * @param seed Seed
+   */
+  void gaussGaugeQuda(long seed);
+
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
