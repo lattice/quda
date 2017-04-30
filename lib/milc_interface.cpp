@@ -1214,7 +1214,7 @@ void qudaEigCGInvert(int external_precision,
   invParam.max_search_dim = 64;//!
   invParam.deflation_grid = deflation_grid; 
   invParam.cuda_prec_ritz = ritz_prec;
-  invParam.tol_restart = 5e+3*inv_param.tol;//think about this...
+  invParam.tol_restart = 5e+3*invParam.tol;//think about this...
   invParam.use_reduced_vector_set = true;
   invParam.use_cg_updates = false;
   invParam.cg_iterref_tol = 5e-2;
@@ -1642,7 +1642,7 @@ void qudaEigCGCloverInvert(int external_precision,
   invParam.max_search_dim = 64;//!
   invParam.deflation_grid = deflation_grid; 
   invParam.cuda_prec_ritz = ritz_prec;
-  invParam.tol_restart = 5e+3*inv_param.tol;//think about this...
+  invParam.tol_restart = 5e+3*invParam.tol;//think about this...
   invParam.use_reduced_vector_set = true;
   invParam.use_cg_updates = false;
   invParam.cg_iterref_tol = 5e-2;
