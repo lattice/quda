@@ -108,7 +108,7 @@ hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o te
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 clean:
-	-rm -f *.o dslash_test invert_test deflation_test staggered_dslash_test	\
+	-rm -f *.o dslash_test invert_test deflated_invert_test staggered_dslash_test	\
 	staggered_invert_test su3_test pack_test blas_test llfat_test	\
 	gauge_force_test fermion_force_test hisq_paths_force_test	\
 	hisq_unitarize_force_test unitarize_link_test multigrid_invert_test

@@ -705,17 +705,6 @@ extern "C" {
   void destroyMultigridQuda(void *mg_instance);
 
   /**
-   * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).
-   * @param _h_x    Outnput: array of solution spinor fields (typically O(10))
-   * @param _h_b    Input: array of source spinor fields (typically O(10))
-   * @param _h_u    Input/Output: array of Ritz spinor fields (typically O(100))
-   * @param _h_h    Input/Output: complex projection mutirx (typically O(100))
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
-   */
-  //void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals);
-
-  /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field

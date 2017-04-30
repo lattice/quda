@@ -31,7 +31,7 @@ namespace quda {
 
    using namespace blas;
    using namespace Eigen;
-
+#ifdef DEFLATEDSOLVER
    using DynamicStride   = Stride<Dynamic, Dynamic>;
 
    using DenseMatrix     = MatrixXcd;
@@ -41,7 +41,7 @@ namespace quda {
 
 //special types needed for compatibility with QUDA blas:
    using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
-
+#endif
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow? 
@@ -49,6 +49,7 @@ namespace quda {
    class EigCGArgs{
 
      public:
+#ifdef DEFLATEDSOLVER
        //host Lanczos matrice, and its eigenvalue/vector arrays:
        DenseMatrix Tm;//VH A V,
        //eigenvectors:
@@ -136,9 +137,9 @@ namespace quda {
 
         return;
       }
-
+#endif
    };
-
+#ifdef DEFLATEDSOLVER
    //Rayleigh Ritz procedure:
    template<libtype which_lib> void ComputeRitz(EigCGArgs &args) {errorQuda("\nUnknown library type.\n");}
 
@@ -212,7 +213,7 @@ namespace quda {
 
      return;
   }
-
+#endif
   // set the required parameters for the inner solver
   static void fillEigCGInnerSolverParam(SolverParam &inner, const SolverParam &outer, bool use_sloppy_partial_accumulator = true)
   {
@@ -257,6 +258,7 @@ namespace quda {
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
+#ifdef DEFLATEDSOLVER
     if( param.rhs_idx < param.deflation_grid )  printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
     else {  
       printfQuda("\nDeflation space is complete, running initCG solver.\n");
@@ -281,7 +283,9 @@ namespace quda {
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
-
+#else
+    errorQuda("Deflation solver was not enabled\n");
+#endif
     return;
   }
 
@@ -313,6 +317,7 @@ namespace quda {
 
  void IncEigCG::RestartVT(const double beta, const double rho)
   {
+#ifdef DEFLATEDSOLVER
     EigCGArgs &args = *eigcg_args;
 
     ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
@@ -350,12 +355,13 @@ namespace quda {
     else omega = Az;
 
     args.RestartLanczos(omega, Vm, 1.0 / rho);
-
+#endif
     return;
   }
 
   void IncEigCG::UpdateVm(ColorSpinorField &res, double beta, double sqrtr2)
   {
+#ifdef DEFLATEDSOLVER
     EigCGArgs &args = *eigcg_args;
 
     if(args.run_residual_correction) return;
@@ -372,7 +378,7 @@ namespace quda {
     blas::copy(Vm->Component(args.id), res);//convert arrays
     //rescale the vector
     blas::ax(1.0 / sqrtr2, Vm->Component(args.id));
-    
+#endif    
     return;
   }
 
@@ -380,6 +386,10 @@ namespace quda {
  * This is a solo precision solver.
 */
   int IncEigCG::eigCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
+
+    int k=0;
+
+#ifdef DEFLATEDSOLVER
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)  errorQuda("Not supported");
 
     profile.TPSTART(QUDA_PROFILE_INIT);
@@ -490,7 +500,6 @@ namespace quda {
 
     double rMinvr = blas::reDotProduct(r,*z);
     //Begin EigCG iterations:
-    int k=0;
     args.restarts = 0;
 
     PrintStats("eigCG", k, r2, b2, heavy_quark_res);
@@ -567,11 +576,13 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
-
+#endif
     return k;
   }
 
   int IncEigCG::initCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
+    int k = 0;
+#ifdef DEFLATEDSOLVER
     //Start init CG iterations:
     deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
     Deflation &defl         = *(defl_p->defl);
@@ -597,7 +608,6 @@ namespace quda {
     ColorSpinorField &rProj = *rp_proj;
 
     int restart_idx  = 0;
-    int k            = 0;
 
     xProj = x;
     rProj = b; 
@@ -652,12 +662,13 @@ namespace quda {
       delete xp_proj;
       delete rp_proj;
     }
-
+#endif
     return k;
   }
 
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
+#ifdef DEFLATEDSOLVER
      const bool mixed_prec = (param.precision != param.precision_sloppy);
      const double b2 = norm2(in);
 
@@ -772,7 +783,7 @@ namespace quda {
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);
        defl.reduce(param.eigenval_tol, max_nev);
      }
-
+#endif
      return;
   }
 
