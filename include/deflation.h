@@ -8,9 +8,7 @@ namespace quda {
 
   /**
      This struct contains all the metadata required to define the
-     multigrid solver.  For each level of multigrid we will have an
-     instance of MGParam describing all the meta data appropriate for
-     given level.
+     deflated solvers.  
    */
   struct DeflationParam {
 
