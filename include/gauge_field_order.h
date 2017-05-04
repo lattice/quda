@@ -13,14 +13,15 @@
 #else
 #define DISABLE_TROVE
 #endif
-#include <tune_quda.h>
+#include <gauge_field.h>
 #include <assert.h>
+#include <type_traits>
+
 #include <register_traits.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <type_traits>
 
 namespace quda {
 
@@ -764,7 +765,6 @@ namespace quda {
         const int M = reconLen / N;
         RegType tmp[reconLen];
 	typedef typename VectorType<Float,N>::type Vector;
-	typedef typename VectorType<RegType,N>::type RegVector;
 
 #pragma unroll
         for (int i=0; i<M; i++){
@@ -797,7 +797,6 @@ namespace quda {
         RegType tmp[reconLen];
         reconstruct.Pack(tmp, v, x);
 	typedef typename VectorType<Float,N>::type Vector;
-	typedef typename VectorType<RegType,N>::type RegVector;
 
 #pragma unroll
         for (int i=0; i<M; i++){
@@ -837,7 +836,6 @@ namespace quda {
           const int M = reconLen / N;
           RegType tmp[reconLen];
 	  typedef typename VectorType<Float,N>::type Vector;
-	  typedef typename VectorType<RegType,N>::type RegVector;
 
 #pragma unroll
           for (int i=0; i<M; i++) {
@@ -862,7 +860,6 @@ namespace quda {
           RegType tmp[reconLen];
           reconstruct.Pack(tmp, v, x);
 	  typedef typename VectorType<Float,N>::type Vector;
-	  typedef typename VectorType<RegType,N>::type RegVector;
 
 #pragma unroll
           for (int i=0; i<M; i++) {
@@ -887,7 +884,6 @@ namespace quda {
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	typedef typename VectorType<Float,N>::type Vector;
-	typedef typename VectorType<RegType,N>::type RegVector;
 
 #pragma unroll
 	for (int i=0; i<M; i++) {
@@ -913,7 +909,6 @@ namespace quda {
 	// use the extended_idx to determine the boundary condition
 	reconstruct.Pack(tmp, v, extended_idx);
 	typedef typename VectorType<Float,N>::type Vector;
-	typedef typename VectorType<RegType,N>::type RegVector;
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
