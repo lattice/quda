@@ -4,6 +4,7 @@
 #include <index_helper.cuh>
 #include <blas_cublas.h>
 #include <blas_quda.h>
+#include <tune_quda.h>
 
 namespace quda {
 

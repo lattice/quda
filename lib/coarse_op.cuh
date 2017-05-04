@@ -1,3 +1,4 @@
+#include <tune_quda.h>
 #include <multigrid_helper.cuh>
 
 #define max_color_per_block 8

@@ -1,3 +1,4 @@
+#include <typeinfo>
 #include <gauge_field_order.h>
 
 namespace quda {

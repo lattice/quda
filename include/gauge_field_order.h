@@ -13,8 +13,10 @@
 #else
 #define DISABLE_TROVE
 #endif
-#include <tune_quda.h>
+#include <gauge_field.h>
 #include <assert.h>
+#include <type_traits>
+
 #include <register_traits.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>

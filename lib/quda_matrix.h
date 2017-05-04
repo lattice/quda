@@ -2,11 +2,9 @@
 #define _QUDA_MATRIX_H_
 
 #include <cstdio>
-
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
-#include <cuda.h>
 
 #include <register_traits.h>
 #include <float_vector.h>
