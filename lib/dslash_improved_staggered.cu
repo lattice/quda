@@ -63,6 +63,7 @@ namespace quda {
     const unsigned int nSrc;
 
   protected:
+    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
     unsigned int sharedBytesPerThread() const
     {
 #ifdef PARALLEL_DIR

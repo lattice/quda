@@ -19,15 +19,15 @@ namespace quda {
 
   bool LatticeField::initIPCComms = false;
 
-  int LatticeField::buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
-  int LatticeField::buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
-  int LatticeField::buffer_send_p2p_back[2][QUDA_MAX_DIM];
-  int LatticeField::buffer_recv_p2p_back[2][QUDA_MAX_DIM];
+  int LatticeField::buffer_send_p2p_fwd[2][QUDA_MAX_DIM] { };
+  int LatticeField::buffer_recv_p2p_fwd[2][QUDA_MAX_DIM] { };
+  int LatticeField::buffer_send_p2p_back[2][QUDA_MAX_DIM] { };
+  int LatticeField::buffer_recv_p2p_back[2][QUDA_MAX_DIM] { };
 
-  MsgHandle* LatticeField::mh_send_p2p_fwd[2][QUDA_MAX_DIM];
-  MsgHandle* LatticeField::mh_send_p2p_back[2][QUDA_MAX_DIM];
-  MsgHandle* LatticeField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
-  MsgHandle* LatticeField::mh_recv_p2p_back[2][QUDA_MAX_DIM];
+  MsgHandle* LatticeField::mh_send_p2p_fwd[2][QUDA_MAX_DIM] { };
+  MsgHandle* LatticeField::mh_send_p2p_back[2][QUDA_MAX_DIM] { };
+  MsgHandle* LatticeField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM] { };
+  MsgHandle* LatticeField::mh_recv_p2p_back[2][QUDA_MAX_DIM] { };
 
   cudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
   cudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
@@ -130,8 +130,8 @@ namespace quda {
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
 	for (int dir=0; dir<2; ++dir) {
-	  MsgHandle* sendHandle = NULL;
-	  MsgHandle* receiveHandle = NULL;
+	  MsgHandle* sendHandle = nullptr;
+	  MsgHandle* receiveHandle = nullptr;
 	  int disp = (dir == 1) ? +1 : -1;
 
 	  // first set up receive
