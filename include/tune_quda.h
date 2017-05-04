@@ -200,8 +200,11 @@ namespace quda {
       return n;
     }
 
+    /** This is the return result from kernels launched using jitify */
+    CUresult jitify_error;
+
   public:
-    Tunable() { }
+    Tunable() : jitify_error(CUDA_SUCCESS) { }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const cudaStream_t &stream) = 0;
@@ -299,6 +302,8 @@ namespace quda {
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
+    CUresult jitifyError() const { return jitify_error; }
+    CUresult& jitifyError() { return jitify_error; }
   };
 
   

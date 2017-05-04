@@ -155,6 +155,8 @@ set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
+set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
+
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
@@ -175,6 +177,8 @@ mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
+
+mark_as_advanced(QUDA_JITIFY)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -397,6 +401,14 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
+endif()
+
+if(QUDA_JITIFY)
+  add_definitions(-DJITIFY)
+  find_package(LibDL)
+#  find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
+  LIST(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
+  LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
 endif()
 
 if(QUDA_ALTRELIABLE)
