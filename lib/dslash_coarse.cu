@@ -510,8 +510,9 @@ namespace quda {
       }
     }
 
-    int blockStep() const { return deviceProp.warpSize/4; }
-    int blockMin() const { return deviceProp.warpSize/4; }
+    // FIXME: understand why this leads to slower perf and variable correctness
+    //int blockStep() const { return deviceProp.warpSize/4; }
+    //int blockMin() const { return deviceProp.warpSize/4; }
 
     // Experimental autotuning of the color column stride
     bool advanceAux(TuneParam &param) const
@@ -651,7 +652,7 @@ namespace quda {
 	coarseDslash<Float,nDim,Ns,Nc,Mc,dslash,clover,dagger,type>(arg);
       } else {
 
-        const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        const TuneParam &tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE /*getVerbosity()*/);
 
 	if (out.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
 	  errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
@@ -969,6 +970,15 @@ namespace quda {
 	} else {
 	  policy.push_back(DSLASH_COARSE_BASIC);
 	  policy.push_back(DSLASH_COARSE_ZERO_COPY_PACK);
+	  policy.push_back(DSLASH_COARSE_ZERO_COPY_READ);
+	  policy.push_back(DSLASH_COARSE_ZERO_COPY);
+	  if (comm_gdr_enabled()) {
+	    policy.push_back(DSLASH_COARSE_GDR_SEND);
+	    policy.push_back(DSLASH_COARSE_GDR_RECV);
+	    policy.push_back(DSLASH_COARSE_GDR);
+	    policy.push_back(DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
+	    policy.push_back(DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
+	  }
 	}
 
 	config += comm_peer2peer_enabled_global();
@@ -978,7 +988,7 @@ namespace quda {
 
       // before we do policy tuning we must ensure the kernel
       // constituents have been tuned since we can't do nested tuning
-      if (0 && getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
 	disableProfileCount();
 	for (auto &i : policy) dslash(i);
 	enableProfileCount();
@@ -989,7 +999,7 @@ namespace quda {
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
    inline void apply(const cudaStream_t &stream) {
-     TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO /*getTuning()*/, getVerbosity());
+     TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
 
      if (config != tp.aux.y) {
        errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
