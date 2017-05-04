@@ -70,35 +70,6 @@ namespace quda {
         if(matProj) delete[]  matProj;
         if(invRitzVals)       delete[]  invRitzVals;
      }
-#if 0 //we cannot reshape the set here.
-     void ReshapeDeflationSpace(const int new_dim, QudaFieldLocation location, QudaPrecision new_ritz_prec = QUDA_INVALID_PRECISION)//reset param.ritz_prec?
-     {
-        if(new_dim > tot_dim || (new_dim == cur_dim && new_ritz_prec == QUDA_INVALID_PRECISION)) return;//nothing to do
-        //
-        this->location = location;
-#if 1
-        ColorSpinorParam ritzParam(RV->Component(0));
-        //
-        ritzParam.create   = QUDA_ZERO_FIELD_CREATE;
-        ritzParam.is_composite  = true;
-        ritzParam.composite_dim = new_dim;
-        ritzParam.location      = location;
-        //
-        if(new_ritz_prec != QUDA_INVALID_PRECISION)  ritzParam.setPrecision(new_ritz_prec);
-        //
-        delete RV;
-        RV = ColorSpinorField::Create(ritzParam); 
-        //
-#else
-        /** not implemented yet*/
-        //RV.ReshapeCompositeField(new_dim, new_ritz_prec);//delete old pointer and allocate new one. Must be implemented in ColorSpinorField
-#endif
-        cur_dim = new_dim;
-
-        return;
-     }
-#endif
-
   };
 
   /**

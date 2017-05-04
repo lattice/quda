@@ -166,8 +166,6 @@ mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_EIGEN)
-mark_as_advanced(QUDA_BLOCKSOVER)
-mark_as_advanced(QUDA_DEFLATEDSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
 mark_as_advanced(QUDA_MULTIGRID)
 

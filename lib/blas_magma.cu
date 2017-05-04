@@ -7,46 +7,19 @@
 #include <util_quda.h>
 #include <quda_internal.h>
 
-#ifndef MAX
-#define MAX(a, b) (a > b) ? a : b;
-#endif
-
-#define MAGMA_2X //default version version of the MAGMA library
-
 #ifdef MAGMA_LIB
+
 #include <magma.h>
 
-#ifdef MAGMA_14
-
-#define _cV 'V'
-#define _cU 'U'
-
-#define _cR 'R'
-#define _cL 'L'
-
-#define _cC 'C'
-#define _cN 'N'
-
-#define _cNV 'N'
-
-#else
-
-#define _cV MagmaVec
-#define _cU MagmaUpper
-
-#define _cR MagmaRight
-#define _cL MagmaLeft
-
-#define _cC MagmaConjTrans
-#define _cN MagmaNoTrans
-
+#define _cV  MagmaVec
+#define _cU  MagmaUpper
+#define _cR  MagmaRight
+#define _cL  MagmaLeft
+#define _cC  MagmaConjTrans
+#define _cN  MagmaNoTrans
 #define _cNV MagmaNoVec
 
 #endif
-
-#endif
-
-//Column major format: Big matrix times Little matrix.
 
 #ifdef MAGMA_LIB
 
@@ -172,7 +145,6 @@
     {
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {
-        //magma_int_t nb = magma_get_cgeqrf_nb( rows );
         magma_int_t nb = magma_get_cgeqrf_nb( rows, cols );
         lwork = std::max( cols*nb, 2*nb*nb );
 
@@ -183,7 +155,6 @@
                              ldm, hwork, lwork, &info );
         if (err != 0)  errorQuda("\nError in magma_cgels_gpu, %d, exit ...\n", info);
       } else {
-        //magma_int_t nb = magma_get_zgeqrf_nb( rows );
         magma_int_t nb = magma_get_zgeqrf_nb( rows, cols );
 
         lwork = std::max( cols*nb, 2*nb*nb );
@@ -199,7 +170,6 @@
 
      if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {
-        //magma_int_t nb = magma_get_cgeqrf_nb( rows );
         magma_int_t nb = magma_get_cgeqrf_nb( rows, cols );
 
         lwork = std::max( cols*nb, 2*nb*nb );
@@ -210,7 +180,6 @@
                              ldm, hwork, lwork, &info );
         if (err != 0)  errorQuda("\nError in magma_cgels_cpu, %d, exit ...\n", info);
       } else {
-        //magma_int_t nb = magma_get_zgeqrf_nb( rows );
         magma_int_t nb = magma_get_zgeqrf_nb( rows, cols );
 
         lwork = std::max( cols*nb, 2*nb*nb );
@@ -395,7 +364,6 @@ void magma_batchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int bat
 
   magma_int_t **dipiv_array = static_cast<magma_int_t**>(device_malloc(batch*sizeof(magma_int_t*)));
   magma_int_t *dipiv_tmp = static_cast<magma_int_t*>(device_malloc(batch*n*sizeof(magma_int_t)));
-  //set_ipointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
   magma_iset_pointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
 
   magma_int_t *dinfo_array = static_cast<magma_int_t*>(device_malloc(batch*sizeof(magma_int_t)));
@@ -407,8 +375,6 @@ void magma_batchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int bat
     magmaFloatComplex **A_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
     magmaFloatComplex **Ainv_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
 
-    //cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
-    //cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
     magma_cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
     magma_cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
 
@@ -454,8 +420,6 @@ void magma_batchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int bat
     magmaDoubleComplex **A_array    = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
     magmaDoubleComplex **Ainv_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
 
-    //zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
-    //zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
     magma_zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
     magma_zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
 

@@ -13,8 +13,6 @@
 
 #endif
 
-//#define USE_BLOCK_DEFLATION
-
 namespace quda {  
 
   using namespace blas;
@@ -365,9 +363,7 @@ namespace quda {
      memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
 
 #ifdef MAGMA_LIB
-     //cudaHostRegister(static_cast<void *>(projm), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
      magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
-     //cudaHostUnregister(projm);
 #else
      Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
      Map<VectorXd, Unaligned> evals_(evals, param.cur_dim);
@@ -434,7 +430,6 @@ namespace quda {
 
        idx += 1;
      }
-     //param.ReshapeDeflationSpace(idx, param.RV->Location());//
 
      printfQuda("\nReserved eigenvectors: %d\n", idx);
      //copy all the stuff to cudaRitzVectors set:

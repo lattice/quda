@@ -895,7 +895,6 @@ namespace quda {
     ColorSpinorField *rp;       //! residual vector
     ColorSpinorField *yp;       //! high precision accumulator
     ColorSpinorField *tmpp;     //! temporary for mat-vec
-    //ColorSpinorField *x_sloppy; //! sloppy solution vector
     ColorSpinorField *r_sloppy; //! sloppy residual vector
     ColorSpinorField *r_pre;    //! residual passed to preconditioner
     ColorSpinorField *p_pre;    //! preconditioner result
@@ -916,12 +915,9 @@ namespace quda {
     //GMRES-DR solver
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
     //
-    //void PerformProjection(ColorSpinorField &x_sloppy, ColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method
     void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, const double tol_threshold);
     //
-    //void RunProjectedCycles(ColorSpinorField *out, ColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
-
     int FlexArnoldiProcedure (const int start_idx, const bool do_givens);
 
     void RestartVZH();
