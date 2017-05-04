@@ -51,6 +51,8 @@
 #   CUDA_nvcuvid_LIBRARY  -- CUDA Video Decoder library.
 #                            Only available for CUDA version 3.2+.
 #                            Windows only.
+#   CUDA_nvrtc_LIBRARY    -- CUDA Run-time Compiler.
+#                            Only available for CUDA version 7.0+.
 #
 
 #   James Bigler, NVIDIA Corp (nvidia.com - jbigler)
@@ -115,6 +117,7 @@ macro(cuda_unset_include_and_libraries)
   unset(CUDA_npps_LIBRARY CACHE)
   unset(CUDA_nvcuvenc_LIBRARY CACHE)
   unset(CUDA_nvcuvid_LIBRARY CACHE)
+  unset(CUDA_nvrtc_LIBRARY CACHE)
 endmacro()
 
 # Check to see if the CUDA_TOOLKIT_ROOT_DIR and CUDA_SDK_ROOT_DIR have changed,
@@ -241,4 +244,8 @@ endif()
 if(NOT CUDA_VERSION VERSION_LESS "7.0")
   # cusolver showed up in version 7.0
   find_cuda_helper_libs(cusolver)
+endif()
+if(NOT CUDA_VERSION VERSION_LESS "7.0")
+  # nvrtc showed up in version 7.0
+  find_cuda_helper_libs(nvrtc)
 endif()

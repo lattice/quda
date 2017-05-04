@@ -150,6 +150,7 @@ set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 set(QUDA_SWIZZLE OFF CACHE BOOL "use swizzle optimization for Dslash")
+set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -175,6 +176,8 @@ mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
 mark_as_advanced(QUDA_MULTIGRID)
 mark_as_advanced(QUDA_SWIZZLE)
+
+mark_as_advanced(QUDA_JITIFY)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -296,6 +299,14 @@ if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
+endif()
+
+if(QUDA_JITIFY)
+  add_definitions(-DJITIFY)
+  find_package(LibDL)
+#  find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
+  LIST(APPEND QUDA_LIBS /usr/local/cuda-9.0/lib64/libnvrtc.so) #${CUDA_nvrtc_LIBRARY})
+  LIST(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
 endif()
 
 # MAX_MULTI_BLAS_N
