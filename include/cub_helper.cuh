@@ -2,7 +2,8 @@
 #include <float_vector.h>
 
 using namespace quda;
-#include <cub/cub.cuh>
+
+#include <cub/block/block_reduce.cuh>
 
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
@@ -118,23 +119,31 @@ namespace quda {
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
   __shared__ bool isLastBlockDone;
 
-  template <int block_size_x, int block_size_y, typename T>
-  __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
+  // multi_yz means that we assume that grid y and z dimensions will
+  // be reducing different indices else all blocks are reducing the
+  // same values (which requires idx==0)
+  template <int block_size_x, int block_size_y, int block_size_z, typename T, bool multi_yz=true>
+  __device__ inline void reduce3d(ReduceArg<T> arg, const T &in, const int idx=0) {
 
-    typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+    typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, block_size_z> BlockReduce;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
 
     T aggregate = BlockReduce(cub_tmp).Sum(in);
 
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
-      arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
+    if (threadIdx.x == 0 && (block_size_y > 1 && threadIdx.y) == 0 && (block_size_z > 0 && threadIdx.z == 0)) {
+      if (multi_yz) arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
+      else arg.partial[idx*gridDim.z*gridDim.y*gridDim.x + ((blockIdx.z*gridDim.y + blockIdx.y)*gridDim.x + blockIdx.x)] = aggregate;
       __threadfence(); // flush result
 
       // increment global block counter
-      unsigned int value = atomicInc(&count[idx], gridDim.x);
-
-      // determine if last block
-      isLastBlockDone = (value == (gridDim.x-1));
+      if (multi_yz) {
+	unsigned int value = atomicInc(&count[idx], gridDim.x);
+	// determine if last block
+	isLastBlockDone = (value == (gridDim.x-1));
+      } else {
+	unsigned int value = atomicInc(&count[idx], gridDim.x * gridDim.y * gridDim.z);
+	isLastBlockDone = (value == (gridDim.x*gridDim.y*gridDim.z-1));
+      }
     }
 
     __syncthreads();
@@ -144,15 +153,22 @@ namespace quda {
       unsigned int i = threadIdx.y*block_size_x + threadIdx.x;
       T sum;
       zero(sum);
-      while (i<gridDim.x) {
-	sum += arg.partial[idx*gridDim.x + i];
-	i += block_size_x*block_size_y;
+      if (multi_yz) {
+	while (i<gridDim.x) {
+	  sum += arg.partial[idx*gridDim.x + i];
+	  i += block_size_x*block_size_y*block_size_z;
+	}
+      } else {
+	while (i<gridDim.x*gridDim.y*gridDim.z) {
+	  sum += arg.partial[idx*gridDim.z*gridDim.y*gridDim.x + i];
+	  i += block_size_x*block_size_y*block_size_z;
+	}
       }
 
       sum = BlockReduce(cub_tmp).Sum(sum);
 
       // write out the final reduced value
-      if (threadIdx.y*block_size_x + threadIdx.x == 0) {
+      if ((threadIdx.z*block_size_y + threadIdx.y)*block_size_x + threadIdx.x == 0) {
 	arg.result_d[idx] = sum;
 	count[idx] = 0; // set to zero for next time
       }
@@ -160,7 +176,10 @@ namespace quda {
   }
 
   template <int block_size, typename T>
-  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T>(arg, in, idx); }
+  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce3d<block_size, 1, 1, T>(arg, in, idx); }
+
+  template <int block_size_x, int block_size_y, typename T>
+  __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) { reduce3d<block_size_x, block_size_y, 1, T>(arg, in, idx); }
 
 
   __shared__ volatile bool isLastWarpDone[16];
