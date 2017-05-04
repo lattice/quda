@@ -15,7 +15,10 @@
 
 #include <iostream>
 
+#ifdef MAGMA_LIB
 #include <blas_magma.h>
+#endif
+
 #include <algorithm>
 
 #ifdef DEFLATEDSOLVER
