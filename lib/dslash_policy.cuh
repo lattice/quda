@@ -1794,6 +1794,8 @@ struct DslashFactory {
    const int *ghostFace;
    TimeProfile &profile;
 
+   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+   bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 

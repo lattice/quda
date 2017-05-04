@@ -337,6 +337,7 @@ protected:
 
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+  bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
   // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
   unsigned int minThreads() const { return dslashParam.threads; }
   char aux[8][TuneKey::aux_n];

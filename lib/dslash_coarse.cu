@@ -400,9 +400,9 @@ namespace quda {
     // for full fields set parity from y thread index else use arg setting
 #if 0  // disable multi-src since this has a measurable impact on single src performance
     int paritySrc = blockDim.y*blockIdx.y + threadIdx.y;
-    int src_idx = (arg.nParity == 2) ? paritySrc / 2 : paritySrc; // maybe want to swap order or source and parity for improved locality of same parity
-    int parity = (arg.nParity == 2) ? paritySrc % 2 : arg.parity;
     if (paritySrc >= arg.nParity * arg.dim[4]) return;
+    const int src_idx = (arg.nParity == 2) ? paritySrc / 2 : paritySrc; // maybe want to swap order or source and parity for improved locality of same parity
+    const int parity = (arg.nParity == 2) ? paritySrc % 2 : arg.parity;
 #else
     const int src_idx = 0;
     const int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
@@ -463,6 +463,7 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc); }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions
+    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
     unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / (dim_threads * 2 * nParity); }
 
@@ -930,6 +931,8 @@ namespace quda {
 
    DslashCoarseLaunch &dslash;
 
+   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+   bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
