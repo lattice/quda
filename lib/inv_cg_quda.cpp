@@ -415,7 +415,6 @@ namespace quda {
 	    printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
 	}
 	steps_since_reliable++;
->>>>>>> 717f500df37eb56338a03c17bd9c8c4831ed12b7
 
       } else {
 
