@@ -35,7 +35,13 @@ namespace quda {
 
   public:
     GaugePlaq(GaugePlaqArg<Gauge> &arg, const GaugeField &meta)
-      : TunableLocalParity(), arg(arg), meta(meta) { }
+      : TunableLocalParity(), arg(arg), meta(meta) {
+#ifdef JITIFY
+      strcpy(aux,"jitify");
+#else
+      strcpy(aux,"offline");
+#endif
+    }
 
     ~GaugePlaq () { }
 
@@ -68,7 +74,7 @@ namespace quda {
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), "_"); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     long long flops() const { return 6ll*2*arg.threads*(3*198+3); }
     long long bytes() const { return 6ll*2*arg.threads*4*arg.dataOr.Bytes(); }
   };
