@@ -199,7 +199,7 @@ namespace quda {
       magma_Xgesv(vec, param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
 #else
       Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-      Map<VectorXcd, Unaligned, DynamicStride> vec_ (vec, param.cur_dim);
+      Map<VectorXcd, Unaligned> vec_ (vec, param.cur_dim);
 
       VectorXcd  vec2_(param.cur_dim);
 
