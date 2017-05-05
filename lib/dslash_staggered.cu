@@ -164,7 +164,8 @@ namespace quda {
 #ifdef SWIZZLE
       if (dslashParam.kernel_type != INTERIOR_KERNEL) { // only swizzle the halo kernels
 	if (param.aux.x < 2*deviceProp.multiProcessorCount) {
-	  param.aux.x++;
+	  if (param.aux.x==1) param.aux=3;
+	  else param.aux.x+=3;
 	  return true;
 	}
       }
@@ -260,14 +261,8 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-#ifndef GPU_COMMS
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger,  in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
-#else
-    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
-    delete dslashImp;
-#endif
 
     delete dslash;
     unbindGaugeTex(gauge);

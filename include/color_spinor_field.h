@@ -266,8 +266,6 @@ namespace quda {
 
     // multi-GPU parameters
 
-    int nFaceComms; // number of faces allocated
-
     void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
@@ -337,7 +335,7 @@ namespace quda {
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-    const char *AuxString() const { return aux_string; }
+    inline const char *AuxString() const { return aux_string; }
 
     void* V() {return v;}
     const void* V() const {return v;}
@@ -425,6 +423,8 @@ namespace quda {
 
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
+    virtual void PrintVector(unsigned int x) = 0;
+
     /**
      * Compute the n-dimensional site index given the 1-d offset index
      * @param y n-dimensional site index
@@ -500,68 +500,14 @@ namespace quda {
     void destroyGhostTexObject();
 #endif
 
-#ifdef GPU_COMMS  // This is a hack for half precision.
-    // Since the ghost data and ghost norm data are not contiguous,
-    // separate MPI calls are needed when using GPUDirect RDMA.
-    void *my_fwd_norm_face[2][QUDA_MAX_DIM];
-    void *my_back_norm_face[2][QUDA_MAX_DIM];
-    void *from_fwd_norm_face[2][QUDA_MAX_DIM];
-    void *from_back_norm_face[2][QUDA_MAX_DIM];
-
-    MsgHandle ***mh_recv_norm_fwd[2];
-    MsgHandle ***mh_recv_norm_back[2];
-    MsgHandle ***mh_send_norm_fwd[2];
-    MsgHandle ***mh_send_norm_back[2];
-#endif
-
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
-    static void *ghost_field[2];     // GPU halo receive buffer
-    void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
-    static void *ghostFaceBuffer[2]; // GPU halo send buffer
-    static void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    static void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static bool initGhostFaceBuffer;
 
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
-
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
-
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
-
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_send_p2p_back[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
-
-    /** Local copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
-
-    /** Remote copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
-
-    /** Remote ghost pointer for sending ghost to */
-    static void* fwdGhostSendDest[2][QUDA_MAX_DIM];
-
-    /** Remote ghost pointer for sending ghost to */
-    static void* backGhostSendDest[2][QUDA_MAX_DIM];
-
-    /** Whether we have initialized peer-to-peer communication for this field */
-    static bool initIPCComms;
+    void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
+    void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -578,15 +524,10 @@ namespace quda {
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
 
-    /** Whether we have initialized communication for this field */
-    bool initComms;
-
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
 
   public:
-
-    static int bufferIndex;
 
     //cudaColorSpinorField();
     cudaColorSpinorField(const cudaColorSpinorField&);
@@ -607,12 +548,6 @@ namespace quda {
     /** Destroy the communication handlers and buffers */
     void destroyComms();
 
-    /** Create the inter-process communication handlers */
-    void createIPCComms();
-
-    /** Handle to remote copy event used for peer-to-peer synchronization */
-    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
-
     /** Allocate the ghost buffers */
     void allocateGhostBuffer(int nFace);
 
@@ -621,9 +556,6 @@ namespace quda {
 
     /** Free statically allocated ghost buffers */
     static void freeGhostBuffer(void);
-
-    /** Destroy the statically allocated inter-process communication handlers */
-    static void destroyIPCComms();
 
     /**
       Packs the cudaColorSpinorField's ghost zone
@@ -708,22 +640,16 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
-    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
-    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
-    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
-    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
-    void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
+    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
+    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
+    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
+    void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
 
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
-
-    /** Helper function to determine if local-to-remote (send) peer-to-peer copy is complete */
-    inline bool ipcCopyComplete(int dir, int dim);
-
-    /** Helper function to determine if local-to-remote (receive) peer-to-peer copy is complete */
-    inline bool ipcRemoteCopyComplete(int dir, int dim);
 
     const void* Ghost2() const { return ghost_field[bufferIndex]; }
 
@@ -752,6 +678,8 @@ namespace quda {
     void getTexObjectInfo() const;
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
+
+    void PrintVector(unsigned int x);
   };
 
   // CPU implementation

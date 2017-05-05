@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,6 +38,7 @@
 #include <iterator>
 #include <limits>
 
+#include "../iterator/arg_index_input_iterator.cuh"
 #include "dispatch/dispatch_reduce.cuh"
 #include "dispatch/dispatch_reduce_by_key.cuh"
 #include "../util_namespace.cuh"
@@ -150,7 +151,8 @@ struct DeviceReduce
         cudaStream_t                stream              = 0,            ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous   = false)        ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        typedef int OffsetT;  // Signed integer type for global offsets
+        // Signed integer type for global offsets
+        typedef int OffsetT;
 
         return DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, ReductionOpT>::Dispatch(
             d_temp_storage,
@@ -223,8 +225,13 @@ struct DeviceReduce
         cudaStream_t                stream              = 0,            ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous   = false)        ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        typedef int OffsetT;                                                    // Signed integer type for global offsets
-        typedef typename std::iterator_traits<InputIteratorT>::value_type T;    // Data element type
+        // Signed integer type for global offsets
+        typedef int OffsetT;
+
+        // The output value type
+        typedef typename If<(Equals<typename std::iterator_traits<OutputIteratorT>::value_type, void>::VALUE),  // OutputT =  (if output iterator's value type is void) ?
+            typename std::iterator_traits<InputIteratorT>::value_type,                                          // ... then the input iterator's value type,
+            typename std::iterator_traits<OutputIteratorT>::value_type>::Type OutputT;                          // ... else the output iterator's value type
 
         return DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, cub::Sum>::Dispatch(
             d_temp_storage,
@@ -233,7 +240,7 @@ struct DeviceReduce
             d_out,
             num_items,
             cub::Sum(),
-            T(),            // zero-initialize
+            OutputT(),            // zero-initialize
             stream,
             debug_synchronous);
     }
@@ -290,8 +297,11 @@ struct DeviceReduce
         cudaStream_t                stream              = 0,            ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous   = false)        ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        typedef int OffsetT;                                                    // Signed integer type for global offsets
-        typedef typename std::iterator_traits<InputIteratorT>::value_type T;    // Data element type
+        // Signed integer type for global offsets
+        typedef int OffsetT;
+
+        // The input value type
+        typedef typename std::iterator_traits<InputIteratorT>::value_type InputT;
 
         return DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, cub::Min>::Dispatch(
             d_temp_storage,
@@ -300,7 +310,7 @@ struct DeviceReduce
             d_out,
             num_items,
             cub::Min(),
-            Traits<T>::Max(),    // replace with std::numeric_limits<T>::max() when C++11 support is more prevalent
+            Traits<InputT>::Max(), // replace with std::numeric_limits<T>::max() when C++11 support is more prevalent
             stream,
             debug_synchronous);
     }
@@ -359,21 +369,35 @@ struct DeviceReduce
         cudaStream_t                stream              = 0,            ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous   = false)        ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        typedef int OffsetT;                                                        // Signed integer type for global offsets
-        typedef typename std::iterator_traits<InputIteratorT>::value_type T;        // Data element type
-        typedef ArgIndexInputIterator<InputIteratorT, int> ArgIndexInputIteratorT;  // Wrapped input iterator type
+        // Signed integer type for global offsets
+        typedef int OffsetT;
 
-        ArgIndexInputIteratorT      d_argmin_in(d_in);
-        KeyValuePair<OffsetT, T>    init = {1, Traits<T>::Max()};   // replace with std::numeric_limits<T>::max() when C++11 support is more prevalent
+        // The input type
+        typedef typename std::iterator_traits<InputIteratorT>::value_type InputValueT;
+
+        // The output tuple type
+        typedef typename If<(Equals<typename std::iterator_traits<OutputIteratorT>::value_type, void>::VALUE),  // OutputT =  (if output iterator's value type is void) ?
+            KeyValuePair<OffsetT, InputValueT>,                                                                 // ... then the key value pair OffsetT + InputValueT
+            typename std::iterator_traits<OutputIteratorT>::value_type>::Type OutputTupleT;                     // ... else the output iterator's value type
+
+        // The output value type
+        typedef typename OutputTupleT::Value OutputValueT;
+
+        // Wrapped input iterator to produce index-value <OffsetT, InputT> tuples
+        typedef ArgIndexInputIterator<InputIteratorT, OffsetT, OutputValueT> ArgIndexInputIteratorT;
+        ArgIndexInputIteratorT d_indexed_in(d_in);
+
+        // Initial value
+        OutputTupleT initial_value(1, Traits<InputValueT>::Max());   // replace with std::numeric_limits<T>::max() when C++11 support is more prevalent
 
         return DispatchReduce<ArgIndexInputIteratorT, OutputIteratorT, OffsetT, cub::ArgMin>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
-            d_argmin_in,
+            d_indexed_in,
             d_out,
             num_items,
             cub::ArgMin(),
-            init,
+            initial_value,
             stream,
             debug_synchronous);
     }
@@ -430,8 +454,11 @@ struct DeviceReduce
         cudaStream_t                stream              = 0,            ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous   = false)        ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        typedef int OffsetT;                                                    // Signed integer type for global offsets
-        typedef typename std::iterator_traits<InputIteratorT>::value_type T;    // Data element type
+        // Signed integer type for global offsets
+        typedef int OffsetT;
+
+        // The input value type
+        typedef typename std::iterator_traits<InputIteratorT>::value_type InputT;
 
         return DispatchReduce<InputIteratorT, OutputIteratorT, OffsetT, cub::Max>::Dispatch(
             d_temp_storage,
@@ -440,7 +467,7 @@ struct DeviceReduce
             d_out,
             num_items,
             cub::Max(),
-            Traits<T>::Lowest(),    // replace with std::numeric_limits<T>::lowest() when C++11 support is more prevalent
+            Traits<InputT>::Lowest(),    // replace with std::numeric_limits<T>::lowest() when C++11 support is more prevalent
             stream,
             debug_synchronous);
     }
@@ -499,21 +526,35 @@ struct DeviceReduce
         cudaStream_t                stream              = 0,            ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous   = false)        ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        typedef int OffsetT;                                                            // Signed integer type for global offsets
-        typedef typename std::iterator_traits<InputIteratorT>::value_type T;            // Data element type
-        typedef ArgIndexInputIterator<InputIteratorT, int> ArgIndexInputIteratorT;      // Wrapped input iterator
+        // Signed integer type for global offsets
+        typedef int OffsetT;
 
-        ArgIndexInputIteratorT      d_argmax_in(d_in);
-        KeyValuePair<OffsetT, T>    init = {1, Traits<T>::Lowest()};                    // replace with std::numeric_limits<T>::lowest() when C++11 support is more prevalent
+        // The input type
+        typedef typename std::iterator_traits<InputIteratorT>::value_type InputValueT;
+
+        // The output tuple type
+        typedef typename If<(Equals<typename std::iterator_traits<OutputIteratorT>::value_type, void>::VALUE),  // OutputT =  (if output iterator's value type is void) ?
+            KeyValuePair<OffsetT, InputValueT>,                                                                 // ... then the key value pair OffsetT + InputValueT
+            typename std::iterator_traits<OutputIteratorT>::value_type>::Type OutputTupleT;                     // ... else the output iterator's value type
+
+        // The output value type
+        typedef typename OutputTupleT::Value OutputValueT;
+
+        // Wrapped input iterator to produce index-value <OffsetT, InputT> tuples
+        typedef ArgIndexInputIterator<InputIteratorT, OffsetT, OutputValueT> ArgIndexInputIteratorT;
+        ArgIndexInputIteratorT d_indexed_in(d_in);
+
+        // Initial value
+        OutputTupleT initial_value(1, Traits<InputValueT>::Lowest());     // replace with std::numeric_limits<T>::lowest() when C++11 support is more prevalent
 
         return DispatchReduce<ArgIndexInputIteratorT, OutputIteratorT, OffsetT, cub::ArgMax>::Dispatch(
             d_temp_storage,
             temp_storage_bytes,
-            d_argmax_in,
+            d_indexed_in,
             d_out,
             num_items,
             cub::ArgMax(),
-            init,
+            initial_value,
             stream,
             debug_synchronous);
     }
@@ -621,10 +662,17 @@ struct DeviceReduce
         cudaStream_t                stream             = 0,         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous  = false)     ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
     {
-        typedef int                 OffsetT;        // Signed integer type for global offsets
-        typedef NullType*           FlagIterator;   // FlagT iterator type (not used)
-        typedef NullType            SelectOp;       // Selection op (not used)
-        typedef Equality            EqualityOp;     // Default == operator
+        // Signed integer type for global offsets
+        typedef int OffsetT;
+
+        // FlagT iterator type (not used)
+        typedef NullType* FlagIterator;
+
+        // Selection op (not used)
+        typedef NullType SelectOp;
+
+        // Default == operator
+        typedef Equality EqualityOp;
 
         return DispatchReduceByKey<KeysInputIteratorT, UniqueOutputIteratorT, ValuesInputIteratorT, AggregatesOutputIteratorT, NumRunsOutputIteratorT, EqualityOp, ReductionOpT, OffsetT>::Dispatch(
             d_temp_storage,

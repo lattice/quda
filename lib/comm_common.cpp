@@ -440,3 +440,19 @@ int comm_partitioned()
   }
   return partitioned;
 }
+
+bool comm_gdr_enabled() {
+  static bool gdr_enabled = false;
+#ifdef MULTI_GPU
+  static bool gdr_init = false;
+
+  if (!gdr_init) {
+    char *enable_gdr_env = getenv("QUDA_ENABLE_GDR");
+    if (enable_gdr_env && strcmp(enable_gdr_env, "1") == 0) {
+      gdr_enabled = true;
+    }
+    gdr_init = true;
+  }
+#endif
+  return gdr_enabled;
+}

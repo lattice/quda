@@ -178,6 +178,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
+      // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+      dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
+      dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       constexpr int register_block_size = 1;
       
@@ -316,14 +320,8 @@ namespace quda {
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
-#ifndef GPU_COMMS
       DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger,  in->Volume()/in->X(4), ghostFace, profile);
       dslash_policy.apply(0);
-#else
-      dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
-      delete dslashImp;
-#endif
     }
 
     delete dslash;

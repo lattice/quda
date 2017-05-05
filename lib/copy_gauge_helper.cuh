@@ -16,9 +16,10 @@ namespace quda {
     int faceVolumeCB[QUDA_MAX_DIM];
     int nDim;
     int geometry;
+    int offset;
     CopyGaugeArg(const OutOrder &out, const InOrder &in, int volume, 
 		 const int *faceVolumeCB, int nDim, int geometry) 
-      : out(out), in(in), volume(volume), nDim(nDim), geometry(geometry) {
+      : out(out), in(in), volume(volume), nDim(nDim), geometry(geometry), offset(0) {
       for (int d=0; d<nDim; d++) this->faceVolumeCB[d] = faceVolumeCB[d];
     }
   };
@@ -131,13 +132,13 @@ namespace quda {
 #ifdef FINE_GRAINED_ACCESS
 	  for (int i=0; i<Ncolor(length); i++)
 	    for (int j=0; j<Ncolor(length); j++)
-	      arg.out.Ghost(d, parity, x, i, j) = arg.in.Ghost(d, parity, x, i, j);
+	      arg.out.Ghost(d+arg.offset, parity, x, i, j) = arg.in.Ghost(d+arg.offset, parity, x, i, j);
 #else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d, parity); // assumes we are loading 
+	  arg.in.loadGhost(in, x, d+arg.offset, parity); // assumes we are loading
 	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d, parity);
+	  arg.out.saveGhost(out, x, d+arg.offset, parity);
 #endif
 	}
       }
@@ -162,13 +163,13 @@ namespace quda {
 #ifdef FINE_GRAINED_ACCESS
 	  for (int i=0; i<Ncolor(length); i++)
 	    for (int j=0; j<Ncolor(length); j++)
-	      arg.out.Ghost(d, parity, x, i, j) = arg.in.Ghost(d, parity, x, i, j);
+	      arg.out.Ghost(d+arg.offset, parity, x, i, j) = arg.in.Ghost(d+arg.offset, parity, x, i, j);
 #else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d, parity); // assumes we are loading 
+	  arg.in.loadGhost(in, x, d+arg.offset, parity); // assumes we are loading
 	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d, parity);
+	  arg.out.saveGhost(out, x, d+arg.offset, parity);
 #endif
 	}
       }
@@ -202,6 +203,8 @@ namespace quda {
 
 #ifndef FINE_GRAINED_ACCESS
       writeAuxString("out_stride=%d,in_stride=%d,geometry=%d", arg.out.stride, arg.in.stride, arg.in.geometry);
+#else
+      writeAuxString("fine-grained");
 #endif
     }
 
@@ -256,6 +259,13 @@ namespace quda {
 	if (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY) copyGhost<FloatOut, FloatIn, length>(arg);
 	//else warningQuda("Cannot copy for %d geometry gauge field", geometry);
       }
+
+      // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
+      if (type == 3) {
+        if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
+	arg.offset = nDim;
+	copyGhost<FloatOut, FloatIn, length>(arg);
+      }
 #endif
     } else if (location == QUDA_CUDA_FIELD_LOCATION) {
       // first copy body
@@ -272,6 +282,14 @@ namespace quda {
 	} else {
 	  //warningQuda("Cannot copy for %d geometry gauge field", geometry);
 	}
+      }
+
+      // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
+      if (type == 3) {
+        if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
+	arg.offset = nDim;
+	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg, out);
+	ghostCopier.apply(0);
       }
 #endif
     } else {
