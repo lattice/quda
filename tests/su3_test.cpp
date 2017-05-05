@@ -34,6 +34,7 @@ extern QudaPrecision prec_sloppy;
 extern double anisotropy;
 
 extern char latfile[];
+extern bool verify_results;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -130,10 +131,11 @@ void SU3test(int argc, char **argv) {
   loadGaugeQuda(gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
 
-#ifdef GPU_GAUGE_TOOLS
   double plaq[3];
   plaqQuda(plaq);
   printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
+#ifdef GPU_GAUGE_TOOLS
 
   // Topological charge
   double qCharge;
@@ -191,10 +193,11 @@ void SU3test(int argc, char **argv) {
   printf("Computed topological charge after is %.16e \n", qCharge);
 
 #else
-  printf("Skipping plaquette tests since gauge tools have not been compiled\n");
+  printf("Skipping smearing tests since gauge tools have not been compiled\n");
 #endif
   
-  check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
+  if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
+
   freeGaugeQuda();
   endQuda();
 
