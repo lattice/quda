@@ -9,6 +9,9 @@
 #include <lattice_field.h>
 
 namespace quda {
+
+  enum MemoryLocation { Device, Host, Remote };
+
   struct FullClover;
 
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
@@ -269,19 +272,19 @@ namespace quda {
     void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
-    int ghostFace[QUDA_MAX_DIM];// the size of each face
-    int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
-    int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
+    mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
+    mutable int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
+    mutable int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
-    size_t ghost_length; // length of ghost zone
-    size_t ghost_norm_length; // length of ghost zone for norm
+    mutable size_t ghost_length; // length of ghost zone
+    mutable size_t ghost_norm_length; // length of ghost zone for norm
 
-    mutable void *ghost_fixme[2*QUDA_MAX_DIM];
+    mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-    size_t ghost_bytes; // size in bytes of the ghost field
-    size_t ghost_face_bytes[QUDA_MAX_DIM];
+    mutable size_t ghost_bytes; // size in bytes of the ghost field
+    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -297,7 +300,7 @@ namespace quda {
     //
     CompositeColorSpinorField components;
 
-    void createGhostZone(int nFace);
+    void createGhostZone(int nFace, bool spin_project=true) const;
 
     // resets the above attributes based on contents of param
     void reset(const ColorSpinorParam &);
@@ -360,8 +363,15 @@ namespace quda {
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
+       @param[in] Field parity
+       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] pack_destination Destination of the packing buffer
+       @param[in] halo_location Destination of the halo reading buffer
+       @param[in] gdr_send Are we using GDR for sending
+       @param[in] gdr_recv Are we using GDR for receiving
      */
-    virtual void exchangeGhost(QudaParity parity, int dagger) const = 0;
+    virtual void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const = 0;
 
     /**
       This function returns true if the field is stored in an internal
@@ -488,16 +498,16 @@ namespace quda {
     bool init;
 
     bool texInit; // whether a texture object has been created or not
-    bool ghostTexInit; // whether the ghost texture object has been created
+    mutable bool ghostTexInit; // whether the ghost texture object has been created
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
-    cudaTextureObject_t ghostTex[2]; // these are double buffered
-    cudaTextureObject_t ghostTexNorm[2];
     void createTexObject();
-    void createGhostTexObject();
     void destroyTexObject();
-    void destroyGhostTexObject();
+    mutable cudaTextureObject_t ghostTex[4]; // these are double buffered and variants to host-mapped buffers
+    mutable cudaTextureObject_t ghostTexNorm[4];
+    void createGhostTexObject() const;
+    void destroyGhostTexObject() const;
 #endif
 
     bool reference; // whether the field is a reference or not
@@ -505,9 +515,7 @@ namespace quda {
     static size_t ghostFaceBytes;
     static bool initGhostFaceBuffer;
 
-    void *ghost_field_tex[2]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
-    void *fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    void *backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    mutable void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -542,41 +550,50 @@ namespace quda {
 
     void switchBufferPinned();
 
-    /** Create the communication handlers and buffers */
-    void createComms(int nFace);
+    /**
+       @brief Create the communication handlers and buffers
+       @param[in] nFace Depth of each halo
+       @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
+    */
+    void createComms(int nFace, bool spin_project=true);
 
-    /** Destroy the communication handlers and buffers */
+    /**
+       @brief Destroy the communication handlers and buffers
+    */
     void destroyComms();
 
-    /** Allocate the ghost buffers */
-    void allocateGhostBuffer(int nFace);
+    /**
+       @brief Allocate the ghost buffers
+       @param[in] nFace Depth of each halo
+       @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
+    */
+    void allocateGhostBuffer(int nFace, bool spin_project=true) const;
 
-    /** Ghost buffer allocation for the generic packer*/
-    void allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const;
-
-    /** Free statically allocated ghost buffers */
+    /**
+       @brief Free statically allocated ghost buffers
+    */
     static void freeGhostBuffer(void);
 
     /**
-      Packs the cudaColorSpinorField's ghost zone
-      @param nFace How many faces to pack (depth)
-      @param parity Parity of the field
-      @param dim Labels space-time dimensions
-      @param dir Pack data to send in forward of backward directions, or both
-      @param dagger Whether the operator is the Hermitian conjugate or not
-      @param stream Which stream to use for the kernel
-      @param buffer Optional parameter where the ghost should be
-      stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
-      @param zero_copy Whether we are packing directly into zero_copy memory
-      @param a Twisted mass parameter (default=0)
-      @param b Twisted mass parameter (default=0)
+       @brief Packs the cudaColorSpinorField's ghost zone
+       @param[in] nFace How many faces to pack (depth)
+       @param[in] parity Parity of the field
+       @param[in] dim Labels space-time dimensions
+       @param[in] dir Pack data to send in forward of backward directions, or both
+       @param[in] dagger Whether the operator is the Hermitian conjugate or not
+       @param[in] stream Which stream to use for the kernel
+       @param[out] buffer Optional parameter where the ghost should be
+       stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
+       @param[in] location Are we packing directly into local device memory, zero-copy memory or remote memory
+       @param[in] a Twisted mass parameter (default=0)
+       @param[in] b Twisted mass parameter (default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-		   cudaStream_t* stream, void *buffer=0, bool zero_copy=false, double a=0, double b=0);
+		   cudaStream_t* stream, MemoryLocation location[2*QUDA_MAX_DIM], double a=0, double b=0);
 
 
     void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
-			   const int dagger,cudaStream_t* stream, void *buffer=0, bool zero_copy=false);
+			   const int dagger,cudaStream_t* stream, bool zero_copy=false);
 
 
     void packGhost(FullClover &clov, FullClover &clovInv, const int nFace, const QudaParity parity, const int dim,
@@ -623,17 +640,8 @@ namespace quda {
 
     void streamInit(cudaStream_t *stream_p);
 
-    void pack(int nFace, int parity, int dagger, int stream_idx, bool zeroCopyPack,
-              double a=0, double b=0);
-
-    void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
-	      int stream_idx, bool zeroCopyPack, double a=0);
-
-    void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
-	      double a=0, double b=0);
-
-    void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
-	      cudaStream_t *stream_p, bool zeroCopyPack, double a=0);
+    void pack(int nFace, int parity, int dagger, int stream_idx,
+	      MemoryLocation location[], double a=0, double b=0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger,
         const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
@@ -651,14 +659,22 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    const void* Ghost2() const { return ghost_field[bufferIndex]; }
+    const void* Ghost2() const { return ghost_field_tex[bufferIndex]; }
 
     /**
-       Do a ghost exchange between neighbouring nodes.  All dimensions
+       @brief This is a unified ghost exchange function for doing a complete
+       halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
+       @param[in] Field parity
+       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] pack_destination Destination of the packing buffer
+       @param[in] halo_location Destination of the halo reading buffer
+       @param[in] gdr_send Are we using GDR for sending
+       @param[in] gdr_recv Are we using GDR for receiving
      */
-    void exchangeGhost(QudaParity parity, int dagger) const;
+    void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
@@ -731,11 +747,19 @@ namespace quda {
     void zero();
 
     /**
-       Do a ghost exchange between neighbouring nodes.  All dimensions
+       @brieff This is a unified ghost exchange function for doing a complete
+       halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
+       @param[in] Field parity
+       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] pack_destination Destination of the packing buffer
+       @param[in] halo_location Destination of the halo reading buffer
+       @param[in] gdr_send Dummy for CPU
+       @param[in] gdr_recv Dummy for GPU
      */
-    void exchangeGhost(QudaParity parity, int dagger) const;
+    void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
   };
 
@@ -751,7 +775,17 @@ namespace quda {
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
 
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger);
+  /**
+     @brief Generic ghost packing routine
+
+     @param[out] ghost Array of packed ghosts with array ordering [2*dim+dir]
+     @param[in] a Input field that is being packed
+     @param[in] parity Which parity are we packing
+     @param[in] dagger Is for a dagger operator (presently ignored)
+     @param[in[ location Array specifiying the memory location of each resulting ghost [2*dim+dir]
+  */
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
+			const int dagger, MemoryLocation *destination=nullptr);
 
 } // namespace quda
 

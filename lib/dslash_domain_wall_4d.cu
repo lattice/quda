@@ -262,7 +262,7 @@ namespace quda {
 			    const int *commOverride, const int DS_type, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(1);
+    inSpinor->createComms(1);
 
     dslashParam.parity = parity;
 

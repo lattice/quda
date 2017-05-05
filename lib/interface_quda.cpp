@@ -2237,15 +2237,14 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  openMagma();
 
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
 
-  closeMagma();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   saveProfile(__func__);
   flushProfile();
+  saveTuneCache();
   return static_cast<void*>(mg);
 }
 

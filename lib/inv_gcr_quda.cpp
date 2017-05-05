@@ -162,7 +162,8 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
 	   TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
-    nKrylov(param.Nkrylov), init(false)
+    nKrylov(param.Nkrylov), init(false),  rp(nullptr), yp(nullptr), tmpp(nullptr), x_sloppy(nullptr),
+    r_sloppy(nullptr), r_pre(nullptr), p_pre(nullptr), rM(nullptr)
   {
 
     fillInnerSolveParam(Kparam, param);
@@ -192,7 +193,8 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
 	   SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov), init(false)
+    nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), x_sloppy(nullptr),
+    r_sloppy(nullptr), r_pre(nullptr), p_pre(nullptr), rM(nullptr)
   {
     p.resize(nKrylov);
     Ap.resize(nKrylov);
@@ -215,23 +217,23 @@ namespace quda {
     if (param.precondition_cycle > 1) delete rM;
 
     if (param.precision_sloppy != param.precision) {
-      delete x_sloppy;
-      delete r_sloppy;
+      if (x_sloppy) delete x_sloppy;
+      if (r_sloppy) delete r_sloppy;
     }
 
     if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
-      delete p_pre;
-      delete r_pre;
+      if (p_pre) delete p_pre;
+      if (r_pre) delete r_pre;
     }
 
     for (int i=0; i<nKrylov; i++) {
-      delete p[i];
-      delete Ap[i];
+      if (p[i]) delete p[i];
+      if (Ap[i]) delete Ap[i];
     }
 
-    delete tmpp;
-    delete rp;
-    delete yp;
+    if (tmpp) delete tmpp;
+    if (rp) delete rp;
+    if (yp) delete yp;
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 

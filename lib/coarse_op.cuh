@@ -1532,7 +1532,12 @@ namespace quda {
     else printfQuda("Doing uni-directional link coarsening\n");
 
     printfQuda("V2 = %e\n", V.norm2());
-    cudaDeviceSynchronize(); checkCudaError();
+
+    // do exchange of null-space vectors
+    v.exchangeGhost(QUDA_INVALID_PARITY, 0);
+    arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
+    if (&v == &av) arg.AV.resetGhost(av.Ghost());
+    LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
     // If doing preconditioned clover then we first multiply the
     // null-space vectors by the clover inverse matrix, since this is
@@ -1546,8 +1551,6 @@ namespace quda {
       printfQuda("AV2 = %e\n", AV.norm2());
     }
 
-    cudaDeviceSynchronize(); checkCudaError();
-
     // If doing preconditioned twisted-mass then we first multiply the
     // null-space vectors by the inverse twist, since this is
     // needed for the coarse link computation
@@ -1559,8 +1562,6 @@ namespace quda {
 
       printfQuda("AV2 = %e\n", AV.norm2());
     }
-
-    cudaDeviceSynchronize(); checkCudaError();
 
     // If doing preconditioned twisted-clover then we first multiply the
     // null-space vectors by the inverse of the squared clover matrix plus
@@ -1574,8 +1575,6 @@ namespace quda {
 
       printfQuda("AV2 = %e\n", AV.norm2());
     }
-
-    cudaDeviceSynchronize(); checkCudaError();
 
     // First compute the coarse forward links if needed
     if (bidirectional_links) {
@@ -1594,25 +1593,18 @@ namespace quda {
       }
     }
 
-    cudaDeviceSynchronize(); checkCudaError();
-
-    // We delay doing the AV exchange until after we've done the
-    // forward links, since doing the AV exchange will overwrite the V
-    // ghost which we need for the forward links
     if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
 	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      int dummy = 0;
-      av.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+      av.exchangeGhost(QUDA_INVALID_PARITY, 0);
       arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
+      LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
     }
-
-    cudaDeviceSynchronize(); checkCudaError();
 
     // Now compute the backward links
     for (int d = 0; d < nDim; d++) {
       y.setDimension(d);
       y.setDirection(QUDA_BACKWARDS);
-	printfQuda("Computing forward %d UV and VUV\n", d);
+      printfQuda("Computing backward %d UV and VUV\n", d);
 
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
       y.apply(0);
@@ -1670,7 +1662,6 @@ namespace quda {
 
     // invert the clover matrix field
     const int n = X_.Ncolor();
-    BlasMagmaArgs magma(X_.Precision());
     if (X_.Location() == QUDA_CUDA_FIELD_LOCATION && X_.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       GaugeFieldParam param(X_);
       // need to copy into AoS format for MAGMA
@@ -1678,17 +1669,17 @@ namespace quda {
       cudaGaugeField X(param);
       cudaGaugeField Xinv(param);
       X.copy(X_);
-      magma.BatchInvertMatrix((void*)Xinv.Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X.Location());
+      blas::flops += cublas::BatchInvertMatrix((void*)Xinv.Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X_.Precision(), X.Location());
       Xinv_.copy(Xinv);
     } else if (X_.Location() == QUDA_CPU_FIELD_LOCATION && X_.Order() == QUDA_QDP_GAUGE_ORDER) {
       cpuGaugeField *X_h = static_cast<cpuGaugeField*>(&X_);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv_);
-      magma.BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), QUDA_CPU_FIELD_LOCATION);
+      blas::flops += cublas::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X_.Precision(), QUDA_CPU_FIELD_LOCATION);
     } else {
       errorQuda("Unsupported location=%d and order=%d", X_.Location(), X_.Order());
     }
 
-    // now exchange Y halos of both forwads and backwards links for multi-process dslash
+    // now exchange Y halos of both forwards and backwards links for multi-process dslash
     Y_.exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
 
     // compute the preconditioned links

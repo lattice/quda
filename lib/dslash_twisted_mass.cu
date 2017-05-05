@@ -177,7 +177,7 @@ namespace quda {
 			     const double &k,  const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(1);
+    inSpinor->createComms(1);
 
 #ifdef GPU_TWISTED_MASS_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
@@ -197,7 +197,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
-      setTwistPack(true);
+      setKernelPackT(true);
       twist_a = kappa; 
       twist_b = mu;
     }
@@ -227,7 +227,7 @@ namespace quda {
     delete dslash;
 #ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
-      setTwistPack(false);
+      setKernelPackT(false);
       twist_a = 0.0; 
       twist_b = 0.0;
     }

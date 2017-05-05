@@ -147,7 +147,6 @@ namespace quda {
         caxpy_recurse(tmpmajor1, x, y1, i_idx, 2*j_idx+1, upper);
 
         delete[] tmpmajor;
-
       }
       else
       {

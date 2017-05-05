@@ -212,6 +212,11 @@ namespace quda {
    */
   void loadTuneCache()
   {
+    if (getTuning() == QUDA_TUNE_NO) {
+      warningQuda("Autotuning disabled");
+      return;
+    }
+
     char *path;
     struct stat pstat;
     std::string cache_path, line, token;
@@ -219,6 +224,7 @@ namespace quda {
     std::stringstream ls;
 
     path = getenv("QUDA_RESOURCE_PATH");
+
     if (!path) {
       warningQuda("Environment variable QUDA_RESOURCE_PATH is not set.");
       warningQuda("Caching of tuned parameters will be disabled.");
@@ -590,7 +596,8 @@ namespace quda {
 	  cudaDeviceSynchronize();
 	  cudaGetLastError(); // clear error counter
 	  tunable.checkLaunchParam(param);
-	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters
+	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if doing policy tuning
+
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
 		       param.block.x, param.block.y, param.block.z,
@@ -598,6 +605,7 @@ namespace quda {
 		       param.shared_bytes,
 		       param.aux.x, param.aux.y, param.aux.z);
 	  }
+
 	  cudaEventRecord(start, 0);
 	  for (int i=0; i<tunable.tuningIter(); i++) {
 	    tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
@@ -658,6 +666,11 @@ namespace quda {
 
       }
       if (commGlobalReduction()) broadcastTuneCache();
+
+      // check this process is getting the key that is expected
+      if (tunecache.find(key) == tunecache.end()) {
+	errorQuda("Failed to find key entry (%s:%s:%s)", key.name, key.volume, key.aux);
+      }
       param = tunecache[key]; // read this now for all processes
 
     } else if (&tunable != active_tunable) {

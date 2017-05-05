@@ -50,7 +50,7 @@ namespace quda {
       output << "block = (" << param.block.x << ", " << param.block.y << ", " << param.block.z << ")" << std::endl;
       output << "grid = (" << param.grid.x << ", " << param.grid.y << ", " << param.grid.z << ")" << std::endl;
       output << "shared_bytes = " << param.shared_bytes << std::endl;
-      output << "aux = (" << param.aux.x << ", " << param.aux.y << ", " << param.aux.z << ")" << std::endl;
+      output << "aux = (" << param.aux.x << ", " << param.aux.y << ", " << param.aux.z << ", " << param.aux.w << ")" << std::endl;
       output << param.comment << std::endl;
       return output;
     }
@@ -72,6 +72,7 @@ namespace quda {
     // override this if a specific thread count is required (e.g., if not grid size tuning)
     virtual unsigned int minThreads() const { return 1; }
     virtual bool tuneGridDim() const { return true; }
+    virtual bool tuneAuxDim() const { return false; }
     virtual bool tuneSharedBytes() const { return true; }
 
     virtual bool advanceGridDim(TuneParam &param) const
@@ -206,8 +207,7 @@ namespace quda {
 	ps << "shared=" << param.shared_bytes << ", ";
 
 	// determine if we are tuning the auxiliary dimension
-	TuneParam dummy; initTuneParam(dummy);
-	if (advanceAux(dummy)) ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
+	if (tuneAuxDim()) ps << "aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
 	return ps.str();
       }
 

@@ -43,8 +43,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, 0, mass, 0, 0, commDim, 0, profile);
@@ -59,8 +57,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, 0, mass, 0, 0, commDim, 1, profile);
@@ -80,7 +76,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, 0, mass, k, 0, commDim, 2, profile);
@@ -100,7 +95,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
@@ -117,7 +111,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),
@@ -138,7 +131,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
     domainWallDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			 &static_cast<const cudaColorSpinorField&>(in),
 			 parity, dagger, &static_cast<const cudaColorSpinorField&>(x),

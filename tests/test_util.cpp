@@ -1578,7 +1578,8 @@ int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
 int gcrNkrylov = 10;
-int pipeline = 0; 
+int pipeline = 0;
+int solution_accumulator_pipeline = 0;
 int test_type = 0;
 int nvec[QUDA_MAX_MG_LEVEL] = { };
 char vec_infile[256] = "";
@@ -1659,7 +1660,8 @@ void usage(char** argv )
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
-  printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n"); 
+  printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
+  printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
 	 "                                                  For multigrid this sets the smoother type.\n");
@@ -2593,6 +2595,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     pipeline = atoi(argv[i+1]);
     if (pipeline < 0 || pipeline > 8){
       printf("ERROR: invalid pipeline length (%d)\n", pipeline);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--solution-pipeline") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    solution_accumulator_pipeline = atoi(argv[i+1]);
+    if (solution_accumulator_pipeline < 0 || solution_accumulator_pipeline > 16){
+      printf("ERROR: invalid solution pipeline length (%d)\n", solution_accumulator_pipeline);
       usage(argv);
     }
     i++;
