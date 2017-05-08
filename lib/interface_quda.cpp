@@ -570,6 +570,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
       if (gaugeLongPrecise) delete gaugeLongPrecise;
       break;
+    case QUDA_SMEARED_LINKS:
+      if (gaugeSmeared) delete gaugeSmeared;
     default:
       errorQuda("Invalid gauge type %d", param->type);
   }
@@ -605,6 +607,12 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 
   param->gaugeGiB += precise->GBytes();
+
+  // for gaugeSmeared we are interested only in the precise version
+  if (param->type == QUDA_SMEARED_LINKS) {
+    gaugeSmeared = precise;
+    goto out;
+  }
 
   // creating sloppy fields isn't really compute, but it is work done on the gpu
   profileGauge.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -693,7 +701,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       errorQuda("Invalid gauge type %d", param->type);
   }
 
-
+ out:
   profileGauge.TPSTART(QUDA_PROFILE_FREE);
   delete in;
   profileGauge.TPSTOP(QUDA_PROFILE_FREE);
@@ -724,6 +732,9 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       break;
     case QUDA_ASQTAD_LONG_LINKS:
       cudaGauge = gaugeLongPrecise;
+      break;
+    case QUDA_SMEARED_LINKS:
+      cudaGauge = gaugeSmeared;
       break;
     default:
       errorQuda("Invalid gauge type");
