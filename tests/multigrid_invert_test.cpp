@@ -381,25 +381,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 int main(int argc, char **argv)
 {
-  // We give here the default value to some of the array
-  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
-    mg_verbosity[i] = QUDA_SILENT;
-    num_setup_iter[i] = 1;
-    mu_factor[i] = 1.;
-  }
-
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
-
-  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
-  if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
+  process_command_line(argc, argv);
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);

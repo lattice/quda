@@ -1723,6 +1723,36 @@ void usage(char** argv )
   return ;
 }
 
+int __attribute__((weak)) process_command_line_option_extra(int argc, char** argv, int* idx) { return -1; };
+
+void process_command_line(int argc, char** argv)
+{
+  // initialization of undefined arrays with default values
+  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+    mg_verbosity[i] = QUDA_SILENT;
+    num_setup_iter[i] = 1;
+    mu_factor[i] = 1.;
+  }
+
+  // reading command line
+  for (int i = 1; i < argc; i++){
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }
+    if(process_command_line_option_extra(argc, argv, &i) == 0){
+      continue;
+    }
+    printf("ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
+
+  // checking for undefined parameters
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+  if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
+}
+
 int process_command_line_option(int argc, char** argv, int* idx)
 {
 #ifdef MULTI_GPU
