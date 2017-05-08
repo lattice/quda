@@ -62,7 +62,7 @@ extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
-extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
+extern QudaInverterType setup_inv;
 extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol;
 extern QudaSetupType setup_type;
@@ -224,7 +224,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
     mg_param.verbosity[i] = mg_verbosity[i];
-    mg_param.setup_inv_type[i] = setup_inv[i];
+    mg_param.setup_inv_type[i] = setup_inv;
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol;
     mg_param.spin_block_size[i] = 1;
@@ -384,7 +384,6 @@ int main(int argc, char **argv)
   // We give here the default value to some of the array
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SILENT;
-    setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
     mu_factor[i] = 1.;
   }

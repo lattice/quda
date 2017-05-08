@@ -1607,7 +1607,7 @@ int nu_pre = 2;
 int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
-QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
+QudaInverterType setup_inv = QUDA_BICGSTAB_INVERTER;
 int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol = 5e-6;
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
@@ -2379,14 +2379,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    setup_inv[level] = get_solver_type(argv[i+1]);
+    setup_inv = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
