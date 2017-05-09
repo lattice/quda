@@ -96,6 +96,11 @@
   void stopwatchStart();
   double stopwatchReadSeconds();
 
+  // setting default values to some parameter structures
+  void setDefaultGaugeParam(QudaGaugeParam &gauge_param);
+  void setDefaultInvertParam(QudaInvertParam &inv_param);
+  void setDefaultMultigridParam(QudaMultigridParam &mg_param);
+
 #ifdef __cplusplus
 //}
 #endif
