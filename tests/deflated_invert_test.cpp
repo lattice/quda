@@ -206,8 +206,10 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   //! For deflated solvers only:
   inv_param.inv_type = inv_type;
+  inv_param.tol      = tol;
+  inv_param.tol_hq   = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
-  inv_param.rhs_idx = 0;
+  inv_param.rhs_idx  = 0;
 
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -241,12 +243,9 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.inv_type_precondition = QUDA_MR_INVERTER;
 #endif
   inv_param.gcrNkrylov = 6;
-  inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
-
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;

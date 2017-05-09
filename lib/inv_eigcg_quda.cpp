@@ -249,6 +249,7 @@ namespace quda {
     inner.secs   = 0;
 
     inner.tol              = outer.tol;
+    inner.tol_restart      = outer.tol_restart;
     inner.maxiter          = outer.maxiter;
     inner.delta            = outer.delta; 
     inner.precision        = outer.precision; // preconditioners are uni-precision solvers
@@ -689,7 +690,7 @@ namespace quda {
         param.iter += iters;
 
         return;
-     }
+     } 
 
      //Start (incremental) eigCG solver:
      ColorSpinorParam csParam(in);

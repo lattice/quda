@@ -437,6 +437,7 @@ namespace quda {
 
      //reset current dimension:
      param.cur_dim = idx;//idx never exceeds cur_dim.
+     param.tot_dim = idx;
 
      free(evals);
      host_free(projm);
