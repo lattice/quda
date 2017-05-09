@@ -1566,6 +1566,7 @@ QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision  prec_precondition = QUDA_INVALID_PRECISION;
+QudaVerbosity verbosity = QUDA_SUMMARIZE;
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
@@ -1640,6 +1641,7 @@ void usage(char** argv )
 #ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
 #endif
+  printf("    --verbosity <silent/summurize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
@@ -1728,7 +1730,7 @@ int __attribute__((weak)) process_command_line_option_extra(int argc, char** arg
 
 void process_command_line(int argc, char** argv)
 {
-  // initialization of undefined arrays with default values
+  // pre-reading actions
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SILENT;
     num_setup_iter[i] = 1;
@@ -1747,7 +1749,8 @@ void process_command_line(int argc, char** argv)
     usage(argv);
   }
 
-  // checking for undefined parameters
+  // post-reading actions
+  setVerbosity(verbosity);
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
@@ -1798,6 +1801,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: Invalid CUDA device number (%d)\n", device);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--verbosity") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    verbosity =  get_verbosity_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
