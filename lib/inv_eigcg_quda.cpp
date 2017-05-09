@@ -45,11 +45,11 @@ namespace quda {
 
 //special types needed for compatibility with QUDA blas:
    using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
+
+   static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 #endif
 
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
-
-   static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow? 
 
    class EigCGArgs{
 

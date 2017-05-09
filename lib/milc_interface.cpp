@@ -1271,7 +1271,7 @@ void qudaEigCGInvert(int external_precision,
   qudamilc_called<false>(__func__, verbosity);
 
 #else
-  errorQuda("Deflation solver was not built.")
+  errorQuda("Deflation solver was not built.");
 #endif
   return;
 } // qudaEigCGInvert
@@ -1666,7 +1666,7 @@ void qudaEigCGCloverInvert(int external_precision,
   if (link && last_rhs_flag) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
 #else
-  errorQuda("Deflation solver was not built.")
+  errorQuda("Deflation solver was not built.");
 #endif
   return;
 } // qudaEigCGCloverInvert
