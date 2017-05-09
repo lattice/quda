@@ -29,7 +29,7 @@ namespace quda {
       r(nullptr), Av(nullptr), r_sloppy(nullptr), Av_sloppy(nullptr) {
 
 #ifndef DEFLATEDSOLVER
-    errorQuda("Deflated solver was not enabled.\n", param.tot_dim);
+    errorQuda("Deflated solver was not enabled.\n");
 #endif
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     printfQuda("Creating deflation space of %d vectors.\n", param.tot_dim);
