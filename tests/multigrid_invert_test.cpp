@@ -126,7 +126,7 @@ QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
-  setDefaultGaugeParam(mg_param);
+  setDefaultGaugeParam(gauge_param);
   
   // Add here additional changings
 
