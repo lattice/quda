@@ -572,6 +572,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       break;
     case QUDA_SMEARED_LINKS:
       if (gaugeSmeared) delete gaugeSmeared;
+      break;
     default:
       errorQuda("Invalid gauge type %d", param->type);
   }
@@ -610,8 +611,22 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   // for gaugeSmeared we are interested only in the precise version
   if (param->type == QUDA_SMEARED_LINKS) {
-    gaugeSmeared = precise;
-    goto out;
+    gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+    for(int dir=0; dir<4; ++dir) {
+      gauge_param.x[dir] = precise->X()[dir] + 2 * R[dir];
+      gauge_param.r[dir] = R[dir];
+    }
+    gaugeSmeared = new cudaGaugeField(gauge_param);
+    copyExtendedGauge(*gaugeSmeared, *precise, QUDA_CUDA_FIELD_LOCATION);
+    gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+    profileGauge.TPSTART(QUDA_PROFILE_FREE);
+    delete precise;
+    delete in;
+    profileGauge.TPSTOP(QUDA_PROFILE_FREE);
+
+    profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
+    return;
   }
 
   // creating sloppy fields isn't really compute, but it is work done on the gpu
@@ -701,7 +716,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       errorQuda("Invalid gauge type %d", param->type);
   }
 
- out:
   profileGauge.TPSTART(QUDA_PROFILE_FREE);
   delete in;
   profileGauge.TPSTOP(QUDA_PROFILE_FREE);
@@ -734,7 +748,16 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       cudaGauge = gaugeLongPrecise;
       break;
     case QUDA_SMEARED_LINKS:
-      cudaGauge = gaugeSmeared;
+      gauge_param.create = QUDA_NULL_FIELD_CREATE;
+      gauge_param.precision = param->cuda_prec;
+      gauge_param.reconstruct = param->reconstruct;
+      gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      gauge_param.pad = param->ga_pad;
+      gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION ||
+                           gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+        QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+      cudaGauge = new cudaGaugeField(gauge_param);
+      copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
       break;
     default:
       errorQuda("Invalid gauge type");
@@ -743,6 +766,10 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge.TPSTART(QUDA_PROFILE_D2H);
   cudaGauge->saveCPUField(cpuGauge);
   profileGauge.TPSTOP(QUDA_PROFILE_D2H);
+
+  if(param->type == QUDA_SMEARED_LINKS) {
+    delete cudaGauge;
+  } 
 
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
