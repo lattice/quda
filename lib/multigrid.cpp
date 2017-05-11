@@ -948,7 +948,7 @@ namespace quda {
 	(*solve)(*out, *in);
 	dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
-	/*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Solution = %g\n", norm2(*x));
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
       }
 
       // global orthonormalization of the generated null-space vectors
