@@ -179,6 +179,7 @@ namespace quda {
    //(supposed to be a pure) magma version: 
    template <> void ComputeRitz<libtype::magma_lib>(EigCGArgs &args)
    {
+#ifdef MAGMA_LIB
      const int m = args.m;
      const int k = args.k;
      //Solve m dim eigenproblem:
@@ -215,7 +216,9 @@ namespace quda {
 //?
      cudaHostUnregister(evecm);
      cudaHostUnregister(evecm1);
-
+#else
+     errorQuda("Magma library was not built.\n");
+#endif
      return;
   }
 

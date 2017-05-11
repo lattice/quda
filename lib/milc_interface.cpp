@@ -1203,25 +1203,25 @@ void qudaEigCGInvert(int external_precision,
   if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
 //!
   QudaEigParam  df_param = newQudaEigParam();
-  df_param.invertParam = &invParam;
+  df_param.invert_param = &invertParam;
 
-  invParam.solve_type = QUDA_NORMOP_PC_SOLVE;
-  invParam.nev = nev; 
-  invParam.max_search_dim = 64;//!
-  invParam.deflation_grid = deflation_grid; 
-  invParam.cuda_prec_ritz = ritz_prec;
-  invParam.tol_restart = 5e+3*invParam.tol;//think about this...
-  invParam.use_reduced_vector_set = true;
-  invParam.use_cg_updates = false;
-  invParam.cg_iterref_tol = 5e-2;
-  invParam.eigcg_max_restarts = 3;
-  invParam.max_restart_num = 3;
-  invParam.inc_tol = 1e-2;
-  invParam.eigenval_tol = 1e-2;
+  invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
+  invertParam.nev = nev; 
+  invertParam.max_search_dim = 64;//!
+  invertParam.deflation_grid = deflation_grid; 
+  invertParam.cuda_prec_ritz = ritz_prec == 2 ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION ;
+  invertParam.tol_restart = 5e+3*invertParam.tol;//think about this...
+  invertParam.use_reduced_vector_set = true;
+  invertParam.use_cg_updates = false;
+  invertParam.cg_iterref_tol = 5e-2;
+  invertParam.eigcg_max_restarts = 3;
+  invertParam.max_restart_num = 3;
+  invertParam.inc_tol = 1e-2;
+  invertParam.eigenval_tol = 1e-2;
 
-  invParam.inv_type = QUDA_INC_EIGCG_INVERTER;
+  invertParam.inv_type = QUDA_INC_EIGCG_INVERTER;
 
-  setDeflationParam(ritz_prec, vec_infile, vec_outfile, &df_param);
+  setDeflationParam(invertParam.cuda_prec_ritz, vec_infile, vec_outfile, &df_param);
 //!
 
   ColorSpinorParam csParam;
@@ -1253,7 +1253,7 @@ void qudaEigCGInvert(int external_precision,
 
   if(rhs_idx == 0)
     df_preconditioner = newDeflationQuda(&df_param);
-    invParam.deflation_op = df_preconditioner;
+    invertParam.deflation_op = df_preconditioner;
   }
 
 
@@ -1631,29 +1631,29 @@ void qudaEigCGCloverInvert(int external_precision,
 
 //!
   QudaEigParam  df_param = newQudaEigParam();
-  df_param.invertParam = &invParam;
+  df_param.invert_param = &invertParam;
 
-  invParam.solve_type = QUDA_NORMOP_PC_SOLVE;
-  invParam.nev = nev; 
-  invParam.max_search_dim = 64;//!
-  invParam.deflation_grid = deflation_grid; 
-  invParam.cuda_prec_ritz = ritz_prec;
-  invParam.tol_restart = 5e+3*invParam.tol;//think about this...
-  invParam.use_reduced_vector_set = true;
-  invParam.use_cg_updates = false;
-  invParam.cg_iterref_tol = 5e-2;
-  invParam.eigcg_max_restarts = 3;
-  invParam.max_restart_num = 3;
-  invParam.inc_tol = 1e-2;
-  invParam.eigenval_tol = 1e-2;
+  invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
+  invertParam.nev = nev; 
+  invertParam.max_search_dim = 64;//!
+  invertParam.deflation_grid = deflation_grid; 
+  invertParam.cuda_prec_ritz = ritz_prec == 2 ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  invertParam.tol_restart = 5e+3*invertParam.tol;//think about this...
+  invertParam.use_reduced_vector_set = true;
+  invertParam.use_cg_updates = false;
+  invertParam.cg_iterref_tol = 5e-2;
+  invertParam.eigcg_max_restarts = 3;
+  invertParam.max_restart_num = 3;
+  invertParam.inc_tol = 1e-2;
+  invertParam.eigenval_tol = 1e-2;
 
-  invParam.inv_type = QUDA_INC_EIGCG_INVERTER;
+  invertParam.inv_type = QUDA_INC_EIGCG_INVERTER;
 
-  setDeflationParam(ritz_prec, vec_infile, vec_outfile, &df_param);
+  setDeflationParam(invertParam.cuda_prec_ritz, vec_infile, vec_outfile, &df_param);
 //!
   if(rhs_idx == 0)
     df_preconditioner = newDeflationQuda(&df_param);
-    invParam.deflation_op = df_preconditioner;
+    invertParam.deflation_op = df_preconditioner;
   }
 
   invertQuda(solution, source, &invertParam);

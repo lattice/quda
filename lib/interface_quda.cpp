@@ -2323,8 +2323,9 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
 void* newDeflationQuda(QudaEigParam *eig_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+#ifdef MAGMA_LIB
   openMagma();
-
+#endif
   deflated_solver *defl = new deflated_solver(*eig_param, profileInvert);
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -2335,7 +2336,9 @@ void* newDeflationQuda(QudaEigParam *eig_param) {
 }
 
 void destroyDeflationQuda(void *df) {
+#ifdef MAGMA_LIB
   closeMagma();
+#endif
   delete static_cast<deflated_solver*>(df);
 }
 
