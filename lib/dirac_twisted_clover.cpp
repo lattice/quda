@@ -561,12 +561,14 @@ namespace quda {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
         ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(*tmp1), *gauge, &static_cast<const cudaColorSpinorField&>(x.Even()), QUDA_ODD_PARITY, dagger,
 				  &static_cast<const cudaColorSpinorField&>(b.Odd()), QUDA_NONDEG_DSLASH, 0., 0., kappa, 0., commDim, profile);
-        TwistCloverInv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
+        //TwistCloverInv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
+        TwistClover(x.Odd(), *tmp1, QUDA_ODD_PARITY);
       } else if (matpcType == QUDA_MATPC_ODD_ODD ||   matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // x_e = A_ee^-1 (b_e + k D_eo x_o)
         ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(*tmp1), *gauge, &static_cast<const cudaColorSpinorField&>(x.Odd()), QUDA_EVEN_PARITY, dagger,
 				  &static_cast<const cudaColorSpinorField&>(b.Even()), QUDA_NONDEG_DSLASH, 0., 0., kappa, 0., commDim, profile);
-        TwistCloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
+        //TwistCloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
+        TwistClover(x.Even(), *tmp1, QUDA_EVEN_PARITY);
       } else {
         errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
       }
