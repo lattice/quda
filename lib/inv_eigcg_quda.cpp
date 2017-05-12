@@ -449,7 +449,7 @@ namespace quda {
       init = true;
     }
 
-    double local_stop = b2*1e-11;
+    double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
 
     EigCGArgs &args = *eigcg_args;
 
