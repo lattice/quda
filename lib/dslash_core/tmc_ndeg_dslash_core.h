@@ -3561,7 +3561,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || coord[3]>0)) ||
 #ifdef MULTI_GPU
       } else {
     
-        const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
+        const int sp_stride_pad = Flavors*ghostFace[static_cast<int>(kernel_type)];
         const int t_proj_scale = TPROJSCALE;
 
         // read half spinor from device memory

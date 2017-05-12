@@ -679,7 +679,7 @@ int sid;
 
 #if (DD_PREC==2) // half precision
 int sp_norm_idx;
-#endif // MULTI_GPU half precision
+#endif
 
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
@@ -2952,7 +2952,7 @@ if (isActive(dim,3,-1,coord,param.commDim,param.X) && coord[3]==0)
     RECONSTRUCT_GAUGE_MATRIX(7);
 
     {
-      const int sp_stride_pad = ghostFace[3];
+      const int sp_stride_pad = Flavors*ghostFace[3];
       const int t_proj_scale = TPROJSCALE;
 
       // read half spinor from device memory
