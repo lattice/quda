@@ -63,6 +63,7 @@ namespace quda {
     const unsigned int max_register_block = 4;
 
   protected:
+    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
     unsigned int sharedBytesPerThread() const
     {
 #ifdef PARALLEL_DIR
@@ -207,7 +208,7 @@ namespace quda {
 			   const double &k, const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(1);
+    inSpinor->createComms(1);
 
 #ifdef GPU_STAGGERED_DIRAC
 

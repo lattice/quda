@@ -110,6 +110,7 @@ set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
 
 # QDPJIT
 set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
+set(QUDA_QDPJITHOME "" CACHE PATH "path to QDPJIT installation")
 
 # Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
@@ -171,7 +172,6 @@ mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
-mark_as_advanced(QUDA_MULTIGRID)
 mark_as_advanced(QUDA_SWIZZLE)
 
 #######################################################################
@@ -208,6 +208,16 @@ if(QUDA_MPI OR QUDA_QMP)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
+endif()
+
+if(QUDA_QDPJIT)
+  add_definitions(-DUSE_QDPJIT)
+  include_directories(SYSTEM ${QUDA_QDPJITHOME}/include)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  FIND_LIBRARY(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
+  FIND_LIBRARY(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
+  FIND_LIBRARY(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
 if(QUDA_MPI AND QUDA_QMP)
@@ -287,7 +297,9 @@ if(QUDA_SWIZZLE)
 endif()
 
 if (QUDA_MULTIGRID)
+  add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
+  LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
 endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
@@ -515,7 +527,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 ## define CUDA flags when CMake < 3.8
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_STRICT ${CUDA_NVCC_FLAGS_DEVEL} CACHE STRING
@@ -535,7 +547,7 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     FORCE )
 
 ## define CUDA flags when CMake >= 3.8
-set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
@@ -558,7 +570,7 @@ set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
-"Flags used by the C++ compiler during rstrict jenkins builds.")
+"Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING

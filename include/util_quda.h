@@ -24,6 +24,14 @@ void setOutputFile(FILE *outfile);
 void pushVerbosity(QudaVerbosity verbosity);
 void popVerbosity();
 
+/**
+   @brief This function returns true if the calling rank is enabled
+   for verbosity (e.g., whether printQuda and warningQuda will print
+   out from this rank).
+   @return Return whether this rank will print
+ */
+bool getRankVerbosity();
+
 char *getPrintBuffer();
 
 
@@ -40,7 +48,7 @@ char *getPrintBuffer();
 
 #define printfQuda(...) do {                           \
   sprintf(getPrintBuffer(), __VA_ARGS__);	       \
-  if (comm_rank() == 0) {	                       \
+  if (getRankVerbosity()) {			       \
     fprintf(getOutputFile(), "%s", getOutputPrefix()); \
     fprintf(getOutputFile(), "%s", getPrintBuffer());  \
     fflush(getOutputFile());                           \
@@ -62,7 +70,7 @@ char *getPrintBuffer();
 #define warningQuda(...) do {                                   \
   if (getVerbosity() > QUDA_SILENT) {				\
     sprintf(getPrintBuffer(), __VA_ARGS__);			\
-    if (comm_rank() == 0) {					\
+    if (getRankVerbosity()) {						\
       fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix());	\
       fprintf(getOutputFile(), "%s", getPrintBuffer());			\
       fprintf(getOutputFile(), "\n");					\

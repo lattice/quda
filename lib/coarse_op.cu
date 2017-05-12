@@ -7,7 +7,7 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <gamma.cuh>
-#include <blas_magma.h>
+#include <blas_cublas.h>
 #include <coarse_op.cuh>
 
 namespace quda {
@@ -35,8 +35,6 @@ namespace quda {
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
-      int dummy = 0;
-      v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -68,8 +66,6 @@ namespace quda {
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
-      int dummy = 0;
-      v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -83,6 +79,7 @@ namespace quda {
 
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
 	(yAccessor, xAccessor, xInvAccessor, uvAccessor, avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, Yhat, av, v, kappa, mu, mu_factor, dirac, matpc);
+
     }
 
   }
@@ -195,6 +192,14 @@ namespace quda {
 
       //Copy the cuda gauge field to the cpu
       gauge.saveCPUField(*static_cast<cpuGaugeField*>(U));
+    } else if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
+      //Create a copy of the gauge field with no reconstruction, required for fine-grained access
+      GaugeFieldParam gf_param(gauge);
+      gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
+      gf_param.setPrecision(gf_param.precision);
+      U = new cudaGaugeField(gf_param);
+
+      U->copy(gauge);
     }
 
     CloverFieldParam cf_param;

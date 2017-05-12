@@ -6,7 +6,7 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <gamma.cuh>
-#include <blas_magma.h>
+#include <blas_cublas.h>
 #include <coarse_op.cuh>
 
 namespace quda {
@@ -31,8 +31,6 @@ namespace quda {
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
-      int dummy = 0;
-      v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F2 uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -62,8 +60,6 @@ namespace quda {
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
-      int dummy = 0;
-      v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F2 uvAccessor(const_cast<ColorSpinorField&>(uv));

@@ -114,6 +114,16 @@ extern "C" {
     double reliable_delta; /**< Reliable update tolerance */
     int use_sloppy_partial_accumulator; /**< Whether to keep the partial solution accumuator in sloppy precision */
 
+    /**< This parameter determines how often we accumulate into the
+       solution vector from the direction vectors in the solver.
+       E.g., running with solution_accumulator_pipeline = 4, means we
+       will update the solution vector every four iterations using the
+       direction vectors from the prior four iterations.  This
+       increases performance of mixed-precision solvers since it means
+       less high-precision vector round-trip memory travel, but
+       requires more low-precision memory allocation. */
+    int solution_accumulator_pipeline;
+
     /**< This parameter determines how many consective reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */

@@ -95,7 +95,7 @@ namespace quda {
 
     protected:
       complex<Float> *v;
-      complex<Float> *ghost[8];
+      mutable complex<Float> *ghost[8];
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
@@ -133,7 +133,7 @@ namespace quda {
        */
       virtual ~FieldOrderCB() { ; }
 
-      void resetGhost(void * const *ghost_)
+      void resetGhost(void * const *ghost_) const
       {
 	for (int d=0; d<4; d++) {
 	  ghost[2*d+0] = static_cast<complex<Float>*>(ghost_[2*d+0]);
