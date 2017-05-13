@@ -377,7 +377,7 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
   const int N_MAX = NXZ > NYW ? NXZ : NYW;
   const int N_MIN = NXZ < NYW ? NXZ : NYW;
 
-  static_assert(MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N <= QUDA_MAX_MULTI_REDUCE, "MAX_MULTI_BLAS_N^2 exceeds maximum number of reduction");
+  static_assert(MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N <= QUDA_MAX_MULTI_REDUCE, "MAX_MULTI_BLAS_N^2 exceeds maximum number of reductions");
   static_assert(MAX_MULTI_BLAS_N <= 16, "MAX_MULTI_BLAS_N exceeds maximum size 16");
   if (N_MAX > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N_MAX, MAX_MULTI_BLAS_N);
 

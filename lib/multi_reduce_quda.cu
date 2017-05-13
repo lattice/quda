@@ -2,6 +2,7 @@
 #include <tune_quda.h>
 #include <float_vector.h>
 #include <color_spinor_field_order.h>
+#include <int32_to_char.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -470,30 +471,51 @@ namespace quda {
       	strcat(aux, ",");
       	strcat(aux, y[0]->AuxString());
         if (hermitian) strcat(aux, ",hermitian");
-        if (Anorm) strcat(aux, ",Anorm"); 
-      	sprintf(aux, "%s,n=%lu,m=%lu", aux, x.size(), y.size());
-
-        // max_tile_size should be set to the largest power of 2 less than
-        // MAX_MULTI_BLAS_N, since we have a requirement that the
-        // tile size is a power of 2.
-        unsigned int max_count = 0;
-        unsigned int tile_size_tmp = MAX_MULTI_BLAS_N;
-        while (tile_size_tmp != 1) { tile_size_tmp = tile_size_tmp >> 1; max_count++; }
-        tile_size_tmp = 1;
-        for (unsigned int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
-        max_tile_size = tile_size_tmp; 
+        if (Anorm) strcat(aux, ",Anorm");
+	strcat(aux,",n=");
+	char size[8];
+	i32toa(size, (int32_t)x.size());
+	strcat(aux,size);
+	strcat(aux,",m=");
+	i32toa(size, (int32_t)y.size());
+	strcat(aux,size);
 
       	// before we do policy tuning we must ensure the kernel
       	// constituents have been tuned since we can't do nested tuning
       	// FIXME this will break if the kernels are destructive - which they aren't here
-      	if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
-      	  disableProfileCount(); // purely for profiling reasons, don't want to profile tunings. 
+	if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+	  disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
-          // Make sure constituents are tuned. 
-      	  for (unsigned int tile_size=1; tile_size <= max_tile_size && tile_size <= x.size() && tile_size <= y.size(); tile_size*=2) {
-      	    multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-      	      (result, x, y, z, w, 0, 0, hermitian, tile_size);
-      	  }
+	  if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
+
+	    max_tile_size = std::min(MAX_MULTI_BLAS_N, (int)std::max(x.size(), y.size()));
+
+	    // Make sure constituents are tuned.
+	    for ( unsigned int tile_size=1; tile_size <= max_tile_size; tile_size++) {
+	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+		(result, x, y, z, w, 0, 0, hermitian, tile_size);
+	    }
+
+	  } else { // 2-d reduction
+
+	    // max_tile_size should be set to the largest power of 2 less than
+	    // MAX_MULTI_BLAS_N, since we have a requirement that the
+	    // tile size is a power of 2.
+	    unsigned int max_count = 0;
+	    unsigned int tile_size_tmp = MAX_MULTI_BLAS_N;
+	    while (tile_size_tmp != 1) { tile_size_tmp = tile_size_tmp >> 1; max_count++; }
+	    tile_size_tmp = 1;
+	    for (unsigned int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
+	    max_tile_size = tile_size_tmp;
+
+	    // Make sure constituents are tuned.
+	    for ( unsigned int tile_size=1; tile_size <= max_tile_size && tile_size <= x.size() &&
+		    (tile_size <= y.size() || y.size()==1) ; tile_size*=2) {
+	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+		(result, x, y, z, w, 0, 0, hermitian, tile_size);
+	    }
+
+	  }
 
       	  enableProfileCount();
       	  setPolicyTuning(true);
@@ -516,13 +538,30 @@ namespace quda {
       // aux.x is the tile size
       bool advanceAux(TuneParam &param) const
       {
-      	param.aux.x *= 2; // only tune powers of two (FIXME)
-	if ((unsigned int)param.aux.x <= max_tile_size && param.aux.x <= (int)x.size() && param.aux.x <= (int)y.size()) {
-      	  return true;
-      	} else {
-      	  param.aux.x = 1; // reset to the beginning (which we'd need for multi-dimensional tuning)
-      	  return false;
-      	}
+
+	if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
+
+	  param.aux.x++;
+	  if ( (unsigned int)param.aux.x <= max_tile_size ) {
+	    return true;
+	  } else {
+	    param.aux.x = 1;
+	    return false;
+	  }
+
+	} else { // 2-d reduction
+
+	  param.aux.x *= 2; // only tune powers of two (FIXME)
+
+	  if ( (unsigned int)param.aux.x <= max_tile_size && param.aux.x <= (int)x.size() &&
+	       param.aux.x <= (int)y.size() ) {
+	    return true;
+	  } else {
+	    param.aux.x = 1; // reset to the beginning (which we'd need for multi-dimensional tuning)
+	    return false;
+	  }
+
+	}
       }
 
       bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
