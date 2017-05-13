@@ -49,6 +49,8 @@ extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
 extern int niter;
+extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
+extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int nvec[];
 extern int mg_levels;
 
@@ -340,7 +342,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param.gcrNkrylov = 20;
+  inv_param.pipeline = pipeline;
+  inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine convergence
