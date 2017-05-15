@@ -184,9 +184,10 @@ ExternalProject_Add(Eigen
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
   INSTALL_COMMAND ""
-  PREFIX=${CMAKE_CURRENT_BINARY_DIR}/eigen
 )
 
+ExternalProject_Get_Property(Eigen source_dir)
+set(EIGEN_INCLUDE_DIR_HINTS ${source_dir})
 
 # we need to check for some packages
 find_package(PythonInterp)
