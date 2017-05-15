@@ -122,4 +122,4 @@ target_link_libraries(dummy_gtest quda_test)
 enable_testing()
   
 
-add_test(dummy_gtest dummy_gtest)
+add_test(dummy_gtest dummy_gtest --gtest_output=xml:dummy_gtest.xml)
