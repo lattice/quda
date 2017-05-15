@@ -113,3 +113,13 @@ if(QUDA_FORCE_HISQ)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
 endif()
+
+
+
+## dummy test for testing gtest, ctest and jenkins integration
+cuda_add_executable(dummy_gtest dummy_gtest.cpp)
+target_link_libraries(dummy_gtest quda_test)
+enable_testing()
+  
+
+add_test(dummy_gtest dummy_gtest)
