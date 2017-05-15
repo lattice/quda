@@ -53,6 +53,16 @@ namespace quda {
     /**< Whether to keep the partial solution accumulator in sloppy precision */
     bool use_sloppy_partial_accumulator;
 
+    /**< This parameter determines how often we accumulate into the
+       solution vector from the direction vectors in the solver.
+       E.g., running with solution_accumulator_pipeline = 4, means we
+       will update the solution vector every four iterations using the
+       direction vectors from the prior four iterations.  This
+       increases performance of mixed-precision solvers since it means
+       less high-precision vector round-trip memory travel, but
+       requires more low-precision memory allocation. */
+    int solution_accumulator_pipeline;
+
     /**< This parameter determines how many consective reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
@@ -204,6 +214,7 @@ namespace quda {
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
@@ -242,6 +253,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
@@ -395,6 +407,7 @@ namespace quda {
     const DiracMatrix &matSloppy;
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *App, *tmpp;
+    std::vector<ColorSpinorField*> p;
     bool init;
 
   public:

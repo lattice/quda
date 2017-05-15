@@ -165,10 +165,11 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   typedef vector<Float,2> vec2;
   Functor<Float2, RegType> f( (Float2)vec2(a), (Float2)vec2(b), (Float2)vec2(c));
 
+  int partitions = (x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset());
   BlasCuda<RegType,M,
     decltype(X), decltype(Y), decltype(Z), decltype(W),
     Functor<Float2, RegType> >
-    blas(X, Y, Z, W, f, length, x.SiteSubset(), bytes, norm_bytes);
+    blas(X, Y, Z, W, f, length, partitions, bytes, norm_bytes);
   blas.apply(*blasStream);
 
   blas::bytes += blas.bytes();

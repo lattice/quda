@@ -114,6 +114,16 @@ extern "C" {
     double reliable_delta; /**< Reliable update tolerance */
     int use_sloppy_partial_accumulator; /**< Whether to keep the partial solution accumuator in sloppy precision */
 
+    /**< This parameter determines how often we accumulate into the
+       solution vector from the direction vectors in the solver.
+       E.g., running with solution_accumulator_pipeline = 4, means we
+       will update the solution vector every four iterations using the
+       direction vectors from the prior four iterations.  This
+       increases performance of mixed-precision solvers since it means
+       less high-precision vector round-trip memory travel, but
+       requires more low-precision memory allocation. */
+    int solution_accumulator_pipeline;
+
     /**< This parameter determines how many consective reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
@@ -360,6 +370,15 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Verbosity on each level of the multigrid */
+    QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
+
+    /** Inverter to use in the setup phase */
+    QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use in the setup phase */
+    double setup_tol[QUDA_MAX_MG_LEVEL];
+
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
 
@@ -411,6 +430,9 @@ extern "C" {
 
     /**< The time taken by the multigrid solver setup */
     double secs;
+
+    /** Multiplicative factor for the mu parameter */
+    double mu_factor[QUDA_MAX_MG_LEVEL];
 
   } QudaMultigridParam;
 
@@ -672,9 +694,16 @@ extern "C" {
   void* newMultigridQuda(QudaMultigridParam *param);
 
   /**
-   * Free resources allocated by the multigrid solver
+   * @brief Free resources allocated by the multigrid solver
+   * @param mg_instance Pointer to instance of multigrid_solver
    */
   void destroyMultigridQuda(void *mg_instance);
+
+  /**
+   * @brief Updates the multigrid preconditioner for the new gauge / clover field
+   * @param mg_instance Pointer to instance of multigrid_solver
+   */
+  void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
    * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).

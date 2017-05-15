@@ -89,15 +89,16 @@ extern "C" {
 
   typedef enum QudaDslashPolicy_s {
     QUDA_DSLASH,
-    QUDA_DSLASH2,
-    QUDA_PTHREADS_DSLASH,
-    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_DSLASH,
+    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_GPU_COMMS_DSLASH,
-    QUDA_DSLASH_ASYNC,
-    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_ZERO_COPY_DSLASH_PACK,
+    QUDA_FUSED_ZERO_COPY_DSLASH_PACK,
     QUDA_ZERO_COPY_DSLASH,
     QUDA_FUSED_ZERO_COPY_DSLASH,
+    QUDA_DSLASH_ASYNC,
+    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_PTHREADS_DSLASH,
     QUDA_DSLASH_NC
   } QudaDslashPolicy;
 
@@ -418,7 +419,13 @@ extern "C" {
     QUDA_FORWARDS = +1,
     QUDA_BOTH_DIRS = 2
   } QudaDirection;
-  
+
+  typedef enum QudaLinkDirection_s {
+    QUDA_LINK_BACKWARDS,
+    QUDA_LINK_FORWARDS,
+    QUDA_LINK_BIDIRECTIONAL
+  } QudaLinkDirection;
+
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,

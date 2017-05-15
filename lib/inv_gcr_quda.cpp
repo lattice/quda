@@ -52,12 +52,12 @@ namespace quda {
 
   void computeBeta(Complex **beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k) {
     Complex *Beta = new Complex[N];
-    std::vector<cudaColorSpinorField*> a(N), b(N);
+    std::vector<ColorSpinorField*> a(N), b(1);
     for (int j=0; j<N; j++) {
-      a[j] = static_cast<cudaColorSpinorField*>(Ap[i+j]);
-      b[j] = static_cast<cudaColorSpinorField*>(Ap[k]);
+      a[j] = Ap[i+j];
       Beta[j] = 0;
     }
+    b[0] = Ap[k];
     blas::cDotProduct(Beta, a, b); // vectorized dot product
 #if 0
     for (int j=0; j<N; j++) {
@@ -162,7 +162,8 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
 	   TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
-    nKrylov(param.Nkrylov), init(false)
+    nKrylov(param.Nkrylov), init(false),  rp(nullptr), yp(nullptr), tmpp(nullptr), x_sloppy(nullptr),
+    r_sloppy(nullptr), r_pre(nullptr), p_pre(nullptr), rM(nullptr)
   {
 
     fillInnerSolveParam(Kparam, param);
@@ -192,7 +193,8 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
 	   SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov), init(false)
+    nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), x_sloppy(nullptr),
+    r_sloppy(nullptr), r_pre(nullptr), p_pre(nullptr), rM(nullptr)
   {
     p.resize(nKrylov);
     Ap.resize(nKrylov);
@@ -215,23 +217,23 @@ namespace quda {
     if (param.precondition_cycle > 1) delete rM;
 
     if (param.precision_sloppy != param.precision) {
-      delete x_sloppy;
-      delete r_sloppy;
+      if (x_sloppy) delete x_sloppy;
+      if (r_sloppy) delete r_sloppy;
     }
 
     if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
-      delete p_pre;
-      delete r_pre;
+      if (p_pre) delete p_pre;
+      if (r_pre) delete r_pre;
     }
 
     for (int i=0; i<nKrylov; i++) {
-      delete p[i];
-      delete Ap[i];
+      if (p[i]) delete p[i];
+      if (Ap[i]) delete Ap[i];
     }
 
-    delete tmpp;
-    delete rp;
-    delete yp;
+    if (tmpp) delete tmpp;
+    if (rp) delete rp;
+    if (yp) delete yp;
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -315,12 +317,16 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      warningQuda("inverting on zero-field source\n");
-      x = b;
-      param.true_res = 0.0;
-      param.true_res_hq = 0.0;
-      return;
+      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+	profile.TPSTOP(QUDA_PROFILE_INIT);
+	warningQuda("inverting on zero-field source\n");
+	x = b;
+	param.true_res = 0.0;
+	param.true_res_hq = 0.0;
+	return;
+      } else {
+	b2 = r2;
+      }
     }
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver

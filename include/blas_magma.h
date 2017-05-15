@@ -7,6 +7,7 @@
 #include <complex>
 #include <cuComplex.h>
 #include <stdio.h>
+#include <enum_quda.h>
 
 //MAGMA library interface
 //required for (incremental) EigCG solver
@@ -106,13 +107,13 @@
 
       /**
 	 Batch inversion the matrix field using an LU decomposition method.
-	 @param Ainv_h Matrix field containing the inverse matrices on the CPU
-	 @param A_h Matrix field containing the input matrices on the CPU
-	 @param Temporary storate on the GPU of size = A_h
-	 @param n Dimension each matrix
-	 @param batch Problem batch size
+	 @param[out] Ainv Matrix field containing the inverse matrices
+	 @param[in] A Matrix field containing the input matrices
+	 @param[in] n Dimension each matrix
+	 @param[in] batch Problem batch size
+	 @param[in] Location of the input/output data
        */
-      void BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch);
+      void BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch, QudaFieldLocation location);
 
    };
 

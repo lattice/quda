@@ -369,24 +369,24 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
 #else
   if (typeid(spinorFloat) == typeid(double2)) {
     cudaBindTexture(0, spinorTexDouble, in->V(), in->Bytes()); 
-    cudaBindTexture(0, ghostSpinorTexDouble, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexDouble, in->Ghost2(), in->GhostBytes());
     if (out) cudaBindTexture(0, interTexDouble, out->V(), in->Bytes());
     if (x) cudaBindTexture(0, accumTexDouble, x->V(), in->Bytes());
   } else if (typeid(spinorFloat) == typeid(float4)) {
     cudaBindTexture(0, spinorTexSingle, in->V(), in->Bytes()); 
-    cudaBindTexture(0, ghostSpinorTexSingle, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexSingle, in->Ghost2(), in->GhostBytes());
     if (out) cudaBindTexture(0, interTexSingle, out->V(), in->Bytes());
     if (x) cudaBindTexture(0, accumTexSingle, x->V(), in->Bytes()); 
   } else if  (typeid(spinorFloat) == typeid(float2)) {
     cudaBindTexture(0, spinorTexSingle2, in->V(), in->Bytes()); 
-    cudaBindTexture(0, ghostSpinorTexSingle2, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexSingle2, in->Ghost2(), in->GhostBytes());
     if (out) cudaBindTexture(0, interTexSingle2, out->V(), in->Bytes()); 
     if (x) cudaBindTexture(0, accumTexSingle2, x->V(), in->Bytes()); 
   } else if (typeid(spinorFloat) == typeid(short4)) {
     cudaBindTexture(0, spinorTexHalf, in->V(), in->Bytes());
     cudaBindTexture(0, spinorTexHalfNorm, in->Norm(), in->NormBytes());
-    cudaBindTexture(0, ghostSpinorTexHalf, in->Ghost2(), in->GhostBytes());
-    cudaBindTexture(0, ghostSpinorTexHalfNorm, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexHalf, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexHalfNorm, in->Ghost2(), in->GhostBytes());
     if (out) cudaBindTexture(0, interTexHalf, out->V(), in->Bytes());
     if (out) cudaBindTexture(0, interTexHalfNorm, out->Norm(), in->NormBytes());
     if (x) cudaBindTexture(0, accumTexHalf, x->V(), in->Bytes());
@@ -394,8 +394,8 @@ int bindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField *ou
   } else if (typeid(spinorFloat) == typeid(short2)) {
     cudaBindTexture(0, spinorTexHalf2, in->V(), in->Bytes());
     cudaBindTexture(0, spinorTexHalf2Norm, in->Norm(), in->NormBytes());
-    cudaBindTexture(0, ghostSpinorTexHalf2, in->Ghost2(), in->GhostBytes());
-    cudaBindTexture(0, ghostSpinorTexHalf2Norm, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexHalf2, in->Ghost2(), in->GhostBytes());
+    if (in->GhostBytes()) cudaBindTexture(0, ghostSpinorTexHalf2Norm, in->Ghost2(), in->GhostBytes());
     if (out) cudaBindTexture(0, interTexHalf2, out->V(), in->Bytes());
     if (out) cudaBindTexture(0, interTexHalf2Norm, out->Norm(), in->NormBytes());
     if (x) cudaBindTexture(0, accumTexHalf2, x->V(), in->Bytes());
@@ -414,24 +414,24 @@ void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField 
 #ifndef USE_TEXTURE_OBJECTS
   if (typeid(spinorFloat) == typeid(double2)) {
     cudaUnbindTexture(spinorTexDouble);
-    cudaUnbindTexture(ghostSpinorTexDouble);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexDouble);
     if (out) cudaUnbindTexture(interTexDouble);
     if (x) cudaUnbindTexture(accumTexDouble);
   } else if (typeid(spinorFloat) == typeid(float4)) {
     cudaUnbindTexture(spinorTexSingle); 
-    cudaUnbindTexture(ghostSpinorTexSingle); 
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexSingle);
     if (out) cudaUnbindTexture(interTexSingle); 
     if (x) cudaUnbindTexture(accumTexSingle); 
   } else if  (typeid(spinorFloat) == typeid(float2)) {
     cudaUnbindTexture(spinorTexSingle2); 
-    cudaUnbindTexture(ghostSpinorTexSingle2); 
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexSingle2);
     if (out) cudaUnbindTexture(interTexSingle2); 
     if (x) cudaUnbindTexture(accumTexSingle2); 
   } else if (typeid(spinorFloat) == typeid(short4)) {
     cudaUnbindTexture(spinorTexHalf); 
     cudaUnbindTexture(spinorTexHalfNorm);
-    cudaUnbindTexture(ghostSpinorTexHalf); 
-    cudaUnbindTexture(ghostSpinorTexHalfNorm);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexHalf);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexHalfNorm);
     if (out) cudaUnbindTexture(interTexHalf); 
     if (out) cudaUnbindTexture(interTexHalfNorm);
     if (x) cudaUnbindTexture(accumTexHalf); 
@@ -439,8 +439,8 @@ void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField 
   } else if (typeid(spinorFloat) == typeid(short2)) {
     cudaUnbindTexture(spinorTexHalf2); 
     cudaUnbindTexture(spinorTexHalf2Norm);
-    cudaUnbindTexture(ghostSpinorTexHalf2); 
-    cudaUnbindTexture(ghostSpinorTexHalf2Norm);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexHalf2);
+    if (in->GhostBytes()) cudaUnbindTexture(ghostSpinorTexHalf2Norm);
     if (out) cudaUnbindTexture(interTexHalf2); 
     if (out) cudaUnbindTexture(interTexHalf2Norm);
     if (x) cudaUnbindTexture(accumTexHalf2); 

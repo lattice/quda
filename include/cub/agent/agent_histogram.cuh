@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -164,7 +164,7 @@ struct AgentHistogram
 
     /// Parameterized BlockLoad type for samples
     typedef BlockLoad<
-            WrappedSampleIteratorT,
+            SampleT,
             BLOCK_THREADS,
             SAMPLES_PER_THREAD,
             AgentHistogramPolicyT::LOAD_ALGORITHM>
@@ -172,7 +172,7 @@ struct AgentHistogram
 
     /// Parameterized BlockLoad type for pixels
     typedef BlockLoad<
-            WrappedPixelIteratorT,
+            PixelT,
             BLOCK_THREADS,
             PIXELS_PER_THREAD,
             AgentHistogramPolicyT::LOAD_ALGORITHM>
@@ -180,7 +180,7 @@ struct AgentHistogram
 
     /// Parameterized BlockLoad type for quads
     typedef BlockLoad<
-            WrappedQuadIteratorT,
+            QuadT,
             BLOCK_THREADS,
             QUADS_PER_THREAD,
             AgentHistogramPolicyT::LOAD_ALGORITHM>
