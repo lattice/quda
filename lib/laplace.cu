@@ -279,7 +279,8 @@ namespace quda {
     // check all locations match
     Location(out, in, U);
 
-    in.exchangeGhost((QudaParity)(1-parity), 0); // last parameter is dummy
+    const int nFace = 1;
+    in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
 
     if (dslash::aux_worker) dslash::aux_worker->apply(0);
 
