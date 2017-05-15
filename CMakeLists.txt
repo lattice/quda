@@ -251,9 +251,10 @@ if(QUDA_MAGMA)
     find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
   else()
     # prefer static library
-    LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
     find_library(MAGMA libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
     # append additional libraries required by magma
+    LIST(APPEND MAGMA ${CUDA_cublas_LIBRARY})
+    LIST(APPEND MAGMA ${CUDA_cusparse_LIBRARY})
     LIST(APPEND MAGMA ${QUDA_MAGMA_LIBS})
     # and any additional OpenMP linker flags
     SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_CXX_FLAGS}" )
