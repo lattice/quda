@@ -370,6 +370,7 @@ namespace quda {
 
      SelfAdjointEigenSolver<MatrixXcd> es(projm_);
 
+     projm_ = es.eigenvectors();
      evals_ = es.eigenvalues();
 #endif
 
