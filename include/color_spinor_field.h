@@ -363,14 +363,15 @@ namespace quda {
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
-       @param[in] Field parity
-       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] parity Field parity
+       @param[in] nFace Depth of halo exchange
+       @param[in] dagger Is this for a dagger operator (only relevant for spin projected Wilson)
        @param[in] pack_destination Destination of the packing buffer
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
      */
-    virtual void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+    virtual void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
 			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const = 0;
 
     /**
@@ -638,14 +639,15 @@ namespace quda {
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
-       @param[in] Field parity
-       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] parity Field parity
+       @param[in] nFace Depth of halo exchange
+       @param[in] dagger Is this for a dagger operator (only relevant for spin projected Wilson)
        @param[in] pack_destination Destination of the packing buffer
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
      */
-    void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+    void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -723,14 +725,15 @@ namespace quda {
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
-       @param[in] Field parity
-       @param[in] Is this for a dagger operator (only relevant for spin projected Wilson)
+       @param[in] parity Field parity
+       @param[in] nFace Depth of halo exchange
+       @param[in] dagger Is this for a dagger operator (only relevant for spin projected Wilson)
        @param[in] pack_destination Destination of the packing buffer
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Dummy for CPU
        @param[in] gdr_recv Dummy for GPU
      */
-    void exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination=nullptr,
+    void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
   };

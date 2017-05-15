@@ -908,8 +908,10 @@ namespace quda {
       bool gdr_recv = (policy == DSLASH_COARSE_GDR_RECV || policy == DSLASH_COARSE_GDR ||
 		       policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
 
-      if (dslash && comm_partitioned())
-	inA.exchangeGhost((QudaParity)(1-parity), dagger, pack_destination, halo_location, gdr_send, gdr_recv);
+      if (dslash && comm_partitioned()) {
+	const int nFace = 1;
+	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv);
+      }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
 

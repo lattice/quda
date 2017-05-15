@@ -1393,10 +1393,9 @@ namespace quda {
     unpackGhostExtended(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, static_cast<QudaParity>(parity), dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/], zero_copy);
   }
  
-  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *pack_destination_,
+  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv)  const {
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
-    int nFace = (nSpin == 1) ? 3 : 1;
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
     // first set default values to device if needed

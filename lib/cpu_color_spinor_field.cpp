@@ -274,7 +274,7 @@ namespace quda {
     }
   }
 
-  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int dagger, const MemoryLocation *dummy1,
+  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *dummy1,
 					  const MemoryLocation *dummy2, bool dummy3, bool dummy4) const
   {
     // allocate ghost buffer if not yet allocated
@@ -291,7 +291,6 @@ namespace quda {
 
     packGhost(sendbuf, parity, dagger);
 
-    int nFace = (nSpin == 1) ? 3 : 1;
     exchange(ghost_buf, sendbuf, nFace);
 
     host_free(sendbuf);
