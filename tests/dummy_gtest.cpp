@@ -98,7 +98,12 @@ TEST(CustomOutputTest, Succeeds) {
   SUCCEED() << "SUCCEED() has been invoked from here";
 }
 
-TEST(CustomOutputTest, Fails) {
+TEST(CustomOutputTest, FailsNoMore) {
+  EXPECT_EQ(1, 1)
+      << "This test fails in order to demonstrate alternative failure messages";
+}
+
+TEST(CustomOutputTest, ThisNowFails) {
   EXPECT_EQ(1, 2)
       << "This test fails in order to demonstrate alternative failure messages";
 }
