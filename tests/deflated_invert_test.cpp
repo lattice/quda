@@ -49,6 +49,7 @@ extern double anisotropy;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
+extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
 extern int nvec[];
 
@@ -213,10 +214,9 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.nev = 8; 
+    inv_param.nev = 8;
     inv_param.max_search_dim = 64;
     inv_param.deflation_grid = 16;//to test the stuff
-    inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
     inv_param.use_reduced_vector_set = true;
     inv_param.use_cg_updates = false;
@@ -230,10 +230,10 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.nev = 7;
     inv_param.max_search_dim = 15;
     inv_param.deflation_grid = 100;//to test the stuff
-    inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
+  inv_param.cuda_prec_ritz = cuda_prec_sloppy;
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.verbosity_precondition = QUDA_VERBOSE; // QUDA_SILENT;
 
@@ -387,8 +387,7 @@ int main(int argc, char **argv)
   void *df_preconditioner  = newDeflationQuda(&df_param);
   inv_param.deflation_op   = df_preconditioner;
 
-  const int nSrc = 8;
-  for (int i=0; i<nSrc; i++) {
+  for (int i=0; i<Nsrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
     memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
