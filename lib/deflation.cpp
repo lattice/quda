@@ -103,7 +103,7 @@ namespace quda {
 
     Complex *projm  = new Complex [param.ld*param.cur_dim];
 
-#ifdef MAGMA_LIB 
+#ifdef MAGMA_LIB
     memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
     double *evals = new double[param.ld];
 
@@ -203,7 +203,8 @@ namespace quda {
 
       VectorXcd  vec2_(param.cur_dim);
 
-      vec2_ = projm_.colPivHouseholderQr().solve(vec_);
+      vec2_ = projm_.fullPivHouseholderQr().solve(vec_);
+
       vec_  = vec2_; 
 #endif
     }
