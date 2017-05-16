@@ -265,6 +265,9 @@ namespace quda {
     void *v; // the field elements
     void *norm; // the normalization field
 
+    void *v_h; // the field elements
+    void *norm_h; // the normalization field
+
     // multi-GPU parameters
 
     int nFaceComms; // number of faces allocated
