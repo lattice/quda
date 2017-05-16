@@ -234,10 +234,6 @@ namespace quda {
 	tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
-        m = (m / 16) * 16 + 16;
-        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
-      }
       if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
