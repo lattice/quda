@@ -345,9 +345,9 @@ extern "C" {
    * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solution Array of solution spinor fields
-   * @param ritzVects Array of ritz vectors (may be input or output, depending on a computation phase)
-   * @param ritzVals Array of ritz values (may be input or output, depending on a computation phase)
    * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
+   * @param vec_infile input file location 
+   * @param vec_outfile output file location
    * @param max_search_dim eigCG parameter: search space dimention
    * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
    * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
@@ -371,9 +371,9 @@ extern "C" {
       const double tadpole,
       void* source,
       void* solution,
-      void* ritzVects,//array of ritz vectors
-      double* ritzVals,//array of ritz values
       int ritz_prec,
+      char vec_infile[],
+      char vec_outfile[],
       const int max_search_dim,
       const int nev,
       const int deflation_grid,
@@ -383,7 +383,6 @@ extern "C" {
       double* const final_residual,
       double* const final_fermilab_residual,
       int *num_iters);
-
 
   /**
    * Solve Ax=b using a Wilson-Clover operator.  All fields are fields
@@ -444,9 +443,9 @@ extern "C" {
    * @param clover_coeff Clover coefficient
    * @param source Right-hand side source field
    * @param solution Solution spinor field
-   * @param ritzVects Array of ritz vectors (may be input or output, depending on a computation phase)
-   * @param ritzVals Array of ritz values (may be input or output, depending on a computation phase)
    * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
+   * @param vec_infile input file location 
+   * @param vec_outfile output file location
    * @param max_search_dim eigCG parameter: search space dimention
    * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
    * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
@@ -472,9 +471,9 @@ extern "C" {
       void* milc_clover_inv,
       void* source,
       void* solution,
-      void* ritzVects,//array of ritz vectors
-      double* ritzVals,//array of ritz values
       int ritz_prec,
+      char vec_infile[],
+      char vec_outfile[],
       const int max_search_dim,
       const int nev,
       const int deflation_grid,
@@ -484,6 +483,7 @@ extern "C" {
       double* const final_residual,
       double* const final_fermilab_residual,
       int *num_iters);
+
 
   /**
    * Load the gauge field from the host.

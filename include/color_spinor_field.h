@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include <lattice_field.h>
+#include <random_quda.h>
 
 namespace quda {
 
@@ -266,6 +267,9 @@ namespace quda {
 
     void *v; // the field elements
     void *norm; // the normalization field
+
+    void *v_h; // the field elements
+    void *norm_h; // the normalization field
 
     // multi-GPU parameters
 
@@ -761,6 +765,18 @@ namespace quda {
   */
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
 			const int dagger, MemoryLocation *destination=nullptr);
+
+  /*Generate a gaussian distributed spinor
+   * @param src The spinorfield
+   * @param seed Seed
+   * */
+  void spinorGauss(ColorSpinorField &src, int seed);
+
+  /*Generate a gaussian distributed spinor
+   * @param src The spinorfield
+   * @param randstates Random state
+   * */
+  void spinorGauss(ColorSpinorField &src, RNG& randstates);
 
 } // namespace quda
 

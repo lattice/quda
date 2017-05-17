@@ -735,7 +735,9 @@ namespace quda {
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
 #else
-    errorQuda("\nQIO library was not built.\n");      
+    if (strcmp(param.mg_global.vec_outfile,"")!=0) {
+      errorQuda("\nQIO library was not built.\n");
+    }
 #endif
   }
 

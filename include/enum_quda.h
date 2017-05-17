@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+  typedef enum QudaMemoryType_s {
+    QUDA_MEMORY_DEVICE,
+    QUDA_MEMORY_PINNED,
+    QUDA_MEMORY_MAPPED,
+    QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
+  } QudaMemoryType;
+
   //
   // Types used in QudaGaugeParam
   //
@@ -119,6 +126,8 @@ extern "C" {
     QUDA_FGMRESDR_INVERTER,
     QUDA_MG_INVERTER,
     QUDA_BICGSTABL_INVERTER,
+    QUDA_CGNE_INVERTER,
+    QUDA_CGNR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
