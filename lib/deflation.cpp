@@ -174,16 +174,16 @@ namespace quda {
     do{
       const int local_length = (param.cur_dim - offset) > cdot_length  ? cdot_length : (param.cur_dim - offset) ;
 
-      std::vector<cudaColorSpinorField*> rv_;
-      std::vector<cudaColorSpinorField*> in_;
+      std::vector<ColorSpinorField*> rv_;
+      std::vector<ColorSpinorField*> in_;
 
       rv_.reserve(local_length);
       in_.reserve(local_length);
 
       for(int i = 0; i < local_length; i++)
       {
-        rv_.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(offset+i)));
-        in_.push_back(static_cast<cudaColorSpinorField*>(b_sloppy));
+        rv_.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+i)));
+        in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
       }
 
       //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
@@ -262,17 +262,17 @@ namespace quda {
         
         const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
 
-        std::vector<cudaColorSpinorField*> vj_local;
-        std::vector<cudaColorSpinorField*> vi_local;
+        std::vector<ColorSpinorField*> vj_local;
+        std::vector<ColorSpinorField*> vi_local;
 
         vj_local.reserve(local_length);
         vi_local.reserve(local_length);
 
         for(int j = 0; j < local_length; j++)
         {
-          vj_local.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(offset+j)));
-          vi_local.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(i)));
-          //vi_local.push_back(static_cast<cudaColorSpinorField*>(accum));
+          vj_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+j)));
+          vi_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(i)));
+          //vi_local.push_back(static_cast<ColorSpinorField*>(accum));
           alpha[j] = 0.0;
         }
 
@@ -312,17 +312,17 @@ namespace quda {
       while (offset < i){
         const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset) ;
 
-        std::vector<cudaColorSpinorField*> vj_local;
-        std::vector<cudaColorSpinorField*> av_local;
+        std::vector<ColorSpinorField*> vj_local;
+        std::vector<ColorSpinorField*> av_local;
 
         vj_local.reserve(local_length);
         av_local.reserve(local_length);
 
         for(int j = 0; j < local_length; j++)
         {
-          vj_local.push_back(static_cast<cudaColorSpinorField*>(&param.RV->Component(offset+j)));
-          av_local.push_back(static_cast<cudaColorSpinorField*>(Av_sloppy));
-          //av_local.push_back(static_cast<cudaColorSpinorField*>(Av));
+          vj_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+j)));
+          av_local.push_back(static_cast<ColorSpinorField*>(Av_sloppy));
+          //av_local.push_back(static_cast<ColorSpinorField*>(Av));
           alpha[j] = 0.0;
         }
 

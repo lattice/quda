@@ -116,15 +116,15 @@ namespace quda {
          do {
            const int local_length = (2*k - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (2*k - offset) ;
 
-           std::vector<cudaColorSpinorField*> v_;
-           std::vector<cudaColorSpinorField*> w_;
+           std::vector<ColorSpinorField*> v_;
+           std::vector<ColorSpinorField*> w_;
            v_.reserve(local_length);
            w_.reserve(local_length);
 
            for(int i = 0; i < local_length; i++)
            {
-             v_.push_back(static_cast<cudaColorSpinorField*>(&v->Component(offset+i)));
-             w_.push_back(static_cast<cudaColorSpinorField*>(w));
+             v_.push_back(static_cast<ColorSpinorField*>(&v->Component(offset+i)));
+             w_.push_back(static_cast<ColorSpinorField*>(w));
            }
            //Warning! this won't work with arbitrary (big) param.cur_dim. That's why pipelining is needed.
            blas::cDotProduct(&s[offset], w_, v_);//<i, b>

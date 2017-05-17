@@ -471,15 +471,15 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      do {
         const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
 
-        std::vector<cudaColorSpinorField*> v_;
-        std::vector<cudaColorSpinorField*> r_;
+        std::vector<ColorSpinorField*> v_;
+        std::vector<ColorSpinorField*> r_;
         v_.reserve(local_length);
         r_.reserve(local_length);
 
         for(int i = 0; i < local_length; i++)
         {
-          v_.push_back(static_cast<cudaColorSpinorField*>(&Vm->Component(offset+i)));
-          r_.push_back(static_cast<cudaColorSpinorField*>(r_sloppy));
+          v_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(offset+i)));
+          r_.push_back(static_cast<ColorSpinorField*>(r_sloppy));
         }
         blas::cDotProduct(&args.c[offset], v_, r_);
         offset += cdot_pipeline_length;
@@ -609,15 +609,15 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
           do {
             const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
 
-            std::vector<cudaColorSpinorField*> v1_;
-            std::vector<cudaColorSpinorField*> v2_;
+            std::vector<ColorSpinorField*> v1_;
+            std::vector<ColorSpinorField*> v2_;
             v1_.reserve(local_length);
             v2_.reserve(local_length);
 
             for(int i = 0; i < local_length; i++)
             {
-              v1_.push_back(static_cast<cudaColorSpinorField*>(&Vm->Component(offset+i)));
-              v2_.push_back(static_cast<cudaColorSpinorField*>(&Vm->Component(l)));
+              v1_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(offset+i)));
+              v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
             }
             blas::cDotProduct(&col[offset], v1_, v2_);
 
