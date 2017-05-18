@@ -610,7 +610,6 @@ BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
 INTERFACE_NVTX
 MPI_NVTX
-GPU_COMMS
 GPU_DIRECT
 POSIX_THREADS
 BUILD_MPI
@@ -733,7 +732,6 @@ enable_contract
 enable_dynamic_clover
 enable_multi_gpu
 enable_gpu_direct
-enable_gpu_comms
 enable_mpi_nvtx
 enable_interface_nvtx
 enable_device_pack
@@ -1422,8 +1420,6 @@ Optional Features:
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
-  --enable-gpu-comms      Enable direct CUDA-NIC communication (experimental,
-                          default: disabled)
   --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
                           the visual profiler (default: disabled)
   --enable-interface-nvtx Enable NVTX markup for profiling interface calls in
@@ -2322,15 +2318,6 @@ if test "${enable_gpu_direct+set}" = set; then :
   enableval=$enable_gpu_direct;  gpu_direct=${enableval}
 else
    gpu_direct="yes"
-
-fi
-
-
-# Check whether --enable-gpu-comms was given.
-if test "${enable_gpu_comms+set}" = set; then :
-  enableval=$enable_gpu_comms;  gpu_comms=${enableval}
-else
-   gpu_comms="no"
 
 fi
 
@@ -4264,13 +4251,6 @@ yes|no);;
   ;;
 esac
 
-case ${gpu_comms} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-gpu-comms " "$LINENO" 5
-  ;;
-esac
-
 case ${mpi_nvtx} in
 yes|no);;
 *)
@@ -4507,11 +4487,6 @@ POSIX_THREADS=${posix_threads}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECT= ${gpu_direct}" >&5
 $as_echo "$as_me: Setting GPU_DIRECT= ${gpu_direct}" >&6;}
 GPU_DIRECT=${gpu_direct}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_COMMS= ${gpu_comms}" >&5
-$as_echo "$as_me: Setting GPU_COMMS= ${gpu_comms}" >&6;}
-GPU_COMMS=${gpu_comms}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_NVTXS= ${mpi_nvtx}" >&5

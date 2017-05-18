@@ -22,13 +22,14 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define NO_PRECOND
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
+//extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -48,32 +49,11 @@ extern double anisotropy;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
+extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
-extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
-extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int nvec[];
-extern int mg_levels;
 
-extern bool generate_nullspace;
-extern bool generate_all_levels;
-extern int nu_pre;
-extern int nu_post;
-extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
-extern double mu_factor[QUDA_MAX_MG_LEVEL];
-
-extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
-
-extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
-extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
-extern double setup_tol;
-extern QudaSetupType setup_type;
-extern bool pre_orthonormalize;
-extern bool post_orthonormalize;
-extern double omega;
-extern QudaInverterType smoother_type;
-extern QudaInverterType coarsest_solver;
-extern double coarsest_tol;
-extern int coarsest_maxiter;
+extern QudaInverterType inv_type;
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -104,11 +84,9 @@ display_test_info()
 	     get_recon_str(link_recon), 
 	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
-  printfQuda("MG parameters\n");
-  printfQuda(" - number of levels %d\n", mg_levels);
-  for (int i=0; i<mg_levels-1; i++) printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
-  printfQuda(" - number of pre-smoother applications %d\n", nu_pre);
-  printfQuda(" - number of post-smoother applications %d\n", nu_post);
+  printfQuda("Deflation parameters\n");
+//  printfQuda(" - number of levels %d\n", mg_levels);
+  printfQuda(" - number of eigenvectors %d\n", nvec[0]);
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -157,143 +135,13 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
   int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
   int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
+  int pad_size =std::max(x_face_size, y_face_size);
+  pad_size = std::max(pad_size, z_face_size);
+  pad_size = std::max(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;    
 #endif
 }
 
-void setMultigridParam(QudaMultigridParam &mg_param) {
-  QudaInvertParam &inv_param = *mg_param.invert_param;
-
-  inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
-  inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = cuda_prec;
-  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
-  }
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.dslash_type = dslash_type;
-
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.mu = mu;
-    inv_param.twist_flavor = twist_flavor;
-    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-
-    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      printfQuda("Twisted-mass doublet non supported (yet)\n");
-      exit(0);
-    }
-  }
-
-  inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
-
-  inv_param.matpc_type = matpc_type;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
-
-  inv_param.solve_type = QUDA_DIRECT_SOLVE;
-
-  mg_param.invert_param = &inv_param;
-  mg_param.n_level = mg_levels;
-  for (int i=0; i<mg_param.n_level; i++) {
-    for (int j=0; j<QUDA_MAX_DIM; j++) {
-      // if not defined use 4
-      mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
-    }
-    mg_param.verbosity[i] = mg_verbosity[i];
-    mg_param.setup_inv_type[i] = setup_inv[i];
-    mg_param.num_setup_iter[i] = num_setup_iter[i];
-    mg_param.setup_tol[i] = setup_tol;
-    mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
-    mg_param.nu_pre[i] = nu_pre;
-    mg_param.nu_post[i] = nu_post;
-    mg_param.mu_factor[i] = mu_factor[i];
-
-    mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
-
-    mg_param.smoother[i] = smoother_type;
-
-    // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
-    mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
-
-    mg_param.global_reduction[i] = QUDA_BOOLEAN_YES;
-
-    // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
-    // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
-
-    // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
-    // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
-
-    // if we are using an outer even-odd preconditioned solve, then we
-    // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
-
-    mg_param.omega[i] = omega; // over/under relaxation factor
-
-    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
-  }
-
-  // only coarsen the spin on the first restriction
-  mg_param.spin_block_size[0] = 2;
-
-  mg_param.setup_type = setup_type;
-  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-
-  // coarsest grid solver
-  mg_param.smoother[mg_levels-1] = coarsest_solver;
-  mg_param.smoother_tol[mg_levels-1] = coarsest_tol == 0 ? tol_hq : coarsest_tol;
-  mg_param.nu_pre[mg_levels-1] = coarsest_maxiter;
-  mg_param.nu_post[mg_levels-1] = 0;
-
-  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
-    : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-
-  mg_param.run_verify = QUDA_BOOLEAN_YES;
-
-  // set file i/o parameters
-  strcpy(mg_param.vec_infile, vec_infile);
-  strcpy(mg_param.vec_outfile, vec_outfile);
-
-  // these need to tbe set for now but are actually ignored by the MG setup
-  // needed to make it pass the initialization test
-  inv_param.inv_type = QUDA_GCR_INVERTER;
-  inv_param.tol = 1e-10;
-  inv_param.maxiter = 1000;
-  inv_param.reliable_delta = 1e-10;
-  inv_param.gcrNkrylov = 10;
-
-  inv_param.verbosity = QUDA_SUMMARIZE;
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
-}
 
 void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.Ls = 1;
@@ -320,6 +168,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+//  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 
   inv_param.dslash_type = dslash_type;
 
@@ -350,46 +200,87 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
 
-  inv_param.inv_type = QUDA_GCR_INVERTER;
 
+  // set default solver type to incremental eigcg is not set at command line
+  if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
+    inv_type = QUDA_INC_EIGCG_INVERTER;
+
+  //! For deflated solvers only:
+  inv_param.inv_type = inv_type;
+  inv_param.tol      = tol;
+  inv_param.tol_hq   = tol_hq; // specify a tolerance for the residual for heavy quark residual
+
+  inv_param.rhs_idx  = 0;
+
+  if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
+    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+    inv_param.nev = 8;
+    inv_param.max_search_dim = 64;
+    inv_param.deflation_grid = 16;//to test the stuff
+    inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
+    inv_param.use_reduced_vector_set = true;
+    inv_param.use_cg_updates = false;
+    inv_param.cg_iterref_tol = 5e-2;
+    inv_param.eigcg_max_restarts = 3;
+    inv_param.max_restart_num = 3;
+    inv_param.inc_tol = 1e-2;
+    inv_param.eigenval_tol = 1e-2;
+  }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    inv_param.nev = 7;
+    inv_param.max_search_dim = 15;
+    inv_param.deflation_grid = 100;//to test the stuff
+    inv_param.tol_restart = 0.0;//restart is not requested...
+  }
+
+  inv_param.cuda_prec_ritz = cuda_prec_sloppy;
   inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = mg_verbosity[0];
+  inv_param.verbosity_precondition = QUDA_VERBOSE; // QUDA_SILENT;
 
-
-  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param.pipeline = pipeline;
-  inv_param.gcrNkrylov = gcrNkrylov;
-  inv_param.tol = tol;
+#ifdef NO_PRECOND
+  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+#else
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
+#endif
+  inv_param.gcrNkrylov = 6;
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
-
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  inv_param.reliable_delta = 1e-1;
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 1;
+  inv_param.tol_precondition = 1e-2;
+  inv_param.maxiter_precondition = 16;
   inv_param.omega = 1.0;
 }
 
+void setDeflationParam(QudaEigParam &df_param) {
+
+  df_param.import_vectors = QUDA_BOOLEAN_NO;
+  df_param.cuda_prec_ritz = cuda_prec_sloppy;
+
+  df_param.location       = QUDA_CUDA_FIELD_LOCATION;
+  df_param.run_verify     = QUDA_BOOLEAN_NO;
+
+  df_param.nk       = df_param.invert_param->nev;
+  df_param.np       = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
+
+  // set file i/o parameters
+  strcpy(df_param.vec_infile, vec_infile);
+  strcpy(df_param.vec_outfile, vec_outfile);
+}
+  
+
 int main(int argc, char **argv)
 {
-  // We give here the default value to some of the array
-  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
-    mg_verbosity[i] = QUDA_SILENT;
-    setup_inv[i] = QUDA_BICGSTAB_INVERTER;
-    num_setup_iter[i] = 1;
-    mu_factor[i] = 1.;
-  }
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
@@ -425,15 +316,13 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
 
-  QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaMultigridParam mg_param = newQudaMultigridParam();
-  mg_param.invert_param = &mg_inv_param;
-
-  setMultigridParam(mg_param);
-
 
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
+
+  QudaEigParam  df_param = newQudaEigParam();
+  df_param.invert_param = &inv_param;
+  setDeflationParam(df_param);
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -493,17 +382,12 @@ int main(int argc, char **argv)
   loadGaugeQuda((void*)gauge, &gauge_param);
 
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
-  if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-  inv_param.solve_type = solve_type; // restore actual solve_type we want to do
+  void *df_preconditioner  = newDeflationQuda(&df_param);
+  inv_param.deflation_op   = df_preconditioner;
 
-  // setup the multigrid solver
-  void *mg_preconditioner = newMultigridQuda(&mg_param);
-  inv_param.preconditioner = mg_preconditioner;
-
-  const int nSrc = 1;
-  for (int i=0; i<nSrc; i++) {
+  for (int i=0; i<Nsrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
     memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
@@ -518,12 +402,10 @@ int main(int argc, char **argv)
     }
 
     invertQuda(spinorOut, spinorIn, &inv_param);
+    printfQuda("\nDone for %d rhs.\n", inv_param.rhs_idx);
   }
 
-  // free the multigrid solver
-  destroyMultigridQuda(mg_preconditioner);
-
-
+  destroyDeflationQuda(df_preconditioner);    
 
   // stop the timer
   time0 += clock();

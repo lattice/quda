@@ -208,12 +208,11 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int dim, int dir,  int parity, i
   in.allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
   stream = stream_p;
 
-  if (zeroCopyPack) {
-    void *my_face_d;
-    cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
-    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[0], my_face_d, a, b);
+  if (zeroCopyPack) { errorQuda("Deprecated");
   } else {
-    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[Nstream-1], 0, a, b);
+    MemoryLocation location[2*QUDA_MAX_DIM];
+    for (int i=0; i<2*QUDA_MAX_DIM; i++) location[i] = Device;
+    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[Nstream-1], location, a, b);
   }
 }
 

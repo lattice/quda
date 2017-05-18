@@ -111,10 +111,24 @@ namespace quda {
     bool tuneGridDim() const { return false; }
 
   public:
-    inline GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta)
+    inline GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta, MemoryLocation *destination)
       : TunableVectorYZ((Ns/Ms)*(Nc/Mc), arg.nParity), arg(arg), meta(meta) {
       strcpy(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
+
+      // record the location of where each pack buffer is in [2*dim+dir] ordering
+      // 0 - no packing
+      // 1 - pack to local GPU memory
+      // 2 - pack to local mapped CPU memory
+      // 3 - pack to remote mapped GPU memory
+      char label[15] = ",dest=";
+      for (int dim=0; dim<4; dim++) {
+	for (int dir=0; dir<2; dir++) {
+	  label[2*dim+dir+6] = !comm_dim_partitioned(dim) ? '0' : destination[2*dim+dir] == Device ? '1' : destination[2*dim+dir] == Host ? '2' : '3';
+	}
+      }
+      label[14] = '\0';
+      strcat(aux,label);
     }
 
     virtual ~GenericPackGhostLauncher() { }
@@ -146,7 +160,8 @@ namespace quda {
   };
 
   template <typename Float, QudaFieldOrder order, int Ns, int Nc>
-  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
+			       const int dagger, MemoryLocation *destination) {
 
     typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
     Q field(a, 0, ghost);
@@ -154,49 +169,51 @@ namespace quda {
     constexpr int spins_per_thread = 1; // make this autotunable
     constexpr int colors_per_thread = 1;
     PackGhostArg<Q> arg(field, ghost, a, parity, dagger);
-    GenericPackGhostLauncher<Float,Ns,spins_per_thread,Nc,colors_per_thread,PackGhostArg<Q> > launch(arg, a);
+    GenericPackGhostLauncher<Float,Ns,spins_per_thread,Nc,colors_per_thread,PackGhostArg<Q> >
+      launch(arg, a, destination);
     launch.apply(0);
   }
 
   template <typename Float, QudaFieldOrder order, int Ns>
-  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
+			       const int dagger, MemoryLocation *destination) {
     
     if (a.Ncolor() == 2) {
-      genericPackGhost<Float,order,Ns,2>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,2>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 3) {
-      genericPackGhost<Float,order,Ns,3>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,3>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 4) {
-      genericPackGhost<Float,order,Ns,4>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,4>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 6) {
-      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 8) {
-      genericPackGhost<Float,order,Ns,8>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,8>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 12) {
-      genericPackGhost<Float,order,Ns,12>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,12>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 16) {
-      genericPackGhost<Float,order,Ns,16>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,16>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 20) {
-      genericPackGhost<Float,order,Ns,20>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,20>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 24) {
-      genericPackGhost<Float,order,Ns,24>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,24>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 28) {
-      genericPackGhost<Float,order,Ns,28>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,28>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 32) {
-      genericPackGhost<Float,order,Ns,32>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,32>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 48) {
-      genericPackGhost<Float,order,Ns,48>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,48>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 72) {
-      genericPackGhost<Float,order,Ns,72>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,72>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 96) {
-      genericPackGhost<Float,order,Ns,96>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,96>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 256) {
-      genericPackGhost<Float,order,Ns,256>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,256>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 576) {
-      genericPackGhost<Float,order,Ns,576>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,576>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 768) {
-      genericPackGhost<Float,order,Ns,768>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,768>(ghost, a, parity, dagger, destination);
     } else if (a.Ncolor() == 1024) {
-      genericPackGhost<Float,order,Ns,1024>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,1024>(ghost, a, parity, dagger, destination);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
     }
@@ -204,15 +221,16 @@ namespace quda {
   }
 
   template <typename Float, QudaFieldOrder order>
-  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
+			       const int dagger, MemoryLocation *destination) {
 
     if (a.Nspin() == 4) {
-      genericPackGhost<Float,order,4>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,4>(ghost, a, parity, dagger, destination);
     } else if (a.Nspin() == 2) {
-      genericPackGhost<Float,order,2>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,2>(ghost, a, parity, dagger, destination);
 #ifdef GPU_STAGGERED_DIRAC
     } else if (a.Nspin() == 1) {
-      genericPackGhost<Float,order,1>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,1>(ghost, a, parity, dagger, destination);
 #endif
     } else {
       errorQuda("Unsupported nSpin = %d", a.Nspin());
@@ -221,22 +239,30 @@ namespace quda {
   }
 
   template <typename Float>
-  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
+			       const int dagger, MemoryLocation *destination) {
 
     if (a.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      genericPackGhost<Float,QUDA_FLOAT2_FIELD_ORDER>(ghost, a, parity, dagger);
+      genericPackGhost<Float,QUDA_FLOAT2_FIELD_ORDER>(ghost, a, parity, dagger, destination);
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      genericPackGhost<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, dagger);
+      genericPackGhost<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, dagger, destination);
     } else {
       errorQuda("Unsupported field order = %d", a.FieldOrder());
     }
 
   }
 
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
+			const int dagger, MemoryLocation *destination_) {
 
     if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
       errorQuda("Field order %d not supported", a.FieldOrder());
+    }
+
+    // set default location to match field type
+    MemoryLocation destination[2*QUDA_MAX_DIM];
+    for (int i=0; i<4*2; i++) {
+      destination[i] = destination_ ? destination_[i] : a.Location() == QUDA_CUDA_FIELD_LOCATION ? Device : Host;
     }
 
     // only do packing if one of the dimensions is partitioned
@@ -246,9 +272,9 @@ namespace quda {
     if (!partitioned) return;
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      genericPackGhost<double>(ghost, a, parity, dagger);
+      genericPackGhost<double>(ghost, a, parity, dagger, destination);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      genericPackGhost<float>(ghost, a, parity, dagger);
+      genericPackGhost<float>(ghost, a, parity, dagger, destination);
     } else {
       errorQuda("Unsupported precision %d", a.Precision());
     }

@@ -193,8 +193,8 @@ namespace quda {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
 
-      RegTypeIn   in[Ns*Nc*2];
-      RegTypeOut  out[Ns*Nc*2];
+      RegTypeIn   in[Ns*Nc*2] = { };
+      RegTypeOut  out[Ns*Nc*2] = { };
 
       if(extend){
         arg.in.load(in, X);

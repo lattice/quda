@@ -155,20 +155,23 @@ namespace quda {
     }
 
     /**
-       Functor to perform the operation y = x + a*y
+       Functor to perform the operation z = x + a*y
     */
     template <typename Float2, typename FloatN>
-    struct xpay_ : public BlasFunctor<Float2,FloatN> {
+    struct xpayz_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
-      xpay_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y = x + a.x*y; }
+      xpayz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { z = x + a.x*y; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 2; } //! flops per element
     };
 
     void xpay(ColorSpinorField &x, const double &a, ColorSpinorField &y) {
-      blasCuda<xpay_,0,1,0,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0),
-			     x, y, x, x);
+      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, x);
+    }
+
+    void xpayz(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z) {
+      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x);
     }
 
     /**

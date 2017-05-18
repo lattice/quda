@@ -4,6 +4,7 @@
 #include <cub/cub.cuh>
 #include <typeinfo>
 #include <multigrid_helper.cuh>
+#include <fast_intdiv.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 #define SWIZZLE
@@ -28,7 +29,7 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the input field (if single parity)
     const int nParity; // number of parities of input fine field
-    int swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
+    int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
 
     RestrictArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
 		const int *fine_to_coarse, const int *coarse_to_fine, int parity)
@@ -254,6 +255,7 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
     unsigned int minThreads() const { return in.VolumeCB(); } // fine parity is the block y dimension
 
   public:
@@ -325,6 +327,7 @@ namespace quda {
 	  } else if (block_size == 144) {  // for 4x4x3x6 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,144>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+#if __COMPUTE_CAPABILITY__ >= 300
 	  } else if (block_size == 192) {  // for 4x4x3x8 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,192>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -334,7 +337,6 @@ namespace quda {
 	  } else if (block_size == 256) { // for 4x4x4x8  aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,256>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#if __COMPUTE_CAPABILITY__ >= 300
 	  } else if (block_size == 432) { // for 6x6x6x4 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,432>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);

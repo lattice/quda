@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+  typedef enum QudaMemoryType_s {
+    QUDA_MEMORY_DEVICE,
+    QUDA_MEMORY_PINNED,
+    QUDA_MEMORY_MAPPED,
+    QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
+  } QudaMemoryType;
+
   //
   // Types used in QudaGaugeParam
   //
@@ -88,15 +95,16 @@ extern "C" {
 
   typedef enum QudaDslashPolicy_s {
     QUDA_DSLASH,
-    QUDA_DSLASH2,
-    QUDA_PTHREADS_DSLASH,
-    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_DSLASH,
+    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_GPU_COMMS_DSLASH,
-    QUDA_DSLASH_ASYNC,
-    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_ZERO_COPY_DSLASH_PACK,
+    QUDA_FUSED_ZERO_COPY_DSLASH_PACK,
     QUDA_ZERO_COPY_DSLASH,
     QUDA_FUSED_ZERO_COPY_DSLASH,
+    QUDA_DSLASH_ASYNC,
+    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_PTHREADS_DSLASH,
     QUDA_DSLASH_NC
   } QudaDslashPolicy;
 

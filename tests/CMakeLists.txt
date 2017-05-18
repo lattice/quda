@@ -30,11 +30,13 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
     QUDA_CHECKBUILDTEST(invertmsrc_test QUDA_BUILD_ALL_TESTS)
   endif()
 
-endif()
+  if(QUDA_DEFLATEDSOLVER)
+    cuda_add_executable(deflated_invert_test deflated_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+    target_link_libraries(deflated_invert_test ${TEST_LIBS})
+    QUDA_CHECKBUILDTEST(deflated_invert_test QUDA_BUILD_ALL_TESTS)
+  endif()
 
-cuda_add_executable(deflation_test deflation_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
-target_link_libraries(deflation_test ${TEST_LIBS})
-QUDA_CHECKBUILDTEST(deflation_test QUDA_BUILD_ALL_TESTS)
+endif()
 
 if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)

@@ -48,7 +48,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  quda_memcpy.cpp quda_arpack_interface.cpp version.cpp )
+  quda_memcpy.cpp quda_arpack_interface.cpp deflation.cpp version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
@@ -107,6 +107,10 @@ target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LI
 
 if(QUDA_QIO)
   target_link_libraries(quda ${QIO_LIB} ${LIME_LIB})
+endif()
+
+if(QUDA_QDPJIT)
+  target_link_libraries(quda ${QDP_LIB} ${QIO_LIB} ${LIME_LIB} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
