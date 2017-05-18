@@ -474,13 +474,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
         std::vector<ColorSpinorField*> v_;
         std::vector<ColorSpinorField*> r_;
         v_.reserve(local_length);
-        r_.reserve(local_length);
 
         for(int i = 0; i < local_length; i++)
         {
           v_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(offset+i)));
-          r_.push_back(static_cast<ColorSpinorField*>(r_sloppy));
         }
+	r_.push_back(static_cast<ColorSpinorField*>(r_sloppy));
         blas::cDotProduct(&args.c[offset], v_, r_);
         offset += cdot_pipeline_length;
 
@@ -612,13 +611,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
             std::vector<ColorSpinorField*> v1_;
             std::vector<ColorSpinorField*> v2_;
             v1_.reserve(local_length);
-            v2_.reserve(local_length);
 
             for(int i = 0; i < local_length; i++)
             {
               v1_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(offset+i)));
-              v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
             }
+	    v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
             blas::cDotProduct(&col[offset], v1_, v2_);
 
             offset += cdot_pipeline_length;

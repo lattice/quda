@@ -178,13 +178,12 @@ namespace quda {
       std::vector<ColorSpinorField*> in_;
 
       rv_.reserve(local_length);
-      in_.reserve(local_length);
 
       for(int i = 0; i < local_length; i++)
       {
         rv_.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+i)));
-        in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
       }
+      in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
 
       //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
       blas::cDotProduct(&vec[offset], rv_, in_);//<i, b>
@@ -266,15 +265,13 @@ namespace quda {
         std::vector<ColorSpinorField*> vi_local;
 
         vj_local.reserve(local_length);
-        vi_local.reserve(local_length);
 
         for(int j = 0; j < local_length; j++)
         {
           vj_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+j)));
-          vi_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(i)));
-          //vi_local.push_back(static_cast<ColorSpinorField*>(accum));
           alpha[j] = 0.0;
         }
+	vi_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(i)));
 
         //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
         blas::cDotProduct(alpha, vj_local, vi_local);
@@ -316,15 +313,13 @@ namespace quda {
         std::vector<ColorSpinorField*> av_local;
 
         vj_local.reserve(local_length);
-        av_local.reserve(local_length);
 
         for(int j = 0; j < local_length; j++)
         {
           vj_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+j)));
-          av_local.push_back(static_cast<ColorSpinorField*>(Av_sloppy));
-          //av_local.push_back(static_cast<ColorSpinorField*>(Av));
           alpha[j] = 0.0;
         }
+	av_local.push_back(static_cast<ColorSpinorField*>(Av_sloppy));
 
         //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
         blas::cDotProduct(alpha, vj_local, av_local);
