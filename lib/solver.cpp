@@ -94,6 +94,7 @@ namespace quda {
       } else {
 	solver = new GMResDR(mat, matSloppy, matPrecon, param, profile);
       }
+      break;
     case QUDA_CGNE_INVERTER:
       report("CGNE");
       solver = new CGNE(mat, matSloppy, param, profile);
