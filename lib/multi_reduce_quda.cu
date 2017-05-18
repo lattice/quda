@@ -33,6 +33,11 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #define QudaSumFloat3 double3
 #endif
 
+// work around for Fermi
+#if (__COMPUTE_CAPABILITY__ < 300)
+#undef MAX_MULTI_BLAS_N
+#define MAX_MULTI_BLAS_N 2
+#endif
 
 static void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
   if (a.Precision() != b.Precision())
