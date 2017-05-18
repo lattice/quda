@@ -235,6 +235,15 @@ namespace quda {
     /** Coarse temporary vector */
     ColorSpinorField *tmp_coarse;
 
+    /** The fine operator used for computing inter-grid residuals */
+    const Dirac *diracResidual;
+
+    /** The fine operator used for doing smoothing */
+    const Dirac *diracSmoother;
+
+    /** The fine operator used for doing sloppy smoothing */
+    const Dirac *diracSmootherSloppy;
+
     /** The coarse operator used for computing inter-grid residuals */
     Dirac *diracCoarseResidual;
 
