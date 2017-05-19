@@ -172,16 +172,7 @@ namespace quda {
     WuppertalSmearing(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
     {
       strcpy(aux, meta.AuxString());
-#ifdef MULTI_GPU
-      char comm[5];
-      comm[0] = (arg.commDim[0] ? '1' : '0');
-      comm[1] = (arg.commDim[1] ? '1' : '0');
-      comm[2] = (arg.commDim[2] ? '1' : '0');
-      comm[3] = (arg.commDim[3] ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
-#endif
+      strcat(aux, comm_dim_partitioned_string());
     }
     virtual ~WuppertalSmearing() { }
 
@@ -284,7 +275,8 @@ namespace quda {
     // check all locations match
     Location(out, in, U);
 
-    in.exchangeGhost((QudaParity)(1-parity), 0); // last parameter is dummy
+    const int nFace = 1;
+    in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
 
     if (out.Precision() == QUDA_SINGLE_PRECISION){
       wuppertalStep<float>(out, in, parity, U, (float) A, (float) B);
