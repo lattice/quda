@@ -791,6 +791,9 @@ namespace quda {
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
 
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U, double A, double B);
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U, double alpha);
+
   void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p);
 
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

@@ -12,6 +12,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\
 	interface_quda.o util_quda.o color_spinor_field.o		\
 	color_spinor_util.o cpu_color_spinor_field.o			\
+	color_spinor_wuppertal.o					\
 	cuda_color_spinor_field.o dirac.o clover_field.o		\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
@@ -20,14 +21,14 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
 	fat_force_quda.o llfat_quda.o					\
-	gauge_force.o field_strength_tensor.o clover_quda.o	\
+	gauge_force.o field_strength_tensor.o clover_quda.o		\
 	dslash_quda.o covDev.o dslash_wilson.o dslash_clover.o		\
 	dslash_clover_asym.o dslash_twisted_mass.o			\
 	dslash_ndeg_twisted_mass.o dslash_twisted_clover.o		\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
-	blas_quda.o multi_blas_quda.o copy_quda.o \
-	reduce_quda.o multi_reduce_quda.o face_buffer.o		\
+	blas_quda.o multi_blas_quda.o copy_quda.o 			\
+	reduce_quda.o multi_reduce_quda.o face_buffer.o			\
 	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
