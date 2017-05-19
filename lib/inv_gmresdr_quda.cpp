@@ -412,7 +412,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
        if(param.precision_precondition != param.precision_sloppy) inPre = Vm->Component(j);
        zero(outPre);
+       pushVerbosity(param.verbosity_precondition);
        (*K)( outPre ,inPre );
+       popVerbosity();
 
        if(param.precision_precondition != param.precision_sloppy) Zm->Component(j) = outPre;
      }
