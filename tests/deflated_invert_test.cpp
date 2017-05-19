@@ -22,8 +22,6 @@
 
 #include <qio_field.h>
 
-#define NO_PRECOND
-
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
@@ -237,11 +235,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.verbosity_precondition = QUDA_VERBOSE; // QUDA_SILENT;
 
-#ifdef NO_PRECOND
   inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
-#else
-  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
-#endif
+  //inv_param.inv_type_precondition = QUDA_MR_INVERTER;
   inv_param.gcrNkrylov = 6;
 
   // require both L2 relative and heavy quark residual to determine convergence

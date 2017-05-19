@@ -163,34 +163,14 @@ namespace quda {
 
     printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", sqrt(check_nrm2), param.cur_dim);
 
-    const int cdot_length  = 4;
-
-    int offset = 0;
-
     ColorSpinorField *b_sloppy = param.RV->Precision() != b.Precision() ? r_sloppy : &b;
     *b_sloppy = b;
 
-    //Warning! this won't work with arbitrary param.cur_dim, so pipelining is needed, also must be generalized for CPU fields
-    do{
-      const int local_length = (param.cur_dim - offset) > cdot_length  ? cdot_length : (param.cur_dim - offset) ;
+    std::vector<ColorSpinorField*> rv_(param.RV->Components().begin(), param.RV->Components().begin()+param.cur_dim);
+    std::vector<ColorSpinorField*> in_;
+    in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
 
-      std::vector<ColorSpinorField*> rv_;
-      std::vector<ColorSpinorField*> in_;
-
-      rv_.reserve(local_length);
-
-      for(int i = 0; i < local_length; i++)
-      {
-        rv_.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+i)));
-      }
-      in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
-
-      //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
-      blas::cDotProduct(&vec[offset], rv_, in_);//<i, b>
-
-      offset += cdot_length;
-
-    } while (offset < param.cur_dim);
+    blas::cDotProduct(vec, rv_, in_);//<i, b>
 
     if(!param.use_inv_ritz) 
     {
@@ -212,7 +192,6 @@ namespace quda {
       for(int i = 0; i < param.cur_dim; i++) vec[i] *= param.invRitzVals[i];
     }
 
-    std::vector<ColorSpinorField*> rv_(param.RV->Components().begin(), param.RV->Components().begin()+param.cur_dim);
     std::vector<ColorSpinorField*> out_;
     out_.push_back(&x);
 
@@ -244,54 +223,36 @@ namespace quda {
 
     printfQuda("\nConstruct projection matrix..\n");
 
-    //Block MGS orthogonalization
+    // Block MGS orthogonalization
+    // The degree to which we interpolate between modified GramSchmidt and GramSchmidt (performance vs stability)
     const int cdot_pipeline_length  = 4;
 
     for(int i = first_idx; i < (first_idx + nev); i++)
     {
-      Complex *alpha = new Complex[cdot_pipeline_length];
-
-      int offset = 0;
+      Complex *alpha = new Complex[i];
 
       ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &param.RV->Component(i);
       *accum = param.RV->Component(i);
 
-      //Warning! this won't work with arbitrary param.cur_dim, so pipelining is needed, also must be generalized for CPU fields
+      int offset = 0;
       while (offset < i) {
         
         const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
 
-        std::vector<ColorSpinorField*> vj_local;
-        std::vector<ColorSpinorField*> vi_local;
+        std::vector<ColorSpinorField*> vj_(param.RV->Components().begin()+offset, param.RV->Components().begin()+offset+local_length);
+        std::vector<ColorSpinorField*> vi_;
+	vi_.push_back(accum);
 
-        vj_local.reserve(local_length);
+        blas::cDotProduct(alpha, vj_, vi_);
+        for (int j = 0; j < local_length; j++) alpha[j] = -alpha[j];
 
-        for(int j = 0; j < local_length; j++)
-        {
-          vj_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+j)));
-          alpha[j] = 0.0;
-        }
-	vi_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(i)));
-
-        //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
-        blas::cDotProduct(alpha, vj_local, vi_local);
-
-        std::vector<ColorSpinorField*> vj_global(param.RV->Components().begin()+offset, param.RV->Components().begin()+offset+local_length);
-        std::vector<ColorSpinorField*> vi_global;
-        //vi_global.push_back(&param.RV->Component(i));
-        vi_global.push_back(accum);
-
-        for(int j = 0; j < local_length; j++) alpha[j] = -alpha[j]; 
-
-        blas::caxpy(alpha, vj_global, vi_global); //i-<j,i>j
+        blas::caxpy(alpha, vj_, vi_); //i-<j,i>j
 
         offset += cdot_pipeline_length;
       }
 
-      //alpha[0] = blas::norm2(param.RV->Component(i));
       alpha[0] = blas::norm2(*accum);
 
-      //if(alpha[0].real() > 1e-16) blas::ax(1.0 /sqrt(alpha[0].real()), param.RV->Component(i));
       if(alpha[0].real() > 1e-16) blas::ax(1.0 /sqrt(alpha[0].real()), *accum);
       else                        errorQuda("\nCannot orthogonalize %dth vector\n", i);
 
@@ -299,39 +260,20 @@ namespace quda {
 
       param.matDeflation(*Av_sloppy, param.RV->Component(i));//precision must match!
       //load diagonal:
-      //param.matProj[i*param.ld+i] = cDotProduct(param.RV->Component(i), *Av);
       *Av = *Av_sloppy; 
       param.matProj[i*param.ld+i] = cDotProduct(*accum, *Av);
 
-      //off-diagonal (use multiblas):
-      offset = 0;
+      if (i>0) {
+        std::vector<ColorSpinorField*> vj_(param.RV->Components().begin(), param.RV->Components().begin()+i);
+        std::vector<ColorSpinorField*> av_;
+	av_.push_back(Av_sloppy);
 
-      while (offset < i){
-        const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset) ;
+	blas::cDotProduct(alpha, vj_, av_);
 
-        std::vector<ColorSpinorField*> vj_local;
-        std::vector<ColorSpinorField*> av_local;
-
-        vj_local.reserve(local_length);
-
-        for(int j = 0; j < local_length; j++)
-        {
-          vj_local.push_back(static_cast<ColorSpinorField*>(&param.RV->Component(offset+j)));
-          alpha[j] = 0.0;
+        for (int j = 0; j < i; j++) {
+          param.matProj[i*param.ld+j] = alpha[j];
+          param.matProj[j*param.ld+i] = conj(alpha[j]);//conj
         }
-	av_local.push_back(static_cast<ColorSpinorField*>(Av_sloppy));
-
-        //Warning! this won't work with arbitrary param.cur_dim. Pipelining is needed.
-        blas::cDotProduct(alpha, vj_local, av_local);
-
-        for (int j = 0; j < local_length; j++)//row id
-        {
-          param.matProj[i*param.ld+(j+offset)] = alpha[j];
-          param.matProj[(j+offset)*param.ld+i] = conj(alpha[j]);//conj
-        }
-
-        offset += cdot_pipeline_length;
-
       }
 
       delete [] alpha;
