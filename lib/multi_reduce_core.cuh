@@ -21,58 +21,90 @@ __shared__ static bool isLastBlockDone;
 
 #include <launch_kernel.cuh>
 
-template <int N, typename ReduceType, typename SpinorX, typename SpinorY, 
-  typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
-  struct MultiReduceArg : public ReduceArg<ReduceType> {
 
-  SpinorX X[N];
-  SpinorY Y[N];
-  SpinorZ Z[N];
-  SpinorW W[N];
-  SpinorV V[N];
-  Reducer r;
+/**
+   @brief Parameter struct for generic multi-blas kernel.
+   @tparam NXZ is dimension of input vectors: X,Z,V
+   @tparam NYW is dimension of in-output vectors: Y,W
+   @tparam SpinorX Type of input spinor for x argument
+   @tparam SpinorY Type of input spinor for y argument
+   @tparam SpinorZ Type of input spinor for z argument
+   @tparam SpinorW Type of input spinor for w argument
+   @tparam SpinorW Type of input spinor for v argument
+   @tparam Reducer Functor used to operate on data
+*/
+template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY, 
+  typename SpinorZ, typename SpinorW, typename Reducer>
+struct MultiReduceArg : public ReduceArg<vector_type<ReduceType,NXZ> > {
+
+  const int NYW;
+  SpinorX X[NXZ];
+  SpinorY Y[MAX_MULTI_BLAS_N];
+  SpinorZ Z[NXZ];
+  SpinorW W[MAX_MULTI_BLAS_N];
+  Reducer  r;
   const int length;
-  const int nParity;
- MultiReduceArg(SpinorX X[N], SpinorY Y[N], SpinorZ Z[N], SpinorW W[N], SpinorV V[N], Reducer r, int length, int nParity)
-   : r(r), length(length), nParity(nParity) {
+ MultiReduceArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Reducer r, int NYW, int length)
+   : NYW(NYW), r(r), length(length) {
 
-    for(int i=0; i<N; ++i){
+    for (int i=0; i<NXZ; ++i)
+    {
       this->X[i] = X[i];
-      this->Y[i] = Y[i];
       this->Z[i] = Z[i];
+    }
+
+    for (int i=0; i<NYW; ++i)
+    {
+      this->Y[i] = Y[i];
       this->W[i] = W[i];
-      this->V[i] = V[i];
     }
   }
 };
 
-template<int src, int N, typename FloatN, int M, typename ReduceType, typename Arg>
-  __device__ inline void compute(ReduceType &sum, Arg &arg, int idx, int parity) {
+// storage for matrix coefficients
+#define MAX_MATRIX_SIZE 4096
+static __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
+static __constant__ signed char Bmatrix_d[MAX_MATRIX_SIZE];
+static __constant__ signed char Cmatrix_d[MAX_MATRIX_SIZE];
 
-  constexpr int k = src < N ? src : 0; // silence out-of-bounds compiler warning
+static signed char *Amatrix_h;
+static signed char *Bmatrix_h;
+static signed char *Cmatrix_h;
+
+// 'sum' should be an array of length NXZ...?
+template<int k, int NXZ, typename FloatN, int M, typename ReduceType, typename Arg>
+__device__ inline void compute(vector_type<ReduceType,NXZ> &sum, Arg &arg, int idx, int parity) {
+
+  constexpr int kmod = k; // there's an old warning about silencing an out-of-bounds compiler warning,
+                          // but I never seem to get it, and I'd need to compare against NYW anyway,
+                          // which we can't really get at here b/c it's not a const, and I don't want 
+                          // to fix that. It works fine based on the switch in the function below.
 
   while (idx < arg.length) {
 
-    FloatN x[M], y[M], z[M], w[M], v[M];
+    FloatN x[M], y[M], z[M], w[M];
 
-    arg.X[k].load(x, idx, parity);
-    arg.Y[k].load(y, idx, parity);
-    arg.Z[k].load(z, idx, parity);
-    arg.W[k].load(w, idx, parity);
-    arg.V[k].load(v, idx, parity);
+    arg.Y[kmod].load(y, idx, parity);
+    arg.W[kmod].load(w, idx, parity);
 
-    arg.r.pre();
+    // Each NYW owns its own thread.
+    // The NXZ's are all in the same thread block,
+    // so they can share the same memory.
+#pragma unroll
+    for (int l=0; l < NXZ; l++) {
+      arg.X[l].load(x, idx, parity);
+      arg.Z[l].load(z, idx, parity);
+
+      arg.r.pre();
 
 #pragma unroll
-    for (int j=0; j<M; j++) arg.r(sum, x[j], y[j], z[j], w[j], v[j]);
+      for (int j=0; j<M; j++) arg.r(sum[l], x[j], y[j], z[j], w[j], k, l);
 
-    arg.r.post(sum);
+      arg.r.post(sum[l]);
+    }
 
-    arg.X[k].load(x, idx, parity);
-    arg.Y[k].load(y, idx, parity);
-    arg.Z[k].load(z, idx, parity);
-    arg.W[k].load(w, idx, parity);
-    arg.V[k].load(v, idx, parity);
+    arg.Y[kmod].save(y, idx, parity);
+    arg.W[kmod].save(w, idx, parity);
 
     idx += gridDim.x*blockDim.x;
  }
@@ -80,93 +112,144 @@ template<int src, int N, typename FloatN, int M, typename ReduceType, typename A
 }
 
 #ifdef WARP_MULTI_REDUCE
-template<int N, typename ReduceType, typename FloatN, int M,
-  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template<typename ReduceType, typename FloatN, int M, int NXZ,
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
 #else
-  template<int block_size, int N, typename ReduceType, typename FloatN, int M,
-  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+  template<int block_size, typename ReduceType, typename FloatN, int M, int NXZ,
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
 #endif
-  __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
+  __global__ void multiReduceKernel(MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> arg) {
 
   unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-  unsigned int src_idx = blockIdx.y*blockDim.y + threadIdx.y;
+  unsigned int k = blockIdx.y*blockDim.y + threadIdx.y;
   unsigned int parity = blockIdx.z;
 
-  ReduceType sum;
-  ::quda::zero(sum);
+  if (k >= arg.NYW) return; // safe since k are different thread blocks
 
-  if (src_idx < N) {
-    switch(src_idx) {
-    case 0: compute<0,N,FloatN,M>(sum,arg,i,parity); break;
-    case 1: compute<1,N,FloatN,M>(sum,arg,i,parity); break;
-    case 2: compute<2,N,FloatN,M>(sum,arg,i,parity); break;
-    case 3: compute<3,N,FloatN,M>(sum,arg,i,parity); break;
-    case 4: compute<4,N,FloatN,M>(sum,arg,i,parity); break;
-    }
-  }
+  vector_type<ReduceType,NXZ> sum;
+
+  switch(k) {
+  case  0: compute< 0,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 2
+  case  1: compute< 1,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 3
+  case  2: compute< 2,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 4
+  case  3: compute< 3,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 5
+  case  4: compute< 4,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 6
+  case  5: compute< 5,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 7
+  case  6: compute< 6,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 8
+  case  7: compute< 7,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 9
+  case  8: compute< 8,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 10
+  case  9: compute< 9,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 11
+  case 10: compute<10,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 12
+  case 11: compute<11,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 13
+  case 12: compute<12,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 14
+  case 13: compute<13,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 15
+  case 14: compute<14,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#if MAX_MULTI_BLAS_N >= 16
+  case 15: compute<15,NXZ,FloatN,M,ReduceType>(sum,arg,i,parity); break;
+#endif //16
+#endif //15
+#endif //14
+#endif //13
+#endif //12
+#endif //11
+#endif //10
+#endif //9
+#endif //8
+#endif //7
+#endif //6
+#endif //5
+#endif //4
+#endif //3
+#endif //2
+}
 
 #ifdef WARP_MULTI_REDUCE
-  ::quda::warp_reduce<ReduceType>(arg, sum, parity*N + src_idx);
+  ::quda::warp_reduce<vector_type<ReduceType,NXZ> >(arg, sum, arg.NYW*parity + k);
 #else
-  ::quda::reduce<block_size, ReduceType>(arg, sum, parity*N + src_idx);
+  ::quda::reduce<block_size, vector_type<ReduceType,NXZ> >(arg, sum, arg.NYW*parity + k);
 #endif
 
 } // multiReduceKernel
 
-template<int N, typename doubleN, typename ReduceType, typename FloatN, int M,
-  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
   void multiReduceLaunch(doubleN result[],
-			 MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> &arg,
-			 const TuneParam &tp, const cudaStream_t &stream){
+			 MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> &arg,
+			 const TuneParam &tp, const cudaStream_t &stream) {
 
-  if(tp.grid.x > REDUCE_MAX_BLOCKS)
-    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
-
+  if(tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
+  
+  // ESW: this is where the multireduce kernel is called...?
 #ifdef WARP_MULTI_REDUCE
-  multiReduceKernel<N,ReduceType,FloatN,M><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+  multiReduceKernel<ReduceType,FloatN,M,NXZ><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #else
-  LAUNCH_KERNEL(multiReduceKernel, tp, stream, arg, N, ReduceType, FloatN, M);
+  LAUNCH_KERNEL_LOCAL_PARITY(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
 #endif
-
+  
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
   if(deviceProp.canMapHostMemory){
     cudaEventRecord(*getReduceEvent(), stream);
     while(cudaSuccess != cudaEventQuery(*getReduceEvent())) {}
   } else
 #endif
-    { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), sizeof(ReduceType)*N, cudaMemcpyDeviceToHost); }
+    { cudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z*sizeof(ReduceType)*NXZ*arg.NYW, cudaMemcpyDeviceToHost); }
 
-  for(int i=0; i<N; ++i) {
-    result[i] = set(((ReduceType*)getHostReduceBuffer())[i]);
-    if (arg.nParity==2) sum(result[i],((ReduceType*)getHostReduceBuffer())[N+i]);
+  // need to transpose for same order with vector thread reduction
+  for (int i=0; i<NXZ; i++) {
+    for (int j=0; j<arg.NYW; j++) {
+      result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[j*NXZ+i]);
+      if (tp.grid.z==2) result[i*arg.NYW+j] = set(((ReduceType*)getHostReduceBuffer())[NXZ*arg.NYW+j*NXZ+i]);
+    }
   }
 }
 
 namespace detail
 {
-  template<unsigned... digits> struct to_chars { static const char value[]; };
-  template<unsigned... digits> const char to_chars<digits...>::value[] = {('0' + digits)..., 0};
-  template<unsigned rem, unsigned... digits> struct explode : explode<rem / 10, rem % 10, digits...> {};
-  template<unsigned... digits> struct explode<0, digits...> : to_chars<digits...> {};
+  template<unsigned... digits>
+  struct to_chars { static const char value[]; };
+
+  template<unsigned... digits>
+  const char to_chars<digits...>::value[] = {('0' + digits)..., 0};
+
+  template<unsigned rem, unsigned... digits>
+  struct explode : explode<rem / 10, rem % 10, digits...> {};
+
+  template<unsigned... digits>
+  struct explode<0, digits...> : to_chars<digits...> {};
 }
 
 template<unsigned num>
 struct num_to_string : detail::explode<num / 10, num % 10> {};
 
-template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
-  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template<int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
+  typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
   class MultiReduceCuda : public Tunable {
 
  private:
-  mutable MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg;
+  const int NYW; 
+  mutable MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> arg;
   doubleN *result;
   int nParity;
 
   // host pointer used for backing up fields when tuning
-  char *X_h[N], *Y_h[N], *Z_h[N], *W_h[N], *V_h[N];
-  char *Xnorm_h[N], *Ynorm_h[N], *Znorm_h[N], *Wnorm_h[N], *Vnorm_h[N];
-  const size_t **bytes_;
-  const size_t **norm_bytes_;
+  // don't curry into the Spinors to minimize parameter size
+  char *Y_h[MAX_MULTI_BLAS_N], *W_h[MAX_MULTI_BLAS_N], *Ynorm_h[MAX_MULTI_BLAS_N], *Wnorm_h[MAX_MULTI_BLAS_N];
+  std::vector<ColorSpinorField*> &y, &w;
 
   unsigned int sharedBytesPerThread() const { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -180,28 +263,30 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
     return false;
   }
 
- public:
- MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], SpinorV V[],
-		 Reducer &r, int length, int nParity, size_t **bytes, size_t **norm_bytes) :
-  arg(X, Y, Z, W, V, r, length/nParity, nParity), nParity(nParity), result(result),
-    X_h(), Y_h(), Z_h(), W_h(), V_h(), Xnorm_h(),
-    Ynorm_h(), Znorm_h(), Wnorm_h(), Vnorm_h(),
-    bytes_(const_cast<const size_t**>(bytes)), norm_bytes_(const_cast<const size_t**>(norm_bytes)) { }
+  // we only launch thread blocks up to size 512 since the autoner
+  // tuner favours smaller blocks and this helps with compile time
+  unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
+
+public:
+  MultiReduceCuda(doubleN result[], SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[],
+		  Reducer &r, int NYW, int length, int nParity, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
+    : NYW(NYW), arg(X, Y, Z, W, r, NYW, length/nParity), nParity(nParity), result(result),
+      Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { }
 
   inline TuneKey tuneKey() const {
     char name[TuneKey::name_n];
-    strcpy(name, num_to_string<N>::value);
+    strcpy(name, num_to_string<NXZ>::value);
+    strcat(name, std::to_string(NYW).c_str());
     strcat(name, typeid(arg.r).name());
-    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_str);
+    return TuneKey(blasStrings.vol_str, name, blasStrings.aux_tmp);
   }
-
-  unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock; }
 
   void apply(const cudaStream_t &stream){
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-    multiReduceLaunch<N,doubleN,ReduceType,FloatN,M>(result,arg,tp,stream);
+    multiReduceLaunch<doubleN,ReduceType,FloatN,M,NXZ>(result,arg,tp,stream);
   }
 
+  // Should these be NYW?
 #ifdef WARP_MULTI_REDUCE
   /**
      @brief This is a specialized variant of the reducer that only
@@ -211,13 +296,13 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
      the blocks so left disabled.
    */
   bool advanceBlockDim(TuneParam &param) const {
-    if (param.block.y < N) {
+    if (param.block.y < NYW) {
       param.block.y++;
-      param.grid.y = (N + param.block.y - 1) / param.block.y;
+      param.grid.y = (NYW + param.block.y - 1) / param.block.y;
       return true;
     } else {
       param.block.y = 1;
-      param.grid.y = N;
+      param.grid.y = NYW;
       return false;
     }
   }
@@ -225,113 +310,172 @@ template<int N, typename doubleN, typename ReduceType, typename FloatN, int M, t
 
   bool advanceGridDim(TuneParam &param) const {
     bool rtn = Tunable::advanceGridDim(param);
-    if (N > deviceProp.maxGridSize[1]) errorQuda("N=%d is greater than the maximum support grid size", N);
+    if (NYW > deviceProp.maxGridSize[1]) errorQuda("N=%d is greater than the maximum support grid size", NYW);
     return rtn;
   }
 
   void initTuneParam(TuneParam &param) const {
     Tunable::initTuneParam(param);
     param.block.y = 1;
-    param.grid.y = N;
+    param.grid.y = NYW;
     param.grid.z = nParity;
   }
 
   void defaultTuneParam(TuneParam &param) const {
     Tunable::defaultTuneParam(param);
     param.block.y = 1;
-    param.grid.y = N;
+    param.grid.y = NYW;
     param.grid.z = nParity;
   }
 
   void preTune() {
-    for(int i=0; i<N; ++i){
-      arg.X[i].backup(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.Z[i].backup(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-      arg.W[i].backup(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
-      arg.V[i].backup(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
+    for(int i=0; i<NYW; ++i){
+      arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
   void postTune() {
-    for(int i=0; i<N; ++i){
-      arg.X[i].restore(&X_h[i], &Xnorm_h[i], bytes_[i][0], norm_bytes_[i][0]);
-      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], bytes_[i][1], norm_bytes_[i][1]);
-      arg.Z[i].restore(&Z_h[i], &Znorm_h[i], bytes_[i][2], norm_bytes_[i][2]);
-      arg.W[i].restore(&W_h[i], &Wnorm_h[i], bytes_[i][3], norm_bytes_[i][3]);
-      arg.V[i].restore(&V_h[i], &Vnorm_h[i], bytes_[i][4], norm_bytes_[i][4]);
+    for(int i=0; i<NYW; ++i){
+      arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+      arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
     }
   }
 
   // Need to check this!
-  long long flops() const { return N*arg.r.flops()*vec_length<FloatN>::value*arg.length*nParity*M; }
+  // The NYW seems right?
+    long long flops() const { return NYW*NXZ*arg.r.flops()*vec_length<FloatN>::value*(long long)arg.length*nParity*M; }
   long long bytes() const {
-    size_t bytes = N*arg.X[0].Precision()*vec_length<FloatN>::value*M;
-    if (arg.X[0].Precision() == QUDA_HALF_PRECISION) bytes += N*sizeof(float);
+    size_t bytes = NYW*NXZ*arg.X[0].Precision()*vec_length<FloatN>::value*M;
+    if (arg.X[0].Precision() == QUDA_HALF_PRECISION) bytes += NYW*NXZ*sizeof(float);
     return arg.r.streams()*bytes*arg.length*nParity; }
   int tuningIter() const { return 3; }
 };
 
+template <typename T>
+struct coeff_array {
+  const T *data;
+  const bool use_const;
+  coeff_array() : data(nullptr), use_const(false) { }
+  coeff_array(const T *data, bool use_const) : data(data), use_const(use_const) { }
+};
 
-template <int N, typename doubleN, typename ReduceType, typename RegType, typename StoreType,
-  int M, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
-  int writeX, int writeY, int writeZ, int writeW, int writeV>
-  void multiReduceCuda(doubleN result[], const double2 &a, const double2 &b,
-			  std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y,
-			  std::vector<cudaColorSpinorField*>& z, std::vector<cudaColorSpinorField*>& w,
-			  std::vector<cudaColorSpinorField*>& v, int length) {
+
+
+template <typename doubleN, typename ReduceType, typename RegType, typename StoreType,
+	  int M, int NXZ, template <int MXZ, typename ReducerType, typename Float, typename FloatN> class Reducer, typename write, typename T>
+  void multiReduceCuda(doubleN result[], const reduce::coeff_array<T> &a, const reduce::coeff_array<T> &b, const reduce::coeff_array<T> &c,
+			  std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
+			  std::vector<ColorSpinorField*>& z, std::vector<ColorSpinorField*>& w,
+			  int length) {
+
+  const int NYW = y.size();
 
   int nParity = x[0]->SiteSubset();
-  memset(result, 0, nParity*N*sizeof(doubleN));
+  memset(result, 0, NXZ*NYW*sizeof(doubleN));
 
-  for (int i=0; i<N; i++) {
-    checkSpinor(*x[i],*y[i]); checkSpinor(*x[i],*z[i]); checkSpinor(*x[i],*w[i]); checkSpinor(*x[i],*v[i]);
+  const int N_MAX = NXZ > NYW ? NXZ : NYW;
+  const int N_MIN = NXZ < NYW ? NXZ : NYW;
+
+  static_assert(MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N <= QUDA_MAX_MULTI_REDUCE, "MAX_MULTI_BLAS_N^2 exceeds maximum number of reductions");
+  static_assert(MAX_MULTI_BLAS_N <= 16, "MAX_MULTI_BLAS_N exceeds maximum size 16");
+  if (N_MAX > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N_MAX, MAX_MULTI_BLAS_N);
+
+  if (NXZ*NYW*sizeof(Complex) > MAX_MATRIX_SIZE)
+    errorQuda("A matrix exceeds max size (%lu > %d)", NXZ*NYW*sizeof(Complex), MAX_MATRIX_SIZE);
+
+  for (int i=0; i<N_MIN; i++) {
+    checkSpinor(*x[i],*y[i]); checkSpinor(*x[i],*z[i]); checkSpinor(*x[i],*w[i]); 
     if (!x[i]->isNative()) {
       warningQuda("Reductions on non-native fields are not supported\n");
       return;
     }
   }
 
-  blasStrings.vol_str = x[0]->VolString();
-  blasStrings.aux_str = x[0]->AuxString();
+  typedef typename scalar<RegType>::type Float;
+  typedef typename vector<Float,2>::type Float2;
+  typedef vector<Float,2> vec2;
 
-  size_t **bytes = new size_t*[N], **norm_bytes = new size_t*[N];
-  for (int i=0; i<N; i++) {
-    bytes[i] = new size_t[5]; norm_bytes[i] = new size_t[5];
-    bytes[i][0] = x[i]->Bytes(); bytes[i][1] = y[i]->Bytes(); bytes[i][2] = z[i]->Bytes();
-    bytes[i][3] = w[i]->Bytes(); bytes[i][4] = v[i]->Bytes();
-    norm_bytes[i][0] = x[i]->NormBytes(); norm_bytes[i][1] = y[i]->NormBytes(); norm_bytes[i][2] = z[i]->NormBytes();
-    norm_bytes[i][3] = w[i]->NormBytes(); norm_bytes[i][4] = v[i]->NormBytes();
+  // FIXME - if NXZ=1 no need to copy entire array
+  // FIXME - do we really need strided access here?
+  if (a.data && a.use_const) {
+    Float2 A[MAX_MATRIX_SIZE/sizeof(Float2)];
+    // since the kernel doesn't know the width of them matrix at compile
+    // time we stride it and copy the padded matrix to GPU
+    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
+      A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+
+    cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+    Amatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(a.data));
   }
 
-  multi::Spinor<RegType,StoreType,M,writeX,0> X[N];
-  multi::Spinor<RegType,StoreType,M,writeY,1> Y[N];
-  multi::Spinor<RegType,StoreType,M,writeZ,2> Z[N];
-  multi::Spinor<RegType,StoreType,M,writeW,3> W[N];
-  multi::Spinor<RegType,StoreType,M,writeV,4> V[N];
+  if (b.data && b.use_const) {
+    Float2 B[MAX_MATRIX_SIZE/sizeof(Float2)];
+    // since the kernel doesn't know the width of them matrix at compile
+    // time we stride it and copy the padded matrix to GPU
+    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
+      B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
-  for (int i=0; i<N; i++) { X[i].set(*x[i]); Y[i].set(*y[i]); Z[i].set(*z[i]); W[i].set(*w[i]); V[i].set(*v[i]); }
+    cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+    Bmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(b.data));
+  }
 
-  typedef typename ::quda::scalar<RegType>::type Float;
-  typedef typename ::quda::vector<Float,2>::type Float2;
-  typedef ::quda::vector<Float,2> vec2;
-  Reducer<ReduceType, Float2, RegType> r((Float2)vec2(a), (Float2)vec2(b));
+  if (c.data && c.use_const) {
+    Float2 C[MAX_MATRIX_SIZE/sizeof(Float2)];
+    // since the kernel doesn't know the width of them matrix at compile
+    // time we stride it and copy the padded matrix to GPU
+    for (int i=0; i<NXZ; i++) for (int j=0; j<NYW; j++)
+      C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
-  MultiReduceCuda<N,doubleN,ReduceType,RegType,M,
-		  multi::Spinor<RegType,StoreType,M,writeX,0>,multi::Spinor<RegType,StoreType,M,writeY,1>,
-		  multi::Spinor<RegType,StoreType,M,writeZ,2>,multi::Spinor<RegType,StoreType,M,writeW,3>,
-		  multi::Spinor<RegType,StoreType,M,writeV,4>,Reducer<ReduceType, Float2, RegType> >
-    reduce(result, X, Y, Z, W, V, r, length, nParity, bytes, norm_bytes);
-  reduce.apply(*blas::getStream());
+    cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+    Cmatrix_h = reinterpret_cast<signed char*>(const_cast<T*>(c.data));
+  }
+
+  blasStrings.vol_str = x[0]->VolString();
+  strcpy(blasStrings.aux_tmp, x[0]->AuxString());
+
+  multi::SpinorTexture<RegType,StoreType,M,0> X[NXZ];
+  multi::Spinor<RegType,StoreType,M,write::Y,1> Y[MAX_MULTI_BLAS_N];
+  multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
+  multi::Spinor<RegType,StoreType,M,write::W,3> W[MAX_MULTI_BLAS_N];
+
+  for (int i=0; i<NXZ; i++) {
+    X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
+    Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));
+  }
+  for (int i=0; i<NYW; i++) {
+    Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i]));
+    W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
+  }
+
+  // since the block dot product and the block norm use the same functors, we need to distinguish them
+  bool is_norm = false;
+  if (NXZ==NYW) {
+    is_norm = true;
+    for (int i=0; i<NXZ; i++) {
+      if (x[i]->V() != y[i]->V() || x[i]->V() != z[i]->V() || x[i]->V() != w[i]->V()) {
+	is_norm = false;
+	break;
+      }
+    }
+  }
+  if (is_norm) strcat(blasStrings.aux_tmp, ",norm");
+
+  Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
+
+  MultiReduceCuda<NXZ,doubleN,ReduceType,RegType,M,
+		  multi::SpinorTexture<RegType,StoreType,M,0>,
+		  multi::Spinor<RegType,StoreType,M,write::Y,1>,
+		  multi::SpinorTexture<RegType,StoreType,M,2>,
+		  multi::Spinor<RegType,StoreType,M,write::W,3>,
+		  decltype(r) >
+    reduce(result, X, Y, Z, W, r, NYW, length, x[0]->SiteSubset(), y, w);
+    reduce.apply(*blas::getStream());
 
   blas::bytes += reduce.bytes();
   blas::flops += reduce.flops();
 
   checkCudaError();
-
-  for (int i=0; i<N; i++) { delete []bytes[i]; delete []norm_bytes[i]; }
-  delete []bytes;
-  delete []norm_bytes;
 
   return;
 }

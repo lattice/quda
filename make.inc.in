@@ -55,7 +55,6 @@ BUILD_ARPACK_VARS = @BUILD_ARPACK_VARS@ # build arpack using env vars ARPACK_LIB
 
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
-GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
 
 # Profiling options
 MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
@@ -208,8 +207,9 @@ ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MULTIGRID)), yes)
-  NVCCOPT += -DGPU_MULTIGRID
-  COPT += -DGPU_MULTIGRID
+  NVCCOPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  COPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  LIB += -lcublas
 endif
 
 ifeq ($(strip $(BUILD_SSTEP)), yes)
@@ -330,11 +330,6 @@ endif
 ifeq ($(strip $(GPU_DIRECT)), yes)
   NVCCOPT += -DGPU_DIRECT
   COPT += -DGPU_DIRECT
-endif
-
-ifeq ($(strip $(GPU_COMMS)), yes)
-  NVCCOPT += -DGPU_COMMS
-  COPT += -DGPU_COMMS
 endif
 
 ifeq ($(strip $(BUILD_QDP_INTERFACE)), yes)

@@ -327,11 +327,13 @@ namespace quda {
      @param kind Type of memory copy
   */
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-		   const char *func, const char *file, int line);
+		   const char *func, const char *file, const char *line);
 
 } // namespace quda
 
-#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, __FILE__, __LINE__);
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, __FILE__, __STRINGIFY__(__LINE__));
 namespace quda{
   /**
      * Check that the resident gauge field is compatible with the requested inv_param

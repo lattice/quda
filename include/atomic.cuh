@@ -16,7 +16,7 @@
 /**
    Implementation of double-precision atomic addition using compare
    and swap.
-   
+
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
@@ -36,7 +36,7 @@ static inline __device__ double atomicAdd(double *addr, double val){
 /**
    Implementation of double2 atomic addition using two
    double-precision additions.
-   
+
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
@@ -44,6 +44,20 @@ static inline __device__ double2 atomicAdd(double2 *addr, double2 val){
   double2 old = *addr;
   old.x = atomicAdd((double*)addr, val.x);
   old.y = atomicAdd((double*)addr + 1, val.y);
+  return old;
+}
+
+/**
+   Implementation off float2 atomic addition using two
+   single-precision additions.
+
+   @param addr Address that stores the atomic variable to be updated
+   @param val Value to be added to the atomic
+*/
+static inline __device__ float2 atomicAdd(float2 *addr, float2 val){
+  float2 old = *addr;
+  old.x = atomicAdd((float*)addr, val.x);
+  old.y = atomicAdd((float*)addr + 1, val.y);
   return old;
 }
 
