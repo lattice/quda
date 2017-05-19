@@ -594,6 +594,7 @@ namespace quda {
     };
 
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
@@ -618,6 +619,7 @@ namespace quda {
     }
 
     void hDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
       Complex* result_tmp = new Complex[x.size()*y.size()];
@@ -644,6 +646,7 @@ namespace quda {
 
     // for (p, Ap) norms in CG which are Hermitian. 
     void hDotProduct_Anorm(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
       Complex* result_tmp = new Complex[x.size()*y.size()];
@@ -673,6 +676,7 @@ namespace quda {
 			 std::vector<ColorSpinorField*>&z){
 
 #if 0
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (y.size() != z.size()) errorQuda("Cannot copy input y of size %lu into z of size %lu\n", y.size(), z.size());
 
       Complex* result_tmp = new Complex[x.size()*y.size()];

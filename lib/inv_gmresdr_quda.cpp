@@ -466,26 +466,14 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      delete[] sn;
 
    } else {
-     const int cdot_pipeline_length  = 5;
-     int offset = 0;
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
 
-     do {
-        const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
+     std::vector<ColorSpinorField*> v_(Vm->Components().begin(), Vm->Components().begin()+args.k+1);
+     std::vector<ColorSpinorField*> r_;
+     r_.push_back(static_cast<ColorSpinorField*>(r_sloppy));
 
-        std::vector<ColorSpinorField*> v_;
-        std::vector<ColorSpinorField*> r_;
-        v_.reserve(local_length);
+     blas::cDotProduct(args.c, v_, r_);
 
-        for(int i = 0; i < local_length; i++)
-        {
-          v_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(offset+i)));
-        }
-	r_.push_back(static_cast<ColorSpinorField*>(r_sloppy));
-        blas::cDotProduct(&args.c[offset], v_, r_);
-        offset += cdot_pipeline_length;
-
-     } while (offset < (args.k+1));
    }
 #endif
    return (j-start_idx);
@@ -600,48 +588,35 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
         mat(y, e);
         ext_r2 = xmyNorm(r, y);
 
+	// can this be done as a single 2-d reduction?
         for(int l = 0; l < args.k+1; l++) {
-
-          const int cdot_pipeline_length  = 4;
-          int offset = 0;
 
           Complex *col = Gm.col(l).data();
 
-          do {
-            const int local_length = ((args.k+1) - offset) > cdot_pipeline_length  ? cdot_pipeline_length : ((args.k+1) - offset) ;
+	  std::vector<ColorSpinorField*> v1_(Vm->Components().begin(), Vm->Components().begin()+args.k+1);
+	  std::vector<ColorSpinorField*> v2_;
+	  v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
 
-            std::vector<ColorSpinorField*> v1_;
-            std::vector<ColorSpinorField*> v2_;
-            v1_.reserve(local_length);
+	  blas::cDotProduct(col, v1_, v2_);
 
-            for(int i = 0; i < local_length; i++)
-            {
-              v1_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(offset+i)));
-            }
-	    v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
-            blas::cDotProduct(&col[offset], v1_, v2_);
+	}//end l-loop
 
-            offset += cdot_pipeline_length;
+	Complex detGm = Gm.determinant();
 
-         } while (offset < (args.k+1));
-       }//end l-loop
+	PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
+	printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2, detGm.real(), detGm.imag());
 
-       Complex detGm = Gm.determinant();
+	Gm.setZero();
 
-       PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
-       printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2, detGm.real(), detGm.imag());
+	do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
+      }
 
-       Gm.setZero();
+      if( ((restart_idx != param.deflation_grid-1) && !do_clean_restart) ) {
 
-       do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
-     }
+	RestartVZH();
+	j = args.k;
 
-     if( ((restart_idx != param.deflation_grid-1) && !do_clean_restart) ) {
-
-       RestartVZH();
-       j = args.k;
-
-     } else {
+      } else {
 
        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
        args.ResetArgs();
