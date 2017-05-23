@@ -469,7 +469,7 @@ namespace quda {
 
     public:
       TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
-	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
+	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm), max_tile_size(1)
       {
       	strcpy(aux, "policy,");
       	strcat(aux, x[0]->AuxString());
