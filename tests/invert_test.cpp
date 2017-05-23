@@ -60,6 +60,7 @@ extern QudaMatPCType matpc_type; // preconditioning type
 extern double clover_coeff;
 extern bool compute_clover;
 
+extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
@@ -350,26 +351,6 @@ int main(int argc, char **argv)
     spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   }
 
-  memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  if (multishift) {
-    for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);    
-  } else {
-    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  }
-
-  // create a point source at 0 (in each subvolume...  FIXME)
-
-  // create a point source at 0 (in each subvolume...  FIXME)
-  
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    //((float*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-  } else {
-    //((double*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-  }
-
   // start the timer
   double time0 = -((double)clock());
 
@@ -383,11 +364,30 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
     loadCloverQuda(clover, clover_inv, &inv_param);
 
-  // perform the inversion
-  if (multishift) {
-    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
-  } else {
-    invertQuda(spinorOut, spinorIn, &inv_param);
+  for (int k=0; k<Nsrc; k++) {
+
+    memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    if (multishift) {
+      for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    } else {
+      memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    }
+
+    // perform the inversion
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      //((float*)spinorIn)[0] = 1.0;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+    } else {
+      //((double*)spinorIn)[0] = 1.0;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+    }
+
+    if (multishift) {
+      invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
+    } else {
+      invertQuda(spinorOut, spinorIn, &inv_param);
+    }
   }
 
   // stop the timer
