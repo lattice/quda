@@ -52,6 +52,7 @@ extern int niter;
 extern int nvec[];
 
 extern QudaInverterType inv_type;
+extern QudaInverterType precon_type;
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -233,10 +234,9 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.cuda_prec_ritz = cuda_prec_sloppy;
   inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_VERBOSE; // QUDA_SILENT;
+  inv_param.verbosity_precondition = QUDA_SILENT;
 
-  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
-  //inv_param.inv_type_precondition = QUDA_MR_INVERTER;
+  inv_param.inv_type_precondition = precon_type;
   inv_param.gcrNkrylov = 6;
 
   // require both L2 relative and heavy quark residual to determine convergence
