@@ -139,7 +139,7 @@ namespace quda {
 
     ColorSpinorParam csParam(x);
     if (!init) {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
       rp = ColorSpinorField::Create(b, csParam);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       yp = ColorSpinorField::Create(b, csParam);
@@ -228,6 +228,8 @@ namespace quda {
       for (auto &pi : p) delete pi;
       p.resize(Np);
       for (auto &pi : p) pi = ColorSpinorField::Create(rSloppy, csParam);
+    } else {
+      for (auto &pi : p) *pi = rSloppy;
     }
 
     if (&x != &xSloppy) {
@@ -594,8 +596,8 @@ namespace quda {
     if (&tmp3 != &tmp) delete tmp3_p;
     if (&tmp2 != &tmp) delete tmp2_p;
 
-    if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
-    if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
+    if (&rSloppy != &r) delete r_sloppy;
+    if (&xSloppy != &x) delete x_sloppy;
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
 

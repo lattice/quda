@@ -40,8 +40,6 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #endif
 
 static void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
-  if (a.Precision() != b.Precision())
-    errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
   if (a.Length() != b.Length())
     errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
   if (a.Stride() != b.Stride())
@@ -469,7 +467,7 @@ namespace quda {
 
     public:
       TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
-	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
+	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm), max_tile_size(1)
       {
       	strcpy(aux, "policy,");
       	strcat(aux, x[0]->AuxString());
