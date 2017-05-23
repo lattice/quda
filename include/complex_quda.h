@@ -545,6 +545,7 @@ public:
 
   // cast operators
   inline operator std::complex<float>() const { return std::complex<float>(real(),imag()); }
+  inline __host__ __device__ operator quda::complex<double>() const;
   // inline operator float() const { return real(); }
 };
 
@@ -662,10 +663,11 @@ public:
 
   // cast operators
   inline operator std::complex<double>() const { return std::complex<double>(real(),imag()); }
+  inline __host__ __device__ operator quda::complex<float>() const { return quda::complex<float>(real(),imag()); }
   // inline operator double() { return real(); }
 };
 
-
+ quda::complex<float>::operator quda::complex<double>() const { return quda::complex<double>(real(),imag()); }
 
   // Binary arithmetic operations
   // At the moment I'm implementing the basic functions, and the
