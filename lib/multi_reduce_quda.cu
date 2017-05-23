@@ -40,8 +40,6 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #endif
 
 static void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
-  if (a.Precision() != b.Precision())
-    errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
   if (a.Length() != b.Length())
     errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
   if (a.Stride() != b.Stride())
