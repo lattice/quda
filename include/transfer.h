@@ -261,10 +261,11 @@ namespace quda {
      @param[in] Nvec Vector length
      @param[in] geo_bs Geometric block size
      @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] coarse_to_fine Coarse-to-fine lookup table (linear indices)
      @param[in] spin_bs Spin block size
    */
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
-			  const int *fine_to_coarse, int spin_bs);
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *fine_to_coarse,
+			  const int *coarse_to_fine, const int *geo_bs, int spin_bs);
 
   /**
      @brief Apply the prolongation operator

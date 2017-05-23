@@ -83,12 +83,8 @@ namespace quda {
 
     V_d = enable_gpu ? ColorSpinorField::Create(param) : 0;
 
-    printfQuda("Transfer: filling V field with zero\n");
-    fillV(*V_h); // copy the null space vectors into V
-
-    param = ColorSpinorParam(*B[0]);
-
     // used for cpu<->gpu transfers
+    param = ColorSpinorParam(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
     fine_tmp_h = ColorSpinorField::Create(param);
 
@@ -119,19 +115,41 @@ namespace quda {
     createGeoMap(geo_bs);
 
     // allocate the fine-to-coarse spin map (don't need it for staggered.)
-    if (param.nSpin != 1){
+    if (B[0]->Nspin() != 1){
       spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
       createSpinMap(spin_bs);
     }
 
-    // orthogonalize the blocks
-    printfQuda("Transfer: block orthogonalizing\n");
-    BlockOrthogonalize(*V_h, Nvec, geo_bs, fine_to_coarse_h, spin_bs);
+    bool gpu_setup = true;
 
-    if (enable_gpu) {
-      *V_d = *V_h;
-      printfQuda("Transferred prolongator to GPU\n");
+    if (gpu_setup) {
+
+      printfQuda("Transfer: filling V field with null-space components\n");
+      fillV(*V_d);  // copy the null space vectors into V
+
+      // orthogonalize the blocks
+      printfQuda("Transfer: block orthogonalizing\n");
+      BlockOrthogonalize(*V_d, Nvec, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
+
+      *V_h = *V_d;
+      printfQuda("Transferred prolongator back to CPU\n");
+
+    } else {
+
+      printfQuda("Transfer: filling V field with null-space components\n");
+      fillV(*V_h); // copy the null space vectors into V
+
+      // orthogonalize the blocks
+      printfQuda("Transfer: block orthogonalizing\n");
+      BlockOrthogonalize(*V_h, Nvec, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
+
+      if (enable_gpu) {
+	*V_d = *V_h;
+	printfQuda("Transferred prolongator to GPU\n");
+      }
+
     }
+
   }
 
   Transfer::~Transfer() {
@@ -195,7 +213,25 @@ namespace quda {
   }
 
   void Transfer::fillV(ColorSpinorField &V) { 
-    FillV(V, B, Nvec);  //printfQuda("V fill check %e\n", norm2(*V));
+    if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      std::vector<ColorSpinorField*> Bgpu;
+      Bgpu.reserve(Nvec);
+      ColorSpinorParam param(*B[0]);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      for (int i=0; i<Nvec; i++) {
+	Bgpu.push_back(ColorSpinorField::Create(param));
+	*Bgpu[i] = *B[i];
+      }
+
+      FillV(V, Bgpu, Nvec);
+
+      for (int i=0; i<Nvec; i++) {
+	delete Bgpu[i];
+      }
+    } else {
+      FillV(V, B, Nvec);
+    }
   }
 
   struct Int2 {
