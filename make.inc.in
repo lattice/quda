@@ -317,6 +317,7 @@ ifeq ($(strip $(VERBOSE)), yes)
   NVCCOPT += --ptxas-options=-v
 endif
 
+NVCCOPT += -DMAX_MULTI_BLAS_N=4
 ifeq ($(strip $(BLAS_TEX)), no)
   NVCCOPT += -DDIRECT_ACCESS_BLAS
   COPT += -DDIRECT_ACCESS_BLAS

@@ -72,6 +72,10 @@ namespace quda {
 #pragma unroll
       for (int i=0; i<n; i++) data[i] += a[i];
     }
+    __device__ __host__ inline void operator=(const vector_type &a) {
+#pragma unroll
+      for (int i=0; i<n; i++) data[i] = a[i];
+    }
     __device__ __host__ vector_type() {
 #pragma unroll
       for (int i=0; i<n; i++) zero(data[i]);

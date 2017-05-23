@@ -177,7 +177,7 @@ namespace quda {
 
     if (!init) {
       ColorSpinorParam csParam(x);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
       rp = ColorSpinorField::Create(csParam);
       yp = ColorSpinorField::Create(csParam);
 
@@ -274,7 +274,15 @@ namespace quda {
     }
 
     blas::copy(rSloppy,r);
-    for (auto &pi : p) blas::copy(*pi,rSloppy);
+    if (Np != (int)p.size()) {
+      for (auto &pi : p) delete pi;
+      p.resize(Np);
+      ColorSpinorParam csParam(rSloppy);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      for (auto &pi : p) pi = ColorSpinorField::Create(rSloppy, csParam);
+    } else {
+      for (auto &pi : p) *pi = rSloppy;
+    }
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
