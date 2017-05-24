@@ -314,6 +314,9 @@ namespace quda {
 	  } else if (block_size == 64) {  // for 2x4x4x4 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,64>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (block_size == 96) {  // for 4x4x3x4 aggregates
+	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,96>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (block_size == 100) {  // for 5x5x2x4 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,100>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -323,7 +326,13 @@ namespace quda {
 	  } else if (block_size == 128) { // for 4x4x4x4 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,128>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (block_size == 144) {  // for 4x4x3x6 aggregates
+	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,144>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #if __COMPUTE_CAPABILITY__ >= 300
+	  } else if (block_size == 192) {  // for 4x4x3x8 aggregates
+	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,192>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (block_size == 200) { // for 5x5x2x8  aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,200>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);

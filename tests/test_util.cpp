@@ -1608,9 +1608,16 @@ int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
+int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol = 5e-6;
+QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
+bool pre_orthonormalize = false;
+bool post_orthonormalize = true;
 double omega = 0.85;
 QudaInverterType smoother_type = QUDA_MR_INVERTER;
+QudaInverterType coarsest_solver = QUDA_GCR_INVERTER;
+double coarsest_tol = 0; // if 0, then we use tolhq
+int coarsest_maxiter = 1000;
 bool generate_nullspace = true;
 bool generate_all_levels = true;
 
@@ -1684,9 +1691,16 @@ void usage(char** argv )
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
+  printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
   printf("    --mg-setup-tol                            # The tolerance to use for the setup of multigrid (default 5e-6)\n");
+  printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
+  printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
+  printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
   printf("    --mg-omega                                # The over/under relaxation factor for the smoother of multigrid (default 0.85)\n");
   printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
+  printf("    --mg-coarsest-solver                      # The solver to use in the coarsest level of multigrid (default gcr)\n");
+  printf("    --mg-coarsest-tol                         # The solver tolerance to use in the coarsest level of multigrid (default tolhq)\n");
+  printf("    --mg-coarsest-maxiter                     # The solver maxiter to use in the coarsest level of multigrid (default 1000)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
@@ -2378,12 +2392,86 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-setup-iters") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    num_setup_iter[level] = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-setup-tol") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
 
     setup_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if( strcmp(argv[i+1], "test") == 0)
+      setup_type = QUDA_TEST_VECTOR_SETUP;
+    else if( strcmp(argv[i+1], "null")==0)
+      setup_type = QUDA_NULL_VECTOR_SETUP;
+    else {
+      fprintf(stderr, "ERROR: invalid setup type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-pre-orth") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      pre_orthonormalize = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      pre_orthonormalize = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid pre orthogonalize type\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-post-orth") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      post_orthonormalize = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      post_orthonormalize = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid post orthogonalize type\n");
+      exit(1);
+    }
+
     i++;
     ret = 0;
     goto out;
@@ -2422,6 +2510,36 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     smoother_type = get_solver_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarsest-solver") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    coarsest_solver = get_solver_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarsest-tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    coarsest_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-coarsest-maxiter") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    coarsest_maxiter = atoi(argv[i+1]);
     i++;
     ret = 0;
     goto out;

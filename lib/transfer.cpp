@@ -120,7 +120,11 @@ namespace quda {
       createSpinMap(spin_bs);
     }
 
+#if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
     bool gpu_setup = true;
+#else
+    bool gpu_setup = false;
+#endif
 
     if (gpu_setup) {
 
@@ -171,7 +175,7 @@ namespace quda {
   }
 
   void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_) {
-    if (parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
+    if (site_subset_ == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
     parity = parity_;
 
     if (site_subset == site_subset_) return;

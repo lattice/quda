@@ -103,6 +103,19 @@ namespace quda {
       report("CGNR");
       solver = new CGNR(mat, matSloppy, param, profile);
       break;
+    case QUDA_CG3_INVERTER:
+      report("CG3");
+      solver = new CG3(mat, matSloppy, param, profile);
+      break;
+    case QUDA_CG3NE_INVERTER:
+      report("CG3NE");
+      solver = new CG3NE(mat, matSloppy, param, profile);
+      break;
+    case QUDA_CG3NR_INVERTER:
+      report("CG3NR");
+      // CG3NR is included in CG3NE
+      solver = new CG3NE(mat, matSloppy, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }
