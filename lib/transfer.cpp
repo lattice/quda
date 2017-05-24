@@ -120,7 +120,11 @@ namespace quda {
       createSpinMap(spin_bs);
     }
 
+#if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
     bool gpu_setup = true;
+#else
+    bool gpu_setup = false;
+#endif
 
     if (gpu_setup) {
 

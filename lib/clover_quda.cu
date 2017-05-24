@@ -17,7 +17,7 @@ namespace quda {
 #ifdef MULTI_GPU
     int border[4]; 
 #endif
-    double cloverCoeff;
+    Float cloverCoeff;
 
     Clover clover;
     Fmunu f;

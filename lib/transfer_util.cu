@@ -483,6 +483,7 @@ namespace quda {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	blockOrthoCPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg>(arg);
       } else {
+#if __COMPUTE_CAPABILITY__ >= 300
 	arg.swizzle = tp.aux.x;
 
 	if (arg.geoBlockSizeCB == 4) {          // for 2x2x2x1 aggregates
@@ -530,6 +531,9 @@ namespace quda {
 	} else {
 	  errorQuda("Block size %d not instantiated", arg.geoBlockSizeCB);
 	}
+#else
+	errorQuda("GPU block orthogonalization not supported on this GPU architecture");
+#endif
       }
     }
 
