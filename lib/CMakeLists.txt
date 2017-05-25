@@ -27,7 +27,7 @@ set (QUDA_OBJS
   multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
-  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
+  clover_deriv_quda.cu clover_invert.cu clover_rho.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_gauss.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_ss.cu
