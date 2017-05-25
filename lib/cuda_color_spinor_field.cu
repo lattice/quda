@@ -11,12 +11,6 @@
 #include <face_quda.h>
 #include <dslash_quda.h>
 
-#ifdef DEVICE_PACK
-static const QudaFieldLocation reorder_location_ = QUDA_CUDA_FIELD_LOCATION;
-#else
-static const QudaFieldLocation reorder_location_ = QUDA_CPU_FIELD_LOCATION;
-#endif
-
 int zeroCopy = 0;
 
 namespace quda {
@@ -544,7 +538,7 @@ namespace quda {
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
-    if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&typeid(src) == typeid(cpuColorSpinorField)) {
+    if (reorder_location() == QUDA_CPU_FIELD_LOCATION &&typeid(src) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes + norm_bytes);
       memset(buffer, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
 
@@ -585,7 +579,7 @@ namespace quda {
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
-    if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&	typeid(dest) == typeid(cpuColorSpinorField)) {
+    if (reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
       qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
