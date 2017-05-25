@@ -272,21 +272,21 @@ namespace quda {
 
       pool_pinned_free(packClover);
     } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && typeid(src) == typeid(cpuCloverField)) {
-      void *packClover = pool_device_malloc(bytes + norm_bytes);
-      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
+      void *packClover = pool_device_malloc(src.Bytes() + src.NormBytes());
+      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + src.Bytes() : 0;
 
       if (src.V(false)) {
-	qudaMemcpy(packClover, src.V(false), bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(packClover, src.V(false), src.Bytes(), cudaMemcpyHostToDevice);
 	if (precision == QUDA_HALF_PRECISION)
-	  qudaMemcpy(packCloverNorm, src.Norm(false), norm_bytes, cudaMemcpyHostToDevice);
+	  qudaMemcpy(packCloverNorm, src.Norm(false), src.NormBytes(), cudaMemcpyHostToDevice);
 
 	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       }
 
       if (src.V(true) && inverse) {
-	qudaMemcpy(packClover, src.V(true), bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(packClover, src.V(true), src.Bytes(), cudaMemcpyHostToDevice);
 	if (precision == QUDA_HALF_PRECISION)
-	  qudaMemcpy(packCloverNorm, src.Norm(true), norm_bytes, cudaMemcpyHostToDevice);
+	  qudaMemcpy(packCloverNorm, src.Norm(true), src.NormBytes(), cudaMemcpyHostToDevice);
 
 	copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       }
