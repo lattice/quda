@@ -1534,7 +1534,8 @@ namespace quda {
     printfQuda("V2 = %e\n", V.norm2());
 
     // do exchange of null-space vectors
-    v.exchangeGhost(QUDA_INVALID_PARITY, 0);
+    const int nFace = 1;
+    v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
     arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
     if (&v == &av) arg.AV.resetGhost(av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
@@ -1595,7 +1596,7 @@ namespace quda {
 
     if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
 	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      av.exchangeGhost(QUDA_INVALID_PARITY, 0);
+      av.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
       arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
       LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
     }

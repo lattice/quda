@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+  typedef enum QudaMemoryType_s {
+    QUDA_MEMORY_DEVICE,
+    QUDA_MEMORY_PINNED,
+    QUDA_MEMORY_MAPPED,
+    QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
+  } QudaMemoryType;
+
   //
   // Types used in QudaGaugeParam
   //

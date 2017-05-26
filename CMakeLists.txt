@@ -130,6 +130,8 @@ set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
+set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
+
 
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
@@ -145,6 +147,7 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
+set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 
@@ -154,6 +157,7 @@ mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
+mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -164,7 +168,6 @@ mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_EIGEN)
-mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
 
 #######################################################################
@@ -259,9 +262,10 @@ if(QUDA_MAGMA)
     find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
   else()
     # prefer static library
-    LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
     find_library(MAGMA libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
     # append additional libraries required by magma
+    LIST(APPEND MAGMA ${CUDA_cublas_LIBRARY})
+    LIST(APPEND MAGMA ${CUDA_cusparse_LIBRARY})
     LIST(APPEND MAGMA ${QUDA_MAGMA_LIBS})
     # and any additional OpenMP linker flags
     SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_CXX_FLAGS}" )
@@ -293,6 +297,9 @@ if(QUDA_ARPACK)
 endif(QUDA_ARPACK)
 
 
+# MAX_MULTI_BLAS_N
+add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
+
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
@@ -305,6 +312,12 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
+  find_package(Eigen REQUIRED)
+  include_directories(${EIGEN_INCLUDE_DIRS})
+endif()
+
+if(QUDA_DEFLATEDSOLVER)
+  add_definitions(-DDEFLATEDSOLVER)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
 endif()

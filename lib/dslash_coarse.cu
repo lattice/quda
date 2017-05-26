@@ -446,7 +446,11 @@ namespace quda {
     const int nParity;
     const int nSrc;
 
+#ifdef EIGHT_WAY_WARP_SPLIT
+    const int max_color_col_stride = 8;
+#else
     const int max_color_col_stride = 4;
+#endif
     mutable int color_col_stride;
     mutable int dim_threads;
     char *saveOut;
@@ -671,6 +675,11 @@ namespace quda {
 	  case 4:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
+#ifdef EIGHT_WAY_WARP_SPLIT
+	  case 8:
+	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	    break;
+#endif
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
 	  }
@@ -686,6 +695,11 @@ namespace quda {
 	  case 4:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
+#ifdef EIGHT_WAY_WARP_SPLIT
+	  case 8:
+	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	    break;
+#endif
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
 	  }
@@ -701,6 +715,11 @@ namespace quda {
 	  case 4:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,4,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
+#ifdef EIGHT_WAY_WARP_SPLIT
+	  case 8:
+	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	    break;
+#endif
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
 	  }
@@ -889,8 +908,10 @@ namespace quda {
       bool gdr_recv = (policy == DSLASH_COARSE_GDR_RECV || policy == DSLASH_COARSE_GDR ||
 		       policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
 
-      if (dslash && comm_partitioned())
-	inA.exchangeGhost((QudaParity)(1-parity), dagger, pack_destination, halo_location, gdr_send, gdr_recv);
+      if (dslash && comm_partitioned()) {
+	const int nFace = 1;
+	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv);
+      }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
 
