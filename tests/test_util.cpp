@@ -2895,12 +2895,10 @@ void setDefaultInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
-  inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = mg_verbosity[0];
+  inv_param.verbosity = verbosity;
 
-
-  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param.gcrNkrylov = 20;
+  inv_param.pipeline = pipeline;
+  inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine convergence
