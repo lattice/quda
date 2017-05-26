@@ -22,7 +22,7 @@ typedef struct curandStateMRG32k3a cuRNGState;
 */
 class RNG {
 public:
-    RNG(int rng_sizes, int seedin, int XX[4]);
+    RNG(int rng_sizes, int seedin, const int XX[4]);
     RNG(int rng_sizes, int seedin);
     /*! free array */
     void Release(); 

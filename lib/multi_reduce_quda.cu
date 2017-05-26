@@ -33,10 +33,13 @@ template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #define QudaSumFloat3 double3
 #endif
 
+// work around for Fermi
+#if (__COMPUTE_CAPABILITY__ < 300)
+#undef MAX_MULTI_BLAS_N
+#define MAX_MULTI_BLAS_N 2
+#endif
 
 static void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
-  if (a.Precision() != b.Precision())
-    errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
   if (a.Length() != b.Length())
     errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());
   if (a.Stride() != b.Stride())
@@ -464,7 +467,7 @@ namespace quda {
 
     public:
       TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
-	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
+	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm), max_tile_size(1)
       {
       	strcpy(aux, "policy,");
       	strcat(aux, x[0]->AuxString());
@@ -589,6 +592,7 @@ namespace quda {
     };
 
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
@@ -613,6 +617,7 @@ namespace quda {
     }
 
     void hDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
       Complex* result_tmp = new Complex[x.size()*y.size()];
@@ -639,6 +644,7 @@ namespace quda {
 
     // for (p, Ap) norms in CG which are Hermitian. 
     void hDotProduct_Anorm(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
       Complex* result_tmp = new Complex[x.size()*y.size()];
@@ -668,6 +674,7 @@ namespace quda {
 			 std::vector<ColorSpinorField*>&z){
 
 #if 0
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (y.size() != z.size()) errorQuda("Cannot copy input y of size %lu into z of size %lu\n", y.size(), z.size());
 
       Complex* result_tmp = new Complex[x.size()*y.size()];

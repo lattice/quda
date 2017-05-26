@@ -245,6 +245,9 @@ extern "C" {
     /** Preconditioner instance, e.g., multigrid */
     void *preconditioner;
 
+    /** Deflation instance */
+    void *deflation_op;
+
     /**
       Dirac Dslash used in preconditioner
     */
@@ -339,6 +342,7 @@ extern "C" {
   typedef struct QudaEigParam_s {
 
     QudaInvertParam *invert_param;
+//specific for Lanczos method:
     QudaSolutionType  RitzMat_lanczos;
     QudaSolutionType  RitzMat_Convcheck;
     QudaEigType eig_type;
@@ -350,6 +354,30 @@ extern "C" {
     int np;
     int f_size;
     double eigen_shift;
+//more general stuff:
+    /** Whether to load eigenvectors */
+    QudaBoolean import_vectors;
+
+    /** The precision of the Ritz vectors */
+    QudaPrecision cuda_prec_ritz;
+
+    /** Location where deflation should be done */
+    QudaFieldLocation location;
+
+    /** Whether to run the verification checks once set up is complete */
+    QudaBoolean run_verify;
+
+    /** Filename prefix where to load the null-space vectors */
+    char vec_infile[256];
+
+    /** Filename prefix for where to save the null-space vectors */
+    char vec_outfile[256];
+
+    /** The Gflops rate of the multigrid solver setup */
+    double gflops;
+
+    /**< The time taken by the multigrid solver setup */
+    double secs;
 
   } QudaEigParam;
 
@@ -700,23 +728,15 @@ extern "C" {
   void destroyMultigridQuda(void *mg_instance);
 
   /**
+<<<<<<< HEAD
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
-   * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).
-   * @param _h_x    Outnput: array of solution spinor fields (typically O(10))
-   * @param _h_b    Input: array of source spinor fields (typically O(10))
-   * @param _h_u    Input/Output: array of Ritz spinor fields (typically O(100))
-   * @param _h_h    Input/Output: complex projection mutirx (typically O(100))
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
-   */
-  void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals);
-
-  /**
+=======
+>>>>>>> 5c038cb32c1ab09c9fcd09c41a001f1a1bd857a3
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -996,6 +1016,12 @@ extern "C" {
                       const QudaGaugeParam* param);
 
   /**
+   * Generate Gaussian distributed gauge field
+   * @param seed Seed
+   */
+  void gaussGaugeQuda(long seed);
+
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
@@ -1104,10 +1130,16 @@ extern "C" {
   void closeMagma();
 
   /**
-  * Clean deflation solver resources.
+  * Create deflation solver resources.
   *
   **/
-  void destroyDeflationQuda(QudaInvertParam *param, const int *X, void *_h_u, double *inv_eigenvals);
+
+  void* newDeflationQuda(QudaEigParam *param);
+
+  /**
+   * Free resources allocated by the deflated solver
+   */
+  void destroyDeflationQuda(void *df_instance);
 
 #ifdef __cplusplus
 }
