@@ -117,7 +117,8 @@ namespace quda {
 		   QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION)
     : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), location(location), nColor(3),
       nSpin( (inv_param.dslash_type == QUDA_ASQTAD_DSLASH ||
-              inv_param.dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4),
+              inv_param.dslash_type == QUDA_STAGGERED_DSLASH ||
+	      inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ? 1 : 4),
       twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
@@ -748,6 +749,9 @@ namespace quda {
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
+
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double A, double B);
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double alpha);
 
   void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p);
 

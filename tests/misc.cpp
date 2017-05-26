@@ -848,6 +848,8 @@ get_dslash_type(char* s)
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
   }else if (strcmp(s, "mobius") == 0){
     ret =  QUDA_MOBIUS_DWF_DSLASH;
+  }else if (strcmp(s, "laplace") == 0){
+    ret =  QUDA_LAPLACE_DSLASH;
   }else{
     fprintf(stderr, "Error: invalid dslash type\n");	
     exit(1);
@@ -882,13 +884,16 @@ get_dslash_str(QudaDslashType type)
     break;
   case QUDA_DOMAIN_WALL_DSLASH:
     ret = "domain-wall";
-      break;
+    break;
   case QUDA_DOMAIN_WALL_4D_DSLASH:
     ret = "domain_wall_4d";
-      break;
+    break;
   case QUDA_MOBIUS_DWF_DSLASH:
     ret = "mobius";
-      break;
+    break;
+  case QUDA_LAPLACE_DSLASH:
+    ret = "laplace";
+    break;
   default:
     ret = "unknown";	
     break;

@@ -16,10 +16,129 @@
 #include <typeinfo>
 #include <complex_quda.h>
 #include <index_helper.cuh>
+#include <color_spinor.h>
 #include <thrust/device_ptr.h>
 #include <thrust/transform_reduce.h>
 
 namespace quda {
+
+    /**
+       @brief colorspinor_wrapper is an internal class that is used to
+       wrap instances of colorspinor accessors, currying in a specifc
+       location on the field.  The operator() accessors in
+       colorspinor-field accessors return instances to this class,
+       allowing us to then use operator overloading upon this class
+       to interact with the ColorSpinor class.  As a result we can
+       include colorspinor-field accessors directly in ColorSpinor
+       expressions in kernels without having to declare temporaries
+       with explicit calls to the load/save methods in the
+       colorspinor-field accessors.
+    */
+  template <typename Float, typename T>
+    struct colorspinor_wrapper {
+      const int x_cb;
+      const int parity;
+      T &field;
+
+      /**
+	 @brief colorspinor_wrapper constructor @param a[in]
+	 colorspinor field accessor we are wrapping @param x_cb[in]
+	 checkerboarded space-time index we are accessing @param
+	 parity[in] Parity we are accessing
+       */
+      __device__ __host__ inline colorspinor_wrapper<Float,T>(T &field, int x_cb, int parity)
+	: field(field), x_cb(x_cb), parity(parity) { }
+
+      /**
+	 @brief Assignment operator with Matrix instance as input
+	 @param C[in] ColorSpinor we want to store in this accessot
+       */
+      template<typename C>
+      __device__ __host__ inline void operator=(const C &a) {
+	field.save((Float*)a.data, x_cb, parity);
+      }
+    };
+
+  /**
+     @brief Copy constructor for the ColorSpinor class with a colorspinor_wrapper input.
+     @param a[in] Input colorspinor_wrapper that we use to file in this matrix instance
+  */
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinor<T,Nc,Ns>::operator=(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+  /**
+     @brief Assignment operator for the ColorSpinor class with a colorspinor_wrapper input.
+     @param a[in] Input colorspinor_wrapper that we use to file in this matrix instance
+   */
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<T,Nc,Ns>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+    /**
+       @brief colorspinor_ghost_wrapper is an internal class that is
+       used to wrap instances of colorspinor accessors, currying in a
+       specifc location on the field.  The Ghost() accessors in
+       colorspinor-field accessors return instances to this class,
+       allowing us to then use operator overloading upon this class to
+       interact with the ColorSpinor class.  As a result we can
+       include colorspinor-field accessors directly in ColorSpinor
+       expressions in kernels without having to declare temporaries
+       with explicit calls to the loadGhost/saveGhost methods in the
+       colorspinor-field accessors.
+    */
+  template <typename Float, typename T>
+    struct colorspinor_ghost_wrapper {
+      const int dim;
+      const int dir;
+      const int ghost_idx;
+      const int parity;
+      T &field;
+
+      /**
+	 @brief colorspinor_ghost_wrapper constructor
+	 @param[in] a colorspinor field accessor we are wrapping
+	 @param[in] dim Dimension of the ghost we are accessing
+	 @param[in] dir Direction of the ghost we are accessing
+	 @param[in] ghost_idx Checkerboarded space-time ghost index we are accessing
+	 @param[in] parity Parity we are accessing
+       */
+      __device__ __host__ inline colorspinor_ghost_wrapper<Float,T>(T &field, int dim, int dir, int ghost_idx, int parity)
+	: field(field), dim(dim), dir(dir), ghost_idx(ghost_idx), parity(parity) { }
+
+      /**
+	 @brief Assignment operator with Matrix instance as input
+	 @param[in] C ColorSpinor we want to store in this accessot
+       */
+      template<typename C>
+      __device__ __host__ inline void operator=(const C &a) {
+	field.saveGhost((Float*)a.data, dim, dir, ghost_idx, parity);
+      }
+    };
+
+  /**
+     @brief Copy constructor for the ColorSpinor class with a colorspinor_ghost_wrapper input.
+     @param[in] a Input colorspinor_ghostwrapper that we use to fill in this instance
+  */
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinor<T,Nc,Ns>::operator=(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.dim, a.dir, a.ghost_idx, a.parity);
+  }
+
+  /**
+     @brief Assignment operator for the ColorSpinor class with a colorspinor_ghost_wrapper input.
+     @param[in] a Input colorspinor_ghost_wrapper that we use to fill in this instance
+   */
+  template <typename T, int Nc, int Ns>
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<T,Nc,Ns>::ColorSpinor(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.dim, a.dir, a.ghost_idx, a.parity);
+  }
 
   namespace colorspinor {
 
@@ -287,6 +406,7 @@ namespace quda {
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(Float); }
     };
 
+
     template <typename Float, int Ns, int Nc, int N>
       struct FloatNOrder {
 	typedef typename mapper<Float>::type RegType;
@@ -357,6 +477,35 @@ namespace quda {
 	  }
 	}
 
+	/**
+	   @brief This accessor routine returns a colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline colorspinor_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+	  operator()(int x_cb, int parity) {
+	  return colorspinor_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >(*this, x_cb, parity);
+	}
+
+	/**
+	   @brief This accessor routine returns a const colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline const colorspinor_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+	  operator()(int x_cb, int parity) const {
+	  return colorspinor_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+	    (const_cast<FloatNOrder<Float,Ns,Nc,N>&>(*this), x_cb, parity);
+	}
+
 	// no parity argument since we only presently exchange single parity field
 	// add support for half-precision ghosts
 	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
@@ -382,6 +531,38 @@ namespace quda {
 	    reinterpret_cast< Vector*>
 	      (ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N)[i*faceVolumeCB[dim]+x] = vecTmp;
           }
+	}
+
+	/**
+	   @brief This accessor routine returns a colorspinor_ghost_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] dim Dimensions of the ghost we are requesting
+	   @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_ghost_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+	  Ghost(int dim, int dir, int ghost_idx, int parity) {
+	  return colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >(*this, dim, dir, ghost_idx, parity);
+	}
+
+	/**
+	   @brief This accessor routine returns a const
+	   colorspinor_ghost_wrapper to this object, allowing us to
+	   overload various operators for manipulating at the site
+	   level interms of matrix operations.
+	   @param[in] dim Dimensions of the ghost we are requesting
+	   @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_ghost+wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline const colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+	  Ghost(int dim, int dir, int ghost_idx, int parity) const {
+	  return colorspinor_ghost_wrapper<Float,FloatNOrder<Float,Ns,Nc,N> >
+	    (const_cast<FloatNOrder<Float,Ns,Nc,N>&>(*this), dim, dir, ghost_idx, parity);
 	}
 
 	size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
