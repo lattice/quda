@@ -1002,6 +1002,19 @@ extern "C" {
   void plaqQuda(double plaq[3]);
 
   /**
+   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param nSteps Number of steps to apply.
+   * @param alpha  Alpha coefficient for Wuppertal smearing.
+   */
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
+                             unsigned int nSteps, double alpha);
+
+  /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for APE smearing.

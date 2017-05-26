@@ -205,6 +205,9 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
+//!< Profiler for wuppertalQuda
+static TimeProfile profileWuppertal("wuppertalQuda");
+
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
@@ -5584,6 +5587,70 @@ void plaqQuda (double plq[3])
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
   return;
+}
+
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
+                           unsigned int nSteps, double alpha)
+{
+  profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == NULL) errorQuda("Gauge field must be loaded");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  if (gaugeSmeared == NULL) {
+    GaugeFieldParam gParam(*gaugePrecise);
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+    for(int dir=0; dir<4; ++dir) {
+      gParam.x[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+      gParam.r[dir] = R[dir];
+    }
+
+    gaugeSmeared = new cudaGaugeField(gParam);
+
+    copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+    gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+  }
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 0, inv_param->input_location);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+  int parity = 0;
+
+  for (unsigned int i=0; i<nSteps; i++) {
+    if(i) in = out;
+    wuppertalStep(out, in, parity, *gaugeSmeared, alpha);
+  }
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
+
+  popVerbosity();
+
+  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void performAPEnStep(unsigned int nSteps, double alpha)
