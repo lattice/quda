@@ -28,7 +28,7 @@ namespace quda {
     if (param.level < param.Nlevel-1) {
       if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
 	if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) generateNullVectors(param.B);
-      } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only laod if infile is defined and not computing
+      } else if (strcmp(param.mg_global.vec_infile,"")!=0) { // only load if infile is defined and not computing
 	loadVectors(param.B);
       }
     }
@@ -773,8 +773,9 @@ namespace quda {
 	delete x;
 
       }//stop for-loop:
-
-    saveVectors(B);
+    if (strcmp(param.mg_global.vec_outfile,"")!=0) { // only save if outfile is defined
+      saveVectors(B);
+    }
 
     return;
   }
