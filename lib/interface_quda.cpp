@@ -2323,13 +2323,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   if(mg->mgParam->mg_global.invert_param != param)
     mg->mgParam->mg_global.invert_param = param;
 
-  openMagma();
-
   mg->mg->updateCoarseOperator();
 
-  closeMagma();
-
-  printfQuda("update completed\n");
   setOutputPrefix("");
 
   // cache is written out even if a long benchmarking job gets interrupted
