@@ -57,7 +57,7 @@ namespace quda {
 
       /**
 	 @brief Assignment operator with Matrix instance as input
-	 @param M[in] Matrix we want to store in this accessot
+	 @param M[in] Matrix we want to store in this accessor
        */
       template<typename M>
       __device__ __host__ inline void operator=(const M &a) {

@@ -517,7 +517,7 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION ||
-	       precision == QUDA_HALF_PRECISION) {
+	       (precision == QUDA_HALF_PRECISION && nColor == 3)) {
       if (nSpin == 4) {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 2) {
