@@ -52,7 +52,7 @@ namespace quda {
       dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), mu_factor(0.0), epsilon(0.0),
       tmp1(0), tmp2(0)
     {
-
+      for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
 
     void print() {
