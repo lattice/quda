@@ -1563,8 +1563,9 @@ QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
-QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
-QudaPrecision  prec_precondition = QUDA_INVALID_PRECISION;
+QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
+QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
+QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
@@ -1797,6 +1798,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     prec_precondition =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--prec-null") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    prec_null =  get_prec(argv[i+1]);
     i++;
     ret = 0;
     goto out;
