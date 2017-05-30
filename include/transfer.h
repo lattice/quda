@@ -165,10 +165,11 @@ namespace quda {
      * @param geo_bs The geometric block sizes to use
      * @param spin_bs The spin block sizes to use
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
+     * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
     Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
-	     bool enable_gpu, TimeProfile &profile);
+	     QudaPrecision null_precision, bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */
     virtual ~Transfer();

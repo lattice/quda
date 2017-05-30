@@ -90,7 +90,7 @@ namespace quda {
     };
 
 
-    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat=Float>
       class FieldOrderCB {
 
     protected:
@@ -114,7 +114,7 @@ namespace quda {
     FieldOrderCB(const ColorSpinorField &field, void *v_=0, void **ghost_=0)
       : v(v_? static_cast<complex<Float>*>(const_cast<void*>(v_))
 	  : static_cast<complex<Float>*>(const_cast<void*>(field.V()))),
-	volumeCB(field.VolumeCB()),
+        volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
 	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
 	location(field.Location()), accessor(field), ghostAccessor(field)
@@ -151,7 +151,7 @@ namespace quda {
        * @param v vector number
        */
       __device__ __host__ inline const complex<Float>& operator()(int parity, int x_cb, int s, int c, int n=0) const
-      {	return v[accessor.index(parity,x_cb,s,c,n)]; }
+      { return v[accessor.index(parity,x_cb,s,c,n)]; }
 
       /**
        * Writable complex-member accessor function.  The last
@@ -162,7 +162,7 @@ namespace quda {
        * @param c color index
        * @param v vector number
        */
-      __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c, int n=0)
+    __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c, int n=0)
       { return v[accessor.index(parity,x_cb,s,c,n)]; }
 
       /**
@@ -197,13 +197,13 @@ namespace quda {
       */
       __device__ __host__ inline void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
 	if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
-	
+
 	for (int d=0; d<nDim; d++) {
 	  y[d] = i % x[d];
-	  i /= x[d];    
+	  i /= x[d];
 	}
 	int parity = i; // parity is the slowest running dimension
-	
+
 	// convert into the full-field lattice coordinate
 	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 	  for (int d=1; d<nDim; d++) parity += y[d];
@@ -212,7 +212,7 @@ namespace quda {
 	}
 	y[0] = 2*y[0] + parity;  // compute the full x coordinate
       }
-      
+
       /**
 	 Convert from n-dimensional spatial index to the 1-dimensional index.
 	 With full fields, we assume that the field is even-odd ordered.  The
@@ -221,17 +221,17 @@ namespace quda {
       __device__ __host__ inline void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
 	int parity = 0;
 	int savey0 = y[0];
-	
+
 	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 	  for (int d=0; d<nDim; d++) parity += y[d];
 	  parity = parity & 1;
 	  y[0] /= 2;
-	  x[0] /= 2; 
+	  x[0] /= 2;
 	}
-	
+
 	i = parity;
 	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
-	
+
 	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 	  //y[0] = 2*y[0] + parity;
 	  y[0] = savey0;
@@ -285,6 +285,273 @@ namespace quda {
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(Float); }
+    };
+
+
+    /**
+       @brief fieldorder_wrapper is an internal class that is used to
+       wrap instances of FieldOrder accessors, currying in the
+       specific location on the field.  This is used as a helper class
+       for fixed-point accessors providing the necessary conversion
+       and scaling when writing to a fixed-point field.
+    */
+    template <typename Float, typename storeFloat>
+      struct fieldorder_wrapper {
+	complex<storeFloat> *v;
+	const int idx;
+	const Float scale;
+	const Float scale_inv;
+
+	/**
+	   @brief fieldorder_wrapper constructor
+	   @param idx Field index
+	*/
+        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
+	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
+
+	__device__ __host__ inline Float real() { return scale_inv*static_cast<Float>(v[idx].real()); }
+	__device__ __host__ inline Float imag() { return scale_inv*static_cast<Float>(v[idx].imag()); }
+
+	/**
+	   @brief Assignment operator with fieldorder_wrapper instance as input (assumes scale factors match)
+	   @param a fieldorder_wrapper we are copying from
+	*/
+	__device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a) {
+	  v[idx] = a.v[a.idx];
+	}
+
+	/**
+	   @brief Assignment operator with Complex number instance as input
+	   @param a Complex number we want to store in this accessor
+	*/
+	__device__ __host__ inline void operator=(const complex<Float> &a) {
+	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
+	    v[idx] = complex<storeFloat>(a.x, a.y);
+	  } else { // we need to scale and then round
+	    v[idx] = complex<storeFloat>(round(scale * a.x), round(scale * a.y));
+	  }
+	}
+
+	__device__ __host__ inline void operator+=(const complex<Float> &a) {
+	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
+	    v[idx] += complex<storeFloat>(a.x, a.y);
+	  } else { // we need to scale and then round
+	    v[idx] += complex<storeFloat>(round(scale * a.x), round(scale * a.y));
+	  }
+	}
+
+	__device__ __host__ inline void operator-=(const complex<Float> &a) {
+	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
+	    v[idx] -= complex<storeFloat>(a.x, a.y);
+	  } else { // we need to scale and then round
+	    v[idx] -= complex<storeFloat>(round(scale * a.x), round(scale * a.y));
+	  }
+	}
+      };
+
+
+    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+      class FieldOrderCB<Float,nSpin,nColor,nVec,order,short> {
+
+      typedef short storeFloat;
+
+    protected:
+      complex<storeFloat> *v;
+      mutable complex<storeFloat> *ghost[8];
+      Float scale;
+      Float scale_inv;
+      mutable int x[QUDA_MAX_DIM];
+      const int volumeCB;
+      const int nDim;
+      const QudaGammaBasis gammaBasis;
+      const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
+      const GhostAccessorCB<storeFloat,nSpin,nColor,nVec,order> ghostAccessor;
+      const int siteSubset;
+      const int nParity;
+      const QudaFieldLocation location;
+
+    public:
+      /**
+       * Constructor for the FieldOrderCB class
+       * @param field The field that we are accessing
+       */
+    FieldOrderCB(const ColorSpinorField &field, void *v_=0, void **ghost_=0)
+      : v(v_? static_cast<complex<storeFloat>*>(const_cast<void*>(v_))
+	  : static_cast<complex<storeFloat>*>(const_cast<void*>(field.V()))),
+        volumeCB(field.VolumeCB()),
+	nDim(field.Ndim()), gammaBasis(field.GammaBasis()),
+	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
+	location(field.Location()), accessor(field), ghostAccessor(field)
+      {
+	for (int d=0; d<4; d++) {
+	  void * const *_ghost = ghost_ ? ghost_ : field.Ghost();
+	  ghost[2*d+0] = static_cast<complex<storeFloat>*>(_ghost[2*d+0]);
+	  ghost[2*d+1] = static_cast<complex<storeFloat>*>(_ghost[2*d+1]);
+	}
+
+	for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
+
+	scale = static_cast<Float>(MAX_SHORT);
+	scale_inv = static_cast<Float>(1.0 / MAX_SHORT);
+      }
+
+      /**
+       * Destructor for the FieldOrderCB class
+       */
+      virtual ~FieldOrderCB() { ; }
+
+      void resetGhost(void * const *ghost_) const
+      {
+	for (int d=0; d<4; d++) {
+	  ghost[2*d+0] = static_cast<complex<storeFloat>*>(ghost_[2*d+0]);
+	  ghost[2*d+1] = static_cast<complex<storeFloat>*>(ghost_[2*d+1]);
+	}
+      }
+
+      /**
+       * Read-only complex-member accessor function.  The last
+       * parameter n is only used for indexed into the packed
+       * null-space vectors.
+       * @param x 1-d checkerboard site index
+       * @param s spin index
+       * @param c color index
+       * @param v vector number
+       */
+      __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
+      {
+	complex<short> tmp = v[accessor.index(parity,x_cb,s,c,n)];
+	return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+      }
+
+      /**
+       * Writable complex-member accessor function.  The last
+       * parameter n is only used for indexed into the packed
+       * null-space vectors.
+       * @param x 1-d checkerboard site index
+       * @param s spin index
+       * @param c color index
+       * @param v vector number
+       */
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int parity, int x_cb, int s, int c, int n=0)
+	{ return fieldorder_wrapper<Float,storeFloat>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv); }
+
+      /**
+       * Read-only complex-member accessor function for the ghost
+       * zone.  The last parameter n is only used for indexed into the
+       * packed null-space vectors.
+       * @param x 1-d checkerboard site index
+       * @param s spin index
+       * @param c color index
+       * @param v vector number
+       */
+      __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
+      {
+	complex<short> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
+	return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+      }
+
+      /**
+       * Writable complex-member accessor function for the ghost zone.
+       * The last parameter n is only used for indexed into the packed
+       * null-space vectors.
+       * @param x 1-d checkerboard site index
+       * @param s spin index
+       * @param c color index
+       * @param n vector number
+       */
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0)
+      {
+	const int idx = ghostAccessor.index(dim,dir,parity,x_cb,s,c,n);
+	return fieldorder_wrapper<Float,storeFloat>(ghost[2*dim+dir], idx, scale, scale_inv);
+      }
+
+      /**
+	 Convert from 1-dimensional index to the n-dimensional spatial index.
+	 With full fields, we assume that the field is even-odd ordered.  The
+	 lattice coordinates that are computed here are full-field
+	 coordinates.
+      */
+      __device__ __host__ inline void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
+
+	for (int d=0; d<nDim; d++) {
+	  y[d] = i % x[d];
+	  i /= x[d];
+	}
+	int parity = i; // parity is the slowest running dimension
+
+	// convert into the full-field lattice coordinate
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  for (int d=1; d<nDim; d++) parity += y[d];
+	  parity = parity & 1;
+	  x[0] *= 2; // restore x[0]
+	}
+	y[0] = 2*y[0] + parity;  // compute the full x coordinate
+      }
+
+      /**
+	 Convert from n-dimensional spatial index to the 1-dimensional index.
+	 With full fields, we assume that the field is even-odd ordered.  The
+	 input lattice coordinates are always full-field coordinates.
+      */
+      __device__ __host__ inline void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
+	int parity = 0;
+	int savey0 = y[0];
+
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  for (int d=0; d<nDim; d++) parity += y[d];
+	  parity = parity & 1;
+	  y[0] /= 2;
+	  x[0] /= 2;
+	}
+
+	i = parity;
+	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
+
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  //y[0] = 2*y[0] + parity;
+	  y[0] = savey0;
+	  x[0] *= 2; // restore x[0]
+	}
+      }
+
+      /** Return the length of dimension d */
+      __device__ __host__ inline int X(int d) const { return x[d]; }
+
+      /** Return the length of dimension d */
+      __device__ __host__ inline const int* X() const { return x; }
+
+      /** Returns the number of field colors */
+       __device__ __host__ inline int Ncolor() const { return nColor; }
+
+      /** Returns the number of field spins */
+      __device__ __host__ inline int Nspin() const { return nSpin; }
+
+      /** Returns the number of field parities (1 or 2) */
+      __device__ __host__ inline int Nparity() const { return nParity; }
+
+      /** Returns the field volume */
+      __device__ __host__ inline int VolumeCB() const { return volumeCB; }
+
+      /** Returns the field geometric dimension */
+      __device__ __host__ inline int Ndim() const { return nDim; }
+
+      /** Returns the field geometric dimension */
+      __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
+
+      /** Returns the number of packed vectors (for mg prolongator) */
+      __device__ __host__ inline int Nvec() const { return nVec; }
+
+      /**
+       * Returns the L2 norm squared of the field in a given dimension
+       * @return L2 norm squared
+      */
+      __host__ double norm2() const {
+	errorQuda("Not implemenred");
+	return 0.0;
+      }
+
+      size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }
     };
 
     template <typename Float, int Ns, int Nc, int N>

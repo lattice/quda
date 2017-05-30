@@ -72,7 +72,7 @@ namespace quda {
       // create transfer operator
       printfQuda("start creating transfer operator\n");
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
-			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
+			      param.mg_global.precision_null[param.level], param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
       //transfer->setTransferGPU(false); // use this to force location of transfer
@@ -340,6 +340,10 @@ namespace quda {
       param_presmooth->precision = param.mg_global.invert_param->cuda_prec_precondition;
       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+    } else {
+      param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
+      param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_sloppy;
+      param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_sloppy;
     }
 
     if (param.level==param.Nlevel-1) {
@@ -447,7 +451,10 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    double tol = std::pow(10.0, 4-2*csParam.precision);
+
+    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.precision)
+      ? param.mg_global.precision_null[param.level]  : csParam.precision;
+    double tol = prec == QUDA_HALF_PRECISION ? 1e-3 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -739,6 +746,7 @@ namespace quda {
       ColorSpinorField *out=nullptr, *in=nullptr;
 
       diracSmoother->prepare(in, out, x, b, outer_solution_type);
+
       (*presmoother)(*out, *in);
       diracSmoother->reconstruct(x, b, outer_solution_type);
     }

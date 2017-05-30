@@ -17,8 +17,7 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu, TimeProfile &profile)
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, bool enable_gpu, TimeProfile &profile)
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
@@ -81,7 +80,12 @@ namespace quda {
     param.location = QUDA_CUDA_FIELD_LOCATION;
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//ok for staggered
 
-    V_d = enable_gpu ? ColorSpinorField::Create(param) : 0;
+    param.precision = null_precision;
+    V_d = enable_gpu ? ColorSpinorField::Create(param) : nullptr;
+    param.precision = V_h->Precision();
+
+    ColorSpinorField *V_tmp = (V_d && V_d->Precision() != V_h->Precision())
+      ? ColorSpinorField::Create(param) : V_d;
 
     // used for cpu<->gpu transfers
     param = ColorSpinorParam(*B[0]);
@@ -129,15 +133,20 @@ namespace quda {
     if (gpu_setup) {
 
       printfQuda("Transfer: filling V field with null-space components\n");
-      fillV(*V_d);  // copy the null space vectors into V
+      fillV(*V_tmp);  // copy the null space vectors into V
 
       // orthogonalize the blocks
       printfQuda("Transfer: block orthogonalizing\n");
-      BlockOrthogonalize(*V_d, Nvec, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
+      BlockOrthogonalize(*V_tmp, Nvec, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
 
-      *V_h = *V_d;
+      *V_h = *V_tmp;
+      if (V_d != V_tmp) {
+	printfQuda("copy from tmp\n");
+	*V_d = *V_tmp;
+	delete V_tmp;
+	printfQuda("done copy from tmp\n");
+      }
       printfQuda("Transferred prolongator back to CPU\n");
-
     } else {
 
       printfQuda("Transfer: filling V field with null-space components\n");
@@ -187,26 +196,26 @@ namespace quda {
     if (site_subset == QUDA_PARITY_SITE_SUBSET) {
       // if doing single-parity then delete full field V and replace with single parity
 
-      delete V_d;
-
       ColorSpinorParam param(*V_h);
       param.location = QUDA_CUDA_FIELD_LOCATION;
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
       param.x[0] /= 2;
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      param.precision = V_d->Precision();
 
+      delete V_d;
       V_d = ColorSpinorField::Create(param);
       *V_d = parity == QUDA_EVEN_PARITY ? V_h->Even() : V_h->Odd();
 
     } else if (site_subset == QUDA_FULL_SITE_SUBSET) {
       // if doing full field then delete single parity V and replace with single parity
 
-      delete V_d;
-
       ColorSpinorParam param(*V_h);
       param.location = QUDA_CUDA_FIELD_LOCATION;
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      param.precision = V_d->Precision();
 
+      delete V_d;
       V_d = ColorSpinorField::Create(param);
       *V_d = *V_h;
 

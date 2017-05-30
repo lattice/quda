@@ -541,6 +541,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
       P(spin_block_size[i], INVALID_INT);
       P(n_vec[i], INVALID_INT);
+#ifdef INIT_PARAM
+      P(precision_null[i], QUDA_SINGLE_PRECISION);
+#else
+      P(precision_null[i], INVALID_INT);
+#endif
       P(cycle_type[i], QUDA_MG_CYCLE_INVALID);
       P(nu_pre[i], INVALID_INT);
       P(nu_post[i], INVALID_INT);

@@ -36,6 +36,7 @@ set (QUDA_OBJS
   copy_color_spinor_hd.cu copy_color_spinor_hs.cu
   copy_color_spinor_hh.cu copy_color_spinor_mg_dd.cu
   copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_sh.cu
   copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu staggered_oprod_new.cu clover_trace_quda.cu ks_force_quda.cu
