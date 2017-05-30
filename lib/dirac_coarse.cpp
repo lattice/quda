@@ -134,9 +134,9 @@ namespace quda {
     if (&in == &out) errorQuda("Fields cannot alias");
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger, commDim);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (8*n*n-2*n)*(long long)in.VolumeCB();
@@ -147,9 +147,9 @@ namespace quda {
     if (&in == &out) errorQuda("Fields cannot alias");
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger);
+      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger, commDim);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger);
+      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (8*n*n-2*n)*(long long)in.VolumeCB();
@@ -160,9 +160,9 @@ namespace quda {
   {
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (8*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -176,9 +176,9 @@ namespace quda {
 
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger);
+      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger);
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -188,9 +188,9 @@ namespace quda {
   {
     if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (9*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
@@ -252,9 +252,9 @@ namespace quda {
   {
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger);
+      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger);
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim);
     }
 
     int n = in.Nspin()*in.Ncolor();

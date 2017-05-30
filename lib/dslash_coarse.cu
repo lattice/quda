@@ -759,17 +759,28 @@ namespace quda {
     if (dagger) {
       if (dslash) {
 	if (clover) {
+
 	  if (type == DSLASH_FULL) {
 	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
+	  } else if (type == DSLASH_INTERIOR) {
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
-	} else {
+
+	} else { // plain dslash
+
 	  if (type == DSLASH_FULL) {
 	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
+	  } else if (type == DSLASH_INTERIOR) {
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
+
 	}
       } else {
+
 	if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
 	if (clover) {
 	  DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
@@ -777,19 +788,31 @@ namespace quda {
 	} else {
 	  errorQuda("Unsupported dslash=false clover=false");
 	}
+
       }
     } else {
+
       if (dslash) {
 	if (clover) {
+
 	  if (type == DSLASH_FULL) {
 	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
+	  } else if (type == DSLASH_INTERIOR) {
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
-	} else {
+
+	} else { // plain dslash
+
 	  if (type == DSLASH_FULL) {
 	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
+	  } else if (type == DSLASH_INTERIOR) {
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
+
 	}
       } else {
 	if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
@@ -877,10 +900,13 @@ namespace quda {
     bool dslash;
     bool clover;
     bool dagger;
+    const int *commDim;
 
     inline DslashCoarseLaunch(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-			      const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger)
-      : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity), dslash(dslash), clover(clover), dagger(dagger) { }
+			      const GaugeField &Y, const GaugeField &X, double kappa, int parity,
+			      bool dslash, bool clover, bool dagger, const int *commDim)
+      : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
+	dslash(dslash), clover(clover), dagger(dagger), commDim(commDim) { }
 
     /**
        @brief Execute the coarse dslash using the given policy
@@ -895,6 +921,11 @@ namespace quda {
       // check all locations match
       Location(out, inA, inB, Y, X);
 
+      int comm_sum = 4;
+      if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-commDim[i]);
+      if (comm_sum != 4 && comm_sum != 0) errorQuda("Unsupported comms");
+      bool comms = comm_sum;
+
       MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
       MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from
       for (int i=0; i<2*QUDA_MAX_DIM; i++) {
@@ -908,7 +939,7 @@ namespace quda {
       bool gdr_recv = (policy == DSLASH_COARSE_GDR_RECV || policy == DSLASH_COARSE_GDR ||
 		       policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
 
-      if (dslash && comm_partitioned()) {
+      if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
 	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv);
       }
@@ -917,13 +948,15 @@ namespace quda {
 
       if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
-	ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, DSLASH_FULL, halo_location);
+	ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+			    dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
 	//if (dslash && comm_partitioned()) ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, true, halo_location);
 #else
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
       } else if (precision == QUDA_SINGLE_PRECISION) {
-	ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, DSLASH_FULL, halo_location);
+	ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+			   dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
 	//if (dslash && comm_partitioned()) ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, true, halo_location);
       } else {
 	errorQuda("Unsupported precision %d\n", Y.Precision());
@@ -966,6 +999,15 @@ namespace quda {
       strcat(aux, dslash.clover ? "clover," : ",");
       strcat(aux,dslash.inA.AuxString());
       strcat(aux,comm_dim_partitioned_string());
+
+      char comm[5];
+      comm[0] = (dslash.commDim[0] ? '1' : '0');
+      comm[1] = (dslash.commDim[1] ? '1' : '0');
+      comm[2] = (dslash.commDim[2] ? '1' : '0');
+      comm[3] = (dslash.commDim[3] ? '1' : '0');
+      comm[4] = '\0';
+      strcat(aux,",comm=");
+      strcat(aux,comm);
 
       if (!dslash_init) {
 	policy.reserve(9);
@@ -1087,9 +1129,10 @@ namespace quda {
   //out(x) = M^dagger*in = X^dagger*in - kappa*\sum_mu Y^\dagger_{-\mu}(x)in(x+mu) + Y_mu(x-mu)in(x-mu)
   //Uses the kappa normalization for the Wilson operator.
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-	           const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool dagger) {
+	           const GaugeField &Y, const GaugeField &X, double kappa, int parity,
+		   bool dslash, bool clover, bool dagger, const int *commDim) {
 
-    DslashCoarseLaunch Dslash(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger);
+    DslashCoarseLaunch Dslash(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim);
 
     DslashCoarsePolicyTune policy(Dslash);
     policy.apply(0);
