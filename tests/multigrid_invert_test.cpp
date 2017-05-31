@@ -77,6 +77,9 @@ extern QudaInverterType coarsest_solver;
 extern double coarsest_tol;
 extern int coarsest_maxiter;
 
+extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
+extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
+
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
@@ -246,11 +249,18 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
     mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
 
-    mg_param.global_reduction[i] = QUDA_BOOLEAN_YES;
-
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
     mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
+
+    // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
+    mg_param.smoother_schwarz_type[i] = schwarz_type[i];
+
+    // if using Schwarz preconditioning then use local reductions only
+    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+
+    // set number of Schwarz cycles to apply
+    mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
@@ -394,6 +404,7 @@ int main(int argc, char **argv)
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
     mu_factor[i] = 1.;
+    schwarz_type[i] = QUDA_INVALID_SCHWARZ;
   }
 
   for (int i = 1; i < argc; i++){
