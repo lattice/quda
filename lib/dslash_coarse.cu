@@ -923,7 +923,7 @@ namespace quda {
 
       int comm_sum = 4;
       if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-commDim[i]);
-      if (comm_sum != 4 && comm_sum != 0) errorQuda("Unsupported comms");
+      if (comm_sum != 4 && comm_sum != 0) errorQuda("Unsupported comms %d", comm_sum);
       bool comms = comm_sum;
 
       MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
@@ -1000,14 +1000,9 @@ namespace quda {
       strcat(aux,dslash.inA.AuxString());
       strcat(aux,comm_dim_partitioned_string());
 
-      char comm[5];
-      comm[0] = (dslash.commDim[0] ? '1' : '0');
-      comm[1] = (dslash.commDim[1] ? '1' : '0');
-      comm[2] = (dslash.commDim[2] ? '1' : '0');
-      comm[3] = (dslash.commDim[3] ? '1' : '0');
-      comm[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
+      int comm_sum = 4;
+      if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-dslash.commDim[i]);
+      strcat(aux, comm_sum ? ",full" : ",interior");
 
       if (!dslash_init) {
 	policy.reserve(9);
