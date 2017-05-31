@@ -13,6 +13,7 @@ namespace quda {
      SolverParam is the meta data used to define linear solvers.
    */
   struct SolverParam {
+
     /**
        Which linear solver to use
     */
@@ -23,7 +24,6 @@ namespace quda {
      * QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      */
     QudaInverterType inv_type_precondition;
-
 
     /**
      * Preconditioner instance, e.g., multigrid
@@ -95,6 +95,9 @@ namespace quda {
 
     /**< Whether to compute the true residual post solve */
     bool compute_true_res;
+
+    /** Whether to declare convergence without checking the true residual */
+    bool sloppy_converge;
 
     /**< Actual L2 residual norm achieved in solver */
     double true_res;
@@ -207,7 +210,7 @@ namespace quda {
        Default constructor
      */
     SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
-      compute_true_res(true), verbosity_precondition(QUDA_SILENT) { ; }
+      compute_true_res(true), sloppy_converge(false), verbosity_precondition(QUDA_SILENT) { ; }
 
     /**
        Constructor that matches the initial values to that of the
@@ -223,7 +226,7 @@ namespace quda {
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      compute_true_res(param.compute_true_res), true_res(param.true_res),
+      compute_true_res(param.compute_true_res), sloppy_converge(false), true_res(param.true_res),
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
       precision_precondition(param.cuda_prec_precondition),
@@ -258,7 +261,7 @@ namespace quda {
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
-      compute_true_res(param.compute_true_res), true_res(param.true_res),
+      compute_true_res(param.compute_true_res), sloppy_converge(param.sloppy_converge), true_res(param.true_res),
       true_res_hq(param.true_res_hq), maxiter(param.maxiter), iter(param.iter),
       precision(param.precision), precision_sloppy(param.precision_sloppy),
       precision_precondition(param.precision_precondition),
@@ -329,9 +332,10 @@ namespace quda {
   protected:
     SolverParam &param;
     TimeProfile &profile;
+    int node_parity;
 
   public:
-    Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) { ; }
+    Solver(SolverParam &param, TimeProfile &profile);
     virtual ~Solver() { ; }
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
@@ -689,9 +693,6 @@ namespace quda {
     ColorSpinorField *tmpp;     //! temporary for mat-vec
     ColorSpinorField *x_sloppy; //! sloppy solution vector
     ColorSpinorField *r_sloppy; //! sloppy residual vector
-    ColorSpinorField *r_pre;    //! residual passed to preconditioner
-    ColorSpinorField *p_pre;    //! preconditioner result
-    ColorSpinorField *rM;       //! residual vector for doing multi-cycle preconditioning
 
     std::vector<ColorSpinorField*> p;  // GCR direction vectors
     std::vector<ColorSpinorField*> Ap; // mat * direction vectors
@@ -716,12 +717,12 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     ColorSpinorField *rp;
+    ColorSpinorField *r_sloppy;
     ColorSpinorField *Arp;
     ColorSpinorField *tmpp;
-    ColorSpinorField *yp;  //Holds initial guess if applicable
+    ColorSpinorField *tmp_sloppy;
+    ColorSpinorField *x_sloppy;
     bool init;
-    bool allocate_r;
-    bool allocate_y;
 
   public:
     MR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);

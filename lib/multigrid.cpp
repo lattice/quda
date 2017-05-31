@@ -108,12 +108,26 @@ namespace quda {
 
       // create smoothing operators
       diracParam.dirac = const_cast<Dirac*>(diracSmoother);
-      diracParam.type = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? QUDA_COARSEPC_DIRAC : QUDA_COARSE_DIRAC;
-      diracParam.tmp1 = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? &(tmp_coarse->Even()) : tmp_coarse;
-      diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
-	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
-	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
-      diracCoarseSmootherSloppy = diracCoarseSmoother;  // for coarse grids these always alias for now (FIXME half precision support for coarse op)
+
+      if (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) {
+	diracParam.type = QUDA_COARSEPC_DIRAC;
+	diracParam.tmp1 = &(tmp_coarse->Even());
+	diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+	{
+	  bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
+	  for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+	}
+	diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
+      } else {
+	diracParam.type = QUDA_COARSE_DIRAC;
+	diracParam.tmp1 = tmp_coarse;
+	diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+	{
+	  bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
+	  for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+	}
+	diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
+      }
 
       matCoarseSmoother = new DiracM(*diracCoarseSmoother);
       matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
@@ -164,6 +178,7 @@ namespace quda {
 	param_coarse_solver->tol = param.mg_global.smoother_tol[param.level+1];
 	param_coarse_solver->global_reduction = true;
 	param_coarse_solver->compute_true_res = false;
+	param_coarse_solver->sloppy_converge = true;
 	param_coarse_solver->delta = 1e-8;
 	param_coarse_solver->verbosity_precondition = param.mg_global.verbosity[param.level+1];
 	param_coarse_solver->pipeline = 5;
@@ -225,7 +240,7 @@ namespace quda {
       if (diracCoarseResidual) delete diracCoarseResidual;
       if (diracCoarseSmoother) delete diracCoarseSmoother;
       // At the moment diracCoarseSmootherSloppy is aliased to diracCoarseSmoother
-      //if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
+      if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
 
       coarse->param.updateInvertParam(*param.mg_global.invert_param);
       coarse->param.delta = 1e-20;
@@ -326,22 +341,29 @@ namespace quda {
     param_presmooth = new SolverParam(param);
 
     param_presmooth->inv_type = param.smoother;
+    param_presmooth->residual_type = (param.smoother == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
     param_presmooth->is_preconditioner = false;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
+
+    param_presmooth->Nsteps = param.mg_global.smoother_schwarz_cycle[param.level];
     param_presmooth->maxiter = param.nu_pre;
+
     param_presmooth->Nkrylov = 4;
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
     param_presmooth->pipeline = 4;
 
+    param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
+    param_presmooth->schwarz_type = param.mg_global.smoother_schwarz_type[param.level];
+    // inner solver must recompute the true residual after each cycle if using Schwarz preconditioning
+    param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
+
     if (param.level == 0) {
-      param_presmooth->precision = param.mg_global.invert_param->cuda_prec_precondition;
       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
     } else {
-      param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_sloppy;
       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_sloppy;
     }
@@ -355,15 +377,29 @@ namespace quda {
       param_presmooth->pipeline = 8;
     }
 
-    presmoother = Solver::create(*param_presmooth, *param.matSmooth,
-				 *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    if (param_presmooth->inv_type == QUDA_GCR_INVERTER) {
+      param_presmooth->inv_type_precondition = param.mg_global.smoother[param.level-1];
+      param_presmooth->tol_precondition = param.mg_global.smoother_tol[param.level];
+      param_presmooth->maxiter_precondition = 4;
+      param_presmooth->precondition_cycle = param.mg_global.smoother_schwarz_cycle[param.level];
+      param_presmooth->verbosity_precondition = QUDA_SILENT;//QUDA_VERBOSE;
+
+      presmoother = Solver::create(*param_presmooth, *param.matSmooth,
+				   *param.matSmooth, *param.matSmoothSloppy, profile);
+    } else {
+      presmoother = Solver::create(*param_presmooth, *param.matSmooth,
+				   *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    }
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       // At the moment CGNE doesn't hold well an initial guess
       if(param.smoother == QUDA_CGNE_INVERTER) param_presmooth->inv_type = QUDA_MR_INVERTER;
+
       param_postsmooth->maxiter = param.nu_post;
+      param_postsmooth->compute_true_res = false;
+
       postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
 				    *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
@@ -876,6 +912,8 @@ namespace quda {
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
       solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
       if (solverParam.precision_sloppy == QUDA_HALF_PRECISION) solverParam.delta = 1e-1;
+    } else {
+      solverParam.precision_precondition = solverParam.precision;
     }
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
@@ -902,11 +940,18 @@ namespace quda {
       solverParam.maxiter = 2000;
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
+      // run GCR with the smoother as a preconditioner
+      solverParam.Nkrylov = 32;
       solverParam.inv_type_precondition = param.mg_global.smoother[param.level];
       solverParam.tol_precondition = param.mg_global.smoother_tol[param.level];
       solverParam.maxiter_precondition = param.mg_global.nu_pre[param.level]+param.mg_global.nu_post[param.level];
-      solverParam.precondition_cycle = 1;
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      solverParam.schwarz_type = param.mg_global.smoother_schwarz_type[param.level];
+      solverParam.precondition_cycle = param.mg_global.smoother_schwarz_cycle[param.level];
+      solverParam.verbosity_precondition = QUDA_SILENT;
+      solverParam.precision_sloppy = solverParam.precision;
+      solverParam.compute_true_res = 0;
+
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
     } else {
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }

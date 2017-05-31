@@ -536,6 +536,13 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
 
+#ifndef CHECK_PARAM
+    P(smoother_schwarz_type[i], QUDA_INVALID_SCHWARZ);
+    P(smoother_schwarz_cycle[i], 1);
+#else
+    P(smoother_schwarz_cycle[i], INVALID_INT);
+#endif
+
     // these parameters are not set for the bottom grid
     if (i<n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);

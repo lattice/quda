@@ -9,6 +9,12 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
+  Solver::Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) {
+    // compute parity of the node
+    for (int i=0; i<4; i++) node_parity += commCoords(i);
+    node_parity = node_parity % 2;
+  }
+
   // solver factory
   Solver* Solver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			 DiracMatrix &matPrecon, TimeProfile &profile)

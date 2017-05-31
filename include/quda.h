@@ -425,6 +425,12 @@ extern "C" {
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
+    QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of Schwarz cycles to apply */
+    int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
+
     /** The type of residual to send to the next coarse grid, and thus the
 	type of solution to receive back from this coarse grid */
     QudaSolutionType coarse_grid_solution_type[QUDA_MAX_MG_LEVEL];
