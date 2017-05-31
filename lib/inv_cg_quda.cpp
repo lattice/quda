@@ -24,7 +24,7 @@
 // do loops over dot products.
 // this is more here for development convenience.
 #define BLOCKSOLVER_MULTIFUNCTIONS
-//#define BLOCKSOLVE_DSLASH5D
+#define BLOCKSOLVE_DSLASH5D
 //#define BLOCKSOLVER_VERBOSE
 
 // Explicitly reorthogonalize Q^\dagger P on reliable update.
@@ -592,7 +592,7 @@ class BlockCGUpdate : public Worker {
     /**
        How many RHS we're solving.
     */
-    unsigned int n_rhs;
+    int n_rhs;
 
     /**
        How much to partition the shifted update. For now, we assume
@@ -1416,19 +1416,23 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     POP_RANGE
 #else
     PUSH_RANGE("BLAS",2)
-    for (int j = 0; j < nsrc; j++)
-    {
-      blas::copy(tmpp->Component(j), qp->Component(j));
+    // for (int j = 0; j < nsrc; j++)
+    // {
+    //   blas::copy(tmpp->Component(j), qp->Component(j));
+    // }
+    // for(int i=0; i<nsrc; i++){
+    //   for(int j=0;j<=i; j++){
+    //     blas::caxpy(Sdagger(i,j), pp->Component(i), tmpp->Component(j));
+    //   }
+    // }
+//TODO
+//FIXME: need to make sure this doesn't actually call the multiblas functions
+    if (just_reliable_updated) {
+      blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    } 
+    else {
+      blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
     }
-    for(int i=0; i<nsrc; i++){
-      for(int j=0;j<=i; j++){
-        blas::caxpy(Sdagger(i,j), pp->Component(i), tmpp->Component(j));
-      }
-    }
-
-    if (just_reliably_updated) blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
-    else blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
-
     POP_RANGE
 #endif
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
