@@ -2,7 +2,6 @@
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
 #include <typeinfo>
-
 #include <multigrid_helper.cuh>
 
 namespace quda {
@@ -13,11 +12,11 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order>
+  template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order>
   struct ProlongateArg {
     FieldOrderCB<Float,fineSpin,fineColor,1,order> out;
     const FieldOrderCB<Float,coarseSpin,coarseColor,1,order> in;
-    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order> V;
+    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order,vFloat> V;
     const int *geo_map;  // need to make a device copy of this
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the output field (if single parity)
@@ -27,7 +26,7 @@ namespace quda {
 		  const int *geo_map,  const int parity)
       : out(out), in(in), V(V), geo_map(geo_map), spin_map(), parity(parity), nParity(out.SiteSubset()) { }
 
-    ProlongateArg(const ProlongateArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,order> &arg)
+    ProlongateArg(const ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,order> &arg)
       : out(arg.out), in(arg.in), V(arg.V), geo_map(arg.geo_map), spin_map(),
 	parity(arg.parity), nParity(arg.nParity) { }
   };
@@ -127,7 +126,7 @@ namespace quda {
       (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
   }
   
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread>
+  template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread>
   class ProlongateLaunch : public TunableVectorYZ {
 
   protected:
@@ -162,7 +161,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	  ProlongateArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
+	  ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
 	    arg(out, in, V, fine_to_coarse, parity);
 	  Prolongate<Float,fineSpin,fineColor,coarseSpin,coarseColor,fine_colors_per_thread>(arg);
 	} else {
@@ -171,7 +170,7 @@ namespace quda {
       } else {
 	if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	  ProlongateArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER>
+	  ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER>
 	    arg(out, in, V, fine_to_coarse, parity);
 	  ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,fine_colors_per_thread>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -199,9 +198,17 @@ namespace quda {
     // for all grids use 1 color per thread
     constexpr int fine_colors_per_thread = 1;
 
-    ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, fine_colors_per_thread>
-      prolongator(out, in, v, fine_to_coarse, parity);
-    prolongator.apply(0);
+    if (v.Precision() == QUDA_HALF_PRECISION) {
+      ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor, fine_colors_per_thread>
+	prolongator(out, in, v, fine_to_coarse, parity);
+      prolongator.apply(0);
+    } else if (v.Precision() == in.Precision()) {
+      ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor, fine_colors_per_thread>
+	prolongator(out, in, v, fine_to_coarse, parity);
+      prolongator.apply(0);
+    } else {
+      errorQuda("Unsupported V precision %d", v.Precision());
+    }
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
@@ -288,7 +295,7 @@ namespace quda {
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)", 
 		out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
 
-    QudaPrecision precision = Precision(out, in, v);
+    QudaPrecision precision = Precision(out, in);
 
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE

@@ -14,7 +14,6 @@ namespace quda {
     t_boundary(u.TBoundary()),
     anisotropy(u.Anisotropy()),
     tadpole(u.Tadpole()),
-    scale(u.Scale()),
     gauge(NULL),
     create(QUDA_NULL_FIELD_CREATE),
     geometry(u.Geometry()),
@@ -29,7 +28,7 @@ namespace quda {
     geometry(param.geometry), reconstruct(param.reconstruct), 
     nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
     order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
-    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
+    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0),
     create(param.create),
     staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
   {
@@ -239,7 +238,6 @@ namespace quda {
     output << "t_boundary = " << param.t_boundary << std::endl;
     output << "anisotropy = " << param.anisotropy << std::endl;
     output << "tadpole = " << param.tadpole << std::endl;
-    output << "scale = " << param.scale << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;

@@ -1567,6 +1567,7 @@ QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision  prec_precondition = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
+QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
@@ -1609,7 +1610,7 @@ int nu_pre = 2;
 int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
-QudaInverterType setup_inv = QUDA_BICGSTAB_INVERTER;
+QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
 int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol = 5e-6;
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
@@ -1733,6 +1734,7 @@ void process_command_line(int argc, char** argv)
   // pre-reading actions
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SILENT;
+    setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
     mu_factor[i] = 1.;
   }
@@ -1753,6 +1755,7 @@ void process_command_line(int argc, char** argv)
   setVerbosity(verbosity);
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
+  if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
 }
@@ -1841,6 +1844,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     prec_precondition =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--prec-null") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    prec_null =  get_prec(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2423,7 +2436,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    setup_inv = get_solver_type(argv[i+1]);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_inv[level] = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2982,11 +3002,12 @@ void setDefaultMultigridParam(QudaMultigridParam &mg_param) {
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
     mg_param.verbosity[i] = mg_verbosity[i];
-    mg_param.setup_inv_type[i] = setup_inv;
+    mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol;
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
     mg_param.mu_factor[i] = mu_factor[i];

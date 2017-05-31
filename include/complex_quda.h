@@ -545,6 +545,7 @@ public:
 
   // cast operators
   inline operator std::complex<float>() const { return std::complex<float>(real(),imag()); }
+  inline __host__ __device__ operator quda::complex<double>() const;
   // inline operator float() const { return real(); }
 };
 
@@ -662,7 +663,48 @@ public:
 
   // cast operators
   inline operator std::complex<double>() const { return std::complex<double>(real(),imag()); }
+  inline __host__ __device__ operator quda::complex<float>() const { return quda::complex<float>(real(),imag()); }
   // inline operator double() { return real(); }
+};
+
+ quda::complex<float>::operator quda::complex<double>() const { return quda::complex<double>(real(),imag()); }
+
+
+template<>
+struct complex <short> : public short2
+{
+public:
+  typedef short value_type;
+
+  __host__ __device__ inline complex<short>(){};
+
+  __host__ __device__ inline complex<short>(const short & re, const short& im = float())
+    {
+      real(re);
+      imag(im);
+    }
+
+  __host__ __device__ inline complex<short>(const complex<short> & z) : short2(z){}
+
+  __host__ __device__ inline complex<short>& operator+=(const complex<short> z)
+    {
+      real(real()+z.real());
+      imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline short real() const volatile{ return x; }
+  __host__ __device__ inline short imag() const volatile{ return y; }
+  __host__ __device__ inline short real() const{ return x; }
+  __host__ __device__ inline short imag() const{ return y; }
+  __host__ __device__ inline void real(short re)volatile{ x = re; }
+  __host__ __device__ inline void imag(short im)volatile{ y = im; }
+  __host__ __device__ inline void real(short re){ x = re; }
+  __host__ __device__ inline void imag(short im){ y = im; }
+
+  // cast operators
+  inline operator std::complex<short>() const { return std::complex<short>(real(),imag()); }
+  //inline __host__ __device__ operator quda::complex<float>() const{ return quda::complex<float>
 };
 
 

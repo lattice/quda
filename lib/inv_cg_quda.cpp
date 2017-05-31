@@ -24,29 +24,35 @@
 namespace quda {
 
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false) {
-    rnewp = nullptr;
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr),
+    rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
+    rSloppyp(nullptr), xSloppyp(nullptr), init(false)
+  {
+
   }
 
   CG::~CG() {
+    profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
-      for (auto pi : p) delete pi;
-      delete rp;
-      delete yp;
-      delete App;
+      for (auto pi : p) if (pi) delete pi;
+      if (rp) delete rp;
+      if (pp) delete pp;
+      if (yp) delete yp;
+      if (App) delete App;
       if(param.precision != param.precision_sloppy) {
-	delete rSloppyp;
-	delete xSloppyp;
+	if (rSloppyp) delete rSloppyp;
+	if (xSloppyp) delete xSloppyp;
       }
-      delete tmpp;
+      if (tmpp) delete tmpp;
       if(!mat.isStaggered()) {
-	delete tmp2p;
-	if(param.precision != param.precision_sloppy) delete tmp3p;
+	if (tmp2p && tmpp != tmp2p) delete tmp2p;
+	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
       if (rnewp) delete rnewp;
 
       init = false;
     }
+    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -177,8 +183,6 @@ namespace quda {
 
       // sloppy fields
       csParam.setPrecision(param.precision_sloppy);
-      p.resize(Np);
-      for (auto &pi : p) pi = ColorSpinorField::Create(csParam);
       App = ColorSpinorField::Create(csParam);
       if(param.precision != param.precision_sloppy) {
 	rSloppyp = ColorSpinorField::Create(csParam);
@@ -221,6 +225,18 @@ namespace quda {
     ColorSpinorField &tmp3 = *tmp3p;
     ColorSpinorField &rSloppy = *rSloppyp;
     ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+
+    {
+      ColorSpinorParam csParam(r);
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      csParam.setPrecision(param.precision_sloppy);
+
+      if (Np != (int)p.size()) {
+	for (auto &pi : p) delete pi;
+	p.resize(Np);
+	for (auto &pi : p) pi = ColorSpinorField::Create(csParam);
+      }
+    }
 
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
@@ -267,7 +283,15 @@ namespace quda {
     }
 
     blas::copy(rSloppy,r);
-    blas::copy(*p[0],rSloppy);
+    if (Np != (int)p.size()) {
+      for (auto &pi : p) delete pi;
+      p.resize(Np);
+      ColorSpinorParam csParam(rSloppy);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      for (auto &pi : p) pi = ColorSpinorField::Create(rSloppy, csParam);
+    } else {
+      for (auto &pi : p) *pi = rSloppy;
+    }
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -453,7 +477,7 @@ namespace quda {
 	}
 
 	// alternative reliable updates
-	if(alternative_reliable){
+	if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);

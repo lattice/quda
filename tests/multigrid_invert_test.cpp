@@ -38,8 +38,9 @@ extern int Lsdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
-extern QudaPrecision  prec_sloppy;
-extern QudaPrecision  prec_precondition;
+extern QudaPrecision prec_sloppy;
+extern QudaPrecision prec_precondition;
+extern QudaPrecision prec_null;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
@@ -48,6 +49,7 @@ extern double anisotropy;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
+extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
@@ -89,6 +91,8 @@ extern void usage(char** );
 
 extern double clover_coeff;
 extern bool compute_clover;
+
+extern bool verify_results;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -251,8 +255,7 @@ int main(int argc, char **argv)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
-  const int nSrc = 1;
-  for (int i=0; i<nSrc; i++) {
+  for (int i=0; i<Nsrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
     memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
