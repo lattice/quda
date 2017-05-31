@@ -241,6 +241,10 @@ namespace quda {
       DiracParam diracParam;
       diracParam.transfer = transfer;
 
+      diracResidual = param.matResidual->Expose();
+      diracSmoother = param.matSmooth->Expose();
+      diracSmootherSloppy = param.matSmoothSloppy->Expose();
+        
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
       diracParam.kappa = diracParam.dirac->Kappa();
       diracParam.mu = diracParam.dirac->Mu();
