@@ -18,11 +18,13 @@
 
 #ifdef BLOCKSOLVER
 #include <Eigen/Dense>
+#include <cuda_profiler_api.h>
 
-// define this to use multireduce, otherwise it'll
+// define this to use multi-functions, otherwise it'll
 // do loops over dot products.
 // this is more here for development convenience.
-#define BLOCKSOLVER_MULTIREDUCE
+#define BLOCKSOLVER_MULTIFUNCTIONS
+//#define BLOCKSOLVE_DSLASH5D
 //#define BLOCKSOLVER_VERBOSE
 
 // Explicitly reorthogonalize Q^\dagger P on reliable update.
@@ -540,7 +542,7 @@ namespace quda {
 #if BCGRQ
 
 
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   using Eigen::Matrix;
   using Eigen::Map;
   using Eigen::RowMajor;
@@ -581,11 +583,10 @@ class BlockCGUpdate : public Worker {
 
     ColorSpinorField* x_sloppyp;
     ColorSpinorField** pp; // double pointer because pp participates in pointer swapping
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     Complex* alpha;
 #else
-    Complex* AC;
-    MatrixXcd* alpha;
+    MatrixXcd &alpha;
 #endif
 
     /**
@@ -599,25 +600,29 @@ class BlockCGUpdate : public Worker {
        should only be getting even/odd preconditioned operators).
     */
     int n_update; 
+    
+#ifndef BLOCKSOLVE_DSLASH5D
+    /** 
+       What X we're updating; only relevant when we're looping over rhs.
+    */
+    int curr_update;
+#endif
 
   public:
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, Complex* alpha) :
 #else
-    BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, MatrixXcd* alpha) :
+    BlockCGUpdate(ColorSpinorField* x_sloppyp, ColorSpinorField** pp, MatrixXcd& alpha) :
 #endif
       x_sloppyp(x_sloppyp), pp(pp), alpha(alpha), n_rhs((*pp)->Components().size()),
       n_update( x_sloppyp->Nspin()==4 ? 4 : 2 )
-    {
-#ifndef BLOCKSOLVER_MULTIREDUCE
-      AC = new Complex[n_rhs*n_rhs];
+#ifdef BLOCKSOLVE_DSLASH5D
+    { ; }
+#else
+    { curr_update = 0; }
 #endif
-    }
-    ~BlockCGUpdate() {
-#ifndef BLOCKSOLVER_MULTIREDUCE
-      delete[] AC;
-#endif
-    }
+    
+    ~BlockCGUpdate() { ; }
     
 
     // note that we can't set the stream parameter here so it is
@@ -625,6 +630,7 @@ class BlockCGUpdate : public Worker {
     void apply(const cudaStream_t &stream) {      
       static int count = 0;
 
+#ifdef BLOCKSOLVE_DSLASH5D
       // How many to update per apply.
       const int update_per_apply = n_rhs/n_update;
 
@@ -638,28 +644,40 @@ class BlockCGUpdate : public Worker {
       {
         std::vector<ColorSpinorField*> curr_p((*pp)->Components().begin() + count*update_per_apply, (*pp)->Components().begin() + (count+1)*update_per_apply);
 
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
         blas::caxpy(&alpha[count*update_per_apply*n_rhs], curr_p, x_sloppyp->Components());
 #else
         for (int i = 0; i < update_per_apply; i++)
           for (int j = 0; j < n_rhs; j++)
-            AC[i*n_rhs + j] = alpha(i + count*update_per_apply, j);
-        blas::caxpy(AC, curr_p, x_sloppyp->Components());
+            blas::caxpy(alpha(i+count*update_per_apply, j), *(curr_p[i]), x_sloppyp->Component(j));
 #endif
       }
       else if (count == n_update-1) // we're updating the leftover.
       {
         std::vector<ColorSpinorField*> curr_p((*pp)->Components().begin() + count*update_per_apply, (*pp)->Components().end());
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
         blas::caxpy(&alpha[count*update_per_apply*n_rhs], curr_p, x_sloppyp->Components());
 #else
         for (int i = 0; i < update_per_apply_on_last; i++)
           for (int j = 0; j < n_rhs; j++)
-            AC[i*n_rhs + j] = alpha(i + count*update_per_apply, j);
-        blas::caxpy(AC, curr_p, x_sloppyp->Components());
+            blas::caxpy(alpha(i+count*update_per_apply,j), *(curr_p[i]), x_sloppyp->Component(j));
 #endif
       }
       POP_RANGE
+#else // BLOCKSOLVE_DSLASH5D
+      if (count == 0)
+      {
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
+        std::vector<ColorSpinorField*> curr_p;
+        curr_p.push_back(&(*pp)->Component(curr_update));
+        blas::caxpy(&alpha[curr_update*n_rhs], curr_p, x_sloppyp->Components());
+#else
+        for (int j = 0; j < n_rhs; j++)
+            blas::caxpy(alpha(curr_update,j), (*pp)->Component(curr_update), x_sloppyp->Component(j));
+#endif
+        if (++curr_update == n_rhs) curr_update = 0;
+      }
+#endif // BLOCKSOLVE_DSLASH5D
       
       if (++count == n_update) count = 0;
       
@@ -755,6 +773,37 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   qp->ExtendLastDimension();
   tmpp->ExtendLastDimension();
   tmp_matsloppy.ExtendLastDimension();
+  
+  csParam.setPrecision(param.precision_sloppy);
+  // tmp2 only needed for multi-gpu Wilson-like kernels
+  //ColorSpinorField *tmp2_p = !mat.isStaggered() ?
+  //ColorSpinorField::Create(x, csParam) : &tmp;
+  //ColorSpinorField &tmp2 = *tmp2_p;
+  ColorSpinorField *tmp2_p = nullptr;
+
+  if(!mat.isStaggered()){
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    tmp2_p =  ColorSpinorField::Create(x, csParam);
+    tmp2_p->ExtendLastDimension();
+  } else {
+    tmp2_p = tmp_matsloppyp;
+  }
+
+  ColorSpinorField &tmp2 = *tmp2_p;
+
+  // additional high-precision temporary if Wilson and mixed-precision
+  csParam.setPrecision(param.precision);
+
+  ColorSpinorField *tmp3_p = nullptr;
+  if(param.precision != param.precision_sloppy && !mat.isStaggered()){
+    //csParam.create = QUDA_ZERO_FIELD_CREATE;
+    tmp3_p =  ColorSpinorField::Create(x, csParam); //ColorSpinorField::Create(csParam);
+    tmp3_p->ExtendLastDimension();
+  } else {
+    tmp3_p = tmp_matsloppyp;
+  }
+
+  ColorSpinorField &tmp3 = *tmp3_p;
 
   // calculate residuals for all vectors
   //for(int i=0; i<nsrc; i++){
@@ -762,11 +811,32 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   //  blas::xmyNorm(b.Component(i), r.Component(i));
   //}
   // Step 2: R = AX - B, using Y as a temporary with the right precision.
-  mat(r, x, y);
+#ifdef BLOCKSOLVE_DSLASH5D
+  mat(r, x, y, tmp3);
+#else
+  for (int i = 0; i < nsrc; i++)
+  {
+    mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
+    // blas::xpay(b.Component(i), -1.0, r.Component(i));
+  }
+#endif
+
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::xpay(b, -1.0, r);
+#else
+  for (int i = 0; i < nsrc; i++)
+  {
+    blas::xpay(b.Component(i), -1.0, r.Component(i));
+  }
+#endif
 
   // Step 3: Y = X
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::copy(y, x);
+#else
+  for (int i = 0; i < nsrc; i++)
+    blas::copy(y.Component(i), x.Component(i));
+#endif
 
   // Step 4: Xs = 0
   // Set field aliasing according to whether
@@ -775,7 +845,12 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator)
   {
     x_sloppyp = &x; // s_sloppy and x point to the same vector in memory.
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::zero(*x_sloppyp); // x_sloppy is zeroed out (and, by extension, so is x)
+#else
+    for (int i = 0; i < nsrc; i++)
+      blas::zero(x_sloppyp->Component(i));
+#endif
   }
   else
   {
@@ -788,7 +863,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   // Syntatic sugar.
   ColorSpinorField &x_sloppy = *x_sloppyp;
 
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   // Set up eigen matrices here.
   // We need to do some goofing around with Eigen maps.
   // https://eigen.tuxfamily.org/dox/group__TutorialMapClass.html
@@ -836,7 +911,6 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd L = MatrixXcd::Zero(nsrc, nsrc);
   MatrixXcd Linv = MatrixXcd::Zero(nsrc, nsrc);
   MatrixXcd pAp = MatrixXcd::Identity(nsrc,nsrc);
-  quda::Complex AC[nsrc*nsrc];
 
   #ifdef BLOCKSOLVER_VERBOSE
   MatrixXcd pTp =  MatrixXcd::Identity(nsrc,nsrc);
@@ -845,7 +919,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   // Step 5: H = (R)^\dagger R
   double r2avg=0;
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::hDotProduct(H_raw, r.Components(), r.Components());
 
   for (int i = 0; i < nsrc; i++)
@@ -867,37 +941,6 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #endif
   printmat("r2", H);
 
-  csParam.setPrecision(param.precision_sloppy);
-  // tmp2 only needed for multi-gpu Wilson-like kernels
-  //ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-  //ColorSpinorField::Create(x, csParam) : &tmp;
-  //ColorSpinorField &tmp2 = *tmp2_p;
-  ColorSpinorField *tmp2_p = nullptr;
-
-  if(!mat.isStaggered()){
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    tmp2_p =  ColorSpinorField::Create(csParam);
-    tmp2_p->ExtendLastDimension();
-  } else {
-    tmp2_p = tmp_matsloppyp;
-  }
-
-  ColorSpinorField &tmp2 = *tmp2_p;
-
-  // additional high-precision temporary if Wilson and mixed-precision
-  csParam.setPrecision(param.precision);
-
-  ColorSpinorField *tmp3_p = nullptr;
-  if(param.precision != param.precision_sloppy && !mat.isStaggered()){
-    //csParam.create = QUDA_ZERO_FIELD_CREATE;
-    tmp3_p =  ColorSpinorField::Create(x, csParam); //ColorSpinorField::Create(csParam);
-    tmp3_p->ExtendLastDimension();
-  } else {
-    tmp3_p = tmp_matsloppyp;
-  }
-
-  ColorSpinorField &tmp3 = *tmp3_p;
-
   //ColorSpinorParam cs5dParam(p);
   //cs5dParam.create = QUDA_REFERENCE_FIELD_CREATE;
   //cs5dParam.x[4] = nsrc;
@@ -914,10 +957,10 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   // Create the worker class for updating x_sloppy. 
   // When we hit matSloppy, tmpp contains P.
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, alpha_raw);
 #else
-  BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, &alpha);
+  BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, alpha);
 #endif
 
   profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -982,18 +1025,16 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   // Step 8: finally set Q to thin QR decompsition of R.
   //blas::zero(*qp); // guaranteed to be zero at start.
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
   blas::caxpy_U(Linv_raw,tmpp->Components(),qp->Components());  // C is upper triangular, so its inverse is.
 #else
-  // temporary hack - use AC to pass matrix arguments to multiblas
   for(int i=0; i<nsrc; i++){
-    for(int j=0;j<nsrc; j++){
-      AC[i*nsrc + j] = Linv(i,j);
+    blas::copy(tmpp->Component(i), r.Component(i));
+    for(int j=i;j<nsrc; j++){
+      blas::caxpy(Linv(i,j), tmpp->Component(i), qp->Component(j));
     }
   }
-  blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-  blas::caxpy_U(AC,*tmpp,*qp); // C is upper triangular, so its inverse is.
 #endif
 
 
@@ -1001,7 +1042,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   blas::copy(*pp, *qp);
 
 #ifdef BLOCKSOLVER_VERBOSE
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::hDotProduct(pTp_raw, pp->Components(), pp->Components());
 #else
   for(int i=0; i<nsrc; i++){
@@ -1020,6 +1061,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   // when we initialized all of the matrices. 
 
   bool just_reliable_updated = false; 
+  cudaProfilerStart();
   while ( !allconverged && k < param.maxiter ) {
     // PUSH_RANGE("Dslash",1)
     //for(int i=0; i<nsrc; i++){
@@ -1038,22 +1080,18 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     }
     PUSH_RANGE("Dslash_sloppy",0)
     // Step 12: Compute Ap.
+#ifdef BLOCKSOLVE_DSLASH5D
     matSloppy(Ap, *pp, tmp_matsloppy, tmp2);
+#else
+    for (int i = 0; i < nsrc; i++)
+      matSloppy(Ap.Component(i), pp->Component(i), tmp_matsloppy.Component(i), tmp2.Component(i));
+#endif
     POP_RANGE
 
     PUSH_RANGE("Reduction",1)
     // Step 13: calculate pAp = P^\dagger Ap
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::hDotProduct_Anorm(pAp_raw, pp->Components(), Ap.Components());
-#if 0
-    // hermiticity check
-    for(int i=0; i<nsrc; i++){
-      for(int j=i; j < nsrc; j++){
-        if ((fabs(pAp(i,j) - conj(pAp(j,i))) / fabs(pAp(i,j))) > 1e-2)
-	  warningQuda("Violated i=%d j=%d %e %e %e %e", i, j, pAp(i,j).real(), pAp(i,j).imag(), pAp(j,i).real(), pAp(j,i).imag());
-      }
-    }
-#endif
 #else
     for(int i=0; i<nsrc; i++){
       for(int j=i; j < nsrc; j++){
@@ -1081,39 +1119,35 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // This step now gets overlapped with the
     // comms in matSloppy. 
 /*
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::caxpy(alpha_raw, *pp, x_sloppy);
 #else
-    // temporary hack using AC
     for(int i = 0; i < nsrc; i++){
       for(int j = 0; j < nsrc; j++){
-        AC[i*nsrc + j] = alpha(i,j);
+        blas::caxpy(alpha(i,j), pp->Component(i), x_sloppy.Component(j));
       }
     }
-    blas::caxpy(AC,*pp,x_sloppy);
 #endif
 */
 
     // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
     // update rSloppy
     PUSH_RANGE("BLAS",2)
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::caxpy(beta_raw, Ap, *qp);
 #else
-    // temporary hack
     for(int i=0; i<nsrc; i++){
       for(int j=0;j<nsrc; j++){
-        AC[i*nsrc + j] = beta(i,j);
+        blas::caxpy(beta(i,j), Ap.Component(i), qp->Component(j));
       }
     }
-    blas::caxpy(AC,Ap,*qp);
 #endif
     POP_RANGE
 
     PUSH_RANGE("Reduction",1)
     // Orthogonalize Q via a thin QR decomposition.
     // Step 18: H = Q^\dagger Q
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::hDotProduct(H_raw, qp->Components(), qp->Components());
 #else
     printfQuda("Iteration %d\n",k);
@@ -1145,19 +1179,25 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   POP_RANGE
   PUSH_RANGE("BLAS",2)
   blas::zero(*tmpp);
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::caxpy_U(Linv_raw, *qp, *tmpp); // tmp is acting as Q.
 #else
-    // temporary hack
     for(int i=0; i<nsrc; i++){
-      for(int j=0;j<nsrc; j++){
-        AC[i*nsrc + j] = Linv(i,j);
+      for(int j=i;j<nsrc; j++){
+        blas::caxpy(Linv(i,j), qp->Component(i), tmpp->Component(j));
       }
     }
-    blas::caxpy_U(AC,*qp,*tmpp); // tmp is acting as Q.
 #endif
     POP_RANGE
+
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     std::swap(qp, tmpp); // now Q actually is Q. tmp is the old Q.
+#else
+    // Technically, this is a 5D function that should
+    // be split into a bunch of 4D functions... but it's
+    // pointer swapping, that gets messy.
+    std::swap(qp, tmpp); // now Q actually is Q. tmp is the old Q.
+#endif
 
     PUSH_RANGE("Eigen",3)
     // Step 22: Back up C (we need to have it if we trigger a reliable update)
@@ -1210,42 +1250,60 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       // to do this X update now.
       // Step 16: update Xsloppy = Xsloppy + P alpha
       PUSH_RANGE("BLAS",1)
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::caxpy(alpha_raw, *pp, x_sloppy);
 #else
-      // temporary hack using AC
       for(int i = 0; i < nsrc; i++){
         for(int j = 0; j < nsrc; j++){
-          AC[i*nsrc + j] = alpha(i,j);
+          blas::caxpy(alpha(i,j), pp->Component(i), x_sloppy.Component(j));
         }
       }
-      blas::caxpy(AC,*pp,x_sloppy);
 #endif
 
       // Reliable updates step 2: Y = Y + X_s
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::xpy(x_sloppy, y);
+#else
+      for (int i = 0; i < nsrc; i++)
+        blas::xpy(x_sloppy.Component(i), y.Component(i));
+#endif
       POP_RANGE
       // Don't do aux work!
       dslash::aux_worker = NULL;
 
       PUSH_RANGE("Dslash",4)
       // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
-      mat(r, y, x);
+#ifdef BLOCKSOLVE_DSLASH5D
+      mat(r, y, x, tmp3);
+#else
+      for (int i = 0; i < nsrc; i++)
+        mat(r.Component(i), y.Component(i), x.Component(i), tmp3.Component(i));
+#endif
       POP_RANGE
       PUSH_RANGE("BLAS",2)
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::xpay(b, -1.0, r);
+#else
+      for (int i = 0; i < nsrc; i++)
+        blas::xpay(b.Component(i), -1.0, r.Component(i));
+#endif
 
       // Reliable updates step 3: X_s = 0.
       // If x.Precision() == x_sloppy.Precision(), they refer
       // to the same pointer under the hood.
       // x gets used as a temporary in mat(r,y,x) above.
       // That's why we need to wait to zero 'x_sloppy' until here.
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::zero(x_sloppy);
+#else
+      for (int i = 0; i < nsrc; i++)
+        blas::zero(x_sloppy.Component(i));
+#endif
       POP_RANGE
       // Reliable updates step 5: H = (R)^\dagger R
       r2avg=0;
       PUSH_RANGE("Reduction",1)
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::hDotProduct(H_raw, r.Components(), r.Components());
       for (int i = 0; i < nsrc; i++)
       {
@@ -1284,19 +1342,19 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       PUSH_RANGE("BLAS",2)
       // Reliable updates step 8: set Q to thin QR decompsition of R.
       blas::zero(*qp);
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
       blas::caxpy_U(Linv_raw,*tmpp,*qp);
 #else
       // temporary hack - use AC to pass matrix arguments to multiblas
       for(int i=0; i<nsrc; i++){
-        for(int j=0;j<nsrc; j++){
-          AC[i*nsrc + j] = Linv(i,j);
+        blas::copy(tmpp->Component(i), r.Component(i));
+        for(int j=i;j<nsrc; j++){
+          blas::caxpy(Linv(i,j), tmpp->Component(i), qp->Component(j));
         }
       }
-      blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-      blas::caxpy_U(AC,*tmpp,*qp); 
 #endif
+
       POP_RANGE
       PUSH_RANGE("Eigen",3)
 
@@ -1330,7 +1388,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
     // Debug print of Q.
 #ifdef BLOCKSOLVER_VERBOSE
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::hDotProduct(pTp_raw, qp->Components(), qp->Components());
 #else
     for(int i=0; i<nsrc; i++){
@@ -1348,25 +1406,29 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // but that's difficult for the same
     // reason a block cax is difficult.
     // Instead, we do it by a caxpyz + pointer swap.
-
-#ifdef BLOCKSOLVER_MULTIREDUCE
     PUSH_RANGE("Eigen",3)
     Sdagger = S.adjoint();
     POP_RANGE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     PUSH_RANGE("BLAS",2)
     if (just_reliable_updated) blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
     else blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
     POP_RANGE
 #else
     PUSH_RANGE("BLAS",2)
-    // temporary hack
+    for (int j = 0; j < nsrc; j++)
+    {
+      blas::copy(tmpp->Component(j), qp->Component(j));
+    }
     for(int i=0; i<nsrc; i++){
-      for(int j=0;j<nsrc; j++){
-        AC[i*nsrc + j] = std::conj(S(j,i));
+      for(int j=0;j<=i; j++){
+        blas::caxpy(Sdagger(i,j), pp->Component(i), tmpp->Component(j));
       }
     }
+
     if (just_reliably_updated) blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
     else blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
+
     POP_RANGE
 #endif
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
@@ -1378,7 +1440,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     {
       // Let's try to explicitly restore Q^\dagger P = I.
       Complex O_raw[nsrc*nsrc];
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       Map<MatrixBCG> O(O_raw, nsrc, nsrc);
       blas::cDotProduct(O_raw, qp->Components(), pp->Components());
 #else
@@ -1393,14 +1455,14 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       printfQuda("Current Q^\\dagger P:\n");
       std::cout << O << "\n";
       
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       O -= MatrixBCG::Identity(nsrc,nsrc);
 #else
       O -= MatrixXcd::Identity(nsrc,nsrc);
 #endif
       O = -O;
       std::cout << "BLAH\n" << O << "\n";
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::caxpy(O_raw, *qp, *pp);
 #else
       // temporary hack
@@ -1413,7 +1475,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       
 
       // Check...
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::cDotProduct(O_raw, qp->Components(), pp->Components());
 #else
       for(int i=0; i<nsrc; i++){
@@ -1430,7 +1492,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
 
 #ifdef BLOCKSOLVER_VERBOSE
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::hDotProduct(pTp_raw, pp->Components(), pp->Components());
 #else
     for(int i=0; i<nsrc; i++){
@@ -1467,25 +1529,35 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   // But remember tmpp holds the old P. 
   if (!just_reliable_updated)
   {
-#ifdef BLOCKSOLVER_MULTIREDUCE
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::caxpy(alpha_raw, *tmpp, x_sloppy);
 #else
     // temporary hack using AC
     for(int i = 0; i < nsrc; i++){
       for(int j = 0; j < nsrc; j++){
-        AC[i*nsrc + j] = alpha(i,j);
+        blas::caxpy(alpha(i,j), tmpp->Component(i), x_sloppy.Component(j));
       }
     }
-    blas::caxpy(AC,*tmpp,x_sloppy);
 #endif
   }
 
   // We've converged!
   // Step 27: Update Xs into Y.
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::xpy(x_sloppy, y);
+#else
+  for (int i = 0; i < nsrc; i++)
+    blas::xpy(x_sloppy.Component(i), y.Component(i));
+#endif
+
 
   // And copy the final answer into X!
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::copy(x, y);
+#else
+  for (int i = 0; i < nsrc; i++)
+    blas::copy(x.Component(i), y.Component(i));
+#endif
 
   profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -1511,7 +1583,12 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   if (param.compute_true_res) {
     // compute the true residuals
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
     mat(r, x, y, tmp3);
+#else
+    for (int i = 0; i < nsrc; i++)
+      mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
+#endif
     for (int i=0; i<nsrc; i++){
       param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
       param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
