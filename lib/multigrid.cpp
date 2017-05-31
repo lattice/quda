@@ -209,6 +209,9 @@ namespace quda {
     sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
     setOutputPrefix(prefix);
 
+    diracResidual = param.matResidual->Expose();
+    diracSmoother = param.matSmooth->Expose();
+    diracSmootherSloppy = param.matSmoothSloppy->Expose();    
     
     destroySmoother();
     createSmoother();
@@ -241,10 +244,6 @@ namespace quda {
       DiracParam diracParam;
       diracParam.transfer = transfer;
 
-      diracResidual = param.matResidual->Expose();
-      diracSmoother = param.matSmooth->Expose();
-      diracSmootherSloppy = param.matSmoothSloppy->Expose();
-        
       diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
       diracParam.kappa = diracParam.dirac->Kappa();
       diracParam.mu = diracParam.dirac->Mu();
@@ -261,8 +260,8 @@ namespace quda {
       diracParam.type = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? QUDA_COARSEPC_DIRAC : QUDA_COARSE_DIRAC;
       diracParam.tmp1 = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? &(tmp_coarse->Even()) : tmp_coarse;
       diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
-      new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
-      new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+        new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
+        new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
       diracCoarseSmootherSloppy = diracCoarseSmoother;  // for coarse grids these always alias for now (FIXME half precision support for coarse op)
 
       matCoarseResidual = new DiracM(*diracCoarseResidual);
