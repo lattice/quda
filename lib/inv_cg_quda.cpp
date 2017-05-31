@@ -1428,22 +1428,28 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     POP_RANGE
 #else
     PUSH_RANGE("BLAS",2)
-    // for (int j = 0; j < nsrc; j++)
-    // {
-    //   blas::copy(tmpp->Component(j), qp->Component(j));
-    // }
-    // for(int i=0; i<nsrc; i++){
-    //   for(int j=0;j<=i; j++){
-    //     blas::caxpy(Sdagger(i,j), pp->Component(i), tmpp->Component(j));
-    //   }
-    // }
-//TODO
-//FIXME: need to make sure this doesn't actually call the multiblas functions
+//FIXME: check whether the implementation without BLOCKSOLVER_MULTIFUNCTIONS is correct
     if (just_reliable_updated) {
-      blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+      // blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+      for (int j = 0; j < nsrc; j++){
+        blas::copy(tmpp->Component(j), qp->Component(j));
+        }
+      for(int i=0; i<nsrc; i++){
+        for(int j=0;j<nsrc; j++){
+          blas::caxpy(Sdagger(i,j), pp->Component(i), tmpp->Component(j));
+        }
+      }
     } 
     else {
-      blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+      // blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+      for (int j = 0; j < nsrc; j++){
+        blas::copy(tmpp->Component(j), qp->Component(j));
+        }
+      for(int i=0; i<nsrc; i++){
+        for(int j=0;j<=i; j++){
+          blas::caxpy(Sdagger(i,j), pp->Component(i), tmpp->Component(j));
+        }
+      }
     }
     POP_RANGE
 #endif
