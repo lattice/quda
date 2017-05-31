@@ -241,7 +241,7 @@ namespace quda {
       DiracParam diracParam;
       diracParam.transfer = transfer;
 
-      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
+      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
       diracParam.kappa = diracParam.dirac->Kappa();
       diracParam.mu = diracParam.dirac->Mu();
       diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
@@ -253,7 +253,7 @@ namespace quda {
       diracCoarseResidual = new DiracCoarse(diracParam);
 
       // create smoothing operators
-      diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
+      diracParam.dirac = const_cast<Dirac*>(diracSmoother);
       diracParam.type = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? QUDA_COARSEPC_DIRAC : QUDA_COARSE_DIRAC;
       diracParam.tmp1 = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? &(tmp_coarse->Even()) : tmp_coarse;
       diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
