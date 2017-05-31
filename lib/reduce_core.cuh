@@ -84,8 +84,8 @@ template <typename doubleN, typename ReduceType, typename FloatN, int M, typenam
 	  typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 doubleN reduceLaunch(ReductionArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> &arg,
 		     const TuneParam &tp, const cudaStream_t &stream) {
-  if (tp.grid.x > REDUCE_MAX_BLOCKS)
-    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
+  if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
   LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,FloatN,M);
 

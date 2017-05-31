@@ -191,8 +191,8 @@ template<typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ,
 			 MultiReduceArg<NXZ,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Reducer> &arg,
 			 const TuneParam &tp, const cudaStream_t &stream) {
 
-  if(tp.grid.x > REDUCE_MAX_BLOCKS)
-    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
+  if(tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
   
   // ESW: this is where the multireduce kernel is called...?
 #ifdef WARP_MULTI_REDUCE

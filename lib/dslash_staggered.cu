@@ -162,9 +162,11 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
 #ifdef SWIZZLE
-      if (param.aux.x < 2*deviceProp.multiProcessorCount) {
-        param.aux.x++;
-	return true;
+      if (dslashParam.kernel_type != INTERIOR_KERNEL) { // only swizzle the halo kernels
+	if (param.aux.x < 2*deviceProp.multiProcessorCount) {
+	  param.aux.x++;
+	  return true;
+	}
       }
 #endif // SWIZZLE
       param.aux.x = 1;

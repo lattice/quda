@@ -1411,7 +1411,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     POP_RANGE
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     PUSH_RANGE("BLAS",2)
-    blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    if (just_reliable_updated) blas::caxpyz(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
+    else blas::caxpyz_L(Sdagger_raw,*pp,*qp,*tmpp); // tmp contains P.
     POP_RANGE
 #else
     PUSH_RANGE("BLAS",2)
@@ -1424,6 +1425,10 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         blas::caxpy(Sdagger(i,j), pp->Component(i), tmpp->Component(j));
       }
     }
+
+    if (just_reliably_updated) blas::caxpyz(AC,*pp,*qp,*tmpp); // tmp contains P.
+    else blas::caxpyz_L(AC,*pp,*qp,*tmpp); // tmp contains P.
+
     POP_RANGE
 #endif
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
