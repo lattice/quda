@@ -224,11 +224,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(reliable_delta, INVALID_DOUBLE);
 #ifdef INIT_PARAM 
   P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
+  P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
   P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
  #else
   P(use_sloppy_partial_accumulator, INVALID_INT);
+  P(solution_accumulator_pipeline, INVALID_INT);
   P(max_res_increase, INVALID_INT);
   P(max_res_increase_total, INVALID_INT);
   P(heavy_quark_check, INVALID_INT);
@@ -493,6 +495,21 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   for (int i=0; i<n_level; i++) {
+#ifdef INIT_PARAM
+    P(verbosity[i], QUDA_SILENT);
+#else
+    P(verbosity[i], QUDA_INVALID_VERBOSITY);
+#endif
+#ifdef INIT_PARAM
+    P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
+#else
+    P(setup_inv_type[i], QUDA_INVALID_INVERTER);
+#endif
+#ifdef INIT_PARAM
+    P(setup_tol[i], 5e-6);
+#else
+    P(setup_tol[i], INVALID_DOUBLE);
+#endif
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
 
@@ -507,6 +524,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
 
+#ifdef INIT_PARAM
+    P(mu_factor[i], 1);
+#else
+    P(mu_factor[i], INVALID_DOUBLE);
+#endif
     P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
     P(global_reduction[i], QUDA_BOOLEAN_YES);

@@ -198,7 +198,6 @@
   }
 
 
-
  template<typename magmaFloat> void magma_heev(void *Mat, const int m, const int ldm, void *evalues)
   {
     cudaPointerAttributes ptr_attr;
@@ -264,7 +263,7 @@
     return;
   }
 
-#endif
+#endif // MAGMA_LIB
 
  void magma_Xgesv(void* sol, const int ldn, const int n, void* Mat, const int ldm, const int prec)
   {
@@ -332,150 +331,6 @@
 #endif
     return;
   }
-
-
-#define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
-    ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
-    : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )
-#define FADDS_GETRF(m_, n_) ( ((m_) < (n_)) \
-    ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_)      ) - (n_)) + (1. / 6.) * (m_)) \
-    : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_)      ) - (m_)) + (1. / 6.) * (n_)) )
-
-#define FLOPS_ZGETRF(m_, n_) (6. * FMULS_GETRF((double)(m_), (double)(n_)) + 2.0 * FADDS_GETRF((double)(m_), (double)(n_)) )
-#define FLOPS_CGETRF(m_, n_) (6. * FMULS_GETRF((double)(m_), (double)(n_)) + 2.0 * FADDS_GETRF((double)(m_), (double)(n_)) )
-
-#define FMULS_GETRI(n_) ( (n_) * ((5. / 6.) + (n_) * ((2. / 3.) * (n_) + 0.5)) )
-#define FADDS_GETRI(n_) ( (n_) * ((5. / 6.) + (n_) * ((2. / 3.) * (n_) - 1.5)) )
-
-#define FLOPS_ZGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
-#define FLOPS_CGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
-
-void magma_batchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch, const int prec)
-{
-#ifdef MAGMA_LIB
-  printfQuda("%s with n=%d and batch=%d\n", __func__, n, batch);
-
-  magma_queue_t queue = 0;
-
-  size_t size = 2*n*n*prec*batch;
-  void *A_d = device_malloc(size);
-  void *Ainv_d = device_malloc(size);
-  qudaMemcpy(A_d, A_h, size, cudaMemcpyHostToDevice);
-
-  magma_int_t **dipiv_array = static_cast<magma_int_t**>(device_malloc(batch*sizeof(magma_int_t*)));
-  magma_int_t *dipiv_tmp = static_cast<magma_int_t*>(device_malloc(batch*n*sizeof(magma_int_t)));
-  magma_iset_pointer(dipiv_array, dipiv_tmp, 1, 0, 0, n, batch, queue);
-
-  magma_int_t *dinfo_array = static_cast<magma_int_t*>(device_malloc(batch*sizeof(magma_int_t)));
-  magma_int_t *info_array = static_cast<magma_int_t*>(safe_malloc(batch*sizeof(magma_int_t)));
-  magma_int_t err;
-
-  // FIXME do this in pipelined fashion to reduce memory overhead.
-  if (prec == 4) {
-    magmaFloatComplex **A_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
-    magmaFloatComplex **Ainv_array = static_cast<magmaFloatComplex**>(device_malloc(batch*sizeof(magmaFloatComplex*)));
-
-    magma_cset_pointer(A_array, static_cast<magmaFloatComplex*>(A_d), n, 0, 0, n*n, batch, queue);
-    magma_cset_pointer(Ainv_array, static_cast<magmaFloatComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
-
-    double magma_time = magma_sync_wtime(queue);
-    err = magma_cgetrf_batched(n, n, A_array, n, dipiv_array, dinfo_array, batch, queue);
-    //err = magma_cgetrf_nopiv_batched(n, n, A_array, n, dinfo_array, batch, queue); (no getri support for nopiv?)
-    magma_time = magma_sync_wtime(queue) - magma_time;
-    printfQuda("LU factorization completed in %f seconds with GFLOPS = %f\n",
-	       magma_time, 1e-9 * batch * FLOPS_CGETRF(n,n) / magma_time);
-
-    if(err != 0) errorQuda("\nError in LU decomposition (magma_cgetrf), error code = %d\n", err);
-
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
-    for (int i=0; i<batch; i++) {
-      if (info_array[i] < 0) {
-	errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
-      } else if (info_array[i] > 0) {
-	errorQuda("%d factorization completed but the factor U is exactly singular", i);
-      }
-    }
-
-    magma_time = magma_sync_wtime(queue);
-    err = magma_cgetri_outofplace_batched(n, A_array, n, dipiv_array, Ainv_array, n, dinfo_array, batch, queue);
-    magma_time = magma_sync_wtime(queue) - magma_time;
-    printfQuda("Matrix inversion completed in %f seconds with GFLOPS = %f\n",
-	       magma_time, 1e-9 * batch * FLOPS_CGETRI(n) / magma_time);
-
-    if(err != 0) errorQuda("\nError in matrix inversion (magma_cgetri), error code = %d\n", err);
-
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
-
-    for (int i=0; i<batch; i++) {
-      if (info_array[i] < 0) {
-	errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
-      } else if (info_array[i] > 0) {
-	errorQuda("%d factorization completed but the factor U is exactly singular", i);
-      }
-    }
-
-    device_free(Ainv_array);
-    device_free(A_array);
-  } else if (prec == 8) {
-    magmaDoubleComplex **A_array    = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
-    magmaDoubleComplex **Ainv_array = static_cast<magmaDoubleComplex**>(device_malloc(batch*sizeof(magmaDoubleComplex*)));
-
-    magma_zset_pointer(A_array, static_cast<magmaDoubleComplex*>(A_d), n, 0, 0, n*n, batch, queue);
-    magma_zset_pointer(Ainv_array, static_cast<magmaDoubleComplex*>(Ainv_d), n, 0, 0, n*n, batch, queue);
-
-    double magma_time = magma_sync_wtime(queue);
-    err = magma_zgetrf_batched(n, n, A_array, n, dipiv_array, dinfo_array, batch, queue);
-    magma_time = magma_sync_wtime(queue) - magma_time;
-    printfQuda("LU factorization completed in %f seconds with GFLOPS = %f\n",
-	       magma_time, 1e-9 * batch * FLOPS_ZGETRF(n,n) / magma_time);
-
-    if(err != 0) errorQuda("\nError in LU decomposition (magma_zgetrf), error code = %d\n", err);
-
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
-    for (int i=0; i<batch; i++) {
-      if (info_array[i] < 0) {
-	errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
-      } else if (info_array[i] > 0) {
-	errorQuda("%d factorization completed but the factor U is exactly singular", i);
-      }
-    }
-
-    magma_time = magma_sync_wtime(queue);
-    err = magma_zgetri_outofplace_batched(n, A_array, n, dipiv_array, Ainv_array, n, dinfo_array, batch, queue);
-    magma_time = magma_sync_wtime(queue) - magma_time;
-    printfQuda("Matrix inversion completed in %f seconds with GFLOPS = %f\n",
-	       magma_time, 1e-9 * batch * FLOPS_ZGETRI(n) / magma_time);
-
-    if(err != 0) errorQuda("\nError in matrix inversion (magma_cgetri), error code = %d\n", err);
-
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
-
-    for (int i=0; i<batch; i++) {
-      if (info_array[i] < 0) {
-	errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
-      } else if (info_array[i] > 0) {
-	errorQuda("%d factorization completed but the factor U is exactly singular", i);
-      }
-    }
-
-    device_free(Ainv_array);
-    device_free(A_array);
-  } else {
-    errorQuda("%s not implemented for precision=%d", __func__, prec);
-  }
-
-  qudaMemcpy(Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);
-
-  device_free(dipiv_tmp);
-  device_free(dipiv_array);
-  device_free(dinfo_array);
-  host_free(info_array);
-  device_free(Ainv_d);
-  device_free(A_d);
-
-#endif
-  return;
-}
 
 
 #ifdef MAGMA_LIB

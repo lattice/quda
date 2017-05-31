@@ -110,38 +110,23 @@ namespace quda {
          Complex *s  = new Complex[2*k];
          for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
 
-         const int cdot_pipeline_length  = 5;
-         int offset = 0;
+	 std::vector<ColorSpinorField*> w_;
+	 w_.push_back(w);
 
-         do {
-           const int local_length = (2*k - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (2*k - offset) ;
+	 std::vector<ColorSpinorField*> v_(v->Components().begin(), v->Components().begin()+2*k);
 
-           std::vector<cudaColorSpinorField*> v_;
-           std::vector<cudaColorSpinorField*> w_;
-           v_.reserve(local_length);
-           w_.reserve(local_length);
+	 blas::cDotProduct(s, w_, v_);
 
-           for(int i = 0; i < local_length; i++)
-           {
-             v_.push_back(static_cast<cudaColorSpinorField*>(&v->Component(offset+i)));
-             w_.push_back(static_cast<cudaColorSpinorField*>(w));
-           }
-           //Warning! this won't work with arbitrary (big) param.cur_dim. That's why pipelining is needed.
-           blas::cDotProduct(&s[offset], w_, v_);//<i, b>
-           offset += cdot_pipeline_length;
+	 Map<VectorXcd, Unaligned > s_(s, 2*k);
+	 s_ *= inv_sqrt_r2;
 
-         } while (offset < 2*k);
+	 Tm.col(2*k).segment(0, 2*k) = s_;
+	 Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
 
-        Map<VectorXcd, Unaligned > s_(s, 2*k);
-        s_ *= inv_sqrt_r2;
+	 delete [] s;
 
-        Tm.col(2*k).segment(0, 2*k) = s_;
-        Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
-
-        delete [] s;
-
-        return;
-      }
+	 return;
+       }
 #endif
    };
 #ifdef DEFLATEDSOLVER

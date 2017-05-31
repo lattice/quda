@@ -4,7 +4,7 @@ namespace mixed {
      Driver for generic blas routine with four loads and two store.
   */
   template <int NXZ, template < int MXZ, typename Float, typename FloatN> class Functor,
-    int writeX, int writeY, int writeZ, int writeW, typename T>
+    typename write, typename T>
     void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
 		       CompositeColorSpinorField &x, CompositeColorSpinorField &y,
 		       CompositeColorSpinorField &z, CompositeColorSpinorField &w) {
@@ -16,14 +16,14 @@ namespace mixed {
 	  if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	    const int M = 12;
-	    multiblasCuda<NXZ,double2,float4,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	    multiblasCuda<NXZ,double2,float4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	    errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
 	  } else if (x[0]->Nspin() == 1) {
 #if defined(GPU_STAGGERED_DIRAC)
 	    const int M = 3;
-	    multiblasCuda<NXZ,double2,float2,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	    multiblasCuda<NXZ,double2,float2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	    errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
@@ -34,14 +34,14 @@ namespace mixed {
 	if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	  const int M = 12;
-	  multiblasCuda<NXZ,double2,short4,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	  multiblasCuda<NXZ,double2,short4,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	  errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
 	} else if (x[0]->Nspin() == 1) {
 #if defined(GPU_STAGGERED_DIRAC)
 	  const int M = 3;
-	  multiblasCuda<NXZ,double2,short2,double2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	  multiblasCuda<NXZ,double2,short2,double2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	  errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
@@ -52,7 +52,7 @@ namespace mixed {
 	if (x[0]->Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	  const int M = 6;
-	  multiblasCuda<NXZ,float4,short4,float4,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	  multiblasCuda<NXZ,float4,short4,float4,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	  errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
@@ -61,7 +61,7 @@ namespace mixed {
 
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
 	  const int M = 3;
-	  multiblasCuda<NXZ,float2,short2,float2,M,Functor,writeX,writeY,writeZ,writeW>(a,b,c,x,y,z,w,x[0]->Volume());
+	  multiblasCuda<NXZ,float2,short2,float2,M,Functor,write>(a,b,c,x,y,z,w,x[0]->Volume());
 #else
 	  errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif

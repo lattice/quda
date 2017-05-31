@@ -62,6 +62,13 @@ if(QUDA_MULTIGRID)
   cuda_add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
+
+  if(${QUDA_GAUGE_ALG})
+    cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+    target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
+    QUDA_CHECKBUILDTEST(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
+endif()
+
 endif()
 
 cuda_add_executable(su3_test su3_test.cpp)

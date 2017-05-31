@@ -214,13 +214,6 @@ AC_ARG_ENABLE(gpu-direct,
   [ gpu_direct="yes" ]
 )
 
-dnl enable direct cuda-nic communication
-AC_ARG_ENABLE(gpu-comms,
-  AC_HELP_STRING([--enable-gpu-comms], [ Enable direct CUDA-NIC communication (experimental, default: disabled)]),
-  [ gpu_comms=${enableval}],
-  [ gpu_comms="no" ]
-)
-
 dnl enable NVTX mark up for the MPI in the visual profiler
 AC_ARG_ENABLE(mpi-nvtx,
   AC_HELP_STRING([--enable-mpi-nvtx], [ Enable NVTX markup for profiling MPI API calls in the visual profiler (default: disabled)]),
@@ -611,14 +604,6 @@ yes|no);;
   ;;
 esac
 
-dnl Enables direct CUDA-NIC communication
-case ${gpu_comms} in
-yes|no);;
-*)
-  AC_MSG_ERROR([ invalid value for --enable-gpu-comms ])
-  ;;
-esac
-
 dnl enable NVTX mark up for the MPI in the visual profiler
 case ${mpi_nvtx} in
 yes|no);;
@@ -804,9 +789,6 @@ AC_SUBST( POSIX_THREADS, [${posix_threads}])
 
 AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
 AC_SUBST( GPU_DIRECT, [${gpu_direct}])
-
-AC_MSG_NOTICE([Setting GPU_COMMS= ${gpu_comms}])
-AC_SUBST( GPU_COMMS, [${gpu_comms}])
 
 AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
 AC_SUBST( MPI_NVTX, [${mpi_nvtx}])

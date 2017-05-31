@@ -15,8 +15,6 @@
  */
 
 namespace quda {
-  /** The maximum number of faces that can be exchanged */
-  const int maxNface = 3;
   
   // LatticeField is an abstract base clase for all Field objects.
 
@@ -153,6 +151,9 @@ namespace quda {
     /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset;
 
+    /** Type of ghost exchange to perform */
+    QudaGhostExchange ghostExchange;
+
     /** Pinned-memory buffer that is used by all derived classes */
     static void *bufferPinned[2]; 
 
@@ -180,7 +181,6 @@ namespace quda {
     /** Resize the device-memory buffer */
     void resizeBufferDevice(size_t bytes) const;
 
-
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
 
     /** The number of dimensions we partition for communication */
@@ -192,42 +192,127 @@ namespace quda {
        faces we can send.
     */
 
-    /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *my_face[2];
-    void *my_face_d[2]; // mapped version of the above
-    void *my_fwd_face[2][QUDA_MAX_DIM];
-    void *my_back_face[2][QUDA_MAX_DIM];
+    /**
+       Double buffered static GPU halo send buffer
+    */
+    static void *ghost_send_buffer_d[2];
 
-    /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *from_face[2];
-    void *from_face_d[2]; // mapped version of the above
-    void *from_back_face[2][QUDA_MAX_DIM];
-    void *from_fwd_face[2][QUDA_MAX_DIM];
+    /**
+       Double buffered static GPU halo receive buffer
+     */
+    static void *ghost_recv_buffer_d[2];
+
+    /**
+       Double buffered static pinned send/recv buffers
+    */
+    static void *ghost_pinned_buffer_h[2];
+
+    /**
+       Mapped version of ghost_pinned
+    */
+    static void *ghost_pinned_buffer_hd[2];
+
+    /**
+       Remove ghost pointer for sending to
+    */
+    static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
+
+    /** Pinned memory buffer used for sending all messages */
+    void *my_face_h[2];
+    /** Mapped version of my_face_h */
+    void *my_face_hd[2];
+
+    /** Local pointers to the pinned my_face buffer */
+    void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+
+    /** Local pointers to the mapped my_face buffer */
+    void *my_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
+
+    /** Local pointers to the device ghost_send buffer */
+    void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
+
+    /** Memory buffer used for receiving all messages */
+    void *from_face_h[2];
+    /** Mapped version of from_face_h */
+    void *from_face_hd[2];
+
+    /** Local pointers to the pinned from_face buffer */
+    void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+
+    /** Local pointers to the mapped from_face buffer */
+    void *from_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
+
+    /** Local pointers to the device ghost_recv buffer */
+    void *from_face_dim_dir_d[2][QUDA_MAX_DIM][2];
     
     /** Message handles for receiving from forwards */
-    MsgHandle ***mh_recv_fwd[2];
+    MsgHandle *mh_recv_fwd[2][QUDA_MAX_DIM];
 
     /** Message handles for receiving from backwards */
-    MsgHandle ***mh_recv_back[2];
+    MsgHandle *mh_recv_back[2][QUDA_MAX_DIM];
 
     /** Message handles for sending forwards */
-    MsgHandle ***mh_send_fwd[2];
+    MsgHandle *mh_send_fwd[2][QUDA_MAX_DIM];
 
     /** Message handles for sending backwards */
-    MsgHandle ***mh_send_back[2];
-    
+    MsgHandle *mh_send_back[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma receiving from forwards */
+    MsgHandle *mh_recv_rdma_fwd[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma receiving from backwards */
+    MsgHandle *mh_recv_rdma_back[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma sending to forwards */
+    MsgHandle *mh_send_rdma_fwd[2][QUDA_MAX_DIM];
+
+    /** Message handles for rdma sending to backwards */
+    MsgHandle *mh_send_rdma_back[2][QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
+
+    /** Local copy of event used for peer-to-peer synchronization */
+    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+
+    /** Remote copy of event used for peer-to-peer synchronization */
+    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+
+    /** Whether we have initialized communication for this field */
+    bool initComms;
+
+    /** Whether we have initialized peer-to-peer communication */
+    static bool initIPCComms;
+
     /** Used as a label in the autotuner */
     char vol_string[TuneKey::volume_n];
     
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
 
-    /**
-       The type of allocation we are going to do for this field */
+    /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
-
-    /** Type of ghost exchange to perform */
-    QudaGhostExchange ghostExchange;
 
   public:
 
@@ -238,6 +323,13 @@ namespace quda {
     LatticeField(const LatticeFieldParam &param);
 
     /**
+       Constructor for creating a LatticeField from another LatticeField
+       @param field Instance of LatticeField from which we are
+       inheriting metadata
+    */
+    LatticeField(const LatticeField &field);
+
+    /**
        Destructor for LatticeField
     */
     virtual ~LatticeField();
@@ -246,6 +338,41 @@ namespace quda {
        Free the pinned-memory buffer
     */
     static void freeBuffer(int index=0);
+
+    /**
+       Create the inter-process communication handlers
+    */
+    void createIPCComms();
+
+    /**
+       Destroy the statically allocated inter-process communication handlers
+    */
+    static void destroyIPCComms();
+
+    /**
+       Helper function to determine if local-to-remote (send) peer-to-peer copy is complete
+    */
+    inline bool ipcCopyComplete(int dir, int dim);
+
+    /**
+       Helper function to determine if local-to-remote (receive) peer-to-peer copy is complete
+    */
+    inline bool ipcRemoteCopyComplete(int dir, int dim);
+
+    /**
+       Handle to remote copy event used for peer-to-peer synchronization
+    */
+    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+
+    /**
+       Static variable that is determined which ghost buffer we are using
+     */
+    static int bufferIndex;
+
+    /**
+       Bool which is triggered if the ghost field is reset
+    */
+    static bool ghost_field_reset;
 
     /**
        @return The dimension of the lattice 
@@ -329,48 +456,43 @@ namespace quda {
        @return The total storage allocated
     */
     size_t GBytes() const { return total_bytes / (1<<30); }
-    
+
     /**
        Check that the metadata of *this and a are compatible
        @param a The LatticeField to which we are comparing
     */
     void checkField(const LatticeField &a) const;
-    
+
     /**
        Read in the field specified by filenemae
        @param filename The name of the file to read
     */
     virtual void read(char *filename);
-    
+
     /**
        Write the field in the file specified by filename
        @param filename The name of the file to write
     */
     virtual void write(char *filename);
     
-    virtual void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
-		      double a=0, double b=0)
-    { errorQuda("Not implemented"); }
-
     virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL)
+    virtual void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
     { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL)
+    virtual int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL)
+    virtual void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)
     { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
-    const char *VolString() const { return vol_string; }
+    inline const char *VolString() const { return vol_string; }
   };
-  
   
   /**
      @brief Helper function for determining if the location of the fields is the same.
@@ -381,7 +503,7 @@ namespace quda {
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b) {
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations do not match");
+    else errorQuda("Locations %d %d do not match", a.Location(), b.Location());
     return location;
   }
 
@@ -395,6 +517,31 @@ namespace quda {
   template <typename... Args>
   inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b, const Args &... args) {
     return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,args...));
+  }
+
+  /**
+     @brief Helper function for determining if the precision of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If precision is unique return the precision
+   */
+  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b) {
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
+    if (a.Precision() == b.Precision()) precision = a.Precision();
+    else errorQuda("Precisions %d %d do not match", a.Precision(), b.Precision());
+    return precision;
+  }
+
+  /**
+     @brief Helper function for determining if the precision of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check precision on
+     @return If precision is unique return the precision
+   */
+  template <typename... Args>
+  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b, const Args &... args) {
+    return static_cast<QudaPrecision>(Precision(a,b) & Precision(a,args...));
   }
 
   /**
