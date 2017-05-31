@@ -550,6 +550,11 @@ namespace quda {
 
 #elif defined(BLOCKSOLVER)
   using Eigen::MatrixXcd;
+  // temporary workaround
+  // using Eigen::Matrix;
+  // using Eigen::Map;
+    // using Eigen::RowMajor;
+  // using Eigen::Dynamic; 
 #endif
 
 // Matrix printing functions
@@ -907,10 +912,17 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   MatrixXcd C = MatrixXcd::Zero(nsrc,nsrc);
   MatrixXcd C_old = MatrixXcd::Zero(nsrc,nsrc);
   MatrixXcd S = MatrixXcd::Identity(nsrc,nsrc); // Step 10: S = I
-  MatrixXcd Sdagger = MatrixXcd::Identity(nsrc,nsrc);
-  MatrixXcd L = MatrixXcd::Zero(nsrc, nsrc);
+   MatrixXcd L = MatrixXcd::Zero(nsrc, nsrc);
   MatrixXcd Linv = MatrixXcd::Zero(nsrc, nsrc);
   MatrixXcd pAp = MatrixXcd::Identity(nsrc,nsrc);
+
+// temporary workaround
+   // MatrixXcd Sdagger = MatrixXcd::Identity(nsrc,nsrc);
+   Complex Sdagger_raw[nsrc*nsrc];
+
+   typedef Eigen::Matrix<Complex, nsrc, nsrc, Eigen::RowMajor> MatrixBCG;
+   Eigen::Map<MatrixBCG> Sdagger(Sdagger_raw, nsrc, nsrc);
+   
 
   #ifdef BLOCKSOLVER_VERBOSE
   MatrixXcd pTp =  MatrixXcd::Identity(nsrc,nsrc);
