@@ -5504,21 +5504,23 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  if (gaugeSmeared == NULL) {
+  cudaGaugeField *precise = NULL;
+  
+  if (gaugeSmeared != NULL) {
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Wuppertal smearing done with gaugeSmeared\n");
     GaugeFieldParam gParam(*gaugePrecise);
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
-    for(int dir=0; dir<4; ++dir) {
-      gParam.x[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
-      gParam.r[dir] = R[dir];
-    }
-
-    gaugeSmeared = new cudaGaugeField(gParam);
-
-    copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    precise = new cudaGaugeField(gParam);
+    copyExtendedGauge(*precise, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    precise->exchangeGhost();
+  } else {
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Wuppertal smearing done with gaugePrecise\n");
+    precise = gaugePrecise;
   }
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 0, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), 0, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
@@ -5536,7 +5538,11 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
 
   for (unsigned int i=0; i<nSteps; i++) {
     if(i) in = out;
-    wuppertalStep(out, in, parity, *gaugeSmeared, alpha);
+    wuppertalStep(out, in, parity, *precise, alpha);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      double norm = blas::norm2(out);
+      printfQuda("Step %d, vector norm %e\n", i, norm);
+    }
   }
 
   cpuParam.v = h_out;
@@ -5549,6 +5555,9 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
     double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
+
+  if (gaugeSmeared != NULL)
+    delete precise;
 
   delete out_h;
   delete in_h;
