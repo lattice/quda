@@ -109,11 +109,11 @@ if(QUDA_QIO)
 endif()
 
 if(QUDA_QDPJIT)
-  target_link_libraries(quda ${QDP_LIB} ${QIO_LIB} ${LIME_LIB} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda ${QDP_LIB} ${QIO_LIB} ${LIME_LIB} ${QMP_LIB} ${QMP_LDFLAGS} ${QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
-  target_link_libraries(quda ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda ${QMP_LIB} ${QMP_LDFLAGS} ${QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MPI)
