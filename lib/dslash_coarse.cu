@@ -1001,7 +1001,7 @@ namespace quda {
       strcat(aux,comm_dim_partitioned_string());
 
       int comm_sum = 4;
-      if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-dslash.commDim[i]);
+      if (dslash.commDim) for (int i=0; i<4; i++) comm_sum -= (1-dslash.commDim[i]);
       strcat(aux, comm_sum ? ",full" : ",interior");
 
       if (!dslash_init) {
