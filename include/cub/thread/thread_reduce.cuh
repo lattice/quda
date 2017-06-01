@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -61,7 +61,7 @@ __device__ __forceinline__ T ThreadReduce(
     T*                  input,                  ///< [in] Input array
     ReductionOp         reduction_op,           ///< [in] Binary reduction operator
     T                   prefix,                 ///< [in] Prefix to seed reduction with
-    Int2Type<LENGTH>    length)
+    Int2Type<LENGTH>    /*length*/)
 {
     T addend = *input;
     prefix = reduction_op(prefix, addend);
@@ -73,10 +73,10 @@ template <
     typename    T,
     typename    ReductionOp>
 __device__ __forceinline__ T ThreadReduce(
-    T*                  input,                  ///< [in] Input array
-    ReductionOp         reduction_op,           ///< [in] Binary reduction operator
+    T*                  /*input*/,              ///< [in] Input array
+    ReductionOp         /*reduction_op*/,       ///< [in] Binary reduction operator
     T                   prefix,                 ///< [in] Prefix to seed reduction with
-    Int2Type<0>         length)
+    Int2Type<0>         /*length*/)
 {
     return prefix;
 }

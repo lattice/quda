@@ -362,7 +362,7 @@ struct coeff_array {
 
 
 
-template <typename doubleN, typename ReduceType, typename RegType, typename StoreType,
+template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename yType,
 	  int M, int NXZ, template <int MXZ, typename ReducerType, typename Float, typename FloatN> class Reducer, typename write, typename T>
   void multiReduceCuda(doubleN result[], const reduce::coeff_array<T> &a, const reduce::coeff_array<T> &b, const reduce::coeff_array<T> &c,
 			  std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
@@ -377,7 +377,7 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
   const int N_MAX = NXZ > NYW ? NXZ : NYW;
   const int N_MIN = NXZ < NYW ? NXZ : NYW;
 
-  static_assert(MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N <= QUDA_MAX_MULTI_REDUCE, "MAX_MULTI_BLAS_N^2 exceeds maximum number of reduction");
+  static_assert(MAX_MULTI_BLAS_N*MAX_MULTI_BLAS_N <= QUDA_MAX_MULTI_REDUCE, "MAX_MULTI_BLAS_N^2 exceeds maximum number of reductions");
   static_assert(MAX_MULTI_BLAS_N <= 16, "MAX_MULTI_BLAS_N exceeds maximum size 16");
   if (N_MAX > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N_MAX, MAX_MULTI_BLAS_N);
 
@@ -433,9 +433,13 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
 
   blasStrings.vol_str = x[0]->VolString();
   strcpy(blasStrings.aux_tmp, x[0]->AuxString());
+  if (typeid(StoreType) != typeid(yType)) {
+    strcat(blasStrings.aux_tmp, ",");
+    strcat(blasStrings.aux_tmp, y[0]->AuxString());
+  }
 
   multi::SpinorTexture<RegType,StoreType,M,0> X[NXZ];
-  multi::Spinor<RegType,StoreType,M,write::Y,1> Y[MAX_MULTI_BLAS_N];
+  multi::Spinor<RegType,yType,M,write::Y,1> Y[MAX_MULTI_BLAS_N];
   multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
   multi::Spinor<RegType,StoreType,M,write::W,3> W[MAX_MULTI_BLAS_N];
 
@@ -465,7 +469,7 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
 
   MultiReduceCuda<NXZ,doubleN,ReduceType,RegType,M,
 		  multi::SpinorTexture<RegType,StoreType,M,0>,
-		  multi::Spinor<RegType,StoreType,M,write::Y,1>,
+		  multi::Spinor<RegType,yType,M,write::Y,1>,
 		  multi::SpinorTexture<RegType,StoreType,M,2>,
 		  multi::Spinor<RegType,StoreType,M,write::W,3>,
 		  decltype(r) >

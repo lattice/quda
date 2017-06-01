@@ -31,6 +31,11 @@ namespace quda {
     void *preconditioner;
 
     /**
+     * Deflation operator
+     */
+    void *deflation_op;
+
+    /**
      * Whether to use the L2 relative residual, L2 absolute residual
      * or Fermilab heavy-quark residual, or combinations therein to
      * determine convergence.  To require that multiple stopping
@@ -52,6 +57,16 @@ namespace quda {
 
     /**< Whether to keep the partial solution accumulator in sloppy precision */
     bool use_sloppy_partial_accumulator;
+
+    /**< This parameter determines how often we accumulate into the
+       solution vector from the direction vectors in the solver.
+       E.g., running with solution_accumulator_pipeline = 4, means we
+       will update the solution vector every four iterations using the
+       direction vectors from the prior four iterations.  This
+       increases performance of mixed-precision solvers since it means
+       less high-precision vector round-trip memory travel, but
+       requires more low-precision memory allocation. */
+    int solution_accumulator_pipeline;
 
     /**< This parameter determines how many consective reliable update
     residual increases we tolerate before terminating the solver,
@@ -200,10 +215,11 @@ namespace quda {
        @param param The QudaInvertParam instance from which the values are copied
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
-      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO), delta(param.reliable_delta),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
@@ -229,19 +245,16 @@ namespace quda {
 	tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
-        m = (m / 16) * 16 + 16;
-        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
-      }
       if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
     }
 
     SolverParam(const SolverParam &param) : inv_type(param.inv_type),
-      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner), deflation_op(param.deflation_op),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
       heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
@@ -395,6 +408,7 @@ namespace quda {
     const DiracMatrix &matSloppy;
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *App, *tmpp;
+    std::vector<ColorSpinorField*> p;
 #ifdef BLOCKSOLVER
     ColorSpinorField *x_sloppy_savedp, *pp, *qp, *tmp_matsloppyp;
 #endif
@@ -411,6 +425,36 @@ namespace quda {
     void solve(ColorSpinorField& out, ColorSpinorField& in);
 
     int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+  };
+
+  class CGNE : public CG {
+
+  private:
+    DiracMMdag mmdag;
+    DiracMMdag mmdagSloppy;
+    ColorSpinorField *xp;
+    bool init;
+
+  public:
+    CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CGNE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class CGNR : public CG {
+
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    ColorSpinorField *bp;
+    bool init;
+
+  public:
+    CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    virtual ~CGNR();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
 
@@ -440,12 +484,41 @@ namespace quda {
       Solver *K;
       SolverParam Kparam; // parameters for preconditioner solve
 
+      int nKrylov;//corresponds to m_{max}+1, if nKrylov = 0 , use standard pcg
+      double *pAp;
+  
+      std::vector<ColorSpinorField*> p;  // FCG search vectors
+      std::vector<ColorSpinorField*> Ap; // mat * search vectors
+
+      /**
+       Solver uses lazy allocation: this flag to determine whether we have allocated.
+      */
+      bool init;
+      bool use_ipcg_iters;//which algorithm to use:  (true & K) => ipcg, (false & K) => fcg, !K => regilar CG
+
+      ColorSpinorField *rp;       //! residual vector
+      ColorSpinorField *yp;       //! high precision accumulator
+      ColorSpinorField *tmpp;     //! temporary for mat-vec
+      ColorSpinorField *x_sloppy; //! sloppy solution vector
+      ColorSpinorField *r_sloppy; //! sloppy residual vector
+      ColorSpinorField *r_pre;    //! residual passed to preconditioner
+      ColorSpinorField *p_pre;    //! preconditioner result
+      ColorSpinorField *wp;       //! preconditioner result in sloppy precision
+
     public:
-      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-               SolverParam &param, TimeProfile &profile);
+      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      /**
+        @param K Preconditioner
+      */
+      PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+
       virtual ~PreconCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
+      //optimization methods:
+      void ComputeBeta(double *beta, int begin, int size);
+      void UpdateP(double *beta, int begin, int j, int size);
+      void orthoDir(int mk, int j, int pipeline); 
   };
 
 
@@ -771,169 +844,104 @@ namespace quda {
 		    std::vector<ColorSpinorField*> q);
   };
 
-  class DeflatedSolver {
+  using ColorSpinorFieldSet = ColorSpinorField;
 
-  protected:
-    SolverParam &param;
-    TimeProfile *profile;
+  //forward declaration
+  class EigCGArgs;
 
-    //WARNING: eigcg_precision may not coinside with param.precision and param.precision_sloppy (both used for the initCG).
-    //
-    QudaPrecision eigcg_precision;//may be double or single.
-
-  public:
-    DeflatedSolver(SolverParam &param, TimeProfile *profile) : param(param), profile(profile)
-    {
-       eigcg_precision = param.precision_sloppy;//for mixed presicion use param.precision_sloppy
-    }
-
-    virtual ~DeflatedSolver() { ; }
-
-    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
-
-//    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
-    virtual void StoreRitzVecs(void *host_buffer, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
-
-    virtual void CleanResources() = 0;
-
-    // solver factory
-    static DeflatedSolver* create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile);
-
-    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
-		     const double &hq_tol);
-
-    /**
-       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
-     */
-    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
-
-    /**
-	Prints out the summary of the solver convergence (requires a
-	versbosity of QUDA_SUMMARIZE).  Assumes
-	SolverParam.true_res and SolverParam.true_res_hq has
-	been set
-    */
-    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
-
-  };
-
-  struct DeflationParam;//Forward declaration
-  typedef cudaColorSpinorField cudaColorSpinorFieldSet;
-
-  class IncEigCG : public DeflatedSolver {
+  class IncEigCG : public Solver {
 
   private:
-    DiracMatrix *mat;
-    DiracMatrix *matSloppy;
+    DiracMatrix &mat;
+    DiracMatrix &matSloppy;
+    DiracMatrix &matPrecon;
 
-    DiracMatrix *matCGSloppy;
+    Solver *K;
+    SolverParam Kparam; // parameters for preconditioner solve
 
-    const DiracMatrix *matDefl;
+    ColorSpinorFieldSet *Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
-    QudaPrecision search_space_prec;
-    cudaColorSpinorFieldSet *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
+    ColorSpinorField *rp;       //! residual vector
+    ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField* p;  // conjugate vector
+    ColorSpinorField* Ap; // mat * conjugate vector
+    ColorSpinorField *tmpp;     //! temporary for mat-vec
+    ColorSpinorField* Az; // mat * conjugate vector from the previous iteration 
+    ColorSpinorField *r_pre;    //! residual passed to preconditioner
+    ColorSpinorField *p_pre;    //! preconditioner result
 
-    SolverParam initCGparam; // parameters for initCG solver
-    TimeProfile *profile;    //time profile for initCG solver
+    EigCGArgs *eigcg_args;
 
-    bool eigcg_alloc;
-    bool use_eigcg;
+    TimeProfile &profile;    //time profile for initCG solver
+
+    bool init;
 
   public:
 
-    IncEigCG(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
-    IncEigCG(SolverParam &param);
+    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
 
-    //EigCG solver
-    int EigCG(cudaColorSpinorField &out, cudaColorSpinorField &in);
-
+    void RestartVT(const double beta, const double rho);
+    void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2); 
+    //EigCG solver:
+    int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    //InitCG solver:
+    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver (for eigcg and initcg calls)
-    void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
-
-    //Compute  u dH^{-1} u^{dagger}b:
-    void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
-    //
-    void DeflateSpinorReduced(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
-
-    //Deflation space management
-    void CreateDeflationSpace(cudaColorSpinorField &eigcgSpinor, DeflationParam *&param);
-
-    //extend projection matrix:
-    //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
-    //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
-    //extend H-matrix with the components
-    void ExpandDeflationSpace(DeflationParam *param, const int new_nev);
-    //
-    void DeleteDeflationSpace(DeflationParam *&param);
-    //
-    void DeleteEigCGSearchSpace();
-    //
-    void SaveEigCGRitzVecs(DeflationParam *param, bool cleanResources = false);
-    //
-    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
-    //
-    void CleanResources();
-
-    void LoadEigenvectors(DeflationParam *param, int max_nevs, double tol = 1e-3);
-
-    void ReportEigenvalueAccuracy(DeflationParam *param, int nevs_to_print);
-
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
 //forward declaration
- struct GMResDRDeflationParam;
  class GMResDRArgs;
 
- class GMResDR : public DeflatedSolver {
+ class GMResDR : public Solver {
 
   private:
 
-    DiracMatrix *mat;
+    DiracMatrix &mat;
+    DiracMatrix &matSloppy;
+    DiracMatrix &matPrecon;
 
-    DiracMatrix *matSloppy;
+    Solver *K;
+    SolverParam Kparam; // parameters for preconditioner solve
 
-    const DiracMatrix *matDefl;
+    ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Zm;//arnoldi basis vectors, size (m+1)
 
-    QudaPrecision gmres_space_prec;
+    ColorSpinorField *rp;       //! residual vector
+    ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField *tmpp;     //! temporary for mat-vec
+    ColorSpinorField *r_sloppy; //! sloppy residual vector
+    ColorSpinorField *r_pre;    //! residual passed to preconditioner
+    ColorSpinorField *p_pre;    //! preconditioner result
 
-    cudaColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
+    TimeProfile &profile;    //time profile for initCG solver
 
-    TimeProfile *profile;    //time profile for initCG solver
+    GMResDRArgs *gmresdr_args;
 
-    GMResDRArgs *args;
-
-    bool gmres_alloc;
+    bool init;
 
   public:
 
-    GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
-    GMResDR(SolverParam &param);
+    GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    GMResDR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~GMResDR();
 
     //GMRES-DR solver
-    //void   GmresDRCycle(cudaColorSpinorField &out, cudaColorSpinorField &in, Complex *u);
-    double GMResDRCycle(cudaColorSpinorField &x, double r2, Complex *u, const double stop);
-    //GMRES-DR solver
-    void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
     //
-    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
-    //
-    void CleanResources();
-    //
-    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method
-    void RunDeflatedCycles (cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
+    void RunDeflatedCycles (ColorSpinorField *out, ColorSpinorField *in, const double tol_threshold);
     //
-    void RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
+    int FlexArnoldiProcedure (const int start_idx, const bool do_givens);
 
-    void AllocateKrylovSubspace(ColorSpinorParam &csParam);
+    void RestartVZH();
+
+    void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
 
   };
-
-
 
 } // namespace quda
 

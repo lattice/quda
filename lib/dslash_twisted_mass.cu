@@ -120,6 +120,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
+      // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+      dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
+      dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+
 #ifdef SHARED_WILSON_DSLASH
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
@@ -173,7 +177,7 @@ namespace quda {
 			     const double &k,  const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(1);
+    inSpinor->createComms(1);
 
 #ifdef GPU_TWISTED_MASS_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
@@ -193,7 +197,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
-      setTwistPack(true);
+      setKernelPackT(true);
       twist_a = kappa; 
       twist_b = mu;
     }
@@ -217,19 +221,13 @@ namespace quda {
       dslash = new TwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
     }
 
-#ifndef GPU_COMMS
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
     dslash_policy.apply(0);
-#else
-    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
-    delete dslashImp;
-#endif
 
     delete dslash;
 #ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
-      setTwistPack(false);
+      setKernelPackT(false);
       twist_a = 0.0; 
       twist_b = 0.0;
     }

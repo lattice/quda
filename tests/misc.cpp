@@ -609,6 +609,52 @@ site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gauge
     return rc;
 }
 
+QudaVerbosity
+get_verbosity_type(char* s)
+{
+  QudaVerbosity ret =  QUDA_INVALID_VERBOSITY;
+
+  if (strcmp(s, "silent") == 0){
+    ret = QUDA_SILENT;
+  }else if (strcmp(s, "summarize") == 0){
+    ret = QUDA_SUMMARIZE;
+  }else if (strcmp(s, "verbose") == 0){
+    ret = QUDA_VERBOSE;
+  }else if (strcmp(s, "debug") == 0){
+    ret = QUDA_DEBUG_VERBOSE;
+  }else{
+    fprintf(stderr, "Error: invalid verbosity type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+const char *
+get_verbosity_str(QudaVerbosity type)
+{
+  const char* ret;
+
+  switch(type) {
+  case QUDA_SILENT:
+    ret = "silent";
+    break;
+  case QUDA_SUMMARIZE:
+    ret = "summarize";
+    break;
+  case QUDA_VERBOSE:
+    ret = "verbose";
+    break;
+  case QUDA_DEBUG_VERBOSE:
+    ret = "debug";
+    break;
+  default:
+    fprintf(stderr, "Error: invalid verbosity type %d\n", type);
+    exit(1);
+  }
+
+  return ret;
+}
 
 QudaReconstructType
 get_recon(char* s)
@@ -1083,6 +1129,10 @@ get_solver_type(char* s)
     ret = QUDA_MG_INVERTER;
   } else if (strcmp(s, "bicgstab-l") == 0){
     ret = QUDA_BICGSTABL_INVERTER;
+  } else if (strcmp(s, "cgne") == 0){
+    ret = QUDA_CGNE_INVERTER;
+  } else if (strcmp(s, "cgnr") == 0){
+    ret = QUDA_CGNR_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);

@@ -76,6 +76,9 @@ extern char latfile[];
 
 extern bool kernel_pack_t;
 
+extern double mass; // mass of Dirac operator
+extern double mu;
+
 QudaVerbosity verbosity = QUDA_VERBOSE;
 
 void init(int argc, char **argv) {
@@ -122,16 +125,13 @@ void init(int argc, char **argv) {
   inv_param.kappa = 0.1;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.mu = 0.01;
-    inv_param.epsilon = 0.01; 
+    inv_param.epsilon = 0.1;
     inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
-    inv_param.mass = 0.01;
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
   } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-    inv_param.mass = 0.01;
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
     for(int k = 0; k < Lsdim; k++)
@@ -143,6 +143,8 @@ void init(int argc, char **argv) {
     }
   }
 
+  inv_param.mu = mu;
+  inv_param.mass = mass;
   inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 2;
   
   inv_param.solve_type = (test_type == 2 || test_type == 4) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE;
@@ -239,12 +241,12 @@ void init(int argc, char **argv) {
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
-    hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
-    hostCloverInv = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
+    hostClover = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
+    hostCloverInv = malloc((size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
   }
 
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
+  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V*gaugeSiteSize*gauge_param.cpu_prec);
 
   ColorSpinorParam csParam;
   
@@ -315,7 +317,7 @@ void init(int argc, char **argv) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
     construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
-    memcpy(hostCloverInv, hostClover, V*cloverSiteSize*inv_param.clover_cpu_prec);
+    memcpy(hostCloverInv, hostClover, (size_t)V*cloverSiteSize*inv_param.clover_cpu_prec);
   }
 
   printfQuda("done.\n"); fflush(stdout);
@@ -677,10 +679,10 @@ void dslashRef() {
         int tm_offset = 12*spinorRef->Volume();
 
 	void *ref1 = spinorRef->V();
-	void *ref2 = cpu_prec == sizeof(double) ? (void*)((double*)ref1 + tm_offset): (void*)((float*)ref1 + tm_offset);
+	void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
     
 	void *flv1 = spinor->V();
-	void *flv2 = cpu_prec == sizeof(double) ? (void*)((double*)flv1 + tm_offset): (void*)((float*)flv1 + tm_offset);
+	void *flv2 = (char*)flv1 + tm_offset*cpu_prec;
     
 	tm_ndeg_dslash(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, 
 	               parity, dagger, inv_param.matpc_type, inv_param.cpu_prec, gauge_param);	
@@ -694,10 +696,10 @@ void dslashRef() {
         int tm_offset = 12*spinorRef->Volume();
 
 	void *ref1 = spinorRef->V();
-	void *ref2 = cpu_prec == sizeof(double) ? (void*)((double*)ref1 + tm_offset): (void*)((float*)ref1 + tm_offset);
+	void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
     
 	void *flv1 = spinor->V();
-	void *flv2 = cpu_prec == sizeof(double) ? (void*)((double*)flv1 + tm_offset): (void*)((float*)flv1 + tm_offset);
+	void *flv2 = (char*)flv1 + tm_offset*cpu_prec;
     
 	tm_ndeg_matpc(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);	
       }	
@@ -710,10 +712,10 @@ void dslashRef() {
         int tm_offset = 12*spinorRef->Volume();
 
 	void *evenOut = spinorRef->V();
-	void *oddOut  = cpu_prec == sizeof(double) ? (void*)((double*)evenOut + tm_offset): (void*)((float*)evenOut + tm_offset);
+	void *oddOut  = (char*)evenOut + tm_offset*cpu_prec;
     
 	void *evenIn = spinor->V();
-	void *oddIn  = cpu_prec == sizeof(double) ? (void*)((double*)evenIn + tm_offset): (void*)((float*)evenIn + tm_offset);
+	void *oddIn  = (char*)evenIn + tm_offset*cpu_prec;
     
 	tm_ndeg_mat(evenOut, oddOut, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);	
       }
@@ -730,13 +732,13 @@ void dslashRef() {
 	int tm_offset = 12*spinorRef->Volume();
 
 	void *ref1 = spinorRef->V();
-	void *ref2 = cpu_prec == sizeof(double) ? (void*)((double*)ref1 + tm_offset): (void*)((float*)ref1 + tm_offset);
+	void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
 
 	void *flv1 = spinor->V();
-	void *flv2 = cpu_prec == sizeof(double) ? (void*)((double*)flv1 + tm_offset): (void*)((float*)flv1 + tm_offset);
+	void *flv2 = (char*)flv1 + tm_offset*cpu_prec;
 
 	void *tmp1 = spinorTmp->V();
-	void *tmp2 = cpu_prec == sizeof(double) ? (void*)((double*)tmp1 + tm_offset): (void*)((float*)tmp1 + tm_offset);
+	void *tmp2 = (char*)tmp1 + tm_offset*cpu_prec;
 
 	tm_ndeg_matpc(tmp1, tmp2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
 	tm_ndeg_matpc(ref1, ref2, hostGauge, tmp1, tmp2, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
@@ -754,13 +756,13 @@ void dslashRef() {
 	int tm_offset = 12*spinorRef->Volume();
 
 	void *evenOut = spinorRef->V();
-	void *oddOut  = cpu_prec == sizeof(double) ? (void*)((double*)evenOut + tm_offset): (void*)((float*)evenOut + tm_offset);
+	void *oddOut  = (char*)evenOut + tm_offset*cpu_prec;
 
 	void *evenIn = spinor->V();
-	void *oddIn  = cpu_prec == sizeof(double) ? (void*)((double*)evenIn + tm_offset): (void*)((float*)evenIn + tm_offset);
+	void *oddIn  = (char*)evenIn + tm_offset*cpu_prec;
 
 	void *evenTmp = spinorTmp->V();
-	void *oddTmp = cpu_prec == sizeof(double) ? (void*)((double*)evenTmp + tm_offset): (void*)((float*)evenTmp + tm_offset);
+	void *oddTmp = (char*)evenTmp + tm_offset*cpu_prec;
 
 	tm_ndeg_mat(evenTmp, oddTmp, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);
 	tm_ndeg_mat(evenOut, oddOut, hostGauge, evenTmp, oddTmp, inv_param.kappa, inv_param.mu, inv_param.epsilon, not_dagger, inv_param.cpu_prec, gauge_param);
@@ -985,7 +987,9 @@ int main(int argc, char **argv)
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    
+    printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
+	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
+
     double norm2_cpu = blas::norm2(*spinorRef);
     double norm2_cpu_cuda= blas::norm2(*spinorOut);
     if (!transfer) {

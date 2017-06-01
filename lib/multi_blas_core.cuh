@@ -173,9 +173,10 @@ private:
 
 public:
   MultiBlasCuda(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f,
-		int NYW, int length, int nParity, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
+		int NYW, int length, int nParity,
+		std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &w)
     : TunableVectorY(NYW), NYW(NYW), arg(X, Y, Z, W, f, NYW, length/nParity),
-      nParity(nParity), Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { ; }
+      nParity(nParity), Y_h(), W_h(), Ynorm_h(), Wnorm_h(), y(y), w(w) { }
 
   virtual ~MultiBlasCuda() { }
 
