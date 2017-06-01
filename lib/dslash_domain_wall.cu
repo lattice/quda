@@ -154,6 +154,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
+      // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+      dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
+      dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
@@ -207,7 +211,7 @@ namespace quda {
 			    const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(1);
+    inSpinor->createComms(1);
 
     dslashParam.parity = parity;
 
@@ -249,14 +253,8 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-#ifndef GPU_COMMS
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
-#else
-    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
-    delete dslashImp;
-#endif
 
     delete dslash;
     unbindGaugeTex(gauge);

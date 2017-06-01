@@ -104,8 +104,6 @@ namespace quda {
     }
     bool reset = newTmp(&tmp, in.Even());
 
-    twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda      
-
     FullClover *cs = new FullClover(clover, false);
     FullClover *cI = new FullClover(clover, true);
 
@@ -157,9 +155,9 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, mu_factor, QUDA_TWISTED_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracTwistedCloverPC::DiracTwistedCloverPC(const DiracTwistedCloverPC &dirac) : DiracTwistedClover(dirac) { }
@@ -198,8 +196,6 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
-    twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-  
     FullClover *cs = new FullClover(clover, false);
     FullClover *cI = new FullClover(clover, true);
 
@@ -236,8 +232,6 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
-    twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-  
     FullClover *cs = new FullClover(clover, false);
     FullClover *cI = new FullClover(clover, true);
 
@@ -419,8 +413,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
   }
 } // namespace quda

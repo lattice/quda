@@ -129,7 +129,7 @@ namespace quda {
 
     QudaFieldCreate create; // used to determine the type of field created
 
-    mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
+    mutable void *ghost[2*QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
 
     /** The staggered phase convention to use */
     QudaStaggeredPhase staggeredPhaseType;
@@ -152,8 +152,8 @@ namespace quda {
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
 
-    virtual void exchangeGhost() = 0;
-    virtual void injectGhost() = 0;
+    virtual void exchangeGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
+    virtual void injectGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
 
     int Length() const { return length; }
     int Ncolor() const { return nColor; }
@@ -262,14 +262,18 @@ namespace quda {
 
     /**
        @brief Exchange the ghost and store store in the padded region
+       @param[in] link_direction Which links are we exchanging: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void exchangeGhost();
+    void exchangeGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief The opposite of exchangeGhost: take the ghost zone on x,
        send to node x-1, and inject back into the field
+       @param[in] link_direction Which links are we injecting: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void injectGhost();
+    void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief This does routine will populate the border / halo region of a
@@ -349,14 +353,18 @@ namespace quda {
 
     /**
        @brief Exchange the ghost and store store in the padded region
+       @param[in] link_direction Which links are we extracting: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void exchangeGhost();
+    void exchangeGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief The opposite of exchangeGhost: take the ghost zone on x,
        send to node x-1, and inject back into the field
+       @param[in] link_direction Which links are we injecting: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void injectGhost();
+    void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief This does routine will populate the border / halo region of a
@@ -446,8 +454,13 @@ namespace quda {
      @param u The gauge field from which we want to extract the ghost zone
      @param ghost The array where we want to pack the ghost zone into
      @param extract Where we are extracting into ghost or injecting from ghost
+     @param offset By default we exchange the nDim site-vector of
+     links in the first nDim dimensions; offset allows us to instead
+     exchange the links in nDim+offset dimensions.  This is used to
+     faciliate sending bi-directional links which is needed for the
+     coarse links.
   */
-  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true);
+  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true, int offset=0);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

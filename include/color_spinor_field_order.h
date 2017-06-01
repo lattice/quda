@@ -16,29 +16,24 @@
 #include <typeinfo>
 #include <complex_quda.h>
 #include <index_helper.cuh>
+#include <thrust/device_ptr.h>
+#include <thrust/transform_reduce.h>
 
 namespace quda {
 
   namespace colorspinor {
 
+    template<typename ReduceType, typename Float> struct square { __host__ __device__ ReduceType operator()(quda::complex<Float> x) { return static_cast<ReduceType>(norm(x)); } };
+
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB { 
-      AccessorCB(const ColorSpinorField &) { }
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const {	
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
-	return 0;
-      }
+      AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
+      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const { return 0; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct GhostAccessorCB {
-      GhostAccessorCB(const ColorSpinorField &) { }
-      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
-	return 0;
-      }
+      GhostAccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
+      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      { return 0; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec> 
@@ -54,7 +49,7 @@ namespace quda {
       int ghostOffset[4];
       GhostAccessorCB(const ColorSpinorField &a) {
 	for (int d=0; d<4; d++) {
-	  ghostOffset[d] = a.Nface()*a.SurfaceCB(d)*a.Ncolor()*a.Nspin();
+	  ghostOffset[d] = a.Nface()*a.SurfaceCB(d)*nColor*nSpin*nVec;
 	}
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
@@ -87,7 +82,7 @@ namespace quda {
       GhostAccessorCB(const ColorSpinorField &a) {
 	for (int d=0; d<4; d++) {
 	  faceVolumeCB[d] = a.Nface()*a.SurfaceCB(d);
-	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin;
+	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
 	}
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
@@ -100,7 +95,7 @@ namespace quda {
 
     protected:
       complex<Float> *v;
-      complex<Float> *ghost[8];
+      mutable complex<Float> *ghost[8];
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
@@ -109,6 +104,7 @@ namespace quda {
       const GhostAccessorCB<Float,nSpin,nColor,nVec,order> ghostAccessor;
       const int siteSubset;
       const int nParity;
+      const QudaFieldLocation location;
 
     public:
       /** 
@@ -121,7 +117,7 @@ namespace quda {
 	volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
 	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
-	accessor(field), ghostAccessor(field)
+	location(field.Location()), accessor(field), ghostAccessor(field)
       { 
 	for (int d=0; d<4; d++) {
 	  void * const *_ghost = ghost_ ? ghost_ : field.Ghost();
@@ -137,7 +133,7 @@ namespace quda {
        */
       virtual ~FieldOrderCB() { ; }
 
-      void resetGhost(void * const *ghost_)
+      void resetGhost(void * const *ghost_) const
       {
 	for (int d=0; d<4; d++) {
 	  ghost[2*d+0] = static_cast<complex<Float>*>(ghost_[2*d+0]);
@@ -270,14 +266,21 @@ namespace quda {
       /** Returns the number of packed vectors (for mg prolongator) */
       __device__ __host__ inline int Nvec() const { return nVec; }
 
+      /**
+       * Returns the L2 norm squared of the field in a given dimension
+       * @return L2 norm squared
+      */
       __host__ double norm2() const {
-	double nrm2 = 0.0;
-	for (int parity=0; parity<nParity; parity++)
-	  for (int x_cb=0; x_cb<volumeCB; x_cb++)
-	    for (int s=0; s<nSpin; s++)
-	      for (int c=0; c<nColor; c++)
-		for (int v=0; v<nVec; v++)
-		  nrm2 += norm((*this)(parity,x_cb,s,c,v));
+	double nrm2 = 0;
+	if (location == QUDA_CUDA_FIELD_LOCATION) {
+	  thrust::device_ptr<complex<Float> > ptr(v);
+	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
+					  square<double,Float>(), 0.0, thrust::plus<double>());
+	} else {
+	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
+					  square<double,Float>(), 0.0, thrust::plus<double>());
+	}
+	comm_allreduce(&nrm2);
 	return nrm2;
       }
 

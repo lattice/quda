@@ -42,7 +42,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\
-	eig_lanczos_quda.o ritz_quda.o eig_solver.o blas_magma.o	\
+	eig_lanczos_quda.o ritz_quda.o eig_solver.o 			\
+	blas_cublas.o blas_magma.o					\
 	misc_helpers.o inv_mpcg_quda.o inv_mpbicgstab_quda.o		\
 	pgauge_exchange.o pgauge_init.o pgauge_heatbath.o random.o	\
 	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
@@ -51,7 +52,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
-	quda_memcpy.o quda_arpack_interface.o ${QIO_UTIL}		\
+	quda_memcpy.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
 	spinor_gauss.o gauge_random.o
 
 # header files, found in include/
@@ -67,7 +68,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
 	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
 	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
-	qio_util.h quda_arpack_interface.h
+	qio_util.h quda_arpack_interface.h deflation.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h

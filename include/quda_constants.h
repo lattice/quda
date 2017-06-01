@@ -31,6 +31,18 @@
 #define QUDA_MAX_MULTI_SHIFT 32
 
 /**
+ * @def QUDA_MAX_BLOCK_SRC
+ * @brief Maximum number of sources that can be supported by the block solver
+ */
+#define QUDA_MAX_BLOCK_SRC 64
+
+/**
+ * @def QUDA_MAX_ARRAY
+ * @brief Maximum array length used in QudaInvertParam arrays
+ */
+#define QUDA_MAX_ARRAY_SIZE (QUDA_MAX_MULTI_SHIFT > QUDA_MAX_BLOCK_SRC ? QUDA_MAX_MULTI_SHIFT : QUDA_MAX_BLOCK_SRC)
+
+/**
  * @def   QUDA_MAX_DWF_LS
  * @brief Maximum length of the Ls dimension for domain-wall fermions
  */
@@ -48,4 +60,4 @@
  * @brief Maximum number of simultaneous reductions that can take
  * place.  This number may be increased if needed.
  */
-#define QUDA_MAX_MULTI_REDUCE 16
+#define QUDA_MAX_MULTI_REDUCE 256

@@ -42,7 +42,6 @@ namespace quda {
     checkSpinorAlias(in, out);
  
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
@@ -58,7 +57,6 @@ namespace quda {
     checkSpinorAlias(in, out);
  
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
@@ -77,7 +75,6 @@ namespace quda {
     checkSpinorAlias(in, out);
  
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
@@ -99,7 +96,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
@@ -118,7 +114,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
@@ -140,7 +135,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
@@ -230,7 +224,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),
@@ -250,7 +243,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     MDWFDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 		   &static_cast<const cudaColorSpinorField&>(in),

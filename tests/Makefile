@@ -48,7 +48,7 @@ ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
 endif
 
 TESTS = su3_test pack_test blas_test dslash_test invert_test		\
-	deflation_test multigrid_invert_test multigrid_benchmark_test $(DIRAC_TEST)	\
+	deflated_invert_test multigrid_invert_test multigrid_benchmark_test $(DIRAC_TEST)	\
 	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)	\
 	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
 	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)		\
@@ -68,7 +68,7 @@ multigrid_invert_test: multigrid_invert_test.o test_util.o wilson_dslash_referen
 multigrid_benchmark_test: multigrid_benchmark_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-deflation_test: deflation_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
+deflated_invert_test: deflated_invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 staggered_dslash_test: staggered_dslash_test.o gtest-all.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
@@ -108,10 +108,12 @@ hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o te
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 clean:
-	-rm -f *.o dslash_test invert_test deflation_test staggered_dslash_test	\
-	staggered_invert_test su3_test pack_test blas_test llfat_test	\
-	gauge_force_test fermion_force_test hisq_paths_force_test	\
-	hisq_unitarize_force_test unitarize_link_test multigrid_invert_test
+	-rm -f *.o dslash_test invert_test deflated_invert_test	\
+	staggered_dslash_test staggered_invert_test su3_test	\
+	pack_test blas_test llfat_test gauge_force_test		\
+	fermion_force_test hisq_paths_force_test		\
+	hisq_unitarize_force_test unitarize_link_test		\
+	multigrid_invert_test multigrid_benchmark_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@
