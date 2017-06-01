@@ -2279,7 +2279,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   // for reporting level 1 is the fine level but internally use level 0 for indexing
   // sprintf(mg->prefix,"MG level 1 (%s): ", param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
   // setOutputPrefix(prefix);
-  setOutputPrefix("MG level 1 (GPU)"); //fix me
+  setOutputPrefix("MG level 1 (GPU): "); //fix me
 
   printfQuda("Updating operator on level 1 of %d levels\n", mg->mgParam->Nlevel);
 
