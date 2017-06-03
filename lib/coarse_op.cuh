@@ -643,7 +643,7 @@ namespace quda {
    * sign of the spin projector
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb) {
+  __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c) {
     auto &Y = arg.Y;
 
     for (int d=0; d<4; d++) {
@@ -652,11 +652,9 @@ namespace quda {
 
 	  const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
 
-	  for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-	    for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
-	      Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = sign*Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
-	    } //Color column
-	  } //Color row
+	  for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
+	    Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = sign*Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
+	  } //Color column
 	} //Spin column
       } //Spin row
 
@@ -668,7 +666,9 @@ namespace quda {
   void ComputeYReverseCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
-	computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb);
+	for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+	  computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
+	}
       } // c/b volume
     } // parity
   }
@@ -678,8 +678,11 @@ namespace quda {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
+    int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // color row
+    if (ic_c >= nColor) return;
+
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb);
+    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
   }
 
   /**
@@ -1239,6 +1242,7 @@ namespace quda {
       case COMPUTE_TMAV:
       case COMPUTE_VUV:
       case COMPUTE_COARSE_CLOVER:
+      case COMPUTE_REVERSE_Y:
 	resizeVector(2,coarseColor);
 	break;
       default:
