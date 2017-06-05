@@ -71,7 +71,8 @@ extern QudaDslashType dslash_type;
 
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
-
+extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
+extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 
 static void end();
 
@@ -132,7 +133,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->maxiter = niter;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
-  inv_param->pipeline = false;
+  inv_param->solution_accumulator_pipeline = solution_accumulator_pipeline;
+  inv_param->pipeline = pipeline;
 
   inv_param->Ls = Nsrc;
   
@@ -266,11 +268,13 @@ invert_test(void)
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = (void**)cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 

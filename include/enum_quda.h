@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+  typedef enum QudaMemoryType_s {
+    QUDA_MEMORY_DEVICE,
+    QUDA_MEMORY_PINNED,
+    QUDA_MEMORY_MAPPED,
+    QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
+  } QudaMemoryType;
+
   //
   // Types used in QudaGaugeParam
   //
@@ -88,15 +95,16 @@ extern "C" {
 
   typedef enum QudaDslashPolicy_s {
     QUDA_DSLASH,
-    QUDA_DSLASH2,
-    QUDA_PTHREADS_DSLASH,
-    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_DSLASH,
+    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_GPU_COMMS_DSLASH,
-    QUDA_DSLASH_ASYNC,
-    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_ZERO_COPY_DSLASH_PACK,
+    QUDA_FUSED_ZERO_COPY_DSLASH_PACK,
     QUDA_ZERO_COPY_DSLASH,
     QUDA_FUSED_ZERO_COPY_DSLASH,
+    QUDA_DSLASH_ASYNC,
+    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_PTHREADS_DSLASH,
     QUDA_DSLASH_NC
   } QudaDslashPolicy;
 
@@ -118,6 +126,8 @@ extern "C" {
     QUDA_FGMRESDR_INVERTER,
     QUDA_MG_INVERTER,
     QUDA_BICGSTABL_INVERTER,
+    QUDA_CGNE_INVERTER,
+    QUDA_CGNR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -362,8 +372,7 @@ extern "C" {
   } QudaDWFPCType; 
 
   typedef enum QudaTwistFlavorType_s {
-    QUDA_TWIST_MINUS = -1,
-    QUDA_TWIST_PLUS = +1,
+    QUDA_TWIST_SINGLET = 1,
     QUDA_TWIST_NONDEG_DOUBLET = +2,
     QUDA_TWIST_DEG_DOUBLET = -2,    
     QUDA_TWIST_NO  = 0,
@@ -414,7 +423,13 @@ extern "C" {
     QUDA_FORWARDS = +1,
     QUDA_BOTH_DIRS = 2
   } QudaDirection;
-  
+
+  typedef enum QudaLinkDirection_s {
+    QUDA_LINK_BACKWARDS,
+    QUDA_LINK_FORWARDS,
+    QUDA_LINK_BIDIRECTIONAL
+  } QudaLinkDirection;
+
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,
@@ -431,10 +446,11 @@ extern "C" {
   } QudaGhostExchange;
 
   typedef enum QudaStaggeredPhase_s {
-    QUDA_MILC_STAGGERED_PHASE = 0,
-    QUDA_CPS_STAGGERED_PHASE = 1,
-    QUDA_TIFR_STAGGERED_PHASE = 2,
-    QUDA_INVALID_STAGGERED_PHASE = QUDA_INVALID_ENUM
+    QUDA_STAGGERED_PHASE_NO = 0,
+    QUDA_STAGGERED_PHASE_MILC = 1,
+    QUDA_STAGGERED_PHASE_CPS = 2,
+    QUDA_STAGGERED_PHASE_TIFR = 3,
+    QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {

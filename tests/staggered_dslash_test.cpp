@@ -195,11 +195,13 @@ void init()
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = cpuLong->Ghost();
 
@@ -431,6 +433,8 @@ static int dslashTest()
 
     unsigned long long flops = dirac->Flops();
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
+	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
     double spinor_out_norm2 =  blas::norm2(*spinorOut);

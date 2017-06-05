@@ -765,7 +765,7 @@ namespace quda {
 
 
   template<typename Float, int NElems, int NCOLORS, typename Gauge>
-  void Monte( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover) {
 
     TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
     MonteArg<Gauge, Float, NCOLORS> montearg(dataOr, data, Beta, rngstate);
@@ -825,7 +825,7 @@ namespace quda {
 
 
   template<typename Float>
-  void Monte( cudaGaugeField& data, RNG &rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( cudaGaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover) {
 
     if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
@@ -854,7 +854,7 @@ namespace quda {
  * @param[in] nhb number of heatbath steps
  * @param[in] nover number of overrelaxation steps
  */
-  void Monte( cudaGaugeField& data, RNG &rngstate, double Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( cudaGaugeField& data, RNG &rngstate, double Beta, int nhb, int nover) {
 #ifdef GPU_GAUGE_ALG
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       Monte<float> (data, rngstate, (float)Beta, nhb, nover);

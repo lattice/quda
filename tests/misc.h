@@ -25,6 +25,9 @@ extern "C" {
   QudaMassNormalization get_mass_normalization_type(char* s);
   const char* get_mass_normalization_str(QudaMassNormalization);
 
+  QudaVerbosity get_verbosity_type(char* s);
+  const char* get_verbosity_str(QudaVerbosity);
+
   QudaMatPCType get_matpc_type(char* s);
   const char* get_matpc_str(QudaMatPCType);
 

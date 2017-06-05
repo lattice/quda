@@ -52,12 +52,11 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
-    if (in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS) {
-      double flavor_mu = in.TwistFlavor() * mu;
+    if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
 	twistGamma5Cuda(&static_cast<cudaColorSpinorField&>(out), 
 			&static_cast<const cudaColorSpinorField&>(in),
-			dagger, kappa, flavor_mu, 0.0, twistType);
+			dagger, kappa, mu, 0.0, twistType);
       } else {
 	errorQuda("Not implemented");
       }
@@ -130,11 +129,8 @@ namespace quda {
     }
     bool reset = newTmp(&tmp, in.Even());
 
-    twisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    ndegtwisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-  
-    if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
-      double a = 2.0 * kappa * in.TwistFlavor() * mu;//for direct twist (must be daggered separately)  
+    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+      double a = 2.0 * kappa * mu;//for direct twist (must be daggered separately)  
 
       TwistedDslashXpay(out.Odd(), in.Even(), in.Odd(), QUDA_ODD_PARITY, 
 			QUDA_DEG_DSLASH_TWIST_XPAY, a, -kappa, 0.0, 0.0);
@@ -186,10 +182,10 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+    double a = 2.0 * kappa * mu;
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, mu_factor, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracTwistedMassPC::DiracTwistedMassPC(const DiracTwistedMassPC &dirac) : DiracTwistedMass(dirac) { }
@@ -228,11 +224,8 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
-    twisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    ndegtwisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-  
-    if (in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
-      double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist (not daggered)
+    if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+      double a = -2.0 * kappa * mu;  //for invert twist (not daggered)
       double b = 1.0 / (1.0 + a*a);                     //for invert twist
       if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 	TwistedDslash(out, in, parity, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0);
@@ -255,6 +248,8 @@ namespace quda {
     
         twistGamma5Cuda(static_cast<cudaColorSpinorField*>(doubletTmp),
 			&static_cast<const cudaColorSpinorField&>(in), dagger, a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a      
+
+	// this is just a vectorized Wilson dslash
         NdegTwistedDslash(out, *doubletTmp, parity, QUDA_NONDEG_DSLASH, 0.0, 0.0, 1.0, 0.0);
 
         flops += 1440ll*in.Volume();//as for the asymmetric case
@@ -275,11 +270,8 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
-    twisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    ndegtwisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-  
-    if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
-      double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist
+    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+      double a = -2.0 * kappa * mu;  //for invert twist
       double b = k / (1.0 + a*a);                     //for invert twist 
       if (!dagger) {
         TwistedDslashXpay(out, in, x, parity, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0);
@@ -303,6 +295,8 @@ namespace quda {
         twistGamma5Cuda(static_cast<cudaColorSpinorField*>(doubletTmp),
 			&static_cast<const cudaColorSpinorField&>(in),
 			dagger, -a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a
+
+	// this is just a vectorized Wilson dslash
         NdegTwistedDslashXpay(out, *doubletTmp, x, parity, QUDA_NONDEG_DSLASH, 0.0, 0.0, k, 0.0);
         flops += 1464ll*in.Volume();
         deleteTmp(&doubletTmp, reset);	  
@@ -316,7 +310,7 @@ namespace quda {
 
     bool reset = newTmp(&tmp1, in);
 
-    if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
+    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
 	  Dslash(*tmp1, in, QUDA_ODD_PARITY);
 	  DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
@@ -324,7 +318,7 @@ namespace quda {
 	  Dslash(*tmp1, in, QUDA_EVEN_PARITY);
 	  DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
       } else {//asymmetric preconditioning 
-        double a = 2.0 * kappa * in.TwistFlavor() * mu;
+        double a = 2.0 * kappa * mu;
         if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 	  Dslash(*tmp1, in, QUDA_ODD_PARITY);
           TwistedDslashXpay(out, *tmp1, in, QUDA_EVEN_PARITY, QUDA_DEG_DSLASH_TWIST_XPAY, a, kappa2, 0.0, 0.0);
@@ -378,9 +372,6 @@ namespace quda {
 				   ColorSpinorField &x, ColorSpinorField &b, 
 				   const QudaSolutionType solType) const
   {
-    twisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    ndegtwisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-
     // we desire solution to preconditioned system
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       src = &b;
@@ -391,7 +382,7 @@ namespace quda {
     bool reset = newTmp(&tmp1, b.Even());
   
     // we desire solution to full system
-    if(b.TwistFlavor() == QUDA_TWIST_PLUS || b.TwistFlavor() == QUDA_TWIST_MINUS){  
+    if(b.TwistFlavor() == QUDA_TWIST_SINGLET) {  
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
         src = &(x.Odd());
@@ -494,9 +485,6 @@ namespace quda {
   void DiracTwistedMassPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				       const QudaSolutionType solType) const
   {
-    twisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    ndegtwisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       return;
     }				
@@ -505,7 +493,7 @@ namespace quda {
     bool reset = newTmp(&tmp1, b.Even());
 
     // create full solution
-    if(b.TwistFlavor() == QUDA_TWIST_PLUS || b.TwistFlavor() == QUDA_TWIST_MINUS){    
+    if(b.TwistFlavor() == QUDA_TWIST_SINGLET) {    
       if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
         DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
@@ -545,9 +533,9 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
+  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+    double a = -2.0 * kappa * mu;
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, -mu_factor, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
   }
 } // namespace quda

@@ -55,13 +55,6 @@ namespace quda {
 
   using namespace improvedstaggered;
 
-  template<typename T> struct RealType {};
-  template<> struct RealType<double2> { typedef double type; };
-  template<> struct RealType<float2> { typedef float type; };
-  template<> struct RealType<float4> { typedef float type; };
-  template<> struct RealType<short2> { typedef short type; };
-  template<> struct RealType<short4> { typedef short type; };
-
 #ifdef GPU_STAGGERED_DIRAC
   template <typename sFloat, typename fatGFloat, typename longGFloat, typename phaseFloat>
   class StaggeredDslashCuda : public DslashCuda {
@@ -70,6 +63,7 @@ namespace quda {
     const unsigned int nSrc;
 
   protected:
+    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
     unsigned int sharedBytesPerThread() const
     {
 #ifdef PARALLEL_DIR
@@ -112,9 +106,9 @@ namespace quda {
     {
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       // first try to advance block.y (number of right-hand sides per block)
-      if (param.block.y < nSrc && param.block.y < deviceProp.maxThreadsDim[1] &&
+      if (param.block.y < nSrc && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
 	  sharedBytesPerThread()*param.block.x*param.block.y < max_shared &&
-	  (param.block.x*(param.block.y+1)) <= deviceProp.maxThreadsPerBlock) {
+	  (param.block.x*(param.block.y+1u)) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	param.block.y++;
 	param.grid.y = (nSrc + param.block.y - 1) / param.block.y;
 	return true;
@@ -258,7 +252,7 @@ namespace quda {
 				   const double &k, const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(3);    
+    inSpinor->createComms(3);
 
 #ifdef GPU_STAGGERED_DIRAC
 
@@ -330,14 +324,8 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
 
-#ifndef GPU_COMMS
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
     dslash_policy.apply(0);
-#else
-    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
-    delete dslashImp;
-#endif
 
     delete dslash;
     unbindFatGaugeTex(fatGauge);

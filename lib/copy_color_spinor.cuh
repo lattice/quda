@@ -138,8 +138,8 @@ namespace quda {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
     for (int x=0; x<volume; x++) {
-      RegTypeIn in[Ns*Nc*2];
-      RegTypeOut out[Ns*Nc*2];
+      RegTypeIn in[Ns*Nc*2] = { };
+      RegTypeOut out[Ns*Nc*2] = { };
       inOrder.load(in, x);
       basis(out, in);
       outOrder.save(out, x);
@@ -155,8 +155,8 @@ namespace quda {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     if (x >= volume) return;
 
-    RegTypeIn in[Ns*Nc*2];
-    RegTypeOut out[Ns*Nc*2];
+    RegTypeIn in[Ns*Nc*2] = { };
+    RegTypeOut out[Ns*Nc*2] = { };
     inOrder.load(in, x);
     basis(out, in);
     outOrder.save(out, x);

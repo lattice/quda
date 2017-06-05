@@ -1,4 +1,5 @@
 #include <tune_quda.h>
+#include <int32_to_char.h>
 
 namespace quda {
 
@@ -14,8 +15,8 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
   public:
-    QudaMemCopy(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-		const char *func, const char *file, int line)
+    inline QudaMemCopy(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
+		       const char *func, const char *file, const char *line)
       : dst(dst), src(src), count(count), kind(kind) {
 
       switch(kind) {
@@ -37,13 +38,17 @@ namespace quda {
       default:
 	errorQuda("Unsupported cudaMemcpyType %d", kind);
       }
-      sprintf(aux, "%s,%s:%d", func, file, line);
+      strcpy(aux, func);
+      strcat(aux, ",");
+      strcat(aux, file);
+      strcat(aux, ",");
+      strcat(aux, line);
     }
 
     virtual ~QudaMemCopy() { }
 
-    void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+    inline void apply(const cudaStream_t &stream) {
+      tuneLaunch(*this, getTuning(), getVerbosity());
       cudaMemcpy(dst, src, count, kind);
     }
 
@@ -51,7 +56,12 @@ namespace quda {
 
     TuneKey tuneKey() const {
       char vol[128];
-      sprintf(vol, "bytes=%llu", (long long unsigned int)count);
+      if (count < INT_MAX) {
+	strcpy(vol,"bytes=");
+	i32toa(vol+6, count);
+      } else {
+	sprintf(vol, "bytes=%llu", (long long unsigned int)count);
+      }
       return TuneKey(vol, name, aux);
     }
 
@@ -61,13 +71,17 @@ namespace quda {
   };
 
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-		  const char *func, const char *file, int line) {
+		  const char *func, const char *file, const char *line) {
     if (getVerbosity() == QUDA_DEBUG_VERBOSE)
       printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
 
     if (count == 0) return;
+#if 1
     QudaMemCopy copy(dst, src, count, kind, func, file, line);
     copy.apply(0);
+#else
+    cudaMemcpy(dst, src, count, kind);
+#endif
     checkCudaError();
   }
 

@@ -14,9 +14,7 @@
 
 !-------------------------------------------------------------------------------
 
-#define QUDA_MAX_DIM 5
-#define QUDA_MAX_MULTI_SHIFT 32
-#define QUDA_MAX_DWF_LS 128
+#include <quda_constants.h>
 
 module quda_fortran
 
@@ -106,12 +104,13 @@ module quda_fortran
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
+     integer(4) :: solution_accumulator_pipeline ! How many direction vectors we accumulate into the solution vector at once
      integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates
      integer(4) :: max_res_increase_total ! Total number of residual increases we tolerate
      integer(4) :: heavy_quark_check ! After how many iterations shall the heavy quark residual be updated
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver
-
+     integer(4) :: num_src ! Number of sources in the multiple source solver
      integer(4) :: overlap ! width of domain overlaps
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset
@@ -168,15 +167,16 @@ module quda_fortran
      QudaUseInitGuess :: use_init_guess
 
      real(8) :: clover_coeff ! Coefficient of the clover term
+     real(8) :: clover_rho   ! Real number added to the clover diagonal (not to inverse)
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
      real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately)
 
-     integer(4) :: compute_clover;                    ! Whether to compute the clover field
-     integer(4) :: compute_clover_inverse;            ! Whether to compute the clover inverse field
-     integer(4) :: return_clover;                     ! Whether to copy back the clover matrix field
-     integer(4) :: return_clover_inverse;             ! Whether to copy back the inverted clover matrix field
+     integer(4) :: compute_clover                    ! Whether to compute the clover field
+     integer(4) :: compute_clover_inverse            ! Whether to compute the clover inverse field
+     integer(4) :: return_clover                     ! Whether to copy back the clover matrix field
+     integer(4) :: return_clover_inverse             ! Whether to copy back the inverted clover matrix field
 
-     QudaVerbosity :: verbosity;                      ! The verbosity setting to use in the solver
+     QudaVerbosity :: verbosity                      ! The verbosity setting to use in the solver
 
      integer(4) :: sp_pad
      integer(4) :: cl_pad
@@ -203,6 +203,8 @@ module quda_fortran
      QudaInverterType :: inv_type_precondition
 
      integer(8) :: preconditioner ! pointer to preconditioner instance
+
+     integer(8) :: deflation_op ! pointer to deflation instance
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition
@@ -256,7 +258,7 @@ module quda_fortran
      integer(4)::max_chrono_dim
 
      ! The index to indeicate which chrono history we are augmenting */
-     integer(4)::chrono_index;
+     integer(4)::chrono_index
 
   end type quda_invert_param
 

@@ -101,26 +101,74 @@ namespace quda {
 
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
+      Accessor(const CloverField &A, bool inverse=false) {
+	errorQuda("Not implemented for order %d", order);
+      }
+
       __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row, int s_col,
 							    int c_row, int c_col) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
 	return dummy;
       }
+    };
+
+    template<int N>
+      __device__ __host__ inline int indexFloatN(int k, int stride, int x) {
+      int j = k / N;
+      int i = k % N;
+      return (j*stride+x)*N + i;
+    };
+
+    template<typename Float, int nColor, int nSpin>
+      struct Accessor<Float,nColor,nSpin,QUDA_FLOAT4_CLOVER_ORDER> {
+      Float *a;
+      int stride;
+      size_t offset;
+      static constexpr int N = nSpin * nColor / 2;
+    Accessor(const CloverField &A, bool inverse=false)
+      : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()), offset(A.Bytes()/(2*sizeof(Float))) { }
+
+      __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
+	// if not in the diagonal chiral block then return 0.0
+	if (s_col / 2 != s_row / 2) { return complex<Float>(0.0); }
+
+	const int chirality = s_col / 2;
+
+	int row = s_row%2 * nColor + c_row;
+	int col = s_col%2 * nColor + c_col;
+	Float *a_ = a+parity*offset+stride*chirality*N*N;
+
+	if (row == col) {
+	  return 2*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(row, stride, x) ];
+	} else if (col < row) {
+	  // switch coordinates to count from bottom right instead of top left of matrix
+	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
+          int idx = N + 2*k;
+
+          return 2*complex<Float>(a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
+				  a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+	} else {
+	  // requesting upper triangular so return conjugate transpose
+	  // switch coordinates to count from bottom right instead of top left of matrix
+	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+          int idx = N + 2*k;
+
+          return 2*complex<Float>( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
+				  -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+	}
+
+      }
+
     };
 
     template<typename Float, int nColor, int nSpin> 
       struct Accessor<Float,nColor,nSpin,QUDA_PACKED_CLOVER_ORDER> { 
       Float *a[2];
-      int volumeCB;
       const int N = nSpin * nColor / 2;
       complex<Float> zero;
-    Accessor(const CloverField &A, bool inverse=false) : volumeCB(A.VolumeCB()) { 
+      Accessor(const CloverField &A, bool inverse=false) {
 	// even
 	a[0] = static_cast<Float*>(const_cast<void*>(A.V(inverse)));
 	// odd
-	//a[1] = static_cast<Float*>(static_cast<char*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/2);
 	a[1] = static_cast<Float*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/(2*sizeof(Float));
 	zero = complex<Float>(0.0,0.0);
       }
@@ -141,11 +189,12 @@ namespace quda {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = (x*2 + chirality)*N*N + N + 2*k;
-          complex<Float> tmp(a[parity][idx], a[parity][idx+1]);
-          return tmp;
+          return complex<Float>(a[parity][idx], a[parity][idx+1]);
 	} else {
-	  // requesting upper triangular so return conjugate transpose
-	  return conj(operator()(parity,x,s_col,s_row,c_col,c_row) );
+	  // switch coordinates to count from bottom right instead of top left of matrix
+	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+          int idx = (x*2 + chirality)*N*N + N + 2*k;
+          return complex<Float>(a[parity][idx], -a[parity][idx+1]);
 	}
       }
 
