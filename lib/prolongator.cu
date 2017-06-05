@@ -51,6 +51,21 @@ namespace quda {
     }
   }
 
+  template <typename Float, int coarseSpin, int coarseColor, class Coarse>
+  __device__ __host__ inline void prolongate2TopLevelStaggered(complex<Float> out[coarseSpin*coarseColor], const Coarse &in,
+                                             int parity_coarse, int x_coarse_cb) {
+#pragma unroll
+    for (int p = 0; p < coarseSpin; p++) { 
+#pragma unroll
+      for (int c = 0; c < coarseColor; c++) {
+        int staggered_coarse_spin = p;
+        out[p*coarseColor+c] = in(parity_coarse, x_coarse_cb, staggered_coarse_spin, c);
+      }
+    }
+    return;
+  }
+
+
   /**
      Rotates from the coarse-color basis into the fine-color basis.  This
      is the second step of applying the prolongator.
@@ -95,21 +110,51 @@ namespace quda {
 
   }
 
+  template <typename Float, int coarseSpin, int fineColor, int coarseColor, int fine_colors_per_thread, class FineColor, class Rotator>
+  __device__ __host__ inline void rotateFineColorTopLevelStaggered(FineColor &out, const complex<Float> in[coarseSpin*coarseColor],
+                                                  const Rotator &V, int parity, int nParity, int x_cb, int fine_color_block) {
+    const int staggered_coarse_spin = parity;
+    const int fine_spinor_parity = (nParity == 2) ? parity : 0;
+    const int v_parity = (V.Nparity() == 2) ? parity : 0;
+#pragma unroll
+    for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++)
+       out(parity, x_cb, 0, fine_color_block+fine_color_local) = 0.0;
+#pragma unroll
+    for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) {
+      int i = fine_color_block + fine_color_local; 
+      for (int j=0; j<coarseColor; j++) {
+        out(fine_spinor_parity, x_cb, 0, i) += V(v_parity, x_cb, 0, i, j) * in[staggered_coarse_spin*coarseColor + j];
+      }
+    }
+  }
+
+
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread, typename Arg>
   void Prolongate(Arg &arg) {
     for (int parity=0; parity<arg.nParity; parity++) {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb=0; x_cb<arg.out.VolumeCB(); x_cb++) {
-	complex<Float> tmp[fineSpin*coarseColor];
-	prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.VolumeCB());
-	for (int fine_color_block=0; fine_color_block<fineColor; fine_color_block+=fine_colors_per_thread) {
-	  rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>
-	    (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
-	}
-      }
-    }
-  }
+
+        if(fineSpin != 1) {
+
+	  complex<Float> tmp[fineSpin*coarseColor];
+	  prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.VolumeCB());
+	  for (int fine_color_block=0; fine_color_block<fineColor; fine_color_block+=fine_colors_per_thread) {
+	    rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>
+	      (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
+
+          }
+	} else {
+          complex<Float> tmp[coarseSpin*coarseColor];
+          prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
+          for (int fine_color_block=0; fine_color_block<fineColor; fine_color_block+=fine_colors_per_thread) {
+            rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
+         } 
+       }
+     }
+   }
+ }
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread, typename Arg>
   __global__ void ProlongateKernel(Arg arg) {
@@ -120,10 +165,16 @@ namespace quda {
     int fine_color_block = (blockDim.z*blockIdx.z + threadIdx.z) * fine_colors_per_thread;
     if (fine_color_block >= fineColor) return;
 
-    complex<Float> tmp[fineSpin*coarseColor];
-    prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.VolumeCB());
-    rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>
-      (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
+    if (fineSpin != 1) {
+      complex<Float> tmp[fineSpin*coarseColor];
+      prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.VolumeCB());
+      rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>
+        (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
+    } else {
+      complex<Float> tmp[2*coarseColor];
+      prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
+      rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
+    }
   }
   
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread>

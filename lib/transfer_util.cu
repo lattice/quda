@@ -284,7 +284,8 @@ namespace quda {
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	      for (int s=0; s<nSpin; s++) {
-		dot[arg.spin_map(s)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
+                int idx = nSpin == 1 ? parity : arg.spin_map(s); 
+		dot[idx] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
 	      }
 	    }
 	  }
@@ -302,7 +303,8 @@ namespace quda {
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	      for (int s=0; s<nSpin; s++) {
-		colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s)]), i, parity, x_cb, s, arg);
+                 int idx = nSpin == 1 ? parity : arg.spin_map(s);
+		colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[idx]), i, parity, x_cb, s, arg);
 	      }
 
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
@@ -324,7 +326,8 @@ namespace quda {
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	    for (int s=0; s<nSpin; s++) {
-	      nrm[arg.spin_map(s)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
+              int idx = nSpin == 1 ? parity : arg.spin_map(s);
+	      nrm[idx] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
 	    }
 	  }
 	}
@@ -343,7 +346,8 @@ namespace quda {
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	    for (int s=0; s<nSpin; s++) {
-	      colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s)], parity, x_cb, s, arg);
+              int idx = nSpin == 1 ? parity : arg.spin_map(s);
+	      colorScale<Float,nColor,Arg>(v[s], nrm[idx], parity, x_cb, s, arg);
 	    }
 
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
@@ -406,7 +410,8 @@ namespace quda {
 	// compute (j,i) block inner products
 #pragma unroll
 	for (int s=0; s<nSpin; s++) {
-	  dot[arg.spin_map(s)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
+          int idx = nSpin == 1 ? parity : arg.spin_map(s);
+	  dot[idx] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
 	}
 
 	__syncthreads();
@@ -418,6 +423,7 @@ namespace quda {
 	// subtract the blocks to orthogonalise
 #pragma unroll
 	for (int s=0; s<nSpin; s++) {
+          int idx = nSpin == 1 ? parity : arg.spin_map(s);     
 	  colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s)]), i, parity, x_cb, s, arg);
 	}
 
@@ -430,7 +436,8 @@ namespace quda {
 
 #pragma unroll
       for (int s=0; s<nSpin; s++) {
-	nrm[arg.spin_map(s)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
+        int idx = nSpin == 1 ? parity : arg.spin_map(s);
+	nrm[idx] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
       }
 
       __syncthreads();
@@ -444,11 +451,12 @@ namespace quda {
 
 #pragma unroll
       for (int s=0; s<nSpin; s++) {
-	colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s)], parity, x_cb, s, arg);
+        int idx = nSpin == 1 ? parity : arg.spin_map(s);
+	colorScale<Float,nColor,Arg>(v[s], nrm[idx], parity, x_cb, s, arg);
       }
 
 #pragma unroll
-      for (int s=0; s<nSpin; s++)
+      for (int s=0; s<nSpin; s++) 
 #pragma unroll
 	for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
 

@@ -1,6 +1,8 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 
+#include <multigrid.h>
+
 namespace quda {
 
   namespace improvedstaggered {
@@ -133,6 +135,9 @@ namespace quda {
     // do nothing
   }
 
+  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+    CoarseKSOp(Y, X, Xinv, Yhat, T, &fatGauge, &longGauge,  2*mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);//
+  }
 
   DiracImprovedStaggeredPC::DiracImprovedStaggeredPC(const DiracParam &param)
     : DiracImprovedStaggered(param)
