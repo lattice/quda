@@ -36,7 +36,7 @@ namespace quda {
   }
 
   /**
-     Compute the checkerboard 1-d index from the 4-d coordinate x[]
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] in the mu direction
 
      @return 1-d checkerboard index
      @param x 4-d lattice index
@@ -49,7 +49,7 @@ namespace quda {
   }
 
   /**
-     Compute the checkerboard 1-d index from the 4-d coordinate x[]
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] in the mu direction
 
      @return 1-d checkerboard index
      @param y copy of 4-d lattice index
@@ -77,6 +77,22 @@ namespace quda {
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] - 1 + X[mu]) % X[mu];
+    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
+    return idx;
+  }
+
+  /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] -3 in the mu direction
+
+     @return 1-d checkerboard index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to subtract 3
+   */
+  static __device__ __host__ inline int linkIndexM3(int x[], const int X[4], const int mu) {
+    int y[4];
+    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    y[mu] = (y[mu] - 3 + X[mu]) % X[mu];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
   }
@@ -113,6 +129,22 @@ namespace quda {
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
+    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
+    return idx;
+  }
+
+  /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] +3 in the mu direction
+
+     @return 1-d checkerboard index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to add 3
+   */  
+  static __device__ __host__ inline int linkIndexP3(int x[], const int X[4], const int mu) {
+    int y[4];
+    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    y[mu] = (y[mu] + 3 + X[mu]) % X[mu];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
   }

@@ -8,7 +8,7 @@
 #include <index_helper.cuh>
 #include <clover_field.h>
 
-#include <blas_magma.h>
+#include <blas_cublas.h>
 #include <ks_coarse_op.cuh> //remove it!
 
 namespace quda {
@@ -23,9 +23,7 @@ namespace quda {
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
     typedef typename gauge::FieldOrder<Float,coarseSpin*coarseColor,coarseSpin,gOrder> gCoarse;
 
-    const ColorSpinorField &v = T.Vectors();
-    int dummy = 0;
-    v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+    const ColorSpinorField &v = T.Vectors(f->Location());
 
     F vAccessor(const_cast<ColorSpinorField&>(v));
     F uvAccessor(const_cast<ColorSpinorField&>(*uv));
@@ -60,7 +58,7 @@ namespace quda {
     cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
      gFine *lAccessor = nullptr;
-     F *uvlAccessor  = nullptr;
+     F *uvlAccessor   = nullptr;
 
     if(l != nullptr && uv_long != nullptr) {
       lAccessor   = new gFine(const_cast<GaugeField&>(*l));
@@ -70,7 +68,6 @@ namespace quda {
     
     if(lAccessor) delete lAccessor;
     if(uvlAccessor) delete uvlAccessor;
-
   }
 
   // template on the number of coarse degrees of freedom
@@ -140,16 +137,10 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
-    if (X.Precision() != Y.Precision() || Y.Precision() != uv->Precision() ||
-        Y.Precision() != T.Vectors().Precision() || Y.Precision() != f->Precision())
-    {
-      errorQuda("Unsupported precision mix");
-    }
 
-    if( l )
-    { 
-      if(Y.Precision() != l->Precision() || Y.Precision() != uv_long->Precision()) errorQuda("Unsupported precision mix for long links.");
-    }
+    Precision(X, Y, *uv, T.Vectors(), *f);
+
+    if( l && uv_long ) Precision(X, Y, *uv_long, T.Vectors(), *l);
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -170,7 +161,10 @@ namespace quda {
   void CoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat,
 		const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links,  double mass, QudaDiracType dirac, QudaMatPCType matpc ) {
     QudaPrecision precision = Y.Precision();
+    QudaFieldLocation location = Location(Y, X, Xinv, Yhat);
     //First make a cpu gauge field from the cuda gauge field
+
+    if (location != QUDA_CPU_FIELD_LOCATION) errorQuda ("Cuda location is not currently supported.\n"); 
 
     int pad = 0;
     GaugeFieldParam fat_param(fat_links->X(), precision, fat_links->Reconstruct(), pad, fat_links->Geometry());
@@ -179,9 +173,13 @@ namespace quda {
     fat_param.link_type = fat_links->LinkType();
     fat_param.t_boundary = fat_links->TBoundary();
     fat_param.anisotropy = fat_links->Anisotropy();
-    fat_param.gauge = nullptr;
-    fat_param.create = QUDA_NULL_FIELD_CREATE;
+    fat_param.gauge      = nullptr;
+    fat_param.create     = QUDA_NULL_FIELD_CREATE;
     fat_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+
+    fat_param.nFace = 1;
+    fat_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+
 
     cpuGaugeField *f = new cpuGaugeField(fat_param);
     cpuGaugeField *l = nullptr;
@@ -193,9 +191,9 @@ set QUDA_REORDER_LOCATION to CPU to perform re-ordering on CPU (GPU reordering d
     fat_links->saveCPUField(*f);
 
     //Create a field UV which holds U*V.  Has the same structure as V.
-    ColorSpinorParam UVparam(T.Vectors());
+    ColorSpinorParam UVparam(T.Vectors(location));
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
-    UVparam.location = QUDA_CPU_FIELD_LOCATION;
+    UVparam.location = location;
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
@@ -212,6 +210,9 @@ set QUDA_REORDER_LOCATION to CPU to perform re-ordering on CPU (GPU reordering d
       long_param.gauge = nullptr;
       long_param.create = QUDA_NULL_FIELD_CREATE;
       long_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+
+      long_param.nFace = 3;
+      long_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
       //
       l = new cpuGaugeField(long_param);
       //
@@ -222,9 +223,6 @@ set QUDA_REORDER_LOCATION to CPU to perform re-ordering on CPU (GPU reordering d
 
     //If the fine lattice operator is the clover operator, copy the cudaCloverField to cpuCloverField
     calculateKSY(Y, X, Xinv, Yhat, uv, uv_long, T, f, l, mass, dirac, matpc);
-
-    // now exchange Y halos for multi-process dslash
-    Y.exchangeGhost();
 
     delete uv; 
     delete f;
