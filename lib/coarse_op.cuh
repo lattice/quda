@@ -953,6 +953,7 @@ namespace quda {
   template <bool from_coarse, typename Float, int fineSpin,
 	    int fineColor, int coarseSpin, int coarseColor, typename Arg>
   class CalculateY : public TunableVectorYZ {
+  public: 
 
     template <int dim> using Gamma_ = Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim>;
 
