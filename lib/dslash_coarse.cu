@@ -139,8 +139,8 @@ namespace quda {
 	      int c_row = color_block + color_local; // global color index
 	      int row = s_row*Nc + c_row;
 #pragma unroll
-	      for(int s_col = 0; s_col < (!is_staggered ? Ns : 1); s_col++) { //Spin column
-                s_col = (1 - s_row);//just redef. s_col?
+	      for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
+                if(is_staggered) s_col = (1 - s_row);//just redef. s_col?
 #pragma unroll
 		for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
 		  int col = s_col*Nc + c_col + color_offset;
@@ -151,6 +151,7 @@ namespace quda {
 		    out[color_local] += arg.Y(d, parity, x_cb, row, col)
 		      * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 		}
+                if(is_staggered) break;
 	      }
 	    }
 	  }
@@ -160,8 +161,8 @@ namespace quda {
 	    int c_row = color_block + color_local; // global color index
 	    int row = s_row*Nc + c_row;
 #pragma unroll
-	    for(int s_col = 0; s_col < (!is_staggered ? Ns : 1); s_col++) { //Spin column
-              s_col = (1 - s_row);
+	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
+             if(is_staggered) s_col = (1 - s_row);
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
 		int col = s_col*Nc + c_col + color_offset;
@@ -172,6 +173,7 @@ namespace quda {
 		  out[color_local] += arg.Y(d, parity, x_cb, row, col)
 		    * arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
+              if(is_staggered) break;
 	    }
 	  }
 	}
@@ -205,8 +207,8 @@ namespace quda {
 	      int c_row = color_block + color_local;
 	      int row = s_row*Nc + c_row;
 #pragma unroll
-	      for (int s_col=0; s_col< (!is_staggered ? Ns : 1); s_col++) {
-                s_col = (1 - s_row);
+	      for (int s_col=0; s_col< Ns; s_col++) {
+                if(is_staggered) s_col = (1 - s_row);
 #pragma unroll
 		for (int c_col=0; c_col<Nc; c_col+=color_stride) {
 		  int col = s_col*Nc + c_col + color_offset;
@@ -217,6 +219,7 @@ namespace quda {
 		    out[color_local] += conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row))
 		      * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 		}
+                if(is_staggered) break;
               }
 	    }
 	  }
@@ -226,8 +229,8 @@ namespace quda {
 	    int c_row = color_block + color_local;
 	    int row = s_row*Nc + c_row;
 #pragma unroll
-	    for(int s_col = 0; s_col < (!is_staggered ? Ns : 1); s_col++) {
-              s_col = (1 - s_row);
+	    for(int s_col = 0; s_col < Ns; s_col++) {
+              if(is_staggered) s_col = (1 - s_row);
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) {
 		int col = s_col*Nc + c_col + color_offset;
@@ -238,6 +241,7 @@ namespace quda {
 		  out[color_local] += conj(arg.Y(d+4, 1-parity, gauge_idx, col, row))
 		    * arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
+              if(is_staggered) break;
             }
 	  }
 	}
