@@ -866,49 +866,49 @@ namespace quda {
             // 0000, 0001
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0x0, c);
             xpy(*tmp,*B[8*c+0]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x1, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x1, c);
             xpy(*tmp,*B[8*c+0]);
 
             // 0010, 0011
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0x2, c);
             xpy(*tmp,*B[8*c+1]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x3, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x3, c);
             xpy(*tmp,*B[8*c+1]);
 
             // 0100, 0101
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0x4, c);
             xpy(*tmp,*B[8*c+2]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x5, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x5, c);
             xpy(*tmp,*B[8*c+2]);
 
             // 0110, 0111
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0x6, c);
             xpy(*tmp,*B[8*c+3]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x7, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x7, c);
             xpy(*tmp,*B[8*c+3]);
 
             // 1000, 1001
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0x8, c);
             xpy(*tmp,*B[8*c+4]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x9, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x9, c);
             xpy(*tmp,*B[8*c+4]);
 
             // 1010, 1011
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0xA, c);
             xpy(*tmp,*B[8*c+5]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xB, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xB, c);
             xpy(*tmp,*B[8*c+5]);
 
             // 1100, 1101
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0xC, c);
             xpy(*tmp,*B[8*c+6]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xD, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xD, c);
             xpy(*tmp,*B[8*c+6]);
 
             // 1110, 1111
             tmp->Source(QUDA_CORNER_SOURCE, 1, 0xE, c);
             xpy(*tmp,*B[8*c+7]);
-            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xF, c)
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xF, c);
             xpy(*tmp,*B[8*c+7]);
           }
 
