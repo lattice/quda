@@ -282,6 +282,7 @@ namespace quda {
       }
 
       // apply kappa
+      if(!is_staggered)
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
 
