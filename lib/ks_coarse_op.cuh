@@ -208,8 +208,6 @@ namespace quda {
     int coarse_size = 1;
     for(int d = 0; d<nDim; d++) coarse_size *= arg.xc_size[d];
 
-    const int stag_sp = 0;
-
     getCoords(coord, x_cb, arg.x_size, parity);
     for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/arg.geo_bs[d];
 

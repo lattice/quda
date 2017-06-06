@@ -284,8 +284,8 @@ namespace quda {
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	      for (int s=0; s<nSpin; s++) {
-                int idx = nSpin == 1 ? parity : arg.spin_map(s); 
-		dot[idx] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
+                int spin_idx = nSpin == 1 ? parity : arg.spin_map(s); 
+		dot[spin_idx] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
 	      }
 	    }
 	  }
@@ -303,8 +303,8 @@ namespace quda {
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	      for (int s=0; s<nSpin; s++) {
-                 int idx = nSpin == 1 ? parity : arg.spin_map(s);
-		colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[idx]), i, parity, x_cb, s, arg);
+                 int spin_idx = nSpin == 1 ? parity : arg.spin_map(s);
+		colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[spin_idx]), i, parity, x_cb, s, arg);
 	      }
 
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
@@ -326,8 +326,8 @@ namespace quda {
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	    for (int s=0; s<nSpin; s++) {
-              int idx = nSpin == 1 ? parity : arg.spin_map(s);
-	      nrm[idx] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
+              int spin_idx = nSpin == 1 ? parity : arg.spin_map(s);
+	      nrm[spin_idx] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
 	    }
 	  }
 	}
@@ -346,8 +346,8 @@ namespace quda {
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	    for (int s=0; s<nSpin; s++) {
-              int idx = nSpin == 1 ? parity : arg.spin_map(s);
-	      colorScale<Float,nColor,Arg>(v[s], nrm[idx], parity, x_cb, s, arg);
+              int spin_idx = nSpin == 1 ? parity : arg.spin_map(s);
+	      colorScale<Float,nColor,Arg>(v[s], nrm[spin_idx], parity, x_cb, s, arg);
 	    }
 
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
@@ -410,8 +410,8 @@ namespace quda {
 	// compute (j,i) block inner products
 #pragma unroll
 	for (int s=0; s<nSpin; s++) {
-          int idx = nSpin == 1 ? parity : arg.spin_map(s);
-	  dot[idx] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
+          int spin_idx = nSpin == 1 ? parity : arg.spin_map(s);
+	  dot[spin_idx] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
 	}
 
 	__syncthreads();
@@ -423,8 +423,8 @@ namespace quda {
 	// subtract the blocks to orthogonalise
 #pragma unroll
 	for (int s=0; s<nSpin; s++) {
-          int idx = nSpin == 1 ? parity : arg.spin_map(s);     
-	  colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s)]), i, parity, x_cb, s, arg);
+          int spin_idx = nSpin == 1 ? parity : arg.spin_map(s);     
+	  colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[spin_idx]), i, parity, x_cb, s, arg);
 	}
 
       } // i
@@ -436,8 +436,8 @@ namespace quda {
 
 #pragma unroll
       for (int s=0; s<nSpin; s++) {
-        int idx = nSpin == 1 ? parity : arg.spin_map(s);
-	nrm[idx] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
+        int spin_idx = nSpin == 1 ? parity : arg.spin_map(s);
+	nrm[spin_idx] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
       }
 
       __syncthreads();
@@ -451,8 +451,8 @@ namespace quda {
 
 #pragma unroll
       for (int s=0; s<nSpin; s++) {
-        int idx = nSpin == 1 ? parity : arg.spin_map(s);
-	colorScale<Float,nColor,Arg>(v[s], nrm[idx], parity, x_cb, s, arg);
+        int spin_idx = nSpin == 1 ? parity : arg.spin_map(s);
+	colorScale<Float,nColor,Arg>(v[s], nrm[spin_idx], parity, x_cb, s, arg);
       }
 
 #pragma unroll
@@ -598,7 +598,8 @@ namespace quda {
     int chiralBlocks = (V.Nspin() == 1) ? 2 : V.Nspin() / spin_bs; //always 2 for staggered.
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
     if (V.Nspin() == 1) blocksize /= chiralBlocks; //for staggered chiral block size is a parity block size
-    constexpr int coarseSpin = (nSpin == 4 || nSpin == 2) ? 2 : 1;
+    //for fine-level staggered (nColor=3, nSpin=1) we have same coarse spin components as for nSpin = 4 nSpin = 2
+    constexpr int coarseSpin = (nSpin == 4 || nSpin == 2 || (nColor == 3 && nSpin == 1)) ? 2 : 1;
 
     printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
