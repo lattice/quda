@@ -21,9 +21,7 @@ namespace quda {
     typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> gFine;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
-    const ColorSpinorField &v = T.Vectors();
-    int dummy = 0;
-    v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+    const ColorSpinorField &v = T.Vectors(Y.Location());
 
     F vAccessor(const_cast<ColorSpinorField&>(v));
     F2 uvAccessor(const_cast<ColorSpinorField&>(uv));
