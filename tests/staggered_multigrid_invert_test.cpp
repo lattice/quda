@@ -409,11 +409,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->scale = dslash_type == QUDA_STAGGERED_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
   gaugeParam->t_boundary = QUDA_PERIODIC_T;//QUDA_ANTI_PERIODIC_T;
-#ifndef USE_QDP_LINKS
-  gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
-#else
   gaugeParam->gauge_order = QUDA_QDP_GAUGE_ORDER;
-#endif
   gaugeParam->ga_pad = X1*X2*X3/2;
 
   inv_param->verbosity = QUDA_VERBOSE;
