@@ -828,7 +828,7 @@ namespace quda {
     for (int i=0; i<Nvec; i++) { 
       V[i] = B[i]->V();
       if (V[i] == NULL) {
-	printfQuda("Could not allocate V[%d]\n", i);
+        printfQuda("Could not allocate V[%d]\n", i);
       }
     }
 
@@ -843,29 +843,104 @@ namespace quda {
       printfQuda("Using %d constant nullvectors\n", Nvec);
       //errorQuda("No nullspace file defined");
 
-      for (int i = 0; i < (Nvec < 2 ? Nvec : 2); i++) {
-	zero(*B[i]);
-#if 1
-	ColorSpinorParam csParam(*B[i]);
-	csParam.create = QUDA_ZERO_FIELD_CREATE;
-	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
-	for (int s=i; s<4; s+=2) {
-	  for (int c=0; c<B[i]->Ncolor(); c++) {
-            tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
-	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, s, 2); // sin in dim 3, mode s, offset = 2
-	    xpy(*tmp,*B[i]);
-	  }
-	}
-	delete tmp;
-#else
-	printfQuda("Using random source for nullvector = %d\n",i);
-	B[i]->Source(QUDA_RANDOM_SOURCE);
-#endif
-	//printfQuda("B[%d]\n",i);
-	//for (int x=0; x<B[i]->Volume(); x++) static_cast<cpuColorSpinorField*>(B[i])->PrintVector(x);
-      }
+      if (B[0]->Nspin() == 1) {
+        // staggered, need 24 null vectors (oi!)
+        if (Nvec != 24) {
+          errorQuda("Error in MG::loadVectors: constant null vectors test for staggered multigrid requires 24 null vectors.\n");
 
-      for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
+          // Zero the null vectors.
+          for (int i = 0; i < Nvec ;i++)
+            zero(*B[i]);
+          
+          // Create a temporary vector.
+          ColorSpinorParam csParam(*B[0]);
+          csParam.create = QUDA_ZERO_FIELD_CREATE;
+          ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+
+          // Build free null vectors.
+          for (int c = 0; c < B[0]->Ncolor(); c++)
+          {
+            // Need to pair an even+odd corner together
+            // since they'll get split up.
+
+            // 0000, 0001
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x0, c);
+            xpy(*tmp,*B[8*c+0]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x1, c)
+            xpy(*tmp,*B[8*c+0]);
+
+            // 0010, 0011
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x2, c);
+            xpy(*tmp,*B[8*c+1]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x3, c)
+            xpy(*tmp,*B[8*c+1]);
+
+            // 0100, 0101
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x4, c);
+            xpy(*tmp,*B[8*c+2]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x5, c)
+            xpy(*tmp,*B[8*c+2]);
+
+            // 0110, 0111
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x6, c);
+            xpy(*tmp,*B[8*c+3]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x7, c)
+            xpy(*tmp,*B[8*c+3]);
+
+            // 1000, 1001
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x8, c);
+            xpy(*tmp,*B[8*c+4]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0x9, c)
+            xpy(*tmp,*B[8*c+4]);
+
+            // 1010, 1011
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xA, c);
+            xpy(*tmp,*B[8*c+5]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xB, c)
+            xpy(*tmp,*B[8*c+5]);
+
+            // 1100, 1101
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xC, c);
+            xpy(*tmp,*B[8*c+6]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xD, c)
+            xpy(*tmp,*B[8*c+6]);
+
+            // 1110, 1111
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xE, c);
+            xpy(*tmp,*B[8*c+7]);
+            tmp->Source(QUDA_CORNER_SOURCE, 1, 0xF, c)
+            xpy(*tmp,*B[8*c+7]);
+          }
+
+          delete tmp;
+
+        }
+      }
+      else {
+        // (twisted) wilson(-clover)
+        for (int i = 0; i < (Nvec < 2 ? Nvec : 2); i++) {
+          zero(*B[i]);
+#if 1
+        	ColorSpinorParam csParam(*B[i]);
+        	csParam.create = QUDA_ZERO_FIELD_CREATE;
+        	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+        	for (int s=i; s<4; s+=2) {
+        	  for (int c=0; c<B[i]->Ncolor(); c++) {
+                    tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
+        	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, s, 2); // sin in dim 3, mode s, offset = 2
+        	    xpy(*tmp,*B[i]);
+        	  }
+        	}
+          delete tmp;
+#else
+          printfQuda("Using random source for nullvector = %d\n",i);
+          B[i]->Source(QUDA_RANDOM_SOURCE);
+#endif
+        	//printfQuda("B[%d]\n",i);
+        	//for (int x=0; x<B[i]->Volume(); x++) static_cast<cpuColorSpinorField*>(B[i])->PrintVector(x);
+        }
+        for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
+      }
     }
 
     printfQuda("Done loading vectors\n");
