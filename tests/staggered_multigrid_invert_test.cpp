@@ -556,9 +556,9 @@ int invert_test(int argc, char** argv)
 
 #ifdef MULTI_GPU    
       staggered_dslash_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
+          out, QUDA_EVEN_PARITY, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
-      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
+      staggered_dslash(ref->V(), qdp_fatlink, qdp_longlink, out->V(), QUDA_EVEN_PARITY, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif
 
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
