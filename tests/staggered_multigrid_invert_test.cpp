@@ -30,21 +30,14 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define mySpinorSiteSize 6
 
-#define  USE_QDP_LINKS
-
 /** Regular or preconditioned solve?**/
 //#define  REGULAR_SOLVE //Do just a regular solve (not multigrid)
 
-/** DIRECT_PC or DIRECT smoother/coarse solves?**/
-#define NONPC_SMOOTHER //Direct solve for the smoother
 
 /** Which smoother to use?**/
 //#define CG_SMOOTHER //USE CG smoother
 #define MR_SMOOTHER //USE MR smoother
 //otherwise use GCR
-
-/** Which system to solve?**/
-#define FULL_SYSTEM_SOLVE //USE MR smoother
 
 #include <dirac_quda.h>
 #include <dslash_quda.h>
@@ -130,8 +123,6 @@ QudaPrecision &cuda_prec_precondition = prec_precondition;
 
 static void end();
 
-#ifdef FULL_SYSTEM_SOLVE 
-
 template<typename Float>
 void constructSpinorField(Float *res, const int Vol) {
   for(int i = 0; i < Vol; i++) {
@@ -143,84 +134,6 @@ void constructSpinorField(Float *res, const int Vol) {
     }
   }
 }
-
-#else
-unsigned gseed = 3377u;
-
-template<typename Float>
-void constructSpinorField(Float *res) {
-
-  std::mt19937 gen(gseed);
-  std::normal_distribution<> dist(0.0, 1.0);
-
-  for(int src=0; src<Nsrc; src++)
-  {
-    for(int x = 0; x < Vh; x++) {
-      for (int m = 0; m < 3; m++) {
-        res[(src*Vh+x)*(1*3*2) + m*(2) + 0] = !_2d_u1_emulation ? dist(gen) : 0.0;
-        res[(src*Vh+x)*(1*3*2) + m*(2) + 1] = !_2d_u1_emulation ? dist(gen) : 0.0;
-      }
-    }
-
-    if(_2d_u1_emulation)
-    {
-      Float *inEven = res;
-      {
-        for(int x_cb = 0; x_cb < (Z[0]*Z[1]) / 2; x_cb++) {
-          inEven[x_cb*(1*3*2) + 0] = dist(gen);
-          inEven[x_cb*(1*3*2) + 1] = dist(gen);
-        }
-      }
-    }//end _2d_u1_emulation
-  }
-
-  gseed += 1222;
-}
-
-
-template<typename Float>
-void constructFullSpinorField(Float *res, const int Vol) {
-
-  std::mt19937 gen(gseed);
-  std::normal_distribution<> dist(0.0, 1.0);
-
-  for(int src=0; src<Nsrc; src++)
-  {
-    for(int x = 0; x < Vol; x++) {
-      for (int m = 0; m < 3; m++) {
-        res[x*(1*3*2) + m*(2) + 0] = !_2d_u1_emulation ? dist(gen) : 0.0;
-        res[x*(1*3*2) + m*(2) + 1] = !_2d_u1_emulation ? dist(gen) : 0.0;
-      }
-    }
-
-    if(_2d_u1_emulation)
-    {
-      Float *inEven = res;
-      Float *inOdd  = res + Vh*mySpinorSiteSize;
-
-      for (int parity = 0; parity < 2; parity++) {
-        for(int x_cb = 0; x_cb < (Z[0]*Z[1]) / 2; x_cb++) {
-
-           if(parity == 0)
-           {
-              inEven[x_cb*(1*3*2) + 0] = dist(gen);
-              inEven[x_cb*(1*3*2) + 1] = dist(gen);
-           }
-           else
-           {
-              inOdd[x_cb*(1*3*2) + 0] = dist(gen);
-              inOdd[x_cb*(1*3*2) + 1] = dist(gen);
-           }
-
-        }
-      }
-    }//end _2d_u1_emulation
-  }
-
-  gseed += 1222;
-}
-
-#endif
 
 void setMultigridParam(QudaMultigridParam &mg_param) {
   QudaInvertParam &inv_param = *mg_param.invert_param;//this will be used to setup SolverParam parent in MGParam class
@@ -259,11 +172,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.solution_type = QUDA_MAT_SOLUTION;//fixed
   //inv_param.solution_type = QUDA_MATPC_SOLUTION;//not allowed
 
-#ifdef FULL_SYSTEM_SOLVE
   inv_param.solve_type = QUDA_DIRECT_SOLVE;//fixed
-#else
-  inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;//not allowed
-#endif
 
   const int default_nvecs = 48;
 
@@ -455,11 +364,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->verbosity_precondition = QUDA_SUMMARIZE; // _VERBOSE, _SILENT
   inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
 
-#ifdef FULL_SYSTEM_SOLVE
   inv_param->solution_type = QUDA_MAT_SOLUTION;
-#else
-  inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-#endif
   inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
   inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param->dagger = QUDA_DAG_NO;
@@ -532,13 +437,9 @@ int invert_test(int argc, char** argv)
   if (strcmp(latfile,"")) {
     read_gauge_field(latfile, inlink, gaugeParam.cpu_prec, gaugeParam.X, argc, argv);
     construct_fat_long_gauge_field(inlink, nullptr, 3, gaugeParam.cpu_prec, &gaugeParam, dslash_type);
-#ifdef USE_QDP_LINKS
     for (int dir = 0; dir < 4; dir++) {
       memcpy(qdp_fatlink[dir], inlink[dir] , V*gaugeSiteSize*gSize);
     }
-#else
-    errorQuda("\nGauge oreder is not supported\n");
-#endif
 
   } else {
 
@@ -550,21 +451,6 @@ int invert_test(int argc, char** argv)
   }
 
   free(inlinks);
-#ifndef USE_QDP_LINKS
-  for(int dir=0; dir<4; ++dir){
-    for(int i=0; i<V; ++i){
-      for(int j=0; j<gaugeSiteSize; ++j){
-        if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-          ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
-        }else{
-          ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
-        }
-      }
-    }
-  }
-#endif
 
   ColorSpinorParam csParam;
   csParam.nColor=3;
@@ -576,11 +462,9 @@ int invert_test(int argc, char** argv)
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
-#ifdef FULL_SYSTEM_SOLVE ///What???
+  // Apparently this needs to be set...?
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-#else
-  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-#endif
+  // csParam.siteSubset = QUDA_FULL_SITE_SUBSET; You'd think it should be this...
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
@@ -593,19 +477,11 @@ int invert_test(int argc, char** argv)
   ref = new cpuColorSpinorField(csParam);  
   tmp = new cpuColorSpinorField(csParam);
 
-#ifdef FULL_SYSTEM_SOLVE
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
     constructSpinorField((float*)in->V(), in->Volume());    
   }else{
     constructSpinorField((double*)in->V(), in->Volume());
   }
-#else
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    constructSpinorField((float*)in->V());    
-  }else{
-    constructSpinorField((double*)in->V());
-  }
-#endif
   printfQuda("\nSource norm : %1.15e\n", sqrt(blas::norm2(*in)));
 
 #ifdef MULTI_GPU
@@ -621,21 +497,13 @@ int invert_test(int argc, char** argv)
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 //  GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
-#ifndef USE_QDP_LINKS
-  GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
-#else
   GaugeFieldParam cpuFatParam(qdp_fatlink, gaugeParam);
-#endif
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = (void**)cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
 //  GaugeFieldParam cpuLongParam(longlink, gaugeParam);
-#ifndef USE_QDP_LINKS
-  GaugeFieldParam cpuLongParam(longlink, gaugeParam);
-#else
   GaugeFieldParam cpuLongParam(qdp_longlink, gaugeParam);
-#endif
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
@@ -656,12 +524,7 @@ int invert_test(int argc, char** argv)
   }
   gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
   gaugeParam.reconstruct_precondition = gaugeParam.reconstruct_sloppy;
- //loadGaugeQuda(fatlink, &gaugeParam);
-#ifndef USE_QDP_LINKS
-  loadGaugeQuda(fatlink, &gaugeParam);
-#else
   loadGaugeQuda(qdp_fatlink, &gaugeParam);
-#endif
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
@@ -670,12 +533,7 @@ int invert_test(int argc, char** argv)
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     gaugeParam.cuda_prec_precondition = gaugeParam.cuda_prec_sloppy;
     gaugeParam.reconstruct_precondition = gaugeParam.reconstruct_sloppy;
-    //loadGaugeQuda(longlink, &gaugeParam);
-#ifndef USE_QDP_LINKS
-  loadGaugeQuda(fatlink, &gaugeParam);
-#else
-  loadGaugeQuda(qdp_fatlink, &gaugeParam);
-#endif
+    loadGaugeQuda(qdp_fatlink, &gaugeParam);
   }
 
   double time0 = -((double)clock()); // Start the timer
