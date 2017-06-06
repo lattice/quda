@@ -205,7 +205,7 @@ namespace quda {
 	      int c_row = color_block + color_local;
 	      int row = s_row*Nc + c_row;
 #pragma unroll
-	      for (int s_col=0; s_col< (is_staggered ? Ns : 1); s_col++)
+	      for (int s_col=0; s_col< (is_staggered ? Ns : 1); s_col++) {
                 s_col = (1 - s_row);
 #pragma unroll
 		for (int c_col=0; c_col<Nc; c_col+=color_stride) {
@@ -217,6 +217,7 @@ namespace quda {
 		    out[color_local] += conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row))
 		      * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 		}
+              }
 	    }
 	  }
 	} else if (doBulk<type>()) {
@@ -225,7 +226,7 @@ namespace quda {
 	    int c_row = color_block + color_local;
 	    int row = s_row*Nc + c_row;
 #pragma unroll
-	    for(int s_col = 0; s_col < (is_staggered ? Ns : 1); s_col++)
+	    for(int s_col = 0; s_col < (is_staggered ? Ns : 1); s_col++) {
               s_col = (1 - s_row);
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) {
@@ -237,6 +238,7 @@ namespace quda {
 		  out[color_local] += conj(arg.Y(d+4, 1-parity, gauge_idx, col, row))
 		    * arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
 	      }
+            }
 	  }
 	}
 
@@ -765,20 +767,29 @@ namespace quda {
 	if (clover) {
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
+        } else if (is_staggered) {
+          if (type == DSLASH_FULL) {
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            dslash.apply(0);
+          } else if (type == DSLASH_INTERIOR) {
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            dslash.apply(0);
+          } else { errorQuda("Dslash type %d not instantiated", type); }
+
 
 	} else { // plain dslash
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
 
@@ -787,7 +798,7 @@ namespace quda {
 
 	if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
 	if (clover) {
-	  DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	  DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	  dslash.apply(0);
 	} else {
 	  errorQuda("Unsupported dslash=false clover=false");
@@ -800,20 +811,29 @@ namespace quda {
 	if (clover) {
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
+        } else if(is_staggered) {   
+
+          if (type == DSLASH_FULL) {
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            dslash.apply(0);
+          } else if (type == DSLASH_INTERIOR) {
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            dslash.apply(0);
+          } else { errorQuda("Dslash type %d not instantiated", type); }
 
 	} else { // plain dslash
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
 
@@ -821,7 +841,7 @@ namespace quda {
       } else {
 	if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
 	if (clover) {
-	  DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	  DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,false,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	  dslash.apply(0);
 	} else {
 	  errorQuda("Unsupported dslash=false clover=false");
@@ -954,14 +974,14 @@ namespace quda {
       if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
 	ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-			    dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+			    is_staggered, dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
 	//if (dslash && comm_partitioned()) ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, true, halo_location);
 #else
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
       } else if (precision == QUDA_SINGLE_PRECISION) {
 	ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-			   dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+			   is_staggered, dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
 	//if (dslash && comm_partitioned()) ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, true, halo_location);
       } else {
 	errorQuda("Unsupported precision %d\n", Y.Precision());

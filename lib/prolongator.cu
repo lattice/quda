@@ -53,7 +53,12 @@ namespace quda {
 
   template <typename Float, int coarseSpin, int coarseColor, class Coarse>
   __device__ __host__ inline void prolongate2TopLevelStaggered(complex<Float> out[coarseSpin*coarseColor], const Coarse &in,
-                                             int parity_coarse, int x_coarse_cb) {
+                                             int parity, int x_cb, const int *geo_map, int fineVolumeCB) {
+    int x = parity*fineVolumeCB + x_cb;
+    int x_coarse = geo_map[x];
+    int parity_coarse = (x_coarse >= in.VolumeCB()) ? 1 : 0;
+    int x_coarse_cb = x_coarse - parity_coarse*in.VolumeCB();
+
 #pragma unroll
     for (int p = 0; p < coarseSpin; p++) { 
 #pragma unroll
@@ -147,7 +152,7 @@ namespace quda {
           }
 	} else {
           complex<Float> tmp[coarseSpin*coarseColor];
-          prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
+          prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in,  parity, x_cb, arg.geo_map, arg.out.VolumeCB());
           for (int fine_color_block=0; fine_color_block<fineColor; fine_color_block+=fine_colors_per_thread) {
             rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
          } 
@@ -172,7 +177,7 @@ namespace quda {
         (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
     } else {
       complex<Float> tmp[2*coarseColor];
-      prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
+      prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.out.VolumeCB());
       rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
     }
   }
