@@ -52,6 +52,12 @@ if(QUDA_DIRAC_STAGGERED)
     target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
     QUDA_CHECKBUILDTEST(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
   endif()
+
+  if(QUDA_MULTIGRID)
+    cuda_add_executable(staggered_multigrid_invert_test staggered_multigrid_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
+    target_link_libraries(staggered_multigrid_invert_test ${TEST_LIBS})
+    QUDA_CHECKBUILDTEST(staggered_multigrid_invert_test QUDA_BUILD_ALL_TESTS)
+  endif()
 endif()
 
 if(QUDA_MULTIGRID)
