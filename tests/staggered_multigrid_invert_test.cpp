@@ -169,8 +169,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
   inv_param.matpc_type = matpc_type;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;//fixed
-  //inv_param.solution_type = QUDA_MATPC_SOLUTION;//not allowed
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;//fixed
 
@@ -325,7 +324,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->mass = mass;
 
   // outer solver parameters
-  inv_param->inv_type = inv_type;
+  inv_param->inv_type = QUDA_GCR_INVERTER;
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
   inv_param->maxiter = niter;
@@ -355,7 +354,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // domain decomposition preconditioner parameters
 #ifndef REGULAR_SOLVE
   inv_param->inv_type_precondition = QUDA_MG_INVERTER;
-  if(inv_type != QUDA_GCR_INVERTER) errorQuda("Solver type is not supported for multilevel precondisioning\n");
 #else
   warningQuda("Running a regular solver, solve type is %d.\n", inv_type);
 #endif
@@ -462,9 +460,7 @@ int invert_test(int argc, char** argv)
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
-  // Apparently this needs to be set...?
-  csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  // csParam.siteSubset = QUDA_FULL_SITE_SUBSET; You'd think it should be this...
+  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
@@ -496,13 +492,11 @@ int invert_test(int argc, char** argv)
   gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-//  GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   GaugeFieldParam cpuFatParam(qdp_fatlink, gaugeParam);
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = (void**)cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-//  GaugeFieldParam cpuLongParam(longlink, gaugeParam);
   GaugeFieldParam cpuLongParam(qdp_longlink, gaugeParam);
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
@@ -561,7 +555,7 @@ int invert_test(int argc, char** argv)
       time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU    
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+      staggered_dslash_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
           out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
