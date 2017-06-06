@@ -132,3 +132,4 @@ enable_testing()
   
 
 add_test(dummy_gtest dummy_gtest --gtest_output=xml:dummy_gtest.xml)
+add_test(blas_test blas_test --gtest_output=xml:blas_test.xml)
