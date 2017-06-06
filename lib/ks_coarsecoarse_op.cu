@@ -5,7 +5,7 @@
 #include <gauge_field_order.h>
 #include <complex_quda.h>
 #include <index_helper.cuh>
-#include <blas_magma.h>
+#include <blas_cublas.h>
 #include <ks_coarse_op.cuh>
 
 namespace quda {

@@ -1,3 +1,5 @@
+#include <multigrid_helper.cuh>
+
 namespace quda {
   static bool bidirectional_debug = false;
 
@@ -799,6 +801,13 @@ namespace quda {
     else printfQuda("Doing uni-directional link coarsening\n");
 
 
+
+    const int nFace = LL != nullptr ? 3 : 1;//
+    v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
+    arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
+
+    LatticeField::bufferIndex = 1 -LatticeField::bufferIndex;
+
     // Now compute the coarse links
     for(int d = 0; d < nDim; d++) {
       y.setDimension(d);
@@ -845,7 +854,7 @@ namespace quda {
       y.apply(0);
       printfQuda("X2 = %e\n", X.norm2(0));
     }
-
+/*
     {
       cpuGaugeField *X_h = static_cast<cpuGaugeField*>(&X_);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv_);
@@ -855,9 +864,27 @@ namespace quda {
       BlasMagmaArgs magma(X_h->Precision());
       magma.BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume());
     }
+*/
+    const int n = X_.Ncolor();
+    if (X_.Location() == QUDA_CUDA_FIELD_LOCATION && X_.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+      GaugeFieldParam param(X_);
+      // need to copy into AoS format for MAGMA
+      param.order = QUDA_MILC_GAUGE_ORDER;
+      cudaGaugeField X(param);
+      cudaGaugeField Xinv(param);
+      X.copy(X_);
+      blas::flops += cublas::BatchInvertMatrix((void*)Xinv.Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X_.Precision(), X.Location());
+      Xinv_.copy(Xinv);
+    } else if (X_.Location() == QUDA_CPU_FIELD_LOCATION && X_.Order() == QUDA_QDP_GAUGE_ORDER) {
+      cpuGaugeField *X_h = static_cast<cpuGaugeField*>(&X_);
+      cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv_);
+      blas::flops += cublas::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X_.Precision(), QUDA_CPU_FIELD_LOCATION);
+    } else {
+      errorQuda("Unsupported location=%d and order=%d", X_.Location(), X_.Order());
+    }
 
     // now exchange Y halos for multi-process dslash
-    Y_.exchangeGhost();
+    Y_.exchangeGhost( QUDA_LINK_BIDIRECTIONAL );
 
     // compute the preconditioned links
     // Yhat_back(x-\mu) = Y_back(x-\mu) * Xinv^dagger(x) (positive projector)
@@ -876,6 +903,11 @@ namespace quda {
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
-    Yhat_.injectGhost();
+    Yhat_.injectGhost( QUDA_LINK_BACKWARDS );
+
+    // exchange forwards links for multi-process dslash dagger
+    // need to put this in the ghost zone of the next node - but only send forwards the forwards links and not overwrite the backwards ghost
+    Yhat_.exchangeGhost( QUDA_LINK_FORWARDS );
+
   }
 } // namespace quda
