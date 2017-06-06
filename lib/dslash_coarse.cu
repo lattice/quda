@@ -139,7 +139,7 @@ namespace quda {
 	      int c_row = color_block + color_local; // global color index
 	      int row = s_row*Nc + c_row;
 #pragma unroll
-	      for(int s_col = 0; s_col < (is_staggered ? Ns : 1); s_col++) { //Spin column
+	      for(int s_col = 0; s_col < (!is_staggered ? Ns : 1); s_col++) { //Spin column
                 s_col = (1 - s_row);//just redef. s_col?
 #pragma unroll
 		for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
@@ -160,7 +160,7 @@ namespace quda {
 	    int c_row = color_block + color_local; // global color index
 	    int row = s_row*Nc + c_row;
 #pragma unroll
-	    for(int s_col = 0; s_col < (is_staggered ? Ns : 1); s_col++) { //Spin column
+	    for(int s_col = 0; s_col < (!is_staggered ? Ns : 1); s_col++) { //Spin column
               s_col = (1 - s_row);
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) { //Color column
@@ -205,7 +205,7 @@ namespace quda {
 	      int c_row = color_block + color_local;
 	      int row = s_row*Nc + c_row;
 #pragma unroll
-	      for (int s_col=0; s_col< (is_staggered ? Ns : 1); s_col++) {
+	      for (int s_col=0; s_col< (!is_staggered ? Ns : 1); s_col++) {
                 s_col = (1 - s_row);
 #pragma unroll
 		for (int c_col=0; c_col<Nc; c_col+=color_stride) {
@@ -226,7 +226,7 @@ namespace quda {
 	    int c_row = color_block + color_local;
 	    int row = s_row*Nc + c_row;
 #pragma unroll
-	    for(int s_col = 0; s_col < (is_staggered ? Ns : 1); s_col++) {
+	    for(int s_col = 0; s_col < (!is_staggered ? Ns : 1); s_col++) {
               s_col = (1 - s_row);
 #pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col+=color_stride) {
