@@ -35,9 +35,6 @@
 /** Regular or preconditioned solve?**/
 //#define  REGULAR_SOLVE //Do just a regular solve (not multigrid)
 
-/** Full output from smoothers/coarse solves?**/
-#define FULL_REPORT //report smoother iteration info
-
 /** DIRECT_PC or DIRECT smoother/coarse solves?**/
 #define NONPC_SMOOTHER //Direct solve for the smoother
 
@@ -300,14 +297,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-#ifndef NONPC_SMOOTHER
-#ifdef FULL_SYSTEM_SOLVE
-    errorQuda("Check mg_param.smoother_solve_type[i]\n");
-#endif
-    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
-#else
+    // We'll eventually want the e-o preconditioning (since it's a nice normal op),
+    // but for now let's not.
     mg_param.smoother_solve_type[i] = QUDA_DIRECT_SOLVE; 
-#endif
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
@@ -464,11 +456,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 #endif
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
-#ifndef FULL_REPORT
-  inv_param->verbosity_precondition = QUDA_SILENT;
-#else
-  inv_param->verbosity_precondition = QUDA_VERBOSE;
-#endif
+  inv_param->verbosity_precondition = QUDA_SUMMARIZE; // _VERBOSE, _SILENT
   inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
 
 #ifdef FULL_SYSTEM_SOLVE
