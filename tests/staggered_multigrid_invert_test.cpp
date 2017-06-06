@@ -555,8 +555,8 @@ int invert_test(int argc, char** argv)
       time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU    
-      staggered_dslash_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-          out, QUDA_EVEN_PARITY, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      staggered_dslash_mg4dir(ref->V(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+          out->V(), QUDA_EVEN_PARITY, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #else
       staggered_dslash(ref->V(), qdp_fatlink, qdp_longlink, out->V(), QUDA_EVEN_PARITY, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif
