@@ -244,7 +244,7 @@ namespace quda {
       for(int c_row = 0; c_row < coarseColor; c_row++) { // Coarse Color row
         for(int c_col = 0; c_col < coarseColor; c_col++) { // Coarse Color column
           (*M)(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[c_row*coarseColor+c_col];
-          if(M_L != nullptr) (*M_L)(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[coarseColor*coarseColor+c_row*coarseColor+c_col]; 
+          if(M_L != nullptr) (*M_L)(dim_index_long,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col) += vuv[coarseColor*coarseColor+c_row*coarseColor+c_col]; 
         }
       }
     } else {
