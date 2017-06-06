@@ -952,6 +952,8 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
+  ::testing::InitGoogleTest(&argc, argv);
+  int result = 0;
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -978,44 +980,46 @@ int main(int argc, char** argv)
 
   setVerbosity(QUDA_SILENT);
 
-  for (int prec = 0; prec < Nprec; prec++) {
-    if (Nspin == 2 && prec == 0) continue;
+  // for (int prec = 0; prec < Nprec; prec++) {
+  //   if (Nspin == 2 && prec == 0) continue;
 
-    printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
-    initFields(prec);
+  //   printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
+  //   initFields(prec);
 
-    for (int kernel = 0; kernel < Nkernels; kernel++) {
-      if (skip_kernel(prec, kernel)) continue;
+  //   for (int kernel = 0; kernel < Nkernels; kernel++) {
+  //     if (skip_kernel(prec, kernel)) continue;
 
-      // do the initial tune
-      benchmark(kernel, 1);
+  //     // do the initial tune
+  //     benchmark(kernel, 1);
 
-      // now rerun with more iterations to get accurate speed measurements
-      quda::blas::flops = 0;
-      quda::blas::bytes = 0;
+  //     // now rerun with more iterations to get accurate speed measurements
+  //     quda::blas::flops = 0;
+  //     quda::blas::bytes = 0;
 
-      double secs = benchmark(kernel, niter);
+  //     double secs = benchmark(kernel, niter);
 
-      double gflops = (quda::blas::flops*1e-9)/(secs);
-      double gbytes = quda::blas::bytes/(secs*1e9);
+  //     double gflops = (quda::blas::flops*1e-9)/(secs);
+  //     double gbytes = quda::blas::bytes/(secs*1e9);
 
-      printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
-    }
-    freeFields();
-  }
+  //     printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
+  //   }
+  //   freeFields();
+  // }
 
   // clear the error state
   cudaGetLastError();
 
   // lastly check for correctness
   if (verify_results) {
-    ::testing::InitGoogleTest(&argc, argv);
-    if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+    
+    // if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+    result = RUN_ALL_TESTS();
   }
 
   endQuda();
 
   finalizeComms();
+  return result;
 }
 
 // The following tests each kernel at each precision using the google testing framework
@@ -1054,6 +1058,25 @@ TEST_P(BlasTest, verify) {
   double tol = (prec == 2 ? 1e-10 : (prec == 1 ? 1e-5 : 1e-3));
   tol = (kernel < 2) ? 1e-4 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
+
+TEST_P(BlasTest, benchmark) {
+  int prec = ::testing::get<0>(GetParam());
+  int kernel = ::testing::get<1>(GetParam());
+// do the initial tune
+      benchmark(kernel, 1);
+
+      // now rerun with more iterations to get accurate speed measurements
+      quda::blas::flops = 0;
+      quda::blas::bytes = 0;
+
+      double secs = benchmark(kernel, niter);
+
+      double gflops = (quda::blas::flops*1e-9)/(secs);
+      double gbytes = quda::blas::bytes/(secs*1e9);
+      RecordProperty("Gflop/s", std::to_string(gflops));
+      RecordProperty("GB/s", std::to_string(gbytes));
+      printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);  
 }
 
 // The optional last argument to INSTANTIATE_TEST_CASE_P allows the user
