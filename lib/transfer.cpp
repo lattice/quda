@@ -119,11 +119,11 @@ namespace quda {
 
     createGeoMap(geo_bs);
 
-    // allocate the fine-to-coarse spin map (don't need it for staggered.)
-    if (B[0]->Nspin() != 1){
-      spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
-      createSpinMap(spin_bs);
+    spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));//let's do it for staggered as well
+    if (param.nSpin == 1 && spin_bs != 1){
+      errorQuda("Cannot create spin_map for spin %d field and spin_bs %d\n", B[0]->Nspin(), spin_bs);
     }
+    createSpinMap(spin_bs);
 
 #if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
     bool gpu_setup = true;
