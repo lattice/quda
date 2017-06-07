@@ -172,7 +172,7 @@ mark_as_advanced(QUDA_ALTRELIABLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
-set(CPU_ARCH x86_64)
+set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 
 #######################################################################
