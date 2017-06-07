@@ -693,6 +693,13 @@ public:
       return *this;
     }
 
+  __host__ __device__ inline complex<short>& operator-=(const complex<short> z)
+    {
+      real(real()-z.real());
+      imag(imag()-z.imag());
+      return *this;
+    }
+
   __host__ __device__ inline short real() const volatile{ return x; }
   __host__ __device__ inline short imag() const volatile{ return y; }
   __host__ __device__ inline short real() const{ return x; }
