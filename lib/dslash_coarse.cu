@@ -962,7 +962,7 @@ namespace quda {
 	errorQuda("Unsupported precision %d\n", Y.Precision());
       }
 
-      if (dslash && comm_partitioned()) inA.bufferIndex = (1 - inA.bufferIndex);
+      if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
 #else
       errorQuda("Multigrid has not been built");
 #endif
