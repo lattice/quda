@@ -1017,7 +1017,8 @@ namespace quda {
     csParam.setPrecision(B[0]->Precision());
 
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    //for staggered we need to pass basis check in copy routines.
+    csParam.gammaBasis = (B[0]->Nspin() == 1) ? param.B[0]->GammaBasis() : QUDA_UKQCD_GAMMA_BASIS;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
     csParam.create = QUDA_NULL_FIELD_CREATE;

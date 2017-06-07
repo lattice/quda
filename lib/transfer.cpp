@@ -28,6 +28,7 @@ namespace quda {
     int ndim = B[0]->Ndim();
 
     for (int d = 0; d < ndim; d++) {
+      if(d == 4 && geo_bs[d] == 1) continue;//no blocking in 5th dim, so there is nothing to check 
       while (geo_bs[d] > 0) {
 	if (d==0 && B[0]->X(0) == geo_bs[0])
 	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);

@@ -223,7 +223,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   }
 
   //mg_param.smoother_solve_type[0] = solve_type == QUDA_NORMOP_PC_SOLVE? QUDA_NORMOP_PC_SOLVE : mg_param.smoother_solve_type[0]; //or choose QUDA_DIRECT_SOLVE;
-  mg_param.smoother_solve_type[0] = QUDA_NORMOP_PC_SOLVE;//enforce NORMOPPC solve
+  mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE;//enforce NORMOPPC solve
   // coarsen the spin on the first restriction is undefined for staggered fields
   mg_param.spin_block_size[0] = 1;
   warningQuda("Level 0 spin block size is set to: %d", mg_param.spin_block_size[0]);
