@@ -72,7 +72,7 @@ namespace quda {
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     gParam.precision = prec;
-    gParam.nDim = ndim;
+    gParam.nDim = ndim == 5 ? 4 : ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 1;
