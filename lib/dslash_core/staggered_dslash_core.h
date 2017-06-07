@@ -884,9 +884,9 @@ if (kernel_type == INTERIOR_KERNEL){
 #else
  for (int reg_src=0; reg_src<reg_block_size; reg_src++) {
 #if (DD_PREC == 2) //half precision
-    int norm_idx1 = half_idx + (src_idx+reg_src)*Volh;
+    int norm_idx1 = idx + (src_idx+reg_src)*Volh;
 #endif
-   READ_ACCUM(tmp,ACCUMTEX, half_idx+(src_idx+reg_src)*block_src_offset*Volh);
+   READ_ACCUM(tmp,ACCUMTEX, idx+(src_idx+reg_src)*block_src_offset*Volh);
    for (int i=0; i<3; i++) O[reg_src][i] = -O[reg_src][i] + a*tmp[i];
  }
 #endif //MULTI_GPU
