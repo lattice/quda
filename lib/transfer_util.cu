@@ -640,6 +640,8 @@ namespace quda {
 	BlockOrthogonalize<Float,nSpin,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
       } else if (Nvec == 32) {
 	BlockOrthogonalize<Float,nSpin,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+      } else if (Nvec == 48) {
+        BlockOrthogonalize<Float,nSpin,nColor,48>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
