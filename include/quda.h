@@ -146,25 +146,25 @@ extern "C" {
     int overlap; /**< Width of domain overlaps */
 
     /** Offsets for multi-shift solver */
-    double offset[QUDA_MAX_MULTI_SHIFT];
+    double offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_MULTI_SHIFT];
+    double tol_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
-    double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
+    double tol_hq_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Actual L2 residual norm achieved in solver for each offset */
-    double true_res_offset[QUDA_MAX_MULTI_SHIFT];
+    double true_res_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
-    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
+    double iter_res_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
-    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
+    double true_res_hq_offset[QUDA_MAX_ARRAY_SIZE];
 
     /** Residuals in the partial faction expansion */
-    double residue[QUDA_MAX_MULTI_SHIFT];
+    double residue[QUDA_MAX_ARRAY_SIZE];
 
     /** Whether we should evaluate the action after the linear solver*/
     int compute_action;

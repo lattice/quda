@@ -59,6 +59,7 @@ namespace quda {
     int ghostVolume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
     int x5   = nDim == 5 ? x[4] : 1; ///includes DW  and non-degenerate TM ghosts
+    //int comp_dim = composite_descr.is_composite ? composite_descr.dim : 1 ;
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
       if (commDimPartitioned(i)) {
@@ -68,6 +69,7 @@ namespace quda {
 	  ghostFace[i] *= x[j];
 	}
 	ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
+        //ghostFace[i] *= comp_dim ;  // this breaks multi-gpu nsrc > 1
 	if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
 	ghostVolume += ghostFace[i];
       }
@@ -184,6 +186,7 @@ namespace quda {
       composite_descr.norm_bytes  = norm_bytes;
 
       volume *= composite_descr.dim;
+      volumeCB *= composite_descr.dim;
       stride *= composite_descr.dim;
       length *= composite_descr.dim;
       real_length *= composite_descr.dim;
@@ -225,6 +228,12 @@ namespace quda {
     if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
       strcpy(aux_tmp, aux_string);
       check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
+      if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+    }
+
+    if (IsComposite()) {
+      strcpy(aux_tmp, aux_string);
+      check = snprintf(aux_string, aux_string_n, "%s,composite_dim=%d", aux_tmp, CompositeDim());
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
     }
   }

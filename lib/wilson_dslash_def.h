@@ -419,7 +419,7 @@
 
 // define the kernel
 
-template <KernelType kernel_type>
+template <KernelType kernel_type, int reg_block_size=1>
   __global__ void DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)(const DslashParam param) {
 
   // build Wilson or clover as appropriate
@@ -474,7 +474,7 @@ template <KernelType kernel_type>
 
 #ifdef MULTI_GPU
 template <>
-__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+__global__ void	DD_FUNC(DD_NAME_F, DD_PREC_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL,1>
   (const DslashParam param) {
 
   // build Wilson or clover as appropriate

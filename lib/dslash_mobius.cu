@@ -183,6 +183,7 @@ namespace quda {
       dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      constexpr int register_block_size = 1;
       
       switch(DS_type){
       case 0:

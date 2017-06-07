@@ -136,6 +136,7 @@ set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
+set(QUDA_BLOCKSOLVER_NVTX OFF CACHE BOOL "add nvtx markup to block solver calls for the visual profiler")
 
 # GPUdirect options
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
@@ -147,6 +148,7 @@ set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
+set(QUDA_SWIZZLE OFF CACHE BOOL "use swizzle optimization for Dslash")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -158,12 +160,15 @@ mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
+mark_as_advanced(QUDA_BLOCKSOLVER_NVTX)
+
 
 mark_as_advanced(QUDA_GPU_DIRECT)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_EIGEN)
 mark_as_advanced(QUDA_ALTRELIABLE)
+mark_as_advanced(QUDA_SWIZZLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -299,6 +304,10 @@ if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
 
+if(QUDA_SWIZZLE)
+  add_definitions(-DSWIZZLE)
+endif()
+
 if (QUDA_MULTIGRID)
   add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
@@ -403,6 +412,11 @@ if(QUDA_INTERFACE_NVTX)
   add_definitions(-DINTERFACE_NVTX)
   set(QUDA_NVTX ON)
 endif(QUDA_INTERFACE_NVTX)
+
+if(QUDA_BLOCKSOLVER_NVTX)
+  add_definitions(-DBLOCKSOLVER_NVTX)
+  set(QUDA_NVTX ON)
+endif(QUDA_BLOCKSOLVER_NVTX)
 
 if(QUDA_NVTX)
   FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)

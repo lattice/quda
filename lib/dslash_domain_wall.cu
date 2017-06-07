@@ -159,6 +159,7 @@ namespace quda {
       dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      constexpr int register_block_size = 1;
       DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
     }
 

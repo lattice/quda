@@ -49,6 +49,8 @@ enum KernelType {
     int gauge_stride;
     int long_gauge_stride;
     float fat_link_max;
+    bool is_composite;//currently staggered only
+    int composite_Vh;
 #endif 
 #ifdef MULTI_GPU
     int threadDimMapLower[4];

@@ -112,23 +112,23 @@ module quda_fortran
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver
      integer(4) :: num_src ! Number of sources in the multiple source solver
      integer(4) :: overlap ! width of domain overlaps
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset
+     real(8), dimension(QUDA_MAX_ARRAY_SIZE) :: offset ! Offsets for multi-shift solver
+     real(8), dimension(QUDA_MAX_ARRAY_SIZE) :: tol_offset ! Solver tolerance for each offset
 
      ! Solver tolerance for each shift when refinement is applied using the heavy-quark residual
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_hq_offset
+     real(8), dimension(QUDA_MAX_ARRAY_SIZE) :: tol_hq_offset
 
      ! Actual L2 residual norm achieved in solver for each offset
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_offset
+     real(8), dimension(QUDA_MAX_ARRAY_SIZE) :: true_res_offset
 
      ! Iterated L2 residual achieved in multi shift solver for each offset
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: iter_res_offset
+     real(8), dimension(QUDA_MAX_ARRAY_SIZE) :: iter_res_offset
 
      ! Actual heavy quark residual norm achieved in solver for each offset
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset
+     real(8), dimension(QUDA_MAX_ARRAY_SIZE) :: true_res_hq_offset
 
      ! Residuals in the partial faction expansion
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: residue
+     real(8), dimension(QUDA_MAX_ARRAY_SIZE) :: residue
 
      ! Whether we should evaluate the action after the linear solve
      integer(4) :: compute_action

@@ -360,8 +360,6 @@ struct coeff_array {
   coeff_array(const T *data, bool use_const) : data(data), use_const(use_const) { }
 };
 
-
-
 template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename yType,
 	  int M, int NXZ, template <int MXZ, typename ReducerType, typename Float, typename FloatN> class Reducer, typename write, typename T>
   void multiReduceCuda(doubleN result[], const reduce::coeff_array<T> &a, const reduce::coeff_array<T> &b, const reduce::coeff_array<T> &c,
@@ -433,6 +431,7 @@ template <typename doubleN, typename ReduceType, typename RegType, typename Stor
 
   blasStrings.vol_str = x[0]->VolString();
   strcpy(blasStrings.aux_tmp, x[0]->AuxString());
+
   if (typeid(StoreType) != typeid(yType)) {
     strcat(blasStrings.aux_tmp, ",");
     strcat(blasStrings.aux_tmp, y[0]->AuxString());
