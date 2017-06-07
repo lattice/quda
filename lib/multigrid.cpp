@@ -55,6 +55,9 @@ namespace quda {
 	csParam.setPrecision(csParam.precision);
 	csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
       }
+      if(param.B[0]->Nspin() == 1) {//NEW:We need this hack for staggered to avoid unnecessary basis checks
+        csParam.gammaBasis = param.B[0]->GammaBasis();
+      }
       r = ColorSpinorField::Create(csParam);
 
       // if we're using preconditioning then allocate storate for the preconditioned source vector
