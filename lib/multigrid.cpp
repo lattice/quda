@@ -891,7 +891,7 @@ namespace quda {
 #endif
   }
 
-  void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {
+  void MG::generateNullVectors(std::vector<ColorSpinorField*> &B) {
     printfQuda("\nGenerate null vectors\n");
 
     SolverParam solverParam(param);  // Set solver field parameters:
