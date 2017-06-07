@@ -88,7 +88,14 @@ namespace quda {
 
   namespace gauge {
 
-    template<typename ReduceType, typename Float> struct square { __host__ __device__ ReduceType operator()(quda::complex<Float> x) { return static_cast<ReduceType>(norm(x)); } };
+    template<typename ReduceType, typename Float> struct square_ {
+      __host__ __device__ ReduceType operator()(quda::complex<Float> x)
+      { return static_cast<ReduceType>(norm(x)); }
+    };
+
+    template<typename Float> struct abs_ {
+      __host__ __device__ Float operator()(quda::complex<Float> x) { return abs(x); }
+    };
 
     template<typename Float, int nColor, QudaGaugeFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
@@ -139,6 +146,16 @@ namespace quda {
       }
 
       __host__ double device_norm2(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmax(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmin(int dim) const {
 	errorQuda("Not implemented");
 	return 0.0;
       }
@@ -198,6 +215,16 @@ namespace quda {
 	errorQuda("Not implemented");
 	return 0.0;
       }
+
+      __host__ double device_absmax(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmin(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
     };
 
     template<typename Float, int nColor, bool native_ghost>
@@ -240,15 +267,17 @@ namespace quda {
       struct Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> {
       complex<Float> *u;
       const int offset_cb;
+      const int volumeCB;
       const int stride;
       const int geometry;
     Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
       : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
 	  static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
-	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride()), geometry(U.Geometry())
+	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), volumeCB(U.VolumeCB()),
+	stride(U.Stride()), geometry(U.Geometry())
 	{  }
     Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
-      : u(a.u), offset_cb(a.offset_cb), stride(a.stride), geometry(a.geometry) {  }
+      : u(a.u), offset_cb(a.offset_cb), volumeCB(a.volumeCB), stride(a.stride), geometry(a.geometry) {  }
 
       __device__ __host__ inline complex<Float>& operator()(int dim, int parity, int x_cb, int row, int col) const
       { return u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb]; }
@@ -266,13 +295,39 @@ namespace quda {
       __host__ double device_norm2(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
 	thrust::device_ptr<complex<Float> > ptr(u);
-	double even = thrust::transform_reduce(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square<double,Float>(), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square<double,Float>(), 0.0, thrust::plus<double>());
+	unsigned parity_start = dim*stride*nColor*nColor;
+	unsigned parity_end = parity_start + volumeCB*nColor*nColor;
+	double even = thrust::transform_reduce(ptr+0*offset_cb+parity_start, ptr+0*offset_cb+parity_end,
+					       square_<double,Float>(), 0.0, thrust::plus<double>());
+	double odd  = thrust::transform_reduce(ptr+1*offset_cb+parity_start, ptr+1*offset_cb+parity_end,
+					       square_<double,Float>(), 0.0, thrust::plus<double>());
 	return even + odd;
+      }
+
+      __host__ double device_absmax(int dim) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust::device_ptr<complex<Float> > ptr(u);
+	unsigned parity_start = dim*stride*nColor*nColor;
+	unsigned parity_end = parity_start + volumeCB*nColor*nColor;
+	Float even = thrust::transform_reduce(ptr+0*offset_cb+parity_start, ptr+0*offset_cb+parity_end,
+					      abs_<Float>(), 0.0, thrust::maximum<Float>());
+	Float odd  = thrust::transform_reduce(ptr+1*offset_cb+parity_start, ptr+1*offset_cb+parity_end,
+					      abs_<Float>(), 0.0, thrust::maximum<Float>());
+	return std::max(even,odd);
+      }
+
+      __host__ double device_absmin(int dim) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust::device_ptr<complex<Float> > ptr(u);
+	unsigned parity_start = dim*stride*nColor*nColor;
+	unsigned parity_end = parity_start + volumeCB*nColor*nColor;
+	Float even = thrust::transform_reduce(ptr+0*offset_cb+parity_start, ptr+0*offset_cb+parity_end,
+					      abs_<Float>(), std::numeric_limits<Float>::max(),
+					      thrust::minimum<Float>());
+	Float odd  = thrust::transform_reduce(ptr+1*offset_cb+parity_start, ptr+1*offset_cb+parity_end,
+					      abs_<Float>(), std::numeric_limits<Float>::max(),
+					      thrust::minimum<Float>());
+	return std::min(even,odd);
       }
     };
 
@@ -345,7 +400,7 @@ namespace quda {
 	}
 
       FieldOrder(const FieldOrder &o) : volumeCB(o.volumeCB),
-	  nDim(o.nDim), geometry(o.geometry),
+	  nDim(o.nDim), geometry(o.geometry), location(o.location),
 	  accessor(o.accessor), ghostAccessor(o.ghostAccessor)
 	{ }
 
@@ -502,6 +557,56 @@ namespace quda {
 	  }
 	  comm_allreduce(&nrm2);
 	  return nrm2;
+	}
+
+	/**
+	 * @brief Returns the Linfinity norm of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Linfinity norm
+	 */
+	__host__ double abs_max(int dim) const {
+	  double absmax = 0;
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmax = accessor.device_absmax(dim);
+	  } else {
+	    // do simple norm on host memory
+	    absmax = 0.0;
+	    for (int parity=0; parity<2; parity++)
+	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		for (int row=0; row<nColor; row++)
+		  for (int col=0; col<nColor; col++)
+		    absmax = abs((*this)(dim,parity,x_cb,row,col)) > absmax
+		      ? abs((*this)(dim,parity,x_cb,row,col)) : absmax;
+	      }
+	  }
+	  comm_allreduce_max(&absmax);
+	  return absmax;
+	}
+
+	/**
+	 * @brief Returns the minimum absolute value of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Minimum norm
+	 */
+	__host__ double abs_min(int dim) const {
+	  double absmin = 0;
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmin = accessor.device_absmin(dim);
+	  } else {
+	    // do simple norm on host memory
+	    absmin = 0.0;
+	    for (int parity=0; parity<2; parity++)
+	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		for (int row=0; row<nColor; row++)
+		  for (int col=0; col<nColor; col++)
+		    absmin = abs((*this)(dim,parity,x_cb,row,col)) < absmin
+		      ? abs((*this)(dim,parity,x_cb,row,col)) : absmin;
+	      }
+	  }
+	  comm_allreduce_min(&absmin);
+	  return absmin;
 	}
 
 	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
