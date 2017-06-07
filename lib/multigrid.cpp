@@ -50,7 +50,7 @@ namespace quda {
       csParam.location = param.location;
       if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
 	// all coarse GPU vectors use FLOAT2 ordering
-	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION || param.level > 0) ? 
+	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION || param.level > 0 || param.B[0]->Nspin() == 1) ? 
 	  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
 	csParam.setPrecision(csParam.precision);
 	csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
