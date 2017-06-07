@@ -108,8 +108,8 @@ namespace quda {
       X_d = new cudaGaugeField(gParam);
       Xinv_d = new cudaGaugeField(gParam);
     }
-
-    bool gpu_setup = true;
+    //we enforce host construction 
+    bool gpu_setup = (transfer->Vectors().Nspin() != 1) ? true : false;
 
     if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*Xinv_d,*Yhat_d,*transfer,kappa,Mu(),MuFactor());
     else dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*Yhat_h,*transfer,kappa,Mu(),MuFactor());
