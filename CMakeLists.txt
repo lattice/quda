@@ -179,7 +179,6 @@ mark_as_advanced(QUDA_SWIZZLE)
 # options that are not exposed at all because only one option exists
 set(CPU_ARCH x86_64)
 
-
 #######################################################################
 # everything below here is processing the setup
 #######################################################################
@@ -336,7 +335,7 @@ if(QUDA_DEFLATEDSOLVER)
 endif()
 
 if(QUDA_ALTRELIABLE)
-  add_definitions(-DALTRELIABE)
+  add_definitions(-DALTRELIABLE)
 endif()
 
 if(QUDA_EIGEN)
