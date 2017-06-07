@@ -334,6 +334,12 @@ namespace quda {
     void generateNullVectors(std::vector<ColorSpinorField*> B);
 
     /**
+       @brief Build free-field null-space vectors
+       @param B Free-field null-space vectors
+     */
+    void buildFreeVectors(std::vector<ColorSpinorField*> B);
+
+    /**
        @brief Return the total flops done on this and all coarser levels.
      */
     double flops() const;
