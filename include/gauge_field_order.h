@@ -295,40 +295,44 @@ namespace quda {
       __host__ double device_norm2(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
 	thrust::device_ptr<complex<Float> > ptr(u);
-	unsigned parity_start = dim*stride*nColor*nColor;
-	unsigned parity_end = parity_start + volumeCB*nColor*nColor;
-	double even = thrust::transform_reduce(ptr+0*offset_cb+parity_start, ptr+0*offset_cb+parity_end,
-					       square_<double,Float>(), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(ptr+1*offset_cb+parity_start, ptr+1*offset_cb+parity_end,
-					       square_<double,Float>(), 0.0, thrust::plus<double>());
-	return even + odd;
+	double nrm2 = 0.0;
+	for (int i=0; i<nColor*nColor; i++) {
+	  thrust::device_ptr<complex<Float> > ptr(u + 0*offset_cb + dim*stride*nColor*nColor + i*stride);
+	  nrm2 += thrust::transform_reduce(ptr, ptr+volumeCB, square_<double,Float>(), 0.0, thrust::plus<double>());
+	  ptr += 1*offset_cb;
+	  nrm2 += thrust::transform_reduce(ptr, ptr+volumeCB, square_<double,Float>(), 0.0, thrust::plus<double>());
+	}
+	return nrm2;
       }
 
-      __host__ double device_absmax(int dim) const {
+      __host__ Float device_absmax(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-	thrust::device_ptr<complex<Float> > ptr(u);
-	unsigned parity_start = dim*stride*nColor*nColor;
-	unsigned parity_end = parity_start + volumeCB*nColor*nColor;
-	Float even = thrust::transform_reduce(ptr+0*offset_cb+parity_start, ptr+0*offset_cb+parity_end,
-					      abs_<Float>(), 0.0, thrust::maximum<Float>());
-	Float odd  = thrust::transform_reduce(ptr+1*offset_cb+parity_start, ptr+1*offset_cb+parity_end,
-					      abs_<Float>(), 0.0, thrust::maximum<Float>());
-	return std::max(even,odd);
+
+	Float max = 0.0;
+	for (int i=0; i<nColor*nColor; i++) {
+	  thrust::device_ptr<complex<Float> > ptr(u + 0*offset_cb + dim*stride*nColor*nColor + i*stride);
+	  max = std::max(max, thrust::transform_reduce(ptr, ptr+volumeCB, abs_<Float>(), static_cast<Float>(0.0), thrust::maximum<Float>()));
+
+	  ptr += 1*offset_cb;
+	  max = std::max(max, thrust::transform_reduce(ptr, ptr+volumeCB, abs_<Float>(), static_cast<Float>(0.0), thrust::maximum<Float>()));
+	}
+	return max;
       }
 
-      __host__ double device_absmin(int dim) const {
+      __host__ Float device_absmin(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-	thrust::device_ptr<complex<Float> > ptr(u);
-	unsigned parity_start = dim*stride*nColor*nColor;
-	unsigned parity_end = parity_start + volumeCB*nColor*nColor;
-	Float even = thrust::transform_reduce(ptr+0*offset_cb+parity_start, ptr+0*offset_cb+parity_end,
-					      abs_<Float>(), std::numeric_limits<Float>::max(),
-					      thrust::minimum<Float>());
-	Float odd  = thrust::transform_reduce(ptr+1*offset_cb+parity_start, ptr+1*offset_cb+parity_end,
-					      abs_<Float>(), std::numeric_limits<Float>::max(),
-					      thrust::minimum<Float>());
-	return std::min(even,odd);
+
+	Float min = std::numeric_limits<Float>::max();
+	for (int i=0; i<nColor*nColor; i++) {
+	  thrust::device_ptr<complex<Float> > ptr(u + 0*offset_cb + dim*stride*nColor*nColor + i*stride);
+	  min = std::min(max, thrust::transform_reduce(ptr, ptr+volumeCB, abs_<Float>(), std::numeric_limits<Float>::max(), thrust::minimum<Float>()));
+
+	  ptr += 1*offset_cb;
+	  min = std::min(max, thrust::transform_reduce(ptr, ptr+volumeCB, abs_<Float>(), std::numeric_limits<Float>::max(), thrust::minimum<Float>()));
+	}
+	return min;
       }
+
     };
 
     template<typename Float, int nColor, bool native_ghost>
