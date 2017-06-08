@@ -293,6 +293,7 @@ namespace quda {
     }
 
 #else // !__CUDA_ARCH__
+    if(!is_staggered)
     for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
 #endif
 
@@ -344,7 +345,7 @@ namespace quda {
 #pragma unroll
     for (int c=0; c<Mc; c++) out[c] = 0.0;
     if (dslash) applyDslash<Float,nDim,Ns,Nc,Mc,color_stride,dim_thread_split,dir,dim,is_staggered,dagger,type>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-    if (doBulk<type>() && clover && dir==0 && dim==0) applyClover<Float,Ns,Nc,Mc,color_stride,dagger>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+    if (doBulk<type>() && (clover || is_staggered) && dir==0 && dim==0) applyClover<Float,Ns,Nc,Mc,color_stride,dagger>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
 
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -769,24 +770,25 @@ namespace quda {
 
     if (dagger) {
       if (dslash) {
-	if (clover) {
+	if (is_staggered) {
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
-        } else if (is_staggered) {
+
+        } else if (clover) {
+
           if (type == DSLASH_FULL) {
-            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,true,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
             dslash.apply(0);
           } else if (type == DSLASH_INTERIOR) {
-            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,true,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
             dslash.apply(0);
           } else { errorQuda("Dslash type %d not instantiated", type); }
-
 
 	} else { // plain dslash
 
@@ -813,22 +815,22 @@ namespace quda {
     } else {
 
       if (dslash) {
-	if (clover) {
+	if (is_staggered) {
 
 	  if (type == DSLASH_FULL) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else if (type == DSLASH_INTERIOR) {
-	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+	    DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
 	    dslash.apply(0);
 	  } else { errorQuda("Dslash type %d not instantiated", type); }
-        } else if(is_staggered) {   
+        } else if(clover) {   
 
           if (type == DSLASH_FULL) {
-            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,false,DSLASH_FULL> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
             dslash.apply(0);
           } else if (type == DSLASH_INTERIOR) {
-            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,false,true,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
+            DslashCoarse<Float,nDim,coarseSpin,coarseColor,colors_per_thread,true,true,false,false,DSLASH_INTERIOR> dslash(out, inA, inB, Y, X, kappa, parity, halo_location);
             dslash.apply(0);
           } else { errorQuda("Dslash type %d not instantiated", type); }
 
