@@ -26,7 +26,7 @@ namespace quda {
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
-      typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder> F;
+      typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
@@ -43,7 +43,7 @@ namespace quda {
 
       calculateY<true,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
 	(yAccessor, xAccessor, xInvAccessor, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor,
-	 Y, X, Xinv, Yhat, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc);
+	 Y, X, Xinv, Yhat, uv, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc);
 
     } else {
 
@@ -55,7 +55,7 @@ namespace quda {
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
-      typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder> F;
+      typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
@@ -72,7 +72,7 @@ namespace quda {
 
       calculateY<true,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
 	(yAccessor, xAccessor, xInvAccessor, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor,
-	 Y, X, Xinv, Yhat, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc);
+	 Y, X, Xinv, Yhat, uv, const_cast<ColorSpinorField&>(v), v, kappa, mu, mu_factor, dirac, matpc);
 
     }
 
@@ -143,7 +143,8 @@ namespace quda {
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, ColorSpinorField &uv,
 			const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
 			double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-    Precision(X, Y, uv, T.Vectors(), g);
+    Precision(X, Xinv, Y, Yhat, g, clover, cloverInv);
+    Precision(uv, T.Vectors(X.Location()));
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -187,7 +188,7 @@ namespace quda {
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
     UVparam.nSpin *= 2; // so nSpin == 4
-    UVparam.precision = T.Vectors(QUDA_CPU_FIELD_LOCATION).Precision(); // in case V on GPU is fixed point
+    UVparam.precision = T.Vectors(location).Precision();
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 

@@ -167,9 +167,11 @@ namespace quda {
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   __device__ __host__ inline void computeAV(Arg &arg, int parity, int x_cb, int ic_c) {
 
+    complex<Float> AV[fineSpin][fineColor];
+
     for(int s = 0; s < fineSpin; s++) {
       for(int c = 0; c < fineColor; c++) {
-	arg.AV(parity,x_cb,s,c,ic_c) = static_cast<Float>(0.0);
+	AV[s][c] = static_cast<Float>(0.0);
       }
     }
 
@@ -182,12 +184,17 @@ namespace quda {
 
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	    arg.AV(parity, x_cb, s, ic, ic_c) +=
-	      arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
+	    AV[s][ic] += arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
 	  }  //Fine color columns
 	}  //Fine color rows
       }
     } //Fine Spin
+
+    for (int s=0; s<fineSpin; s++) {
+      for (int ic=0; ic<fineColor; ic++) {
+	arg.AV(parity, x_cb, s, ic, ic_c) = AV[s][ic];
+      }
+    }
 
   } // computeAV
 
@@ -402,15 +409,12 @@ namespace quda {
   __device__ __host__ inline void computeTMCAV(Arg &arg, int parity, int x_cb) {
 
     complex<Float> mu(0.,arg.mu);
+    complex<Float> UV[fineSpin][fineColor][coarseColor];
 
-    for(int s = 0; s < fineSpin; s++) {
-      for(int c = 0; c < fineColor; c++) {
-	for(int v = 0; v < coarseColor; v++) {
-	  arg.UV(parity,x_cb,s,c,v) = static_cast<Float>(0.0);
-	  arg.AV(parity,x_cb,s,c,v) = static_cast<Float>(0.0);
-	}
-      }
-    }
+    for (int s = 0; s < fineSpin; s++)
+      for (int c = 0; c < fineColor; c++)
+	for (int v = 0; v < coarseColor; v++)
+	  UV[s][c][v] = static_cast<Float>(0.0);
 
     //First we store in UV the product [(Clover -/+ i mu)·Vector]
     for(int s = 0; s < fineSpin; s++) {  //Fine Spin
@@ -423,8 +427,7 @@ namespace quda {
 	for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
-	      arg.UV(parity, x_cb, s, ic, ic_c) +=
-		arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
+	      UV[s][ic][ic_c] += arg.C(0, parity, x_cb, s, s_col, ic, jc) * arg.V(parity, x_cb, s_col, jc, ic_c);
 	    }  //Fine color columns
 	  }  //Fine color rows
 	} //Coarse color
@@ -434,7 +437,7 @@ namespace quda {
     for(int s = 0; s < fineSpin/2; s++) {  //Fine Spin
       for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
-	  arg.UV(parity, x_cb, s, ic, ic_c) -= mu * arg.V(parity, x_cb, s, ic, ic_c);
+	  UV[s][ic][ic_c] -= mu * arg.V(parity, x_cb, s, ic, ic_c);
 	}  //Fine color
       } //Coarse color
     } //Fine Spin
@@ -442,10 +445,15 @@ namespace quda {
     for(int s = fineSpin/2; s < fineSpin; s++) {  //Fine Spin
       for(int ic_c = 0; ic_c < coarseColor; ic_c++) {  //Coarse Color
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color
-	  arg.UV(parity, x_cb, s, ic, ic_c) += mu * arg.V(parity, x_cb, s, ic, ic_c);
+	  UV[s][ic][ic_c] += mu * arg.V(parity, x_cb, s, ic, ic_c);
 	}  //Fine color
       } //Coarse color
     } //Fine Spin
+
+    for (int s = 0; s < fineSpin; s++)
+      for (int c = 0; c < fineColor; c++)
+	for (int v = 0; v < coarseColor; v++)
+	  arg.AV(parity,x_cb,s,c,v) = static_cast<Float>(0.0);
 
 #ifndef	DYNAMIC_CLOVER
     //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
@@ -461,7 +469,7 @@ namespace quda {
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	      arg.AV(parity, x_cb, s, ic, ic_c) +=
-		arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * arg.UV(parity, x_cb, s_col, jc, ic_c);
+		arg.Cinv(0, parity, x_cb, s, s_col, ic, jc) * UV[s_col][jc][ic_c];
 	    }  //Fine color columns
 	  }  //Fine color rows
 	} //Coarse color
@@ -1517,7 +1525,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
 	   QudaGaugeFieldOrder gOrder, typename F, typename Ftmp, typename Vt, typename coarseGauge, typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, Ftmp &UV, F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv,
-		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, ColorSpinorField &av, const ColorSpinorField &v,
+		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
 		  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
     // sanity checks
@@ -1570,16 +1578,25 @@ namespace quda {
     if (&v == &av) arg.AV.resetGhost(av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
+    printfQuda("V2 = %e\n", arg.V.norm2());
+
     // If doing preconditioned clover then we first multiply the
     // null-space vectors by the clover inverse matrix, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       printfQuda("Computing AV\n");
 
+      if (av.Precision() == QUDA_HALF_PRECISION) {
+	double max = 6*arg.Cinv.abs_max(0);
+	printfQuda("clover max %e\n", max);
+	av.Scale(max);
+	arg.AV.resetScale(max);
+      }
+
       y.setComputeType(COMPUTE_AV);
       y.apply(0);
 
-      printfQuda("AV2 = %e\n", AV.norm2());
+      printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
     // If doing preconditioned twisted-mass then we first multiply the
@@ -1588,10 +1605,20 @@ namespace quda {
     if ( dirac == QUDA_TWISTED_MASSPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       printfQuda("Computing TMAV\n");
 
+      if (av.Precision() == QUDA_HALF_PRECISION) {
+	// this is just a trivial rescaling kernel, find the maximum
+	complex<Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
+	complex<Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
+	double max = std::max(abs(fp), abs(fm));
+	printfQuda("tm max %e\n", max);
+	av.Scale(max);
+	arg.AV.resetScale(max);
+      }
+
       y.setComputeType(COMPUTE_TMAV);
       y.apply(0);
 
-      printfQuda("AV2 = %e\n", AV.norm2());
+      printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
     // If doing preconditioned twisted-clover then we first multiply the
@@ -1601,10 +1628,20 @@ namespace quda {
     if ( dirac == QUDA_TWISTED_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       printfQuda("Computing TMCAV\n");
 
+      if (av.Precision() == QUDA_HALF_PRECISION) {
+#ifdef DYNAMIC_CLOVER
+	errorQuda("Half precision not supported with dynamic clover");
+#endif
+	double max = 6*sqrt(arg.Cinv.abs_max(0));
+	printfQuda("tmc max %e\n", max);
+	av.Scale(max);
+	arg.AV.resetScale(max);
+      }
+
       y.setComputeType(COMPUTE_TMCAV);
       y.apply(0);
 
-      printfQuda("AV2 = %e\n", AV.norm2());
+      printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
     // First compute the coarse forward links if needed
@@ -1614,13 +1651,22 @@ namespace quda {
 	y.setDirection(QUDA_FORWARDS);
 	printfQuda("Computing forward %d UV and VUV\n", d);
 
+	if (uv.Precision() == QUDA_HALF_PRECISION) {
+	  double U_max = 3.0*arg.U.abs_max(from_coarse ? d+4 : d);
+	  double uv_max = U_max * v.Scale();
+	  uv.Scale(uv_max);
+	  arg.UV.resetScale(uv_max);
+
+	  printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", d, U_max, v.Scale(), uv_max);
+	}
+
 	y.setComputeType(COMPUTE_UV);  // compute U*V product
 	y.apply(0);
-	printfQuda("UV2[%d] = %e\n", d, UV.norm2());
+	printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
 	y.setComputeType(COMPUTE_VUV); // compute Y += VUV
 	y.apply(0);
-	printfQuda("Y2[%d] = %e\n", d, Y.norm2(4+d));
+	printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2(4+d));
       }
     }
 
@@ -1637,15 +1683,24 @@ namespace quda {
       y.setDirection(QUDA_BACKWARDS);
       printfQuda("Computing backward %d UV and VUV\n", d);
 
+      if (uv.Precision() == QUDA_HALF_PRECISION) {
+	double U_max = 3.0*arg.U.abs_max(d);
+	double uv_max = U_max * av.Scale();
+	uv.Scale(uv_max);
+	arg.UV.resetScale(uv_max);
+
+	printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
+      }
+
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
       y.apply(0);
-      printfQuda("UAV2[%d] = %e\n", d, UV.norm2());
+      printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(0);
-      printfQuda("Y2[%d] = %e\n", d, Y.norm2(d));
+      printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2(d));
     }
-    printfQuda("X2 = %e\n", X.norm2(0));
+    printfQuda("X2 = %e\n", arg.X.norm2(0));
 
     cudaDeviceSynchronize(); checkCudaError();
 
@@ -1662,7 +1717,7 @@ namespace quda {
     printfQuda("Computing coarse local\n");
     y.setComputeType(COMPUTE_COARSE_LOCAL);
     y.apply(0);
-    printfQuda("X2 = %e\n", X.norm2(0));
+    printfQuda("X2 = %e\n", arg.X.norm2(0));
 
     cudaDeviceSynchronize(); checkCudaError();
 
@@ -1689,7 +1744,7 @@ namespace quda {
 
     cudaDeviceSynchronize(); checkCudaError();
 
-    printfQuda("X2 = %e\n", X.norm2(0));
+    printfQuda("X2 = %e\n", arg.X.norm2(0));
 
     // invert the clover matrix field
     const int n = X_.Ncolor();
@@ -1732,7 +1787,7 @@ namespace quda {
       CalculateYhat<Float, coarseSpin*coarseColor, yHatArg> yHat(arg, Y_);
       yHat.apply(0);
 
-      for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e\n", d, Y.norm2(d));
+      for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e\n", d, arg.Y.norm2(d));
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
