@@ -292,6 +292,8 @@ namespace quda {
 	Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 32) {
 	Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 48) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,48>(out, in, v, fine_to_coarse, parity);
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
       }

@@ -513,6 +513,8 @@ namespace quda {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 32) {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 48) {
+        Restrict<Float,fineSpin,fineColor,coarseSpin,48>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
       }

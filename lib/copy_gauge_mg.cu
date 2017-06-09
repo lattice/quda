@@ -142,6 +142,9 @@ namespace quda {
     } else  if (in.Ncolor() == 64) {
       const int Nc = 64;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 96) {
+      const int Nc = 96;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else 
 #endif // GPU_MULTIGRID
     {

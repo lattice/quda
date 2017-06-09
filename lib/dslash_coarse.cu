@@ -894,6 +894,8 @@ namespace quda {
 #endif
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover,is_staggered, dagger, type, halo_location);
+    } else if (inA.Ncolor() == 48) {
+      ApplyCoarse<Float,48,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover,is_staggered, dagger, type, halo_location);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
