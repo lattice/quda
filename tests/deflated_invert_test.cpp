@@ -39,6 +39,7 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern QudaPrecision  prec_sloppy;
 extern QudaPrecision  prec_precondition;
+extern QudaPrecision  prec_ritz;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
@@ -113,6 +114,7 @@ QudaPrecision &cpu_prec = prec;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
+QudaPrecision &cuda_prec_ritz = prec_ritz;
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.X[0] = xdim;
@@ -239,7 +241,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
-  inv_param.cuda_prec_ritz = cuda_prec_sloppy;
+  inv_param.cuda_prec_ritz = cuda_prec_ritz;
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.verbosity_precondition = QUDA_SILENT;
 

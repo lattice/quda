@@ -1565,6 +1565,8 @@ QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision  prec_precondition = QUDA_INVALID_PRECISION;
+QudaPrecision  prec_ritz = QUDA_INVALID_PRECISION;
+
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
@@ -1645,6 +1647,7 @@ void usage(char** argv )
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
+  printf("    --prec-ritz <double/single/half>  # Eigenvector precision in GPU\n");
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
   printf("    --recon-sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
   printf("    --recon-precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
@@ -1802,6 +1805,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     prec_precondition =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--prec-ritz") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    prec_ritz =  get_prec(argv[i+1]);
     i++;
     ret = 0;
     goto out;
