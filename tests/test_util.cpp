@@ -1615,6 +1615,16 @@ bool generate_nullspace = true;
 bool generate_all_levels = true;
 
 int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
+int nev = 8;
+int max_search_dim = 64;
+int deflation_grid = 16;//to test the stuff
+double tol_restart = 5e+3*tol;//think about this...
+
+int eigcg_max_restarts = 3;
+int max_restart_num = 3;
+double inc_tol = 1e-2;
+double eigenval_tol = 1e-1;
+
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1694,7 +1704,16 @@ void usage(char** argv )
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --mg-vebosity <level verb>                # The verbosity to use on each level of the multigrid (default silent)\n");
+  printf("    --df-nev <nev>                            # Set number of eigenvectors computed within a single solve cycle (default 8)\n");
+  printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
+  printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
+  printf("    --df-eigcg-max-restarts <n>               # Set how many eigCG restarts are allowed within a single physical right hand site solve (default 4)\n");
+  printf("    --df-tol-restart <tol>                    # Set restart tolerance for the eigCG solver(default 1e-6)\n");
+  printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
+  printf("    --df-tol-iterref <tol>                    # Set iterative tolerance for the iter refinement cycle  (default 1e-2)\n");
+  printf("    --df-max-restart-num <n>                    # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
+
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --help                                    # Print out this message\n");
 
@@ -2559,7 +2578,98 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
+
+  if( strcmp(argv[i], "--df-nev") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    nev = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-max-search-dim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    max_search_dim = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-deflation-grid") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    deflation_grid = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+  if( strcmp(argv[i], "--df-eigcg-max-restarts") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    eigcg_max_restarts = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+  if( strcmp(argv[i], "--df-max-restart-num") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    max_restart_num = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+
+  if( strcmp(argv[i], "--df-tol-restart") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    tol_restart = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+
+  if( strcmp(argv[i], "--df-tol-eigenval") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    eigenval_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+  if( strcmp(argv[i], "--df-tol-iterref") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    inc_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);

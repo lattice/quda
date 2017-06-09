@@ -664,8 +664,10 @@ namespace quda {
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
 #ifdef DEFLATEDSOLVER
+     if(param.rhs_idx == 0) max_eigcg_cycles = param.eigcg_max_restarts;
+
      const bool mixed_prec = (param.precision != param.precision_sloppy);
-     const double b2 = norm2(in);
+     const double b2       = norm2(in);
 
      deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
      Deflation &defl         = *(defl_p->defl);
@@ -715,7 +717,7 @@ namespace quda {
        if( dcg_cycle ) { //run DCG instead
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
-           Kparam.tol         = param.cg_iterref_tol;
+           Kparam.tol         = param.inc_tol;//param.cg_iterref_tol
            K = new CG(matSloppy, matPrecon, Kparam, profile);   
          }
 

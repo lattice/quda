@@ -418,15 +418,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
-  P(nev, 0);
-  P(max_search_dim, 0);
+  P(nev, 8);
+  P(max_search_dim, 64);
   P(rhs_idx, 0);
-  P(deflation_grid, 0);
+  P(deflation_grid, 1);
 
-  P(use_reduced_vector_set, true);
-  P(use_cg_updates, false);
-  P(cg_iterref_tol, 5e-2);
-  P(eigcg_max_restarts, 2);
+  P(eigcg_max_restarts, 4);
   P(max_restart_num, 3);
   P(inc_tol, 1e-2);
   P(eigenval_tol, 1e-1);

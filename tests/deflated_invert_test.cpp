@@ -68,6 +68,17 @@ extern void usage(char** );
 extern double clover_coeff;
 extern bool compute_clover;
 
+extern int nev;
+extern int max_search_dim;
+extern int deflation_grid;
+extern double tol_restart;
+
+extern int eigcg_max_restarts;
+extern int max_restart_num;
+extern double inc_tol;
+extern double eigenval_tol;
+
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -211,24 +222,20 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.rhs_idx  = 0;
 
+  inv_param.nev = nev;
+  inv_param.max_search_dim = max_search_dim;
+  inv_param.deflation_grid = deflation_grid;
+  inv_param.tol_restart = tol_restart;.
+  inv_param.eigcg_max_restarts = eigcg_max_restarts;
+  inv_param.max_restart_num = max_restart_num;
+  inv_param.inc_tol = inc_tol;
+  inv_param.eigenval_tol = eigenval_tol;
+
+
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.nev = 8;
-    inv_param.max_search_dim = 64;
-    inv_param.deflation_grid = 16;//to test the stuff
-    inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
-    inv_param.use_reduced_vector_set = true;
-    inv_param.use_cg_updates = false;
-    inv_param.cg_iterref_tol = 5e-2;
-    inv_param.eigcg_max_restarts = 3;
-    inv_param.max_restart_num = 3;
-    inv_param.inc_tol = 1e-2;
-    inv_param.eigenval_tol = 1e-2;
   }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    inv_param.nev = 7;
-    inv_param.max_search_dim = 15;
-    inv_param.deflation_grid = 100;//to test the stuff
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
