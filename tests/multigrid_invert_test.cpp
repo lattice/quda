@@ -72,9 +72,10 @@ extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
 extern double omega;
-extern QudaInverterType smoother_type;
-extern QudaInverterType coarsest_solver;
-extern double coarsest_tol;
+extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
+extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+extern double smoother_tol[QUDA_MAX_MG_LEVEL];
 extern int coarsest_maxiter;
 
 extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
@@ -244,10 +245,14 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
-    mg_param.smoother[i] = smoother_type;
+    // set the coarse solver wrappers including bottom solver
+    mg_param.coarse_solver[i] = coarse_solver[i];
+    mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
+
+    mg_param.smoother[i] = smoother_type[i];
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
-    mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
+    mg_param.smoother_tol[i] = smoother_tol[i];
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
@@ -282,8 +287,6 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
   // coarsest grid solver
-  mg_param.smoother[mg_levels-1] = coarsest_solver;
-  mg_param.smoother_tol[mg_levels-1] = coarsest_tol == 0 ? tol_hq : coarsest_tol;
   mg_param.nu_pre[mg_levels-1] = coarsest_maxiter;
   mg_param.nu_post[mg_levels-1] = 0;
 
@@ -398,13 +401,18 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 int main(int argc, char **argv)
 {
-  // We give here the default value to some of the array
+  // We give here the default values to some of the array
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SILENT;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
     mu_factor[i] = 1.;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
+    schwarz_cycle[i] = 1;
+    smoother_type[i] = QUDA_MR_INVERTER;
+    smoother_tol[i] = 0.25;
+    coarse_solver[i] = QUDA_GCR_INVERTER;
+    coarse_solver_tol[i] = 0.25;
   }
 
   for (int i = 1; i < argc; i++){
