@@ -34,7 +34,7 @@ namespace quda {
   CG::~CG() {
     profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
-      for (auto pi : p) if (pi) delete pi;
+      for (auto &pi : p) delete pi;
       if (rp) delete rp;
       if (pp) delete pp;
       if (yp) delete yp;
@@ -45,8 +45,8 @@ namespace quda {
       }
       if (tmpp) delete tmpp;
       if(!mat.isStaggered()) {
-	if (tmp2p && tmpp != tmp2p) delete tmp2p;
-	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
+	if (tmp2p) delete tmp2p;
+	if (tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
       if (rnewp) delete rnewp;
 
@@ -208,15 +208,6 @@ namespace quda {
       init = true;
     }
 
-    if (Np != (int)p.size()) {
-      for (auto &pi : p) delete pi;
-      p.resize(Np);
-      ColorSpinorParam csParam(x);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.setPrecision(param.precision_sloppy);
-      for (auto &pi : p) pi = ColorSpinorField::Create(csParam);
-    }
-
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -225,18 +216,6 @@ namespace quda {
     ColorSpinorField &tmp3 = *tmp3p;
     ColorSpinorField &rSloppy = *rSloppyp;
     ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
-
-    {
-      ColorSpinorParam csParam(r);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      csParam.setPrecision(param.precision_sloppy);
-
-      if (Np != (int)p.size()) {
-	for (auto &pi : p) delete pi;
-	p.resize(Np);
-	for (auto &pi : p) pi = ColorSpinorField::Create(csParam);
-      }
-    }
 
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
@@ -718,13 +697,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       tmp3p = tmp2p = tmpp;
     }
 
-    init = true;
-  }
+    rnewp = ColorSpinorField::Create(csParam);
 
-  if(!rnewp) {
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    init = true;
   }
 
   ColorSpinorField &r = *rp;
@@ -1111,13 +1086,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       tmp3p = tmp2p = tmpp;
     }
 
-    init = true;
-  }
+    rpnew = ColorSpinorField::Create(csParam);
 
-  if(!rnewp) {
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    init = true;
   }
 
   ColorSpinorField &r = *rp;
