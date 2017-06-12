@@ -1016,6 +1016,13 @@ void constructUnitaryGaugeField(Float **res)
 
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
+  if(type == 3)
+  {
+    if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling_long((double**)gauge, Vh, param, QUDA_STAGGERED_DSLASH);
+    else applyGaugeFieldScaling_long((float**)gauge, Vh, param, QUDA_STAGGERED_DSLASH);
+    return;
+  }
+
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) constructUnitGaugeField((double**)gauge, param);
     else constructUnitGaugeField((float**)gauge, param);
@@ -1076,6 +1083,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       }
     }
   }
+
+  if( type == 3) return;
 
   // set all links to zero to emulate the 1-link operator (needed for host comparison)
   if (dslash_type == QUDA_STAGGERED_DSLASH) { 
