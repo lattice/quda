@@ -132,8 +132,9 @@ namespace quda {
 #endif
 
     /**
-       Copy into this CloverField from the generic CloverField src
+       @brief Copy into this CloverField from the generic CloverField src
        @param src The clover field from which we want to copy
+       @param inverse Are we copying the inverse or direct field
      */
     void copy(const CloverField &src, bool inverse=true);
 
@@ -245,8 +246,8 @@ namespace quda {
      @param outNorm The output norm buffer (optional)
      @param inNorm The input norm buffer (optional)
   */
-  void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-			 void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
+  void copyGenericClover(CloverField &out, const CloverField &in, bool inverse,
+			 QudaFieldLocation location, void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
   
 
 
@@ -259,6 +260,14 @@ namespace quda {
      @param location The location of the field
   */
   void cloverInvert(CloverField &clover, bool computeTraceLog, QudaFieldLocation location);
+
+  /**
+     @brief This function adds a real scalar onto the clover diagonal (only to the direct field not the inverse)
+
+     @param clover The clover field
+     @param rho Real scalar to be added on
+  */
+  void cloverRho(CloverField &clover, double rho);
 
   /**
      @brief Compute the force contribution from the solver solution fields
