@@ -1366,145 +1366,12 @@ namespace quda {
   };
 
 
-  template <typename Flloat, typename Gauge, int n>
-  struct CalculateYhatArg {
-    Gauge Yhat;
-    const Gauge Y;
-    const Gauge Xinv;
-    int dim[QUDA_MAX_DIM];
-    int comm_dim[QUDA_MAX_DIM];
-    int nFace;
-    const int coarseVolumeCB;   /** Coarse grid volume */
-
-    CalculateYhatArg(const Gauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim, const int *comm_dim, int nFace)
-      : Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), coarseVolumeCB(Y.VolumeCB()) {
-      for (int i=0; i<4; i++) {
-	this->comm_dim[i] = comm_dim[i];
-	this->dim[i] = dim[i];
-      }
-    }
-  };
-
-  template<typename Float, int n, typename Arg>
-  __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i) {
-
-    int coord[5];
-    getCoords(coord, x_cb, arg.dim, parity);
-    coord[4] = 0;
-
-    const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-
-    // first do the backwards links Y^{+\mu} * X^{-\dagger}
-    if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
-
-      for(int j = 0; j<n; j++) {
-	arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) = 0.0;
-	for(int k = 0; k<n; k++) {
-	  arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) += arg.Y.Ghost(d,1-parity,ghost_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
-	}
-      }
-
-    } else {
-      const int back_idx = linkIndexM1(coord, arg.dim, d);
-
-      for(int j = 0; j<n; j++) {
-	arg.Yhat(d,1-parity,back_idx,i,j) = 0.0;
-	for(int k = 0; k<n; k++) {
-	  arg.Yhat(d,1-parity,back_idx,i,j) += arg.Y(d,1-parity,back_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
-	}
-      }
-
-    }
-
-    // now do the forwards links X^{-1} * Y^{-\mu}
-    for(int j = 0; j<n; j++) {
-      arg.Yhat(d+4,parity,x_cb,i,j) = 0.0;
-      for(int k = 0; k<n; k++) {
-	arg.Yhat(d+4,parity,x_cb,i,j) += arg.Xinv(0,parity,x_cb,i,k) * arg.Y(d+4,parity,x_cb,k,j);
-      }
-    }
-
-  }
-
-  template<typename Float, int n, typename Arg>
-  void CalculateYhatCPU(Arg &arg) {
-
-    for (int d=0; d<4; d++) {
-      for (int parity=0; parity<2; parity++) {
-	for (int x_cb=0; x_cb<arg.Y.VolumeCB(); x_cb++) {
-	  for (int i=0; i<n; i++) computeYhat<Float,n>(arg, d, x_cb, parity, i);
-	} // x_cb
-      } //parity
-    } // dimension
-  }
-
-  template<typename Float, int n, typename Arg>
-  __global__ void CalculateYhatGPU(Arg arg) {
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.coarseVolumeCB) return;
-    int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (i_parity >= 2*n) return;
-    int d = blockDim.z*blockIdx.z + threadIdx.z;
-    if (d >= 4) return;
-
-    int i = i_parity % n;
-    int parity = i_parity / n;
-    // first do the backwards links Y^{+\mu} * X^{-\dagger}
-    computeYhat<Float,n>(arg, d, x_cb, parity, i);
-  }
-
-  template <typename Float, int n, typename Arg>
-  class CalculateYhat : public TunableVectorYZ {
-
-  protected:
-    Arg &arg;
-    const LatticeField &meta;
-
-    long long flops() const { return 2l * arg.coarseVolumeCB * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
-    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()); }
-
-    unsigned int minThreads() const { return arg.coarseVolumeCB; }
-
-    bool tuneGridDim() const { return false; } // don't tune the grid dimension
-
-  public:
-    CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4), arg(arg), meta(meta)
-    {
-      strcpy(aux,comm_dim_partitioned_string());
-    }
-    virtual ~CalculateYhat() { }
-
-    void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	CalculateYhatCPU<Float,n,Arg>(arg);
-      } else {
-	CalculateYhatGPU<Float,n,Arg> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      }
-    }
-
-    bool advanceTuneParam(TuneParam &param) const {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) return Tunable::advanceTuneParam(param);
-      else return false;
-    }
-
-    TuneKey tuneKey() const {
-      char Aux[TuneKey::aux_n];
-      strcpy(Aux,aux);
-      strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
-      return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
-    }
-  };
-
 
   /**
-     @brief Calculate the coarse-link field, include the clover field,
-     and its inverse, and finally also compute the preconditioned
-     coarse link field.
+     @brief Calculate the coarse-link field, including the coarse clover field.
 
      @param Y[out] Coarse link field accessor
      @param X[out] Coarse clover field accessor
-     @param Xinv[out] Coarse clover inverse field accessor
      @param UV[out] Temporary accessor used to store fine link field * null space vectors
      @param AV[out] Temporary accessor use to store fine clover inverse * null
      space vectors (only applicable when fine-grid operator is the
@@ -1515,8 +1382,7 @@ namespace quda {
      @param Cinv[in] Fine grid clover inverse field accessor
      @param Y_[out] Coarse link field
      @param X_[out] Coarse clover field
-     @param Xinv_[out] Coarse clover field
-     @param Yhat_[out] Preconditioned coarse link field
+     @param X_[out] Coarse clover inverese field (used as temporary here)
      @param v[in] Packed null-space vectors
      @param kappa[in] Kappa parameter
      @param mu[in] Twisted-mass parameter
@@ -1525,7 +1391,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
 	   QudaGaugeFieldOrder gOrder, typename F, typename Ftmp, typename Vt, typename coarseGauge, typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, Ftmp &UV, F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv,
-		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, GaugeField &Yhat_, ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
+		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
 		  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
     // sanity checks
@@ -1561,7 +1427,7 @@ namespace quda {
     Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, mu_factor, x_size, xc_size, geo_bs, spin_bs);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v, Y_, X_, Xinv_);
 
-    QudaFieldLocation location = Location(Y_, X_, Xinv_, Yhat_, av, v);
+    QudaFieldLocation location = Location(Y_, X_, Xinv_, av, v);
     printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     // If doing a preconditioned operator with a clover term then we
@@ -1702,8 +1568,6 @@ namespace quda {
     }
     printfQuda("X2 = %e\n", arg.X.norm2(0));
 
-    cudaDeviceSynchronize(); checkCudaError();
-
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
     if ( !bidirectional_links ) {
@@ -1712,14 +1576,10 @@ namespace quda {
       y.apply(0);
     }
 
-    cudaDeviceSynchronize(); checkCudaError();
-
     printfQuda("Computing coarse local\n");
     y.setComputeType(COMPUTE_COARSE_LOCAL);
     y.apply(0);
     printfQuda("X2 = %e\n", arg.X.norm2(0));
-
-    cudaDeviceSynchronize(); checkCudaError();
 
     // Check if we have a clover term that needs to be coarsened
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
@@ -1732,8 +1592,6 @@ namespace quda {
       y.apply(0);
     }
 
-    cudaDeviceSynchronize(); checkCudaError();
-
     if (arg.mu*arg.mu_factor!=0 || dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC)
 	arg.mu_factor += 1.;
@@ -1742,64 +1600,8 @@ namespace quda {
       y.apply(0);
     }
 
-    cudaDeviceSynchronize(); checkCudaError();
-
     printfQuda("X2 = %e\n", arg.X.norm2(0));
-
-    // invert the clover matrix field
-    const int n = X_.Ncolor();
-    if (X_.Location() == QUDA_CUDA_FIELD_LOCATION && X_.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      GaugeFieldParam param(X_);
-      // need to copy into AoS format for MAGMA
-      param.order = QUDA_MILC_GAUGE_ORDER;
-      cudaGaugeField X(param);
-      cudaGaugeField Xinv(param);
-      X.copy(X_);
-      blas::flops += cublas::BatchInvertMatrix((void*)Xinv.Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X_.Precision(), X.Location());
-      Xinv_.copy(Xinv);
-    } else if (X_.Location() == QUDA_CPU_FIELD_LOCATION && X_.Order() == QUDA_QDP_GAUGE_ORDER) {
-      cpuGaugeField *X_h = static_cast<cpuGaugeField*>(&X_);
-      cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv_);
-      blas::flops += cublas::BatchInvertMatrix(((void**)Xinv_h->Gauge_p())[0], ((void**)X_h->Gauge_p())[0], n, X_h->Volume(), X_.Precision(), QUDA_CPU_FIELD_LOCATION);
-    } else {
-      errorQuda("Unsupported location=%d and order=%d", X_.Location(), X_.Order());
-    }
-
-    // now exchange Y halos of both forwards and backwards links for multi-process dslash
-    Y_.exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
-
-    // compute the preconditioned links
-    // Yhat_back(x-\mu) = Y_back(x-\mu) * Xinv^dagger(x) (positive projector)
-    // Yhat_fwd(x) = Xinv(x) * Y_fwd(x)                  (negative projector)
-    {
-      // use spin-ignorant accessor to make multiplication simpler
-      // also with new accessor we ensure we're accessing the same ghost buffer in Y_ as was just exchanged
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,1,gOrder> gCoarse;
-      gCoarse yAccessor(const_cast<GaugeField&>(Y_));
-      gCoarse yHatAccessor(const_cast<GaugeField&>(Yhat_));
-      gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv_));
-      printfQuda("Xinv = %e\n", xInvAccessor.norm2(0));
-
-      int comm_dim[4];
-      for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
-      typedef CalculateYhatArg<Float,gCoarse,coarseSpin*coarseColor> yHatArg;
-      yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
-      CalculateYhat<Float, coarseSpin*coarseColor, yHatArg> yHat(arg, Y_);
-      yHat.apply(0);
-
-      for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e\n", d, arg.Y.norm2(d));
-    }
-
-    // fill back in the bulk of Yhat so that the backward link is updated on the previous node
-    // need to put this in the bulk of the previous node - but only send backwards the backwards links to and not overwrite the forwards bulk
-    Yhat_.injectGhost(QUDA_LINK_BACKWARDS);
-
-    // exchange forwards links for multi-process dslash dagger
-    // need to put this in the ghost zone of the next node - but only send forwards the forwards links and not overwrite the backwards ghost
-    Yhat_.exchangeGhost(QUDA_LINK_FORWARDS);
-
   }
-
 
 
 } // namespace quda
