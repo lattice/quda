@@ -131,7 +131,7 @@ void Mat(sFloat *out, gFloat **fatlink, gFloat** longlink, sFloat *in, sFloat ka
   // full dslash operator
   dslashReference(outOdd, fatlink, longlink, inEven, 1, daggerBit);
   dslashReference(outEven, fatlink, longlink, inOdd, 0, daggerBit);
-    }
+}
 
 
 void 
@@ -404,6 +404,54 @@ matdagmat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void
   }
 
 }
+
+void 
+mat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink, 
+		 cpuColorSpinorField* in, double factor, int dagger_bit,
+		 QudaPrecision sPrecision, QudaPrecision gPrecision, QudaInvertParam *inv_param)
+{
+  //assert sPrecision and gPrecision must be the same
+  if (sPrecision != gPrecision){
+    errorQuda("Spinor precision and gPrecison is not the same");
+  }
+
+  ColorSpinorParam cpuParam(0, *inv_param, in->X(), true, QUDA_CPU_FIELD_LOCATION);
+  cpuParam.create    = QUDA_REFERENCE_FIELD_CREATE;
+  cpuParam.precision = sPrecision;
+
+  cpuParam.v = in->V();
+  cpuColorSpinorField *in_even  = new cpuColorSpinorField(cpuParam);  
+  
+  cpuParam.v = (char*)in->V()+in->X(4)*Vh*mySpinorSiteSize;
+  cpuColorSpinorField *in_odd   = new cpuColorSpinorField(cpuParam);
+  
+  cpuParam.v = out->V();
+  cpuColorSpinorField *out_even = new cpuColorSpinorField(cpuParam);  
+  cpuParam.v = (char*)out->V()+out->X(4)*Vh*mySpinorSiteSize;
+  cpuColorSpinorField *out_odd  = new cpuColorSpinorField(cpuParam);  
+  
+  staggered_dslash_mg4dir(out_odd, fatlink, longlink, ghost_fatlink, ghost_longlink,
+			  in_even, 1, dagger_bit, sPrecision, gPrecision);
+
+  staggered_dslash_mg4dir(out_even, fatlink, longlink, ghost_fatlink, ghost_longlink,
+			  in_odd, 0, dagger_bit, sPrecision, gPrecision);
+
+  // lastly apply the kappa term
+  if (sPrecision == QUDA_DOUBLE_PRECISION){
+    xpay((double*)in->V(), -factor, (double*)out->V(), out->X(4)*V*mySpinorSiteSize, sPrecision);
+  } else { 
+    xpay((float*)in->V(), -factor, (float*)out->V(), out->X(4)*V*mySpinorSiteSize, sPrecision);
+  }
+
+  delete in_even;
+  delete in_odd;
+
+  delete out_even;
+  delete out_odd;
+
+}
+
+
 
 #endif
 

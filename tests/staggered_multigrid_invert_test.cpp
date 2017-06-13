@@ -536,7 +536,7 @@ int invert_test(int argc, char** argv)
   double src2=0;
   int ret = 0;
 
-  int len = Vh*Nsrc;
+  int len = V;//Vh*Nsrc;
   {//switch
       if(inv_type == QUDA_GCR_INVERTER){
       	inv_param.gcrNkrylov = 64;
@@ -554,12 +554,14 @@ int invert_test(int argc, char** argv)
       time0 += clock(); 
       time0 /= CLOCKS_PER_SEC;
 
+      double factor = 1.0 / (2.0*mass);
 #ifdef MULTI_GPU    
-      staggered_dslash_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-          out, QUDA_EVEN_PARITY, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      mat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, in, factor, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec, &inv_param);
+
 #else
-      staggered_dslash(ref->V(), qdp_fatlink, qdp_longlink, out->V(), QUDA_EVEN_PARITY, QUDA_DAG_NO, inv_param.cpu_prec, gaugeParam.cpu_prec);
+      mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), factor, 0, inv_param.cpu_prec, gaugeParam.cpu_prec);
 #endif
+      ax( factor, in->V(), len*mySpinorSiteSize, inv_param.cpu_prec );
 
       mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
