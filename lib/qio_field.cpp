@@ -183,6 +183,8 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
   case 24:
     status = read_field<24>(infile, count, field_in, cpu_prec);
     break;
+  case 6:
+    status = read_field<6>(infile, count, field_in, cpu_prec);
   case 96:
     status = read_field<96>(infile, count, field_in, cpu_prec);
     break;
@@ -276,6 +278,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   QIO_string_destroy(xml_record_out);
 
   if (status != QIO_SUCCESS) return 1;
+
   return 0;
 }
 
@@ -290,6 +293,8 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
   case 24:
     status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
     break;
+  case 6: //staggered fields
+    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
   case 96:
     status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
     break;
@@ -321,7 +326,6 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
   printfQuda("%s: writing %d vector fields\n", __func__, Nvec); fflush(stdout);
   int status = write_field(outfile, 2*nSpin*nColor, Nvec, V, precision, precision, nSpin, nColor, type);
   if(status) { errorQuda("write_spinor_fields failed %d\n", status); }
-
   /* Close the file */
   QIO_close_write(outfile);
   printfQuda("%s: Closed file for writing\n",__func__);
