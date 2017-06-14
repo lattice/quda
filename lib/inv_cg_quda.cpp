@@ -404,7 +404,8 @@ namespace quda {
         // here we are deploying the alternative beta computation
         Complex cg_norm = blas::axpyCGNorm(-alpha[j], Ap, rSloppy);
         r2 = real(cg_norm);  // (r_new, r_new)
-        sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
+        std::cout << "altS " << imag(cg_norm) << " regS" << r2 << " deltaS " << (r2-imag(cg_norm))/r2 << std::endl;
+        sigma = r2;//imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
 
       // reliable update conditions
@@ -828,7 +829,7 @@ class BlockCGUpdate : public Worker {
 // the current status in blockCG is to just look for reliable updates in 'r'.
 int CG::block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
   // reliable updates
-  rNorm = sqrt(r2);
+  // rNorm = sqrt(r2);
   if (rNorm > maxrx) maxrx = rNorm;
   if (rNorm > maxrr) maxrr = rNorm;
   //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
@@ -1155,7 +1156,11 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   // Set Linv = C.inverse() for convenience in the next step.
   L = H.llt().matrixL(); // retrieve factor L in the decomposition
   C = L.adjoint();
+  std::cout << "RELUP " << C.norm() << " " << rNorm << std::endl;
   Linv = C.inverse();
+
+  maxrx = C.norm();
+  maxrr = C.norm();
 
   #ifdef BLOCKSOLVER_VERBOSE
   std::cout << "r2\n " << H << std::endl;
@@ -1255,6 +1260,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // Step 15: Compute alpha = beta * C
     alpha = - beta * C;
     POP_RANGE
+
+//MWREL: regular update
+
     // Step 16: update Xsloppy = Xsloppy + P alpha
     // This step now gets overlapped with the
     // comms in matSloppy. 
@@ -1282,6 +1290,14 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       }
     }
 #endif
+
+//MWALTBETA
+    blas::zero(*tmpp);
+    blas::caxpy(beta_raw, Ap, *tmpp);
+    blas::hDotProduct(H_raw, qp->Components(), tmpp->Components());
+    L = H.llt().matrixL();
+    S = L.adjoint();
+    std::cout << "altS" << S;
     POP_RANGE
 
     PUSH_RANGE("Reduction",1)
@@ -1307,6 +1323,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     
     // Step 20: S = L^\dagger
     S = L.adjoint();
+    std::cout << "regS" << L.adjoint() << std::endl;
 
     // Step 21: Q = Q S^{-1}
     // This would be most "cleanly" implemented
@@ -1372,6 +1389,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #ifdef BLOCKSOLVER_EXPLICIT_QP_ORTHO
     bool did_reliable = false;
 #endif
+    rNorm = C.norm();
+
+    // reliable update
     if (block_reliable(rNorm, maxrx, maxrr, r2, delta))
     {
 #ifdef BLOCKSOLVER_EXPLICIT_QP_ORTHO
@@ -1499,7 +1519,8 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
       PUSH_RANGE("Eigen",3)
 
       // Reliable updates step 9: Set S = C * C_old^{-1} (equation 6.1 in the blockCGrQ paper)
-      S = C * C_old.inverse();
+      // S = C * C_old.inverse();
+      std::cout << "reliable S " << S << std::endl;
       POP_RANGE
 
       // Reliable updates step 10: Recompute residuals, reset rNorm, etc.
@@ -1518,6 +1539,7 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         if (rNorm < sqrt(H(i,i).real())) rNorm = sqrt(H(i,i).real());
 #endif
       }
+      rNorm = C.norm();
       maxrx = rNorm;
       maxrr = rNorm;
       rUpdate++;
@@ -1727,7 +1749,9 @@ void CG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
   if (getVerbosity() >= QUDA_VERBOSE)
-   printfQuda("Block-CG: Reliable updates = %d\n", rUpdate);
+   printfQuda("Block-CG: ReliableUpdateInfo (delta,iter,rupdates): %f %i %i \n", delta, k, rUpdate);
+
+
 
   dslash::aux_worker = NULL;
 
