@@ -123,18 +123,6 @@ QudaPrecision &cuda_prec_precondition = prec_precondition;
 
 static void end();
 
-template<typename Float>
-void constructSpinorField(Float *res, const int Vol) {
-  for(int i = 0; i < Vol; i++) {
-    for (int s = 0; s < 1; s++) {
-      for (int m = 0; m < 3; m++) {
-        res[i*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-        res[i*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
-      }
-    }
-  }
-}
-
 void setMultigridParam(QudaMultigridParam &mg_param) {
   QudaInvertParam &inv_param = *mg_param.invert_param;//this will be used to setup SolverParam parent in MGParam class
 
@@ -254,6 +242,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   // coarse grid solver is GCR
   //mg_param.smoother[mg_levels-1] = QUDA_CG_INVERTER; //QUDA_GCR_INVERTER;
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
+  mg_param.nu_pre [mg_levels-1] = 500*nu_pre;
+  mg_param.nu_post[mg_levels-1] = 500*nu_post;
+
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
   //@mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_LOW_MODE_VECTOR;
@@ -279,7 +270,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.tol = 1e-10;
   inv_param.maxiter = 100;
   inv_param.reliable_delta = 1e-10;
-  inv_param.gcrNkrylov = 16;//10
+  inv_param.gcrNkrylov = 64;//10
 
   //inv_param.verbosity = QUDA_SUMMARIZE;
   inv_param.verbosity = QUDA_VERBOSE;
@@ -349,7 +340,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
-  //inv_param->gcrNkrylov = 10;
+  inv_param->gcrNkrylov = 10;
 
   // domain decomposition preconditioner parameters
 #ifndef REGULAR_SOLVE
@@ -473,11 +464,8 @@ int invert_test(int argc, char** argv)
   ref = new cpuColorSpinorField(csParam);  
   tmp = new cpuColorSpinorField(csParam);
 
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    constructSpinorField((float*)in->V(), in->Volume());    
-  }else{
-    constructSpinorField((double*)in->V(), in->Volume());
-  }
+  in->Source(QUDA_RANDOM_SOURCE);
+
   printfQuda("\nSource norm : %1.15e\n", sqrt(blas::norm2(*in)));
 
 #ifdef MULTI_GPU

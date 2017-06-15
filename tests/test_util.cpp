@@ -1014,14 +1014,16 @@ void constructUnitaryGaugeField(Float **res)
   }
 }
 
+template <typename Float> 
+static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type) {
+
+  if(type == 3)  applyGaugeFieldScaling_long((Float**)res, Vh, param, QUDA_STAGGERED_DSLASH);
+
+  return;
+}
+
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
-  if(type == 3)
-  {
-    if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling_long((double**)gauge, Vh, param, QUDA_STAGGERED_DSLASH);
-    else applyGaugeFieldScaling_long((float**)gauge, Vh, param, QUDA_STAGGERED_DSLASH);
-    return;
-  }
 
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) constructUnitGaugeField((double**)gauge, param);
@@ -1053,14 +1055,25 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((double**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((double**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((double**)fatlink, param, type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((double**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH)
+      {
+        if(type != 3) constructGaugeField((double**)fatlink, param, dslash_type);
+        else applyStaggeredScaling((double**)fatlink, param, type);
+      }
     }else {
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((float**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((float**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((float**)fatlink, param, type);
+
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((float**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) 
+      {
+        if(type != 3) constructGaugeField((float**)fatlink, param, dslash_type);
+        else applyStaggeredScaling((float**)fatlink, param, type);
+      }
     }
   }
 
@@ -1604,7 +1617,7 @@ double anisotropy = 1.0;
 double clover_coeff = 0.1;
 bool compute_clover = false;
 double tol = 1e-7;
-double tol_hq = 0.;
+double tol_hq = 1e-2;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
