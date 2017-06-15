@@ -4,8 +4,12 @@ include_directories(.)
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-set(TEST_LIBS quda quda_test)
 
+if ( QUDA_QDPJIT )
+  set(TEST_LIBS quda quda_test ${QDP_LIBS})
+else()
+  set(TEST_LIBS quda quda_test)
+endif()
 
 MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   IF(NOT ${qudabuildtests})
