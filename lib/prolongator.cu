@@ -176,7 +176,7 @@ namespace quda {
       rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>
         (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
     } else {
-      complex<Float> tmp[2*coarseColor];
+      complex<Float> tmp[coarseSpin*coarseColor];
       prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.out.VolumeCB());
       rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
     }

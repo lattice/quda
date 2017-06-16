@@ -4,6 +4,9 @@
 
 namespace quda {
 
+  const bool staggered_dslash_emulation    = false;
+  const bool coarsecoarse_dslash_emulation = false;
+
   DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Yhat_h(nullptr),
@@ -62,6 +65,8 @@ namespace quda {
     //Coarse Spin
     //int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs();
     int Ns_c = (transfer->Vectors().Nspin() == 1) ? 2 : transfer->Vectors().Nspin()/transfer->Spin_bs();
+
+    if(staggered_dslash_emulation) return;
 
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
@@ -193,8 +198,48 @@ namespace quda {
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool is_staggered = false;
-    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() || typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_staggered = true;
+    bool is_staggered      = false;
+    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name())  is_staggered = true;
+
+    bool is_norm_staggered = false;
+    if( typeid(*dirac).name() == typeid(DiracStaggeredPC).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggeredPC).name() ) is_norm_staggered = true;
+
+    if(is_norm_staggered || staggered_dslash_emulation || coarsecoarse_dslash_emulation)
+    {
+      if (!enable_gpu) errorQuda("Cannot apply coarse grid operator on GPU since enable_gpu has not been set");
+      const ColorSpinorField &tmp3 = transfer->Vectors();//this are full vectors.
+      ColorSpinorParam csParam(tmp3);
+
+      if(is_norm_staggered || is_staggered) {//that is, we are on file level
+        csParam.nSpin  = 1;
+        csParam.nColor = 3;
+      } else { //think about this.
+        errorQuda("Coarse grid dslash emulation.\n");
+      }
+
+      csParam.location   = QUDA_CUDA_FIELD_LOCATION;
+      csParam.create     = QUDA_ZERO_FIELD_CREATE;
+      csParam.gammaBasis = tmp3.GammaBasis();
+      csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+
+      if(is_norm_staggered)
+      {
+        csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+        csParam.x[0] /= 2;
+      } 
+
+      ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
+      ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
+
+      transfer->P(*tmp1, in);
+      dirac->M(*tmp2, *tmp1);
+      transfer->R(out, *tmp2);
+
+      delete tmp1;
+      delete tmp2;
+
+      return;
+    } 
 
     if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);

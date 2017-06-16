@@ -156,7 +156,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  inv_param.matpc_type = matpc_type;
+  inv_param.matpc_type = matpc_type;//!
   inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;//fixed
@@ -195,14 +195,15 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
     // We'll eventually want the e-o preconditioning (since it's a nice normal op),
     // but for now let's not.
-    mg_param.smoother_solve_type[i] = QUDA_DIRECT_SOLVE; 
+    //mg_param.smoother_solve_type[i] = QUDA_DIRECT_SOLVE; 
+    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
 
     // if we are using an outer even-odd preconditioned solve, then we
     // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = (mg_param.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE || mg_param.smoother_solve_type[i] == QUDA_NORMOP_PC_SOLVE) ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;//QUDA_MATPCDAG_MATPC_SOLUTION
+    mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     mg_param.omega[i] = 0.85; // over/under relaxation factor
 
@@ -211,7 +212,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   }
 
   //mg_param.smoother_solve_type[0] = solve_type == QUDA_NORMOP_PC_SOLVE? QUDA_NORMOP_PC_SOLVE : mg_param.smoother_solve_type[0]; //or choose QUDA_DIRECT_SOLVE;
-  mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE;//enforce NORMOPPC solve
+  //mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE;//enforce NORMOPPC solve
+  mg_param.smoother_solve_type[0] = solve_type;//same as fine level solve type.
   // coarsen the spin on the first restriction is undefined for staggered fields
   mg_param.spin_block_size[0] = 1;
   warningQuda("Level 0 spin block size is set to: %d", mg_param.spin_block_size[0]);
@@ -227,36 +229,21 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
      mg_param.smoother[0] = QUDA_GCR_INVERTER;
 #endif
 #endif
-     mg_param.coarse_grid_solution_type[0] = QUDA_MATPC_SOLUTION;//just to be safe.
-     ////mg_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;//remove
   } 
-  //
-  //mg_param.null_solve_type = QUDA_DIRECT_SOLVE;
-  //@mg_param.null_solve_type = QUDA_NORMOP_PC_SOLVE; //not defined
-  //mg_param.null_solve_type = mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE ? mg_param.smoother_solve_type[0] : QUDA_NORMOP_PC_SOLVE;
-
   //number of the top-level smoothing:
   mg_param.nu_pre[0] = nu_pre;
   mg_param.nu_post[0] = nu_post;
 
-  // coarse grid solver is GCR
-  //mg_param.smoother[mg_levels-1] = QUDA_CG_INVERTER; //QUDA_GCR_INVERTER;
+  //setup coarse grid solver related parameters:
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
   mg_param.nu_pre [mg_levels-1] = 500*nu_pre;
   mg_param.nu_post[mg_levels-1] = 500*nu_post;
-
+  mg_param.coarse_grid_solution_type[mg_levels-1] = QUDA_MAT_SOLUTION;
+  mg_param.smoother_solve_type[mg_levels-1] = QUDA_DIRECT_SOLVE;//always direct solve.
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-  //@mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_LOW_MODE_VECTOR;
-  //mg_param.compute_null_vector = QUDA_COMPUTE_LOW_MODE_VECTOR;
 
-  //@if (mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR) 
-   //@ mg_param.eigensolver_precision = cuda_prec;//??
-  //@else
-    //@mg_param.eigensolver_precision = cuda_prec;
-
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES 
-   :  QUDA_BOOLEAN_NO;
+  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
   mg_param.run_verify = QUDA_BOOLEAN_YES;
 
@@ -527,7 +514,7 @@ int invert_test(int argc, char** argv)
   int len = V;//Vh*Nsrc;
   {//switch
       if(inv_type == QUDA_GCR_INVERTER){
-      	inv_param.gcrNkrylov = 64;
+      	inv_param.gcrNkrylov = 96;
       }
 
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
