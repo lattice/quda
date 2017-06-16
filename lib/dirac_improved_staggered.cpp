@@ -167,7 +167,9 @@ namespace quda {
 
   void DiracImprovedStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    errorQuda("DiracImprovedStaggeredPC::M() is not implemented\n");
+    //errorQuda("DiracImprovedStaggeredPC::M() is not implemented\n");
+    MdagM(out, in);
+    return;
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -195,14 +197,52 @@ namespace quda {
 				 ColorSpinorField &x, ColorSpinorField &b, 
 				 const QudaSolutionType solType) const
   {
-    src = &b;
-    sol = &x;  
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      src = &b;
+      sol = &x;
+    } else {//PC staggered multigrid version:
+      // we desire solution to full system. It's a bit hacky : 1) compute -2m*be-D_eo b_o and 2) apply -1
+      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      // src = 2m*b_e + D_eo b_o
+        DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), -2.0*mass);
+        blas::ax(-1.0 , x.Odd());
+        src = &(x.Odd());
+        sol = &(x.Even());
+      } else if ( matpcType == QUDA_MATPC_ODD_ODD ) { 
+      // src = 2m*b_o + D_oe b_e
+        DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), -2.0*mass);
+        blas::ax(-1.0 , x.Even());
+        src = &(x.Even());
+        sol = &(x.Odd());
+      } else {
+        errorQuda("MatPCType %d not valid for DiracImprovedStaggeredPC", matpcType);
+      }
+    }  
   }
 
   void DiracImprovedStaggeredPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				     const QudaSolutionType solType) const
   {
-    // do nothing
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+
+      return;//do nothing
+
+    } else {//hack: 1) compute -1.0*be-D_eo b_o and 2) apply - (1 / 2m)
+      checkParitySpinor(x.Even(), b.Even());
+      checkParitySpinor(x.Odd(), b.Odd());
+
+      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      // x_o = 1.0 / 2m ( b_o + D_oe x_e)
+        DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), -1.0);
+        blas::ax(-1.0 / (2.0*mass), x.Odd());
+      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      // x_e = 1.0 / 2m ( b_e + D_eo x_o)
+        DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), -1.0);
+        blas::ax(-1.0 / (2.0*mass), x.Even());
+      } else {
+        errorQuda("MatPCType %d not valid for DiracImprovedStaggeredPC", matpcType);
+      }
+    }
   }
 
 } // namespace quda
