@@ -118,6 +118,8 @@ namespace quda {
     Yhat_h = new cpuGaugeField(gParam);
 
     if (enable_gpu) {
+      // use the null-space precision for the preconditioned links
+      gParam.precision = transfer->Vectors(QUDA_CUDA_FIELD_LOCATION).Precision();
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
       int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
       gParam.pad = gParam.nFace * pad * 2; // factor of 2 since we have to store bi-directional ghost zone

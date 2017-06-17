@@ -6,9 +6,9 @@
 
 namespace quda {
 
-  template <typename Flloat, typename Gauge, int n>
+  template <typename PreconditionedGauge, typename Gauge, int n>
   struct CalculateYhatArg {
-    Gauge Yhat;
+    PreconditionedGauge Yhat;
     const Gauge Y;
     const Gauge Xinv;
     int dim[QUDA_MAX_DIM];
@@ -16,7 +16,7 @@ namespace quda {
     int nFace;
     const int coarseVolumeCB;   /** Coarse grid volume */
 
-    CalculateYhatArg(const Gauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim, const int *comm_dim, int nFace)
+    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim, const int *comm_dim, int nFace)
       : Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), coarseVolumeCB(Y.VolumeCB()) {
       for (int i=0; i<4; i++) {
 	this->comm_dim[i] = comm_dim[i];
@@ -38,30 +38,33 @@ namespace quda {
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
 
       for(int j = 0; j<n; j++) {
-	arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) = 0.0;
+	complex<Float> yHat = 0.0;
 	for(int k = 0; k<n; k++) {
-	  arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) += arg.Y.Ghost(d,1-parity,ghost_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
+	  yHat += arg.Y.Ghost(d,1-parity,ghost_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
 	}
+	arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) = yHat;
       }
 
     } else {
       const int back_idx = linkIndexM1(coord, arg.dim, d);
 
       for(int j = 0; j<n; j++) {
-	arg.Yhat(d,1-parity,back_idx,i,j) = 0.0;
+	complex<Float> yHat = 0.0;
 	for(int k = 0; k<n; k++) {
-	  arg.Yhat(d,1-parity,back_idx,i,j) += arg.Y(d,1-parity,back_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
+	  yHat += arg.Y(d,1-parity,back_idx,i,k) * conj(arg.Xinv(0,parity,x_cb,j,k));
 	}
+	arg.Yhat(d,1-parity,back_idx,i,j) = yHat;
       }
 
     }
 
     // now do the forwards links X^{-1} * Y^{-\mu}
     for(int j = 0; j<n; j++) {
-      arg.Yhat(d+4,parity,x_cb,i,j) = 0.0;
+      complex<Float> yHat = 0.0;
       for(int k = 0; k<n; k++) {
-	arg.Yhat(d+4,parity,x_cb,i,j) += arg.Xinv(0,parity,x_cb,i,k) * arg.Y(d+4,parity,x_cb,k,j);
+	yHat += arg.Xinv(0,parity,x_cb,i,k) * arg.Y(d+4,parity,x_cb,k,j);
       }
+      arg.Yhat(d+4,parity,x_cb,i,j) = yHat;
     }
 
   }
@@ -143,7 +146,7 @@ namespace quda {
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
    */
-  template<typename Float, int N, QudaGaugeFieldOrder gOrder>
+  template<typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
 
@@ -181,19 +184,30 @@ namespace quda {
 
       // use spin-ignorant accessor to make multiplication simpler
       typedef typename gauge::FieldOrder<Float,N,1,gOrder> gCoarse;
+      typedef typename gauge::FieldOrder<Float,N,1,gOrder,true,storeFloat> gPreconditionedCoarse;
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
-      gCoarse yHatAccessor(const_cast<GaugeField&>(Yhat));
+      gPreconditionedCoarse yHatAccessor(const_cast<GaugeField&>(Yhat));
       gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
       printfQuda("Xinv = %e\n", xInvAccessor.norm2(0));
 
       int comm_dim[4];
       for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
-      typedef CalculateYhatArg<Float,gCoarse,N> yHatArg;
+      typedef CalculateYhatArg<gPreconditionedCoarse,gCoarse,N> yHatArg;
       yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
+
+      double max = 3.0 * arg.Y.abs_max() * arg.Xinv.abs_max();
+      Yhat.Scale(max);
+      arg.Yhat.resetScale(max);
+
       CalculateYhat<Float, N, yHatArg> yHat(arg, Y);
       yHat.apply(0);
 
-      for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e\n", d, arg.Yhat.norm2(d));
+#if 0
+      for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, arg.Yhat.norm2(d),
+					 arg.Yhat.abs_max(d), arg.Y.abs_max(d) * arg.Xinv.abs_max(0),
+					 arg.Y.abs_max(d), arg.Xinv.abs_max(0));
+#endif
+
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
@@ -207,53 +221,60 @@ namespace quda {
     Yhat.exchangeGhost(QUDA_LINK_FORWARDS);
   }
 
-  template <typename Float, int N>
+  template <typename storeFloat, typename Float, int N>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
-      calculateYhat<Float,N,gOrder>(Yhat, Xinv, Y, X);
+      calculateYhat<storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X);
     } else {
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
       if (Y.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", Y.FieldOrder());
-      calculateYhat<Float,N,gOrder>(Yhat, Xinv, Y, X);
+      calculateYhat<storeFloat,Float,N,gOrder>(Yhat, Xinv, Y, X);
     }
   }
 
   // template on the number of coarse degrees of freedom
-  template <typename Float>
+  template <typename storeFloat, typename Float>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
     const int n = Y.Ncolor();
 
     switch (Y.Ncolor()) {
-    case  2: calculateYhat<Float, 2>(Yhat, Xinv, Y, X); break;
-    case  4: calculateYhat<Float, 4>(Yhat, Xinv, Y, X); break;
-    case  8: calculateYhat<Float, 8>(Yhat, Xinv, Y, X); break;
-    case 12: calculateYhat<Float,12>(Yhat, Xinv, Y, X); break;
-    case 16: calculateYhat<Float,16>(Yhat, Xinv, Y, X); break;
-    case 20: calculateYhat<Float,20>(Yhat, Xinv, Y, X); break;
-    case 24: calculateYhat<Float,24>(Yhat, Xinv, Y, X); break;
-    case 32: calculateYhat<Float,32>(Yhat, Xinv, Y, X); break;
-    case 48: calculateYhat<Float,48>(Yhat, Xinv, Y, X); break;
-    case 64: calculateYhat<Float,64>(Yhat, Xinv, Y, X); break;
+    case  2: calculateYhat<storeFloat,Float, 2>(Yhat, Xinv, Y, X); break;
+    case  4: calculateYhat<storeFloat,Float, 4>(Yhat, Xinv, Y, X); break;
+    case  8: calculateYhat<storeFloat,Float, 8>(Yhat, Xinv, Y, X); break;
+    case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X); break;
+    case 16: calculateYhat<storeFloat,Float,16>(Yhat, Xinv, Y, X); break;
+    case 20: calculateYhat<storeFloat,Float,20>(Yhat, Xinv, Y, X); break;
+    case 24: calculateYhat<storeFloat,Float,24>(Yhat, Xinv, Y, X); break;
+    case 32: calculateYhat<storeFloat,Float,32>(Yhat, Xinv, Y, X); break;
+    case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X); break;
+    case 64: calculateYhat<storeFloat,Float,64>(Yhat, Xinv, Y, X); break;
     default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
     }
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    QudaPrecision precision = Precision(Yhat, Xinv, Y, X);
+    QudaPrecision precision = Precision(Xinv, Y, X);
     printfQuda("Computing Yhat field......\n");
 
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
+      if (Yhat.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Unsupported precision %d\n", Yhat.Precision());
       calculateYhat<double>(Yhat, Xinv, Y, X);
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (precision == QUDA_SINGLE_PRECISION) {
-      calculateYhat<float>(Yhat, Xinv, Y, X);
+      if (Yhat.Precision() == QUDA_SINGLE_PRECISION) {
+	calculateYhat<float,float>(Yhat, Xinv, Y, X);
+      } else if (Yhat.Precision() == QUDA_HALF_PRECISION) {
+	calculateYhat<short,float>(Yhat, Xinv, Y, X);
+      } else {
+	errorQuda("Unsupported precision %d\n", precision);
+      }
     } else {
       errorQuda("Unsupported precision %d\n", precision);
     }

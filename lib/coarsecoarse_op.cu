@@ -27,7 +27,8 @@ namespace quda {
 
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
       typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
-      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> gFine;
+      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder,true,vFloat> gFine;
+      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> cFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
@@ -35,8 +36,8 @@ namespace quda {
       V vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
       gFine gAccessor(const_cast<GaugeField&>(g));
-      gFine cAccessor(const_cast<GaugeField&>(clover));
-      gFine cInvAccessor(const_cast<GaugeField&>(cloverInv));
+      cFine cAccessor(const_cast<GaugeField&>(clover));
+      cFine cInvAccessor(const_cast<GaugeField&>(cloverInv));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
       gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
@@ -56,7 +57,8 @@ namespace quda {
 
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
       typedef typename colorspinor::FieldOrderCB<Float,2*fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
-      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> gFine;
+      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder,true,vFloat> gFine;
+      typedef typename gauge::FieldOrder<Float,fineColor*fineSpin,fineSpin,gOrder> cFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
@@ -64,8 +66,8 @@ namespace quda {
       V vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
       gFine gAccessor(const_cast<GaugeField&>(g));
-      gFine cAccessor(const_cast<GaugeField&>(clover));
-      gFine cInvAccessor(const_cast<GaugeField&>(cloverInv));
+      cFine cAccessor(const_cast<GaugeField&>(clover));
+      cFine cInvAccessor(const_cast<GaugeField&>(cloverInv));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
       gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
@@ -143,8 +145,8 @@ namespace quda {
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, ColorSpinorField &uv,
 			const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
 			double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-    Precision(X, Xinv, Y, g, clover, cloverInv);
-    Precision(uv, T.Vectors(X.Location()));
+    Precision(X, Xinv, Y, clover, cloverInv);
+    Precision(g, uv, T.Vectors(X.Location()));
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
