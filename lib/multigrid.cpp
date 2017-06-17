@@ -15,7 +15,7 @@ namespace quda {
       profile_global(profile_global),
       profile( "MG level " + std::to_string(param.level+1), false ),
       coarse(nullptr), fine(param.fine), coarse_solver(nullptr),
-      param_coarse(nullptr), param_presmooth(nullptr), param_postsmooth(nullptr),
+      param_coarse(nullptr), param_presmooth(nullptr), param_postsmooth(nullptr), param_coarse_solver(nullptr),
       r(nullptr), r_coarse(nullptr), x_coarse(nullptr), tmp_coarse(nullptr),
       diracResidual(param.matResidual->Expose()), diracSmoother(param.matSmooth->Expose()), diracSmootherSloppy(param.matSmoothSloppy->Expose()),
       diracCoarseResidual(nullptr), diracCoarseSmoother(nullptr), diracCoarseSmootherSloppy(nullptr),
@@ -422,7 +422,7 @@ namespace quda {
     if (param.level < param.Nlevel-1) {
       if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
 	delete coarse_solver;
-	delete param_coarse_solver;
+	if (param_coarse_solver) delete param_coarse_solver;
       }
 
       if (B_coarse) {
@@ -453,9 +453,16 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
   }
 
+  // FIXME need to make this more robust (implement Solver::flops() for all solvers)
   double MG::flops() const {
     double flops = 0;
-    if (param.level < param.Nlevel-1) flops += coarse->flops();
+
+    if (param_coarse_solver) {
+      flops += param_coarse_solver->gflops * 1e9;
+      param_coarse_solver->gflops = 0;
+    } else if (param.level < param.Nlevel-1) {
+      flops += coarse->flops();
+    }
 
     if (param_presmooth) {
       flops += param_presmooth->gflops * 1e9;
