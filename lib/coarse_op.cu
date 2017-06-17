@@ -110,10 +110,8 @@ namespace quda {
 #endif
     } else if (coarseColor == 24) {
       calculateY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Xinv, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#if 0
     } else if (coarseColor == 32) {
       calculateY<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, Xinv, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

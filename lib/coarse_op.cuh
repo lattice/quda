@@ -1311,6 +1311,9 @@ namespace quda {
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
       }
 
+      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_COARSE_LOCAL || type == COMPUTE_DIAGONAL
+			     || type == COMPUTE_TMDIAGONAL) ? X.VolString () : meta.VolString();
+
       if (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) {
 	strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU," : ",CPU,");
 	strcat(Aux,"coarse_vol=");
@@ -1319,7 +1322,7 @@ namespace quda {
 	strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
       }
 
-      return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
+      return TuneKey(vol_str, typeid(*this).name(), Aux);
     }
 
     void preTune() {
@@ -1454,7 +1457,7 @@ namespace quda {
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 	double max = 6*arg.Cinv.abs_max(0);
-	printfQuda("clover max %e\n", max);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("clover max %e\n", max);
 	av.Scale(max);
 	arg.AV.resetScale(max);
       }
@@ -1476,7 +1479,7 @@ namespace quda {
 	complex<Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
 	complex<Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
 	double max = std::max(abs(fp), abs(fm));
-	printfQuda("tm max %e\n", max);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("tm max %e\n", max);
 	av.Scale(max);
 	arg.AV.resetScale(max);
       }
@@ -1499,7 +1502,7 @@ namespace quda {
 	errorQuda("Half precision not supported with dynamic clover");
 #endif
 	double max = 6*sqrt(arg.Cinv.abs_max(0));
-	printfQuda("tmc max %e\n", max);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("tmc max %e\n", max);
 	av.Scale(max);
 	arg.AV.resetScale(max);
       }
@@ -1523,7 +1526,7 @@ namespace quda {
 	  uv.Scale(uv_max);
 	  arg.UV.resetScale(uv_max);
 
-	  printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", d, U_max, v.Scale(), uv_max);
+	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", d, U_max, v.Scale(), uv_max);
 	}
 
 	y.setComputeType(COMPUTE_UV);  // compute U*V product
@@ -1555,7 +1558,7 @@ namespace quda {
 	uv.Scale(uv_max);
 	arg.UV.resetScale(uv_max);
 
-	printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
       }
 
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
