@@ -567,22 +567,34 @@ namespace quda {
     zero(*r_coarse);
 
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
-    transfer->P(*tmp1, *tmp_coarse);
 
-    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      double kappa = diracResidual->Kappa();
-      if (param.level==0) {
-	diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
-	diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
-      } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
-	diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
-	diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+    if(param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && param.B[0]->Nspin() == 1) {
+      reset();
+
+      transfer->P(tmp1->Even(), *tmp_coarse);
+      (*param.matSmooth)(tmp2->Even(), tmp1->Even());
+      transfer->R(*x_coarse, tmp2->Even());
+
+    } else {//original code:
+
+      transfer->P(*tmp1, *tmp_coarse);
+
+      if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+        double kappa = diracResidual->Kappa();
+        if (param.level==0) {
+	  diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+	  diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+        } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
+	  diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+	  diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+        }
+      } else {
+        (*param.matResidual)(*tmp2,*tmp1);
       }
-    } else {
-      (*param.matResidual)(*tmp2,*tmp1);
+
+      transfer->R(*x_coarse, *tmp2);
     }
 
-    transfer->R(*x_coarse, *tmp2);
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
