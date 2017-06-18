@@ -1702,9 +1702,10 @@ void usage(char** argv )
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
   printf("    --mg-omega                                # The over/under relaxation factor for the smoother of multigrid (default 0.85)\n");
-  printf("    --mg-level-solver <level gcr/etc.>        # The solver to wrap the V cycle on each level (default gcr)\n");
+  printf("    --mg-coarse-solver <level gcr/etc.>       # The solver to wrap the V cycle on each level (default gcr, only for levels 1+)\n");
+  printf("    --mg-coarse-solver-tol <level gcr/etc.>   # The coarse solver tolerance for each level (default 0.25, only for levels 1+)\n");
   printf("    --mg-smoother <level mr/etc.>             # The smoother to use for multigrid (default mr)\n");
-  printf("    --mg-smoother-tol <level resid_tol>       # The smoother tolerance to use for multigrid (default 0.25)\n");
+  printf("    --mg-smoother-tol <level resid_tol>       # The smoother tolerance to use for each multigrid (default 0.25)\n");
   printf("    --mg-schwarz-type <level false/add/mul>   # Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)\n");
   printf("    --mg-schwarz-cycle <level cycle>          # The number of Schwarz cycles to apply per smoother application (default=1)\n");
   printf("    --mg-coarsest-maxiter                     # The solver maxiter to use in the coarsest level of multigrid (default 1000)\n");
