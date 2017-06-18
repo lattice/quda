@@ -23,7 +23,6 @@ cpuColorSpinorField *spinor, *spinor2;
 
 ColorSpinorParam csParam;
 
-float kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
 

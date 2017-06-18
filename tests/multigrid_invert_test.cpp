@@ -44,6 +44,7 @@ extern QudaPrecision prec_null;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
+extern double kappa; // kappa of Dirac operator
 extern double mu;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
@@ -118,15 +119,16 @@ display_test_info()
   printfQuda(" - number of pre-smoother applications %d\n", nu_pre);
   printfQuda(" - number of post-smoother applications %d\n", nu_post);
 
+  printfQuda("Outer solver paramers\n");
+  printfQuda(" - pipeline = %d\n", pipeline);
+
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
-  
   return ;
-  
 }
 
 QudaPrecision &cpu_prec = prec;
@@ -202,9 +204,13 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  if (inv_param.kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
+  }
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -341,9 +347,13 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  if (inv_param.kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
+  }
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
