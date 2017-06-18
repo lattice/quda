@@ -195,9 +195,11 @@ namespace quda {
       typedef CalculateYhatArg<gPreconditionedCoarse,gCoarse,N> yHatArg;
       yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
-      double max = 3.0 * arg.Y.abs_max() * arg.Xinv.abs_max();
-      Yhat.Scale(max);
-      arg.Yhat.resetScale(max);
+      if (Yhat.Precision() == QUDA_HALF_PRECISION) {
+	double max = 3.0 * arg.Y.abs_max() * arg.Xinv.abs_max();
+	Yhat.Scale(max);
+	arg.Yhat.resetScale(max);
+      }
 
       CalculateYhat<Float, N, yHatArg> yHat(arg, Y);
       yHat.apply(0);
