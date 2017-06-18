@@ -438,9 +438,15 @@ namespace quda {
     QudaPrecision Precision() const { return precision; }
 
     /**
-       @return The global scaling factor for fixed-point field
+       @return The global scaling factor for a fixed-point field
     */
     double Scale() const { return scale; }
+
+    /**
+       @brief Set the scale factor for a fixed-point field
+       @param[in] scale_ The new scale factor
+    */
+    void Scale(double scale_) { scale = scale_; }
 
     /**
        @return Field subset type

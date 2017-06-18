@@ -42,7 +42,7 @@ namespace quda {
   {
     if (Precision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", Precision(x,b), param.precision);
 
-    if (param.maxiter == 0) {
+    if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }

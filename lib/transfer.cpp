@@ -142,10 +142,8 @@ namespace quda {
 
       *V_h = *V_tmp;
       if (V_d != V_tmp) {
-	printfQuda("copy from tmp\n");
 	*V_d = *V_tmp;
 	delete V_tmp;
-	printfQuda("done copy from tmp\n");
       }
       printfQuda("Transferred prolongator back to CPU\n");
     } else {

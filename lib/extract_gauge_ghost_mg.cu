@@ -11,9 +11,10 @@ namespace quda {
   using namespace gauge;
 
   /** This is the template driver for extractGhost */
-  template <typename Float, int Nc>
-  void extractGhostMG(const GaugeField &u, Float **Ghost, bool extract, int offset) {
+  template <typename storeFloat, int Nc>
+  void extractGhostMG(const GaugeField &u, storeFloat **Ghost, bool extract, int offset) {
 
+    typedef typename mapper<storeFloat>::type Float;
     constexpr int length = 2*Nc*Nc;
 
     QudaFieldLocation location = 
@@ -22,7 +23,7 @@ namespace quda {
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 #ifdef FINE_GRAINED_ACCESS
-	typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false> G;
+	typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,storeFloat> G;
 	extractGhost<Float,length>(G(const_cast<GaugeField&>(u), 0, (void**)Ghost), u, location, extract, offset);
 #else
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,length>::type G;
@@ -33,7 +34,7 @@ namespace quda {
       
 #ifdef BUILD_QDP_INTERFACE
 #ifdef FINE_GRAINED_ACCESS
-      typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_QDP_GAUGE_ORDER> G;
+      typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_QDP_GAUGE_ORDER,true,storeFloat> G;
       extractGhost<Float,length>(G(const_cast<GaugeField&>(u), 0, (void**)Ghost), u, location, extract, offset);
 #else
       extractGhost<Float,length>(QDPOrder<Float,length>(u, 0, Ghost), u, location, extract, offset);
@@ -75,6 +76,10 @@ namespace quda {
 
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset) {
 
+#ifndef FINE_GRAINED_ACCESS
+    if (u.Precision() == QUDA_HALF_PRECISION) errorQuda("Precision format not supported");
+#endif
+
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       extractGhostMG(u, (double**)ghost, extract, offset);
@@ -83,6 +88,8 @@ namespace quda {
 #endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
       extractGhostMG(u, (float**)ghost, extract, offset);
+    } else if (u.Precision() == QUDA_HALF_PRECISION) {
+      extractGhostMG(u, (short**)ghost, extract, offset);
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }

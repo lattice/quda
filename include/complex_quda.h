@@ -26,6 +26,12 @@
 #include <sstream>
 #include <cuComplex.h>
 
+namespace quda {
+  namespace gauge {
+    template<typename Float, typename storeFloat> struct fieldorder_wrapper;
+  }
+}
+
 // We need this to make sure code inside quda:: that calls sqrt() using real numbers
 // doesn't try to call the complex sqrt, but the standard sqrt
 namespace quda
@@ -547,6 +553,9 @@ public:
   inline operator std::complex<float>() const { return std::complex<float>(real(),imag()); }
   inline __host__ __device__ operator quda::complex<double>() const;
   // inline operator float() const { return real(); }
+
+  template<typename storeFloat>
+    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<float,storeFloat> &a);
 };
 
 template<>
@@ -665,6 +674,7 @@ public:
   inline operator std::complex<double>() const { return std::complex<double>(real(),imag()); }
   inline __host__ __device__ operator quda::complex<float>() const { return quda::complex<float>(real(),imag()); }
   // inline operator double() { return real(); }
+
 };
 
  quda::complex<float>::operator quda::complex<double>() const { return quda::complex<double>(real(),imag()); }
@@ -690,6 +700,13 @@ public:
     {
       real(real()+z.real());
       imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline complex<short>& operator-=(const complex<short> z)
+    {
+      real(real()-z.real());
+      imag(imag()-z.imag());
       return *this;
     }
 
