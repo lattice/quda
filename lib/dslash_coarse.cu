@@ -1074,7 +1074,7 @@ namespace quda {
    inline void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_DEBUG_VERBOSE /*getVerbosity()*/);
 
-     if (config != tp.aux.y) {
+     if (config != tp.aux.y && comm_size() > 1) {
        errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
 		 "this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.",
 		 config, tp.aux.y);
