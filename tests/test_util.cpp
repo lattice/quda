@@ -1590,6 +1590,7 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
+double kappa = -1;
 double mu = 0.1;
 double anisotropy = 1.0;
 double clover_coeff = 0.1;
@@ -1677,6 +1678,7 @@ void usage(char** argv )
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
+  printf("    --kappa                                   # Kappa of Dirac operator (default 0.1)\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
   printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
@@ -2176,6 +2178,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mass = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--kappa") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    kappa = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2681,16 +2693,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     geo_block_size[level][3] = tsize;
     i++;
 
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mass") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    mass= atof(argv[i+1]);
-    i++;
     ret = 0;
     goto out;
   }
