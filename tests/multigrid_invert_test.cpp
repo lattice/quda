@@ -77,7 +77,7 @@ extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
 extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
 extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
 extern double smoother_tol[QUDA_MAX_MG_LEVEL];
-extern int coarsest_maxiter;
+extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
 extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
 extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
@@ -204,7 +204,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (inv_param.kappa == -1.0) {
+  if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
   } else {
@@ -254,6 +254,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = coarse_solver[i];
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
+    mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
 
     mg_param.smoother[i] = smoother_type[i];
 
@@ -291,10 +292,6 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-
-  // coarsest grid solver
-  mg_param.nu_pre[mg_levels-1] = coarsest_maxiter;
-  mg_param.nu_post[mg_levels-1] = 0;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
@@ -347,7 +344,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (inv_param.kappa == -1.0) {
+  if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
   } else {
@@ -423,6 +420,7 @@ int main(int argc, char **argv)
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
+    coarse_solver_maxiter[i] = 10;
   }
 
   for (int i = 1; i < argc; i++){

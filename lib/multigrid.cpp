@@ -401,9 +401,10 @@ namespace quda {
       param_coarse_solver->delta = 1e-8;
       param_coarse_solver->pipeline = 8;
 
-      param_coarse_solver->maxiter = 11; // FIXME - dirty hack
+      param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level+1];
       param_coarse_solver->inv_type_precondition = (param.level<param.Nlevel-2 || coarse->presmoother) ? QUDA_MG_INVERTER : QUDA_INVALID_INVERTER;
       param_coarse_solver->preconditioner = (param.level<param.Nlevel-2 || coarse->presmoother) ? coarse : nullptr;
+      param_coarse_solver->mg_instance = true;
       param_coarse_solver->verbosity_precondition = param.mg_global.verbosity[param.level+1];
 
       // need this to ensure we don't use half precision on the preconditioner in GCR
@@ -428,7 +429,7 @@ namespace quda {
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
       if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
-	delete coarse_solver;
+	if (coarse_solver) delete coarse_solver;
 	if (param_coarse_solver) delete param_coarse_solver;
       }
 

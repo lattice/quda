@@ -535,6 +535,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
+    P(coarse_solver_maxiter[i], INVALID_INT);
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
 

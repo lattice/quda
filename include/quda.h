@@ -428,6 +428,9 @@ extern "C" {
     /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
     double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
 
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
 

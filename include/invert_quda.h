@@ -206,11 +206,16 @@ namespace quda {
 
     bool global_reduction; //! whether to use a global or local (node) reduction for this solver
 
+    /** Whether the MG preconditioner (if any) is an instance of MG
+	(used internally in MG) or of multigrid_solver (used in the
+	interface)*/
+    bool mg_instance;
+
     /**
        Default constructor
      */
     SolverParam() : compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
-      compute_true_res(true), sloppy_converge(false), verbosity_precondition(QUDA_SILENT) { ; }
+      compute_true_res(true), sloppy_converge(false), verbosity_precondition(QUDA_SILENT), mg_instance(false) { ; }
 
     /**
        Constructor that matches the initial values to that of the
@@ -240,7 +245,7 @@ namespace quda {
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(false), global_reduction(true)
+      is_preconditioner(false), global_reduction(true), mg_instance(false)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -275,7 +280,7 @@ namespace quda {
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction)
+      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction), mg_instance(param.mg_instance)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
