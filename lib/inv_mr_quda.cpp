@@ -30,6 +30,7 @@ namespace quda {
       delete tmpp;
       if (allocate_y) delete yp;
 
+      init = false;
     }
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
