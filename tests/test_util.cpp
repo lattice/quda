@@ -1611,6 +1611,7 @@ int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
+QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL] = { };
 int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol[QUDA_MAX_MG_LEVEL] = { };
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
@@ -1694,6 +1695,7 @@ void usage(char** argv )
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-solve-type <level solve>             # The type of solve to do (direct, direct-pc) (default direct-pc) \n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
   printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
   printf("    --mg-setup-tol <level tol>                # The tolerance to use for the setup of multigrid (default 5e-6)\n");
@@ -1738,6 +1740,7 @@ void process_command_line(int argc, char** argv)
     num_setup_iter[i] = 1;
     setup_tol[i] = 5e-6;
     mu_factor[i] = 1.;
+    mg_solve_type[i] = QUDA_INVALID_SOLVE;
   }
 
   // reading command line
@@ -1759,6 +1762,9 @@ void process_command_line(int argc, char** argv)
   if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
+  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+    if (mg_solve_type[i] == QUDA_INVALID_SOLVE) mg_solve_type[i] = solve_type;
+  }
 }
 
 int process_command_line_option(int argc, char** argv, int* idx)
@@ -2405,6 +2411,24 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-solve-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_solve_type[level] = get_solve_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
   if( strcmp(argv[i], "--mg-nu-pre") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3037,7 +3061,7 @@ void setDefaultMultigridParam(QudaMultigridParam &mg_param) {
 
     // if we are using an outer even-odd preconditioned solve, then we
     // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    mg_param.coarse_grid_solution_type[i] = mg_solve_type[i] == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
