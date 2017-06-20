@@ -1050,6 +1050,25 @@ get_solve_str(QudaSolveType type)
   return ret;
 }
 
+QudaSchwarzType
+get_schwarz_type(char* s)
+{
+  QudaSchwarzType ret = QUDA_INVALID_SCHWARZ;
+
+  if (strcmp(s, "false") == 0) {
+    ret = QUDA_INVALID_SCHWARZ;
+  } else if (strcmp(s, "add") == 0) {
+    ret = QUDA_ADDITIVE_SCHWARZ;
+  } else if (strcmp(s, "mul") == 0) {
+    ret = QUDA_MULTIPLICATIVE_SCHWARZ;
+  } else {
+    fprintf(stderr, "Error: invalid Schwarz type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
 QudaTwistFlavorType
 get_flavor_type(char* s)
 {
@@ -1145,7 +1164,7 @@ get_solver_type(char* s)
   } else if (strcmp(s, "cg3nr") == 0){
     ret = QUDA_CG3NR_INVERTER;
   } else {
-    fprintf(stderr, "Error: invalid solver type\n");	
+    fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
   }
   

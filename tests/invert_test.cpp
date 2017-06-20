@@ -50,6 +50,7 @@ extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern double kappa; // kappa of Dirac operator
 extern double mu;
 extern double anisotropy; // temporal anisotropy
 extern double tol; // tolerance for inverter
@@ -162,9 +163,14 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  inv_param.mass = mass;
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/gauge_param.anisotropy);
+  }
   inv_param.mu = mu;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.epsilon = 0.1385;

@@ -32,6 +32,7 @@ extern bool verify_results;
 extern int test_type;
 
 extern QudaPrecision prec;
+extern QudaPrecision prec_sloppy;
 
 extern void usage(char** );
 
@@ -141,11 +142,13 @@ void initFields(QudaPrecision prec)
 	(gParam.x[0]*gParam.x[2]*gParam.x[3])/2,
 	(gParam.x[0]*gParam.x[1]*gParam.x[3])/2 } );
   gParam.pad = gParam.nFace * pad * 2;
+  gParam.precision = prec_sloppy;
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
   Y_d->copy(*Y_h);
   Yhat_d->copy(*Yhat_h);
 
+  gParam.precision = param.precision;
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;

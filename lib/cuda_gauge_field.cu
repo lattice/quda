@@ -35,7 +35,7 @@ namespace quda {
     }
 #endif
 
-    if(create != QUDA_NULL_FIELD_CREATE &&
+    if (create != QUDA_NULL_FIELD_CREATE &&
         create != QUDA_ZERO_FIELD_CREATE &&
         create != QUDA_REFERENCE_FIELD_CREATE){
       errorQuda("ERROR: create type(%d) not supported yet\n", create);
@@ -61,7 +61,8 @@ namespace quda {
     }
 
     even = gauge;
-    odd = (char*)gauge + bytes/2; 
+    odd = static_cast<char*>(gauge) + bytes/2;
+    if (create != QUDA_ZERO_FIELD_CREATE && isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) zeroPad();
 
 #ifdef USE_TEXTURE_OBJECTS
     createTexObject(evenTex, even);
@@ -74,6 +75,17 @@ namespace quda {
     }
 #endif
 
+  }
+
+  void cudaGaugeField::zeroPad() {
+    size_t pad_bytes = (stride - volumeCB) * precision * order;
+    int Npad = (geometry * (reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2)) / order;
+
+    size_t pitch = stride*order*precision;
+    if (pad_bytes) {
+      cudaMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      cudaMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+    }
   }
 
 #ifdef USE_TEXTURE_OBJECTS

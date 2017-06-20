@@ -528,6 +528,9 @@ namespace quda {
 	} else if (arg.geoBlockSizeCB == 500) { // 5x5x5x8 aggregates
 	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,500>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (arg.geoBlockSizeCB == 512) { // 4x4x8x8 aggregates
+	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,512>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else {
 	  errorQuda("Block size %d not instantiated", arg.geoBlockSizeCB);
 	}

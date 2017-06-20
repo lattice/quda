@@ -240,26 +240,20 @@ namespace quda {
       Anorm = sqrt(blas::norm2(r)/b2);
     }
 
-
     // compute initial residual
     double r2 = 0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
       if (b2 == 0) b2 = r2;
-      if (&x != &xSloppy) {
-	blas::copy(y, x);
-	blas::zero(xSloppy);
-      } else {
-	blas::zero(y);
-      }
+      blas::copy(y, x);
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = b2;
-      blas::zero(x);
       blas::zero(y);
-      if (&x != &xSloppy) blas::zero(xSloppy);
     }
+    blas::zero(x);
+    if (&x != &xSloppy) blas::zero(xSloppy);
 
     blas::copy(rSloppy,r);
     if (Np != (int)p.size()) {

@@ -1592,6 +1592,7 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
+double kappa = -1.0;
 double mu = 0.1;
 double anisotropy = 1.0;
 double clover_coeff = 0.1;
@@ -1618,12 +1619,15 @@ QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
 double omega = 0.85;
-QudaInverterType smoother_type = QUDA_MR_INVERTER;
-QudaInverterType coarsest_solver = QUDA_GCR_INVERTER;
-double coarsest_tol = 0; // if 0, then we use tolhq
-int coarsest_maxiter = 1000;
+QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL] = { };
+double coarse_solver_tol[QUDA_MAX_MG_LEVEL] = { };
+QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL] = { };
+double smoother_tol[QUDA_MAX_MG_LEVEL] = { };
+int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL] = { };
 bool generate_nullspace = true;
 bool generate_all_levels = true;
+QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL] = { };
+int schwarz_cycle[QUDA_MAX_MG_LEVEL] = { };
 
 int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
 
@@ -1675,10 +1679,10 @@ void usage(char** argv )
   printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
-  printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
-	 "                                                  For multigrid this sets the smoother type.\n");
-  printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
+  printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
+  printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
+  printf("    --kappa                                   # Kappa of Dirac operator (default 0.1)\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
   printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
@@ -1703,10 +1707,13 @@ void usage(char** argv )
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
   printf("    --mg-omega                                # The over/under relaxation factor for the smoother of multigrid (default 0.85)\n");
-  printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
-  printf("    --mg-coarsest-solver                      # The solver to use in the coarsest level of multigrid (default gcr)\n");
-  printf("    --mg-coarsest-tol                         # The solver tolerance to use in the coarsest level of multigrid (default tolhq)\n");
-  printf("    --mg-coarsest-maxiter                     # The solver maxiter to use in the coarsest level of multigrid (default 1000)\n");
+  printf("    --mg-coarse-solver <level gcr/etc.>       # The solver to wrap the V cycle on each level (default gcr, only for levels 1+)\n");
+  printf("    --mg-coarse-solver-tol <level gcr/etc.>   # The coarse solver tolerance for each level (default 0.25, only for levels 1+)\n");
+  printf("    --mg-coarse-solver-maxiter <level n>      # The coarse solver maxiter for each level (default 100)\n");
+  printf("    --mg-smoother <level mr/etc.>             # The smoother to use for multigrid (default mr)\n");
+  printf("    --mg-smoother-tol <level resid_tol>       # The smoother tolerance to use for each multigrid (default 0.25)\n");
+  printf("    --mg-schwarz-type <level false/add/mul>   # Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)\n");
+  printf("    --mg-schwarz-cycle <level cycle>          # The number of Schwarz cycles to apply per smoother application (default=1)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
@@ -1741,6 +1748,13 @@ void process_command_line(int argc, char** argv)
     setup_tol[i] = 5e-6;
     mu_factor[i] = 1.;
     mg_solve_type[i] = QUDA_INVALID_SOLVE;
+    schwarz_type[i] = QUDA_INVALID_SCHWARZ;
+    schwarz_cycle[i] = 1;
+    smoother_type[i] = QUDA_MR_INVERTER;
+    smoother_tol[i] = 0.25;
+    coarse_solver[i] = QUDA_GCR_INVERTER;
+    coarse_solver_tol[i] = 0.25;
+    coarse_solver_maxiter[i] = 10;
   }
 
   // reading command line
@@ -1897,7 +1911,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--dim") == 0){
-    if (i+1 >= argc){
+    if (i+4 >= argc){
       usage(argv);
     }
     xdim= atoi(argv[i+1]);
@@ -2081,7 +2095,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--gridsize") == 0){
-    if (i+1 >= argc){ 
+    if (i+4 >= argc){
       usage(argv);
     }     
     int xsize =  atoi(argv[i+1]);
@@ -2225,6 +2239,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mass = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--kappa") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    kappa = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2377,7 +2401,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
     
   if( strcmp(argv[i], "--mg-nvec") == 0){
-    if (i+1 >= argc){
+    if (i+2 >= argc){
       usage(argv);
     }
     int level = atoi(argv[i+1]);
@@ -2458,7 +2482,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-setup-inv") == 0){
-    if (i+1 >= argc){
+    if (i+2 >= argc){
       usage(argv);
     }
     int level = atoi(argv[i+1]);
@@ -2475,7 +2499,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-setup-iters") == 0){
-    if (i+1 >= argc){
+    if (i+2 >= argc){
       usage(argv);
     }
     int level = atoi(argv[i+1]);
@@ -2577,7 +2601,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-verbosity") == 0){
-    if (i+1 >= argc){
+    if (i+2 >= argc){
       usage(argv);
     }
     int level = atoi(argv[i+1]);
@@ -2593,48 +2617,135 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-coarse-solver") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 1 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d for coarse solver", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver[level] = get_solver_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-smoother") == 0){
-    if (i+1 >= argc){
+    if (i+2 >= argc){
       usage(argv);
     }
-    smoother_type = get_solver_type(argv[i+1]);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    smoother_type[level] = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--mg-coarsest-solver") == 0){
-    if (i+1 >= argc){
+  if( strcmp(argv[i], "--mg-smoother-tol") == 0){
+    if (i+2 >= argc){
       usage(argv);
     }
-    coarsest_solver = get_solver_type(argv[i+1]);
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    smoother_tol[level] = atof(argv[i+1]);
+
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--mg-coarsest-tol") == 0){
-    if (i+1 >= argc){
+  if( strcmp(argv[i], "--mg-coarse-solver-tol") == 0){
+    if (i+2 >= argc){
       usage(argv);
     }
-    coarsest_tol = atof(argv[i+1]);
+    int level = atoi(argv[i+1]);
+    if (level < 1 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d for coarse solver", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_tol[level] = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--mg-coarsest-maxiter") == 0){
-    if (i+1 >= argc){
+  if( strcmp(argv[i], "--mg-coarse-solver-maxiter") == 0){
+    if (i+2 >= argc){
       usage(argv);
     }
-    coarsest_maxiter = atoi(argv[i+1]);
+
+    int level = atoi(argv[i+1]);
+    if (level < 1 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d for coarse solver", level);
+      usage(argv);
+    }
+    i++;
+
+    coarse_solver_maxiter[level] = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+  if( strcmp(argv[i], "--mg-schwarz-type") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    schwarz_type[level] = get_schwarz_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-schwarz-cycle") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    schwarz_cycle[level] = atoi(argv[i+1]);
+    if (schwarz_cycle[level] < 0 || schwarz_cycle[level] >= 128) {
+      printf("ERROR: invalid Schwarz cycle value requested %d for level %d",
+	     level, schwarz_cycle[level]);
+      usage(argv);
+    }
     i++;
     ret = 0;
     goto out;
   }
 
   if( strcmp(argv[i], "--mg-block-size") == 0){
-    if (i+1 >= argc){ 
+    if (i+5 >= argc){
       usage(argv);
     }     
     int level = atoi(argv[i+1]);
@@ -2680,18 +2791,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--mass") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    mass= atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
   if( strcmp(argv[i], "--mg-mu-factor") == 0){
-    if (i+1 >= argc){
+    if (i+2 >= argc){
       usage(argv);
     }
     int level = atoi(argv[i+1]);
@@ -2917,9 +3018,13 @@ void setDefaultInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
+  }
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -3002,9 +3107,13 @@ void setDefaultMultigridParam(QudaMultigridParam &mg_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
+  }
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -3045,23 +3154,35 @@ void setDefaultMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
-    mg_param.smoother[i] = smoother_type;
+    // set the coarse solver wrappers including bottom solver
+    mg_param.coarse_solver[i] = coarse_solver[i];
+    mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
+    mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
+
+    mg_param.smoother[i] = smoother_type[i];
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
-    mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
-
-    mg_param.global_reduction[i] = QUDA_BOOLEAN_YES;
+    mg_param.smoother_tol[i] = smoother_tol[i];
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
     mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
+
+    // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
+    mg_param.smoother_schwarz_type[i] = schwarz_type[i];
+
+    // if using Schwarz preconditioning then use local reductions only
+    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+
+    // set number of Schwarz cycles to apply
+    mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
 
     // if we are using an outer even-odd preconditioned solve, then we
     // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = mg_solve_type[i] == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
@@ -3074,12 +3195,6 @@ void setDefaultMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-
-  // coarsest grid solver
-  mg_param.smoother[mg_levels-1] = coarsest_solver;
-  mg_param.smoother_tol[mg_levels-1] = coarsest_tol == 0 ? tol_hq : coarsest_tol;
-  mg_param.nu_pre[mg_levels-1] = coarsest_maxiter;
-  mg_param.nu_post[mg_levels-1] = 0;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;

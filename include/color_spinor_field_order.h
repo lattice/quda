@@ -142,7 +142,18 @@ namespace quda {
 
   namespace colorspinor {
 
-    template<typename ReduceType, typename Float> struct square { __host__ __device__ ReduceType operator()(quda::complex<Float> x) { return static_cast<ReduceType>(norm(x)); } };
+    template<typename ReduceType, typename Float> struct square {
+      square(ReduceType scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
+      { return static_cast<ReduceType>(norm(x)); }
+    };
+
+    template<typename ReduceType> struct square<ReduceType,short> {
+      const ReduceType scale;
+      square(ReduceType scale) : scale(scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<short> &x)
+      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB { 
       AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
@@ -259,6 +270,11 @@ namespace quda {
 	  ghost[2*d+1] = static_cast<complex<Float>*>(ghost_[2*d+1]);
 	}
       }
+
+      /**
+	 Dummy function for floating point field
+      */
+      void resetScale(double max) { }
 
       /**
        * Read-only complex-member accessor function.  The last
@@ -394,10 +410,10 @@ namespace quda {
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust::device_ptr<complex<Float> > ptr(v);
 	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,Float>(), 0.0, thrust::plus<double>());
+					  square<double,Float>(0.0), 0.0, thrust::plus<double>());
 	} else {
 	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,Float>(), 0.0, thrust::plus<double>());
+					  square<double,Float>(0.0), 0.0, thrust::plus<double>());
 	}
 	comm_allreduce(&nrm2);
 	return nrm2;
@@ -428,19 +444,19 @@ namespace quda {
         __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
 	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
 
-	__device__ __host__ inline Float real() { return scale_inv*static_cast<Float>(v[idx].real()); }
-	__device__ __host__ inline Float imag() { return scale_inv*static_cast<Float>(v[idx].imag()); }
+	__device__ __host__ inline Float real() const { return scale_inv*static_cast<Float>(v[idx].real()); }
+	__device__ __host__ inline Float imag() const { return scale_inv*static_cast<Float>(v[idx].imag()); }
 
 	/**
-	   @brief Assignment operator with fieldorder_wrapper instance as input (assumes scale factors match)
+	   @brief Assignment operator with fieldorder_wrapper instance as input
 	   @param a fieldorder_wrapper we are copying from
 	*/
 	__device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a) {
-	  v[idx] = a.v[a.idx];
+	  v[idx] = complex<storeFloat>(round(scale * a.real()), round(scale * a.imag()));
 	}
 
 	/**
-	   @brief Assignment operator with Complex number instance as input
+	   @brief Assignment operator with complex number instance as input
 	   @param a Complex number we want to store in this accessor
 	*/
 	__device__ __host__ inline void operator=(const complex<Float> &a) {
@@ -451,6 +467,10 @@ namespace quda {
 	  }
 	}
 
+	/**
+	   @brief Operator+= with complex number instance as input
+	   @param a Complex number we want to add to this accessor
+	*/
 	__device__ __host__ inline void operator+=(const complex<Float> &a) {
 	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
 	    v[idx] += complex<storeFloat>(a.x, a.y);
@@ -459,6 +479,10 @@ namespace quda {
 	  }
 	}
 
+	/**
+	   @brief Operator-= with complex number instance as input
+	   @param a Complex number we want to subtract from this accessor
+	*/
 	__device__ __host__ inline void operator-=(const complex<Float> &a) {
 	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
 	    v[idx] -= complex<storeFloat>(a.x, a.y);
@@ -510,8 +534,8 @@ namespace quda {
 
 	for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
 
-	scale = static_cast<Float>(MAX_SHORT);
-	scale_inv = static_cast<Float>(1.0 / MAX_SHORT);
+	scale = static_cast<Float>(MAX_SHORT / field.Scale());
+	scale_inv = static_cast<Float>(field.Scale() / MAX_SHORT);
       }
 
       /**
@@ -525,6 +549,11 @@ namespace quda {
 	  ghost[2*d+0] = static_cast<complex<storeFloat>*>(ghost_[2*d+0]);
 	  ghost[2*d+1] = static_cast<complex<storeFloat>*>(ghost_[2*d+1]);
 	}
+      }
+
+      void resetScale(double max) {
+	scale = static_cast<Float>(MAX_SHORT / max);
+	scale_inv = static_cast<Float>(max / MAX_SHORT);
       }
 
       /**
@@ -666,8 +695,17 @@ namespace quda {
        * @return L2 norm squared
       */
       __host__ double norm2() const {
-	errorQuda("Not implemenred");
-	return 0.0;
+	double nrm2 = 0;
+	if (location == QUDA_CUDA_FIELD_LOCATION) {
+	  thrust::device_ptr<complex<storeFloat> > ptr(v);
+	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
+					  square<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	} else {
+	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
+					  square<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	}
+	comm_allreduce(&nrm2);
+	return nrm2;
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }

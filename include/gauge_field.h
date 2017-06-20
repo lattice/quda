@@ -243,6 +243,11 @@ namespace quda {
     void *even;
     void *odd;
 
+    /**
+       @brief Initialize the padded region to 0
+     */
+    void zeroPad();
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t evenTex;
     cudaTextureObject_t oddTex;

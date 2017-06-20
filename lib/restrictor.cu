@@ -346,6 +346,9 @@ namespace quda {
 	  } else if (block_size == 500) { // 5x5x5x8 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,500>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (block_size == 512) { // 4x4x8x8 aggregates
+	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,512>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
 	  } else {
 	    errorQuda("Block size %d not instantiated", block_size);

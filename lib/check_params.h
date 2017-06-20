@@ -535,8 +535,18 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #else
     P(setup_tol[i], INVALID_DOUBLE);
 #endif
+
+    P(coarse_solver[i], QUDA_INVALID_INVERTER);
+    P(coarse_solver_maxiter[i], INVALID_INT);
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+
+#ifndef CHECK_PARAM
+    P(smoother_schwarz_type[i], QUDA_INVALID_SCHWARZ);
+    P(smoother_schwarz_cycle[i], 1);
+#else
+    P(smoother_schwarz_cycle[i], INVALID_INT);
+#endif
 
     // these parameters are not set for the bottom grid
     if (i<n_level-1) {
@@ -559,6 +569,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #else
     P(mu_factor[i], INVALID_DOUBLE);
 #endif
+    P(coarse_solver_tol[i], INVALID_DOUBLE);
     P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
     P(global_reduction[i], QUDA_BOOLEAN_YES);

@@ -44,6 +44,7 @@ extern QudaPrecision prec_null;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
+extern double kappa; // kappa of Dirac operator
 extern double mu;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
@@ -70,10 +71,14 @@ extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
 extern double omega;
-extern QudaInverterType smoother_type;
-extern QudaInverterType coarsest_solver;
-extern double coarsest_tol;
-extern int coarsest_maxiter;
+extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
+extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+extern double smoother_tol[QUDA_MAX_MG_LEVEL];
+extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
+extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
+extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
@@ -112,15 +117,16 @@ display_test_info()
   printfQuda(" - number of pre-smoother applications %d\n", nu_pre);
   printfQuda(" - number of post-smoother applications %d\n", nu_post);
 
+  printfQuda("Outer solver paramers\n");
+  printfQuda(" - pipeline = %d\n", pipeline);
+
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
-  
   return ;
-  
 }
 
 QudaPrecision &cpu_prec = prec;
