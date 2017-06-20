@@ -66,9 +66,6 @@ extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
-extern QudaInverterType setup_inv;
-extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
-extern double setup_tol;
 extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
@@ -270,6 +267,10 @@ int main(int argc, char **argv)
     }
 
     invertQuda(spinorOut, spinorIn, &inv_param);
+    //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+    //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+    printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+               inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, 0.0);
   }
 
   // free the multigrid solver
@@ -284,10 +285,6 @@ int main(int argc, char **argv)
   printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-  //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, 0.0);
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     
