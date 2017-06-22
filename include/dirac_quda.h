@@ -673,7 +673,8 @@ namespace quda {
      * @param Yhat[out] Coarse preconditioned link field
      * @param T[in] Transfer operator defining the coarse grid
  **/
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, 
+                                 const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
 
   };
 
@@ -725,7 +726,8 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, 
+                                 const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned staggered

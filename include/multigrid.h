@@ -375,7 +375,8 @@ namespace quda {
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
-  void CoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double mass, QudaDiracType dirac, QudaMatPCType matpc);
+  void CoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, 
+                const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double mass, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
@@ -398,8 +399,8 @@ namespace quda {
 		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
 		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
-  void CoarseCoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
-                      const cpuGaugeField &coarse_links, const cpuGaugeField &coarse_clover, const cpuGaugeField &coarse_cloverInv,
+  void CoarseCoarseKSOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+                      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
                       double mass, QudaDiracType dirac, QudaMatPCType matpc);
 
 

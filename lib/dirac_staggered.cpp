@@ -128,8 +128,8 @@ namespace quda {
     // do nothing
   }
 
-  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
-     CoarseKSOp(Y, X, Xinv, Yhat, T, gauge, nullptr,  2*mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);//
+  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, double kappa, double mu, double mu_factor) const {
+     CoarseKSOp(Y, X, Xinv, T, gauge, nullptr,  2*mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);//
   }
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
