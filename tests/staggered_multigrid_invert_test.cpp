@@ -105,14 +105,25 @@ extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
-extern QudaInverterType smoother_type;
-
-extern double mu_factor[QUDA_MAX_MG_LEVEL];
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
+//extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
+//extern double setup_tol;
+//
 extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
+extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol;
+extern QudaSetupType setup_type;
 
+extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
+extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+extern double smoother_tol[QUDA_MAX_MG_LEVEL];
+extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
+extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
+extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
+//
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
@@ -174,17 +185,22 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     //mg_param.setup_inv_type[i] = setup_inv[i];
 //!!!    mg_param.setup_inv_type[i] = QUDA_CG_INVERTER;
     mg_param.setup_inv_type[i] = QUDA_BICGSTAB_INVERTER;
+    mg_param.num_setup_iter[i] = num_setup_iter[i];//default 1
     mg_param.setup_tol[i] = setup_tol;
 
     mg_param.spin_block_size[i] = 1;// 1 or 0 (1 for parity blocking)
     mg_param.n_vec[i] =  nvec[i] == 0 ? default_nvecs : nvec[i]; // default to 24 vectors if not set
-    mg_param.nu_pre[i] = 4;//nu_pre;
-    mg_param.nu_post[i] = 4;//nu_post;
+    mg_param.nu_pre[i] = nu_pre;
+    mg_param.nu_post[i] = nu_post;
     //mg_param.mu_factor[i] = mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_VCYCLE;//QUDA_MG_CYCLE_RECURSIVE;
+    // set the coarse solver wrappers including bottom solver
+    mg_param.coarse_solver[i] = coarse_solver[i];
+    mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
+    mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
 
-    mg_param.smoother[i] = smoother_type;
+    mg_param.smoother[i] = smoother_type[i];
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
     mg_param.smoother_tol[i] = tol_hq; // repurpose heavy-quark tolerance for now
@@ -197,6 +213,9 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // but for now let's not.
     //mg_param.smoother_solve_type[i] = QUDA_DIRECT_SOLVE; 
     mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
+
+    // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
+    mg_param.smoother_schwarz_type[i] = schwarz_type[i];
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
@@ -211,12 +230,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     //mg_param.location[i] = QUDA_CPU_FIELD_LOCATION;
   }
 
-  //mg_param.smoother_solve_type[0] = solve_type == QUDA_NORMOP_PC_SOLVE? QUDA_NORMOP_PC_SOLVE : mg_param.smoother_solve_type[0]; //or choose QUDA_DIRECT_SOLVE;
-  //mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE;//enforce NORMOPPC solve
+  //fine-level smoother:
   mg_param.smoother_solve_type[0] = solve_type;//same as fine level solve type.
   // coarsen the spin on the first restriction is undefined for staggered fields
   mg_param.spin_block_size[0] = 1;
   warningQuda("Level 0 spin block size is set to: %d", mg_param.spin_block_size[0]);
+  mg_param.coarse_solver[0] = QUDA_GCR_INVERTER; 
 
   if(mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE || mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) 
   { 
@@ -230,19 +249,13 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 #endif
 #endif
   } 
-  //number of the top-level smoothing:
-  mg_param.nu_pre[0] = nu_pre;
-  mg_param.nu_post[0] = nu_post;
 
   //setup coarse grid solver related parameters:
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
-  mg_param.nu_pre [mg_levels-1] = 500*nu_pre;
-  mg_param.nu_post[mg_levels-1] = 500*nu_post;
   mg_param.coarse_grid_solution_type[mg_levels-1] = QUDA_MAT_SOLUTION;
   mg_param.smoother_solve_type[mg_levels-1] = QUDA_DIRECT_SOLVE;//always direct solve.
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-
   mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
 
   mg_param.run_verify = QUDA_BOOLEAN_YES;

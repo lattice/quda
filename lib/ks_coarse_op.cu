@@ -126,8 +126,8 @@ namespace quda {
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
   void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T,
 		  const GaugeField *fl, const GaugeField *ll, const CloverField &c, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
-    if (T.Vectors().Nspin()/T.Spin_bs() != 2)
-      errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
+    if (T.Vectors().Nspin() != 1 && T.Spin_bs() != 1)
+      errorQuda("Unsupported number of spins %d or incorrect spin block size parameter %d.\n",T.Vectors().Nspin(), T.Spin_bs());
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
@@ -181,8 +181,9 @@ namespace quda {
   void calculateKSY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T,
 		  const GaugeField *fl, const GaugeField *ll, const CloverField &c, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
     Precision(X, Y, *fl);
-    Precision(X, Y, *ll);
-    Precision(*uv, *uv_long, T.Vectors(X.Location()));
+    if( ll ) Precision(X, Y, *ll);
+    Precision(*uv, *uv, T.Vectors(X.Location()));
+    if( uv_long ) Precision(*uv_long, *uv_long, T.Vectors(X.Location()));
 
     printfQuda("Computing Y field......\n");
 
