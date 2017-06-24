@@ -414,17 +414,20 @@ namespace quda {
 #endif
     bool init;
 
+    template <int n>
+    void solve_n(ColorSpinorField& out, ColorSpinorField& in);
+    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+
+    
+
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    template <int n>
-    void solve_n(ColorSpinorField& out, ColorSpinorField& in);
     void solve(ColorSpinorField& out, ColorSpinorField& in);
 
-    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+    
   };
 
   class CGNE : public CG {
