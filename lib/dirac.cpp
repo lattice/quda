@@ -214,6 +214,9 @@ namespace quda {
     } else if (param.type == QUDA_GAUGE_LAPLACEPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeLaplacePC operator\n");
       return new GaugeLaplacePC(param);
+    } else if (param.type == QUDA_GAUGE_COVDEV_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeCovDev operator\n");
+      return new GaugeCovDev(param);
     } else {
       errorQuda("Unsupported Dirac type %d", param.type);
     }
@@ -229,6 +232,7 @@ namespace quda {
     {
       case QUDA_COARSE_DIRAC: // single fused operator
       case QUDA_GAUGE_LAPLACE_DIRAC:
+      case QUDA_GAUGE_COVDEV_DIRAC:
 	steps = 1;
 	break;
       case QUDA_WILSON_DIRAC:
