@@ -8,13 +8,17 @@ namespace quda {
   static bool bidirectional_debug = false;
 
   template <typename Float, int fineSpin, int coarseSpin,
-	    typename coarseGauge, typename fineGauge, typename fineSpinor,
+	    typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor,
 	    typename fineSpinorTmp, typename fineSpinorV, typename fineClover>
   struct CalculateYArg {
 
     coarseGauge Y;           /** Computed coarse link field */
     coarseGauge X;           /** Computed coarse clover field */
     coarseGauge Xinv;        /** Computed coarse clover field */
+
+    coarseGaugeAtomic Y_atomic;    /** Y atomic accessor used for computation before conversion to final format */
+    coarseGaugeAtomic X_atomic;    /** X atomic accessor used for computation before conversion to final format */
+    coarseGaugeAtomic Xinv_atomic; /** Xinv atomic accessor used for computation before conversion to final format */
 
     fineSpinorTmp UV;        /** Temporary that stores the fine-link * spinor field product */
     fineSpinor AV;           /** Temporary that stores the clover * spinor field product */
@@ -40,9 +44,13 @@ namespace quda {
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
-    CalculateYArg(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
-		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, double mu_factor, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
-      : Y(Y), X(X), Xinv(Xinv), UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
+    CalculateYArg(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv,
+		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, coarseGaugeAtomic &Xinv_atomic,
+		  fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
+		  const fineClover &C, const fineClover &Cinv, double kappa, double mu, double mu_factor,
+		  const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_)
+      : Y(Y), X(X), Xinv(Xinv), Y_atomic(Y_atomic), X_atomic(X_atomic), Xinv_atomic(Xinv_atomic),
+	UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
 	kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
         fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB())
     {
@@ -610,15 +618,15 @@ namespace quda {
       for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
 	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	  arg.Y.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
+	  arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
 	}
       }
-    } else if (dir == QUDA_BACKWARDS) { // store the forward and backward clover contributions separately for now since they can't be added coeherently easily
+    } else if (dir == QUDA_BACKWARDS) { // store the forward and backward clover contributions separately for now since they can't be added coherently easily
 #pragma unroll
       for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
 	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	  arg.X.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
+	  arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
 	}
       }
     } else {
@@ -626,7 +634,7 @@ namespace quda {
       for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
 	for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
-	  arg.Xinv.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
+	  arg.Xinv_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,c_row,c_col,vuv[s_row*coarseSpin+s_col]);
 	}
       }
     }
@@ -665,7 +673,7 @@ namespace quda {
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c) {
-    auto &Y = arg.Y;
+    auto &Y = arg.Y_atomic;
 
     for (int d=0; d<4; d++) {
       for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
@@ -725,7 +733,7 @@ namespace quda {
 	for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
 	  for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
 	    //Flip s_col, s_row on the rhs because of Hermitian conjugation.  Color part left untransposed.
-	    Xlocal[((nSpin*s_col+s_row)*nColor+ic_c)*nColor+jc_c] = arg.X(0,parity,x_cb,s_row, s_col, ic_c, jc_c);
+	    Xlocal[((nSpin*s_col+s_row)*nColor+ic_c)*nColor+jc_c] = arg.X_atomic(0,parity,x_cb,s_row, s_col, ic_c, jc_c);
 	  }
 	}
       }
@@ -740,13 +748,13 @@ namespace quda {
 	  for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
 	    if (bidirectional) {
 	      // here we have forwards links in Xinv and backwards links in X
-	      arg.X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) =
-		-arg.kappa*(arg.Xinv(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
+	      arg.X_atomic(0,parity,x_cb,s_row,s_col,ic_c,jc_c) =
+		-arg.kappa*(arg.Xinv_atomic(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
 			    +conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
 	    } else {
 	      // here we have just backwards links
-	      arg.X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) =
-		-arg.kappa*(sign*arg.X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
+	      arg.X_atomic(0,parity,x_cb,s_row,s_col,ic_c,jc_c) =
+		-arg.kappa*(sign*arg.X_atomic(0,parity,x_cb,s_row,s_col,ic_c,jc_c)
 			    +conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
 	    }
 	  } //Color column
@@ -841,7 +849,7 @@ namespace quda {
       for (int sj = 0; sj < coarseSpin; sj++) {
 	//for (int ic = 0; ic < coarseColor; ic++) {
 	  for (int jc = 0; jc < coarseColor; jc++) {
-	    arg.X.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc,X[(si*coarseSpin+sj)*coarseColor+jc]);
+	    arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj,ic_c,jc,X[(si*coarseSpin+sj)*coarseColor+jc]);
 	  }
 	  //}
       }
@@ -879,7 +887,7 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
         for(int s = 0; s < nSpin; s++) { //Spin
          for(int c = 0; c < nColor; c++) { //Color
-	   arg.X(0,parity,x_cb,s,s,c,c) += static_cast<Float>(1.0);
+	   arg.X_atomic(0,parity,x_cb,s,s,c,c) += static_cast<Float>(1.0);
          } //Color
         } //Spin
       } // x_cb
@@ -896,7 +904,7 @@ namespace quda {
 
     for(int s = 0; s < nSpin; s++) { //Spin
       for(int c = 0; c < nColor; c++) { //Color
-	arg.X(0,parity,x_cb,s,s,c,c) += static_cast<Float>(1.0);
+	arg.X_atomic(0,parity,x_cb,s,s,c,c) += static_cast<Float>(1.0);
       } //Color
     } //Spin
    }
@@ -911,12 +919,12 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
 	for(int s = 0; s < nSpin/2; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X(0,parity,x_cb,s,s,c,c) += mu;
+            arg.X_atomic(0,parity,x_cb,s,s,c,c) += mu;
           } //Color
 	} //Spin
 	for(int s = nSpin/2; s < nSpin; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
-            arg.X(0,parity,x_cb,s,s,c,c) -= mu;
+            arg.X_atomic(0,parity,x_cb,s,s,c,c) -= mu;
           } //Color
 	} //Spin
       } // x_cb
@@ -934,15 +942,71 @@ namespace quda {
 
     for(int s = 0; s < nSpin/2; s++) { //Spin
       for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
-       arg.X(0,parity,x_cb,s,s,ic_c,ic_c) += mu;
+       arg.X_atomic(0,parity,x_cb,s,s,ic_c,ic_c) += mu;
       } //Color
     } //Spin
     for(int s = nSpin/2; s < nSpin; s++) { //Spin
       for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
-       arg.X(0,parity,x_cb,s,s,ic_c,ic_c) -= mu;
+       arg.X_atomic(0,parity,x_cb,s,s,ic_c,ic_c) -= mu;
       } //Color
     } //Spin
    }
+
+  /**
+   * Convert the field from the atomic format to the required computation format, e.g. fixed point to floating point
+   */
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  __device__ __host__ void convert(Arg &arg, int parity, int x_cb, int c_row, int c_col) {
+
+    const auto &Yin = arg.Y_atomic;
+    const auto &Xin = arg.X_atomic;
+
+    for (int d=0; d<8; d++) {
+      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+	for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+	  complex<Float> Y = Yin(d,parity,x_cb,s_row,s_col,c_row,c_col);
+	  arg.Y(d,parity,x_cb,s_row,s_col,c_row,c_col) = Y;
+	} //Spin column
+      } //Spin row
+    } // dimension
+
+    for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+      for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+	arg.X(0,parity,x_cb,s_row,s_col,c_row,c_col) = Xin(0,parity,x_cb,s_row,s_col,c_row,c_col);
+      }
+    }
+
+  }
+
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  void ConvertCPU(Arg &arg) {
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
+	for(int c_row = 0; c_row < nColor; c_row++) { //Color row
+	  for(int c_col = 0; c_col < nColor; c_col++) { //Color column
+	    convert<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+	  }
+	}
+      } // c/b volume
+    } // parity
+  }
+
+  template<typename Float, int nSpin, int nColor, typename Arg>
+  __global__ void ConvertGPU(Arg arg) {
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    if (x_cb >= arg.coarseVolumeCB) return;
+
+    int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
+    if (parity_c_col >= 2*nColor) return;
+
+    int c_col = parity_c_col % nColor; // color col index
+    int parity = parity_c_col / nColor;
+
+    int c_row = blockDim.z*blockIdx.z + threadIdx.z; // color row index
+    if (c_row >= nColor) return;
+
+    convert<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+  }
 
   enum ComputeType {
     COMPUTE_UV,
@@ -955,12 +1019,14 @@ namespace quda {
     COMPUTE_COARSE_LOCAL,
     COMPUTE_DIAGONAL,
     COMPUTE_TMDIAGONAL,
+    COMPUTE_CONVERT,
     COMPUTE_INVALID
   };
 
   template <bool from_coarse, typename Float, int fineSpin,
 	    int fineColor, int coarseSpin, int coarseColor, typename Arg>
   class CalculateY : public TunableVectorYZ {
+  public:
 
     template <int dim> using Gamma_ = Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim>;
 
@@ -1002,6 +1068,7 @@ namespace quda {
 	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
       case COMPUTE_REVERSE_Y:
+      case COMPUTE_CONVERT:
 	// no floating point operations
 	flops_ = 0;
 	break;
@@ -1049,6 +1116,9 @@ namespace quda {
       case COMPUTE_TMDIAGONAL:
 	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
 	break;
+      case COMPUTE_CONVERT:
+	bytes_ = 2*(arg.X.Bytes() + arg.X_atomic.Bytes() + 8*(arg.Y.Bytes() + arg.Y_atomic.Bytes()));
+	break;
       default:
 	errorQuda("Undefined compute type %d", type);
       }
@@ -1070,6 +1140,7 @@ namespace quda {
       case COMPUTE_COARSE_LOCAL:
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
+      case COMPUTE_CONVERT:
 	threads = arg.coarseVolumeCB;
 	break;
       default:
@@ -1168,6 +1239,10 @@ namespace quda {
 
           AddCoarseTmDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
 
+	} else if (type == COMPUTE_CONVERT) {
+
+	  ConvertCPU<Float,coarseSpin,coarseColor>(arg);
+
 	} else {
 	  errorQuda("Undefined compute type %d", type);
 	}
@@ -1242,6 +1317,11 @@ namespace quda {
 
           AddCoarseTmDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 
+	} else if (type == COMPUTE_CONVERT) {
+
+	  tp.grid.y = 2*coarseColor;
+	  ConvertGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+
 	} else {
 	  errorQuda("Undefined compute type %d", type);
 	}
@@ -1265,6 +1345,7 @@ namespace quda {
       type = type_;
       switch(type) {
       case COMPUTE_VUV:
+      case COMPUTE_CONVERT:
 	resizeVector(1,coarseColor);
 	break;
       case COMPUTE_UV:
@@ -1299,6 +1380,7 @@ namespace quda {
       else if (type == COMPUTE_COARSE_LOCAL)  strcat(Aux,",computeCoarseLocal");
       else if (type == COMPUTE_DIAGONAL)      strcat(Aux,",computeCoarseDiagonal");
       else if (type == COMPUTE_TMDIAGONAL)    strcat(Aux,",computeCoarseTmDiagonal");
+      else if (type == COMPUTE_CONVERT)       strcat(Aux,",computeConvert");
       else errorQuda("Unknown type=%d\n", type);
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
@@ -1312,7 +1394,7 @@ namespace quda {
       }
 
       const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_COARSE_LOCAL || type == COMPUTE_DIAGONAL
-			     || type == COMPUTE_TMDIAGONAL) ? X.VolString () : meta.VolString();
+			     || type == COMPUTE_TMDIAGONAL || type == COMPUTE_CONVERT) ? X.VolString () : meta.VolString();
 
       if (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) {
 	strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU," : ",CPU,");
@@ -1328,8 +1410,9 @@ namespace quda {
     void preTune() {
       switch (type) {
       case COMPUTE_VUV:
-	Y.backup();
 	Xinv.backup();
+      case COMPUTE_CONVERT:
+	Y.backup();
       case COMPUTE_COARSE_LOCAL:
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
@@ -1349,8 +1432,9 @@ namespace quda {
     void postTune() {
       switch (type) {
       case COMPUTE_VUV:
-	Y.restore();
 	Xinv.restore();
+      case COMPUTE_CONVERT:
+	Y.restore();
       case COMPUTE_COARSE_LOCAL:
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
@@ -1391,10 +1475,13 @@ namespace quda {
      @param mu[in] Twisted-mass parameter
      @param matpc[in] The type of preconditioning of the source fine-grid operator
    */
-  template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
-	   QudaGaugeFieldOrder gOrder, typename F, typename Ftmp, typename Vt, typename coarseGauge, typename fineGauge, typename fineClover>
-  void calculateY(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv, Ftmp &UV, F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv,
-		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
+  template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
+	   typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineClover>
+  void calculateY(coarseGauge &Y, coarseGauge &X, coarseGauge &Xinv,
+		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, coarseGaugeAtomic &Xinv_atomic,
+		  Ftmp &UV, F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv,
+		  GaugeField &Y_, GaugeField &X_, GaugeField &Xinv_, ColorSpinorField &uv,
+		  ColorSpinorField &av, const ColorSpinorField &v,
 		  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
     // sanity checks
@@ -1426,8 +1513,8 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    typedef CalculateYArg<Float,fineSpin,coarseSpin,coarseGauge,fineGauge,F,Ftmp,Vt,fineClover> Arg;
-    Arg arg(Y, X, Xinv, UV, AV, G, V, C, Cinv, kappa, mu, mu_factor, x_size, xc_size, geo_bs, spin_bs);
+    typedef CalculateYArg<Float,fineSpin,coarseSpin,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
+    Arg arg(Y, X, Xinv, Y_atomic, X_atomic, Xinv_atomic, UV, AV, G, V, C, Cinv, kappa, mu, mu_factor, x_size, xc_size, geo_bs, spin_bs);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v, Y_, X_, Xinv_);
 
     QudaFieldLocation location = Location(Y_, X_, Xinv_, av, v);
@@ -1513,6 +1600,14 @@ namespace quda {
       printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
+    // work out what to set the scales to
+    if (coarseGaugeAtomic::fixedPoint()) {
+      double max = 100.0; // FIXME - more accurate computation needed?
+      arg.Y_atomic.resetScale(max);
+      arg.X_atomic.resetScale(max);
+      arg.Xinv_atomic.resetScale(max);
+    }
+
     // First compute the coarse forward links if needed
     if (bidirectional_links) {
       for (int d = 0; d < nDim; d++) {
@@ -1535,7 +1630,7 @@ namespace quda {
 
 	y.setComputeType(COMPUTE_VUV); // compute Y += VUV
 	y.apply(0);
-	printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2(4+d));
+	printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(4+d));
       }
     }
 
@@ -1567,9 +1662,10 @@ namespace quda {
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(0);
-      printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2(d));
+      printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(d));
+
     }
-    printfQuda("X2 = %e\n", arg.X.norm2(0));
+    printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
 
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
@@ -1582,7 +1678,7 @@ namespace quda {
     printfQuda("Computing coarse local\n");
     y.setComputeType(COMPUTE_COARSE_LOCAL);
     y.apply(0);
-    printfQuda("X2 = %e\n", arg.X.norm2(0));
+    printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
 
     // Check if we have a clover term that needs to be coarsened
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
@@ -1603,7 +1699,14 @@ namespace quda {
       y.apply(0);
     }
 
-    printfQuda("X2 = %e\n", arg.X.norm2(0));
+    printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
+
+    // now convert from atomic to application computation format if necesaary
+    if (coarseGaugeAtomic::fixedPoint()) {
+      y.setComputeType(COMPUTE_CONVERT);
+      y.apply(0);
+    }
+
   }
 
 
