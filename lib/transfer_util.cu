@@ -577,6 +577,27 @@ namespace quda {
 
     long long flops() const { return arg.nBlock * arg.geoBlockSize * arg.spinBlockSize * nColor * (nVec * ((nVec-1) * (8l + 8l)) + 6l); }
     long long bytes() const { return (((nVec+1)*nVec)/2) * (meta.Bytes()/nVec) + meta.Bytes(); } // load + store
+
+    char *saveOut, *saveOutNorm;
+
+    void preTune() {
+      saveOut = new char[meta.Bytes()];
+      cudaMemcpy(saveOut, meta.V(), meta.Bytes(), cudaMemcpyDeviceToHost);
+      if (meta.Precision() == QUDA_HALF_PRECISION && meta.NormBytes()) {
+	saveOutNorm = new char[meta.NormBytes()];
+	cudaMemcpy(saveOutNorm, meta.Norm(), meta.NormBytes(), cudaMemcpyDeviceToHost);
+      }
+    }
+
+    void postTune() {
+      cudaMemcpy((void*)meta.V(), saveOut, meta.Bytes(), cudaMemcpyHostToDevice);
+      delete[] saveOut;
+      if (meta.Precision() == QUDA_HALF_PRECISION && meta.NormBytes()) {
+	cudaMemcpy((void*)meta.Norm(), saveOutNorm, meta.NormBytes(), cudaMemcpyHostToDevice);
+	delete[] saveOutNorm;
+      }
+    }
+
   };
 
   template<typename Float, int nSpin, int nColor, int nVec>
