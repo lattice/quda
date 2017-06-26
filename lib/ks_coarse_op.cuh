@@ -80,16 +80,39 @@ namespace quda {
       }
     }
 
+    //compute contribution of the long link coarsening:
+    if(compute_3d_nbr) {
+      if ( arg.comm_dim[dim] && (coord[dim] + 3 >= arg.x_size[dim])) {
+        int ghost_long_idx  = ghostFaceIndex<1>(coord, arg.x_size, dim, 3) : 0;
+
+        for(int s = 0; s < fineSpin; s++) {  //Fine Spin
+	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+              UVL[s][ic] += (*arg.LL)(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_long_idx, s, jc, ic_c);
+	    }  //Fine color columns
+	  }  //Fine color rows
+        }  //Fine Spin
+      } else {
+        int y3_cb = linkIndexP3(coord, arg.x_size, dim);
+        for(int s = 0; s < fineSpin; s++) {  //Fine Spin
+	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
+	    for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
+              UVL[s][ic] += (*arg.LL)(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y3_cb, s, jc, ic_c);
+	    }  //Fine color columns
+	  }  //Fine color rows
+        }  //Fine Spin
+      }
+    } // compute 3d nbr
+
+    //compute contribution of the long link coarsening:
     if ( arg.comm_dim[dim] && (coord[dim] + 1 >= arg.x_size[dim]) ) {
       int ghost_idx       = ghostFaceIndex<1>(coord, arg.x_size, dim, 1);
-      int ghost_long_idx  = ( compute_3d_nbr ) ? ghostFaceIndex<1>(coord, arg.x_size, dim, 3) : 0;
 
       for(int s = 0; s < fineSpin; s++) {  //Fine Spin
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse) {
 	      UV[s][ic] += (*arg.FL)(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
-              if( compute_3d_nbr ) UVL[s][ic] += (*arg.LL)(dim, parity, x_cb, ic, jc) * W.Ghost(dim, 1, (parity+1)&1, ghost_long_idx, s, jc, ic_c);
 	    } else {
 	      // on the coarse lattice if forwards then use the forwards links
               int s_col = 1 - s;// WARNING: we assume that only off-diagonal terms contribute
@@ -101,14 +124,12 @@ namespace quda {
 
     } else {
       int y_cb  = linkIndexP1(coord, arg.x_size, dim);
-      int y3_cb = ( compute_3d_nbr ) ? linkIndexP3(coord, arg.x_size, dim) : 0;
 
       for(int s = 0; s < fineSpin; s++) {  //Fine Spin
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse) {
 	      UV[s][ic] += (*arg.FL)(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y_cb, s, jc, ic_c);
-              if( compute_3d_nbr ) UVL[s][ic] += (*arg.LL)(dim, parity, x_cb, ic, jc) * W((parity+1)&1, y3_cb, s, jc, ic_c);
 	    } else {
               int s_col = 1 - s;
 	      // on the coarse lattice if forwards then use the forwards links
@@ -911,7 +932,7 @@ namespace quda {
     else printfQuda("Doing uni-directional link coarsening\n");
 
     // do exchange of null-space vectors
-    const int nFace = 1;
+    const int nFace = 3;
     v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
     arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
 
