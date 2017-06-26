@@ -950,14 +950,29 @@ namespace quda {
 
   public:
     GaugeCovDev(const DiracParam &param);
-    GaugeCovDev(const GaugeLaplace &laplace);
+    GaugeCovDev(const GaugeCovDev &covDev);
 
     virtual ~GaugeCovDev();
     GaugeCovDev& operator=(const GaugeCovDev &covDev);
 
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const int mu) const;
-    virtual void M(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
-    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
+    virtual void DslashCD(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const int mu) const;
+    virtual void MCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
+    virtual void MdagMCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const;
+
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+
+
   };
 
 

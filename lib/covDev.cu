@@ -189,7 +189,7 @@ namespace quda {
       strcat(aux,comm);
 #endif
     }
-    virtual ~Laplace() { }
+    virtual ~CovDev() { }
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -209,7 +209,7 @@ namespace quda {
   {
     constexpr int nDim = 4;
       CovDevArg<Float,nColor,recon> arg(out, in, U, parity, mu);
-      CovDev<Float,nDim,nColor,LaplaceArg<Float,nColor,recon> > myCovDev(arg, in);
+      CovDev<Float,nDim,nColor,CovDevArg<Float,nColor,recon> > myCovDev(arg, in);
       myCovDev.apply(0);
   }
 

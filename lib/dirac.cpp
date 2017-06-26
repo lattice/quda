@@ -208,15 +208,15 @@ namespace quda {
     } else if (param.type == QUDA_COARSEPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
       return new DiracCoarsePC(param);
+    } else if (param.type == QUDA_GAUGE_COVDEV_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeCovDev operator\n");
+      return new GaugeCovDev(param);
     } else if (param.type == QUDA_GAUGE_LAPLACE_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeLaplace operator\n");
       return new GaugeLaplace(param);
     } else if (param.type == QUDA_GAUGE_LAPLACEPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeLaplacePC operator\n");
       return new GaugeLaplacePC(param);
-    } else if (param.type == QUDA_GAUGE_COVDEV_DIRAC) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeCovDev operator\n");
-      return new GaugeCovDev(param);
     } else {
       errorQuda("Unsupported Dirac type %d", param.type);
     }
