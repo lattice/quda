@@ -2704,7 +2704,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-
   if( strcmp(argv[i], "--mg-schwarz-type") == 0){
     if (i+2 >= argc){
       usage(argv);
