@@ -210,8 +210,8 @@ namespace quda {
 
       inner.inv_type_precondition = QUDA_INVALID_INVERTER;
       inner.is_preconditioner = true; 
-
-      inner.global_reduction = false;
+      inner.global_reduction  = true;
+      warningQuda("Set global reduction flag for preconditioner to true.\n");
 
       if (outer.precision_sloppy != outer.precision_precondition)
         inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
@@ -258,7 +258,8 @@ namespace quda {
       delete Vm;
       Vm = nullptr;
 
-      if (param.precision_sloppy != param.precision)  delete r_sloppy;
+      //if (param.precision_sloppy != param.precision)  delete r_sloppy;
+      delete r_sloppy;
 
       if(K && (param.precision_precondition != param.precision_sloppy))
       {
@@ -502,7 +503,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.setPrecision(param.precision_sloppy);
 
       tmpp     = ColorSpinorField::Create(csParam);
-      r_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : rp;
+      //r_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : rp;
+      r_sloppy = ColorSpinorField::Create(csParam);
 
       if ( K && (param.precision_precondition != param.precision_sloppy) ) {
 
@@ -549,14 +551,13 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
 
+    rSloppy = r;
 
     if(param.precision_sloppy != param.precision) {
       blas::axpy(1.0 / args.c[0].real(), r, y);
-      blas::copy(rSloppy, r);
-      blas::copy(Vm->Component(0), y);
+      Vm->Component(0) = y;
       blas::zero(y);
     } else {
-      blas::zero(Vm->Component(0));
       blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));   
     }
 
