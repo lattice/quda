@@ -325,7 +325,7 @@ namespace quda {
 
     if (out.isNative()) {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
-      ColorSpinor outOrder(out, Out, outNorm);
+      ColorSpinor outOrder(out, 1, Out, outNorm);
       copySpinorEx<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
     } else {
@@ -357,7 +357,7 @@ namespace quda {
 
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
-      ColorSpinor inOrder(in, In, inNorm);
+      ColorSpinor inOrder(in, 1, In, inNorm);
       extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
     } else {
       errorQuda("Order not defined");

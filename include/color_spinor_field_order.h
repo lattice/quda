@@ -166,9 +166,9 @@ namespace quda {
     template<typename Float, int nSpin, int nColor, int nVec>
       struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
       int ghostOffset[4];
-      GhostAccessorCB(const ColorSpinorField &a) {
+      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
 	for (int d=0; d<4; d++) {
-	  ghostOffset[d] = a.Nface()*a.SurfaceCB(d)*nColor*nSpin*nVec;
+	  ghostOffset[d] = nFace*a.SurfaceCB(d)*nColor*nSpin*nVec;
 	}
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
@@ -198,9 +198,9 @@ namespace quda {
       struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER> {
       int faceVolumeCB[4];
       int ghostOffset[4];
-      GhostAccessorCB(const ColorSpinorField &a) {
+      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
 	for (int d=0; d<4; d++) {
-	  faceVolumeCB[d] = a.Nface()*a.SurfaceCB(d);
+	  faceVolumeCB[d] = nFace*a.SurfaceCB(d);
 	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
 	}
       }
@@ -230,13 +230,13 @@ namespace quda {
        * Constructor for the FieldOrderCB class
        * @param field The field that we are accessing
        */
-    FieldOrderCB(const ColorSpinorField &field, void *v_=0, void **ghost_=0)
+    FieldOrderCB(const ColorSpinorField &field, int nFace=1, void *v_=0, void **ghost_=0)
       : v(v_? static_cast<complex<Float>*>(const_cast<void*>(v_))
 	  : static_cast<complex<Float>*>(const_cast<void*>(field.V()))),
 	volumeCB(field.VolumeCB()),
-	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
+	nDim(field.Ndim()), gammaBasis(field.GammaBasis()),
 	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
-	location(field.Location()), accessor(field), ghostAccessor(field)
+	location(field.Location()), accessor(field), ghostAccessor(field,nFace)
       { 
 	for (int d=0; d<4; d++) {
 	  void * const *_ghost = ghost_ ? ghost_ : field.Ghost();
@@ -423,7 +423,7 @@ namespace quda {
 	int stride;
 	Float *ghost[8];
 	int nParity;
-      FloatNOrder(const ColorSpinorField &a, Float *field_=0, float *norm_=0, Float **ghost_=0)
+      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
 	norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
 	volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
@@ -431,7 +431,7 @@ namespace quda {
 	  for (int i=0; i<4; i++) {
 	    ghost[2*i+0] = ghost_ ? ghost_[2*i+0] : static_cast<Float*>(a.Ghost()[2*i+0]);
 	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : static_cast<Float*>(a.Ghost()[2*i+1]);
-	    faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
+	    faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
 	  }
 	}
 	virtual ~FloatNOrder() { ; }
@@ -579,7 +579,7 @@ namespace quda {
 	int faceVolumeCB[4];
 	int stride;
 	int nParity;
-      SpaceColorSpinorOrder(const ColorSpinorField &a, Float *field_=0, float *dummy=0, Float **ghost_=0)
+      SpaceColorSpinorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *dummy=0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
 	  volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
 	{
@@ -587,7 +587,7 @@ namespace quda {
 	  for (int i=0; i<4; i++) {
 	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
 	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
-	    faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
+	    faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
 	  }
 	}
 	virtual ~SpaceColorSpinorOrder() { ; }
@@ -646,7 +646,7 @@ namespace quda {
 	int faceVolumeCB[4];
 	int stride;
 	int nParity;
-      SpaceSpinorColorOrder(const ColorSpinorField &a, Float *field_=0, float *dummy=0, Float **ghost_=0)
+      SpaceSpinorColorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *dummy=0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
 	  volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
 	{
@@ -654,7 +654,7 @@ namespace quda {
 	  for (int i=0; i<4; i++) {
 	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
 	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
-	    faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
+	    faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
 	  }
 	}
 	virtual ~SpaceSpinorColorOrder() { ; }
@@ -717,7 +717,7 @@ namespace quda {
 	int nParity;
 	int dim[4]; // full field dimensions
 	int exDim[4]; // full field dimensions
-      PaddedSpaceSpinorColorOrder(const ColorSpinorField &a, Float *field_=0, float *dummy=0, Float **ghost_=0)
+      PaddedSpaceSpinorColorOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *dummy=0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()),
 	  volumeCB(a.VolumeCB()), exVolumeCB(1), stride(a.Stride()), nParity(a.SiteSubset()),
 	  dim{ a.X(0), a.X(1), a.X(2), a.X(3)}, exDim{ a.X(0), a.X(1), a.X(2) + 4, a.X(3)}
@@ -726,7 +726,7 @@ namespace quda {
 	  for (int i=0; i<4; i++) {
 	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
 	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
-	    faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
+	    faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
 	    exVolumeCB *= exDim[i];
 	  }
 	  exVolumeCB /= nParity;
@@ -806,7 +806,7 @@ namespace quda {
 	int volumeCB;
 	int stride;
 	int nParity;
-      QDPJITDiracOrder(const ColorSpinorField &a, Float *field_=0)
+      QDPJITDiracOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0)
       : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
 	{ if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
 	virtual ~QDPJITDiracOrder() { ; }
