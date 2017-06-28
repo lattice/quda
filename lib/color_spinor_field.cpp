@@ -9,6 +9,12 @@ namespace quda {
   /*ColorSpinorField::ColorSpinorField() : init(false) {
 
     }*/
+// helper function
+template<typename T, typename... Ts>
+  std::unique_ptr<T> make_unique(Ts&&... params)
+  {
+    return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
+  }
 
   ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
     field.fill(*this);
@@ -722,6 +728,34 @@ namespace quda {
       field = new cpuColorSpinorField(src, param);
     } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
       field = new cudaColorSpinorField(src, param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
+    std::unique_ptr<ColorSpinorField> ColorSpinorField::CreateSmartPtr(const ColorSpinorParam &param) {
+
+    std::unique_ptr<ColorSpinorField> field;// = NULL;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = quda::make_unique<cpuColorSpinorField>(param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = quda::make_unique<cudaColorSpinorField>(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
+  std::unique_ptr<ColorSpinorField> ColorSpinorField::CreateSmartPtr(const ColorSpinorField &src, const ColorSpinorParam &param) {
+
+    std::unique_ptr<ColorSpinorField> field;// = NULL;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = quda::make_unique<cpuColorSpinorField>(src, param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = quda::make_unique<cudaColorSpinorField>(src, param);
     } else {
       errorQuda("Invalid field location %d", param.location);
     }

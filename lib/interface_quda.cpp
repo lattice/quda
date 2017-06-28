@@ -2973,38 +2973,44 @@ for(int i=0; i < param->num_src; i++) {
       errorQuda("Multigrid preconditioning only supported for direct non-red-black solve");
 
     if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-      for(int i=0; i < param->num_src; i++) {
-        cudaColorSpinorField tmp((in->Component(i)));
-        dirac.Mdag(in->Component(i), tmp);
-      }
+      errorQuda("norm_error_solve not supported in multi source solve");
+
+      // for(int i=0; i < param->num_src; i++) {
+      //   cudaColorSpinorField tmp((in->Component(i)));
+      //   dirac.Mdag(in->Component(i), tmp);
+      // }
     } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
-      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      SolverParam solverParam(*param);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
-      for(int i=0; i < param->num_src; i++) {
-        blas::copy(in->Component(i), out->Component(i));
-      }
-      solverParam.updateInvertParam(*param);
-      delete solve;
+      errorQuda("norm_error_solve not supported in multi source solve");
+
+      // DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      // SolverParam solverParam(*param);
+      // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      // solve->solve(*out,*in);
+      // for(int i=0; i < param->num_src; i++) {
+      //   blas::copy(in->Component(i), out->Component(i));
+      // }
+      // solverParam.updateInvertParam(*param);
+      // delete solve;
     }
 
     if (direct_solve) {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
+      // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      // solve->solve(*out,*in);
+      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
+      bcg(*out, *in);
       solverParam.updateInvertParam(*param);
-      delete solve;
+      // delete solve;
     } else if (!norm_error_solve) {
-      DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-      SolverParam solverParam(*param);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->solve(*out,*in);
-      solverParam.updateInvertParam(*param);
-      delete solve;
+      // DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      // SolverParam solverParam(*param);
+      // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      // solve->solve(*out,*in);
+      // solverParam.updateInvertParam(*param);
+      // delete solve;
     } else { // norm_error_solve
-      DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      // DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       errorQuda("norm_error_solve not supported in multi source solve");
       //cudaColorSpinorField tmp(*out);
       // SolverParam solverParam(*param);

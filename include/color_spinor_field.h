@@ -5,6 +5,7 @@
 #include <quda.h>
 
 #include <iostream>
+#include <memory>
 
 #include <lattice_field.h>
 #include <random_quda.h>
@@ -456,6 +457,8 @@ namespace quda {
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
     static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
+    static std::unique_ptr<ColorSpinorField> CreateSmartPtr(const ColorSpinorParam &param);
+    static std::unique_ptr<ColorSpinorField> CreateSmartPtr(const ColorSpinorField &src, const ColorSpinorParam &param);
     ColorSpinorField* CreateCoarse(const int *geoblockSize, int spinBlockSize, int Nvec,
 				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION);
     ColorSpinorField* CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
