@@ -607,7 +607,7 @@ namespace quda {
     xProj = x;
     rProj = b; 
     //launch initCG:
-    while((restart_tol > full_tol) && (restart_idx < param.max_restart_num)) {//currently just one restart, think about better algorithm for the restarts.
+    while((restart_tol > full_tol) && (restart_idx < param.max_restart_num)) {
 
       defl(xProj, rProj);
       x = xProj;      
@@ -717,7 +717,7 @@ namespace quda {
        if( dcg_cycle ) { //run DCG instead
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
-           Kparam.tol         = param.inc_tol;//param.cg_iterref_tol
+           Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
            K = new CG(matSloppy, matPrecon, Kparam, profile);   
          }
 

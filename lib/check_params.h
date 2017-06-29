@@ -433,7 +433,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
   P(deflation_grid, INVALID_INT);
-  P(cg_iterref_tol, INVALID_DOUBLE);
   P(eigcg_max_restarts, INVALID_INT);
   P(max_restart_num, INVALID_INT);
   P(inc_tol, INVALID_DOUBLE);

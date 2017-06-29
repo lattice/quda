@@ -210,8 +210,8 @@ namespace quda {
 
       inner.inv_type_precondition = QUDA_INVALID_INVERTER;
       inner.is_preconditioner = true; 
-      inner.global_reduction  = true;
-      warningQuda("Set global reduction flag for preconditioner to true.\n");
+      inner.global_reduction  = false;
+      if(inner.global_reduction) warningQuda("Set global reduction flag for preconditioner to true.\n");
 
       if (outer.precision_sloppy != outer.precision_precondition)
         inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;

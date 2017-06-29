@@ -1619,8 +1619,8 @@ bool generate_all_levels = true;
 int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
 int nev = 8;
 int max_search_dim = 64;
-int deflation_grid = 16;//to test the stuff
-double tol_restart = 5e+3*tol;//think about this...
+int deflation_grid = 16;
+double tol_restart = 5e+3*tol;
 
 int eigcg_max_restarts = 3;
 int max_restart_num = 3;

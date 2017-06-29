@@ -227,7 +227,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.nev = nev;
   inv_param.max_search_dim = max_search_dim;
   inv_param.deflation_grid = deflation_grid;
-  inv_param.tol_restart = tol_restart;.
+  inv_param.tol_restart = tol_restart;
   inv_param.eigcg_max_restarts = eigcg_max_restarts;
   inv_param.max_restart_num = max_restart_num;
   inv_param.inc_tol = inc_tol;
@@ -262,7 +262,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-2;
-  inv_param.maxiter_precondition = 16;
+  inv_param.maxiter_precondition = 10;
   inv_param.omega = 1.0;
 }
 
