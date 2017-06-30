@@ -83,7 +83,7 @@ namespace quda {
     //compute contribution of the long link coarsening:
     if(compute_3d_nbr) {
       if ( arg.comm_dim[dim] && (coord[dim] + 3 >= arg.x_size[dim])) {
-        int ghost_long_idx  = ghostFaceIndex<1>(coord, arg.x_size, dim, 3) : 0;
+        int ghost_long_idx  = ghostFaceIndex<1>(coord, arg.x_size, dim, 3);
 
         for(int s = 0; s < fineSpin; s++) {  //Fine Spin
 	  for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
