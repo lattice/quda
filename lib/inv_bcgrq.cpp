@@ -496,7 +496,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   // Create the worker class for updating x_sloppy. 
   // When we hit matSloppy, tmpp contains P.
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-  BlockCGUpdate blockcg_update(&x_sloppy, &tmpp, alpha_raw);
+  BlockCGUpdate blockcg_update(x_sloppyp, tmpp, alpha_raw);
 #else
   BlockCGUpdate blockcg_update(x_sloppyp, tmpp, alpha);
 #endif
@@ -695,7 +695,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     blas::hDotProduct(H_raw, qp->Components(), tmpp->Components());
     L = H.llt().matrixL();
     S = L.adjoint();
-    std::cout << "altS" << S;
+    // std::cout << "altS" << S;
     #endif
     POP_RANGE
 
@@ -721,8 +721,8 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     L = H.llt().matrixL();// retrieve factor L  in the decomposition
     
     // Step 20: S = L^\dagger
-    // S = L.adjoint();
-    std::cout << "regS" << L.adjoint() << std::endl;
+    S = L.adjoint();
+    // std::cout << "regS" << L.adjoint() << std::endl;
 
     // Step 21: Q = Q S^{-1}
     // This would be most "cleanly" implemented

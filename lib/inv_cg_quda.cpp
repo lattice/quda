@@ -21,9 +21,6 @@ namespace quda {
 
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr), App(nullptr), tmpp(nullptr),
-#ifdef BLOCKSOLVER
-    x_sloppy_savedp(nullptr), pp(nullptr), qp(nullptr), tmp_matsloppyp(nullptr),
-#endif
     init(false) {
   }
 
@@ -34,12 +31,6 @@ namespace quda {
       if (yp) delete yp;
       if (App) delete App;
       if (tmpp) delete tmpp;
-#ifdef BLOCKSOLVER
-      if (x_sloppy_savedp) delete x_sloppy_savedp;
-      if (pp) delete pp;
-      if (qp) delete qp;
-      if (tmp_matsloppyp) delete tmp_matsloppyp;
-#endif
       init = false;
     }
   }
