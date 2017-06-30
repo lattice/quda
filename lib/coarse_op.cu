@@ -33,6 +33,7 @@ namespace quda {
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,int> gCoarseAtomic;
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
@@ -44,11 +45,15 @@ namespace quda {
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
       gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
+      gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Y));
+      gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(X));
+      gCoarseAtomic xInvAccessorAtomic(const_cast<GaugeField&>(Xinv));
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-      calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
-	(yAccessor, xAccessor, xInvAccessor, uvAccessor, avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc);
+      calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+	(yAccessor, xAccessor, xInvAccessor, yAccessorAtomic, xAccessorAtomic, xInvAccessorAtomic, uvAccessor,
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc);
 
     } else {
 
@@ -64,22 +69,27 @@ namespace quda {
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,int> gCoarseAtomic;
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
 
       F vAccessor(const_cast<ColorSpinorField&>(v));
       F uvAccessor(const_cast<ColorSpinorField&>(uv));
+      F avAccessor(const_cast<ColorSpinorField&>(av));
       gFine gAccessor(const_cast<GaugeField&>(g));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
       gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
+      gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Y));
+      gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(X));
+      gCoarseAtomic xInvAccessorAtomic(const_cast<GaugeField&>(Xinv));
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-      F avAccessor(const_cast<ColorSpinorField&>(av));
-      calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor,gOrder>
-	(yAccessor, xAccessor, xInvAccessor, uvAccessor, avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc);
+      calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+	(yAccessor, xAccessor, xInvAccessor, yAccessorAtomic, xAccessorAtomic, xInvAccessorAtomic, uvAccessor,
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc);
 
     }
 

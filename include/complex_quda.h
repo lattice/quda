@@ -721,8 +721,51 @@ public:
 
   // cast operators
   inline operator std::complex<short>() const { return std::complex<short>(real(),imag()); }
-  //inline __host__ __device__ operator quda::complex<float>() const{ return quda::complex<float>
 };
+
+template<>
+struct complex <int> : public int2
+{
+public:
+  typedef int value_type;
+
+  __host__ __device__ inline complex<int>(){};
+
+  __host__ __device__ inline complex<int>(const int& re, const int& im = float())
+    {
+      real(re);
+      imag(im);
+    }
+
+  __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
+
+  __host__ __device__ inline complex<int>& operator+=(const complex<int> z)
+    {
+      real(real()+z.real());
+      imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline complex<int>& operator-=(const complex<int> z)
+    {
+      real(real()-z.real());
+      imag(imag()-z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline int real() const volatile{ return x; }
+  __host__ __device__ inline int imag() const volatile{ return y; }
+  __host__ __device__ inline int real() const{ return x; }
+  __host__ __device__ inline int imag() const{ return y; }
+  __host__ __device__ inline void real(int re)volatile{ x = re; }
+  __host__ __device__ inline void imag(int im)volatile{ y = im; }
+  __host__ __device__ inline void real(int re){ x = re; }
+  __host__ __device__ inline void imag(int im){ y = im; }
+
+  // cast operators
+  inline operator std::complex<int>() const { return std::complex<int>(real(),imag()); }
+};
+
 
 
 
