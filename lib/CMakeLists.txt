@@ -50,7 +50,7 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  quda_memcpy.cpp quda_arpack_interface.cpp deflation.cpp version.cpp )
+  quda_memcpy.cpp quda_arpack_interface.cpp quda_arnoldi_interface.cu deflation.cpp version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
@@ -80,6 +80,7 @@ mark_as_advanced(QUDA_GITDIR)
 
 # include_directories
 include_directories(dslash_core)
+include_directories(arnoldi_core)
 include_directories(.)
 
 # generate a cmake object library for all cpp files first

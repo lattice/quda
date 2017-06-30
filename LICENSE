@@ -219,3 +219,8 @@ following license:
   integer division.  This is distributed under the Apache License,
   Version 2.0.  See declaration at top of int_fastdiv.h for license
   specifics.
+
+  CUDA version of the IRA method is based on the modified code by Teemu Rantalaiho, 
+  This is distributed under the Apache License,  Version 2.0.  See declaration at top of quda_arnoldi_interface.cu 
+  for license  specifics.
+

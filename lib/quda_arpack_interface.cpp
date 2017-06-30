@@ -1,5 +1,15 @@
 #include <quda_arpack_interface.h>
 
+#if (defined (QMP_COMMS) || defined (MPI_COMMS))
+//#include <qmp.h>
+#include <mpi.h>
+#endif
+
+//#ifdef PRIMME_LIB
+//#include "primme.h"
+//#endif
+
+
 //using namespace quda ;
 
   struct SortEvals{
