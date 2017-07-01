@@ -246,7 +246,6 @@ namespace quda {
 
   protected:
     bool init;
-    QudaPrecision precision;
 
     int nColor;
     int nSpin;
@@ -324,7 +323,6 @@ namespace quda {
 
     virtual ColorSpinorField& operator=(const ColorSpinorField &);
 
-    QudaPrecision Precision() const { return precision; }
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
