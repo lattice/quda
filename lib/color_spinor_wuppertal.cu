@@ -24,14 +24,14 @@ namespace quda {
     const int parity;     // only use this for single parity fields
     const int nParity;    // number of parities we're working on
     const int nFace;      // hard code to 1 for now
-    const int dim[4];     // full lattice dimensions
+    const int dim[5];     // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;   // checkerboarded volume
 
     WuppertalSmearingArg(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField &U,
                        Float A, Float B)
       : out(out), in(in), U(U), A(A), B(B), parity(parity), nParity(in.SiteSubset()), nFace(1),
-        dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3) },
+        dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(in.VolumeCB())
     {
@@ -54,8 +54,9 @@ namespace quda {
     typedef Matrix<complex<Float>,Nc> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
-    int coord[4];
+    int coord[5];
     getCoords(coord, x_cb, arg.dim, parity);
+    coord[4] = 0;
 
 #pragma unroll
     for (int dir=0; dir<3; dir++) { // loop over spatial directions
@@ -260,20 +261,11 @@ namespace quda {
       errorQuda("Orign and destination fields must be different pointers");
     }
 
-    if(out.Precision() != in.Precision()) {
-      errorQuda("Orign and destination fields must have the same precision\n");
-    }
-
-    if(out.Precision() != U.Precision()) {
-      errorQuda("Spinor and gauge field must have the same precision\n");
-    }
-
-    if(out.Precision() == QUDA_HALF_PRECISION){
-      errorQuda("Half precision not supported\n");
-    }
+    // check precisions match
+    checkPrecision(out, in, U);
 
     // check all locations match
-    Location(out, in, U);
+    checkLocation(out, in, U);
 
     const int nFace = 1;
     in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy

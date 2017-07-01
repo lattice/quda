@@ -132,10 +132,10 @@ namespace quda {
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     if (&in == &out) errorQuda("Fields cannot alias");
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -145,10 +145,10 @@ namespace quda {
   void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     if (&in == &out) errorQuda("Fields cannot alias");
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
       ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -158,10 +158,10 @@ namespace quda {
   void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
 			   const QudaParity parity) const
   {
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -174,10 +174,10 @@ namespace quda {
   {
     if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
 
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
       ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -186,10 +186,10 @@ namespace quda {
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
+    if ( checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -229,7 +229,7 @@ namespace quda {
   void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const
   {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    if (Location(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
+    if (checkLocation(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
       CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     } else {
       CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
@@ -250,10 +250,10 @@ namespace quda {
 
   void DiracCoarsePC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
       ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger);
     }
 
@@ -406,7 +406,7 @@ namespace quda {
   void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const
   {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    if (Location(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
+    if (checkLocation(Y, X, Xinv, Yhat) == QUDA_CPU_FIELD_LOCATION) {
       CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     } else {
       CoarseCoarseOp(Y, X, Xinv, Yhat, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);

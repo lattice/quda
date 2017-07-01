@@ -272,13 +272,14 @@ namespace quda {
 		    double kappa, const ColorSpinorField *x, int parity)		    
   {
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (out.Precision() != in.Precision() || U.Precision() != in.Precision())
-      errorQuda("Precision mismatch out=%d in=%d U=%d", out.Precision(), in.Precision(), U.Precision());
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
     
+    // check all precisions match
+    checkPrecision(out, in, U);
+
     // check all locations match
-    Location(out, in, U);
+    checkLocation(out, in, U);
 
     const int nFace = 1;
     in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
