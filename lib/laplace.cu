@@ -16,7 +16,7 @@ namespace quda {
    */
   template <typename Float, int nColor, QudaReconstructType reconstruct, bool xpay>
   struct LaplaceArg {
-    typedef typename colorspinor_order_mapper<Float,QUDA_FLOAT2_FIELD_ORDER,1,nColor>::type F;
+    typedef typename colorspinor_mapper<Float,1,nColor>::type F;
     typedef typename gauge_mapper<Float,reconstruct>::type G;
 
     F out;                // output vector field
@@ -75,12 +75,8 @@ namespace quda {
 	const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
 	const Link U = arg.U(d, x_cb, parity);
-#if 0 // FIXME - why is this slow?
 	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-#else
-	const Vector in;
-	arg.in.loadGhost((Float*)in.data, ghost_idx, d, 1, their_spinor_parity);
-#endif
+
 	out += U * in;
 	} else {
 
@@ -98,12 +94,8 @@ namespace quda {
 	const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
 	const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
-#if 0 // FIXME - why is this slow?
 	const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-#else
-	const Vector in;
-	arg.in.loadGhost((Float*)in.data, ghost_idx, d, 0, their_spinor_parity);
-#endif
+
 	out += conj(U) * in;
       } else {
 	

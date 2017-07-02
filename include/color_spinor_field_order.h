@@ -59,23 +59,27 @@ namespace quda {
       }
     };
 
-  /**
-     @brief Copy constructor for the ColorSpinor class with a colorspinor_wrapper input.
-     @param a[in] Input colorspinor_wrapper that we use to file in this matrix instance
-  */
   template <typename T, int Nc, int Ns>
     template <typename S>
     __device__ __host__ inline void ColorSpinor<T,Nc,Ns>::operator=(const colorspinor_wrapper<T,S> &a) {
     a.field.load((T*)data, a.x_cb, a.parity);
   }
 
-  /**
-     @brief Assignment operator for the ColorSpinor class with a colorspinor_wrapper input.
-     @param a[in] Input colorspinor_wrapper that we use to file in this matrix instance
-   */
   template <typename T, int Nc, int Ns>
     template <typename S>
     __device__ __host__ inline ColorSpinor<T,Nc,Ns>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinor<T,Nc,4>::operator=(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<T,Nc,4>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
     a.field.load((T*)data, a.x_cb, a.parity);
   }
 
@@ -116,28 +120,32 @@ namespace quda {
        */
       template<typename C>
       __device__ __host__ inline void operator=(const C &a) {
-	field.saveGhost((Float*)a.data, dim, dir, ghost_idx, parity);
+	field.saveGhost((Float*)a.data, ghost_idx, dim, dir, parity);
       }
     };
 
-  /**
-     @brief Copy constructor for the ColorSpinor class with a colorspinor_ghost_wrapper input.
-     @param[in] a Input colorspinor_ghostwrapper that we use to fill in this instance
-  */
   template <typename T, int Nc, int Ns>
     template <typename S>
     __device__ __host__ inline void ColorSpinor<T,Nc,Ns>::operator=(const colorspinor_ghost_wrapper<T,S> &a) {
-    a.field.loadGhost((T*)data, a.dim, a.dir, a.ghost_idx, a.parity);
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
-  /**
-     @brief Assignment operator for the ColorSpinor class with a colorspinor_ghost_wrapper input.
-     @param[in] a Input colorspinor_ghost_wrapper that we use to fill in this instance
-   */
   template <typename T, int Nc, int Ns>
     template <typename S>
     __device__ __host__ inline ColorSpinor<T,Nc,Ns>::ColorSpinor(const colorspinor_ghost_wrapper<T,S> &a) {
-    a.field.loadGhost((T*)data, a.dim, a.dir, a.ghost_idx, a.parity);
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline void ColorSpinor<T,Nc,4>::operator=(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<T,Nc,4>::ColorSpinor(const colorspinor_ghost_wrapper<T,S> &a) {
+    a.field.loadGhost((T*)data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   namespace colorspinor {

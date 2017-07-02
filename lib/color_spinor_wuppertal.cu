@@ -13,7 +13,7 @@ namespace quda {
 
   template <typename Float, int Ns, int Nc, QudaReconstructType gRecon>
   struct WuppertalSmearingArg {
-    typedef typename colorspinor_order_mapper<Float,QUDA_FLOAT2_FIELD_ORDER,Ns,Nc>::type F;
+    typedef typename colorspinor_mapper<Float,Ns,Nc>::type F;
     typedef typename gauge_mapper<Float,gRecon>::type G;
 
     F out;                // output vector field
@@ -68,14 +68,12 @@ namespace quda {
         const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, dir, arg.nFace);
 
         const Link U = arg.U(dir, x_cb, parity);
-        const Vector in;
-        arg.in.loadGhost((Float*)in.data, ghost_idx, dir, 1, their_spinor_parity);
+	const Vector in = arg.in.Ghost(dir, 1, ghost_idx, their_spinor_parity);
 
         out += U * in;
       } else {
         const Link U = arg.U(dir, x_cb, parity);
-        const Vector in;
-        arg.in.load((Float*)in.data, fwd_idx, their_spinor_parity);
+	const Vector in = arg.in(fwd_idx, their_spinor_parity);
 
         out += U * in;
       }
@@ -88,14 +86,12 @@ namespace quda {
         const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, dir, arg.nFace);
 
         const Link U = arg.U.Ghost(dir, ghost_idx, 1-parity);
-        const Vector in;
-        arg.in.loadGhost((Float*)in.data, ghost_idx, dir, 0, their_spinor_parity);
+	const Vector in = arg.in.Ghost(dir, 0, ghost_idx, their_spinor_parity);
 
         out += conj(U) * in;
       } else {
         const Link U = arg.U(dir, gauge_idx, 1-parity);
-        const Vector in;
-        arg.in.load((Float*)in.data, back_idx, their_spinor_parity);
+	const Vector in = arg.in(back_idx, their_spinor_parity);
 
         out += conj(U) * in;
       }
@@ -190,7 +186,8 @@ namespace quda {
   };
 
   template<typename Float, int Ns, int Nc, QudaReconstructType gRecon>
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, Float A, Float B)
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity,
+		     const GaugeField& U, double A, double B)
   {
     WuppertalSmearingArg<Float,Ns,Nc,gRecon> arg(out, in, parity, U, A, B);
     WuppertalSmearing<Float,Ns,Nc,WuppertalSmearingArg<Float,Ns,Nc,gRecon> > wuppertal(arg, in);
@@ -199,15 +196,16 @@ namespace quda {
 
   // template on the gauge reconstruction
   template<typename Float, int Ns, int Nc>
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, Float A, Float B)
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity,
+		     const GaugeField& U, double A, double B)
   {
-    if(U.Reconstruct() == QUDA_RECONSTRUCT_NO){
+    if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
       wuppertalStep<Float,Ns,Nc,QUDA_RECONSTRUCT_NO>(out, in, parity, U, A, B);
-    }else if(U.Reconstruct() == QUDA_RECONSTRUCT_12){
+    } else if(U.Reconstruct() == QUDA_RECONSTRUCT_12) {
       wuppertalStep<Float,Ns,Nc,QUDA_RECONSTRUCT_12>(out, in, parity, U, A, B);
-    }else if(U.Reconstruct() == QUDA_RECONSTRUCT_8){
+    } else if(U.Reconstruct() == QUDA_RECONSTRUCT_8) {
       wuppertalStep<Float,Ns,Nc,QUDA_RECONSTRUCT_8>(out, in, parity, U, A, B);
-    }else{
+    } else {
       errorQuda("Reconstruction type %d of origin gauge field not supported", U.Reconstruct());
     }
   }
@@ -215,13 +213,14 @@ namespace quda {
 
   // template on the number of colors
   template<typename Float, int Ns>
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, Float A, Float B)
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity,
+		     const GaugeField& U, double A, double B)
   {
-    if(out.Ncolor() != in.Ncolor()) {
+    if (out.Ncolor() != in.Ncolor()) {
       errorQuda("Orign and destination fields must have the same number of colors\n");
     }
 
-    if (out.Ncolor() == 3 ){
+    if (out.Ncolor() == 3 ) {
       wuppertalStep<Float,Ns,3>(out, in, parity, U, A, B);
     } else {
       errorQuda(" is not implemented for Ncolor!=3");
@@ -230,7 +229,8 @@ namespace quda {
 
   // template on the number of spins
   template<typename Float>
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, Float A, Float B)
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity,
+		     const GaugeField& U, double A, double B)
   {
     if(out.Nspin() != in.Nspin()) {
       errorQuda("Orign and destination fields must have the same number of spins\n");
@@ -255,7 +255,8 @@ namespace quda {
      @param[in] B The scaling factor for \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   */
   // template on the precision
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double A, double B)
+  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity,
+		     const GaugeField& U, double A, double B)
   {
     if (in.V() == out.V()) {
       errorQuda("Orign and destination fields must be different pointers");
@@ -271,7 +272,7 @@ namespace quda {
     in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
 
     if (out.Precision() == QUDA_SINGLE_PRECISION){
-      wuppertalStep<float>(out, in, parity, U, (float) A, (float) B);
+      wuppertalStep<float>(out, in, parity, U, A, B);
     } else if(out.Precision() == QUDA_DOUBLE_PRECISION) {
       wuppertalStep<double>(out, in, parity, U, A, B);
     } else {
