@@ -31,7 +31,7 @@ extern int Msrc;
 
 extern void usage(char** );
 
-const int Nkernels = 40;
+const int Nkernels = 42;
 
 using namespace quda;
 
@@ -270,6 +270,7 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * A = new quda::Complex[Nsrc*Msrc];
   quda::Complex * B = new quda::Complex[Nsrc*Msrc];
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -433,15 +434,23 @@ double benchmark(int kernel, const int niter) {
     case 37:
       for (int i=0; i < niter; ++i) blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (double*)C);
       break;
-        
+
     case 38:
-      for (int i=0; i < niter; ++i) blas::caxpyBxpz(a2, *xD, *yD, b2, *zD); 
-      break; 
+      for (int i=0; i < niter; ++i) blas::caxpyBxpz(a2, *xD, *yD, b2, *zD);
+      break;
 
     case 39:
-      for (int i=0; i < niter; ++i) blas::caxpyBxpz(a2, *xD, *yD, b2, *zD); 
-      break; 
-        
+      for (int i=0; i < niter; ++i) blas::caxpyBzpx(a2, *xD, *yD, b2, *zD);
+      break;
+
+    case 40:
+      for (int i=0; i < niter; ++i) blas::cDotProduct(A2, xmD->Components(), xmD->Components());
+      break;
+
+    case 41:
+      for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -456,6 +465,7 @@ double benchmark(int kernel, const int niter) {
   delete[] A;
   delete[] B;
   delete[] C;
+  delete[] A2;
   double secs = runTime / 1000;
   return secs;
 }
@@ -470,10 +480,16 @@ double test(int kernel) {
   quda::Complex * A = new quda::Complex[Nsrc*Msrc];
   quda::Complex * B = new quda::Complex[Nsrc*Msrc];
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
+  quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
+  quda::Complex * B2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   for(int i=0; i < Nsrc*Msrc; i++){
     A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
     B[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
     C[i] = a2*  (1.0*((M_PI/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
+  }
+  for(int i=0; i < Nsrc*Nsrc; i++){
+    A2[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
+    B2[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
   }
   // A[0] = a2;
   // A[1] = 0.;
@@ -826,7 +842,7 @@ double test(int kernel) {
     }
     error/= Nsrc;
     break;
-      
+
   case 38:
     *xD = *xH;
     *yD = *yH;
@@ -845,12 +861,41 @@ double test(int kernel) {
      error = ERROR(x) + ERROR(z);}
     break;
 
+  case 40:
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    blas::cDotProduct(A2, xmD->Components(), xmD->Components());
+    error = 0.0;
+    for (int i = 0; i < Nsrc; i++) {
+      for (int j = 0; j < Nsrc; j++) {
+	B2[i*Nsrc+j] = blas::cDotProduct(xmD->Component(i), xmD->Component(j));
+	error += fabs(A2[i*Nsrc+j] - B2[i*Nsrc+j])/fabs(B2[i*Nsrc+j]);
+      }
+    }
+    error /= Nsrc*Nsrc;
+    break;
+
+  case 41:
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
+    blas::cDotProduct(A, xmD->Components(), ymD->Components());
+    error = 0.0;
+    for (int i = 0; i < Nsrc; i++) {
+      for (int j = 0; j < Msrc; j++) {
+	B[i*Msrc+j] = blas::cDotProduct(xmD->Component(i), ymD->Component(j));
+	error += fabs(A[i*Msrc+j] - B[i*Msrc+j])/fabs(B[i*Msrc+j]);
+      }
+    }
+    error /= Nsrc*Msrc;
+    break;
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
   delete[] A;
   delete[] B;
   delete[] C;
+  delete[] A2;
+  delete[] B2;
   return error;
 }
 
@@ -896,7 +941,10 @@ const char *names[] = {
   "caxpy (block)",
   "axpyBzpcx (block)",
   "caxpyBxpz",
-  "caxpyBzpx"
+  "caxpyBzpx",
+  "cDotProductNorm (block)",
+  "cDotProduct (block)",
+  "caxpy (composite)"
 };
 
 int main(int argc, char** argv)
@@ -993,7 +1041,7 @@ TEST_P(BlasTest, verify) {
   // failed without running
   double deviation =  skip_kernel(prec,kernel) ? 1.0 : test(kernel);
   printfQuda("%-35s error = %e\n", names[kernel], deviation);
-  double tol = (prec == 2 ? 1e-11 : (prec == 1 ? 1e-5 : 1e-3));
+  double tol = (prec == 2 ? 1e-10 : (prec == 1 ? 1e-5 : 1e-3));
   tol = (kernel < 2) ? 1e-4 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
@@ -1039,6 +1087,8 @@ INSTANTIATE_TEST_CASE_P(multicaxpy_half, BlasTest, ::testing::Values( make_int2(
 INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_half, BlasTest, ::testing::Values( make_int2(0,37) ));
 INSTANTIATE_TEST_CASE_P(caxpyBxpz_half, BlasTest, ::testing::Values( make_int2(0,38) ));
 INSTANTIATE_TEST_CASE_P(caxpyBzpx_half, BlasTest, ::testing::Values( make_int2(0,39) ));
+INSTANTIATE_TEST_CASE_P(multicDotProductNorm_half, BlasTest, ::testing::Values( make_int2(0,40) ));
+INSTANTIATE_TEST_CASE_P(multicDotProduct_half, BlasTest, ::testing::Values( make_int2(0,41) ));
 
 // single precision
 INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
@@ -1081,6 +1131,8 @@ INSTANTIATE_TEST_CASE_P(multicaxpy_single, BlasTest, ::testing::Values( make_int
 INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_single, BlasTest, ::testing::Values( make_int2(1,37) ));
 INSTANTIATE_TEST_CASE_P(caxpyBxpz_single, BlasTest, ::testing::Values( make_int2(1,38) ));
 INSTANTIATE_TEST_CASE_P(caxpyBzpx_single, BlasTest, ::testing::Values( make_int2(1,39) ));
+INSTANTIATE_TEST_CASE_P(multicDotProductNorm_single, BlasTest, ::testing::Values( make_int2(1,40) ));
+INSTANTIATE_TEST_CASE_P(multicDotProduct_single, BlasTest, ::testing::Values( make_int2(1,41) ));
 
 // double precision
 INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
@@ -1123,4 +1175,5 @@ INSTANTIATE_TEST_CASE_P(multicaxpy_double, BlasTest, ::testing::Values( make_int
 INSTANTIATE_TEST_CASE_P(multiaxpyBzpcx_double, BlasTest, ::testing::Values( make_int2(2,37) ));
 INSTANTIATE_TEST_CASE_P(caxpyBxpz_double, BlasTest, ::testing::Values( make_int2(2,38) ));
 INSTANTIATE_TEST_CASE_P(caxpyBzpx_double, BlasTest, ::testing::Values( make_int2(2,39) ));
-
+INSTANTIATE_TEST_CASE_P(multicDotProductNorm_double, BlasTest, ::testing::Values( make_int2(2,40) ));
+INSTANTIATE_TEST_CASE_P(multicDotProduct_double, BlasTest, ::testing::Values( make_int2(2,41) ));

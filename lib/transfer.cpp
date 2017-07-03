@@ -73,13 +73,7 @@ namespace quda {
       param.x[0] *= 2;
     }
 
-    if (param.nSpin == 1){
-      //param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//host orthogonalization is implemented for SPIN_COLOR order only!
-      printfQuda("Transfer: creating V field with location %d\n", param.location);
-    }
-    else{
-      printfQuda("Transfer: creating V field with basis %d with location %d\n", param.gammaBasis, param.location);    
-    }
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: creating V field with location %d\n", param.location);
 
     // for cpu transfer this is the V field, for gpu it's just a temporary until we port the block orthogonalization
     V_h = ColorSpinorField::Create(param);
@@ -133,8 +127,6 @@ namespace quda {
     // orthogonalize the blocks
     printfQuda("Transfer: block orthogonalizing\n");
     BlockOrthogonalize(*V_h, Nvec, geo_bs, fine_to_coarse_h, spin_bs);
-    //for (int x=0; x<Vh->Volume(); x++) static_cast<cpuColorSpinorField*>(Vh)->PrintVector(x);
-    //printfQuda("Vh->Volume() = %d Vh->Nspin() = %d Vh->Ncolor = %d Vh->Length() = %d\n", Vh->Volume(), Vh->Nspin(), Vh->Ncolor(), Vh->Length());
 
     if (enable_gpu) {
       *V_d = *V_h;

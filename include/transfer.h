@@ -189,9 +189,12 @@ namespace quda {
 
     /**
      * Returns a const reference to the V field
+     * @param location Which memory space are we requesting
      * @return The V field const reference
      */
-    const ColorSpinorField& Vectors() const { return *V_h; }
+    const ColorSpinorField& Vectors(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const {
+      return (location == QUDA_CUDA_FIELD_LOCATION) ? *V_d : *V_h;
+    }
 
     /**
      * Returns the number of near nullvectors

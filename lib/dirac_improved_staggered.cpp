@@ -8,9 +8,7 @@ namespace quda {
   }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) : 
-    Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
-    face1(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()),
-    face2(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
+    Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge))
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
     improvedstaggered::initConstants(*param.gauge, profile);    
@@ -18,7 +16,7 @@ namespace quda {
   }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac) 
-  : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face1(dirac.face1), face2(dirac.face2)
+  : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge)
   {
     improvedstaggered::initConstants(*dirac.gauge, profile);
     improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
@@ -32,8 +30,6 @@ namespace quda {
       Dirac::operator=(dirac);
       fatGauge = dirac.fatGauge;
       longGauge = dirac.longGauge;
-      face1 = dirac.face1;
-      face2 = dirac.face2;
     }
     return *this;
   }
@@ -70,7 +66,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
 				  dagger, 0, 0, commDim, profile);
@@ -88,7 +83,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);

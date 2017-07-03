@@ -55,7 +55,6 @@ BUILD_ARPACK_VARS = @BUILD_ARPACK_VARS@ # build arpack using env vars ARPACK_LIB
 
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
-GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
 
 # Profiling options
 MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
@@ -68,9 +67,6 @@ BUILD_CPS_INTERFACE = @BUILD_CPS_INTERFACE@                     # build cps inte
 BUILD_QDPJIT_INTERFACE = @BUILD_QDPJIT_INTERFACE@               # build qdpjit interface
 BUILD_BQCD_INTERFACE = @BUILD_BQCD_INTERFACE@                   # build bqcd interface
 BUILD_TIFR_INTERFACE = @BUILD_TIFR_INTERFACE@                   # build tifr interface
-
-# Packing option
-DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
 
 # GPU contractions of spinors
 BUILD_CONTRACT = @BUILD_CONTRACT@    # build code for bilinear contraction?
@@ -208,8 +204,9 @@ ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MULTIGRID)), yes)
-  NVCCOPT += -DGPU_MULTIGRID
-  COPT += -DGPU_MULTIGRID
+  NVCCOPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  COPT += -DGPU_MULTIGRID -DCUBLAS_LIB
+  LIB += -lcublas
 endif
 
 ifeq ($(strip $(BUILD_SSTEP)), yes)
@@ -317,6 +314,7 @@ ifeq ($(strip $(VERBOSE)), yes)
   NVCCOPT += --ptxas-options=-v
 endif
 
+NVCCOPT += -DMAX_MULTI_BLAS_N=4
 ifeq ($(strip $(BLAS_TEX)), no)
   NVCCOPT += -DDIRECT_ACCESS_BLAS
   COPT += -DDIRECT_ACCESS_BLAS
@@ -330,11 +328,6 @@ endif
 ifeq ($(strip $(GPU_DIRECT)), yes)
   NVCCOPT += -DGPU_DIRECT
   COPT += -DGPU_DIRECT
-endif
-
-ifeq ($(strip $(GPU_COMMS)), yes)
-  NVCCOPT += -DGPU_COMMS
-  COPT += -DGPU_COMMS
 endif
 
 ifeq ($(strip $(BUILD_QDP_INTERFACE)), yes)
@@ -365,11 +358,6 @@ endif
 ifeq ($(strip $(BUILD_TIFR_INTERFACE)), yes)
   NVCCOPT += -DBUILD_TIFR_INTERFACE
   COPT += -DBUILD_TIFR_INTERFACE
-endif
-
-ifeq ($(strip $(DEVICE_PACK)), yes)
-  NVCCOPT += -DDEVICE_PACK
-  COPT += -DDEVICE_PACK
 endif
 
 ifeq ($(strip $(BUILD_CONTRACT)), yes)

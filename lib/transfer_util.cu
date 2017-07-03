@@ -9,52 +9,80 @@ namespace quda {
 
   using namespace quda::colorspinor;
 
-//ok for staggered: nSpin = 1 will work as well. Accessors do allow this case as well.
+  template<typename real, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+  struct FillVArg {
 
-  // copy the null-space vectors into the V-field
-  template <int nSpin, int nColor, int nVec, class V, class B>
-  void fill(V &out, const B &in, int v) {
-    for (int parity=0; parity<out.Nparity(); parity++) {
-      for (int x_cb=0; x_cb<out.VolumeCB(); x_cb++) {
+    FieldOrderCB<real,nSpin,nColor,nVec,order> V;
+    FieldOrderCB<real,nSpin,nColor,1,order> B;
+    const int v;
+
+    FillVArg(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int v)
+      : V(V), B(*(B[v])), v(v) { }
+
+  };
+
+  // CPU routine to copy the null-space vectors into the V-field
+  template <typename Float, int nSpin, int nColor, int nVec, typename Arg>
+  void FillVCPU(Arg &arg, int v) {
+
+    for (int parity=0; parity<arg.V.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<arg.V.VolumeCB(); x_cb++) {
 	for (int s=0; s<nSpin; s++) {
 	  for (int c=0; c<nColor; c++) {
-	    out(parity, x_cb, s, c, v) = in(parity, x_cb, s, c);
+	    arg.V(parity, x_cb, s, c, arg.v) = arg.B(parity, x_cb, s, c);
 	  }
 	}
       }
     }
+
   }
 
-  template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
-  void fillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
-    FieldOrderCB<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
-    for (int v=0; v<nVec; v++) {
-      FieldOrderCB<Float,nSpin,nColor,1,order> bOrder(const_cast<ColorSpinorField&>(*B[v]));
-      fill<nSpin,nColor,nVec>(vOrder, bOrder, v);
+  // GPU kernel to copy the null-space vectors into the V-field
+  template <typename Float, int nSpin, int nColor, int nVec, typename Arg>
+  __global__ void FillVGPU(Arg arg, int v) {
+
+    int x_cb = threadIdx.x + blockDim.x*blockIdx.x;
+    int parity = threadIdx.y + blockDim.y*blockIdx.y;
+
+    for (int s=0; s<nSpin; s++) {
+      for (int c=0; c<nColor; c++) {
+	arg.V(parity, x_cb, s, c, arg.v) = arg.B(parity, x_cb, s, c);
+      }
     }
+
   }
 
-  template <typename real, int nSpin, int nColor, int nVec, QudaFieldOrder order>
-  class FillVLaunch : public Tunable {
+  template <typename real, int nSpin, int nColor, int nVec>
+  class FillVLaunch : public TunableVectorY {
 
     ColorSpinorField &V;
     const std::vector<ColorSpinorField*> &B;
-
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    const int v;
+    unsigned int minThreads() const { return V.VolumeCB(); }
 
   public:
-    FillVLaunch(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) : V(V), B(B) {
-      (V.Location() == QUDA_CPU_FIELD_LOCATION) ? strcpy(aux, "CPU") : strcpy(aux,"GPU");
+    FillVLaunch(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, const int v)
+      : TunableVectorY(2), V(V), B(B), v(v) {
+      (V.Location() == QUDA_CPU_FIELD_LOCATION) ? strcpy(aux,"CPU") : strcpy(aux,"GPU");
     }
     virtual ~FillVLaunch() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
-	fillV<real,nSpin,nColor,nVec,order>(V,B);
+	if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+	  FillVArg<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> arg(V,B,v);
+	  FillVCPU<real,nSpin,nColor,nVec>(arg,v);
+	} else {
+	  errorQuda("Field order not implemented %d", V.FieldOrder());
+	}
       } else {
-	errorQuda("Not implemented for GPU");
+	if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+	  FillVArg<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER> arg(V,B,v);
+	  FillVGPU<real,nSpin,nColor,nVec> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg,v);
+	} else {
+	  errorQuda("Field order not implemented %d", V.FieldOrder());
+	}
       }
     }
 
@@ -67,85 +95,73 @@ namespace quda {
   };
 
 
-  template <typename real, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+  template <typename real, int nSpin, int nColor, int nVec>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
-    FillVLaunch<real,nSpin,nColor,nVec,order> f(V,B);
-    f.apply(0);
+    for (int v=0; v<nVec; v++) {
+      FillVLaunch<real,nSpin,nColor,nVec> f(V,B,v);
+      f.apply(0);
+    }
   }
 
-//for staggered: this does not include factor 2 due to parity decomposition!
-
-  template <typename Float, int nSpin, int nColor, QudaFieldOrder order>
+  // For staggered this does not include factor 2 due to parity decomposition!
+  template <typename Float, int nSpin, int nColor>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (Nvec == 2) {
-      FillV<Float,nSpin,nColor,2,order>(V,B);
+      FillV<Float,nSpin,nColor,2>(V,B);
     } else if (Nvec == 4) {
-      FillV<Float,nSpin,nColor,4,order>(V,B);
+      FillV<Float,nSpin,nColor,4>(V,B);
     } else if (Nvec == 8) {
-      FillV<Float,nSpin,nColor,8,order>(V,B);
+      FillV<Float,nSpin,nColor,8>(V,B);
     } else if (Nvec == 12) {
-      FillV<Float,nSpin,nColor,12,order>(V,B);
+      FillV<Float,nSpin,nColor,12>(V,B);
     } else if (Nvec == 16) {
-      FillV<Float,nSpin,nColor,16,order>(V,B);
+      FillV<Float,nSpin,nColor,16>(V,B);
     } else if (Nvec == 20) {
-      FillV<Float,nSpin,nColor,20,order>(V,B);
+      FillV<Float,nSpin,nColor,20>(V,B);
     } else if (Nvec == 24) {
-      FillV<Float,nSpin,nColor,24,order>(V,B);
+      FillV<Float,nSpin,nColor,24>(V,B);
     } else if (Nvec == 32) {
-      FillV<Float,nSpin,nColor,32,order>(V,B);
+      FillV<Float,nSpin,nColor,32>(V,B);
     } else if (Nvec == 48) {
-      FillV<Float,nSpin,nColor,48,order>(V,B);
+      FillV<Float,nSpin,nColor,48>(V,B);
     } else {
       errorQuda("Unsupported Nvec %d", Nvec);
     }
   }
 
-//ok for 2-cycle multigrid, must be extended for more complicated version.
-
-  template <typename Float, int nSpin, QudaFieldOrder order>
+  template <typename Float, int nSpin>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (B[0]->Ncolor()*Nvec != V.Ncolor()) errorQuda("Something wrong here");
 
     if (B[0]->Ncolor() == 2) {
-      FillV<Float,nSpin,2,order>(V,B,Nvec);
+      FillV<Float,nSpin,2>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 3) {
-      FillV<Float,nSpin,3,order>(V,B,Nvec);
+      FillV<Float,nSpin,3>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 8) {
-      FillV<Float,nSpin,8,order>(V,B,Nvec);
+      FillV<Float,nSpin,8>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 16) {
-      FillV<Float,nSpin,16,order>(V,B,Nvec);
+      FillV<Float,nSpin,16>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 24) {
-      FillV<Float,nSpin,24,order>(V,B,Nvec);
+      FillV<Float,nSpin,24>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 32) {
-      FillV<Float,nSpin,32,order>(V,B,Nvec);
+      FillV<Float,nSpin,32>(V,B,Nvec);
     } else {
       errorQuda("Unsupported nColor %d", B[0]->Ncolor());
     }
   }
 
-  template <typename Float, QudaFieldOrder order>
+  template <typename Float>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (V.Nspin() == 4) {
-      FillV<Float,4,order>(V,B,Nvec);
+      FillV<Float,4>(V,B,Nvec);
     } else if (V.Nspin() == 2) {
-      FillV<Float,2,order>(V,B,Nvec);
+      FillV<Float,2>(V,B,Nvec);
 #ifdef GPU_STAGGERED_DIRAC
     } else if (V.Nspin() == 1) {
-      FillV<Float,1,order>(V,B,Nvec);
+      FillV<Float,1>(V,B,Nvec);
 #endif
     } else {
       errorQuda("Unsupported nSpin %d", V.Nspin());
-    }
-  }
-
-  template <typename Float>
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
-    if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      FillV<Float,QUDA_FLOAT2_FIELD_ORDER>(V,B,Nvec);
-    } else if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      FillV<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(V,B,Nvec);
-    } else {
-      errorQuda("Unsupported field type %d", V.FieldOrder());
     }
   }
 
@@ -437,115 +453,198 @@ namespace quda {
     long long bytes() const { return 2*V.Bytes(); }
   };
 
+#if 0
+  using namespace quda::colorspinor;
 
-  template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+  /**
+      Kernel argument struct
+  */
+  template <typename Out, typename In, typename Rotator, int fineSpin, int coarseSpin>
+  struct BlockOrthoArg {
+    const Rotator V;
+    const int *fine_to_coarse;
+    const int *coarse_to_fine;
+    const spin_mapper<fineSpin,coarseSpin> spin_map;
+    const int parity; // the parity of the input field (if single parity)
+    const int nParity; // number of parities of input fine field
+    int swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
+
+    BlockOrthoArg(Rotator &V, const int *fine_to_coarse, const int *coarse_to_fine,
+		  int parity, const ColorSpinorField &meta) :
+      out(out), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+      spin_map(), parity(parity), nParity(meta.SiteSubset()), swizzle(1)
+    { }
+
+    BlockOrthoArg(const BlockOrthoArg<Out,In,Rotator,fineSpin,coarseSpin> &arg) :
+      out(arg.out), in(arg.in), V(arg.V),
+      fine_to_coarse(arg.fine_to_coarse), coarse_to_fine(arg.coarse_to_fine), spin_map(),
+      parity(arg.parity), nParity(arg.nParity), swizzle(arg.swizzle)
+    { }
+  };
+
+  template <typename Float, int nVec, int fineSpin, int coarseSpin, typename Arg>
+  void BlockOrtho(Arg &arg) {
+
+    constexpr spinBlocks = fineSpin / coarseSpin;
+
+    for (int b=0; b<nBlocks; b++) {
+      for (int s=0; s<spinBlocks; s++) {
+
+	for (int k=0; k<nVec; k++) {
+
+	  for (int l=0; l<k; l++) {
+	    complex<Float> dot = 0.0;
+
+	    for (int i=0; i<blockSize; i++) {
+
+	      dot += conj(v(parity, x_cb, s, c, l)) * v(parity, x_cb, s, c, k);
+
+	    }
+
+	}
+
+      }
+    }
+
+    for (int parity_coarse=0; parity_coarse<2; parity_coarse++)
+      for (int x_coarse_cb=0; x_coarse_cb<arg.out.VolumeCB(); x_coarse_cb++)
+	for (int s=0; s<coarseSpin; s++)
+	  for (int c=0; c<coarseColor; c++)
+	    arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
+
+    // loop over fine degrees of freedom
+    for (int parity=0; parity<arg.nParity; parity++) {
+      parity = (arg.nParity == 2) ? parity : arg.parity;
+
+      for (int x_cb=0; x_cb<arg.in.VolumeCB(); x_cb++) {
+
+	int x = parity*arg.in.VolumeCB() + x_cb;
+	int x_coarse = arg.fine_to_coarse[x];
+	int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
+	int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
+
+	for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
+	  complex<Float> tmp[fineSpin*coarse_colors_per_thread];
+	  rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>
+	    (tmp, arg.in, arg.V, parity, arg.nParity, x_cb, coarse_color_block);
+
+	  for (int s=0; s<fineSpin; s++) {
+	    for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+	      int c = coarse_color_block + coarse_color_local;
+	      arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarse_colors_per_thread+coarse_color_local];
+	    }
+	  }
+
+	}
+      }
+    }
+
+  }
+#endif
+
+    template<typename Float, int nSpin, int nColor, int nVec>
   void BlockOrthogonalize(ColorSpinorField &V, const int *geo_bs, const int *geo_map, int spin_bs) {
     complex<Float> *Vblock = new complex<Float>[V.Volume()*V.Nspin()*V.Ncolor()];
 
-    typedef FieldOrderCB<Float,nSpin,nColor,nVec,order> VectorField;
-    VectorField vOrder(const_cast<ColorSpinorField&>(V));
+    if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      constexpr QudaFieldOrder order = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
-    int geo_blocksize = 1;
-    for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
+      typedef FieldOrderCB<Float,nSpin,nColor,nVec,order> VectorField;
+      VectorField vOrder(const_cast<ColorSpinorField&>(V));
 
-    int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
-    int chiralBlocks = (V.Nspin() == 1) ? 2 : vOrder.Nspin() / spin_bs; //always 2 for staggered. 
-    int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
-    if (V.Nspin() == 1) blocksize /= chiralBlocks; //for staggered chiral block size is a parity block size
+      int geo_blocksize = 1;
+      for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
+
+      int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs;
+      int chiralBlocks = (V.Nspin() == 1) ? 2 : vOrder.Nspin() / spin_bs; //always 2 for staggered.
+      int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
+      if (V.Nspin() == 1) blocksize /= chiralBlocks; //for staggered chiral block size is a parity block size
     
-    printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
+      printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
-    BlockOrderV<true,nVec,Float,VectorField> reorder(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
-    reorder.apply(0);
+#if 0
+      BlockOrthoArg<> arg(V);
+      BlockOrtho ortho();
+      otho.apply(0);
+#endif
 
-    BlockGramSchmidt<double,Float,nVec> ortho(Vblock, numblocks, blocksize, V);
-    ortho.apply(0);
+      BlockOrderV<true,nVec,Float,VectorField> reorder(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
+      reorder.apply(0);
 
-    BlockOrderV<false,nVec,Float,VectorField> reset(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
-    reset.apply(0);
+      BlockGramSchmidt<double,Float,nVec> ortho(Vblock, numblocks, blocksize, V);
+      ortho.apply(0);
 
-    delete []Vblock;
+      BlockOrderV<false,nVec,Float,VectorField> reset(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
+      reset.apply(0);
+
+      delete []Vblock;
+
+    } else {
+      errorQuda("Unsupported field order %d\n", V.FieldOrder());
+    }
+
   }
 
-
-  template<typename Float, int nSpin, int nColor, QudaFieldOrder order>
+  template<typename Float, int nSpin, int nColor>
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs) {
     if (Nvec == 2) {
-      BlockOrthogonalize<Float,nSpin,nColor,2,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,2>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 4) {
-      BlockOrthogonalize<Float,nSpin,nColor,4,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,4>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 8) {
-      BlockOrthogonalize<Float,nSpin,nColor,8,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,8>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 12) {
-      BlockOrthogonalize<Float,nSpin,nColor,12,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,12>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 16) {
-      BlockOrthogonalize<Float,nSpin,nColor,16,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,16>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 20) {
-      BlockOrthogonalize<Float,nSpin,nColor,20,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,20>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 24) {
-      BlockOrthogonalize<Float,nSpin,nColor,24,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,24>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 32) {
-      BlockOrthogonalize<Float,nSpin,nColor,32,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,32>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 48) {
-      BlockOrthogonalize<Float,nSpin,nColor,48,order>(V, geo_bs, geo_map, spin_bs);
+      BlockOrthogonalize<Float,nSpin,nColor,48>(V, geo_bs, geo_map, spin_bs);
     } else {
       errorQuda("Unsupported nVec %d\n", Nvec);
     }
   }
 
-  template<typename Float, int nSpin, QudaFieldOrder order>
+  template<typename Float, int nSpin>
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
     if (V.Ncolor()/Nvec == 3) {
-      BlockOrthogonalize<Float,nSpin,3,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    }
-    else if (V.Ncolor()/Nvec == 2) {
-      BlockOrthogonalize<Float,nSpin,2,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    }
-    else if (V.Ncolor()/Nvec == 8) {
-      BlockOrthogonalize<Float,nSpin,8,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    }
-    else if (V.Ncolor()/Nvec == 16) {
-      BlockOrthogonalize<Float,nSpin,16,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    }
-    else if (V.Ncolor()/Nvec == 24) {
-      BlockOrthogonalize<Float,nSpin,24,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    }
-    else if (V.Ncolor()/Nvec == 32) {
-      BlockOrthogonalize<Float,nSpin,32,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    }
-    else if (V.Ncolor()/Nvec == 48) {
-      BlockOrthogonalize<Float,nSpin,48,order>(V, Nvec, geo_bs, geo_map, spin_bs); //for staggered, even-odd blocking presumed
+      BlockOrthogonalize<Float,nSpin,3>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Ncolor()/Nvec == 2) {
+      BlockOrthogonalize<Float,nSpin,2>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Ncolor()/Nvec == 8) {
+      BlockOrthogonalize<Float,nSpin,8>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Ncolor()/Nvec == 16) {
+      BlockOrthogonalize<Float,nSpin,16>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Ncolor()/Nvec == 24) {
+      BlockOrthogonalize<Float,nSpin,24>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Ncolor()/Nvec == 32) {
+      BlockOrthogonalize<Float,nSpin,32>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Ncolor()/Nvec == 48) {
+      BlockOrthogonalize<Float,nSpin,48>(V, Nvec, geo_bs, geo_map, spin_bs); //for staggered, even-odd blocking presumed
     }  
     else {
       errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
     }
   }
 
-  template<typename Float, QudaFieldOrder order>
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
-			  const int *geo_bs, const int *geo_map, int spin_bs) {
-    if (V.Nspin() == 4) {
-      BlockOrthogonalize<Float,4,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    }
-    else if(V.Nspin() ==2) {
-      BlockOrthogonalize<Float,2,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    } 
-    else if (V.Nspin() == 1) {
-      BlockOrthogonalize<Float,1,order>(V, Nvec, geo_bs, geo_map, 1);
-    }
-    else {
-      errorQuda("Unsupported nSpin %d\n", V.Nspin());
-    }
-  }
-
   template<typename Float>
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
-  if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      BlockOrthogonalize<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(V, Nvec, geo_bs, geo_map, spin_bs);
-    } else {
-      errorQuda("Unsupported field order %d\n", V.FieldOrder());
+    if (V.Nspin() == 4) {
+      BlockOrthogonalize<Float,4>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if(V.Nspin() ==2) {
+      BlockOrthogonalize<Float,2>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Nspin() == 1) {
+      BlockOrthogonalize<Float,1>(V, Nvec, geo_bs, geo_map, 1);
+    }
+    else {
+      errorQuda("Unsupported nSpin %d\n", V.Nspin());
     }
   }
 

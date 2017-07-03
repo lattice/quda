@@ -21,16 +21,6 @@ namespace quda {
   bool getKernelPackT();
 
   /**
-    @param pack Sets whether to use a kernel to pack twisted spinor
-    */
-  void setTwistPack(bool pack);
-
-  /**
-    @return Whether a kernel requires twisted pack or not
-    */
-  bool getTwistPack();
-
-  /**
      Sets commDim array used in dslash_pack.cu
    */
   void setPackComms(const int *commDim);
@@ -117,18 +107,27 @@ namespace quda {
   void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger, const double &kappa, const double &mu,
 			     const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity);
 
-  // face packing routines
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, bool zero_copy, const int nFace, const int dagger,
-		const int parity, const int dim, const int face_num, const cudaStream_t &stream,
-		const double a=0.0, const double b=0.0);
-
-  void packFaceExtended(void *ghost_buf, cudaColorSpinorField &field, bool zero_copy, const int nFace, const int R[], const int dagger,
-			const int parity, const int dim, const int face_num, const cudaStream_t &stream, const bool unpack=false);
-
-  // face packing routines
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, FullClover &clov, FullClover &clovInv,
+  /**
+     @brief Dslash face packing routine
+     @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
+     @param[in] in Input ColorSpinorField to be packed
+     @param[in] location Array of locations where the packed fields are (Device, Host or Remote)
+     @param[in] nFace Depth of halo
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] parity Field parity
+     @param[in] dim Which dimensions we are packing
+     @param[in] face_num Are we packing backwards (0), forwards (1) or both directions (2)
+     @param[in] stream Which stream are we executing in
+     @param[in] a Packing coefficient (twisted-mass only)
+     @param[in] b Packing coefficient (twisted-mass only)
+  */
+  void packFace(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &in, MemoryLocation location[],
 		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
-		const cudaStream_t &stream, const double a=0.0);
+		const cudaStream_t &stream, const double a=0.0, const double b=0.0);
+
+  void packFaceExtended(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &field, MemoryLocation location[],
+			const int nFace, const int R[], const int dagger, const int parity, const int dim,
+			const int face_num, const cudaStream_t &stream, const bool unpack=false);
 
   /**
      out = gamma_5 in

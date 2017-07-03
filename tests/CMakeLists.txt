@@ -4,8 +4,8 @@ include_directories(.)
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-set(TEST_LIBS quda quda_test)
 
+set(TEST_LIBS quda quda_test )
 
 MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   IF(NOT ${qudabuildtests})
@@ -30,11 +30,13 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
     QUDA_CHECKBUILDTEST(invertmsrc_test QUDA_BUILD_ALL_TESTS)
   endif()
 
-endif()
+  if(QUDA_DEFLATEDSOLVER)
+    cuda_add_executable(deflated_invert_test deflated_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+    target_link_libraries(deflated_invert_test ${TEST_LIBS})
+    QUDA_CHECKBUILDTEST(deflated_invert_test QUDA_BUILD_ALL_TESTS)
+  endif()
 
-cuda_add_executable(deflation_test deflation_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
-target_link_libraries(deflation_test ${TEST_LIBS})
-QUDA_CHECKBUILDTEST(deflation_test QUDA_BUILD_ALL_TESTS)
+endif()
 
 if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp)
@@ -60,6 +62,13 @@ if(QUDA_MULTIGRID)
   cuda_add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
+
+  if(${QUDA_GAUGE_ALG})
+    cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+    target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
+    QUDA_CHECKBUILDTEST(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
+endif()
+
 endif()
 
 cuda_add_executable(su3_test su3_test.cpp)

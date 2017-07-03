@@ -49,6 +49,8 @@ extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
 extern int niter;
+extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
+extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int nvec[];
 extern int mg_levels;
 
@@ -57,7 +59,13 @@ extern bool generate_all_levels;
 extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
+extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
+extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
+
+extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
+extern double setup_tol;
+extern double omega;
 extern QudaInverterType smoother_type;
 
 extern QudaMatPCType matpc_type;
@@ -209,10 +217,14 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
+    mg_param.verbosity[i] = mg_verbosity[i];
+    mg_param.setup_inv_type[i] = setup_inv[i];
+    mg_param.setup_tol[i] = setup_tol;
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
+    mg_param.mu_factor[i] = mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
@@ -234,7 +246,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // use single parity injection into the coarse grid
     mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
-    mg_param.omega[i] = 0.85; // over/under relaxation factor
+    mg_param.omega[i] = omega; // over/under relaxation factor
 
     mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
@@ -326,11 +338,12 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = mg_verbosity[0];
 
 
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param.gcrNkrylov = 20;
+  inv_param.pipeline = pipeline;
+  inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine convergence
@@ -355,6 +368,12 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 int main(int argc, char **argv)
 {
+  // We give here the default value to some of the array
+  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+    mg_verbosity[i] = QUDA_SILENT;
+    setup_inv[i] = QUDA_BICGSTAB_INVERTER;
+    mu_factor[i] = 1.;
+  }
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
