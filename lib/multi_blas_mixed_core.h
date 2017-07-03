@@ -9,7 +9,7 @@ namespace mixed {
 		       CompositeColorSpinorField &x, CompositeColorSpinorField &y,
 		       CompositeColorSpinorField &z, CompositeColorSpinorField &w) {
 
-    if (Location(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
 
       if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
 

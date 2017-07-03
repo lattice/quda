@@ -246,7 +246,6 @@ namespace quda {
 
   protected:
     bool init;
-    QudaPrecision precision;
 
     int nColor;
     int nSpin;
@@ -324,7 +323,6 @@ namespace quda {
 
     virtual ColorSpinorField& operator=(const ColorSpinorField &);
 
-    QudaPrecision Precision() const { return precision; }
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
@@ -350,8 +348,6 @@ namespace quda {
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
     virtual const void* Ghost2() const { return nullptr; }
-
-    int Nface() const { return (nSpin == 1) ? 3 : 1; } // FIXME for naive staggered or other operators
 
     /**
        Do the exchange between neighbouring nodes of the data in
@@ -715,10 +711,14 @@ namespace quda {
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
     void PrintVector(unsigned int x);
 
-    void allocateGhostBuffer(void) const;
+    /**
+       @brief Allocate the ghost buffers
+       @param[in] nFace Depth of each halo
+    */
+    void allocateGhostBuffer(int nFace) const;
     static void freeGhostBuffer(void);
 
-    void packGhost(void **ghost, QudaParity parity, int dagger) const;
+    void packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
     void unpackGhost(void* ghost_spinor, const int dim,
 		     const QudaDirection dir, const int dagger);
 
@@ -767,8 +767,8 @@ namespace quda {
      @param[in] dagger Is for a dagger operator (presently ignored)
      @param[in[ location Array specifiying the memory location of each resulting ghost [2*dim+dir]
   */
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity,
-			const int dagger, MemoryLocation *destination=nullptr);
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
+			int nFace, int dagger, MemoryLocation *destination=nullptr);
 
   /*Generate a gaussian distributed spinor
    * @param src The spinorfield
