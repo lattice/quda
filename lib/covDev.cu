@@ -14,9 +14,9 @@ namespace quda {
   /**
      @brief Parameter structure for driving the covariant derivative
    */
-  template <typename Float, int nColor, QudaReconstructType reconstruct>
+  template <typename Float, int nSpin, int nColor, QudaReconstructType reconstruct>
   struct CovDevArg {
-    typedef typename colorspinor_mapper<Float,1,nColor>::type F;
+    typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
     typedef typename gauge_mapper<Float,reconstruct>::type G;
 
     F out;                // output vector field
@@ -106,10 +106,10 @@ namespace quda {
 
 
   //out(x) = M*in
-  template <typename Float, int nDim, int nColor, typename Arg>
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
   __device__ __host__ inline void covDev(Arg &arg, int x_cb, int parity)
   {
-    typedef ColorSpinor<Float,nColor,1> Vector;
+    typedef ColorSpinor<Float,nColor,nSpin> Vector;
     Vector out;
 
     applyCovDev<Float,nDim,nColor>(out, arg, x_cb, parity);
@@ -117,7 +117,7 @@ namespace quda {
   }
 
   // CPU kernel for applying the Laplace operator to a vector
-  template <typename Float, int nDim, int nColor, typename Arg>
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
   void covDevCPU(Arg arg)
   {
 
@@ -126,14 +126,14 @@ namespace quda {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
-	covDev<Float,nDim,nColor>(arg, x_cb, parity);
+	covDev<Float,nDim,nSpin,nColor>(arg, x_cb, parity);
       } // 4-d volumeCB
     } // parity
 
   }
 
   // GPU Kernel for applying the Laplace operator to a vector
-  template <typename Float, int nDim, int nColor, typename Arg>
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
   __global__ void covDevGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
@@ -144,10 +144,10 @@ namespace quda {
     if (x_cb >= arg.volumeCB) return;
     if (parity >= arg.nParity) return;
 
-    covDev<Float,nDim,nColor>(arg, x_cb, parity);
+    covDev<Float,nDim,nSpin,nColor>(arg, x_cb, parity);
   }
 
-  template <typename Float, int nDim, int nColor, typename Arg>
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
   class CovDev : public TunableVectorY {
 
   protected:
@@ -185,10 +185,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	covDevCPU<Float,nDim,nColor>(arg);
+	covDevCPU<Float,nDim,nSpin,nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	covDevGPU<Float,nDim,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	covDevGPU<Float,nDim,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
 
@@ -200,9 +200,14 @@ namespace quda {
     void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
   {
     constexpr int nDim = 4;
-      CovDevArg<Float,nColor,recon> arg(out, in, U, parity, mu);
-      CovDev<Float,nDim,nColor,CovDevArg<Float,nColor,recon> > myCovDev(arg, in);
+    if (in.Nspin() == 1) {
+      constexpr int nSpin = 1;
+      CovDevArg<Float,nSpin,nColor,recon> arg(out, in, U, parity, mu);
+      CovDev<Float,nDim,nSpin,nColor,CovDevArg<Float,nSpin,nColor,recon> > myCovDev(arg, in);
       myCovDev.apply(0);
+    } else {
+      errorQuda("Unsupported nSpin=%d", in.Nspin());
+    }
   }
 
   // template on the gauge reconstruction
