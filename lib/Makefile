@@ -55,7 +55,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
 	copy_color_spinor_mg_hs.o copy_color_spinor_mg_sh.o		\
-	quda_memcpy.o quda_arpack_interface.o quda_arnoldi_interface.o deflation.o ${QIO_UTIL}   \
+	quda_memcpy.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
 	spinor_gauss.o gauge_random.o
 
 # header files, found in include/
@@ -141,10 +141,7 @@ wilson_pack_clover_twisted_face_dagger_core.h wilson_pack_face_core.h	\
 wilson_pack_face_dagger_core.h wilson_pack_twisted_face_core.h		\
 wilson_pack_twisted_face_dagger_core.h
 
-ARNOLDI_HDRS = apar_defs.h arnoldi_generic_quda.h cuda_forall.h cuda_matmul.h cuda_reduce.h
-ARNOLDI_CORE = $(ARNOLDI_HDRS:%=arnoldi_core/%)
-
-INC += -I../include -Idslash_core -Iarnoldi_core -I. -I../tests
+INC += -I../include -Idslash_core -I. -I../tests
 
 HDRS = $(QUDA_HDRS:%=../include/%)
 HDRS += $(QUDA_INLN)
@@ -267,9 +264,6 @@ milc_interface.o: milc_interface.cpp $(HDRS) $(CORE)
 
 blas_magma.o: blas_magma.cu $(HDRS)
 	$(NVCC) $(MAGMA_INCLUDE) $(NVCCFLAGS) $(MAGMA_FLAGS) $< -c -o $@
-
-quda_arnoldi_interface.o: quda_arnoldi_interface.cu $(HDRS) $(ARNOLDI_CORE)
-	$(NVCC) $(MAGMA_INCLUDE)  $(NVCCFLAGS) $(MAGMA_FLAGS) $< -c -o $@
 
 copy_gauge_double.o: copy_gauge_double.cu copy_gauge_inc.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
