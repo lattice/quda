@@ -16,7 +16,7 @@ namespace quda {
    */
   template <typename Float, int nColor, QudaReconstructType reconstruct>
   struct CovDevArg {
-    typedef typename colorspinor_order_mapper<Float,QUDA_FLOAT2_FIELD_ORDER,1,nColor>::type F;
+    typedef typename colorspinor_mapper<Float,1,nColor>::type F;
     typedef typename gauge_mapper<Float,reconstruct>::type G;
 
     F out;                // output vector field
@@ -25,14 +25,14 @@ namespace quda {
     const int parity;     // only use this for single parity fields
     const int nParity;    // number of parities we're working on
     const int nFace;      // hard code to 1 for now
-    const int dim[4];     // full lattice dimensions
+    const int dim[5];     // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;   // checkerboarded volume
     const int mu;         // direction of the covariant derivative
 
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const int parity, const int mu)
       : out(out), in(in), U(U), parity(parity), mu(mu), nParity(in.SiteSubset()), nFace(1),
-	dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3) },
+	dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(in.VolumeCB())
     {
@@ -51,14 +51,14 @@ namespace quda {
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
    */
-  extern __shared__ float s[];
   template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
   __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
-    int coord[4];
+    int coord[5];
     getCoords(coord, x_cb, arg.dim, parity);
+    coord[4] = 0;
 
     const int d = arg.mu%4;
 
@@ -71,12 +71,8 @@ namespace quda {
 	const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
 	const Link U = arg.U(d, x_cb, parity);
-#if 0 // FIXME - why is this slow?
 	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-#else
-	const Vector in;
-	arg.in.loadGhost((Float*)in.data, ghost_idx, d, 1, their_spinor_parity);
-#endif
+
 	out += U * in;
 	} else {
 
@@ -94,12 +90,8 @@ namespace quda {
 	const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
 	const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
-#if 0 // FIXME - why is this slow?
 	const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-#else
-	const Vector in;
-	arg.in.loadGhost((Float*)in.data, ghost_idx, d, 0, their_spinor_parity);
-#endif
+
 	out += conj(U) * in;
       } else {
 	
@@ -251,13 +243,14 @@ namespace quda {
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)		    
   {
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (out.Precision() != in.Precision() || U.Precision() != in.Precision())
-      errorQuda("Precision mismatch out=%d in=%d U=%d", out.Precision(), in.Precision(), U.Precision());
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
     
+    // check all precision match
+    checkPrecision(out, in, U);
+
     // check all locations match
-    Location(out, in, U);
+    checkLocation(out, in, U);
 
     const int nFace = 1;
     in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
