@@ -373,6 +373,9 @@ void comm_allreduce_array(double* data, size_t size)
   delete []recvbuf;
 }
 
+void comm_allreduce_complex(double* data){
+  comm_allreduce_array(data, 2);
+}
 
 void comm_allreduce_int(int* data)
 {

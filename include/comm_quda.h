@@ -217,6 +217,8 @@ extern "C" {
   void comm_barrier(void);
   void comm_abort(int status);
 
+  void comm_allreduce_complex(double* data);
+
 #ifdef __cplusplus
 }
 #endif

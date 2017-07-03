@@ -339,6 +339,9 @@ void comm_allreduce_array(double* data, size_t size)
   QMP_CHECK( QMP_sum_double_array(data, size) );
 }
 
+void comm_allreduce_complex(double* data){
+  comm_allreduce_array(data, 2);
+}
 
 void comm_allreduce_int(int* data)
 {

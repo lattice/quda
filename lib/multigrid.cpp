@@ -696,6 +696,67 @@ namespace quda {
     free(which);
 #else
     warningQuda("\nThis test requires ARPACK.\n");
+
+    int neigv     = 128;
+
+    // create function struct
+    arnoldi_abs_int functions;
+
+    // disable reverse communication interface
+    functions.mvecmulFun     = param.matSmooth;
+    functions.scalar_redFun  = comm_allreduce;//void comm_allreduce(double* data);
+    functions.complex_redFun = comm_allreduce_complex;
+
+    ColorSpinorParam arnParam(*param.B[0]);
+    arnParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    arnParam.location = QUDA_CUDA_FIELD_LOCATION;
+    arnParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//currently is the only format 
+
+    if(param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) { 
+      arnParam.x[0] /= 2; 
+      arnParam.siteSubset = QUDA_PARITY_SITE_SUBSET; 
+    }
+
+    arnParam.setPrecision(QUDA_DOUBLE_PRECISION);
+    //for staggered we need to pass basis check in copy routines.
+    arnParam.gammaBasis = (param.B[0]->Nspin() == 1) ? param.B[0]->GammaBasis() : QUDA_UKQCD_GAMMA_BASIS;
+
+    ColorSpinorField *init_vec = static_cast<ColorSpinorField*>(new cudaColorSpinorField(arnParam));
+    
+    arnParam.is_composite  = true;
+    arnParam.composite_dim = neigv; 
+
+    ColorSpinorField *rvecs = static_cast<ColorSpinorField*>(new cudaColorSpinorField(arnParam));
+
+    int ncv       = 256;
+    int maxit     = 1000;
+    double eigtol = 1e-7;
+
+    arnmode mode = arnmode_SR;
+
+    void *evalsBuffer = static_cast<void*>(new std::complex<double>[neigv+1]);
+
+    int err = arnoldiGPUSolve(static_cast<dcomplex_t*> (evalsBuffer), init_vec, rvecs, (init_vec->Length() >> 1), 1, 0, neigv, ncv, eigtol, &maxit, &functions, mode);
+
+    if( err != 0 ) errorQuda("Eigensolver return error code %d \n", err);
+
+    for (int i=0; i<neigv; i++) {
+      // as well as copying to the correct location this also changes basis if necessary
+      *tmp1 = rvecs->Component(i); 
+
+      transfer->R(*r_coarse, *tmp1);
+      transfer->P(*tmp2, *r_coarse);
+
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+
+      deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
+      printfQuda("L2 relative deviation = %e\n", deviation);
+    }
+    
+    delete init_vec;
+    delete rvecs;
 #endif
 
     delete tmp1;

@@ -135,7 +135,7 @@ namespace quda{
   } dcomplex_t;
 
 /* Do reduction of val across all nodes - for single-node support, just leave this NULL */
-  typedef void (*mpi_reductiont) (void* val);
+  typedef void (*mpi_reductiont) (double* val);
 
 
   typedef struct arnoldi_abs_int_s{
@@ -148,25 +148,8 @@ namespace quda{
     void* reserve2;
   } arnoldi_abs_int;
 
-#ifndef EXTERN_C_BEGIN
-#ifdef __cplusplus
-#define EXTERN_C_BEGIN extern "C" {
-#define EXTERN_C_END }
-#else
-#define EXTERN_C_BEGIN
-#define EXTERN_C_END
-#endif
-#endif
-
-
-
-// init_vec contains the initial field vector (type depends on fieldAllocT) for Arnoldi iteration (optional)
-// rvecs should be a pointer to an array of n_eigs pointers or NULL - if not NULL, will contain the right eigenvectors corresponding to results
-// maxIter contains the number of iterations used
-  EXTERN_C_BEGIN
   int arnoldiGPUSolve(dcomplex_t* results, const ColorSpinorField *init_vec, ColorSpinorFieldSet* rvecs, int size, int nMulti, int stride, int n_eigs, int n_extend, double tolerance, int* maxIter, 
                        const arnoldi_abs_int* functions, arnmode mode);
-  EXTERN_C_END
 
 
 }//endof namespace quda 

@@ -285,7 +285,7 @@ __device__ static inline void fieldEntry_complex_madd(const fieldentry * restric
 
 
 /* Do reduction of val across all nodes - for single-node support, just leave this NULL */
-typedef void (*mpi_reductionT) (void* val);
+typedef void (*mpi_reductionT) (double* val);
 typedef void* (*mallocFunT)(size_t size);
 typedef void (*freeFunT)(void* ptr);
 
@@ -649,8 +649,11 @@ radix fieldvec_magsq_V( const fieldtype* s, multisize size )
   in.s = s;
   in.stride = size.stride;
   FOR_RANGE_REDUCE_KERNEL(fvec_magsq, in, &tmp, 0, size.size, size.nMulti, 0, 0);
-  if (scalar_reduction_f)
-      scalar_reduction_f(&tmp);
+  if (scalar_reduction_f) {
+      double d_tmp = static_cast<double>(tmp);
+      scalar_reduction_f(&d_tmp);
+      tmp = d_tmp;
+  }
 #ifdef TRACE_STATISTICS
   if (s_cputimef)
       s_parallelT += s_cputimef() - t0;
@@ -699,8 +702,12 @@ lcomplex fieldvec_cdot_V( const fieldtype* a, const fieldtype* b, multisize size
     s_nCDotProds++;
 #endif
   fieldvec_cdot_V_skipmpi(a, b, size, &result, 0);
-  if (complex_reduction_f)
-      complex_reduction_f(&result);
+  if (complex_reduction_f) {
+      double d_result[2] = { static_cast<double>(result.real), static_cast<double>(result.imag) };
+      complex_reduction_f(d_result);
+      result.real = d_result[0];
+      result.imag = d_result[1];
+  }
 #ifdef TRACE_STATISTICS
   if (s_cputimef){
       s_parallelT += s_cputimef() - t0;
@@ -1515,8 +1522,13 @@ static void field_vec_msub_dot_V(fieldtype* Vj, lcomplex* alpha, fieldtype* z, f
     in.malpha.imag = -alpha->imag;
     FOR_RANGE_REDUCE_KERNEL(field_vec_msub_dot, in, &res, 0, size.size, size.nMulti, 0, 0);
     *alpha = res;
-    if (complex_reduction_f)
-        complex_reduction_f(alpha);
+    if (complex_reduction_f){
+      double d_result[2] = { static_cast<double>(alpha->real), static_cast<double>(alpha->imag) };
+      complex_reduction_f(d_result);
+      alpha->real = d_result[0];
+      alpha->imag = d_result[1];
+    }
+
 #ifdef TRACE_STATISTICS
     if (s_cputimef)
         s_parallelT += s_cputimef() - t0;
@@ -1618,8 +1630,13 @@ int arnoldi_step(
     multi_fvec_cdot_V(V, z, i+1, H->n, Vdotzs, size);
 #ifdef MULTI_GPU
     for(j=0; j < (i+1); j++)
-        if (complex_reduction_f)
-            complex_reduction_f(&Vdotzs[j]);
+        if (complex_reduction_f) {
+            //complex_reduction_f(&Vdotzs[j]);
+            double d_result[2] = { static_cast<double>(Vdotzs[j].real), static_cast<double>(Vdotzs[j].imag) };
+            complex_reduction_f(d_result);
+            Vdotzs[j].real = d_result[0];
+            Vdotzs[j].imag = d_result[1];
+        }
     fieldvec_linearsuperpos_sub(V, z, i+1, Vdotzs, z, size);
     for(j=0; j < (i+1); j++) {
         H->e[j][i] = Vdotzs[j];
@@ -1632,8 +1649,13 @@ int arnoldi_step(
     for(j=0; j < (i+1); j++) {
       // Store the result in temp_z to avoid pointer aliasing
       // operation is diagonal and hence destination can be one of the sources
-      if (complex_reduction_f)
-          complex_reduction_f(&H->e[j][i]);
+      if (complex_reduction_f){
+          //complex_reduction_f(&H->e[j][i]);
+          double d_result[2] = { static_cast<double>(H->e[j][i].real), static_cast<double>(H->e[j][i].imag) };
+          complex_reduction_f(d_result);
+          H->e[j][i].real = d_result[0];
+          H->e[j][i].imag = d_result[1];
+      }
       fieldvec_complex_msub_V(z, (H->e[j][i]), V[j], z, size);
     }
 #endif
