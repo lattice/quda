@@ -1711,7 +1711,7 @@ void usage(char** argv )
   printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
   printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
   printf("    --df-eigcg-max-restarts <n>               # Set how many eigCG restarts are allowed within a single physical right hand site solve (default 4)\n");
-  printf("    --df-tol-restart <tol>                    # Set restart tolerance for the eigCG solver(default 1e-6)\n");
+  printf("    --df-tol-restart <tol>                    # Set restart tolerance for the eigCG solver(default 5e-5)\n");
   printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
   printf("    --df-tol-iterref <tol>                    # Set iterative tolerance for the iter refinement cycle  (default 1e-2)\n");
   printf("    --df-max-restart-num <n>                    # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
