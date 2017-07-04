@@ -893,6 +893,55 @@ namespace quda {
     void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
   };
 
+
+  /**
+     @brief Full Gauge Laplace operator.  Although not a Dirac
+     operator per se, it's a linear operator so it's conventient to
+     put in the Dirac operator abstraction.
+  */
+  class GaugeLaplace : public Dirac {
+
+  public:
+    GaugeLaplace(const DiracParam &param);
+    GaugeLaplace(const GaugeLaplace &laplace);
+
+    virtual ~GaugeLaplace();
+    GaugeLaplace& operator=(const GaugeLaplace &laplace);
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
+  /**
+     @brief Even-odd preconditioned Gauge Laplace operator
+  */
+  class GaugeLaplacePC : public GaugeLaplace {
+
+  public:
+    GaugeLaplacePC(const DiracParam &param);
+    GaugeLaplacePC(const GaugeLaplacePC &laplace);
+    virtual ~GaugeLaplacePC();
+    GaugeLaplacePC& operator=(const GaugeLaplacePC &laplace);
+
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+		 ColorSpinorField &x, ColorSpinorField &b,
+		 const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+  };
+
+
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
   class DiracMatrix {
 

@@ -94,11 +94,11 @@ namespace quda {
 
     if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       typedef typename colorspinor::FieldOrderCB<FloatOut, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
-      ColorSpinor outOrder(out, Out);
+      ColorSpinor outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       typedef typename colorspinor::FieldOrderCB<FloatOut, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
-      ColorSpinor outOrder(out, Out);
+      ColorSpinor outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out, location);
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", out.FieldOrder(), Ns, Nc);
@@ -113,11 +113,11 @@ namespace quda {
 
     if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
-      ColorSpinor inOrder(in, In);
+      ColorSpinor inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, location, Out);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
-      ColorSpinor inOrder(in, In);
+      ColorSpinor inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, location, Out);
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);

@@ -890,10 +890,10 @@ namespace quda {
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
       // check all precisions match
-      QudaPrecision precision = Precision(out, inA, inB, Y, X);
+      QudaPrecision precision = checkPrecision(out, inA, inB, Y, X);
 
       // check all locations match
-      Location(out, inA, inB, Y, X);
+      checkLocation(out, inA, inB, Y, X);
 
       MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
       MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from
