@@ -109,20 +109,20 @@ namespace quda {
 
     template<typename Float, typename storeFloat> struct abs_ {
       abs_(const Float scale) { }
-      __host__ __device__ Float operator()(quda::complex<storeFloat> &x) { return abs(x); }
+      __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
     };
 
     template<typename Float> struct abs_<Float,short> {
       Float scale;
       abs_(const Float scale) : scale(scale) { }
-      __host__ __device__ Float operator()(quda::complex<short> &x)
+      __host__ __device__ Float operator()(const quda::complex<short> &x)
       { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
     template<typename Float> struct abs_<Float,int> {
       Float scale;
       abs_(const Float scale) : scale(scale) { }
-      __host__ __device__ Float operator()(quda::complex<int> &x)
+      __host__ __device__ Float operator()(const quda::complex<int> &x)
       { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
