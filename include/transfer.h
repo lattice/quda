@@ -216,6 +216,18 @@ namespace quda {
     const int *Geo_bs() const {return geo_bs;}
     
     /**
+       @return Pointer to the lookup table to the fine-to-coarse map
+    */
+    const int* fineToCoarse(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const
+    { return location == QUDA_CPU_FIELD_LOCATION ? fine_to_coarse_h : fine_to_coarse_d; }
+
+    /**
+       @return Pointer to the lookup table to the coarse-to-fine map
+    */
+    const int* coarseToFine(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const
+    { return location == QUDA_CPU_FIELD_LOCATION ? coarse_to_fine_h : coarse_to_fine_d; }
+
+    /**
      * Sets where the prolongator / restrictor should take place
      * @param location Location where the transfer operator should be computed
      */
