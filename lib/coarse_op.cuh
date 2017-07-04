@@ -965,8 +965,6 @@ namespace quda {
 
     template <int dim> using Gamma_ = Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim>;
 
-    template <int dim> using Gamma_ = Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim>;
-
   protected:
     Arg &arg;
     const ColorSpinorField &meta;
