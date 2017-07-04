@@ -222,8 +222,9 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
-      param.shared_bytes = sharedBytesPerThread()*param.block.x > sharedBytesPerBlock(param) ?
-	sharedBytesPerThread()*param.block.x : sharedBytesPerBlock(param);
+      int nthreads = param.block.x*param.block.y*param.block.z;
+      param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+	sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
     }
 
     /** sets default values for when tuning is disabled */
@@ -326,15 +327,16 @@ namespace quda {
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     unsigned int vector_length_y;
+    bool tune_block_x;
 
   public:
-    TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y) { }
+  TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y), tune_block_x(true) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
       dim3 block = param.block;
       dim3 grid = param.grid;
-      bool ret = Tunable::advanceBlockDim(param);
+      bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
       param.block.y = block.y;
       param.grid.y = grid.y;
 
@@ -376,16 +378,17 @@ namespace quda {
   class TunableVectorYZ : public TunableVectorY {
 
     mutable unsigned vector_length_z;
+    bool tune_block_y;
 
   public:
     TunableVectorYZ(unsigned int vector_length_y, unsigned int vector_length_z)
-      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z) { }
+      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z), tune_block_y(true) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
       dim3 block = param.block;
       dim3 grid = param.grid;
-      bool ret = TunableVectorY::advanceBlockDim(param);
+      bool ret = tune_block_y ? TunableVectorY::advanceBlockDim(param) : tune_block_x ? Tunable::advanceBlockDim(param) : false;
       param.block.z = block.z;
       param.grid.z = grid.z;
 
