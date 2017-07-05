@@ -1714,11 +1714,12 @@ void usage(char** argv )
   printf("    --df-nev <nev>                            # Set number of eigenvectors computed within a single solve cycle (default 8)\n");
   printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
   printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
-  printf("    --df-eigcg-max-restarts <n>               # Set how many eigCG restarts are allowed within a single physical right hand site solve (default 4)\n");
-  printf("    --df-tol-restart <tol>                    # Set restart tolerance for the eigCG solver(default 5e-5)\n");
+  printf("    --df-eigcg-max-restarts <n>               # Set how many iterative refinement cycles will be solved with eigCG within a single physical right hand site solve (default 4)\n");
+  printf("    --df-tol-restart <tol>                    # Set tolerance for the first restart in the initCG solver(default 5e-5)\n");
+  printf("    --df-tol-inc <tol>                        # Set tolerance for the subsequent restarts in the initCG solver  (default 1e-2)\n");
+  printf("    --df-max-restart-num <n>                  # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
   printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
-  printf("    --df-tol-iterref <tol>                    # Set iterative tolerance for the iter refinement cycle  (default 1e-2)\n");
-  printf("    --df-max-restart-num <n>                    # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
+
 
   printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
   printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
@@ -2682,7 +2683,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   } 
 
-  if( strcmp(argv[i], "--df-tol-iterref") == 0){
+  if( strcmp(argv[i], "--df-tol-inc") == 0){
     if (i+1 >= argc){
       usage(argv);
     }

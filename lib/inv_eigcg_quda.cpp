@@ -588,8 +588,8 @@ namespace quda {
     deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
     Deflation &defl         = *(defl_p->defl);
 
-    double full_tol    = Kparam.tol;
-    double restart_tol = Kparam.tol_restart;
+    const double full_tol    = Kparam.tol;
+    Kparam.tol         = Kparam.tol_restart;
 
     ColorSpinorParam csParam(x);
 
@@ -613,12 +613,11 @@ namespace quda {
     xProj = x;
     rProj = b; 
     //launch initCG:
-    while((restart_tol > full_tol) && (restart_idx < param.max_restart_num)) {
+    while((Kparam.tol >= full_tol) && (restart_idx < param.max_restart_num)) {
+      restart_idx += 1;
 
       defl(xProj, rProj);
       x = xProj;      
-
-      Kparam.tol = (restart_tol > full_tol) ? restart_tol : full_tol;
 
       K = new CG(mat, matPrecon, Kparam, profile);
       (*K)(x, b);
@@ -632,22 +631,12 @@ namespace quda {
 
       if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
 
-      restart_tol *= param.inc_tol;
-      restart_idx += 1;
+      Kparam.tol *= param.inc_tol;
+
+      if(restart_idx == (param.max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
 
       param.secs   += Kparam.secs;
     }
-
-    defl(xProj, rProj);
-    x = xProj;      
-
-    Kparam.tol = full_tol;
-
-    K = new CG(mat, matPrecon, Kparam, profile);
-    (*K)(x, b);
-    delete K;
-
-    K = nullptr;
 
     if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
     //
