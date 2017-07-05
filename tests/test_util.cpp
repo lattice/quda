@@ -1627,6 +1627,9 @@ int max_restart_num = 3;
 double inc_tol = 1e-2;
 double eigenval_tol = 1e-1;
 
+QudaMemoryType mem_type_ritz    = QUDA_MEMORY_INVALID;
+QudaExtLibType solver_ext_lib     = QUDA_EXTLIB_INVALID;
+QudaExtLibType deflation_ext_lib  = QUDA_EXTLIB_INVALID;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1715,6 +1718,12 @@ void usage(char** argv )
   printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
   printf("    --df-tol-iterref <tol>                    # Set iterative tolerance for the iter refinement cycle  (default 1e-2)\n");
   printf("    --df-max-restart-num <n>                    # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
+
+  printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
+  printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
+
+  printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory location for the ritz vectors  (default device memory loction)\n");
+
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");

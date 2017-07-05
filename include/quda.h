@@ -291,7 +291,7 @@ extern "C" {
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
-    int max_search_dim;//for magma library this parameter must be multiple 16?
+    int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
     /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
@@ -358,6 +358,9 @@ extern "C" {
 
     /** The precision of the Ritz vectors */
     QudaPrecision cuda_prec_ritz;
+
+    /** The memory type used to keep the Ritz vectors */
+    QudaMemoryType mem_type_ritz;
 
     /** Location where deflation should be done */
     QudaFieldLocation location;
