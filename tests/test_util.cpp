@@ -1627,9 +1627,10 @@ int max_restart_num = 3;
 double inc_tol = 1e-2;
 double eigenval_tol = 1e-1;
 
-QudaMemoryType mem_type_ritz    = QUDA_MEMORY_INVALID;
-QudaExtLibType solver_ext_lib     = QUDA_EXTLIB_INVALID;
-QudaExtLibType deflation_ext_lib  = QUDA_EXTLIB_INVALID;
+QudaExtLibType solver_ext_lib     = QUDA_EIGEN_EXTLIB;
+QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
+QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
+QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1721,8 +1722,8 @@ void usage(char** argv )
 
   printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
   printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
-
-  printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory location for the ritz vectors  (default device memory loction)\n");
+  printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory loction)\n");
+  printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
 
@@ -2691,6 +2692,46 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   } 
+
+  if( strcmp(argv[i], "--solver-ext-lib-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    solver_ext_lib = get_solve_ext_lib_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-ext-lib-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    deflation_ext_lib = get_df_ext_lib_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-location-ritz") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    location_ritz = get_df_location_ritz(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-mem-type-ritz") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mem_type_ritz = get_df_mem_type_ritz(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
 
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){

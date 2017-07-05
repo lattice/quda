@@ -162,6 +162,12 @@ void printQudaEigParam(QudaEigParam *param) {
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
 
+#if defined INIT_PARAM
+  P(location, QUDA_CUDA_FIELD_LOCATION);
+#else
+  P(location, QUDA_INVALID_FIELD_LOCATION);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif

@@ -36,7 +36,7 @@ extern int tdim;
 extern int Lsdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
+extern QudaPrecision  prec;
 extern QudaPrecision  prec_sloppy;
 extern QudaPrecision  prec_precondition;
 extern QudaPrecision  prec_ritz;
@@ -79,6 +79,11 @@ extern int max_restart_num;
 extern double inc_tol;
 extern double eigenval_tol;
 
+extern QudaExtLibType   solver_ext_lib;
+extern QudaExtLibType   deflation_ext_lib;
+
+extern QudaFieldLocation location_ritz;
+extern QudaMemoryType    mem_type_ritz;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -264,18 +269,22 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.tol_precondition = 1e-2;
   inv_param.maxiter_precondition = 10;
   inv_param.omega = 1.0;
+
+  inv_param.extlib_type = solver_ext_lib;
 }
 
 void setDeflationParam(QudaEigParam &df_param) {
 
   df_param.import_vectors = QUDA_BOOLEAN_NO;
-  df_param.cuda_prec_ritz = cuda_prec_sloppy;
-
-  df_param.location       = QUDA_CUDA_FIELD_LOCATION;
   df_param.run_verify     = QUDA_BOOLEAN_NO;
 
-  df_param.nk       = df_param.invert_param->nev;
-  df_param.np       = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
+  df_param.nk             = df_param.invert_param->nev;
+  df_param.np             = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
+  df_param.extlib_type    = deflation_ext_lib;
+
+  df_param.cuda_prec_ritz = prec_ritz;
+  df_param.location       = location_ritz;
+  df_param.mem_type_ritz  = mem_type_ritz;
 
   // set file i/o parameters
   strcpy(df_param.vec_infile, vec_infile);
