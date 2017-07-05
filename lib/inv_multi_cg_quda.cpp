@@ -156,7 +156,7 @@ namespace quda {
 
   void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b)
   {
-    if (Location(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
+    if (checkLocation(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
 
     profile.TPSTART(QUDA_PROFILE_INIT);

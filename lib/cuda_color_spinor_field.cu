@@ -1460,7 +1460,7 @@ namespace quda {
       if (halo_location[2*d+0] == Host || halo_location[2*d+1] == Host) halo_host = true;
     }
 
-    genericPackGhost(send, *this, parity, dagger, pack_destination); // FIXME - need support for asymmetric topologies
+    genericPackGhost(send, *this, parity, nFace, dagger, pack_destination); // FIXME - need support for asymmetric topologies
 
     size_t total_bytes = 0;
     for (int i=0; i<nDimComms; i++) if (comm_dim_partitioned(i)) total_bytes += 2*ghost_face_bytes[i]; // 2 for fwd/bwd

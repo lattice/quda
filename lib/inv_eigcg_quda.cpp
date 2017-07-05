@@ -385,7 +385,7 @@ namespace quda {
     int k=0;
 
 #ifdef DEFLATEDSOLVER
-    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)  errorQuda("Not supported");
+    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)  errorQuda("Not supported");
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 

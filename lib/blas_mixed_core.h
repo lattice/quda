@@ -9,7 +9,7 @@ namespace mixed {
 		  ColorSpinorField &x, ColorSpinorField &y,
 		  ColorSpinorField &z, ColorSpinorField &w) {
 
-    if (Location(x, y, z, w) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(x, y, z, w) == QUDA_CUDA_FIELD_LOCATION) {
       if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
 	if (x.Nspin() == 4) {
 	  const int M = 12;

@@ -5,10 +5,11 @@ set (QUDA_OBJS
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_plaq.cu
+  gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
+  color_spinor_wuppertal.cu
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
   clover_field.cpp covd.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu

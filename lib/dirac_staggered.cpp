@@ -59,7 +59,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
 			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
 			  dagger, 0, 0, commDim, profile);
@@ -76,7 +76,7 @@ namespace quda {
   {    
     checkParitySpinor(in, out);
 
-    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
