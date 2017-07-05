@@ -315,7 +315,13 @@ namespace quda {
 #ifdef DEFLATEDSOLVER
     EigCGArgs &args = *eigcg_args;
 
-    ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
+    if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
+      ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
+    } else if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
+      ComputeRitz<libtype::magma_lib>(args);//if args.m < 128, one may better use libtype::eigen_lib
+    } else {
+      errorQuda("Unknown library type.\n");
+    }
 
     //Create intermediate model:
     ColorSpinorParam csParam(Vm->Component(0));

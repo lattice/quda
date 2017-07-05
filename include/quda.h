@@ -323,6 +323,9 @@ extern "C" {
     /** The index to indeicate which chrono history we are augmenting */
     int chrono_index;
 
+    /** Which external library to use in the linear solvers (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
+
   } QudaInvertParam;
 
 
@@ -373,6 +376,9 @@ extern "C" {
 
     /**< The time taken by the multigrid solver setup */
     double secs;
+
+    /** Which external library to use in the deflation operations (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
 
   } QudaEigParam;
 

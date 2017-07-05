@@ -200,6 +200,9 @@ namespace quda {
 
     bool global_reduction; //! whether to use a global or local (node) reduction for this solver
 
+    /** Which external lib to use in the solver */
+    QudaExtLibType extlib_type;
+
     /**
        Default constructor
      */
@@ -233,7 +236,7 @@ namespace quda {
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(false), global_reduction(true)
+      is_preconditioner(false), global_reduction(true), extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -267,7 +270,7 @@ namespace quda {
       eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
-      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction)
+      is_preconditioner(param.is_preconditioner), global_reduction(param.global_reduction), extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];

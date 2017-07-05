@@ -149,6 +149,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, 0);
   P(f_size, 0);
   P(eigen_shift, 0.0);
+  P(extlib_type, QUDA_EIGEN_EXTLIB);//current default
 #else
   P(NPoly, INVALID_INT);
   P(Stp_residual, INVALID_DOUBLE);
@@ -156,6 +157,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, INVALID_INT);
   P(f_size, INVALID_INT);
   P(eigen_shift, INVALID_DOUBLE);
+  P(extlib_type, QUDA_EXTLIB_INVALID);
 #endif
 
 #ifdef INIT_PARAM
@@ -460,6 +462,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(make_resident_chrono, INVALID_INT);
   P(max_chrono_dim, INVALID_INT);
   P(chrono_index, INVALID_INT);
+#endif
+
+#if defined INIT_PARAM
+  P(extlib_type, QUDA_EIGEN_EXTLIB);
+#else
+  P(extlib_type, QUDA_EXTLIB_INVALID);
 #endif
 
 #ifdef INIT_PARAM

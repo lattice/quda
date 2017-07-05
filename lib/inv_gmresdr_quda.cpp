@@ -282,18 +282,20 @@ namespace quda {
    profile.TPSTOP(QUDA_PROFILE_FREE);
  }
 
-#define EIGEN_GELS
+
  void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
  {
 #ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
 
    if(do_gels) {
-#ifdef EIGEN_GELS
-     ComputeEta<libtype::eigen_lib>(args);
-#else
-     ComputeEta<libtype::magma_lib>(args);
-#endif
+     if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {     
+       ComputeEta<libtype::eigen_lib>(args);
+     } else if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+       ComputeEta<libtype::magma_lib>(args);
+     } else {
+       errorQuda("Unknown library type.\n");
+     } 
    }
 
    std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().begin()+args.m);
@@ -313,17 +315,19 @@ namespace quda {
    return;
  }
 
-//#define USE_MAGMA
 
  void GMResDR::RestartVZH()
  {
 #ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
-#ifdef USE_MAGMA
-   ComputeHarmonicRitz<libtype::magma_lib>(args);
-#else
-   ComputeHarmonicRitz<libtype::eigen_lib>(args);
-#endif
+
+   if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {     
+     ComputeHarmonicRitz<libtype::eigen_lib>(args);
+   } else if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+     ComputeHarmonicRitz<libtype::magma_lib>(args);
+   } else {
+     errorQuda("Unknown library type.\n");
+   } 
 
    DenseMatrix Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
 
