@@ -33,11 +33,6 @@ See also: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES 
 */
 
 namespace quda {
-//Notes:
-//GMResDR does not require large m (and esp. nev), so this will use normal LAPACK routines.
-//TODO : 
-//Control precision of Vm/Zm (?)
-//Proj cycles
 
     using namespace blas;
     using namespace std;
