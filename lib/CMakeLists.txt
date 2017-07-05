@@ -139,6 +139,12 @@ endif()
 find_library(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
 target_link_libraries(quda ${CUDA_CUDA_LIBRARY})
 
+# if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
+if (QUDA_DOWNLOAD_EIGEN)
+  add_dependencies(quda_cpp Eigen)
+  add_dependencies(quda Eigen)
+endif()
+
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 # some hackery to prevent having old shared / static builds of quda messing with the current build
