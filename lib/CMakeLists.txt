@@ -5,10 +5,11 @@ set (QUDA_OBJS
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_plaq.cu
+  gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
+  color_spinor_wuppertal.cu
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
   clover_field.cpp covd.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu
@@ -27,7 +28,7 @@ set (QUDA_OBJS
   multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
-  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
+  clover_deriv_quda.cu clover_invert.cu clover_rho.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_gauss.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_ss.cu
@@ -109,7 +110,7 @@ if(QUDA_QIO)
 endif()
 
 if(QUDA_QDPJIT)
-  target_link_libraries(quda ${QDP_LIB} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
@@ -137,6 +138,12 @@ endif()
 # So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
 find_library(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
 target_link_libraries(quda ${CUDA_CUDA_LIBRARY})
+
+# if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
+if (QUDA_DOWNLOAD_EIGEN)
+  add_dependencies(quda_cpp Eigen)
+  add_dependencies(quda Eigen)
+endif()
 
 # until we define an install step copy the include directory to the build directory
 ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)

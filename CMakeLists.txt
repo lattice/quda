@@ -140,16 +140,14 @@ set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for t
 # GPUdirect options
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
 
-# Packing option
-set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
-
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
-set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
+set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
+set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -164,21 +162,19 @@ mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 mark_as_advanced(QUDA_GPU_DIRECT)
 
-mark_as_advanced(QUDA_DEVICE_PACK)
-
 mark_as_advanced(QUDA_SSTEP)
-mark_as_advanced(QUDA_EIGEN)
+mark_as_advanced(QUDA_USE_EIGEN)
+mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
-set(CPU_ARCH x86_64)
+set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 
 #######################################################################
 # everything below here is processing the setup
 #######################################################################
-
 # we need to check for some packages
 find_package(PythonInterp)
 
@@ -194,6 +190,31 @@ else()
   set(USING_CUDA_LANG_SUPPORT False)
 endif()
 
+#######################################################################
+## QUDA depends on Eigen
+## this part makes sure we can download eigen if it is not found
+if (QUDA_DOWNLOAD_EIGEN)
+  include(ExternalProject)
+  ExternalProject_Add(Eigen
+    URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2
+    URL_HASH SHA256=dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/eigen/
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND COMMAND ""
+    INSTALL_COMMAND ""
+  )
+  ExternalProject_Get_Property(Eigen source_dir)
+  set(EIGEN_INCLUDE_DIRS ${source_dir}/EIGEN)
+else()
+  find_package(Eigen QUIET)
+  if(NOT EIGEN_FOUND)
+    message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
+  endif()
+endif()
+include_directories(${EIGEN_INCLUDE_DIRS})
+
+
+# We need threads
 find_package(Threads REQUIRED)
 
 # do all the build definitions
@@ -318,8 +339,6 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_DEFLATEDSOLVER)
@@ -332,10 +351,8 @@ if(QUDA_ALTRELIABLE)
   add_definitions(-DALTRELIABE)
 endif()
 
-if(QUDA_EIGEN)
+if(QUDA_USE_EIGEN)
   add_definitions(-DEIGEN)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_POSIX_THREADS)
@@ -461,10 +478,6 @@ if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
   SET(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()
-
-if(DEVICE_PACK)
-  add_definitions(-DDEVICE_PACK)
-endif(DEVICE_PACK)
 
 
 

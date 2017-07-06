@@ -1251,14 +1251,14 @@ void qudaEigCGInvert(int external_precision,
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
 
-  if(rhs_idx == 0)
+  if(rhs_idx == 0) {
     df_preconditioner = newDeflationQuda(&df_param);
     invertParam.deflation_op = df_preconditioner;
   }
 
 
-  invertQuda(((char*)solution + quark_offset*host_precision),
-	     ((char*)source + quark_offset*host_precision),
+  invertQuda((char*)solution + quark_offset*host_precision,
+	     (char*)source + quark_offset*host_precision,
 	     &invertParam);
 
   if(last_rhs_flag) destroyDeflationQuda(df_preconditioner);    
@@ -1607,7 +1607,7 @@ void qudaEigCGCloverInvert(int external_precision,
 
   if (link && (rhs_idx == 0)) qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
-  if (clover || cloverInverse && (rhs_idx == 0)) {
+  if ( (clover || cloverInverse) && (rhs_idx == 0)) {
     qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
 			QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
   }
@@ -1651,7 +1651,7 @@ void qudaEigCGCloverInvert(int external_precision,
 
   setDeflationParam(invertParam.cuda_prec_ritz, vec_infile, vec_outfile, &df_param);
 //!
-  if(rhs_idx == 0)
+  if(rhs_idx == 0) {
     df_preconditioner = newDeflationQuda(&df_param);
     invertParam.deflation_op = df_preconditioner;
   }
@@ -1664,7 +1664,7 @@ void qudaEigCGCloverInvert(int external_precision,
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  if (clover || cloverInverse && last_rhs_flag) qudaFreeCloverField();
+  if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
 #else
