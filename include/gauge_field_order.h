@@ -126,10 +126,14 @@ namespace quda {
       { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
-    template <typename Float, typename storeFloat> __host__ __device__ constexpr bool fixed_point() { return false; }
-    template<> __host__ __device__ constexpr bool fixed_point<float,char>() { return true; }
-    template<> __host__ __device__ constexpr bool fixed_point<float,short>() { return true; }
-    template<> __host__ __device__ constexpr bool fixed_point<float,int>() { return true; }
+    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,char>() { return true; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
+
+    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
+    template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
+    template<> __host__ __device__ inline constexpr bool match<short,short>() { return true; }
 
     /**
        @brief fieldorder_wrapper is an internal class that is used to
@@ -168,25 +172,41 @@ namespace quda {
 	   @brief Assignment operator with complex number instance as input
 	   @param a Complex number we want to store in this accessor
 	*/
-	__device__ __host__ inline void operator=(const complex<Float> &a) {
-	  v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+        template<typename theirFloat>
+	__device__ __host__ inline void operator=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
+	    v[idx] = complex<storeFloat>(a.x, a.y);
+	  } else {
+	    v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+	  }
 	}
 
 	/**
 	   @brief Operator+= with complex number instance as input
 	   @param a Complex number we want to add to this accessor
 	*/
-	__device__ __host__ inline void operator+=(const complex<Float> &a) {
-	  v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+        template<typename theirFloat>
+	__device__ __host__ inline void operator+=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
+	    v[idx] += complex<storeFloat>(a.x, a.y);
+	  } else {
+	    v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+	  }
 	}
 
 	/**
 	   @brief Operator-= with complex number instance as input
 	   @param a Complex number we want to subtract from this accessor
 	*/
-	__device__ __host__ inline void operator-=(const complex<Float> &a) {
-	  v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+	template<typename theirFloat>
+	__device__ __host__ inline void operator-=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
+	    v[idx] -= complex<storeFloat>(a.x, a.y);
+	  } else {
+	    v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+	  }
 	}
+
       };
 
     template<typename Float, typename storeFloat>

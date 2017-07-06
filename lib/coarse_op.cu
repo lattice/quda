@@ -8,6 +8,11 @@
 #include <index_helper.cuh>
 #include <gamma.cuh>
 #include <blas_cublas.h>
+
+// this is the storage type used when computing the coarse link variables
+// by using integers we have deterministic atomics
+typedef int storeType;
+
 #include <coarse_op.cuh>
 
 namespace quda {
@@ -33,7 +38,7 @@ namespace quda {
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,int> gCoarseAtomic;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
@@ -53,7 +58,8 @@ namespace quda {
 
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, xInvAccessor, yAccessorAtomic, xAccessorAtomic, xInvAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc);
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
+	 T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
 
@@ -69,7 +75,7 @@ namespace quda {
       typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
       typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
       typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,int> gCoarseAtomic;
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
       typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
@@ -89,7 +95,8 @@ namespace quda {
 
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, xInvAccessor, yAccessorAtomic, xAccessorAtomic, xInvAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc);
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Xinv, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
+	 T.fineToCoarse(location), T.coarseToFine(location));
 
     }
 
