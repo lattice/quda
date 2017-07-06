@@ -205,6 +205,11 @@ namespace quda {
       CovDevArg<Float,nSpin,nColor,recon> arg(out, in, U, parity, mu);
       CovDev<Float,nDim,nSpin,nColor,CovDevArg<Float,nSpin,nColor,recon> > myCovDev(arg, in);
       myCovDev.apply(0);
+    } else if (in.Nspin() == 4) {
+      constexpr int nSpin = 4;
+      CovDevArg<Float,nSpin,nColor,recon> arg(out, in, U, parity, mu);
+      CovDev<Float,nDim,nSpin,nColor,CovDevArg<Float,nSpin,nColor,recon> > myCovDev(arg, in);
+      myCovDev.apply(0);
     } else {
       errorQuda("Unsupported nSpin=%d", in.Nspin());
     }
