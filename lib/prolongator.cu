@@ -145,7 +145,7 @@ namespace quda {
     ProlongateLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
 		     const int *fine_to_coarse, int parity)
       : TunableVectorYZ(out.SiteSubset(), fineColor/fine_colors_per_thread), out(out), in(in), V(V),
-	fine_to_coarse(fine_to_coarse), parity(parity), location(Location(out, in, V))
+	fine_to_coarse(fine_to_coarse), parity(parity), location(checkLocation(out, in, V))
     {
       strcpy(vol, out.VolString());
       strcat(vol, ",");
@@ -210,7 +210,7 @@ namespace quda {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
 
@@ -295,7 +295,7 @@ namespace quda {
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)", 
 		out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
 
-    QudaPrecision precision = Precision(out, in);
+    QudaPrecision precision = checkPrecision(out, in);
 
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
@@ -309,7 +309,7 @@ namespace quda {
       errorQuda("Unsupported precision %d", out.Precision());
     }
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
 #else
     errorQuda("Multigrid has not been built");
 #endif

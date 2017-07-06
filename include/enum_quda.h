@@ -25,6 +25,7 @@ extern "C" {
     QUDA_THREE_LINKS,
     QUDA_MOMENTUM,
     QUDA_COARSE_LINKS, // used for coarse-gauge field with multigrid
+    QUDA_SMEARED_LINKS, // used for loading and saving gaugeSmeared in the interface
     QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
     QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
@@ -90,6 +91,7 @@ extern "C" {
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
     QUDA_TWISTED_CLOVER_DSLASH,
+    QUDA_LAPLACE_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
 
@@ -299,6 +301,8 @@ extern "C" {
     QUDA_TWISTED_CLOVERPC_DIRAC,
     QUDA_COARSE_DIRAC,
     QUDA_COARSEPC_DIRAC,
+    QUDA_GAUGE_LAPLACE_DIRAC,
+    QUDA_GAUGE_LAPLACEPC_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 

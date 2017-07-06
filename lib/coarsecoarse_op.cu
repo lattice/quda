@@ -162,8 +162,8 @@ namespace quda {
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Xinv, ColorSpinorField &uv,
 			const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
 			double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-    Precision(X, Xinv, Y, clover, cloverInv);
-    Precision(g, uv, T.Vectors(X.Location()));
+    checkPrecision(X, Xinv, Y, clover, cloverInv);
+    checkPrecision(g, uv, T.Vectors(X.Location()));
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -197,7 +197,7 @@ namespace quda {
 		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
     QudaPrecision precision = Y.Precision();
-    QudaFieldLocation location = Location(X, Y, Xinv, gauge, clover, cloverInv);
+    QudaFieldLocation location = checkLocation(X, Y, Xinv, gauge, clover, cloverInv);
 
     //Create a field UV which holds U*V.  Has the same similar
     //structure to V but double the number of spins so we can store

@@ -76,7 +76,7 @@ namespace quda {
       printfQuda("%s bytes = %llu\n", __func__, (long long unsigned int)count);
 
     if (count == 0) return;
-#if 0
+#if 1
     QudaMemCopy copy(dst, src, count, kind, func, file, line);
     copy.apply(0);
 #else

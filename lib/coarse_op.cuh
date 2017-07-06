@@ -1757,7 +1757,7 @@ namespace quda {
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine);
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, dirac, v, Y_, X_, Xinv_);
 
-    QudaFieldLocation location = Location(Y_, X_, Xinv_, av, v);
+    QudaFieldLocation location = checkLocation(Y_, X_, Xinv_, av, v);
     printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     // If doing a preconditioned operator with a clover term then we

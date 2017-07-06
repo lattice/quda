@@ -41,7 +41,7 @@ namespace quda {
 
   void CG3NE::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
+    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (x.Precision() != param.precision || b.Precision() != param.precision)
       errorQuda("Precision mismatch");

@@ -62,7 +62,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
       
-    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover);
       asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
@@ -79,7 +79,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover);     // regular clover term
       cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		 &static_cast<const cudaColorSpinorField&>(in), parity);
@@ -186,7 +186,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       // needs to be cloverinv
       FullClover cs(clover, true);
       cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
@@ -207,7 +207,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
@@ -226,7 +226,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 

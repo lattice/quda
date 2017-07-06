@@ -53,7 +53,7 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
 	twistGamma5Cuda(&static_cast<cudaColorSpinorField&>(out), 
 			&static_cast<const cudaColorSpinorField&>(in),
 			dagger, kappa, mu, 0.0, twistType);

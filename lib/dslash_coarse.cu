@@ -918,10 +918,10 @@ namespace quda {
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
       // check all precisions match
-      QudaPrecision precision = Precision(out, inA, inB, X);
+      QudaPrecision precision = checkPrecision(out, inA, inB, X);
 
       // check all locations match
-      Location(out, inA, inB, Y, X);
+      checkLocation(out, inA, inB, Y, X);
 
       int comm_sum = 4;
       if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-commDim[i]);

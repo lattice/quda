@@ -159,8 +159,8 @@ namespace quda {
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
 		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-    Precision(X, Y, g);
-    Precision(uv, av, T.Vectors(X.Location()));
+    checkPrecision(X, Y, g);
+    checkPrecision(uv, av, T.Vectors(X.Location()));
 
     printfQuda("Computing Y field......\n");
 
@@ -195,7 +195,7 @@ namespace quda {
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
 
     QudaPrecision precision = Y.Precision();
-    QudaFieldLocation location = Location(Y, X, Xinv);
+    QudaFieldLocation location = checkLocation(Y, X, Xinv);
 
     GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
     CloverField *C = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaCloverField*>(clover) : nullptr;
