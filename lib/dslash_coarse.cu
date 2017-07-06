@@ -471,7 +471,7 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / (dim_threads * 2 * nParity); }
+    unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (dim_threads * 2 * nParity); }
 
     bool advanceBlockDim(TuneParam &param) const
     {

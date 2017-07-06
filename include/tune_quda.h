@@ -92,32 +92,37 @@ namespace quda {
       }
     }
 
-    virtual unsigned int maxBlockSize() const { return deviceProp.maxThreadsDim[0]; }
+    virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
 
+    virtual void resetBlockDim(TuneParam &param) const {
+      const unsigned int max_threads = maxBlockSize(param);
+      const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const int step = blockStep();
+
+      if (tuneGridDim()) {
+	param.block.x = step;
+      } else { // not tuning the grid dimension so have to set a valid grid size
+	// ensure the blockDim is large enough given the limit on gridDim
+	param.block.x = (minThreads()+max_blocks-1)/max_blocks;
+	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
+	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
+	  errorQuda("Local lattice volume is too large for device");
+      }
+    }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
-      const unsigned int max_threads = maxBlockSize();
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const unsigned int max_threads = maxBlockSize(param);
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-      const int step = blockStep();
       bool ret;
 
-      param.block.x += step;
+      param.block.x += blockStep();
       int nthreads = param.block.x*param.block.y*param.block.z;
       if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared) {
-
-	if (tuneGridDim()) {
-	  param.block.x = step;
-	} else { // not tuning the grid dimension so have to set a valid grid size
-	  // ensure the blockDim is large enough given the limit on gridDim
-	  param.block.x = (minThreads()+max_blocks-1)/max_blocks;
-	  param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
-	  if(param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	}
-
+	resetBlockDim(param);
 	ret = false;
       } else {
 	ret = true;
@@ -293,7 +298,7 @@ namespace quda {
        The maximum block size in the x dimension is the total number
        of threads divided by the size of the y dimension
      */
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
+    unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / 2; }
 
   public:
     bool advanceBlockDim(TuneParam &param) const {
@@ -340,7 +345,7 @@ namespace quda {
       param.block.y = block.y;
       param.grid.y = grid.y;
 
-      if (ret) { // we advanced the block.x so we're done
+      if (ret) {
 	return true;
       } else { // block.x (spacetime) was reset
 
@@ -392,7 +397,8 @@ namespace quda {
       param.block.z = block.z;
       param.grid.z = grid.z;
 
-      if (ret) { // we advanced the block.y / block.x so we're done
+      if (ret) {
+	// we advanced the block.x / block.y so we're done
 	return true;
       } else { // block.x/block.y (spacetime) was reset
 
