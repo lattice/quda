@@ -125,6 +125,9 @@ namespace quda {
       }
     }
 
+    // no locality in this kernel so no point in shared-memory tuning
+    bool advanceSharedBytes(TuneParam &param) const { return false; }
+
     bool advanceTuneParam(TuneParam &param) const {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) return Tunable::advanceTuneParam(param);
       else return false;
