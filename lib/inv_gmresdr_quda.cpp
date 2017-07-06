@@ -253,7 +253,6 @@ namespace quda {
       delete Vm;
       Vm = nullptr;
 
-      //if (param.precision_sloppy != param.precision)  delete r_sloppy;
       delete r_sloppy;
 
       if(K && (param.precision_precondition != param.precision_sloppy))
@@ -284,12 +283,10 @@ namespace quda {
    GMResDRArgs &args = *gmresdr_args;
 
    if(do_gels) {
-     if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {     
-       ComputeEta<libtype::eigen_lib>(args);
-     } else if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+     if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
        ComputeEta<libtype::magma_lib>(args);
      } else {
-       errorQuda("Unknown library type.\n");
+       ComputeEta<libtype::eigen_lib>(args);
      } 
    }
 
@@ -316,12 +313,10 @@ namespace quda {
 #ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
 
-   if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {     
-     ComputeHarmonicRitz<libtype::eigen_lib>(args);
-   } else if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+   if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
      ComputeHarmonicRitz<libtype::magma_lib>(args);
    } else {
-     errorQuda("Unknown library type.\n");
+     ComputeHarmonicRitz<libtype::eigen_lib>(args);
    } 
 
    DenseMatrix Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
@@ -502,7 +497,6 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.setPrecision(param.precision_sloppy);
 
       tmpp     = ColorSpinorField::Create(csParam);
-      //r_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : rp;
       r_sloppy = ColorSpinorField::Create(csParam);
 
       if ( K && (param.precision_precondition != param.precision_sloppy) ) {

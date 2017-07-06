@@ -103,13 +103,7 @@ namespace quda {
 
     Complex *projm  = new Complex [param.ld*param.cur_dim];
 
-    if ( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
-      Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-      Map<MatrixXcd, Unaligned, DynamicStride> evecs_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-
-      SelfAdjointEigenSolver<MatrixXcd> es_projm( projm_ );
-      evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
-    } else if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
+    if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
 #ifdef MAGMA_LIB
       memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
       double *evals = new double[param.ld];
@@ -123,7 +117,12 @@ namespace quda {
       errorQuda("MAGMA library was not built.\n");
 #endif
     } else {
-      errorQuda ("Unknown external library type.\n");
+
+      Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+      Map<MatrixXcd, Unaligned, DynamicStride> evecs_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+
+      SelfAdjointEigenSolver<MatrixXcd> es_projm( projm_ );
+      evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
     }
 
     std::vector<ColorSpinorField*> rv(param.RV->Components().begin(), param.RV->Components().begin() + param.cur_dim);
@@ -180,22 +179,20 @@ namespace quda {
 
     if(!param.use_inv_ritz) 
     {
-      if(param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB){
-        Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-        Map<VectorXcd, Unaligned> vec_ (vec, param.cur_dim);
-
-        VectorXcd  vec2_(param.cur_dim);
-        vec2_ = projm_.fullPivHouseholderQr().solve(vec_);
-
-        vec_  = vec2_; 
-      }else if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
+      if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
 #ifdef MAGMA_LIB
         magma_Xgesv(vec, param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
 #else
         errorQuda("MAGMA library was not built.\n");
 #endif
       } else {
-        errorQuda("Unknown library type.\n");
+        Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+        Map<VectorXcd, Unaligned> vec_ (vec, param.cur_dim);
+
+        VectorXcd  vec2_(param.cur_dim);
+        vec2_ = projm_.fullPivHouseholderQr().solve(vec_);
+
+        vec_  = vec2_;
       }
     } else {
       for(int i = 0; i < param.cur_dim; i++) vec[i] *= param.invRitzVals[i];
@@ -309,7 +306,13 @@ namespace quda {
      Complex *projm  = (Complex*)mapped_malloc(param.ld*param.cur_dim * sizeof(Complex));
      memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
 
-     if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
+     if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
+#ifdef MAGMA_LIB
+       magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
+#else
+       errorQuda("MAGMA library was not built.\n");
+#endif
+     } else {
        Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
        Map<VectorXd, Unaligned> evals_(evals, param.cur_dim);
 
@@ -317,15 +320,6 @@ namespace quda {
 
        projm_ = es.eigenvectors();
        evals_ = es.eigenvalues();
-
-     } else if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
-#ifdef MAGMA_LIB
-       magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
-#else
-       errorQuda("MAGMA library was not built.\n");
-#endif
-     } else {
-       errorQuda("Unknown library type.\n");
      }
 
      //reset projection matrix, now we will use inverse ritz values when deflate an initial guess:
