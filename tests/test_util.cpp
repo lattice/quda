@@ -2708,7 +2708,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    deflation_ext_lib = get_df_ext_lib_type(argv[i+1]);
+    deflation_ext_lib = get_solve_ext_lib_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

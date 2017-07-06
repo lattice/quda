@@ -1241,23 +1241,6 @@ get_solve_ext_lib_type(char* s)
   return ret;
 }
 
-QudaExtLibType
-get_df_ext_lib_type(char* s)
-{
-  QudaExtLibType ret = QUDA_EXTLIB_INVALID;
-
-  if (strcmp(s, "eigen") == 0) {
-    ret = QUDA_EIGEN_EXTLIB;
-  } else if (strcmp(s, "magma") == 0) {
-    ret = QUDA_MAGMA_EXTLIB;
-  } else {
-    fprintf(stderr, "Error: invalid external library type %s\n", s);
-    exit(1);
-  }
-
-  return ret;
-}
-
 QudaFieldLocation
 get_df_location_ritz(char* s)
 {
