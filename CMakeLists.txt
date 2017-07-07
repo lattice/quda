@@ -100,6 +100,9 @@ set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
 #ARPACK
 set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
 
+#LAPACK
+set(QUDA_LAPACK OFF CACHE BOOL "build with lapack")
+
 # Interface options
 set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
 set(QUDA_INTERFACE_MILC ON CACHE BOOL "build milc interface")
@@ -119,6 +122,9 @@ set(QUDA_LIMEHOME "" CACHE PATH "path to LIME")
 set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
 set(QUDA_MAGMAHOME "" CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
 set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link against magma")
+
+set(QUDA_LAPACKHOME "" CACHE PATH "path to LAPACK, if not set, pkg-config will be attempted")
+set(QUDA_LAPACK_LIBS "" CACHE STRING "additional linker flags required to link against magma")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
@@ -296,6 +302,16 @@ if(QUDA_ARPACK)
   endif()
 endif(QUDA_ARPACK)
 
+if(QUDA_LAPACK)
+  add_definitions(-DLAPACK_LIB)
+  find_package(OpenMP)
+  # prefer static library
+  find_library(LAPACK liblapack.a lapack ${QUDA_LAPACKHOME}/lib/)
+  # append additional libraries required by lapack
+  LIST(APPEND LAPACK ${QUDA_LAPACK_LIBS})
+  # and any additional OpenMP linker flags
+  SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_CXX_FLAGS}" )
+endif(QUDA_LAPACK)
 
 # MAX_MULTI_BLAS_N
 add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})

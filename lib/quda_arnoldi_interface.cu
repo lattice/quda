@@ -24,7 +24,9 @@
 
 #include <quda_arpack_interface.h>
 
-using namespace quda;
+//using namespace quda;
+
+namespace quda{
 
 #define RADIX_SIZE 64
 
@@ -166,7 +168,7 @@ int arnoldiGPUSolve(
         int n_eigs, int n_extend, double tolerance, int* maxIter,
         const arnoldi_abs_int* functions, arnmode mode)
 {
-    if( (rvecs->CompositeDim() < (n_eigs + n_extend)) ) errorQuda("Wrong eigenspace dimension.\n");
+    if( (rvecs->CompositeDim() < (n_eigs + n_extend)) ) errorQuda("Wrong eigenspace dimension: %d %d %d\n", rvecs->CompositeDim() , n_eigs, n_extend);
     if(nMulti != 1 && stride != 0) errorQuda("Unsupported option.\n");
 
     //@fieldtype** e_vecs = (fieldtype**)s_mallocf(sizeof(fieldtype*) * (n_eigs + n_extend));//move outside!!!!
@@ -199,4 +201,5 @@ int arnoldiGPUSolve(
     return error;
 }
 
+}//end namespace quda
 

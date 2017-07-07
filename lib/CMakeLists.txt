@@ -132,6 +132,11 @@ if(QUDA_ARPACK)
   target_link_libraries(quda ${PARPACK_OR_ARPACK})
 endif()
 
+if(QUDA_LAPACK)
+  target_link_libraries(quda ${LAPACK})
+endif()
+
+
 if(QUDA_NUMA_NVML)
 target_link_libraries(quda ${NVML_LIBRARY})
 endif()

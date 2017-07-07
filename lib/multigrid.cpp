@@ -697,7 +697,8 @@ namespace quda {
 #else
     warningQuda("\nThis test requires ARPACK.\n");
 
-    int neigv     = 128;
+    int neigv     = 16;
+    int ncv       = 32;
 
     // create function struct
     arnoldi_abs_int functions;
@@ -725,11 +726,10 @@ namespace quda {
     ColorSpinorField *init_vec = static_cast<ColorSpinorField*>(new cudaColorSpinorField(arnParam));
     
     arnParam.is_composite  = true;
-    arnParam.composite_dim = neigv; 
+    arnParam.composite_dim = neigv+ncv; 
 
     ColorSpinorField *rvecs = static_cast<ColorSpinorField*>(new cudaColorSpinorField(arnParam));
 
-    int ncv       = 256;
     int maxit     = 1000;
     double eigtol = 1e-7;
 
