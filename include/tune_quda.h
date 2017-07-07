@@ -436,7 +436,7 @@ namespace quda {
   };
 
   void loadTuneCache();
-  void saveTuneCache();
+  void saveTuneCache(bool error = false);
 
   /**
    * @brief Save profile to disk.

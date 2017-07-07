@@ -296,7 +296,7 @@ namespace quda {
   /**
    * Write tunecache to disk.
    */
-  void saveTuneCache()
+  void saveTuneCache(bool error)
   {
     time_t now;
     int lock_handle;
@@ -313,7 +313,7 @@ namespace quda {
     if (comm_rank() == 0) {
 #endif
 
-      if (tunecache.size() == initial_cache_size) return;
+      if (tunecache.size() == initial_cache_size && !error) return;
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
@@ -330,7 +330,7 @@ namespace quda {
       int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
-      cache_path = resource_path + "/tunecache.tsv";
+      cache_path = resource_path + (error ? "/tunecache_error.tsv" : "/tunecache.tsv");
       cache_file.open(cache_path.c_str());
 
       if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -356,6 +356,10 @@ namespace quda {
       initial_cache_size = tunecache.size();
 
 #ifdef MULTI_GPU
+    } else {
+      // give process 0 time to write out its tunecache if needed, but
+      // doesn't cause a hang if error is not triggered on process 0
+      if (error) sleep(10);
     }
 #endif
   }
