@@ -256,30 +256,12 @@ namespace quda {
       coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;
       coarse->updateCoarseOperator();
 
-      // if on the second to bottom level then we can just use the coarse solver as is
-      if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE || param.level == param.Nlevel-2) {
-	coarse_solver = coarse;
-	printfQuda("Assigned coarse solver to coarse MG operator\n");
-      } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
-        if (coarse_solver) delete coarse_solver;
+      setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 
-	if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
-	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
-	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
-	} else {
-	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
-	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
-	}
-
-	printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
-      } else {
-	errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
-      }
+      createCoarseSolver();
     }
 
-    setOutputPrefix(prefix);
+    printfQuda("setup completed\n");
 
     // now we can run through the verification if requested
     if (param.level == 0 && param.mg_global.run_verify) verify();
@@ -379,6 +361,7 @@ namespace quda {
       coarse_solver = coarse;
       printfQuda("Assigned coarse solver to coarse MG operator\n");
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
+      if (param_coarse_solver) delete param_coarse_solver;
       param_coarse_solver = new SolverParam(param);
 
       param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level];
@@ -403,6 +386,7 @@ namespace quda {
       // need this to ensure we don't use half precision on the preconditioner in GCR
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
+      if (coarse_solver) delete coarse_solver;
       if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
 	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
 	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
