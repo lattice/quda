@@ -929,7 +929,7 @@ namespace quda {
     DiracMdagM *mdagmSloppy = new DiracMdagM(*diracSmootherSloppy);
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
       solverParam.maxiter = 2000;
-      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
+      solve = Solver::create(solverParam, *mdagm, *mdagm, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
       // run GCR with the smoother as a preconditioner
       solverParam.Nkrylov = 32;
@@ -944,7 +944,7 @@ namespace quda {
 
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
     } else {
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
     }
 
     // Initializing to random vector and allocating B_gpu
