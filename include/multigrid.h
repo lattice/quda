@@ -277,14 +277,9 @@ namespace quda {
     virtual ~MG();
 
     /**
-       @brief Update coarse operator (recursive call from fine to coarsest level)
+       @brief Create/Update the current level and below
     */
-    void updateCoarseOperator();
-
-    /**
-       @brief Create the solver wrapper
-    */
-    void createCoarseSolver();
+    void createLevel();
 
     /**
        @brief Create the smoothers
@@ -292,9 +287,14 @@ namespace quda {
     void createSmoother();
 
     /**
-       @brief Free the smoothers
+       @brief Create the coarse dirac operator
     */
-    void destroySmoother();
+    void createCoarseDirac();
+
+    /**
+       @brief Create the solver wrapper
+    */
+    void createCoarseSolver();
 
     /**
        This method is a placeholder for reseting the solver, e.g.,
