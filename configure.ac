@@ -228,13 +228,6 @@ AC_ARG_ENABLE(interface-nvtx,
   [ interface_nvtx="no" ]
 )
 
-dnl enable packing and unpacking on the device
-AC_ARG_ENABLE(device-pack,
-  AC_HELP_STRING([--enable-device-pack], [ Enable the packing / unpacking of fields on the device (default: disabled)]),
-  [ device_pack=${enableval}],
-  [ device_pack="no" ]
-)
-
 AC_ARG_WITH(mpi,
  AC_HELP_STRING([--with-mpi=MPIDIR], [ Specify MPI installation directory]),
  [ mpi_home=${withval}; build_mpi="yes"],
@@ -813,9 +806,6 @@ AC_SUBST( BUILD_BQCD_INTERFACE, [${build_bqcd_interface}])
 
 AC_MSG_NOTICE([Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}])
 AC_SUBST( BUILD_TIFR_INTERFACE, [${build_tifr_interface}])
-
-AC_MSG_NOTICE([Setting DEVICE_PACK= ${device_pack}])
-AC_SUBST( DEVICE_PACK, [${device_pack}])
 
 AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
 AC_SUBST( BUILD_QIO, [${build_qio}])

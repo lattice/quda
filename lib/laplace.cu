@@ -173,7 +173,6 @@ namespace quda {
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / arg.nParity; }
 
   public:
     Laplace(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)

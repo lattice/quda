@@ -900,6 +900,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.direct = true;
   clover_param.inverse = dynamic_clover ? false : true;
 
+  if (inv_param->clover_rho != 0.0) cloverRho(*cloverPrecise, inv_param->clover_rho);
+
   // create the mirror sloppy clover field
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
     profileClover.TPSTART(QUDA_PROFILE_INIT);
@@ -2271,8 +2273,10 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
   DiracParam diracSmoothSloppyParam;
-  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
-  dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
+  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve,
+		   mg_param.smoother_schwarz_type[0] == QUDA_INVALID_SCHWARZ ? true : false);
+
+  dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
   mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
   printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
@@ -2288,6 +2292,9 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
   profile.TPSTOP(QUDA_PROFILE_INIT);
 }
 
@@ -2309,16 +2316,25 @@ void destroyMultigridQuda(void *mg) {
 }
 
 void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
+
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
   multigrid_solver *mg = static_cast<multigrid_solver*>(mg_);
+  checkMultigridParam(mg_param);
 
   QudaInvertParam *param = mg_param->invert_param;
-  checkGauge(param);
-  checkMultigridParam(mg_param);
+  checkInvertParam(param);
+
+  // for reporting level 1 is the fine level but internally use level 0 for indexing
+  // sprintf(mg->prefix,"MG level 1 (%s): ", param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+  // setOutputPrefix(prefix);
+  setOutputPrefix("MG level 1 (GPU): "); //fix me
+
+  printfQuda("Updating operator on level 1 of %d levels\n", mg->mgParam->Nlevel);
 
   bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
-  // free the previous dirac oprators
+  // free the previous dirac operators
   if (mg->m) delete mg->m;
   if (mg->mSmooth) delete mg->mSmooth;
   if (mg->mSmoothSloppy) delete mg->mSmoothSloppy;
@@ -2353,13 +2369,17 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   mg->mgParam->matSmooth = mg->mSmooth;
   mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
 
-  // recreate the smoothers on the fine level
-  mg->mg->destroySmoother();
-  mg->mg->createSmoother();
-
-  //mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
-  //mg = new MG(*mgParam, profile);
   mg->mgParam->updateInvertParam(*param);
+  if(mg->mgParam->mg_global.invert_param != param)
+    mg->mgParam->mg_global.invert_param = param;
+
+  mg->mg->updateCoarseOperator();
+
+  setOutputPrefix("");
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)

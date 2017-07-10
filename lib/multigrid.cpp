@@ -15,10 +15,12 @@ namespace quda {
       profile_global(profile_global),
       profile( "MG level " + std::to_string(param.level+1), false ),
       coarse(nullptr), fine(param.fine), coarse_solver(nullptr),
-      param_coarse(nullptr), param_presmooth(nullptr), param_postsmooth(nullptr),
+      param_coarse(nullptr), param_presmooth(nullptr), param_postsmooth(nullptr), param_coarse_solver(nullptr),
       r(nullptr), r_coarse(nullptr), x_coarse(nullptr), tmp_coarse(nullptr),
-      diracCoarseResidual(nullptr), diracCoarseSmoother(nullptr), matCoarseResidual(nullptr), matCoarseSmoother(nullptr) {
-
+      diracResidual(param.matResidual->Expose()), diracSmoother(param.matSmooth->Expose()), diracSmootherSloppy(param.matSmoothSloppy->Expose()),
+      diracCoarseResidual(nullptr), diracCoarseSmoother(nullptr), diracCoarseSmootherSloppy(nullptr),
+      matCoarseResidual(nullptr), matCoarseSmoother(nullptr), matCoarseSmootherSloppy(nullptr)
+  {
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
     setOutputPrefix(prefix);
@@ -65,15 +67,13 @@ namespace quda {
 
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel-1) {
-      QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
 
       // create transfer operator
       printfQuda("start creating transfer operator\n");
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
-			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
+			      param.mg_global.precision_null[param.level], param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
-      //transfer->setTransferGPU(false); // use this to force location of transfer
       printfQuda("end creating transfer operator\n");
 
       // create coarse residual vector
@@ -87,14 +87,15 @@ namespace quda {
 
       // check if we are coarsening the preconditioned system then
       bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
+      QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
 
       // create coarse grid operator
       DiracParam diracParam;
       diracParam.transfer = transfer;
 
-      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(param.matSmooth->Expose()) : const_cast<Dirac*>(param.matResidual->Expose());
-      diracParam.kappa = param.matResidual->Expose()->Kappa();
-      diracParam.mu = param.matResidual->Expose()->Mu();
+      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
+      diracParam.kappa = diracParam.dirac->Kappa();
+      diracParam.mu = diracParam.dirac->Mu();
       diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
 
       diracParam.dagger = QUDA_DAG_NO;
@@ -102,17 +103,31 @@ namespace quda {
       diracParam.tmp1 = tmp_coarse;
       // use even-odd preconditioning for the coarse grid solver
       diracCoarseResidual = new DiracCoarse(diracParam);
-      matCoarseResidual = new DiracM(*diracCoarseResidual);
 
       // create smoothing operators
-      diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
-      diracParam.type = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? QUDA_COARSEPC_DIRAC : QUDA_COARSE_DIRAC;
-      diracParam.tmp1 = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ? &(tmp_coarse->Even()) : tmp_coarse;
-      diracCoarseSmoother = (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) ?
-	new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam) :
-	new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
-      diracCoarseSmootherSloppy = diracCoarseSmoother;  // for coarse grids these always alias for now (FIXME half precision support for coarse op)
+      diracParam.dirac = const_cast<Dirac*>(diracSmoother);
 
+      if (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) {
+	diracParam.type = QUDA_COARSEPC_DIRAC;
+	diracParam.tmp1 = &(tmp_coarse->Even());
+	diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+	{
+	  bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
+	  for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+	}
+	diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
+      } else {
+	diracParam.type = QUDA_COARSE_DIRAC;
+	diracParam.tmp1 = tmp_coarse;
+	diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+	{
+	  bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
+	  for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+	}
+	diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
+      }
+
+      matCoarseResidual = new DiracM(*diracCoarseResidual);
       matCoarseSmoother = new DiracM(*diracCoarseSmoother);
       matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
 
@@ -137,52 +152,113 @@ namespace quda {
       param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level+1);
       param_coarse->fine = this;
       param_coarse->delta = 1e-20;
+      param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
 
       coarse = new MG(*param_coarse, profile_global);
 
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 
-      // if on the second to bottom level then we can just use the coarse solver as is
-      if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE || param.level == param.Nlevel-2) {
-	coarse_solver = coarse;
-	printfQuda("Assigned coarse solver to coarse MG operator\n");
-      } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
-	param_coarse_solver = new SolverParam(param);
+      createCoarseSolver();
 
-	param_coarse_solver->inv_type = QUDA_GCR_INVERTER;
-	param_coarse_solver->inv_type_precondition = QUDA_MG_INVERTER;
-	param_coarse_solver->preconditioner = coarse;
+    }
 
-	param_coarse_solver->is_preconditioner = false;
-	param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_YES;
-	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-	param_coarse_solver->maxiter = 11; // FIXME - dirty hack
-	param_coarse_solver->Nkrylov = 10;
-	param_coarse_solver->tol = param.mg_global.smoother_tol[param.level+1];
-	param_coarse_solver->global_reduction = true;
-	param_coarse_solver->compute_true_res = false;
-	param_coarse_solver->delta = 1e-8;
-	param_coarse_solver->verbosity_precondition = param.mg_global.verbosity[param.level+1];
-	param_coarse_solver->pipeline = 5;
+    printfQuda("setup completed\n");
 
-	// need this to ensure we don't use half precision on the preconditioner in GCR
-	param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
+    // now we can run through the verification if requested
+    if (param.level == 0 && param.mg_global.run_verify) verify();
 
-	if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
-	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
-	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
-	} else {
-	  Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
-	  sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
-	  coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
+    if (param.level == 0) reset();
+
+    // print out profiling information for the adaptive setup
+    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
+    // Reset the profile for accurate solver timing
+    profile.TPRESET();
+
+    setOutputPrefix("");
+  }
+
+  void MG::updateCoarseOperator() {
+
+    // for reporting level 1 is the fine level but internally use level 0 for indexing
+    sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+    setOutputPrefix(prefix);
+
+    destroySmoother();
+    createSmoother();
+
+    // if not on the coarsest level, update next
+    if (param.level < param.Nlevel-1) {
+      printfQuda("Updating operator on level %d of %d levels\n", param.level+2, param.Nlevel);
+
+      // free the previous dirac operators
+      if (matCoarseResidual) delete matCoarseResidual;
+      if (matCoarseSmoother) delete matCoarseSmoother;
+      if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
+
+      if (diracCoarseResidual) delete diracCoarseResidual;
+      if (diracCoarseSmoother) delete diracCoarseSmoother;
+      if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
+
+      // restoring transfer properties before reset()
+      transfer->setSiteSubset(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
+
+      // check if we are coarsening the preconditioned system then
+      bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
+      QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+
+      // create coarse grid operator
+      DiracParam diracParam;
+      diracParam.transfer = transfer;
+
+      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
+      diracParam.kappa = diracParam.dirac->Kappa();
+      diracParam.mu = diracParam.dirac->Mu();
+      diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
+
+      diracParam.dagger = QUDA_DAG_NO;
+      diracParam.matpcType = matpc_type;
+      diracParam.tmp1 = tmp_coarse;
+      // use even-odd preconditioning for the coarse grid solver
+      diracCoarseResidual = new DiracCoarse(diracParam);
+
+      // create smoothing operators
+      diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
+
+      if (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) {
+	diracParam.type = QUDA_COARSEPC_DIRAC;
+	diracParam.tmp1 = &(tmp_coarse->Even());
+	diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+	{
+	  bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
+	  for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
 	}
-
-	printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
+	diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
       } else {
-	errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
+	diracParam.type = QUDA_COARSE_DIRAC;
+	diracParam.tmp1 = tmp_coarse;
+	diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
+	{
+	  bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
+	  for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+	}
+	diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
       }
 
+      matCoarseResidual = new DiracM(*diracCoarseResidual);
+      matCoarseSmoother = new DiracM(*diracCoarseSmoother);
+      matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
+
+      coarse->param.updateInvertParam(*param.mg_global.invert_param);
+      coarse->param.delta = 1e-20;
+      coarse->param.precision = param.mg_global.invert_param->cuda_prec_precondition;
+      coarse->param.matResidual = matCoarseResidual;
+      coarse->param.matSmooth = matCoarseSmoother;
+      coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;
+      coarse->updateCoarseOperator();
+
+      setOutputPrefix(prefix); // restore since we just popped back from coarse grid
+
+      createCoarseSolver();
     }
 
     printfQuda("setup completed\n");
@@ -212,42 +288,52 @@ namespace quda {
 
   void MG::createSmoother() {
     // create the smoother for this level
-    printfQuda("smoother has operator %s\n", typeid(param.matSmooth).name());
+    diracResidual = param.matResidual->Expose();
+    diracSmoother = param.matSmooth->Expose();
+    diracSmootherSloppy = param.matSmoothSloppy->Expose();
 
     param_presmooth = new SolverParam(param);
 
-    param_presmooth->inv_type = param.smoother;
-    param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
     param_presmooth->is_preconditioner = false;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-    param_presmooth->maxiter = param.nu_pre;
-    param_presmooth->Nkrylov = 4;
+
+    param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
+    param_presmooth->precision_sloppy = (param.level == 0) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
+    param_presmooth->precision_precondition = (param.level == 0) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
+
+    param_presmooth->inv_type = param.smoother;
+    param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
+    param_presmooth->residual_type = (param_presmooth->inv_type == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+    param_presmooth->Nsteps = param.mg_global.smoother_schwarz_cycle[param.level];
+    param_presmooth->maxiter = (param.level < param.Nlevel-1) ? param.nu_pre : param.nu_pre + param.nu_post;
+
+    param_presmooth->Nkrylov = param_presmooth->maxiter;
+    param_presmooth->pipeline = param_presmooth->maxiter;
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
-    if (param.level == 0) {
-       param_presmooth->precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
-       param_presmooth->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
-    }
 
-    if (param.level==param.Nlevel-1) {
-      param_presmooth->Nkrylov = 20;
-      param_presmooth->maxiter = 1000;
-      param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-8;
-      param_presmooth->compute_true_res = false;
-      param_presmooth->pipeline = 8;
-    }
+    param_presmooth->schwarz_type = param.mg_global.smoother_schwarz_type[param.level];
 
-    presmoother = Solver::create(*param_presmooth, *param.matSmooth,
-				 *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+    // inner solver should recompute the true residual after each cycle if using Schwarz preconditioning
+    param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
+
+    presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) &&  param_presmooth->inv_type != QUDA_INVALID_INVERTER) ?
+      Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      // At the moment CGNE doesn't hold well an initial guess
+      if(param.smoother == QUDA_CGNE_INVERTER) param_presmooth->inv_type = QUDA_MR_INVERTER;
+
       param_postsmooth->maxiter = param.nu_post;
-      postsmoother = Solver::create(*param_postsmooth, *param.matSmooth,
-				    *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+
+      // we never need to compute the true residual for a post smoother
+      param_postsmooth->compute_true_res = false;
+
+      postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER) ?
+	Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
     }
   }
 
@@ -263,13 +349,65 @@ namespace quda {
     param_presmooth = nullptr;
     if (param_postsmooth) delete param_postsmooth;
     param_postsmooth = nullptr;
+
+    diracResidual = nullptr;
+    diracSmoother = nullptr;
+    diracSmootherSloppy = nullptr;
+  }
+
+  void MG::createCoarseSolver() {
+    if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE && param.level < param.Nlevel-2) {
+      // if coarse solver is not a bottom solver and on the second to bottom level then we can just use the coarse solver as is
+      coarse_solver = coarse;
+      printfQuda("Assigned coarse solver to coarse MG operator\n");
+    } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
+      if (param_coarse_solver) delete param_coarse_solver;
+      param_coarse_solver = new SolverParam(param);
+
+      param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level];
+      param_coarse_solver->is_preconditioner = false;
+      param_coarse_solver->sloppy_converge = true; // this means we don't check the true residual before declaring convergence
+
+      param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_YES;  // or can this be no
+      param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
+      param_coarse_solver->Nkrylov = 20;
+      param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
+      param_coarse_solver->global_reduction = true;
+      param_coarse_solver->compute_true_res = false;
+      param_coarse_solver->delta = 1e-8;
+      param_coarse_solver->pipeline = 8;
+
+      param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level+1];
+      param_coarse_solver->inv_type_precondition = (param.level<param.Nlevel-2 || coarse->presmoother) ? QUDA_MG_INVERTER : QUDA_INVALID_INVERTER;
+      param_coarse_solver->preconditioner = (param.level<param.Nlevel-2 || coarse->presmoother) ? coarse : nullptr;
+      param_coarse_solver->mg_instance = true;
+      param_coarse_solver->verbosity_precondition = param.mg_global.verbosity[param.level+1];
+
+      // need this to ensure we don't use half precision on the preconditioner in GCR
+      param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
+
+      if (coarse_solver) delete coarse_solver;
+      if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
+	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
+      } else {
+	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+	coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
+      }
+
+      printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
+    } else {
+      errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
+    }
   }
 
   MG::~MG() {
     if (param.level < param.Nlevel-1) {
-      if (param.level < param.Nlevel-2 && param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
-	delete coarse_solver;
-	delete param_coarse_solver;
+      if (param.level == param.Nlevel-1 || param.cycle_type == QUDA_MG_CYCLE_RECURSIVE) {
+	if (coarse_solver) delete coarse_solver;
+	if (param_coarse_solver) delete param_coarse_solver;
       }
 
       if (B_coarse) {
@@ -280,7 +418,7 @@ namespace quda {
       if (coarse) delete coarse;
       if (transfer) delete transfer;
       if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
-      if (diracCoarseSmootherSloppy && diracCoarseSmootherSloppy != diracCoarseSmoother) delete diracCoarseSmootherSloppy;
+      if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
       if (matCoarseSmoother) delete matCoarseSmoother;
       if (diracCoarseSmoother) delete diracCoarseSmoother;
       if (matCoarseResidual) delete matCoarseResidual;
@@ -300,9 +438,16 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
   }
 
+  // FIXME need to make this more robust (implement Solver::flops() for all solvers)
   double MG::flops() const {
     double flops = 0;
-    if (param.level < param.Nlevel-1) flops += coarse->flops();
+
+    if (param_coarse_solver) {
+      flops += param_coarse_solver->gflops * 1e9;
+      param_coarse_solver->gflops = 0;
+    } else if (param.level < param.Nlevel-1) {
+      flops += coarse->flops();
+    }
 
     if (param_presmooth) {
       flops += param_presmooth->gflops * 1e9;
@@ -333,7 +478,10 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    double tol = std::pow(10.0, 4-2*csParam.precision);
+
+    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.precision)
+      ? param.mg_global.precision_null[param.level]  : csParam.precision;
+    double tol = prec == QUDA_HALF_PRECISION ? 5e-3 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -390,14 +538,13 @@ namespace quda {
     transfer->P(*tmp1, *tmp_coarse);
 
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      const Dirac &dirac = *(param.matSmooth->Expose());
-      double kappa = param.matResidual->Expose()->Kappa();
+      double kappa = diracResidual->Kappa();
       if (param.level==0) {
-	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
-	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+	diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+	diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
       } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
-	dirac.DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
-	dirac.DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+	diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+	diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
       }
     } else {
       (*param.matResidual)(*tmp2,*tmp1);
@@ -420,11 +567,11 @@ namespace quda {
 
     // When the mu is shifted on the coarse level; we can compute exxactly the error we introduce in the check:
     //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
-    if(param.matResidual->Expose()->Mu() != 0) {
+    if(diracResidual->Mu() != 0) {
       double delta_factor = param.mg_global.mu_factor[param.level+1] - param.mg_global.mu_factor[param.level];
       if(fabs(delta_factor) > tol ) {
-	double delta_a = delta_factor * 2.0 * param.matResidual->Expose()->Kappa() *
-	  param.matResidual->Expose()->Mu() * transfer->Vectors().TwistFlavor();
+	double delta_a = delta_factor * 2.0 * diracResidual->Kappa() *
+	  diracResidual->Mu() * transfer->Vectors().TwistFlavor();
 	deviation -= fabs(delta_a) * sqrt( norm2(*tmp_coarse) / norm2(*x_coarse) );
 	deviation = fabs(deviation);
       }
@@ -435,16 +582,14 @@ namespace quda {
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      const Dirac &diracS = *(param.matSmooth->Expose());
-      diracS.MdagM(tmp2->Even(), tmp1->Odd());
+      diracSmoother->MdagM(tmp2->Even(), tmp1->Odd());
       Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
 		 real(dot), imag(dot), deviation);
       if (deviation > tol) errorQuda("failed");
 
-      const Dirac &diracR = *(param.matResidual->Expose());
-      diracR.MdagM(*tmp2, *tmp1);
+      diracResidual->MdagM(*tmp2, *tmp1);
       dot = cDotProduct(*tmp2,*tmp1);
 
       deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
@@ -452,9 +597,7 @@ namespace quda {
 		 real(dot), imag(dot), deviation);
       if (deviation > tol) errorQuda("failed");
     } else {
-      const Dirac &dirac = *(param.matResidual->Expose());
-
-      dirac.MdagM(*tmp2, *tmp1);
+      diracResidual->MdagM(*tmp2, *tmp1);
       Complex dot = cDotProduct(*tmp1,*tmp2);
 
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
@@ -559,8 +702,7 @@ namespace quda {
       // FIXME only need to make a copy if not preconditioning
       residual = b; // copy source vector since we will overwrite source with iterated residual
 
-      const Dirac &dirac = *(param.matSmooth->Expose());
-      dirac.prepare(in, out, x, residual, outer_solution_type);
+      diracSmoother->prepare(in, out, x, residual, outer_solution_type);
 
       // b_tilde holds either a copy of preconditioned source or a pointer to original source
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
@@ -569,7 +711,7 @@ namespace quda {
       (*presmoother)(*out, *in);
 
       ColorSpinorField &solution = inner_solution_type == outer_solution_type ? x : x.Even();
-      dirac.reconstruct(solution, b, inner_solution_type);
+      diracSmoother->reconstruct(solution, b, inner_solution_type);
 
       // if using preconditioned smoother then need to reconstruct full residual
       // FIXME extend this check for precision, Schwarz, etc.
@@ -619,20 +761,21 @@ namespace quda {
 	in = r;
       }
 
-      //dirac.prepare(in, out, solution, residual, inner_solution_type);
       // we should keep a copy of the prepared right hand side as we've already destroyed it
+      //dirac.prepare(in, out, solution, residual, inner_solution_type);
+
       (*postsmoother)(*out, *in); // for inner solve preconditioned, in the should be the original prepared rhs
 
-      dirac.reconstruct(x, b, outer_solution_type);
+      diracSmoother->reconstruct(x, b, outer_solution_type);
 
     } else { // do the coarse grid solve
 
-      const Dirac &dirac = *(param.matSmooth->Expose());
       ColorSpinorField *out=nullptr, *in=nullptr;
 
-      dirac.prepare(in, out, x, b, outer_solution_type);
+      diracSmoother->prepare(in, out, x, b, outer_solution_type);
+
       (*presmoother)(*out, *in);
-      dirac.reconstruct(x, b, outer_solution_type);
+      diracSmoother->reconstruct(x, b, outer_solution_type);
     }
 
     if ( debug ) {
@@ -753,12 +896,15 @@ namespace quda {
     solverParam.delta = 1e-7; 
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
     solverParam.Nkrylov = 4;
-    solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTABL_INVERTER ? 4 : 0); // pipeline != 0 breaks BICGSTAB
+    solverParam.pipeline = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // pipeline != 0 breaks BICGSTAB
+    solverParam.precision = B[0]->Precision();
     
     if (param.level == 0) { // this enables half precision on the fine grid only if set
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
       solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
       if (solverParam.precision_sloppy == QUDA_HALF_PRECISION) solverParam.delta = 1e-1;
+    } else {
+      solverParam.precision_precondition = solverParam.precision;
     }
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
@@ -778,58 +924,92 @@ namespace quda {
 
     std::vector<ColorSpinorField*> B_gpu;
 
-    const Dirac &dirac = *(param.matSmooth->Expose());
     Solver *solve;
-    DiracMdagM mdagm(dirac);
-    const Dirac &diracSloppy = *(param.matSmoothSloppy->Expose());
-    DiracMdagM mdagmSloppy(diracSloppy);
+    DiracMdagM *mdagm = new DiracMdagM(*diracSmoother);
+    DiracMdagM *mdagmSloppy = new DiracMdagM(*diracSmootherSloppy);
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
       solverParam.maxiter = 2000;
-      solve = Solver::create(solverParam, mdagm, mdagmSloppy, mdagmSloppy, profile);
+      solve = Solver::create(solverParam, *mdagm, *mdagm, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_GCR_INVERTER) {
+      // run GCR with the smoother as a preconditioner
+      solverParam.Nkrylov = 32;
       solverParam.inv_type_precondition = param.mg_global.smoother[param.level];
       solverParam.tol_precondition = param.mg_global.smoother_tol[param.level];
       solverParam.maxiter_precondition = param.mg_global.nu_pre[param.level]+param.mg_global.nu_post[param.level];
-      solverParam.precondition_cycle = 1;
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      solverParam.schwarz_type = param.mg_global.smoother_schwarz_type[param.level];
+      solverParam.precondition_cycle = param.mg_global.smoother_schwarz_cycle[param.level];
+      solverParam.verbosity_precondition = param.mg_global.verbosity[param.level+1];
+      solverParam.precision_sloppy = solverParam.precision;
+      solverParam.compute_true_res = 0;
+
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
     } else {
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
     }
 
-    // Generate sources and launch solver for each source:
-    for(unsigned int i=0; i<B.size(); i++) {
-      B[i]->Source(QUDA_RANDOM_SOURCE); //random initial guess
-
+    // Initializing to random vector and allocating B_gpu
+    for(int i=0; i<(int)B.size(); i++) {
+      B[i]->Source(QUDA_RANDOM_SOURCE);
       B_gpu.push_back(ColorSpinorField::Create(csParam));
-      ColorSpinorField *x = B_gpu[i];
-      *x = *B[i]; // copy initial guess to GPU:
+      *B_gpu[i] = *B[i];
+    }
 
-      zero(*b); // need zero rhs
-
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
-
-      ColorSpinorField *out=nullptr, *in=nullptr;
-      dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
-      (*solve)(*out, *in);
-      dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
-
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
-
-      // global orthonormalization of the generated null-space vectors
-      for (int i=0; B_gpu[i] != x; ++i) {
-	Complex alpha = cDotProduct(*B_gpu[i], *x);//<j,i>
-	caxpy(-alpha, *B_gpu[i], *x); //i-<j,i>j
+    for(int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
+      // global orthonormalization of the initial null-space vectors
+      if(param.mg_global.pre_orthonormalize) {
+	for(int i=0; i<(int)B.size(); i++) {
+	  for (int j=0; j<i; j++) {
+	    Complex alpha = cDotProduct(*B_gpu[j], *B_gpu[i]);// <j,i>
+	    caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
+	  }
+	  double nrm2 = norm2(*B_gpu[i]);
+	  if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B_gpu[i]);// i/<i,i>
+	  else errorQuda("\nCannot normalize %u vector\n", i);
+	}
       }
 
-      double nrm2 = norm2(*x);
-      if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *x);
-      else errorQuda("\nCannot orthogonalize %u vector\n", i);
+      // launch solver for each source
+      for(int i=0; i<(int)B.size(); i++) {
+	ColorSpinorField *x = B_gpu[i];
+	if(param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
+	  *b = *x;  // inverting against the vector
+	  zero(*x); // with zero initial guess
+	} else {
+	  zero(*b); // zero rhs
+	}
 
+
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(*b));
+
+	ColorSpinorField *out=nullptr, *in=nullptr;
+	diracSmoother->prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
+	(*solve)(*out, *in);
+	diracSmoother->reconstruct(*x, *b, QUDA_MAT_SOLUTION);
+
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
+      }
+
+      // global orthonormalization of the generated null-space vectors
+      if(param.mg_global.post_orthonormalize) {
+	for(int i=0; i<(int)B.size(); i++) {
+	  for (int j=0; j<i; j++) {
+	    Complex alpha = cDotProduct(*B_gpu[j], *B_gpu[i]);// <j,i>
+	    caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
+	  }
+	  double nrm2 = norm2(*B_gpu[i]);
+	  if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B_gpu[i]);// i/<i,i>
+	  else errorQuda("\nCannot normalize %u vector\n", i);
+	}
+      }
     }
 
     delete solve;
+    delete mdagm;
+    delete mdagmSloppy;
     delete b;
 
+    // storing and freeing B_gpu
     for (int i=0; i<(int)B.size(); i++) {
       *B[i] = *B_gpu[i];
       delete B_gpu[i];

@@ -370,6 +370,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(compute_clover_inverse, 0);
     P(return_clover, 0);
     P(return_clover_inverse, 0);
+    P(clover_rho, 0.0);
 #else
     if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
       param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
@@ -378,6 +379,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(compute_clover_inverse, QUDA_INVALID_PRECISION);
     P(return_clover, QUDA_INVALID_PRECISION);
     P(return_clover_inverse, QUDA_INVALID_PRECISION);
+    P(clover_rho, INVALID_DOUBLE);
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
     P(cl_pad, INVALID_INT);
@@ -494,6 +496,24 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   int n_level = param->n_level;
 #endif
 
+#ifdef INIT_PARAM
+  P(setup_type, QUDA_NULL_VECTOR_SETUP);
+#else
+  P(setup_type, QUDA_INVALID_SETUP_TYPE);
+#endif
+
+#ifdef INIT_PARAM
+  P(pre_orthonormalize, QUDA_BOOLEAN_NO);
+#else
+  P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(post_orthonormalize, QUDA_BOOLEAN_YES);
+#else
+  P(post_orthonormalize, QUDA_BOOLEAN_INVALID);
+#endif
+
   for (int i=0; i<n_level; i++) {
 #ifdef INIT_PARAM
     P(verbosity[i], QUDA_SILENT);
@@ -506,18 +526,38 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_inv_type[i], QUDA_INVALID_INVERTER);
 #endif
 #ifdef INIT_PARAM
+    P(num_setup_iter[i], 1);
+#else
+    P(num_setup_iter[i], INVALID_INT);
+#endif
+#ifdef INIT_PARAM
     P(setup_tol[i], 5e-6);
 #else
     P(setup_tol[i], INVALID_DOUBLE);
 #endif
+
+    P(coarse_solver[i], QUDA_INVALID_INVERTER);
+    P(coarse_solver_maxiter[i], INVALID_INT);
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+
+#ifndef CHECK_PARAM
+    P(smoother_schwarz_type[i], QUDA_INVALID_SCHWARZ);
+    P(smoother_schwarz_cycle[i], 1);
+#else
+    P(smoother_schwarz_cycle[i], INVALID_INT);
+#endif
 
     // these parameters are not set for the bottom grid
     if (i<n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
       P(spin_block_size[i], INVALID_INT);
       P(n_vec[i], INVALID_INT);
+#ifdef INIT_PARAM
+      P(precision_null[i], QUDA_SINGLE_PRECISION);
+#else
+      P(precision_null[i], INVALID_INT);
+#endif
       P(cycle_type[i], QUDA_MG_CYCLE_INVALID);
       P(nu_pre[i], INVALID_INT);
       P(nu_post[i], INVALID_INT);
@@ -529,6 +569,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #else
     P(mu_factor[i], INVALID_DOUBLE);
 #endif
+    P(coarse_solver_tol[i], INVALID_DOUBLE);
     P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
     P(global_reduction[i], QUDA_BOOLEAN_YES);

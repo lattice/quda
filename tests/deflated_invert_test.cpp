@@ -42,6 +42,7 @@ extern QudaPrecision  prec_precondition;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern double mass;
+extern double kappa;
 extern double mu;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
@@ -172,9 +173,13 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.dslash_type = dslash_type;
 
-  //Free field!
-  inv_param.mass = mass;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
+  }
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;

@@ -62,12 +62,15 @@ namespace quda {
     /** The extended field radius (if applicable) */
     int r[QUDA_MAX_DIM];
 
+    /** For fixed-point fields that need a global scaling factor */
+    double scale;
+
     /**
        @brief Default constructor for LatticeFieldParam
     */
     LatticeFieldParam()
     : nDim(4), pad(0), precision(QUDA_INVALID_PRECISION), siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(QUDA_GHOST_EXCHANGE_PAD)
+      ghostExchange(QUDA_GHOST_EXCHANGE_PAD), scale(1.0)
     {
       for (int i=0; i<nDim; i++) {
 	x[i] = 0;
@@ -86,7 +89,7 @@ namespace quda {
     LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision,
 		      QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD)
     : nDim(nDim), pad(pad), precision(precision), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(ghostExchange)
+      ghostExchange(ghostExchange), scale(1.0)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
       for (int i=0; i<nDim; i++) {
@@ -103,7 +106,7 @@ namespace quda {
     */
     LatticeFieldParam(const QudaGaugeParam &param) 
     : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(QUDA_GHOST_EXCHANGE_NO)
+      ghostExchange(QUDA_GHOST_EXCHANGE_NO), scale(param.scale)
     {
       for (int i=0; i<nDim; i++) {
 	this->x[i] = param.X[i];
@@ -148,6 +151,9 @@ namespace quda {
     /** Precision of the field */
     QudaPrecision precision;
     
+    /** For fixed-point fields that need a global scaling factor */
+    double scale;
+
     /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset;
 
@@ -430,6 +436,17 @@ namespace quda {
        @return The field precision
     */
     QudaPrecision Precision() const { return precision; }
+
+    /**
+       @return The global scaling factor for a fixed-point field
+    */
+    double Scale() const { return scale; }
+
+    /**
+       @brief Set the scale factor for a fixed-point field
+       @param[in] scale_ The new scale factor
+    */
+    void Scale(double scale_) { scale = scale_; }
 
     /**
        @return Field subset type

@@ -19,6 +19,8 @@ namespace quda {
   void copyGenericColorSpinorMGDS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGSD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorMGSS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+  void copyGenericColorSpinorMGHS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+  void copyGenericColorSpinorMGSH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
 			      QudaFieldLocation location, void *Dst, void *Src, 
@@ -78,6 +80,14 @@ namespace quda {
 	  copyGenericColorSpinorMGSD(dst, src, location, (float*)Dst, (double*)Src);
 	} else if (src.Precision() == QUDA_SINGLE_PRECISION) {
 	  copyGenericColorSpinorMGSS(dst, src, location, (float*)Dst, (float*)Src);
+	} else if (src.Precision() == QUDA_HALF_PRECISION) {
+	  copyGenericColorSpinorMGSH(dst, src, location, (float*)Dst, (short*)Src);
+	} else {
+	  errorQuda("Unsupported Precision %d", src.Precision());
+	}
+      } else if (dst.Precision() == QUDA_HALF_PRECISION) {
+	if (src.Precision() == QUDA_SINGLE_PRECISION) {
+	  copyGenericColorSpinorMGHS(dst, src, location, (short*)Dst, (float*)Src);
 	} else {
 	  errorQuda("Unsupported Precision %d", src.Precision());
 	}

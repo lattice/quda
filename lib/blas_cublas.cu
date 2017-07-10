@@ -93,8 +93,6 @@ namespace quda {
 	pool_device_free(Ainv_array);
 	pool_device_free(A_array);
 
-      } else if (prec == QUDA_DOUBLE_PRECISION) {
-
       } else {
 	errorQuda("%s not implemented for precision=%d", __func__, prec);
       }

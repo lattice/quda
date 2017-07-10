@@ -3,9 +3,11 @@ include ../make.inc
 QUDA = libquda.a
 
 QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
-	coarsecoarse_op.o multigrid.o transfer.o transfer_util.o	\
+	coarsecoarse_op.o coarse_op_preconditioned.o 			\
+	multigrid.o transfer.o transfer_util.o				\
 	prolongator.o restrictor.o gauge_phase.o timer.o malloc.o	\
-	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
+	solver.o inv_bicgstab_quda.o inv_cg_quda.o inv_cg3_quda.o	\
+	inv_cg3ne_quda.o						\
 	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o		\
 	gauge_ape.o gauge_stout.o gauge_plaq.o laplace.o gauge_laplace.o\
 	inv_gcr_quda.o inv_mr_quda.o inv_bicgstabl_quda.o     		\
@@ -53,8 +55,9 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
+	copy_color_spinor_mg_hs.o copy_color_spinor_mg_sh.o		\
 	quda_memcpy.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
-	spinor_gauss.o gauge_random.o
+	spinor_gauss.o gauge_random.o clover_rho.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\

@@ -22,8 +22,7 @@
 #include <fast_intdiv.h>
 #include <type_traits>
 #include <atomic.cuh>
-#include <thrust/device_ptr.h>
-#include <thrust/transform_reduce.h>
+#include <thrust_helper.cuh>
 
 namespace quda {
 
@@ -57,7 +56,7 @@ namespace quda {
 
       /**
 	 @brief Assignment operator with Matrix instance as input
-	 @param[in] M Matrix we want to store in this accessot
+	 @param[in] M Matrix we want to store in this accessor
        */
       template<typename M>
       __device__ __host__ inline void operator=(const M &a) {
@@ -145,142 +144,440 @@ namespace quda {
 
   namespace gauge {
 
-    template<typename ReduceType, typename Float> struct square { __host__ __device__ ReduceType operator()(quda::complex<Float> x) { return static_cast<ReduceType>(norm(x)); } };
+    template<typename ReduceType, typename Float> struct square_ {
+      square_(ReduceType scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
+      { return static_cast<ReduceType>(norm(x)); }
+    };
 
-    template<typename Float, int nColor, QudaGaugeFieldOrder order> struct Accessor {
+    template<typename ReduceType> struct square_<ReduceType,short> {
+      const ReduceType scale;
+      square_(const ReduceType scale) : scale(scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<short> &x)
+      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
+
+    template<typename ReduceType> struct square_<ReduceType,int> {
+      const ReduceType scale;
+      square_(const ReduceType scale) : scale(scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<int> &x)
+      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
+
+    template<typename Float, typename storeFloat> struct abs_ {
+      abs_(const Float scale) { }
+      __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
+    };
+
+    template<typename Float> struct abs_<Float,short> {
+      Float scale;
+      abs_(const Float scale) : scale(scale) { }
+      __host__ __device__ Float operator()(const quda::complex<short> &x)
+      { return abs(scale * complex<Float>(x.real(), x.imag())); }
+    };
+
+    template<typename Float> struct abs_<Float,int> {
+      Float scale;
+      abs_(const Float scale) : scale(scale) { }
+      __host__ __device__ Float operator()(const quda::complex<int> &x)
+      { return abs(scale * complex<Float>(x.real(), x.imag())); }
+    };
+
+    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,char>() { return true; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
+
+    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
+    template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
+    template<> __host__ __device__ inline constexpr bool match<short,short>() { return true; }
+
+    /**
+       @brief fieldorder_wrapper is an internal class that is used to
+       wrap instances of FieldOrder accessors, currying in the
+       specific location on the field.  This is used as a helper class
+       for fixed-point accessors providing the necessary conversion
+       and scaling when writing to a fixed-point field.
+    */
+    template <typename Float, typename storeFloat>
+      struct fieldorder_wrapper {
+	complex<storeFloat> *v;
+	const int idx;
+	const Float scale;
+	const Float scale_inv;
+	static constexpr bool fixed = fixed_point<Float,storeFloat>();
+
+	/**
+	   @brief fieldorder_wrapper constructor
+	   @param idx Field index
+	*/
+        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
+	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
+
+	__device__ __host__ inline Float real() const { return scale_inv*static_cast<Float>(v[idx].real()); }
+	__device__ __host__ inline Float imag() const { return scale_inv*static_cast<Float>(v[idx].imag()); }
+
+	/**
+	   @brief Assignment operator with fieldorder_wrapper instance as input
+	   @param a fieldorder_wrapper we are copying from
+	*/
+	__device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a) {
+	  v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
+	}
+
+	/**
+	   @brief Assignment operator with complex number instance as input
+	   @param a Complex number we want to store in this accessor
+	*/
+        template<typename theirFloat>
+	__device__ __host__ inline void operator=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
+	    v[idx] = complex<storeFloat>(a.x, a.y);
+	  } else {
+	    v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+	  }
+	}
+
+	/**
+	   @brief Operator+= with complex number instance as input
+	   @param a Complex number we want to add to this accessor
+	*/
+        template<typename theirFloat>
+	__device__ __host__ inline void operator+=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
+	    v[idx] += complex<storeFloat>(a.x, a.y);
+	  } else {
+	    v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+	  }
+	}
+
+	/**
+	   @brief Operator-= with complex number instance as input
+	   @param a Complex number we want to subtract from this accessor
+	*/
+	template<typename theirFloat>
+	__device__ __host__ inline void operator-=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
+	    v[idx] -= complex<storeFloat>(a.x, a.y);
+	  } else {
+	    v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+	  }
+	}
+
+      };
+
+    template<typename Float, typename storeFloat>
+    __device__ __host__ inline complex<Float> operator*(const Float &a, const fieldorder_wrapper<Float,storeFloat> &b)
+    {
+      if (fixed_point<Float,storeFloat>()) return a*complex<Float>(b.real(), b.imag());
+      else return a*complex<Float>(b.v[b.idx].real(),b.v[b.idx].imag());
+    }
+
+    template<typename Float, typename storeFloat>
+    __device__ __host__ inline complex<Float> operator+(const fieldorder_wrapper<Float,storeFloat> &a, const complex<Float> &b) {
+      if (fixed_point<Float,storeFloat>()) return complex<Float>(a.real(), a.imag()) + b;
+      else return complex<Float>(a.v[a.idx].real(),a.v[a.idx].imag()) + b;
+    }
+
+    template<typename Float, typename storeFloat>
+    __device__ __host__ inline complex<Float> operator+(const complex<Float> &a, const fieldorder_wrapper<Float,storeFloat> &b) {
+      if (fixed_point<Float,storeFloat>()) return a + complex<Float>(b.real(), b.imag());
+      else return a + complex<Float>(b.v[b.idx].real(),b.v[b.idx].imag());;
+    }
+
+    template<typename Float, int nColor, QudaGaugeFieldOrder order, typename storeFloat> struct Accessor {
       mutable complex<Float> dummy;
       Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
 	errorQuda("Not implemented for order=%d", order);
       }
+
+      void resetScale(Float dummy) { }
+
       __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
 	return dummy;
       }
     };
 
-    template<typename Float, int nColor, QudaGaugeFieldOrder order, bool native_ghost>
+    template<typename Float, int nColor, QudaGaugeFieldOrder order, bool native_ghost, typename storeFloat>
     struct GhostAccessor {
       mutable complex<Float> dummy;
       GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
 	errorQuda("Not implemented for order=%d", order);
       }
+
+      void resetScale(Float dummy) { }
+
       __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
 	return dummy;
       }
     };
 
-    template<typename Float, int nColor>
-      struct Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> {
-      complex <Float> *u[QUDA_MAX_GEOMETRY];
+    template<typename Float, int nColor, typename storeFloat>
+      struct Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,storeFloat> {
+      complex <storeFloat> *u[QUDA_MAX_GEOMETRY];
       const int cb_offset;
-    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
-      : cb_offset((U.Bytes()>>1) / (sizeof(complex<Float>)*U.Geometry())) {
+      Float scale;
+      Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float,storeFloat>();
+
+      Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+	: cb_offset((U.Bytes()>>1) / (sizeof(complex<storeFloat>)*U.Geometry())),
+	scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+      {
 	for (int d=0; d<U.Geometry(); d++)
-	  u[d] = gauge_ ? static_cast<complex<Float>**>(gauge_)[d] :
-	    static_cast<complex<Float>**>(const_cast<void*>(U.Gauge_p()))[d];
+	  u[d] = gauge_ ? static_cast<complex<storeFloat>**>(gauge_)[d] :
+	    static_cast<complex<storeFloat>**>(const_cast<void*>(U.Gauge_p()))[d];
+	resetScale(U.Scale());
       }
-    Accessor(const Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> &a) : cb_offset(a.cb_offset) {
+
+      Accessor(const Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,storeFloat> &a)
+	: cb_offset(a.cb_offset), scale(a.scale), scale_inv(a.scale_inv) {
 	for (int d=0; d<QUDA_MAX_GEOMETRY; d++)
 	  u[d] = a.u[d];
       }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
-      { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
+
+      void resetScale(Float max) {
+	if (fixed) {
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
+      }
+
+      __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
+      {
+	complex<storeFloat> tmp = u[d][ parity*cb_offset + (x*nColor + row)*nColor + col];
+
+	if (fixed) {
+	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	} else {
+	  return complex<Float>(tmp.x,tmp.y);
+	}
+      }
+
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
+	{ return fieldorder_wrapper<Float,storeFloat>(u[d], parity*cb_offset + (x*nColor + row)*nColor + col,
+						      scale, scale_inv); }
 
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
 #ifdef __CUDA_ARCH__
-	typedef typename vector<Float,2>::type vec2;
+	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
-	atomicAdd(u2, (vec2&)val);
+	if (fixed) {
+	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
+	  atomicAdd(u2, (vec2&)val_);
+	} else {
+	  atomicAdd(u2, (vec2&)val);
+	}
 #else
-	u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col] += val;
+	if (fixed) {
+	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
+	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col] += val_;
+	} else {
+	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col] += complex<storeFloat>(val.x,val.y);
+	}
 #endif
       }
 
-      __host__ double device_norm2(int dim) const {
+      __host__ double device_norm2(int dim=0) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmax(int dim=0) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmin(int dim=0) const {
 	errorQuda("Not implemented");
 	return 0.0;
       }
     };
 
-    template<typename Float, int nColor, bool native_ghost>
-      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> {
-      complex<Float> *ghost[8];
+    template<typename Float, int nColor, bool native_ghost, typename storeFloat>
+      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost,storeFloat> {
+      complex<storeFloat> *ghost[8];
       int ghostOffset[8];
-      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
+      Float scale;
+      Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float,storeFloat>();
+
+      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+	: scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0)) {
 	for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
-	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
+	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
 	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<Float>*>(ghost_[d+4]) :
-	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d+4]));
+	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
 	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
+
+	resetScale(U.Scale());
       }
-      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> &a) {
+
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost,storeFloat> &a)
+	: scale(a.scale), scale_inv(a.scale_inv) {
 	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
       }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
-      { return ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col]; }
+
+      void resetScale(Float max) {
+	if (fixed) {
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
+      }
+
+      __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
+      {
+	complex<storeFloat> tmp = ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col];
+	if (fixed) {
+	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	} else {
+	  return complex<Float>(tmp.x,tmp.y);
+	}
+      }
+
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
+	{ return fieldorder_wrapper<Float,storeFloat>(ghost[d], parity*ghostOffset[d] + (x*nColor + row)*nColor + col,
+						      scale, scale_inv); }
     };
 
-    template<typename Float, int nColor>
-      struct Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> {
-      complex<Float> *u;
+    template<typename Float, int nColor, typename storeFloat>
+      struct Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,storeFloat> {
+      complex<storeFloat> *u;
       const int volumeCB;
       const int geometry;
-    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
-      : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
-	  static_cast<complex<Float>*>(const_cast<void *>(U.Gauge_p()))),
-	volumeCB(U.VolumeCB()), geometry(U.Geometry()) { }
-    Accessor(const Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> &a)
-      : u(a.u), volumeCB(a.volumeCB), geometry(a.geometry) { }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
-      { return 	u[(((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col]; }
+      Float scale;
+      Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float,storeFloat>();
+
+      Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      : u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
+	  static_cast<complex<storeFloat>*>(const_cast<void *>(U.Gauge_p()))),
+	volumeCB(U.VolumeCB()), geometry(U.Geometry()),
+	scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0)) {
+	resetScale(U.Scale());
+      }
+
+      Accessor(const Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,storeFloat> &a)
+	: u(a.u), volumeCB(a.volumeCB), geometry(a.geometry), scale(a.scale), scale_inv(a.scale_inv)
+      { }
+
+      void resetScale(Float max) {
+	if (fixed) {
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
+      }
+
+      __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
+      {
+	complex<storeFloat> tmp = u[(((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col];
+	if (fixed) {
+	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	} else {
+	  return complex<Float>(tmp.x,tmp.y);
+	}
+      }
+
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
+	{ return fieldorder_wrapper<Float,storeFloat>
+	    (u, (((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col, scale, scale_inv); }
 
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
 #ifdef __CUDA_ARCH__
-	typedef typename vector<Float,2>::type vec2;
+	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
-	atomicAdd(u2, (vec2&)val);
+	if (fixed) {
+	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
+	  atomicAdd(u2, (vec2&)val_);
+	} else {
+	  atomicAdd(u2, (vec2&)val);
+	}
 #else
-	u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col] += val;
+	if (fixed) {
+	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
+	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col] += val_;
+	} else {
+	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col] += complex<storeFloat>(val.x,val.y);
+	}
 #endif
       }
 
-      __host__ double device_norm2(int dim) const {
+      __host__ double device_norm2(int dim=0) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmax(int dim=0) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmin(int dim=0) const {
 	errorQuda("Not implemented");
 	return 0.0;
       }
     };
 
-    template<typename Float, int nColor, bool native_ghost>
-      struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> {
-      complex<Float> *ghost[8];
+    template<typename Float, int nColor, bool native_ghost, typename storeFloat>
+      struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost,storeFloat> {
+      complex<storeFloat> *ghost[8];
       int ghostOffset[8];
-      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
+      Float scale;
+      Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float,storeFloat>();
+
+      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+	: scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0)) {
 	for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
-	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
+	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
 	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<Float>*>(ghost_[d+4]) :
-	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d+4]));
+	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
 	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
+
+	resetScale(U.Scale());
       }
-      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> &a) {
+
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost,storeFloat> &a)
+	: scale(a.scale), scale_inv(a.scale_inv) {
 	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
       }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
-      { return ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col]; }
+
+      void resetScale(Float max) {
+	if (fixed) {
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
+      }
+
+      __device__ __host__ inline complex<Float> operator()(int d, int parity, int x, int row, int col) const
+      {
+	complex<storeFloat> tmp = ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col];
+	if (fixed) {
+	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	} else {
+	  return complex<Float>(tmp.x,tmp.y);
+	}
+      }
+
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
+	{ return fieldorder_wrapper<Float,storeFloat>
+	    (ghost[d], parity*ghostOffset[d] + (x*nColor + row)*nColor + col, scale, scale_inv); }
     };
 
     template<int nColor, int N>
@@ -293,77 +590,198 @@ namespace quda {
       return index;
     };
 
-    template<typename Float, int nColor>
-      struct Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> {
-      complex<Float> *u;
+    template<typename Float, int nColor, typename storeFloat>
+      struct Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER, storeFloat> {
+      complex<storeFloat> *u;
       const int offset_cb;
+      const int volumeCB;
       const int stride;
       const int geometry;
-    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
-      : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
-	  static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
-	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride()), geometry(U.Geometry())
-	{  }
-    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
-      : u(a.u), offset_cb(a.offset_cb), stride(a.stride), geometry(a.geometry) {  }
+      Float scale;
+      Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      __device__ __host__ inline complex<Float>& operator()(int dim, int parity, int x_cb, int row, int col) const
-      { return u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb]; }
+      Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      : u(gauge_ ? static_cast<complex<storeFloat>*>(gauge_) :
+	  static_cast<complex<storeFloat>*>(const_cast<void*>(U.Gauge_p()))),
+	offset_cb( (U.Bytes()>>1) / sizeof(complex<storeFloat>)), volumeCB(U.VolumeCB()),
+	stride(U.Stride()), geometry(U.Geometry()),
+	scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+      {
+	resetScale(U.Scale());
+      }
+
+      Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,storeFloat> &a)
+      : u(a.u), offset_cb(a.offset_cb), volumeCB(a.volumeCB), stride(a.stride), geometry(a.geometry),
+	scale(a.scale), scale_inv(a.scale_inv) {  }
+
+      void resetScale(Float max) {
+	if (fixed) {
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
+      }
+
+      __device__ __host__ inline const complex<Float> operator()(int dim, int parity, int x_cb, int row, int col) const
+      {
+	complex<storeFloat> tmp = u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb];
+	if (fixed) {
+	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	} else {
+	  return complex<Float>(tmp.x, tmp.y);
+	}
+      }
+
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int dim, int parity, int x_cb, int row, int col)
+      {
+	int index = parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb;
+	return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
+      }
 
       __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
 #ifdef __CUDA_ARCH__
-	typedef typename vector<Float,2>::type vec2;
+	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
-	atomicAdd(u2, (vec2&)val);
+	if (fixed) {
+	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
+	  atomicAdd(u2, (vec2&)val_);
+	} else {
+	  atomicAdd(u2, (vec2&)val);
+	}
 #else
-	u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb] += val;
+	if (fixed) {
+	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
+	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb] += val_;
+	} else {
+	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb] += complex<storeFloat>(val.x,val.y);
+	}
 #endif
       }
 
       __host__ double device_norm2(int dim) const {
 	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-	thrust::device_ptr<complex<Float> > ptr(u);
-	double even = thrust::transform_reduce(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square<double,Float>(), 0.0, thrust::plus<double>());
-	double odd  = thrust::transform_reduce(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
-					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
-					       square<double,Float>(), 0.0, thrust::plus<double>());
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+
+	double even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor),
+					       thrust::retag<my_tag>(ptr+0*offset_cb+(dim+1)*stride*nColor*nColor),
+					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	double odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor),
+					       thrust::retag<my_tag>(ptr+1*offset_cb+(dim+1)*stride*nColor*nColor),
+					       square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	return even + odd;
       }
+
+      __host__ Float device_absmax() const {
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+0*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+0*offset_cb+geometry*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+0*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+1*offset_cb+geometry*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
+	return std::max(even,odd);
+      }
+
+      __host__ Float device_absmax(int dim) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+0*offset_cb+(dim+1)*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+1*offset_cb+(dim+1)*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), static_cast<Float>(0.0), thrust::maximum<Float>());
+	return std::max(even,odd);
+      }
+
+      __host__ Float device_absmin() const {
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+0*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+0*offset_cb+geometry*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+0*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+1*offset_cb+geometry*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
+	return std::min(even,odd);
+      }
+
+      __host__ Float device_absmin(int dim) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust::device_ptr<complex<storeFloat> > ptr(u);
+	Float even = thrust::transform_reduce(thrust::retag<my_tag>(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+0*offset_cb+(dim+1)*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
+	Float odd  = thrust::transform_reduce(thrust::retag<my_tag>(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor),
+					      thrust::retag<my_tag>(ptr+1*offset_cb+(dim+1)*stride*nColor*nColor),
+					      abs_<Float,storeFloat>(scale_inv), std::numeric_limits<Float>::max(), thrust::minimum<Float>());
+	return std::min(even,odd);
+      }
+
     };
 
-    template<typename Float, int nColor, bool native_ghost>
-      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> {
-      complex<Float> *ghost[8];
+    template<typename Float, int nColor, bool native_ghost, typename storeFloat>
+      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost,storeFloat> {
+      complex<storeFloat> *ghost[8];
       const int volumeCB;
       int ghostVolumeCB[8];
-      Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> accessor;
-    GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-      : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_)
+
+      Float scale;
+      Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float,storeFloat>();
+      Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,storeFloat> accessor;
+
+      GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
+	: volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_),
+	  scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
 	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
-	  ghost[d] = !native_ghost ? static_cast<complex<Float>*>(ghost_[d]) : nullptr;
+	  ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
 	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
-	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<Float>*>(ghost_[d+4]) : nullptr;
+	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
 	  ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
 	}
+	resetScale(U.Scale());
       }
-    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> &a)
-      : volumeCB(a.volumeCB), accessor(a.accessor)
+
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost,storeFloat> &a)
+	: volumeCB(a.volumeCB), scale(a.scale), scale_inv(a.scale_inv), accessor(a.accessor)
       {
 	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostVolumeCB[d] = a.ghostVolumeCB[d];
 	}
       }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x_cb, int row, int col) const
+
+      void resetScale(Float max) {
+	accessor.resetScale(max);
+	if (fixed) {
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
+      }
+
+      __device__ __host__ inline const complex<Float> operator()(int d, int parity, int x_cb, int row, int col) const
+      {
+	if (native_ghost) {
+	  return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
+	} else {
+	  complex<storeFloat> tmp = ghost[d][ ((parity*nColor + row)*nColor+col)*ghostVolumeCB[d] + x_cb ];
+	  if (fixed) {
+	    return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	  } else {
+	    return complex<Float>(tmp.x, tmp.y);
+	  }
+	}
+      }
+
+      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x_cb, int row, int col)
       {
 	if (native_ghost)
 	  return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
 	else
-	  return ghost[d][ ((parity*nColor + row)*nColor+col)*ghostVolumeCB[d] + x_cb ];
+	  return fieldorder_wrapper<Float,storeFloat>
+	    (ghost[d], ((parity*nColor + row)*nColor+col)*ghostVolumeCB[d] + x_cb, scale, scale_inv);
       }
     };
 
@@ -372,22 +790,28 @@ namespace quda {
        This is a template driven generic gauge field accessor.  To
        deploy for a specifc field ordering, the two operator()
        accessors have to be specialized for that ordering.
+
+       @tparam Float Underlying type returned by the accessors
+       @tparam nColor Number of colors for the field
+       @tparam nSpinCoarse Number of "spin degrees of freedom" (for coarse-link fields only)
+       @tparam order Storage order of the field
+       @tparam native_ghost Whether to use native ghosts (inlined into
+       the padded area for internal-order fields or use a separate array if false)
      */
-  template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost=true>
+  template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order,
+    bool native_ghost=true, typename storeFloat=Float>
       struct FieldOrder {
 
-      protected:
 	/** An internal reference to the actual field we are accessing */
 	const int volumeCB;
 	const int nDim;
 	const int geometry;
+	const QudaFieldLocation location;
 	static constexpr int nColorCoarse = nColor / nSpinCoarse;
-	QudaFieldLocation location;
 
-	const Accessor<Float,nColor,order> accessor;
-	const GhostAccessor<Float,nColor,order,native_ghost> ghostAccessor;
+	Accessor<Float,nColor,order,storeFloat> accessor;
+	GhostAccessor<Float,nColor,order,native_ghost,storeFloat> ghostAccessor;
 
-      public:
 	/**
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
@@ -402,11 +826,18 @@ namespace quda {
 	}
 
       FieldOrder(const FieldOrder &o) : volumeCB(o.volumeCB),
-	  nDim(o.nDim), geometry(o.geometry),
+	  nDim(o.nDim), geometry(o.geometry), location(o.location),
 	  accessor(o.accessor), ghostAccessor(o.ghostAccessor)
 	{ }
 
 	virtual ~FieldOrder() { ; }
+
+	void resetScale(double max) {
+	  accessor.resetScale(max);
+	  ghostAccessor.resetScale(max);
+	}
+
+	static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
 
 	/**
 	 * Read-only complex-member accessor function
@@ -416,7 +847,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ const complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+	__device__ __host__ complex<Float> operator()(int d, int parity, int x, int row, int col) const
 	{ return accessor(d,parity,x,row,col); }
 
 	/**
@@ -427,7 +858,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ complex<Float>& operator() (int d, int parity, int x, int row, int col)
+	__device__ __host__ fieldorder_wrapper<Float,storeFloat> operator() (int d, int parity, int x, int row, int col)
 	{ return accessor(d,parity,x,row,col); }
 
 	/**
@@ -438,7 +869,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ const complex<Float>& Ghost(int d, int parity, int x, int row, int col) const
+	__device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row, int col) const
 	{ return ghostAccessor(d,parity,x,row,col); }
 
 	/**
@@ -449,7 +880,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ complex<Float>& Ghost(int d, int parity, int x, int row, int col)
+	__device__ __host__ fieldorder_wrapper<Float,storeFloat> Ghost(int d, int parity, int x, int row, int col)
 	{ return ghostAccessor(d,parity,x,row,col); }
 
     	/**
@@ -462,8 +893,8 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline const complex<Float>& operator()(int d, int parity, int x, int s_row,
-							     int s_col, int c_row, int c_col) const {
+	__device__ __host__ inline const complex<Float> operator()(int d, int parity, int x, int s_row,
+								   int s_col, int c_row, int c_col) const {
 	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
@@ -477,8 +908,8 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int s_row,
-							     int s_col, int c_row, int c_col) {
+	__device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()
+	  (int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
 	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
@@ -492,8 +923,8 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline const complex<Float>& Ghost(int d, int parity, int x, int s_row,
-							     int s_col, int c_row, int c_col) const {
+	__device__ __host__ inline complex<Float> Ghost(int d, int parity, int x, int s_row,
+							int s_col, int c_row, int c_col) const {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
@@ -507,8 +938,8 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline complex<Float>& Ghost(int d, int parity, int x, int s_row,
-							     int s_col, int c_row, int c_col) {
+	__device__ __host__ inline fieldorder_wrapper<Float,storeFloat>
+	  Ghost(int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
@@ -561,8 +992,87 @@ namespace quda {
 	  return nrm2;
 	}
 
+	/**
+	 * @brief Returns the Linfinity norm of the field
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Linfinity norm
+	 */
+	__host__ double abs_max() const {
+	  double absmax = 0;
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmax = accessor.device_absmax();
+	  } else {
+	    // do simple norm on host memory
+	    absmax = 0.0;
+	    for (int parity=0; parity<2; parity++)
+	      for (int dim=0; dim<nDim; dim++) {
+		for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		  for (int row=0; row<nColor; row++)
+		    for (int col=0; col<nColor; col++)
+		      absmax = abs((*this)(dim,parity,x_cb,row,col)) > absmax
+		      ? abs((*this)(dim,parity,x_cb,row,col)) : absmax;
+		}
+	      }
+	  }
+	  comm_allreduce_max(&absmax);
+	  return absmax;
+	}
+
+	/**
+	 * @brief Returns the Linfinity norm of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Linfinity norm
+	 */
+	__host__ double abs_max(int dim) const {
+	  double absmax = 0;
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmax = accessor.device_absmax(dim);
+	  } else {
+	    // do simple norm on host memory
+	    absmax = 0.0;
+	    for (int parity=0; parity<2; parity++)
+	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		for (int row=0; row<nColor; row++)
+		  for (int col=0; col<nColor; col++)
+		    absmax = abs((*this)(dim,parity,x_cb,row,col)) > absmax
+		      ? abs((*this)(dim,parity,x_cb,row,col)) : absmax;
+	      }
+	  }
+	  comm_allreduce_max(&absmax);
+	  return absmax;
+	}
+
+	/**
+	 * @brief Returns the minimum absolute value of the field
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Minimum norm
+	 */
+	__host__ double abs_min(int dim) const {
+	  double absmin = 0;
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmin = accessor.device_absmin();
+	  } else {
+	    // do simple norm on host memory
+	    absmin = 0.0;
+	    for (int parity=0; parity<2; parity++)
+	      for (int dim=0; dim<nDim; dim++) {
+		for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		  for (int row=0; row<nColor; row++)
+		    for (int col=0; col<nColor; col++)
+		      absmin = abs((*this)(dim,parity,x_cb,row,col)) < absmin
+			? abs((*this)(dim,parity,x_cb,row,col)) : absmin;
+		}
+	      }
+	  }
+	  comm_allreduce_min(&absmin);
+	  return absmin;
+	}
+
 	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(Float); }
+	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
       };
 
 
@@ -1742,6 +2252,12 @@ namespace quda {
     };
 
   } // namespace gauge
+
+  template <typename storeFloat>
+  __device__ __host__ inline void complex<float>::operator=(const gauge::fieldorder_wrapper<float,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
 
   // Use traits to reduce the template explosion
   template<typename T,QudaReconstructType,int N=18,QudaStaggeredPhase stag=QUDA_STAGGERED_PHASE_NO> struct gauge_mapper { };

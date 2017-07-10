@@ -50,6 +50,7 @@ extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern double kappa; // kappa of Dirac operator
 extern double mu;
 extern double anisotropy; // temporal anisotropy
 extern double tol; // tolerance for inverter
@@ -60,6 +61,7 @@ extern QudaMatPCType matpc_type; // preconditioning type
 extern double clover_coeff;
 extern bool compute_clover;
 
+extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter; // max solver iterations
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
@@ -161,9 +163,14 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  inv_param.mass = mass;
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/gauge_param.anisotropy);
+  }
   inv_param.mu = mu;
-  inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.epsilon = 0.1385;
@@ -210,7 +217,7 @@ int main(int argc, char **argv)
       dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
       dslash_type == QUDA_TWISTED_MASS_DSLASH || 
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
-      multishift || inv_type == QUDA_CG_INVERTER) {
+      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_CG3_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -350,26 +357,6 @@ int main(int argc, char **argv)
     spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   }
 
-  memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  if (multishift) {
-    for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);    
-  } else {
-    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  }
-
-  // create a point source at 0 (in each subvolume...  FIXME)
-
-  // create a point source at 0 (in each subvolume...  FIXME)
-  
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    //((float*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-  } else {
-    //((double*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-  }
-
   // start the timer
   double time0 = -((double)clock());
 
@@ -383,11 +370,30 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
     loadCloverQuda(clover, clover_inv, &inv_param);
 
-  // perform the inversion
-  if (multishift) {
-    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
-  } else {
-    invertQuda(spinorOut, spinorIn, &inv_param);
+  for (int k=0; k<Nsrc; k++) {
+
+    memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    if (multishift) {
+      for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    } else {
+      memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    }
+
+    // perform the inversion
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      //((float*)spinorIn)[0] = 1.0;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+    } else {
+      //((double*)spinorIn)[0] = 1.0;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+    }
+
+    if (multishift) {
+      invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
+    } else {
+      invertQuda(spinorOut, spinorIn, &inv_param);
+    }
   }
 
   // stop the timer

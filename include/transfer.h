@@ -165,10 +165,11 @@ namespace quda {
      * @param geo_bs The geometric block sizes to use
      * @param spin_bs The spin block sizes to use
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
+     * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
     Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
-	     bool enable_gpu, TimeProfile &profile);
+	     QudaPrecision null_precision, bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
@@ -214,6 +215,18 @@ namespace quda {
      */
     const int *Geo_bs() const {return geo_bs;}
     
+    /**
+       @return Pointer to the lookup table to the fine-to-coarse map
+    */
+    const int* fineToCoarse(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const
+    { return location == QUDA_CPU_FIELD_LOCATION ? fine_to_coarse_h : fine_to_coarse_d; }
+
+    /**
+       @return Pointer to the lookup table to the coarse-to-fine map
+    */
+    const int* coarseToFine(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const
+    { return location == QUDA_CPU_FIELD_LOCATION ? coarse_to_fine_h : coarse_to_fine_d; }
+
     /**
      * Sets where the prolongator / restrictor should take place
      * @param location Location where the transfer operator should be computed
@@ -261,10 +274,11 @@ namespace quda {
      @param[in] Nvec Vector length
      @param[in] geo_bs Geometric block size
      @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] coarse_to_fine Coarse-to-fine lookup table (linear indices)
      @param[in] spin_bs Spin block size
    */
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
-			  const int *fine_to_coarse, int spin_bs);
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *fine_to_coarse,
+			  const int *coarse_to_fine, const int *geo_bs, int spin_bs);
 
   /**
      @brief Apply the prolongation operator

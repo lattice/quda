@@ -202,6 +202,7 @@ extern "C" {
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
     double clover_coeff;                   /**< Coefficient of the clover term */
+    double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
     double trlogA[2];                      /**< The trace log of the clover term (even/odd computed separately) */
@@ -398,17 +399,59 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Precision to store the null-space vectors in (post block orthogonalization) */
+    QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
+
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 
+    /** Number of setup iterations */
+    int num_setup_iter[QUDA_MAX_MG_LEVEL];
+
     /** Tolerance to use in the setup phase */
     double setup_tol[QUDA_MAX_MG_LEVEL];
 
+    /** Null-space type to use in the setup phase */
+    QudaSetupType setup_type;
+
+    /** Pre orthonormalize vectors in the setup phase */
+    QudaBoolean pre_orthonormalize;
+
+    /** Post orthonormalize vectors in the setup phase */
+    QudaBoolean post_orthonormalize;
+
+    /** The solver that wraps around the coarse grid correction and smoother */
+    QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use for the smoother / solver on each level */
+    double smoother_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Number of pre-smoother applications on each level */
+    int nu_pre[QUDA_MAX_MG_LEVEL];
+
+    /** Number of post-smoother applications on each level */
+    int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Over/under relaxation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
+    QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of Schwarz cycles to apply */
+    int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
 	type of solution to receive back from this coarse grid */
@@ -419,18 +462,6 @@ extern "C" {
 
     /** The type of multigrid cycle to perform at each level */
     QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
-
-    /** Number of pre-smoother applications on each level */
-    int nu_pre[QUDA_MAX_MG_LEVEL];
-
-    /** Number of post-smoother applications on each level */
-    int nu_post[QUDA_MAX_MG_LEVEL];
-
-    /** Tolerance to use for the smoother / solver on each level */
-    double smoother_tol[QUDA_MAX_MG_LEVEL];
-
-    /** Over/under relaxation factor for the smoother at each level */
-    double omega[QUDA_MAX_MG_LEVEL];
 
     /** Whether to use global reductions or not for the smoother / solver at each level */
     QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
@@ -728,15 +759,12 @@ extern "C" {
   void destroyMultigridQuda(void *mg_instance);
 
   /**
-<<<<<<< HEAD
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
-=======
->>>>>>> 5c038cb32c1ab09c9fcd09c41a001f1a1bd857a3
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field

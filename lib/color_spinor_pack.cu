@@ -163,7 +163,7 @@ namespace quda {
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
 
-    typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
+    typedef typename colorspinor::FieldOrderCB<typename mapper<Float>::type,Ns,Nc,1,order,Float> Q;
     Q field(a, nFace, 0, ghost);
 
     constexpr int spins_per_thread = 1; // make this autotunable
@@ -275,6 +275,8 @@ namespace quda {
       genericPackGhost<double>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       genericPackGhost<float>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Precision() == QUDA_HALF_PRECISION) {
+      genericPackGhost<short>(ghost, a, parity, nFace, dagger, destination);
     } else {
       errorQuda("Unsupported precision %d", a.Precision());
     }

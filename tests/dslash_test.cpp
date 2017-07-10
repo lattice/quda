@@ -79,7 +79,7 @@ extern bool kernel_pack_t;
 extern double mass; // mass of Dirac operator
 extern double mu;
 
-QudaVerbosity verbosity = QUDA_VERBOSE;
+extern QudaVerbosity verbosity;
 
 void init(int argc, char **argv) {
 

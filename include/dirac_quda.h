@@ -52,7 +52,7 @@ namespace quda {
       dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), mu_factor(0.0), epsilon(0.0),
       tmp1(0), tmp2(0)
     {
-
+      for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
 
     void print() {
@@ -152,6 +152,7 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return matpcType; }
     int getStencilSteps() const;
     void Dagger(QudaDagType dag) const { dagger = dag; }
+    void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
 
     /**
      * @brief Create the coarse operator (virtual parent)
@@ -159,14 +160,15 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat[out] Coarse preconditioned link field
      * @param T[in] Transfer operator defining the coarse grid
      * @param kappa Kappa parameter for the coarse operator
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0., double mu_factor=0.) const
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+				double kappa, double mu=0., double mu_factor=0.) const
     {errorQuda("Not implemented");}
+
   };
 
   // Full Wilson
@@ -202,11 +204,11 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat[out] Coarse preconditioned link field
      * @param T[in] Transfer operator defining the coarse grid
      * @param kappa Kappa parameter for the coarse operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0., double mu_factor=0.) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+				double kappa, double mu=0., double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -263,10 +265,10 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+			double kappa, double mu=0., double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned clover
@@ -303,10 +305,10 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+			double kappa, double mu=0., double mu_factor=0.) const;
   };
 
 
@@ -501,12 +503,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+			double kappa, double mu, double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -540,12 +542,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+			double kappa, double mu, double mu_factor=0.) const;
   };
 
   // Full twisted mass with a clover term
@@ -585,12 +587,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+			double kappa, double mu, double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -628,12 +630,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+			double kappa, double mu, double mu_factor=0.) const;
   };
 
   // Full staggered
@@ -848,12 +850,24 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat[out] Coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv,	const Transfer &T,
+			double kappa, double mu, double mu_factor=0.) const;
+
+
+    /**
+     * @brief Create the precondtioned coarse operator
+     *
+     * @param Yhat[out] Preconditioned coarse link field
+     * @param Xinv[out] Coarse clover inversefield
+     * @param Y[in] Coarse link field
+     * @param X[in] Coarse clover inverse field
+     */
+    void createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
+
   };
 
   /**
@@ -885,12 +899,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param Xinv[out] Coarse clover inverse field
-     * @param Yhat coarse preconditioned link field
      * @param kappa Kappa parameter for the coarse operator
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+			double kappa, double mu, double mu_factor=0.) const;
   };
 
 
@@ -985,6 +999,8 @@ namespace quda {
   public:
     DiracMatrix(const Dirac &d) : dirac(&d) { }
     DiracMatrix(const Dirac *d) : dirac(d) { }
+    DiracMatrix(const DiracMatrix &mat) : dirac(mat.dirac) { }
+    DiracMatrix(const DiracMatrix *mat) : dirac(mat->dirac) { }
     virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
@@ -992,6 +1008,7 @@ namespace quda {
 			    ColorSpinorField &tmp) const = 0;
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in,
 			    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const = 0;
+
 
     unsigned long long flops() const { return dirac->Flops(); }
 
@@ -1032,7 +1049,7 @@ namespace quda {
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       bool reset1 = false;
       bool reset2 = false;
@@ -1042,7 +1059,7 @@ namespace quda {
       if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
-    
+
     int getStencilSteps() const
     {
       return dirac->getStencilSteps(); 
@@ -1073,7 +1090,7 @@ namespace quda {
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
@@ -1082,8 +1099,7 @@ namespace quda {
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }
-    
-    
+ 
     int getStencilSteps() const
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
@@ -1115,7 +1131,7 @@ namespace quda {
     }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
@@ -1124,8 +1140,7 @@ namespace quda {
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }
-    
-    
+
     int getStencilSteps() const
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
@@ -1159,10 +1174,47 @@ namespace quda {
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }
-    
+
     int getStencilSteps() const
     {
       return dirac->getStencilSteps(); 
+    }
+  };
+
+  class DiracDagger : public DiracMatrix {
+
+  protected:
+    const DiracMatrix &mat;
+
+  public:
+  DiracDagger(const DiracMatrix &mat) : DiracMatrix(mat), mat(mat) { }
+  DiracDagger(const DiracMatrix *mat) : DiracMatrix(mat), mat(*mat) { }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      dirac->flipDagger();
+      mat(out, in);
+      dirac->flipDagger();
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    {
+      dirac->flipDagger();
+      mat(out, in, tmp);
+      dirac->flipDagger();
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+                    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    {
+      dirac->flipDagger();
+      mat(out, in, Tmp1, Tmp2);
+      dirac->flipDagger();
+    }
+
+    int getStencilSteps() const
+    {
+      return mat.getStencilSteps(); 
     }
   };
 
