@@ -1566,6 +1566,7 @@ QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
+QudaVerbosity verbosity = QUDA_SUMMARIZE;
 int xdim = 24;
 int ydim = 24;
 int zdim = 24;
@@ -1610,8 +1611,9 @@ int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
+QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL] = { };
 int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
-double setup_tol = 5e-6;
+double setup_tol[QUDA_MAX_MG_LEVEL] = { };
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
@@ -1644,6 +1646,7 @@ void usage(char** argv )
 #ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
 #endif
+  printf("    --verbosity <silent/summurize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
@@ -1695,9 +1698,10 @@ void usage(char** argv )
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-solve-type <level solve>             # The type of solve to do (direct, direct-pc) (default direct-pc) \n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
   printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
-  printf("    --mg-setup-tol                            # The tolerance to use for the setup of multigrid (default 5e-6)\n");
+  printf("    --mg-setup-tol <level tol>                # The tolerance to use for the setup of multigrid (default 5e-6)\n");
   printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
@@ -1775,6 +1779,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: Invalid CUDA device number (%d)\n", device);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--verbosity") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    verbosity =  get_verbosity_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2403,6 +2417,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-solve-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_solve_type[level] = get_solve_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-setup-inv") == 0){
     if (i+2 >= argc){
       usage(argv);
@@ -2441,8 +2472,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
 
-    setup_tol = atof(argv[i+1]);
+    setup_tol[level] = atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
