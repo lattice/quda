@@ -146,7 +146,8 @@ set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
-set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
+set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
+set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -162,18 +163,18 @@ mark_as_advanced(QUDA_INTERFACE_NVTX)
 mark_as_advanced(QUDA_GPU_DIRECT)
 
 mark_as_advanced(QUDA_SSTEP)
-mark_as_advanced(QUDA_EIGEN)
+mark_as_advanced(QUDA_USE_EIGEN)
+mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
-set(CPU_ARCH x86_64)
+set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 
 #######################################################################
 # everything below here is processing the setup
 #######################################################################
-
 # we need to check for some packages
 find_package(PythonInterp)
 
@@ -189,6 +190,31 @@ else()
   set(USING_CUDA_LANG_SUPPORT False)
 endif()
 
+#######################################################################
+## QUDA depends on Eigen
+## this part makes sure we can download eigen if it is not found
+if (QUDA_DOWNLOAD_EIGEN)
+  include(ExternalProject)
+  ExternalProject_Add(Eigen
+    URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2
+    URL_HASH SHA256=dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/eigen/
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND COMMAND ""
+    INSTALL_COMMAND ""
+  )
+  ExternalProject_Get_Property(Eigen source_dir)
+  set(EIGEN_INCLUDE_DIRS ${source_dir}/EIGEN)
+else()
+  find_package(Eigen QUIET)
+  if(NOT EIGEN_FOUND)
+    message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
+  endif()
+endif()
+include_directories(${EIGEN_INCLUDE_DIRS})
+
+
+# We need threads
 find_package(Threads REQUIRED)
 
 # do all the build definitions
@@ -202,6 +228,9 @@ else()
 endif()
 
 if(QUDA_QDPJIT)
+  if(NOT QUDA_QMP)
+    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+  endif()
   add_definitions(-DUSE_QDPJIT)
   include_directories(SYSTEM ${QUDA_QDPJITHOME}/include)
   execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -226,11 +255,14 @@ if(QUDA_QMP)
     message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is set" )
   endif()
   add_definitions(-DQMP_COMMS)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
+  set(QUDA_QMP_LDFLAGS  "" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+  set(QUDA_QMP_LIBS  "" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  #FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
+  include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
@@ -307,8 +339,6 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_DEFLATEDSOLVER)
@@ -321,10 +351,8 @@ if(QUDA_ALTRELIABLE)
   add_definitions(-DALTRELIABE)
 endif()
 
-if(QUDA_EIGEN)
+if(QUDA_USE_EIGEN)
   add_definitions(-DEIGEN)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_POSIX_THREADS)

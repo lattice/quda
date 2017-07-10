@@ -74,6 +74,8 @@ extern double mass; // the mass of the Dirac operator
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 
+extern QudaSolveType solve_type;
+
 static void end();
 
 template<typename Float>
@@ -89,7 +91,6 @@ void constructSpinorField(Float *res) {
     }
   }
 }
-
 
 static void
 set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
@@ -114,10 +115,10 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->anisotropy = 1.0;
   gaugeParam->tadpole_coeff = tadpole_coeff;
 
-  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
+  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
 
-  gaugeParam->scale = dslash_type == QUDA_STAGGERED_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+  gaugeParam->scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
@@ -125,6 +126,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   inv_param->verbosity = QUDA_VERBOSE;
   inv_param->mass = mass;
+  inv_param->kappa = 1.0/(8.0 + mass); // for Laplace operator
 
   // outer solver parameters
   inv_param->inv_type = inv_type;
@@ -162,8 +164,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->verbosity_precondition = QUDA_SILENT;
   inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
 
-  inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-  inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
+  inv_param->solution_type = dslash_type == QUDA_LAPLACE_DSLASH ? QUDA_MAT_SOLUTION : QUDA_MATPCDAG_MATPC_SOLUTION;
+  inv_param->solve_type = dslash_type == QUDA_LAPLACE_DSLASH ? solve_type : QUDA_NORMOP_PC_SOLVE;
   inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param->dagger = QUDA_DAG_NO;
   inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;
@@ -211,8 +213,12 @@ invert_test(void)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, 
-				 &gaugeParam, dslash_type);
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    construct_gauge_field(qdp_fatlink, 0, gaugeParam.cpu_prec, &gaugeParam);
+  } else {
+    construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
+				   &gaugeParam, dslash_type);
+  }
 
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
@@ -234,12 +240,13 @@ invert_test(void)
   csParam.nSpin=1;
   csParam.nDim=5;
   for (int d = 0; d < 4; d++) csParam.x[d] = gaugeParam.X[d];
-  csParam.x[0] /= 2;
+  bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  if (pc) csParam.x[0] /= 2;
   csParam.x[4] = Nsrc;
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
-  csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  csParam.siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
@@ -264,7 +271,7 @@ invert_test(void)
   int link_pad =  3*tmp_value;
 
   // FIXME: currently assume staggered is SU(3)
-  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+  gaugeParam.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
@@ -278,16 +285,15 @@ invert_test(void)
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
-
 #else
   int fat_pad = 0;
   int link_pad = 0;
 #endif
   
-  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+  gaugeParam.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = fat_pad;
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gaugeParam.reconstruct = link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
   } else {

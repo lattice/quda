@@ -1655,7 +1655,7 @@ void usage(char** argv )
   printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
-         "                                                  /asqtad/domain-wall/domain-wall-4d/mobius\n");
+         "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
