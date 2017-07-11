@@ -62,7 +62,7 @@ namespace quda {
 
     const int d = arg.mu%4;
 
-    if (arg.mu >= 4) {
+    if (arg.mu < 4) {
 
       //Forward gather - compute fwd offset for vector fetch
       const int fwd_idx = linkIndexP1(coord, arg.dim, d);
