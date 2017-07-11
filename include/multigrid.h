@@ -353,7 +353,6 @@ namespace quda {
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
-     @param Xinv[out] Coarse clover inverse field
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
@@ -365,7 +364,7 @@ namespace quda {
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
@@ -373,7 +372,6 @@ namespace quda {
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
-     @param Xinv[out] Coarse clover inverse field
      @param T[in] Transfer operator that defines the new coarse space
      @param gauge[in] Link field from fine grid
      @param clover[in] Clover field on fine grid
@@ -386,7 +384,7 @@ namespace quda {
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
 		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
