@@ -194,9 +194,10 @@ endif()
 ## QUDA depends on Eigen
 ## this part makes sure we can download eigen if it is not found
 if (QUDA_DOWNLOAD_EIGEN)
+  FILE(DOWNLOAD http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2 ${CMAKE_SOURCE_DIR}/externals/3.3.4.tar.bz2 SHOW_PROGRESS EXPECTED_HASH SHA256=dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6 STATUS EIGEN_DOWNLOADED)
   include(ExternalProject)
   ExternalProject_Add(Eigen
-    URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2
+    URL ${CMAKE_SOURCE_DIR}/externals/3.3.4.tar.bz2
     URL_HASH SHA256=dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/eigen/
     CONFIGURE_COMMAND ""
