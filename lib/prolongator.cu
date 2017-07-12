@@ -182,7 +182,7 @@ namespace quda {
 
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
-    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * out.SiteSubset()*out.VolumeCB(); }
+    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * out.SiteSubset()*(long long)out.VolumeCB(); }
 
     long long bytes() const {
       size_t v_bytes = V.Bytes() / (V.SiteSubset() == out.SiteSubset() ? 1 : 2);

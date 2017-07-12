@@ -1,632 +1,279 @@
-#include <cstdlib>
-#include <cstdio>
-#include <string>
-#include <iostream>
+#include <transfer.h>
+#include <gauge_field_order.h>
+#include <color_spinor_field_order.h>
+#include <index_helper.cuh>
+#include <stencil.h>
+#include <color_spinor.h>
 
-#include <color_spinor_field.h>
-#include <clover_field.h>
+/**
+   This is the covariant derivative based on the basic gauged Laplace operator
+*/
 
-// these control the Wilson-type actions
-
-#include <quda_internal.h>
-#include <dslash_quda.h>
-#include <sys/time.h>
-#include <blas_quda.h>
-#include <face_quda.h>
-
-#include <inline_ptx.h>
-
-
-namespace quda
-{
-  namespace covdev
-  {
-    #include <dslash_constants.h>
-    #include <dslash_textures.h>
-    #include <dslash_index.cuh>
-
-    // Enable shared memory dslash for Fermi architecture
-    //#define SHARED_WILSON_DSLASH
-    //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
-
-    #include <dslash_quda.cuh>
-
-    #include	"covDev.h"	//Covariant derivative definitions
-  } // end namespace covDev
-
-  // declare the dslash events
-  #include <dslash_events.cuh>
-
-  using namespace covdev;
+namespace quda {
 
   /**
-     This macros try to mimic dslash definitions, because of the similarities between the covariant derivative and the dslash
-  */
+     @brief Parameter structure for driving the covariant derivative
+   */
+  template <typename Float, int nSpin, int nColor, QudaReconstructType reconstruct>
+  struct CovDevArg {
+    typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
+    typedef typename gauge_mapper<Float,reconstruct>::type G;
 
-#define EVEN_MORE_GENERIC_COVDEV(FUNC, FLOAT, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param) \
-  if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
-      switch	(dir) {							\
-      case 0:								\
-        FUNC ## 018 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 1:								\
-        FUNC ## 118 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 2:								\
-        FUNC ## 218 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 3:								\
-        FUNC ## 318 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      }									\
-    } else if	(reconstruct == QUDA_RECONSTRUCT_12) {			\
-      switch	(dir) {							\
-      case 0:								\
-        FUNC ## 012 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 1:								\
-        FUNC ## 112 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 2:								\
-        FUNC ## 212 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 3:								\
-        FUNC ## 312 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      }									\
-    } else if	(reconstruct == QUDA_RECONSTRUCT_8) {			\
-      switch	(dir) {							\
-      case 0:								\
-        FUNC ## 08 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 1:								\
-        FUNC ## 18 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 2:								\
-        FUNC ## 28 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      case 3:								\
-        FUNC ## 38 ## DAG ## FLOAT ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> (param); \
-        break;								\
-      }									\
+    F out;                // output vector field
+    const F in;           // input vector field
+    const G U;            // the gauge field
+    const int parity;     // only use this for single parity fields
+    const int nParity;    // number of parities we're working on
+    const int nFace;      // hard code to 1 for now
+    const int dim[5];     // full lattice dimensions
+    const int commDim[4]; // whether a given dimension is partitioned or not
+    const int volumeCB;   // checkerboarded volume
+    const int mu;         // direction of the covariant derivative
+
+    CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const int parity, const int mu)
+      : out(out), in(in), U(U), parity(parity), mu(mu), nParity(in.SiteSubset()), nFace(1),
+	dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
+      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+      volumeCB(in.VolumeCB())
+    {
+      if (in.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || !U.isNative())
+      errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
     }
-
-#define MORE_GENERIC_COVDEV(FUNC, dir, DAG, kernel_type, gridDim, blockDim, shared, stream,param) \
-  if (typeid(Float) == typeid(double)) {				\
-    EVEN_MORE_GENERIC_COVDEV(FUNC, D, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param) \
-  } else if (typeid(Float) == typeid(float)) { \
-    EVEN_MORE_GENERIC_COVDEV(FUNC, S, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param) \
-  } else {								\
-    errorQuda("Undefined precision type");				\
-  }
-
-#define GENERIC_COVDEV(FUNC, dir, DAG, gridDim, blockDim, shared, stream, param) \
-    switch(param.kernel_type) {						\
-      case INTERIOR_KERNEL:							\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, INTERIOR_KERNEL,   gridDim, blockDim, shared, stream, param) \
-        break;									\
-      case EXTERIOR_KERNEL_X:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_X, gridDim, blockDim, shared, stream, param) \
-        break;									\
-      case EXTERIOR_KERNEL_Y:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_Y, gridDim, blockDim, shared, stream, param) \
-        break;									\
-      case EXTERIOR_KERNEL_Z:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_Z, gridDim, blockDim, shared, stream, param) \
-        break;									\
-      case EXTERIOR_KERNEL_T:						\
-        MORE_GENERIC_COVDEV(FUNC, dir, DAG, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param) \
-	break;							        \
-      default:								\
-        errorQuda("Unsupported kernel_type %d", param.kernel_type);	\
-    }
-
-#define COVDEV(FUNC, mu, gridDim, blockDim, shared, stream, param)	\
-    if (mu < 4) {								\
-      GENERIC_COVDEV(FUNC, mu, , gridDim, blockDim, shared, stream, param) \
-    } else {								\
-      int nMu = mu - 4;							\
-      GENERIC_COVDEV(FUNC, nMu, Dagger, gridDim, blockDim, shared, stream, param) \
-    }
-
-#define PROFILE(f, profile, idx)		\
-    profile.TPSTART(idx);			\
-    f;						\
-    profile.TPSTOP(idx);
-
-  /**
-     This is a simpler version of the dslashCuda function to call the right kernels
-  */
-
-  void covDevCuda(DslashCuda &dslash, const size_t regSize, const int mu, TimeProfile &profile)
-  {
-    #ifdef GPU_CONTRACT
-    const int	dir = mu%4;
-
-    dslashParam.kernel_type = INTERIOR_KERNEL;
-
-    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-
-    checkCudaError();
-
-    #ifdef MULTI_GPU
-      if(comm_dim(dir) > 1)
-      {
-        dslashParam.kernel_type = static_cast<KernelType>(dir);
-        dslashParam.ghostDim[dir] = commDimPartitioned(dir);     // determines whether to use regular or ghost indexing at boundary
-        dslashParam.commDim[dir] = commDimPartitioned(dir);      // switch off comms if override = 0
-
-        PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-
-        checkCudaError();
-
-        dslashParam.ghostDim[dir] = 0;                           // not sure whether neccessary
-        dslashParam.commDim[dir] = 0;
-      }
-    #endif // MULTI_GPU
-    cudaStreamSynchronize(streams[Nstream-1]);
-    #else
-      errorQuda("Contraction kernels have not been built");
-    #endif
-
-  }
-
-  /**
-     Class for covariant derivative, is based on SharedDslashCuda
-  */
-#ifdef GPU_CONTRACT
-  template <typename Float, typename Float2>
-  class CovDevCuda : public SharedDslashCuda
-  {
-    private:
-      const cudaGaugeField *gauge;
-      const int mu;                     // Direction to apply the covariant derivative. Anything beyond 3 is understood as dagger and moving backwards (from x to x-(mu%4))
-      const int dir;                    // This is the real direction xyzt, that is, mu%4
-      const int parity;                 // The current implementation works on parity spinors
-
-      void *gauge0, *gauge1;
-
-      bool binded;
-
-      #ifdef MULTI_GPU
-        Float *ghostBuffer;             // For the ghosts, I did my own implementation, jsut because the number of functions to overload was absurd
-        int ghostVolume;
-        int ghostBytes;
-        int offset;
-        int Npad;
-        int Nvec;
-        int Nint;
-      #endif
-
-      #ifdef USE_TEXTURE_OBJECTS
-        cudaTextureObject_t tex;
-      #endif
-
-    protected:
-      unsigned int minThreads() const
-      {
-        #ifdef MULTI_GPU
-          if(dslashParam.kernel_type == INTERIOR_KERNEL) { return in->Volume(); } else { return ghostVolume; }
-        #else
-          return in->Volume();
-        #endif
-      }
-
-      unsigned int sharedBytesPerThread() const { return 0; }
-
-      dim3 createGrid(const dim3 &block) const	         // Tuning is supported in a one-dimensional grid, because other grids gave me wrong results
-      {
-        unsigned int gx = (dslashParam.threads + block.x - 1) / block.x;
-        unsigned int gy = 1;
-        unsigned int gz = 1;
-
-        return dim3(gx, gy, gz);
-      }
-
-      /**
-         Advance 1-d block size, accounting for the differences of the covariant derivative (I could not make the 3-d block work reliably)
-      */
-
-      bool advanceBlockDim(TuneParam &param) const
-      {
-        //if(dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::advanceBlockDim(param);
-        const unsigned int min_threads = 2;
-        const unsigned int max_threads = 512;            // FIXME: use deviceProp.maxThreadsDim[0];
-
-        param.block.x += 2;
-        param.block.y = 1;
-        param.block.z = 1;
-        param.grid = createGrid(param.block);
-
-        if((param.block.x > min_threads) && (param.block.x < max_threads))
-          return true;
-        else
-          return false;
-      }
-
-      #ifdef MULTI_GPU
-
-        /**
-           Allocates ghosts for multi-GPU
-        */
-        void allocateGhosts()
-        {
-          ghostBuffer = (Float*)device_malloc(ghostBytes);
-        }
-
-        /**
-          Sends the ghosts, I only checked it for two gpus and partitioning in one dimension. The current implementation works for zt-splitting, but
-          for z-splitting is not very efficient. I tried to make something that worked for xy-splitting as well, but it didn't and I never understood
-          why. You're welcome to improve this piece of code.
-        */
-
-        void exchangeGhosts()
-        {
-          const int rel = (mu < 4) ? 1 : -1;
-
-          // Send buffers:
-          void *send = pinned_malloc(ghostBytes);
-
-          // Receive buffers:
-          void *recv = pinned_malloc(ghostBytes);
-
-          switch(mu) {
-            default:
-              break;
-
-            case 0: {                                              // x from point p to p + x
-              void *sendFacePtr = (char*) in->V();
-              size_t len = Nvec*sizeof(Float);
-              size_t skip = len*in->X(0);
-              size_t dpitch = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-
-              for(int t=0;t<ghostVolume;t++) {                     // I know this is a crime...
-                cudaMemcpy2DAsync((void*) (((char*)send)+len*t), dpitch, (void*) (((char*)sendFacePtr)+skip*t),
-                                  spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-                cudaStreamSynchronize(streams[0]);
-              }
-            }
-            break;
-
-            case 1: {                                             // y from point p to p + y
-              void *sendFacePtr = (char*)in->V();
-              size_t len = in->X(0)*Nvec*sizeof(Float);
-              size_t skip = len*in->X(1);
-              size_t dpitch = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-
-              for(int tz=0;tz<(in->X(2)*in->X(3));tz++) {         // Although is terribly inefficient, it should work. The problem is that it doesn't
-                cudaMemcpy2DAsync((void*) (((char*)send)+len*tz), dpitch, (void*) (((char*)sendFacePtr)+skip*tz),
-                                  spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-                cudaStreamSynchronize(streams[0]);
-              }
-            }
-            break;
-
-            case 2: {                                             // z from point p to p + z
-              void *sendFacePtr = (char*) in->V();
-              size_t len = ghostVolume*Nvec*sizeof(Float)/in->X(3);
-              size_t skip = len*in->X(2);
-              size_t dpitch = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-
-              for(int t=0;t<in->X(3);t++) {                       // I'm sure this can be improved
-                cudaMemcpy2DAsync((void*) (((char*)send)+len*t), dpitch, (void*) (((char*)sendFacePtr)+skip*t),
-                                  spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-                cudaStreamSynchronize(streams[0]);
-              }
-            }
-            break;
-
-            case 3: {                                               // t from point p to p + t
-              void *sendFacePtr = (char*)in->V();
-              size_t len = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-              cudaMemcpy2DAsync(send, len, sendFacePtr, spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-              cudaStreamSynchronize(streams[0]);
-            }
-            break;
-
-            // Dagger versions (mu >= 4) follow
-
-            case 4: {                                              // x dagger from point p to p - x
-              void *sendFacePtr = (char*) in->V() + offset*Nvec*sizeof(Float);
-              size_t len = Nvec*sizeof(Float);
-              size_t skip = len*in->X(0);
-              size_t dpitch = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-
-              for(int t=0;t<ghostVolume;t++) {
-  	      cudaMemcpy2DAsync((void*) (((char*)send)+len*t), dpitch, (void*) (((char*)sendFacePtr)+skip*t),
-                                  spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-                cudaStreamSynchronize(streams[0]);
-              }
-            }
-            break;
-
-            case 5: {                                              // y dagger from point p to p - y
-              void *sendFacePtr = ((char*) in->V()) + offset*Nvec*sizeof(Float);
-              size_t len = in->X(0)*Nvec*sizeof(Float);
-              size_t skip = len*in->X(1);
-              size_t dpitch = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-
-              for(int tz=0;tz<(in->X(2)*in->X(3));tz++) {
-                cudaMemcpy2DAsync((void*) (((char*)send)+len*tz), dpitch, (void*) (((char*)sendFacePtr)+skip*tz),
-                                  spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-                cudaStreamSynchronize(streams[0]);
-              }
-            }
-            break;
-
-            case 6: {                                              // z dagger from point p to p - z
-              void *sendFacePtr = (((char*)in->V()) + offset*Nvec*sizeof(Float));
-              size_t len = ghostVolume*Nvec*sizeof(Float)/in->X(3);
-              size_t skip = len*in->X(2);
-              size_t dpitch = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-
-              for(int t=0;t<in->X(3);t++) {
-                cudaMemcpy2DAsync((void*) (((char*)send)+len*t), dpitch, (void*) (((char*)sendFacePtr)+skip*t),
-      	                        spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-                cudaStreamSynchronize(streams[0]);
-              }
-            }
-            break;
-
-            case 7: {                                              // t dagger from point p to p - t
-              void *sendFacePtr = (char*)in->V() + offset*Nvec*sizeof(Float);
-              size_t len = ghostVolume*Nvec*sizeof(Float);
-              size_t spitch = in->Stride()*Nvec*sizeof(Float);
-
-              cudaMemcpy2DAsync(send, len, sendFacePtr, spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
-              cudaStreamSynchronize(streams[0]);
-            }
-            break;
-          }
-
-          // Send buffers to neighbors:
-
-          MsgHandle *mh_send;
-          MsgHandle *mh_from;
-
-          mh_send = comm_declare_send_relative(send, dir, rel*(-1), ghostBytes);
-          mh_from = comm_declare_receive_relative(recv, dir, rel, ghostBytes);
-          comm_start (mh_send);
-          comm_start (mh_from);
-          comm_wait (mh_send);
-          comm_wait (mh_from);
-          comm_free (mh_send);
-          comm_free (mh_from);
-
-          // Send buffers to GPU:
-          qudaMemcpy(ghostBuffer, recv, ghostBytes, cudaMemcpyHostToDevice);
-          cudaDeviceSynchronize();
-
-          host_free(send);
-          host_free(recv);
-        }
-
-
-        void freeGhosts() { device_free(ghostBuffer); }
-
-        void bindGhosts()
-        {
-          if(binded == false) {       // bind only once
-            #ifdef USE_TEXTURE_OBJECTS
-              cudaChannelFormatDesc desc;
-              memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-              if (in->Precision() == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-              else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
-
-              // staggered fields in half and single are always two component
-              if (in->Nspin() == 1 && (in->Precision() == QUDA_SINGLE_PRECISION)) {
-                desc.x = 8*in->Precision();
-                desc.y = 8*in->Precision();
-                desc.z = 0;
-                desc.w = 0;
-              } else { // all others are four component
-                desc.x = (in->Precision() == QUDA_DOUBLE_PRECISION) ? 32 : 8*in->Precision();
-                desc.y = (in->Precision() == QUDA_DOUBLE_PRECISION) ? 32 : 8*in->Precision();
-                desc.z = (in->Precision() == QUDA_DOUBLE_PRECISION) ? 32 : 8*in->Precision();
-                desc.w = (in->Precision() == QUDA_DOUBLE_PRECISION) ? 32 : 8*in->Precision();
-              }
-
-              cudaResourceDesc resDesc;
-              memset(&resDesc, 0, sizeof(resDesc));
-              resDesc.resType = cudaResourceTypeLinear;
-              resDesc.res.linear.devPtr = ghostBuffer;
-              resDesc.res.linear.desc = desc;
-              resDesc.res.linear.sizeInBytes = Nint * ghostVolume * sizeof(Float);
-
-              cudaTextureDesc texDesc;
-              memset(&texDesc, 0, sizeof(texDesc));
-              texDesc.readMode = cudaReadModeElementType;
-
-              cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-
-              dslashParam.inTex = tex;
-            #else
-              if(in->Precision() == QUDA_DOUBLE_PRECISION)
-                cudaBindTexture(0, spinorTexDouble, (Float2*)ghostBuffer, ghostBytes);
-              else if(in->Precision() == QUDA_SINGLE_PRECISION)
-                cudaBindTexture(0, spinorTexSingle, (Float2*)ghostBuffer, ghostBytes);
-              else
-                errorQuda("Half precision for covariant derivative not supported.");
-            #endif
-            checkCudaError();
-            binded = true;
-          }
-        }
-
-        void unbindGhosts() {
-          if(binded == true) {
-            #ifdef USE_TEXTURE_OBJECTS
-              cudaDestroyTextureObject(tex);
-            #else
-              if(in->Precision() == QUDA_DOUBLE_PRECISION)
-                cudaUnbindTexture(spinorTexDouble);
-              else
-                cudaUnbindTexture(spinorTexSingle);
-            #endif
-            checkCudaError();
-            binded = false;
-          }
-        }
-      #endif               /* MULTI_GPU */
-
-      void unbindGauge() {
-        unbindGaugeTex(*gauge);
-        checkCudaError();
-      }
-
-
-    public:
-      CovDevCuda(cudaColorSpinorField *out, const cudaGaugeField *gauge, const cudaColorSpinorField *in, const int parity, const int mu)
-      : SharedDslashCuda(out, in, 0, gauge->Reconstruct(), mu<4 ? 0 : 1), gauge(gauge), parity(parity), mu(mu), dir(mu%4), binded(false)
-      {
-        bindSpinorTex<Float2>(in, out);
-        bindGaugeTex(*gauge, parity, &gauge0, &gauge1);
-
-        #ifdef MULTI_GPU
-          if(comm_dim(dir) > 1) {
-            Nvec = sizeof(Float2)/sizeof(Float);
-            Nint = in->Ncolor()*in->Nspin()*Nvec;
-            Npad = Nint/Nvec;
-
-            switch(dir) {
-              case 0:
-                ghostVolume = in->X(1)*in->X(2)*in->X(3)/2;
-                offset = in->X(0) - 1;
-                break;
-
-              case 1:
-                ghostVolume = in->X(0)*in->X(2)*in->X(3);
-                offset = in->X(0)*(in->X(1) - 1);
-                break;
-
-              case 2:
-                ghostVolume = in->X(0)*in->X(1)*in->X(3);
-                offset = in->X(0)*in->X(1)*(in->X(2) - 1);
-                break;
-
-              case 3:
-                ghostVolume = in->X(0)*in->X(1)*in->X(2);
-                offset = in->Volume() - ghostVolume;
-                break;
-            }
-
-            ghostBytes = ghostVolume*Nint*sizeof(Float);
-            allocateGhosts();
-          }
-        #endif
-      }
-
-      virtual ~CovDevCuda() {
-        #ifdef MULTI_GPU
-          if(comm_dim(dir) > 1) {
-            unbindGhosts();
-            freeGhosts();
-          }
-        #endif
-        unbindGauge();
-      }
-
-      void apply(const cudaStream_t &stream) {
-        #ifdef SHARED_WILSON_DSLASH
-          if(dslashParam.kernel_type == EXTERIOR_KERNEL_X)
-            errorQuda("Shared dslash (covariant derivative) does not yet support X-dimension partitioning");
-        #endif
-        if((dslashParam.kernel_type == EXTERIOR_KERNEL_X) || (dslashParam.kernel_type == EXTERIOR_KERNEL_Y))
-          errorQuda("Covariant derivative does not yet support X or Y-dimension partitioning");
-
-        dslashParam.parity = parity;
-
-        for(int i=0; i<4; i++) {
-          dslashParam.ghostDim[i] = 0;
-          dslashParam.ghostOffset[i][0] = 0;
-          dslashParam.ghostOffset[i][1] = 0;
-          dslashParam.ghostNormOffset[i][0] = 0;
-          dslashParam.ghostNormOffset[i][1] = 0;
-          dslashParam.commDim[i] = 0;
-        }
-
-	dslashParam.out = (void*)out->V();
-	dslashParam.outNorm = (float*)out->Norm();
-	dslashParam.in = (void*)in->V();
-	dslashParam.inNorm = (float*)in->Norm();
-	dslashParam.gauge0 = (void*)gauge0;
-	dslashParam.gauge1 = (void*)gauge1;
-
-        if(dslashParam.kernel_type != INTERIOR_KERNEL) {
-          #ifdef MULTI_GPU
-            dslashParam.threads = ghostVolume;
-            exchangeGhosts();                           // We must exchange ghosts here because the covDevCuda function requires a Dslash class as parameter
-            bindGhosts();                               // and the dslash class doesn't have these specific functions to exchange ghosts
-
-            // Maybe I should rebind the spinors for the INTERIOR kernels after this???
-
-            TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-            COVDEV(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-          #endif
-        } else {
-          dslashParam.threads = in->Volume();
-          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          COVDEV(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);
-        }
-      }
-
-      long long flops() const { return 144 * in->Volume(); } // Correct me if I'm wrong
   };
-#endif
 
   /**
-     The function applies the color matrices of a gauge configuration to a spinor, so it is not exactly a covariant derivative, although a combination of calls to
-     this function will give you a covariant derivative. The output is the new spinor (out), and the inputs are the input spinor (in), the parity of the spinor (at
-     this moment, the function works for parity spinors only), the direction of the color matrices (mu) and a profiler for timing. The value mu ranges from 0 to 7,
-     being anything higher than 3 understood as direction (mu - 4) backwards, and therefore applying the dagger version of the color matrices
+     Applies the off-diagonal part of the Laplace operator
 
-     Again a half precision implementation was straightforwad, but I don't think it would be useful
-  */
+     @param[out] out The out result field
+     @param[in] U The gauge field
+     @param[in] kappa Kappa value
+     @param[in] in The input field
+     @param[in] parity The site parity
+     @param[in] x_cb The checkerboarded site index
+   */
+  template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
+  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int x_cb, int parity) {
+    typedef Matrix<complex<Float>,nColor> Link;
+    const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
-  void covDev(cudaColorSpinorField *out, cudaGaugeField &gauge, const cudaColorSpinorField *in, const int parity, const int mu, TimeProfile &profile) {
+    int coord[5];
+    getCoords(coord, x_cb, arg.dim, parity);
+    coord[4] = 0;
 
-#ifdef GPU_CONTRACT
-    DslashCuda *covdev = 0;
-    size_t regSize = sizeof(float);
+    const int d = arg.mu%4;
 
-        if (Location(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
-          errorQuda("Error: CPU fields not supported for covariant derivative");
+    if (arg.mu < 4) {
 
-        if(in->Precision() == QUDA_HALF_PRECISION)
-          errorQuda("Error: Half precision not supported");
+      //Forward gather - compute fwd offset for vector fetch
+      const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 
-        if(in->Precision() != gauge.Precision())
-          errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
+      if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+	const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
-        profile.TPSTART(QUDA_PROFILE_TOTAL);
-        profile.TPSTART(QUDA_PROFILE_INIT);
+	const Link U = arg.U(d, x_cb, parity);
+	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
 
-        if(in->Precision() == QUDA_SINGLE_PRECISION)
-          covdev = new CovDevCuda<float, float4>(static_cast<cudaColorSpinorField*>(out), &gauge,
-                                                 static_cast<const cudaColorSpinorField*>(in), parity, mu);
-        else if(in->Precision	() == QUDA_DOUBLE_PRECISION) {
-	  covdev = new CovDevCuda<double, double2>(static_cast<cudaColorSpinorField*>(out), &gauge,
-                                                   static_cast<const cudaColorSpinorField*>(in), parity, mu);
-	  regSize = sizeof(double);
-        }
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+	out += U * in;
+	} else {
 
-        covDevCuda(*covdev, regSize, mu, profile);
+	const Link U = arg.U(d, x_cb, parity);
+	const Vector in = arg.in(fwd_idx, their_spinor_parity);
 
-        profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-        delete covdev;
-        checkCudaError();
-        profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-        profile.TPSTOP(QUDA_PROFILE_TOTAL);
-      #else
-        errorQuda("Contraction kernels have not been built");
-      #endif
+	out += U * in;
+      }
+    } else {
+      //Backward gather - compute back offset for spinor and gauge fetch
+      const int back_idx = linkIndexM1(coord, arg.dim, d);
+      const int gauge_idx = back_idx;
+
+      if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+
+	const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
+	const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+
+	out += conj(U) * in;
+      } else {
+	
+	const Link U = arg.U(d, gauge_idx, 1-parity);
+	const Vector in = arg.in(back_idx, their_spinor_parity);
+
+	out += conj(U) * in;
+      }
+    } // Forward/backward derivative
+
+  }
+
+
+  //out(x) = M*in
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
+  __device__ __host__ inline void covDev(Arg &arg, int x_cb, int parity)
+  {
+    typedef ColorSpinor<Float,nColor,nSpin> Vector;
+    Vector out;
+
+    applyCovDev<Float,nDim,nColor>(out, arg, x_cb, parity);
+    arg.out(x_cb, parity) = out;
+  }
+
+  // CPU kernel for applying the Laplace operator to a vector
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
+  void covDevCPU(Arg arg)
+  {
+
+    for (int parity= 0; parity < arg.nParity; parity++) {
+      // for full fields then set parity from loop else use arg setting
+      parity = (arg.nParity == 2) ? parity : arg.parity;
+
+      for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
+	covDev<Float,nDim,nSpin,nColor>(arg, x_cb, parity);
+      } // 4-d volumeCB
+    } // parity
+
+  }
+
+  // GPU Kernel for applying the Laplace operator to a vector
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
+  __global__ void covDevGPU(Arg arg)
+  {
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+
+    // for full fields set parity from y thread index else use arg setting
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+
+    if (x_cb >= arg.volumeCB) return;
+    if (parity >= arg.nParity) return;
+
+    covDev<Float,nDim,nSpin,nColor>(arg, x_cb, parity);
+  }
+
+  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
+  class CovDev : public TunableVectorY {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &meta;
+
+    long long flops() const
+    {
+      return 8*nColor*nColor*arg.nParity*(long long)meta.VolumeCB();
+    }
+    long long bytes() const
+    {
+      return arg.out.Bytes() + arg.in.Bytes() + arg.nParity*arg.U.Bytes()*meta.VolumeCB();
+    }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.volumeCB; }
+
+  public:
+    CovDev(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
+    {
+      strcpy(aux, meta.AuxString());
+#ifdef MULTI_GPU
+      char comm[5];
+      comm[0] = (arg.commDim[0] ? '1' : '0');
+      comm[1] = (arg.commDim[1] ? '1' : '0');
+      comm[2] = (arg.commDim[2] ? '1' : '0');
+      comm[3] = (arg.commDim[3] ? '1' : '0');
+      comm[4] = '\0';
+      strcat(aux,",comm=");
+      strcat(aux,comm);
+#endif
+    }
+    virtual ~CovDev() { }
+
+    void apply(const cudaStream_t &stream) {
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+	covDevCPU<Float,nDim,nSpin,nColor>(arg);
+      } else {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	covDevGPU<Float,nDim,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      }
+    }
+
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+  };
+
+
+  template <typename Float, int nColor, QudaReconstructType recon>
+    void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
+  {
+    constexpr int nDim = 4;
+    if (in.Nspin() == 1) {
+      constexpr int nSpin = 1;
+      CovDevArg<Float,nSpin,nColor,recon> arg(out, in, U, parity, mu);
+      CovDev<Float,nDim,nSpin,nColor,CovDevArg<Float,nSpin,nColor,recon> > myCovDev(arg, in);
+      myCovDev.apply(0);
+    } else if (in.Nspin() == 4) {
+      constexpr int nSpin = 4;
+      CovDevArg<Float,nSpin,nColor,recon> arg(out, in, U, parity, mu);
+      CovDev<Float,nDim,nSpin,nColor,CovDevArg<Float,nSpin,nColor,recon> > myCovDev(arg, in);
+      myCovDev.apply(0);
+    } else {
+      errorQuda("Unsupported nSpin=%d", in.Nspin());
     }
   }
+
+  // template on the gauge reconstruction
+  template <typename Float, int nColor>
+    void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
+  {
+    if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
+      ApplyCovDev<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, parity, mu);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
+      ApplyCovDev<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, parity, mu);
+    } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
+      ApplyCovDev<Float,nColor,QUDA_RECONSTRUCT_8> (out, in, U, parity, mu);
+    } else {
+      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }
+  }
+
+  // template on the number of colors
+  template <typename Float>
+    void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
+  {
+    if (in.Ncolor() == 3) {
+      ApplyCovDev<Float,3>(out, in, U, parity, mu);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    }
+  }
+
+  // this is the Worker pointer that may have issue additional work
+  // while we're waiting on communication to finish
+  namespace dslash {
+    extern Worker* aux_worker;
+  }
+
+  //Apply the covariant derivative operator
+  //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
+  //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
+  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)		    
+  {
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+    
+    // check all precision match
+    checkPrecision(out, in, U);
+
+    // check all locations match
+    checkLocation(out, in, U);
+
+    const int nFace = 1;
+    in.exchangeGhost((QudaParity)(1-parity), nFace, 0); // last parameter is dummy
+
+    if (dslash::aux_worker) dslash::aux_worker->apply(0);
+
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyCovDev<double>(out, in, U, parity, mu);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyCovDev<float>(out, in, U, parity, mu);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
+
+
+} // namespace quda

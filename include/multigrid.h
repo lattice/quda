@@ -178,6 +178,9 @@ namespace quda {
     /** This is the transfer operator that defines the prolongation and restriction operators */
     Transfer *transfer;
 
+    /** This tell to reset() if transfer needs to be rebuilt */
+    bool resetTransfer;
+
     /** This is the smoother used */
     Solver *presmoother, *postsmoother;
 
@@ -277,14 +280,9 @@ namespace quda {
     virtual ~MG();
 
     /**
-       @brief Update coarse operator (recursive call from fine to coarsest level)
-    */
-    void updateCoarseOperator();
-
-    /**
-       @brief Create the solver wrapper
-    */
-    void createCoarseSolver();
+       @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
+     */
+    void reset();
 
     /**
        @brief Create the smoothers
@@ -292,18 +290,14 @@ namespace quda {
     void createSmoother();
 
     /**
-       @brief Free the smoothers
+       @brief Create the coarse dirac operator
     */
-    void destroySmoother();
+    void createCoarseDirac();
 
     /**
-       This method is a placeholder for reseting the solver, e.g.,
-       when a parameter has changed such as the mass.  For now, all it
-       does is call Transfer::setSiteSubset to resize the on-GPU
-       null-space components to single-parity if we're doing a
-       single-parity solve (memory saving technique).
-     */
-    void reset();
+       @brief Create the solver wrapper
+    */
+    void createCoarseSolver();
 
     /**
        This method verifies the correctness of the MG method.  It checks:
@@ -353,7 +347,6 @@ namespace quda {
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
-     @param Xinv[out] Coarse clover inverse field
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
@@ -365,7 +358,7 @@ namespace quda {
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
@@ -373,7 +366,6 @@ namespace quda {
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
-     @param Xinv[out] Coarse clover inverse field
      @param T[in] Transfer operator that defines the new coarse space
      @param gauge[in] Link field from fine grid
      @param clover[in] Clover field on fine grid
@@ -386,7 +378,7 @@ namespace quda {
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
 		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 

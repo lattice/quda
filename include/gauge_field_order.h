@@ -358,7 +358,7 @@ namespace quda {
 	{ return fieldorder_wrapper<Float,storeFloat>(u[d], parity*cb_offset + (x*nColor + row)*nColor + col,
 						      scale, scale_inv); }
 
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
@@ -490,7 +490,7 @@ namespace quda {
 	{ return fieldorder_wrapper<Float,storeFloat>
 	    (u, (((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col, scale, scale_inv); }
 
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
@@ -638,7 +638,7 @@ namespace quda {
 	return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
       }
 
-      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<Float> &val) const {
 #ifdef __CUDA_ARCH__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
@@ -944,7 +944,7 @@ namespace quda {
 	}
 
 	__device__ __host__ inline void atomicAdd(int d, int parity, int x, int s_row, int s_col,
-						  int c_row, int c_col, complex<Float> &val) {
+						  int c_row, int c_col, const complex<Float> &val) {
 	  accessor.atomic_add(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col, val);
 	}
 

@@ -82,10 +82,9 @@ namespace quda {
 
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
-
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
+
     X_h = new cpuGaugeField(gParam);
-    Xinv_h = new cpuGaugeField(gParam);
 
     if (enable_gpu) {
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -99,17 +98,14 @@ namespace quda {
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       gParam.nFace = 0;
       gParam.pad = 0;
-
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       X_d = new cudaGaugeField(gParam);
-      Xinv_d = new cudaGaugeField(gParam);
     }
 
     bool gpu_setup = true;
 
-    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*Xinv_d,*transfer,kappa,Mu(),MuFactor());
-    else dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*transfer,kappa,Mu(),MuFactor());
+    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,Mu(),MuFactor());
+    else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,Mu(),MuFactor());
 
     gParam.order = QUDA_QDP_GAUGE_ORDER;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -117,13 +113,28 @@ namespace quda {
     gParam.geometry = QUDA_COARSE_GEOMETRY;
     Yhat_h = new cpuGaugeField(gParam);
 
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    gParam.nFace = 0;
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+    Xinv_h = new cpuGaugeField(gParam);
+
     if (enable_gpu) {
       // use the null-space precision for the preconditioned links
-      gParam.precision = transfer->Vectors(QUDA_CUDA_FIELD_LOCATION).Precision();
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      gParam.nFace = 1;
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+      gParam.geometry = QUDA_COARSE_GEOMETRY;
+      gParam.precision = transfer->Vectors(QUDA_CUDA_FIELD_LOCATION).Precision();
       int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
       gParam.pad = gParam.nFace * pad * 2; // factor of 2 since we have to store bi-directional ghost zone
       Yhat_d = new cudaGaugeField(gParam);
+
+      gParam.precision = prec;
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gParam.nFace = 0;
+      gParam.pad = 0;
+      gParam.geometry = QUDA_SCALAR_GEOMETRY;
+      Xinv_d = new cudaGaugeField(gParam);
     }
 
     if (enable_gpu && gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
@@ -246,13 +257,13 @@ namespace quda {
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, double kappa, double mu, double mu_factor) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mu, double mu_factor) const
   {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    if (checkLocation(Y, X, Xinv) == QUDA_CPU_FIELD_LOCATION) {
-      CoarseCoarseOp(Y, X, Xinv, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+    if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
+      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     } else {
-      CoarseCoarseOp(Y, X, Xinv, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
     }
   }
 
@@ -423,13 +434,13 @@ namespace quda {
   //Make the coarse operator one level down.  For the preconditioned
   //operator we are coarsening the Yhat links, not the Y links.  We
   //pass the fine clover fields, though they are actually ignored.
-  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, double kappa, double mu, double mu_factor) const
+  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mu, double mu_factor) const
   {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    if (checkLocation(Y, X, Xinv) == QUDA_CPU_FIELD_LOCATION) {
-      CoarseCoarseOp(Y, X, Xinv, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+    if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     } else {
-      CoarseCoarseOp(Y, X, Xinv, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
     }
   }
 

@@ -84,9 +84,6 @@ namespace quda {
     V_d = enable_gpu ? ColorSpinorField::Create(param) : nullptr;
     param.precision = V_h->Precision();
 
-    ColorSpinorField *V_tmp = (V_d && V_d->Precision() != V_h->Precision())
-      ? ColorSpinorField::Create(param) : V_d;
-
     // used for cpu<->gpu transfers
     param = ColorSpinorParam(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
@@ -126,13 +123,26 @@ namespace quda {
     }
     createSpinMap(spin_bs);
 
+    reset();
+  }
+
+  void Transfer::reset() {
+
+    ColorSpinorField *V_tmp = V_d;
+
+    if(V_d && V_d->Precision() != V_h->Precision()) {
+      ColorSpinorParam param(*V_d);
+      param.precision = V_h->Precision();
+      V_tmp = ColorSpinorField::Create(param);
+    }
+
 #if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
     bool gpu_setup = true;
 #else
     bool gpu_setup = false;
 #endif
 
-    if (gpu_setup) {
+    if (enable_gpu && gpu_setup) {
 
       printfQuda("Transfer: filling V field with null-space components\n");
       fillV(*V_tmp);  // copy the null space vectors into V
@@ -147,6 +157,7 @@ namespace quda {
 	delete V_tmp;
       }
       printfQuda("Transferred prolongator back to CPU\n");
+
     } else {
 
       printfQuda("Transfer: filling V field with null-space components\n");
@@ -160,9 +171,7 @@ namespace quda {
 	*V_d = *V_h;
 	printfQuda("Transferred prolongator to GPU\n");
       }
-
     }
-
   }
 
   Transfer::~Transfer() {
