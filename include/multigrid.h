@@ -178,6 +178,9 @@ namespace quda {
     /** This is the transfer operator that defines the prolongation and restriction operators */
     Transfer *transfer;
 
+    /** This tell to reset() if transfer needs to be rebuilt */
+    bool resetTransfer;
+
     /** This is the smoother used */
     Solver *presmoother, *postsmoother;
 
@@ -277,9 +280,9 @@ namespace quda {
     virtual ~MG();
 
     /**
-       @brief Create/Update the current level and below
-    */
-    void createLevel();
+       @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
+     */
+    void reset();
 
     /**
        @brief Create the smoothers
@@ -295,15 +298,6 @@ namespace quda {
        @brief Create the solver wrapper
     */
     void createCoarseSolver();
-
-    /**
-       This method is a placeholder for reseting the solver, e.g.,
-       when a parameter has changed such as the mass.  For now, all it
-       does is call Transfer::setSiteSubset to resize the on-GPU
-       null-space components to single-parity if we're doing a
-       single-parity solve (memory saving technique).
-     */
-    void reset();
 
     /**
        This method verifies the correctness of the MG method.  It checks:
