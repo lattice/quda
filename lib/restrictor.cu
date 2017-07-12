@@ -424,7 +424,7 @@ namespace quda {
       param.aux.x = 1; // swizzle factor
     }
 
-    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * in.SiteSubset()*in.VolumeCB(); }
+    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * in.SiteSubset()*(long long)in.VolumeCB(); }
 
     long long bytes() const {
       size_t v_bytes = v.Bytes() / (v.SiteSubset() == in.SiteSubset() ? 1 : 2);
