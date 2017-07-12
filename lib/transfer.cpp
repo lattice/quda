@@ -21,7 +21,7 @@ namespace quda {
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
+      spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
       flops_(0), profile(profile)
   {
@@ -118,11 +118,13 @@ namespace quda {
 
     createGeoMap(geo_bs);
 
-    // allocate the fine-to-coarse spin map (don't need it for staggered.)
-    if (B[0]->Nspin() != 1){
-      spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
-      createSpinMap(spin_bs);
+    // allocate the fine-to-coarse spin map
+    spin_map = static_cast<int**>(safe_malloc(nspin_fine*sizeof(int*)));
+    for (int s = 0; s < B[0]->Nspin(); s++)
+    {
+      spin_map[s] = static_cast<int*>(safe_malloc(2*sizeof(int)));
     }
+    createSpinMap(spin_bs);
 
 #if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
     bool gpu_setup = true;
@@ -164,7 +166,11 @@ namespace quda {
   }
 
   Transfer::~Transfer() {
-    if (spin_map) host_free(spin_map);
+    if (spin_map)
+    {
+      for (int s = 0; s < nspin_fine; s++) { if (spin_map[s]) host_free(spin_map[s]); } 
+      host_free(spin_map);
+    }
     if (coarse_to_fine_d) device_free(coarse_to_fine_d);
     if (fine_to_coarse_d) device_free(fine_to_coarse_d);
     if (coarse_to_fine_h) host_free(coarse_to_fine_h);
@@ -296,13 +302,20 @@ namespace quda {
 
   }
 
-  // compute the fine spin to coarse spin map
+  // compute the fine spin and checkerboard to coarse spin map
   void Transfer::createSpinMap(int spin_bs) {
-
-    for (int s=0; s<B[0]->Nspin(); s++) {
-      spin_map[s] = s / spin_bs;
+    if (spin_bs == 0) // staggered
+    {
+      spin_map[0][0] = 0; // fine even
+      spin_map[0][1] = 1; // fine odd
     }
-
+    else
+    {
+      for (int s=0; s<B[0]->Nspin(); s++) {
+        spin_map[s][0] = s / spin_bs; // not staggered, doesn't care about parity. 
+        spin_map[s][1] = s / spin_bs;
+      }
+    }
   }
 
   // apply the prolongator

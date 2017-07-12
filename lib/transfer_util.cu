@@ -199,7 +199,7 @@ namespace quda {
   /**
       Kernel argument struct
   */
-  template <typename Rotator, int fineSpin, int coarseSpin>
+  template <typename Rotator, int fineSpin, int spinBlockSize, int coarseSpin>
   struct BlockOrthoArg {
     Rotator V;
     const int *fine_to_coarse;
@@ -210,19 +210,18 @@ namespace quda {
     int coarseVolume;
     int geoBlockSize; // number of geometric elements in each block
     int geoBlockSizeCB; // number of geometric elements in each checkerboarded block
-    const int spinBlockSize;
     int nBlock; // number of blocks we are orthogonalizing
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
 
     BlockOrthoArg(Rotator &V, const int *fine_to_coarse, const int *coarse_to_fine,
-		  int parity, const int *geo_bs, int spin_bs, const ColorSpinorField &meta) :
+		  int parity, const int *geo_bs, const ColorSpinorField &meta) :
       V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-      spin_map(), parity(parity), nParity(meta.SiteSubset()), spinBlockSize(spin_bs), swizzle(1)
+      spin_map(), parity(parity), nParity(meta.SiteSubset()), swizzle(1)
     {
       geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       geoBlockSizeCB = geoBlockSize/2;
-      int chiralBlocks = (fineSpin==1) ? 2 : V.Nspin() / spin_bs; //always 2 for staggered.
+      int chiralBlocks = (fineSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
       nBlock = (meta.Volume()/geoBlockSize) * chiralBlocks;
       coarseVolume = meta.Volume() / geoBlockSize;
       if (nParity != 2) errorQuda("BlockOrtho only presently supports full fields");
@@ -259,7 +258,7 @@ namespace quda {
   }
 
 
-  template <typename sumFloat, typename Float, int nSpin, int nColor, int coarseSpin, int nVec, typename Arg>
+  template <typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec, typename Arg>
   void blockOrthoCPU(Arg &arg) {
 
     // loop over geometric blocks
@@ -284,7 +283,7 @@ namespace quda {
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	      for (int s=0; s<nSpin; s++) {
-		dot[arg.spin_map(s)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
+		dot[arg.spin_map(s,parity)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
 	      }
 	    }
 	  }
@@ -302,7 +301,7 @@ namespace quda {
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	      for (int s=0; s<nSpin; s++) {
-		colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s)]), i, parity, x_cb, s, arg);
+		colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s,parity)]), i, parity, x_cb, s, arg);
 	      }
 
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
@@ -324,7 +323,7 @@ namespace quda {
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	    for (int s=0; s<nSpin; s++) {
-	      nrm[arg.spin_map(s)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
+	      nrm[arg.spin_map(s,parity)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
 	    }
 	  }
 	}
@@ -343,7 +342,7 @@ namespace quda {
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	    for (int s=0; s<nSpin; s++) {
-	      colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s)], parity, x_cb, s, arg);
+	      colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s,parity)], parity, x_cb, s, arg);
 	    }
 
 	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
@@ -356,7 +355,7 @@ namespace quda {
     } // x_coarse
   }
 
-  template <typename sumFloat, typename Float, int nSpin, int nColor, int coarseSpin, int nVec,
+  template <typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec,
 	    typename Arg, int block_size>
   __global__ void blockOrthoGPU(Arg arg) {
 
@@ -406,7 +405,7 @@ namespace quda {
 	// compute (j,i) block inner products
 #pragma unroll
 	for (int s=0; s<nSpin; s++) {
-	  dot[arg.spin_map(s)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
+	  dot[arg.spin_map(s,parity)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
 	}
 
 	__syncthreads();
@@ -418,7 +417,7 @@ namespace quda {
 	// subtract the blocks to orthogonalise
 #pragma unroll
 	for (int s=0; s<nSpin; s++) {
-	  colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s)]), i, parity, x_cb, s, arg);
+	  colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s,parity)]), i, parity, x_cb, s, arg);
 	}
 
       } // i
@@ -430,7 +429,7 @@ namespace quda {
 
 #pragma unroll
       for (int s=0; s<nSpin; s++) {
-	nrm[arg.spin_map(s)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
+	nrm[arg.spin_map(s,parity)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
       }
 
       __syncthreads();
@@ -444,7 +443,7 @@ namespace quda {
 
 #pragma unroll
       for (int s=0; s<nSpin; s++) {
-	colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s)], parity, x_cb, s, arg);
+	colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s,parity)], parity, x_cb, s, arg);
       }
 
 #pragma unroll
@@ -457,14 +456,13 @@ namespace quda {
   }
 
 
-  template <typename sumType, typename real, int nSpin, int nColor, int coarseSpin, int nVec>
+  template <typename sumType, typename real, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec>
   class BlockOrtho : public Tunable {
 
     ColorSpinorField &V;
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const int *geo_bs;
-    const int spin_bs;
     int geoBlockSize;
     int nBlock;
 
@@ -474,8 +472,8 @@ namespace quda {
 
   public:
     BlockOrtho(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine,
-	       const int *geo_bs, int spin_bs)
-      : V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine), geo_bs(geo_bs), spin_bs(spin_bs)
+	       const int *geo_bs)
+      : V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine), geo_bs(geo_bs)
     {
       strcpy(aux, V.AuxString());
       strcat(aux, V.Location() == QUDA_CPU_FIELD_LOCATION ? ",CPU,block_size=" : ",GPU,block_size=");
@@ -485,7 +483,7 @@ namespace quda {
       i32toa(size, geoBlockSize);
       strcat(aux,size);
 
-      int chiralBlocks = (nSpin==1) ? 2 : V.Nspin() / spin_bs; //always 2 for staggered.
+      int chiralBlocks = (nSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
       nBlock = (V.Volume()/geoBlockSize) * chiralBlocks;
     }
 
@@ -497,9 +495,9 @@ namespace quda {
 	if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	  typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> VectorField;
 	  VectorField vOrder(const_cast<ColorSpinorField&>(V));
-	  typedef BlockOrthoArg<VectorField,nSpin,coarseSpin> Arg;
-	  Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, spin_bs, V);
-	  blockOrthoCPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg>(arg);
+	  typedef BlockOrthoArg<VectorField,nSpin,spinBlockSize,coarseSpin> Arg;
+	  Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, V);
+	  blockOrthoCPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg>(arg);
 	} else {
 	  errorQuda("Unsupported field order %d\n", V.FieldOrder());
 	}
@@ -508,57 +506,57 @@ namespace quda {
 	if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
 	  typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER> VectorField;
 	  VectorField vOrder(const_cast<ColorSpinorField&>(V));
-	  typedef BlockOrthoArg<VectorField,nSpin,coarseSpin> Arg;
-	  Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, spin_bs, V);
+	  typedef BlockOrthoArg<VectorField,nSpin,spinBlockSize,coarseSpin> Arg;
+	  Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, V);
 	  arg.swizzle = tp.aux.x;
 
 	  if (arg.geoBlockSizeCB == 4) {          // for 2x2x2x1 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,4>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,4>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 8) {   // for 2x2x2x2 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,8>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,8>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 16) {  // for 4x2x2x2 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,16>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,16>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 27) {  // for 3x3x3x2 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,27>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,27>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 32) {  // for 4x4x2x2 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,32>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,32>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 36) {  // for 3x3x2x4 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,36>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,36>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 54) {  // for 3x3x3x4 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,54>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,54>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 64) {  // for 2x4x4x4 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,64>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,64>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 100) {  // for 5x5x2x4 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,100>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,100>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 108) {  // for 3x3x3x8 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,108>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,108>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 128) { // for 4x4x4x4 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,128>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,128>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 200) { // for 5x5x2x8  aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,200>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,200>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 256) { // for 4x4x4x8  aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,256>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,256>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 432) { // for 6x6x6x4 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,432>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,432>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 500) { // 5x5x5x8 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,500>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,500>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 512) { // 4x4x8x8 aggregates
-	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,512>
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,512>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else {
 	    errorQuda("Block size %d not instantiated", arg.geoBlockSizeCB);
@@ -607,7 +605,7 @@ namespace quda {
       param.aux.x = 1; // swizzle factor
     }
 
-    long long flops() const { return nBlock * (geoBlockSize/2) * spin_bs * nColor * (nVec * ((nVec-1) * (8l + 8l)) + 6l); }
+    long long flops() const { return nBlock * (geoBlockSize/2) * (spinBlockSize == 0 ? 1 : 2*spinBlockSize) / 2 * nColor * (nVec * ((nVec-1) * (8l + 8l)) + 6l); }
     long long bytes() const { return (((nVec+1)*nVec)/2) * (V.Bytes()/nVec) + V.Bytes(); } // load + store
 
     char *saveOut, *saveOutNorm;
@@ -632,38 +630,38 @@ namespace quda {
 
   };
 
-  template<typename Float, int nSpin, int nColor, int nVec>
+  template<typename Float, int nSpin, int spinBlockSize, int nColor, int nVec>
   void BlockOrthogonalize(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine,
-			  const int *geo_bs, int spin_bs) {
+			  const int *geo_bs) {
 
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
 
-    int blocksize = geo_blocksize * V.Ncolor() * spin_bs;
-    int chiralBlocks = (V.Nspin() == 1) ? 2 : V.Nspin() / spin_bs; //always 2 for staggered.
+    int blocksize = geo_blocksize * V.Ncolor();
+    if (spinBlockSize == 0) { blocksize /= 2; } else { blocksize *= spinBlockSize; }
+    int chiralBlocks = (spinBlockSize == 0) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
-    if (V.Nspin() == 1) blocksize /= chiralBlocks; //for staggered chiral block size is a parity block size
-    constexpr int coarseSpin = (nSpin == 4 || nSpin == 2) ? 2 : 1;
+    constexpr int coarseSpin = (nSpin == 4 || nSpin == 2 || spinBlockSize == 0) ? 2 : 1;
 
     printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
-    BlockOrtho<double,Float,nSpin,nColor,coarseSpin,nVec> ortho(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+    BlockOrtho<double,Float,nSpin,spinBlockSize,nColor,coarseSpin,nVec> ortho(V, fine_to_coarse, coarse_to_fine, geo_bs);
     ortho.apply(0);
   }
 
-  template<typename Float, int nSpin>
+  template<typename Float, int nSpin, int spinBlockSize>
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec,
-			  const int *fine_to_coarse, const int *coarse_to_fine, const int *geo_bs, int spin_bs) {
+			  const int *fine_to_coarse, const int *coarse_to_fine, const int *geo_bs) {
 
     if (V.Ncolor()/Nvec == 3) {
 
       constexpr int nColor = 3;
       if (Nvec == 2) {
-	BlockOrthogonalize<Float,nSpin,nColor,2>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,2>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 24) {
-	BlockOrthogonalize<Float,nSpin,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 32) {
-	BlockOrthogonalize<Float,nSpin,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
@@ -672,7 +670,7 @@ namespace quda {
 
       constexpr int nColor = 2;
       if (Nvec == 2) {
-	BlockOrthogonalize<Float,nSpin,nColor,2>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,2>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
@@ -681,9 +679,9 @@ namespace quda {
 
       constexpr int nColor = 24;
       if (Nvec == 24) {
-	BlockOrthogonalize<Float,nSpin,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 32) {
-	BlockOrthogonalize<Float,nSpin,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
@@ -692,7 +690,7 @@ namespace quda {
 
       constexpr int nColor = 32;
       if (Nvec == 32) {
-	BlockOrthogonalize<Float,nSpin,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
@@ -704,23 +702,24 @@ namespace quda {
 
   template<typename Float>
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
-			  const int *fine_to_coarse, const int *coarse_to_fine, const int *geo_bs, int spin_bs) {
-    if (V.Nspin() == 4) {
-      BlockOrthogonalize<Float,4>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
-    } else if(V.Nspin() ==2) {
-      BlockOrthogonalize<Float,2>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+			  const int *fine_to_coarse, const int *coarse_to_fine, const int *geo_bs, const int spin_bs) {
+    if (V.Nspin() == 4 && spin_bs == 2) { // coarsening Wilson-like fermions.
+      BlockOrthogonalize<Float,4,2>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
+    } else if(V.Nspin() ==2 && spin_bs == 1) { //coarsening coarse fermions w/ chirality.
+      BlockOrthogonalize<Float,2,1>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
 #ifdef GPU_STAGGERED_DIRAC
-    } else if (V.Nspin() == 1) {
-      BlockOrthogonalize<Float,1>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs, 1);
+    } else if (V.Nspin() == 1 && spin_bs == 0) { // coarsening staggered fermions.
+      BlockOrthogonalize<Float,1,0>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
 #endif
-    }
-    else {
-      errorQuda("Unsupported nSpin %d\n", V.Nspin());
+    } else if (V.Nspin() == 1 && spin_bs == 1) { // coarsening Laplace-like operators.
+      BlockOrthogonalize<Float,1,1>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
+    } else {
+      errorQuda("Unsupported nSpin %d and spinBlockSize %d combination.\n", V.Nspin(), spin_bs);
     }
   }
 
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
-			  const int *fine_to_coarse, const int *coarse_to_fine, const int *geo_bs, int spin_bs) {
+			  const int *fine_to_coarse, const int *coarse_to_fine, const int *geo_bs, const int spin_bs) {
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       BlockOrthogonalize<double>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
