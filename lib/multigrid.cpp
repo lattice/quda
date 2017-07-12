@@ -69,7 +69,9 @@ namespace quda {
       }
     }
 
-    reset();
+    // in case of iterative setup with MG the coarse level may be already built
+    if(!transfer)
+      reset();
 
     setOutputPrefix("");
   }
@@ -79,7 +81,7 @@ namespace quda {
     setVerbosity(param.mg_global.verbosity[param.level]);
     setOutputPrefix(prefix);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d of %d levels\n",transfer ? "Creating":"Resetting", param.level+1, param.Nlevel);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d of %d levels\n", transfer ? "Resetting":"Creating", param.level+1, param.Nlevel);
     createSmoother();
 
     // if not on the coarsest level, update next
@@ -974,8 +976,8 @@ namespace quda {
     }
 
     delete solve;
-    delete mdagm;
-    delete mdagmSloppy;
+    if (mdagm) delete mdagm;
+    if (mdagmSloppy) delete mdagmSloppy;
     delete b;
 
     // storing and freeing B_gpu
