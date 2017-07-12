@@ -174,6 +174,11 @@ namespace quda {
     /** The destructor for Transfer */
     virtual ~Transfer();
 
+    /**
+     @brief for resetting the Transfer when the null vectors have changed
+     */
+    void reset();
+
     /** 
      * Apply the prolongator
      * @param out The resulting field on the fine lattice
