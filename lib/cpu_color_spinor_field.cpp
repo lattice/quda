@@ -124,7 +124,7 @@ namespace quda {
     // means a ghost zone is set.  So we unset it here.  This will be
     // fixed when clean up the ghost code with the peer-2-peer branch
     bytes = length * precision;
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
 
     if (pad != 0) errorQuda("Non-zero pad not supported");  
