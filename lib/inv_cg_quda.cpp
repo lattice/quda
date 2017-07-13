@@ -400,7 +400,7 @@ namespace quda {
 	  } else {
 
 	    if ( (j+1)%Np == 0 ) {
-	      auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
+	      const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	      for (int i=0; i<Np; i++) alpha_[i] = alpha[i];
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
@@ -437,7 +437,7 @@ namespace quda {
       } else {
 
 	{
-	  auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
+	  const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	  for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	  std::vector<ColorSpinorField*> x_;
 	  x_.push_back(&xSloppy);
@@ -547,7 +547,7 @@ namespace quda {
 
       // if we have converged and need to update any trailing solutions
       if (converged && steps_since_reliable > 0 && (j+1)%Np != 0 ) {
-	auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
+	const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	std::vector<ColorSpinorField*> x_;
 	x_.push_back(&xSloppy);
