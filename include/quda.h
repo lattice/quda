@@ -202,6 +202,7 @@ extern "C" {
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
     double clover_coeff;                   /**< Coefficient of the clover term */
+    double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
     double trlogA[2];                      /**< The trace log of the clover term (even/odd computed separately) */
@@ -1053,6 +1054,19 @@ extern "C" {
    * @param Array for storing the averages (total, spatial, temporal)
    */
   void plaqQuda(double plaq[3]);
+
+  /**
+   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param nSteps Number of steps to apply.
+   * @param alpha  Alpha coefficient for Wuppertal smearing.
+   */
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
+                             unsigned int nSteps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared

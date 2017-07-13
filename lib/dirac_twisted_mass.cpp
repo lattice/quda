@@ -53,7 +53,7 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
 	twistGamma5Cuda(&static_cast<cudaColorSpinorField&>(out), 
 			&static_cast<const cudaColorSpinorField&>(in),
 			dagger, kappa, mu, 0.0, twistType);
@@ -182,11 +182,11 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 					double kappa, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu;
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, T, *gauge, c, kappa, a, mu_factor, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, c, kappa, a, mu_factor, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracTwistedMassPC::DiracTwistedMassPC(const DiracTwistedMassPC &dirac) : DiracTwistedMass(dirac) { }
@@ -534,10 +534,10 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 					  double kappa, double mu, double mu_factor) const {
     double a = -2.0 * kappa * mu;
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, T, *gauge, c, kappa, a, -mu_factor, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, c, kappa, a, -mu_factor, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
   }
 } // namespace quda

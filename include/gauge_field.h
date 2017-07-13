@@ -87,7 +87,7 @@ namespace quda {
       compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
       staggeredPhaseApplied(param.staggered_phase_applied), staggered_u1_emulation(param._2d_u1_emulation), staggered_2link_term(param._2link_term), i_mu(param.i_mu)
 	{
-	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
+	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS || link_type == QUDA_SMEARED_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
 	  else if (link_type == QUDA_INVALID_LINKS) errorQuda("Error: invalid link type(%d)\n", link_type);
 	}

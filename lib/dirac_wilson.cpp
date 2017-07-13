@@ -41,7 +41,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
     } else {
@@ -58,7 +58,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
@@ -146,11 +146,11 @@ namespace quda {
   the color matrix that is diagonal on the coarse
   grid
   */
-  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 				   double kappa, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, T, *gauge, c, kappa, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, c, kappa, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)

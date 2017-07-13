@@ -68,9 +68,6 @@ BUILD_QDPJIT_INTERFACE = @BUILD_QDPJIT_INTERFACE@               # build qdpjit i
 BUILD_BQCD_INTERFACE = @BUILD_BQCD_INTERFACE@                   # build bqcd interface
 BUILD_TIFR_INTERFACE = @BUILD_TIFR_INTERFACE@                   # build tifr interface
 
-# Packing option
-DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
-
 # GPU contractions of spinors
 BUILD_CONTRACT = @BUILD_CONTRACT@    # build code for bilinear contraction?
 
@@ -361,11 +358,6 @@ endif
 ifeq ($(strip $(BUILD_TIFR_INTERFACE)), yes)
   NVCCOPT += -DBUILD_TIFR_INTERFACE
   COPT += -DBUILD_TIFR_INTERFACE
-endif
-
-ifeq ($(strip $(DEVICE_PACK)), yes)
-  NVCCOPT += -DDEVICE_PACK
-  COPT += -DDEVICE_PACK
 endif
 
 ifeq ($(strip $(BUILD_CONTRACT)), yes)

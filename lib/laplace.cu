@@ -6,32 +6,36 @@
 #include <color_spinor.h>
 
 /**
-   This is the covariant derivative based on the basic gauged Laplace operator
+   This is a basic gauged Laplace operator
 */
 
 namespace quda {
 
   /**
-     @brief Parameter structure for driving the covariant derivative
+     @brief Parameter structure for driving the Laplace operator
    */
-  template <typename Float, int nSpin, int nColor, QudaReconstructType reconstruct>
-  struct CovDevArg {
-    typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
+  template <typename Float, int nColor, QudaReconstructType reconstruct, bool xpay>
+  struct LaplaceArg {
+    typedef typename colorspinor_mapper<Float,1,nColor>::type F;
     typedef typename gauge_mapper<Float,reconstruct>::type G;
 
     F out;                // output vector field
     const F in;           // input vector field
+    const F x;            // inpuot vector when doing xpay
     const G U;            // the gauge field
+    const Float kappa;    // kappa parameter = 1/(8+m)
     const int parity;     // only use this for single parity fields
     const int nParity;    // number of parities we're working on
     const int nFace;      // hard code to 1 for now
     const int dim[5];     // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;   // checkerboarded volume
-    const int mu;         // direction of the covariant derivative
 
-    CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const int parity, const int mu)
-      : out(out), in(in), U(U), parity(parity), mu(mu), nParity(in.SiteSubset()), nFace(1),
+    __host__ __device__ static constexpr bool isXpay() { return xpay; }
+
+    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+	       Float kappa, const ColorSpinorField *x, int parity)
+      : out(out), in(in), U(U), kappa(kappa), x(xpay ? *x : in), parity(parity), nParity(in.SiteSubset()), nFace(1),
 	dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(in.VolumeCB())
@@ -52,7 +56,7 @@ namespace quda {
      @param[in] x_cb The checkerboarded site index
    */
   template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
-  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int x_cb, int parity) {
+  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
@@ -60,10 +64,9 @@ namespace quda {
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
-    const int d = arg.mu%4;
-
-    if (arg.mu < 4) {
-
+#pragma unroll
+    for (int d = 0; d<nDim; d++) // loop over dimension
+    {
       //Forward gather - compute fwd offset for vector fetch
       const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 
@@ -81,7 +84,7 @@ namespace quda {
 
 	out += U * in;
       }
-    } else {
+
       //Backward gather - compute back offset for spinor and gauge fetch
       const int back_idx = linkIndexM1(coord, arg.dim, d);
       const int gauge_idx = back_idx;
@@ -100,25 +103,30 @@ namespace quda {
 
 	out += conj(U) * in;
       }
-    } // Forward/backward derivative
+    } //nDim
 
   }
 
 
-  //out(x) = M*in
-  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
-  __device__ __host__ inline void covDev(Arg &arg, int x_cb, int parity)
+  //out(x) = M*in = (-D + m) * in(x-mu)
+  template <typename Float, int nDim, int nColor, typename Arg>
+  __device__ __host__ inline void laplace(Arg &arg, int x_cb, int parity)
   {
-    typedef ColorSpinor<Float,nColor,nSpin> Vector;
+    typedef ColorSpinor<Float,nColor,1> Vector;
     Vector out;
 
-    applyCovDev<Float,nDim,nColor>(out, arg, x_cb, parity);
+    applyLaplace<Float,nDim,nColor>(out, arg, x_cb, parity);
+
+    if (arg.isXpay()) {
+      Vector x = arg.x(x_cb, parity);
+      out = x + arg.kappa * out;
+    }
     arg.out(x_cb, parity) = out;
   }
 
   // CPU kernel for applying the Laplace operator to a vector
-  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
-  void covDevCPU(Arg arg)
+  template <typename Float, int nDim, int nColor, typename Arg>
+  void laplaceCPU(Arg arg)
   {
 
     for (int parity= 0; parity < arg.nParity; parity++) {
@@ -126,15 +134,15 @@ namespace quda {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
-	covDev<Float,nDim,nSpin,nColor>(arg, x_cb, parity);
+	laplace<Float,nDim,nColor>(arg, x_cb, parity);
       } // 4-d volumeCB
     } // parity
 
   }
 
   // GPU Kernel for applying the Laplace operator to a vector
-  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
-  __global__ void covDevGPU(Arg arg)
+  template <typename Float, int nDim, int nColor, typename Arg>
+  __global__ void laplaceGPU(Arg arg)
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
 
@@ -144,11 +152,11 @@ namespace quda {
     if (x_cb >= arg.volumeCB) return;
     if (parity >= arg.nParity) return;
 
-    covDev<Float,nDim,nSpin,nColor>(arg, x_cb, parity);
+    laplace<Float,nDim,nColor>(arg, x_cb, parity);
   }
 
-  template <typename Float, int nDim, int nSpin, int nColor, typename Arg>
-  class CovDev : public TunableVectorY {
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class Laplace : public TunableVectorY {
 
   protected:
     Arg &arg;
@@ -156,17 +164,18 @@ namespace quda {
 
     long long flops() const
     {
-      return 8*nColor*nColor*arg.nParity*(long long)meta.VolumeCB();
+      return (2*nDim*(8*nColor*nColor)-2*nColor + (arg.isXpay() ? 2*2*nColor : 0) )*arg.nParity*(long long)meta.VolumeCB();
     }
     long long bytes() const
     {
-      return arg.out.Bytes() + arg.in.Bytes() + arg.nParity*arg.U.Bytes()*meta.VolumeCB();
+      return arg.out.Bytes() + 2*nDim*arg.in.Bytes() + arg.nParity*2*nDim*arg.U.Bytes()*meta.VolumeCB() +
+	(arg.isXpay() ? arg.x.Bytes() : 0);
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    CovDev(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
+    Laplace(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
     {
       strcpy(aux, meta.AuxString());
 #ifdef MULTI_GPU
@@ -179,15 +188,16 @@ namespace quda {
       strcat(aux,",comm=");
       strcat(aux,comm);
 #endif
+      if (arg.isXpay()) strcat(aux,",xpay");
     }
-    virtual ~CovDev() { }
+    virtual ~Laplace() { }
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	covDevCPU<Float,nDim,nSpin,nColor>(arg);
+	laplaceCPU<Float,nDim,nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	covDevGPU<Float,nDim,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	laplaceGPU<Float,nDim,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
 
@@ -196,34 +206,32 @@ namespace quda {
 
 
   template <typename Float, int nColor, QudaReconstructType recon>
-    void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
+    void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+		      double kappa, const ColorSpinorField *x, int parity)
   {
     constexpr int nDim = 4;
-    if (in.Nspin() == 1) {
-      constexpr int nSpin = 1;
-      CovDevArg<Float,nSpin,nColor,recon> arg(out, in, U, parity, mu);
-      CovDev<Float,nDim,nSpin,nColor,CovDevArg<Float,nSpin,nColor,recon> > myCovDev(arg, in);
-      myCovDev.apply(0);
-    } else if (in.Nspin() == 4) {
-      constexpr int nSpin = 4;
-      CovDevArg<Float,nSpin,nColor,recon> arg(out, in, U, parity, mu);
-      CovDev<Float,nDim,nSpin,nColor,CovDevArg<Float,nSpin,nColor,recon> > myCovDev(arg, in);
-      myCovDev.apply(0);
+    if (x) {
+      LaplaceArg<Float,nColor,recon,true> arg(out, in, U, kappa, x, parity);
+      Laplace<Float,nDim,nColor,LaplaceArg<Float,nColor,recon,true> > laplace(arg, in);
+      laplace.apply(0);
     } else {
-      errorQuda("Unsupported nSpin=%d", in.Nspin());
+      LaplaceArg<Float,nColor,recon,false> arg(out, in, U, kappa, x, parity);
+      Laplace<Float,nDim,nColor,LaplaceArg<Float,nColor,recon,false> > laplace(arg, in);
+      laplace.apply(0);
     }
   }
 
   // template on the gauge reconstruction
   template <typename Float, int nColor>
-    void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
+    void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+		      double kappa, const ColorSpinorField *x, int parity)
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
-      ApplyCovDev<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, parity, mu);
+      ApplyLaplace<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, kappa, x, parity);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_12) {
-      ApplyCovDev<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, parity, mu);
+      ApplyLaplace<Float,nColor,QUDA_RECONSTRUCT_12>(out, in, U, kappa, x, parity);
     } else if (U.Reconstruct()== QUDA_RECONSTRUCT_8) {
-      ApplyCovDev<Float,nColor,QUDA_RECONSTRUCT_8> (out, in, U, parity, mu);
+      ApplyLaplace<Float,nColor,QUDA_RECONSTRUCT_8>(out, in, U, kappa, x, parity);
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }
@@ -231,10 +239,11 @@ namespace quda {
 
   // template on the number of colors
   template <typename Float>
-    void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)
+    void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+		      double kappa, const ColorSpinorField *x, int parity)
   {
     if (in.Ncolor() == 3) {
-      ApplyCovDev<Float,3>(out, in, U, parity, mu);
+      ApplyLaplace<Float,3>(out, in, U, kappa, x, parity);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
@@ -246,16 +255,17 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
-  //Apply the covariant derivative operator
-  //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
-  //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)		    
+  //Apply the Laplace operator
+  //out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
+  //Uses the kappa normalization for the Wilson operator.
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+		    double kappa, const ColorSpinorField *x, int parity)		    
   {
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
     
-    // check all precision match
+    // check all precisions match
     checkPrecision(out, in, U);
 
     // check all locations match
@@ -267,9 +277,9 @@ namespace quda {
     if (dslash::aux_worker) dslash::aux_worker->apply(0);
 
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyCovDev<double>(out, in, U, parity, mu);
+      ApplyLaplace<double>(out, in, U, kappa, x, parity);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyCovDev<float>(out, in, U, parity, mu);
+      ApplyLaplace<float>(out, in, U, kappa, x, parity);
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }

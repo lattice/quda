@@ -62,7 +62,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
       
-    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover);
       asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
@@ -79,7 +79,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover);     // regular clover term
       cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		 &static_cast<const cudaColorSpinorField&>(in), parity);
@@ -155,10 +155,10 @@ namespace quda {
     // do nothing
   }
 
-  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 				   double kappa, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
@@ -186,7 +186,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       // needs to be cloverinv
       FullClover cs(clover, true);
       cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
@@ -207,7 +207,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
@@ -226,7 +226,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
@@ -373,10 +373,10 @@ namespace quda {
 
   }
 
-  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 				     double kappa, double mu, double mu_factor) const {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
 } // namespace quda

@@ -301,7 +301,7 @@ namespace quda {
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		   const int *fine_to_coarse, const int *coarse_to_fine, int parity)
       : out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-	parity(parity), location(Location(out,in,v)), block_size(in.VolumeCB()/(2*out.VolumeCB()))
+	parity(parity), location(checkLocation(out,in,v)), block_size(in.VolumeCB()/(2*out.VolumeCB()))
     {
       strcpy(vol, out.VolString());
       strcat(vol, ",");
@@ -341,6 +341,9 @@ namespace quda {
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (block_size == 27) {  // for 3x3x3x2 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,27>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (block_size == 32) {  // for 4x4x2x2 aggregates
+	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,32>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (block_size == 36) {  // for 3x3x2x4 aggregates
 	    RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,36>
@@ -457,7 +460,7 @@ namespace quda {
       param.aux.x = 1; // swizzle factor
     }
 
-    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * in.SiteSubset()*in.VolumeCB(); }
+    long long flops() const { return 8 * fineSpin * fineColor * coarseColor * in.SiteSubset()*(long long)in.VolumeCB(); }
 
     long long bytes() const {
       size_t v_bytes = v.Bytes() / (v.SiteSubset() == in.SiteSubset() ? 1 : 2);
@@ -486,7 +489,7 @@ namespace quda {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   template <typename Float, int fineSpin>
@@ -575,7 +578,7 @@ namespace quda {
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)",
 		out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
 
-    QudaPrecision precision = Precision(out, in);
+    QudaPrecision precision = checkPrecision(out, in);
 
     if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE

@@ -125,6 +125,9 @@ namespace quda {
       }
     }
 
+    // no locality in this kernel so no point in shared-memory tuning
+    bool advanceSharedBytes(TuneParam &param) const { return false; }
+
     bool advanceTuneParam(TuneParam &param) const {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) return Tunable::advanceTuneParam(param);
       else return false;
@@ -150,7 +153,7 @@ namespace quda {
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
 
-    QudaFieldLocation location = Location(Yhat, Y, X, Xinv);
+    QudaFieldLocation location = checkLocation(Yhat, Y, X, Xinv);
 
     // invert the clover matrix field
     const int n = X.Ncolor();
@@ -259,7 +262,7 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    QudaPrecision precision = Precision(Xinv, Y, X);
+    QudaPrecision precision = checkPrecision(Xinv, Y, X);
     printfQuda("Computing Yhat field......\n");
 
     if (precision == QUDA_DOUBLE_PRECISION) {

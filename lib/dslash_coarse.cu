@@ -483,7 +483,7 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / (dim_threads * 2 * nParity); }
+    unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (dim_threads * 2 * nParity); }
 
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -950,10 +950,10 @@ namespace quda {
       if (inA.V() == out.V()) errorQuda("Aliasing pointers");
 
       // check all precisions match
-      QudaPrecision precision = Precision(out, inA, inB, X);
+      QudaPrecision precision = checkPrecision(out, inA, inB, X);
 
       // check all locations match
-      Location(out, inA, inB, Y, X);
+      checkLocation(out, inA, inB, Y, X);
 
       int comm_sum = 4;
       if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-commDim[i]);

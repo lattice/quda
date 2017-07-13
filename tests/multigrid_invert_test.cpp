@@ -61,6 +61,7 @@ extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern int nu_pre;
 extern int nu_post;
+extern QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL];
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
@@ -68,7 +69,7 @@ extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
 extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
 extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
-extern double setup_tol;
+extern double setup_tol[QUDA_MAX_MG_LEVEL];
 extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
@@ -241,7 +242,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
-    mg_param.setup_tol[i] = setup_tol;
+    mg_param.setup_tol[i] = setup_tol[i];
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
@@ -263,7 +264,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE; // EVEN-ODD
+    mg_param.smoother_solve_type[i] = mg_solve_type[i]; // EVEN-ODD
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
     mg_param.smoother_schwarz_type[i] = schwarz_type[i];
@@ -279,7 +280,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     // if we are using an outer even-odd preconditioned solve, then we
     // use single parity injection into the coarse grid
-    mg_param.coarse_grid_solution_type[i] = solve_type == QUDA_DIRECT_PC_SOLVE ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+    mg_param.coarse_grid_solution_type[i] = solve_type == mg_solve_type[i] ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
@@ -410,10 +411,12 @@ int main(int argc, char **argv)
 {
   // We give here the default values to some of the array
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
-    mg_verbosity[i] = QUDA_SILENT;
+    mg_verbosity[i] = QUDA_SUMMARIZE;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
+    setup_tol[i] = 5e-6;
     mu_factor[i] = 1.;
+    mg_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     schwarz_cycle[i] = 1;
     smoother_type[i] = QUDA_MR_INVERTER;
@@ -436,6 +439,9 @@ int main(int argc, char **argv)
   if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
+  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+    if (mg_solve_type[i] == QUDA_INVALID_SOLVE) mg_solve_type[i] = solve_type;
+  }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);

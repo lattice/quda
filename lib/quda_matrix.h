@@ -121,6 +121,7 @@ namespace quda {
     }
 
   template<typename Float, typename T> struct gauge_wrapper;
+  template<typename Float, typename T> struct gauge_ghost_wrapper;
 
   template<class T, int N>
     class Matrix
@@ -162,6 +163,12 @@ namespace quda {
 
 	template<typename S>
 	  __device__ __host__ inline void operator=(const gauge_wrapper<typename RealType<T>::type, S> &s);
+
+	template<typename S>
+	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+
+	template<typename S>
+	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
     };
 
   template<class T>

@@ -465,82 +465,114 @@ namespace quda {
   }
 
 
-  template <typename sumType, typename real, int nSpin, int nColor, int coarseSpin, int nVec, typename Arg>
+  template <typename sumType, typename real, int nSpin, int nColor, int coarseSpin, int nVec>
   class BlockOrtho : public Tunable {
 
-    Arg &arg;
-    const ColorSpinorField &meta;
+    ColorSpinorField &V;
+    const int *fine_to_coarse;
+    const int *coarse_to_fine;
+    const int *geo_bs;
+    const int spin_bs;
+    int geoBlockSize;
+    int nBlock;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    unsigned int minThreads() const { return arg.V.VolumeCB(); } // fine parity is the block y dimension
+    unsigned int minThreads() const { return V.VolumeCB(); } // fine parity is the block y dimension
 
   public:
-    BlockOrtho(Arg &arg, const ColorSpinorField &meta) : arg(arg), meta(meta) {
-      strcpy(aux, meta.AuxString());
-      strcat(aux, meta.Location() == QUDA_CPU_FIELD_LOCATION ? ",CPU,block_size=" : ",GPU,block_size=");
+    BlockOrtho(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine,
+	       const int *geo_bs, int spin_bs)
+      : V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine), geo_bs(geo_bs), spin_bs(spin_bs)
+    {
+      strcpy(aux, V.AuxString());
+      strcat(aux, V.Location() == QUDA_CPU_FIELD_LOCATION ? ",CPU,block_size=" : ",GPU,block_size=");
       char size[8];
-      i32toa(size, arg.geoBlockSize);
+      geoBlockSize = 1;
+      for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
+      i32toa(size, geoBlockSize);
       strcat(aux,size);
+
+      int chiralBlocks = (nSpin==1) ? 2 : V.Nspin() / spin_bs; //always 2 for staggered.
+      nBlock = (V.Volume()/geoBlockSize) * chiralBlocks;
     }
 
     virtual ~BlockOrtho() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	blockOrthoCPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg>(arg);
+      if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
+	if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+	  typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> VectorField;
+	  VectorField vOrder(const_cast<ColorSpinorField&>(V));
+	  typedef BlockOrthoArg<VectorField,nSpin,coarseSpin> Arg;
+	  Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, spin_bs, V);
+	  blockOrthoCPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg>(arg);
+	} else {
+	  errorQuda("Unsupported field order %d\n", V.FieldOrder());
+	}
       } else {
 #if __COMPUTE_CAPABILITY__ >= 300
-	arg.swizzle = tp.aux.x;
+	if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+	  typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER> VectorField;
+	  VectorField vOrder(const_cast<ColorSpinorField&>(V));
+	  typedef BlockOrthoArg<VectorField,nSpin,coarseSpin> Arg;
+	  Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, spin_bs, V);
+	  arg.swizzle = tp.aux.x;
 
-	if (arg.geoBlockSizeCB == 4) {          // for 2x2x2x1 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,4>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 8) {   // for 2x2x2x2 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,8>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 16) {  // for 4x2x2x2 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,16>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 27) {  // for 3x3x3x2 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,27>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 36) {  // for 3x3x2x4 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,36>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 54) {  // for 3x3x3x4 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,54>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 64) {  // for 2x4x4x4 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,64>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 100) {  // for 5x5x2x4 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,100>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 108) {  // for 3x3x3x8 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,108>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 128) { // for 4x4x4x4 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,128>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 200) { // for 5x5x2x8  aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,200>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 256) { // for 4x4x4x8  aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,256>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 432) { // for 6x6x6x4 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,432>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 500) { // 5x5x5x8 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,500>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (arg.geoBlockSizeCB == 512) { // 4x4x8x8 aggregates
-	  blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,512>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  if (arg.geoBlockSizeCB == 4) {          // for 2x2x2x1 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,4>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 8) {   // for 2x2x2x2 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,8>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 16) {  // for 4x2x2x2 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,16>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 27) {  // for 3x3x3x2 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,27>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 32) {  // for 4x4x2x2 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,32>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 36) {  // for 3x3x2x4 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,36>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 54) {  // for 3x3x3x4 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,54>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 64) {  // for 2x4x4x4 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,64>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 100) {  // for 5x5x2x4 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,100>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 108) {  // for 3x3x3x8 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,108>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 128) { // for 4x4x4x4 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,128>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 200) { // for 5x5x2x8  aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,200>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 256) { // for 4x4x4x8  aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,256>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 432) { // for 6x6x6x4 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,432>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 500) { // 5x5x5x8 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,500>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 512) { // 4x4x8x8 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,nColor,coarseSpin,nVec,Arg,512>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else {
+	    errorQuda("Block size %d not instantiated", arg.geoBlockSizeCB);
+	  }
 	} else {
-	  errorQuda("Block size %d not instantiated", arg.geoBlockSizeCB);
+	  errorQuda("Unsupported field order %d\n", V.FieldOrder());
 	}
 #else
 	errorQuda("GPU block orthogonalization not supported on this GPU architecture");
@@ -564,44 +596,44 @@ namespace quda {
     }
 
     bool advanceTuneParam(TuneParam &param) const {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	return advanceSharedBytes(param) || advanceAux(param);
       } else {
 	return false;
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(V.VolString(), typeid(*this).name(), aux); }
 
     void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
-      param.block = dim3(arg.geoBlockSizeCB, meta.SiteSubset(), 1);
+      param.block = dim3(geoBlockSize/2, V.SiteSubset(), 1);
       param.grid = dim3( (minThreads()+param.block.x-1) / param.block.x, 1, 1);
       param.shared_bytes = 0;
       param.aux.x = 1; // swizzle factor
     }
 
-    long long flops() const { return arg.nBlock * arg.geoBlockSize * arg.spinBlockSize * nColor * (nVec * ((nVec-1) * (8l + 8l)) + 6l); }
-    long long bytes() const { return (((nVec+1)*nVec)/2) * (meta.Bytes()/nVec) + meta.Bytes(); } // load + store
+    long long flops() const { return nBlock * (geoBlockSize/2) * spin_bs * nColor * (nVec * ((nVec-1) * (8l + 8l)) + 6l); }
+    long long bytes() const { return (((nVec+1)*nVec)/2) * (V.Bytes()/nVec) + V.Bytes(); } // load + store
 
     char *saveOut, *saveOutNorm;
 
     void preTune() {
-      saveOut = new char[meta.Bytes()];
-      cudaMemcpy(saveOut, meta.V(), meta.Bytes(), cudaMemcpyDeviceToHost);
-      if (meta.Precision() == QUDA_HALF_PRECISION && meta.NormBytes()) {
-	saveOutNorm = new char[meta.NormBytes()];
-	cudaMemcpy(saveOutNorm, meta.Norm(), meta.NormBytes(), cudaMemcpyDeviceToHost);
+      saveOut = new char[V.Bytes()];
+      cudaMemcpy(saveOut, V.V(), V.Bytes(), cudaMemcpyDeviceToHost);
+      if (V.Precision() == QUDA_HALF_PRECISION && V.NormBytes()) {
+	saveOutNorm = new char[V.NormBytes()];
+	cudaMemcpy(saveOutNorm, V.Norm(), V.NormBytes(), cudaMemcpyDeviceToHost);
       }
     }
 
     void postTune() {
-      cudaMemcpy((void*)meta.V(), saveOut, meta.Bytes(), cudaMemcpyHostToDevice);
+      cudaMemcpy((void*)V.V(), saveOut, V.Bytes(), cudaMemcpyHostToDevice);
       delete[] saveOut;
-      if (meta.Precision() == QUDA_HALF_PRECISION && meta.NormBytes()) {
-	cudaMemcpy((void*)meta.Norm(), saveOutNorm, meta.NormBytes(), cudaMemcpyHostToDevice);
+      if (V.Precision() == QUDA_HALF_PRECISION && V.NormBytes()) {
+	cudaMemcpy((void*)V.Norm(), saveOutNorm, V.NormBytes(), cudaMemcpyHostToDevice);
 	delete[] saveOutNorm;
       }
     }
@@ -624,28 +656,8 @@ namespace quda {
 
     printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
-    // FIXME do not instantiate CPU order templates for GPU kernels
-    if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      typedef FieldOrderCB<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> VectorField;
-      VectorField vOrder(const_cast<ColorSpinorField&>(V));
-
-      typedef BlockOrthoArg<VectorField,nSpin,coarseSpin> Arg;
-      Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, spin_bs, V);
-      BlockOrtho<double,Float,nSpin,nColor,coarseSpin,nVec,Arg> ortho(arg, V);
-      ortho.apply(0);
-
-    } else if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      typedef FieldOrderCB<Float,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER> VectorField;
-      VectorField vOrder(const_cast<ColorSpinorField&>(V));
-
-      typedef BlockOrthoArg<VectorField,nSpin,coarseSpin> Arg;
-      Arg arg(vOrder, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, spin_bs, V);
-      BlockOrtho<double,Float,nSpin,nColor,coarseSpin,nVec,Arg> ortho(arg, V);
-      ortho.apply(0);
-    } else {
-      errorQuda("Unsupported field order %d\n", V.FieldOrder());
-    }
-
+    BlockOrtho<double,Float,nSpin,nColor,coarseSpin,nVec> ortho(V, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs);
+    ortho.apply(0);
   }
 
   template<typename Float, int nSpin>
