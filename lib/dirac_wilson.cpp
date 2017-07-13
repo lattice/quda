@@ -147,7 +147,7 @@ namespace quda {
   grid
   */
   void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				   double kappa, double mu, double mu_factor) const {
+				   double kappa, double mass, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     cudaCloverField *c = NULL;
     CoarseOp(Y, X, T, *gauge, c, kappa, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);

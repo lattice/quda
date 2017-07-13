@@ -104,8 +104,8 @@ namespace quda {
 
     bool gpu_setup = true;
 
-    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,Mu(),MuFactor());
-    else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,Mu(),MuFactor());
+    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
+    else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
 
     gParam.order = QUDA_QDP_GAUGE_ORDER;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -257,7 +257,7 @@ namespace quda {
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mu, double mu_factor) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu, double mu_factor) const
   {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
@@ -434,7 +434,7 @@ namespace quda {
   //Make the coarse operator one level down.  For the preconditioned
   //operator we are coarsening the Yhat links, not the Y links.  We
   //pass the fine clover fields, though they are actually ignored.
-  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mu, double mu_factor) const
+  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu, double mu_factor) const
   {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
