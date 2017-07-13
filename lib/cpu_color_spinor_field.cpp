@@ -18,14 +18,19 @@ namespace quda {
 
   cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
     ColorSpinorField(param), init(false), reference(false) {
+
+    // need to set this before create
+    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+      v = param.v;
+      reference = true;
+    }
+
     create(param.create);
-    if (param.create == QUDA_NULL_FIELD_CREATE) {
+
+    if (param.create == QUDA_NULL_FIELD_CREATE || param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
-    } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      v = param.v;
-      reference = true;
     } else {
       errorQuda("Creation type %d not supported", param.create);
     }
@@ -65,6 +70,7 @@ namespace quda {
       errorQuda("Undefined behaviour"); // else silent bug possible?
     }
 
+    // need to set this before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = (void*)src.V();
       norm = (void*)src.Norm();
@@ -159,6 +165,10 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
       param.norm = norm;
+      param.is_composite  = false;
+      param.composite_dim = 0;
+      param.is_component  = composite_descr.is_component;
+      param.component_id  = composite_descr.id;
       even = new cpuColorSpinorField(*this, param);
       odd = new cpuColorSpinorField(*this, param);
 
@@ -192,10 +202,9 @@ namespace quda {
 
   void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
     checkField(*this, src);
-    if (fieldOrder == src.fieldOrder) {
+    if (fieldOrder == src.fieldOrder && bytes == src.Bytes()) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	// FIXME (HJ Kim): I think this is a bug, we should copy the data with amount of "bytes/Ls"
-        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes); 
+        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes/x[nDim-1]);
       else 
         memcpy(v, src.v, bytes);
     } else {
