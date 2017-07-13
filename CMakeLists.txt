@@ -521,6 +521,10 @@ STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
 
+# this allows simplified running of clang-tidy 
+if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
+   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
