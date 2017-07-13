@@ -703,16 +703,18 @@ namespace quda {
   template<typename Float>
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
 			  const int *fine_to_coarse, const int *coarse_to_fine, const int *geo_bs, const int spin_bs) {
-    if (V.Nspin() == 4 && spin_bs == 2) { // coarsening Wilson-like fermions.
-      BlockOrthogonalize<Float,4,2>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
-    } else if(V.Nspin() ==2 && spin_bs == 1) { //coarsening coarse fermions w/ chirality.
+    if(V.Nspin() ==2 && spin_bs == 1) { //coarsening coarse fermions w/ chirality.
       BlockOrthogonalize<Float,2,1>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
+#ifdef GPU_WILSON_DIRAC
+    } else if (V.Nspin() == 4 && spin_bs == 2) { // coarsening Wilson-like fermions.
+      BlockOrthogonalize<Float,4,2>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs); 
+#endif
 #ifdef GPU_STAGGERED_DIRAC
     } else if (V.Nspin() == 1 && spin_bs == 0) { // coarsening staggered fermions.
       BlockOrthogonalize<Float,1,0>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
-#endif
     } else if (V.Nspin() == 1 && spin_bs == 1) { // coarsening Laplace-like operators.
       BlockOrthogonalize<Float,1,1>(V, Nvec, fine_to_coarse, coarse_to_fine, geo_bs);
+#endif
     } else {
       errorQuda("Unsupported nSpin %d and spinBlockSize %d combination.\n", V.Nspin(), spin_bs);
     }
