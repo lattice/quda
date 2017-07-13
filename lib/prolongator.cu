@@ -274,10 +274,12 @@ namespace quda {
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
 
-    if (out.Nspin() == 4) {
-      Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-    } else if (out.Nspin() == 2) {
+    if (out.Nspin() == 2) {
       Prolongate<Float,2>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+#ifdef GPU_WILSON_DIRAC
+    } else if (out.Nspin() == 4) {
+      Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+#endif
 #ifdef GPU_STAGGERED_DIRAC
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);

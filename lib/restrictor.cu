@@ -518,10 +518,12 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
 
-    if (in.Nspin() == 4) {
-      Restrict<Float,4>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
-    } else if (in.Nspin() == 2) {
+    if (in.Nspin() == 2) {
       Restrict<Float,2>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+#ifdef GPU_WILSON_DIRAC
+    } else if (in.Nspin() == 4) {
+      Restrict<Float,4>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+#endif
 #if GPU_STAGGERED_DIRAC
     } else if (in.Nspin() == 1) {
       Restrict<Float,1>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
