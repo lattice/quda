@@ -30,6 +30,33 @@ extern "C" {
     QudaInverterType solver_type; /** Type of solver to use */
   } QudaInvertArgs_t;
 
+  /**
+   * Parameters related to deflated solvers.
+   */
+
+  typedef struct {
+    QudaPrecision  prec_ritz;
+    int nev;
+    int max_search_dim;
+    int deflation_grid;
+    double tol_restart;
+
+    int eigcg_max_restarts;
+    int max_restart_num;
+    double inc_tol;
+    double eigenval_tol;
+
+    QudaExtLibType   solver_ext_lib;
+    QudaExtLibType   deflation_ext_lib;
+
+    QudaFieldLocation location_ritz;
+    QudaMemoryType    mem_type_ritz;
+
+    char *vec_infile;
+    char *vec_outfile;
+
+  } QudaEigArgs_t;
+
 
   /**
    * Parameters related to problem size and machine topology.
@@ -345,13 +372,7 @@ extern "C" {
    * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solution Array of solution spinor fields
-   * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
-   * @param vec_infile input file location 
-   * @param vec_outfile output file location
-   * @param max_search_dim eigCG parameter: search space dimention
-   * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
-   * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
-   * @param tol_restart initCG parameter : at what tolerance value to restart initCG solver
+   * @param eig_args contains info about deflation space
    * @param rhs_idx  bookkeep current rhs
    * @param last_rhs_flag  is this the last rhs to solve?
    * @param final_residual Array of true residuals
@@ -371,13 +392,7 @@ extern "C" {
       const double tadpole,
       void* source,
       void* solution,
-      int ritz_prec,
-      char vec_infile[],
-      char vec_outfile[],
-      const int max_search_dim,
-      const int nev,
-      const int deflation_grid,
-      double tol_restart,//e.g.: 5e+3*target_residual
+      QudaEigArgs_t eig_args,
       const int rhs_idx,//current rhs
       const int last_rhs_flag,//is this the last rhs to solve?
       double* const final_residual,
@@ -443,13 +458,7 @@ extern "C" {
    * @param clover_coeff Clover coefficient
    * @param source Right-hand side source field
    * @param solution Solution spinor field
-   * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
-   * @param vec_infile input file location 
-   * @param vec_outfile output file location
-   * @param max_search_dim eigCG parameter: search space dimention
-   * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
-   * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
-   * @param tol_restart initCG parameter : at what tolerance value to restart initCG solver
+   * @param eig_args contains info about deflation space
    * @param rhs_idx  bookkeep current rhs
    * @param last_rhs_flag  is this the last rhs to solve?
    * @param final_residual Array of true residuals
@@ -471,13 +480,7 @@ extern "C" {
       void* milc_clover_inv,
       void* source,
       void* solution,
-      int ritz_prec,
-      char vec_infile[],
-      char vec_outfile[],
-      const int max_search_dim,
-      const int nev,
-      const int deflation_grid,
-      double tol_restart,//e.g.: 5e+3*target_residual
+      QudaEigArgs_t eig_args,
       const int rhs_idx,//current rhs
       const int last_rhs_flag,//is this the last rhs to solve?
       double* const final_residual,
