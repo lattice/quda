@@ -208,7 +208,7 @@ namespace quda {
     }
 
     for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s); // Coarse spin
+      const int s_c = arg.spin_map(s,parity); // Coarse spin
 
       //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
       //in the same chiral block.
@@ -450,7 +450,7 @@ namespace quda {
 
     //First we store in UV the product [(Clover -/+ i mu)·Vector]
     for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s); // Coarse Spin
+      const int s_c = arg.spin_map(s,parity); // Coarse Spin
 
       //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
       //in the same chiral block.
@@ -491,7 +491,7 @@ namespace quda {
     //Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
     //for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
     for(int s = 0; s < fineSpin; s++) {  //Fine Spin
-      const int s_c = arg.spin_map(s); // Coarse Spin
+      const int s_c = arg.spin_map(s,parity); // Coarse Spin
 
       //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
       //in the same chiral block.
@@ -556,7 +556,7 @@ namespace quda {
 	//of two terms - diagonal and off-diagonal part of
 	//P_mu = (1+/-\gamma_mu)
 
-	const int s_c_row = arg.spin_map(s); // Coarse spin row index
+	const int s_c_row = arg.spin_map(s,parity); // Coarse spin row index
 
 	//Use Gamma to calculate off-diagonal coupling and
 	//column index.  Diagonal coupling is always 1.
@@ -565,7 +565,7 @@ namespace quda {
 
 	int s_col;
 	const complex<Float> coupling = gamma.getrowelem(s, s_col);
-	const int s_c_col = arg.spin_map(s_col); // Coarse spin col index
+	const int s_c_col = arg.spin_map(s_col,parity); // Coarse spin col index
 
 #pragma unroll
 	for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color
@@ -945,7 +945,7 @@ namespace quda {
     if (!from_coarse) {
       //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
       for(int s = 0; s < fineSpin; s++) { //Loop over fine spin row
-	const int s_c = arg.spin_map(s);
+	const int s_c = arg.spin_map(s,parity);
 	//On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
 	//in the same chiral block.
 	for(int s_col = s_c*arg.spin_bs; s_col < (s_c+1)*arg.spin_bs; s_col++) { //Loop over fine spin column

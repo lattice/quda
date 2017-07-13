@@ -46,7 +46,7 @@ namespace quda {
     for (int s=0; s<fineSpin; s++) {
 #pragma unroll
       for (int c=0; c<coarseColor; c++) {
-	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map(s), c);
+	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map(s,parity), c);
       }
     }
   }
@@ -216,7 +216,7 @@ namespace quda {
 
   template <typename Float, int fineSpin>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  int nVec, const int *fine_to_coarse, const int *spin_map, int parity) {
+		  int nVec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
 
     if (in.Nspin() != 2) errorQuda("Coarse spin %d is not supported", in.Nspin());
     const int coarseSpin = 2;
@@ -224,7 +224,8 @@ namespace quda {
     // first check that the spin_map matches the spin_mapper
     spin_mapper<fineSpin,coarseSpin> mapper;
     for (int s=0; s<fineSpin; s++) 
-      if (mapper(s) != spin_map[s]) errorQuda("Spin map does not match spin_mapper");
+      for (int p=0; p<2; p++)
+        if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
     if (out.Ncolor() == 3) {
       const int fineColor = 3;
@@ -271,12 +272,14 @@ namespace quda {
 
   template <typename Float>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  int Nvec, const int *fine_to_coarse, const int *spin_map, int parity) {
+		  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
 
-    if (out.Nspin() == 4) {
-      Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-    } else if (out.Nspin() == 2) {
+    if (out.Nspin() == 2) {
       Prolongate<Float,2>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+#ifdef GPU_WILSON_DIRAC
+    } else if (out.Nspin() == 4) {
+      Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+#endif
 #ifdef GPU_STAGGERED_DIRAC
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
@@ -289,7 +292,7 @@ namespace quda {
 #endif // GPU_MULTIGRID
 
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  int Nvec, const int *fine_to_coarse, const int *spin_map, int parity) {
+		  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
 #ifdef GPU_MULTIGRID
     if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)", 

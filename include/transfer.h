@@ -80,11 +80,14 @@ namespace quda {
 	block order, with each value corresponding to a fine-grid offset. (GPU) */
     int *coarse_to_fine_d;
 
-    /** The spin blocking */
+    /** The spin blocking. Defined as zero when the fine operator is staggered. */
     int spin_bs;
 
-    /** The mapping onto coarse spin from fine spin */
-    int *spin_map;
+    /** The mapping onto coarse spin from fine spin (inner) and fine parity (outer), for staggered */
+    int **spin_map;
+
+    /** Nspin for the fine level. Required for deallocating spin_map. */
+    const int nspin_fine;
 
     /** Whether the transfer operator is to be applied to full fields or single parity fields */
     QudaSiteSubset site_subset;
@@ -139,7 +142,7 @@ namespace quda {
     //void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize);
 
     /** 
-     * Creates the map between fine and coarse spin dimensions
+     * Creates the map between fine spin and parity to coarse spin dimensions
      * @param spin_bs The spin block size
      */
     void createSpinMap(int spin_bs);
@@ -209,7 +212,7 @@ namespace quda {
     int nvec() const {return Nvec;}
 
     /**
-     * Returns the amount of spin blocking
+     * Returns the amount of spin blocking. Defined as zero when coarsening staggered. 
      * @return spin_bs
      */
     int Spin_bs() const {return spin_bs;}
@@ -283,7 +286,7 @@ namespace quda {
      @param[in] spin_bs Spin block size
    */
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *fine_to_coarse,
-			  const int *coarse_to_fine, const int *geo_bs, int spin_bs);
+			  const int *coarse_to_fine, const int *geo_bs, const int spin_bs);
 
   /**
      @brief Apply the prolongation operator
@@ -296,7 +299,7 @@ namespace quda {
      @param[in] parity of the output fine field (if single parity output field)
    */
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		  int Nvec, const int *fine_to_coarse, const int *spin_map,
+		  int Nvec, const int *fine_to_coarse, const int * const *spin_map,
 		  int parity=QUDA_INVALID_PARITY);
 
   /**
@@ -310,7 +313,7 @@ namespace quda {
      @param[in] parity of the input fine field (if single parity input field)
    */
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map,
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
 		int parity=QUDA_INVALID_PARITY);
   
 

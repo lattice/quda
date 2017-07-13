@@ -221,6 +221,10 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
+  // Set some defaults that lets the benchmark fit in memory if you run it
+  // with default parameters.
+  xdim = ydim = zdim = tdim = 8;
+  
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
