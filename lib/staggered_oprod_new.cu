@@ -364,7 +364,7 @@ namespace quda {
   }; // StaggeredOprodField
 
 
-  void exchangeGhost(cudaColorSpinorField &a, int parity, int dag) {
+  void exchangeGhost(int nFace, cudaColorSpinorField &a, int parity, int dag) {
     // need to enable packing in temporal direction to get spin-projector correct
     bool pack_old = getKernelPackT();
     setKernelPackT(true);
@@ -372,14 +372,15 @@ namespace quda {
     // first transfer src1
     cudaDeviceSynchronize();
 
-    a.pack(1, 1-parity, dag, Nstream-1, 0);
+    MemoryLocation location[2*QUDA_MAX_DIM] = {Device, Device, Device, Device, Device, Device, Device, Device};
+    a.pack(nFace, 1-parity, dag, Nstream-1, location);
 
     cudaDeviceSynchronize();
 
     for(int i=3; i>=0; i--){
       if(commDimPartitioned(i)){
 	// Initialize the host transfer from the source spinor
-	a.gather(1, dag, 2*i);
+	a.gather(nFace, dag, 2*i);
       } // commDim(i)
     } // i=3,..,0
 
@@ -387,14 +388,14 @@ namespace quda {
 
     for (int i=3; i>=0; i--) {
       if(commDimPartitioned(i)) {
-	a.commsStart(1, 2*i, dag);
+	a.commsStart(nFace, 2*i, dag);
       }
     }
 
     for (int i=3; i>=0; i--) {
       if(commDimPartitioned(i)) {
-	a.commsWait(1, 2*i, dag);
-	a.scatter(1, dag, 2*i);
+	a.commsWait(nFace, 2*i, dag);
+	a.scatter(nFace, dag, 2*i);
       }
     }
 
@@ -468,14 +469,14 @@ namespace quda {
     if (inEven.Precision() == QUDA_DOUBLE_PRECISION) {
       Spinor<double2, double2, 3, 0, 0> spinorA(inA, nFace);
       Spinor<double2, double2, 3, 0, 1> spinorB(inB, nFace);
-      exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, 0);
+      exchangeGhost(nFace,static_cast<cudaColorSpinorField&>(inB), parity, 0);
 
       computeStaggeredOprodCuda<double>(gauge::FloatNOrder<double, 18, 2, 18>(outA), gauge::FloatNOrder<double, 18, 2, 18>(outB),
 					outA, outB, spinorA, spinorB, inB, parity, inB.GhostFace(), coeff, nFace);
     } else if (inEven.Precision() == QUDA_SINGLE_PRECISION) {
       Spinor<float2, float2, 3, 0, 0> spinorA(inA, nFace);
       Spinor<float2, float2, 3, 0, 1> spinorB(inB, nFace);
-      exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, 0);
+      exchangeGhost(nFace,static_cast<cudaColorSpinorField&>(inB), parity, 0);
 
       computeStaggeredOprodCuda<float>(gauge::FloatNOrder<float, 18, 2, 18>(outA), gauge::FloatNOrder<float, 18, 2, 18>(outB),
 				       outA, outB, spinorA, spinorB, inB, parity, inB.GhostFace(), coeff, nFace);

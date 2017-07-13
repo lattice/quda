@@ -4270,9 +4270,14 @@ computeHISQForceCompleteQuda(void* const milc_momentum,
   cudaGaugeField* cudaInForce  = new cudaGaugeField(param);
 
 #ifdef MULTI_GPU
-  for(int dir=0; dir<4; ++dir) param.x[dir] += 4;
+  int R[4] = {2, 2, 2, 2};
+  for(int dir=0; dir<4; ++dir) {
+    param.x[dir] += 2*R[dir];
+    param.r[dir] = R[dir];
+  }
   param.reconstruct = QUDA_RECONSTRUCT_NO;
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   cudaGaugeField* cudaGaugeEx = new cudaGaugeField(param);
   cudaGaugeField* cudaInForceEx = new cudaGaugeField(param);
   cudaGaugeField* cudaOutForceEx = new cudaGaugeField(param);
@@ -4310,7 +4315,6 @@ computeHISQForceCompleteQuda(void* const milc_momentum,
   cudaGauge->loadCPUField(cpuWLink);
   profileHISQForce.TPSTOP(QUDA_PROFILE_H2D);
 #ifdef MULTI_GPU
-  int R[4] = {2, 2, 2, 2};
   profileHISQForce.TPSTART(QUDA_PROFILE_COMMS);
   copyExtendedGauge(*cudaGaugeEx, *cudaGauge, QUDA_CUDA_FIELD_LOCATION);
   cudaGaugeEx->exchangeExtendedGhost(R,true);
@@ -4536,16 +4540,20 @@ void computeStaggeredOprodQuda(void** oprod,
     cudaQuarkOdd = cpuQuarkOdd;
     profileStaggeredOprod.TPSTOP(QUDA_PROFILE_H2D);
 
-
     profileStaggeredOprod.TPSTART(QUDA_PROFILE_COMPUTE);
+#if 1
+    experimental::computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuarkEven, cudaQuarkOdd, 0, coeff[i], 3);
+    experimental::computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuarkEven, cudaQuarkOdd, 1, coeff[i], 3);
+#else
     // Operate on even-parity sites
     computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuarkEven, cudaQuarkOdd, faceBuffer1, 0, coeff[i]);
 
     // Operate on odd-parity sites
     computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuarkEven, cudaQuarkOdd, faceBuffer2, 1, coeff[i]);
+#endif
+
     profileStaggeredOprod.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-
 
   // copy the outer product field back to the host
   profileStaggeredOprod.TPSTART(QUDA_PROFILE_D2H);
