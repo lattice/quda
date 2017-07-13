@@ -161,11 +161,12 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param T[in] Transfer operator defining the coarse grid
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
     virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				double kappa, double mu=0., double mu_factor=0.) const
+				double kappa, double mass=0., double mu=0., double mu_factor=0.) const
     {errorQuda("Not implemented");}
 
   };
@@ -203,10 +204,11 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param T[in] Transfer operator defining the coarse grid
+     * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
      * @param kappa Kappa parameter for the coarse operator
      */
     virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				double kappa, double mu=0., double mu_factor=0.) const;
+				double kappa, double mass=0.,double mu=0., double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -263,9 +265,10 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu=0., double mu_factor=0.) const;
+			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned clover
@@ -302,9 +305,10 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (set to zero)
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu=0., double mu_factor=0.) const;
+			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
   };
 
 
@@ -499,11 +503,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu, double mu_factor=0.) const;
+			double kappa, double mass, double mu, double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -537,11 +542,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu, double mu_factor=0.) const;
+			double kappa, double mass, double mu, double mu_factor=0.) const;
   };
 
   // Full twisted mass with a clover term
@@ -581,11 +587,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu, double mu_factor=0.) const;
+			double kappa, double mass, double mu, double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -623,11 +630,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu, double mu_factor=0.) const;
+			double kappa, double mass, double mu, double mu_factor=0.) const;
   };
 
   // Full staggered
@@ -655,6 +663,20 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse staggered operator.  Unlike the Wilson operator,
+     *        we assume a mass normalization, not a kappa normalization. Thus kappa
+     *        gets ignored. 
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+      double kappa, double mass, double mu=0., double mu_factor=0.) const;
   };
 
   // Even-odd preconditioned staggered
@@ -842,11 +864,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter (assumed to be zero, staggered mass gets built into clover)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu, double mu_factor=0.) const;
+			double kappa, double mass, double mu, double mu_factor=0.) const;
 
 
     /**
@@ -890,11 +913,12 @@ namespace quda {
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
+     * @param mass Mass parameter for the coarse operator, assumed to be zero
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mu, double mu_factor=0.) const;
+			double kappa, double mass, double mu, double mu_factor=0.) const;
   };
 
 
