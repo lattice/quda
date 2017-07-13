@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+  typedef enum QudaMemoryType_s {
+    QUDA_MEMORY_DEVICE,
+    QUDA_MEMORY_PINNED,
+    QUDA_MEMORY_MAPPED,
+    QUDA_MEMORY_INVALID = QUDA_INVALID_ENUM
+  } QudaMemoryType;
+
   //
   // Types used in QudaGaugeParam
   //
@@ -88,15 +95,16 @@ extern "C" {
 
   typedef enum QudaDslashPolicy_s {
     QUDA_DSLASH,
-    QUDA_DSLASH2,
-    QUDA_PTHREADS_DSLASH,
-    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_DSLASH,
+    QUDA_GPU_COMMS_DSLASH,
     QUDA_FUSED_GPU_COMMS_DSLASH,
-    QUDA_DSLASH_ASYNC,
-    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_ZERO_COPY_DSLASH_PACK,
+    QUDA_FUSED_ZERO_COPY_DSLASH_PACK,
     QUDA_ZERO_COPY_DSLASH,
     QUDA_FUSED_ZERO_COPY_DSLASH,
+    QUDA_DSLASH_ASYNC,
+    QUDA_FUSED_DSLASH_ASYNC,
+    QUDA_PTHREADS_DSLASH,
     QUDA_DSLASH_NC
   } QudaDslashPolicy;
 
@@ -120,6 +128,9 @@ extern "C" {
     QUDA_BICGSTABL_INVERTER,
     QUDA_CGNE_INVERTER,
     QUDA_CGNR_INVERTER,
+    QUDA_CG3_INVERTER,
+    QUDA_CG3NE_INVERTER,
+    QUDA_CG3NR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -346,6 +357,7 @@ extern "C" {
     QUDA_RANDOM_SOURCE,
     QUDA_CONSTANT_SOURCE,
     QUDA_SINUSOIDAL_SOURCE,
+    QUDA_CORNER_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
@@ -405,6 +417,12 @@ extern "C" {
     QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
   } QudaComputeNullVector;
 
+  typedef enum QudaSetupType_s {
+    QUDA_NULL_VECTOR_SETUP,
+    QUDA_TEST_VECTOR_SETUP,
+    QUDA_INVALID_SETUP_TYPE = QUDA_INVALID_ENUM
+  } QudaSetupType;
+
   typedef enum QudaBoolean_s {
     QUDA_BOOLEAN_NO = 0,
     QUDA_BOOLEAN_YES = 1,
@@ -416,7 +434,13 @@ extern "C" {
     QUDA_FORWARDS = +1,
     QUDA_BOTH_DIRS = 2
   } QudaDirection;
-  
+
+  typedef enum QudaLinkDirection_s {
+    QUDA_LINK_BACKWARDS,
+    QUDA_LINK_FORWARDS,
+    QUDA_LINK_BIDIRECTIONAL
+  } QudaLinkDirection;
+
   typedef enum QudaFieldGeometry_s {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,

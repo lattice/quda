@@ -28,6 +28,10 @@ void matomega(void *out, void **fatlink, void** longlink, void *in, double mass,
 void mat(void *out, void **fatlink, void** longlink, void *in, double kappa, int daggerBit,
 	 QudaPrecision sPrecision, QudaPrecision gPrecision);
 
+void mat_mg4dir(cpuColorSpinorField* out, void **fatlink, void** longlink, void** ghost_fatlink, void** ghost_longlink, 
+		 cpuColorSpinorField* in, double factor, int dagger_bit,
+		 QudaPrecision sPrecision, QudaPrecision gPrecision, QudaInvertParam *inv_param);
+
 void staggered_matpc(void *out, void **fatlink, void ** longlink, void *in, double kappa, QudaMatPCType matpc_type, 
 		     int daggerBit, QudaPrecision sPrecision, QudaPrecision gPrecision);
 void matdagmat(void *out, void **fatlink, void** longlink, void *in, double mass, int dagger_bit,

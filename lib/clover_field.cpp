@@ -77,8 +77,8 @@ namespace quda {
 
     if (param.direct) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	clover = pool_device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) norm = pool_device_malloc(norm_bytes);
+	clover = bytes ? pool_device_malloc(bytes) : nullptr;
+	if (precision == QUDA_HALF_PRECISION) norm = norm_bytes ? pool_device_malloc(norm_bytes) : nullptr;
       } else {
 	clover = param.clover;
 	norm = param.norm;
@@ -105,8 +105,8 @@ namespace quda {
 
     if (param.inverse) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-	cloverInv = pool_device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) invNorm = pool_device_malloc(norm_bytes);
+	cloverInv = bytes ? pool_device_malloc(bytes) : nullptr;
+	if (precision == QUDA_HALF_PRECISION) invNorm = norm_bytes ? pool_device_malloc(norm_bytes): nullptr;
       } else {
 	cloverInv = param.cloverInv;
 	invNorm = param.invNorm;
@@ -156,7 +156,7 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
 					void *field, void *norm) {
-    if (order == QUDA_FLOAT2_CLOVER_ORDER || order == QUDA_FLOAT4_CLOVER_ORDER) {
+    if (isNative()) {
       // create the texture for the field components
       
       cudaChannelFormatDesc desc;
@@ -211,7 +211,7 @@ namespace quda {
   }
 
   void cudaCloverField::destroyTexObject() {
-    if (order == QUDA_FLOAT2_CLOVER_ORDER || order == QUDA_FLOAT4_CLOVER_ORDER) {
+    if (isNative()) {
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
       cudaDestroyTextureObject(evenInvTex);

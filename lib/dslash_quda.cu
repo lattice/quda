@@ -77,13 +77,6 @@ namespace quda {
 
   bool getKernelPackT() { return kernelPackT; }
 
-
-  //these params are needed for twisted mass (in particular, for packing twisted spinor)
-  static bool twistPack = false;
-
-  void setTwistPack(bool flag) { twistPack = flag; }
-  bool getTwistPack() { return twistPack; }
-
   namespace dslash {
     int it = 0;
 

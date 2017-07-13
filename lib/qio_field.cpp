@@ -278,6 +278,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   QIO_string_destroy(xml_record_out);
 
   if (status != QIO_SUCCESS) return 1;
+
   return 0;
 }
 
@@ -325,7 +326,6 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
   printfQuda("%s: writing %d vector fields\n", __func__, Nvec); fflush(stdout);
   int status = write_field(outfile, 2*nSpin*nColor, Nvec, V, precision, precision, nSpin, nColor, type);
   if(status) { errorQuda("write_spinor_fields failed %d\n", status); }
-
   /* Close the file */
   QIO_close_write(outfile);
   printfQuda("%s: Closed file for writing\n",__func__);

@@ -2,14 +2,9 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 
-#include <random>
-
 namespace quda {
 
   using namespace colorspinor;
-
-  const unsigned int rn_seed = 1984;
-  std::ranlux24      rn_gen(rn_seed);
 
   /**
      Random number insertion over all field elements
@@ -76,6 +71,44 @@ namespace quda {
     }
   }
 
+  /**
+     Create a corner source with value "v" on color "c"
+     on a single corner overloaded into "s". "s" is 
+     encoded via a bitmap: 1010 -> x = 0, y = 1, z = 0, t = 1
+     corner, for ex.
+  */
+  template <class T>
+  void corner(T &p, int v, int s, int c) {
+    if (p.Nspin() != 1)
+      errorQuda("ERROR: lib/color_spinor_util.cu, corner() is only defined for Nspin = 1 fields.\n");
+
+    int coord[4];
+    int X[4] = { p.X(0), p.X(1), p.X(2), p.X(3)};
+    X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
+
+    for (int parity=0; parity<p.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<p.VolumeCB(); x_cb++) {
+
+        
+        // get coords
+        getCoords(coord, x_cb, X, parity);
+
+        // Figure out corner of current site.
+        int corner = 8*(coord[3]%2)+4*(coord[2]%2)+2*(coord[1]%2)+(coord[0]%2);
+
+        // set all color components to zero
+        for (int c2=0; c2<p.Ncolor(); c2++) {
+          p(parity,x_cb,0,c2) = 0.0;
+          // except the corner and color we want
+          if (s == corner)
+            p(parity,x_cb,0,c) = (double)v;
+        }
+
+      }
+    }
+  }
+
+
   // print out the vector at volume point x
   template <typename Float, int nSpin, int nColor, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
@@ -84,6 +117,7 @@ namespace quda {
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
     else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s, c);
+    else if (sourceType == QUDA_CORNER_SOURCE) corner(A, x, s, c);
     else errorQuda("Unsupported source type %d", sourceType);
   }
 
@@ -109,8 +143,8 @@ namespace quda {
       genericSource<Float,nSpin,32,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 48) {
       genericSource<Float,nSpin,48,order>(a,sourceType, x, s, c);
-    } else if (a.Ncolor() == 96) {
-      genericSource<Float,nSpin,96,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 64) {
+      genericSource<Float,nSpin,64,order>(a,sourceType, x, s, c);
     } else {
       errorQuda("Unsupported nColor=%d\n", a.Ncolor());
     }
@@ -145,52 +179,6 @@ namespace quda {
       genericSource<double>(a,sourceType, x, s, c);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       genericSource<float>(a,sourceType, x, s, c);      
-    } else {
-      errorQuda("Precision not supported");
-    }
-
-  }
-
-  template<typename Float, int fineSpin>
-  void generate2DU1Vector(cpuColorSpinorField &a, std::ranlux24 &gen) {
-     if(a.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) errorQuda("\nIncorrect feild order (%d) or null vector index (%d).\n", a.FieldOrder());
-     quda::colorspinor::FieldOrderCB<Float,fineSpin,3,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> aOrder(static_cast<ColorSpinorField&>(a));
-
-     //blas::zero(a);
-     warningQuda("\nProcessing 2d null vector.");
-
-     std::normal_distribution<> dist(0.0, 1.0);
-
-     const int c = 0;
-
-     for (int parity = 0; parity < 2; parity++) {
-        for(int x_cb = 0; x_cb < a.VolumeCB(); x_cb++) {
-
-           int i = parity*a.VolumeCB() + x_cb;
-           int xx[4] = {0};
-           a.LatticeIndex(xx, i);
-
-           if( xx[2] == 0 && xx[3] == 0 )
-           {
-             std::complex<Float> rnd_val = std::complex<Float>(static_cast<Float>(dist(gen)), static_cast<Float>(dist(gen)));
-             aOrder(parity, x_cb, 0, c) = rnd_val; 
-           }
-       }
-     }
-  }
-
-  void generic2DSource(cpuColorSpinorField &a) {
-
-    if(a.Nspin() == 4) errorQuda("\nUnsupported spin\n");
-
-    if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      if     ( a.Nspin() == 1 ) generate2DU1Vector<double, 1>(a, rn_gen);
-      else if( a.Nspin() == 2 ) generate2DU1Vector<double, 2>(a, rn_gen);
-    } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-  
-      if     ( a.Nspin() == 1 ) generate2DU1Vector<float, 1>(a, rn_gen);
-      else if( a.Nspin() == 2 ) generate2DU1Vector<float, 2>(a, rn_gen);
-      
     } else {
       errorQuda("Precision not supported");
     }
@@ -344,10 +332,6 @@ namespace quda {
     }
     else if (a.Ncolor() == 2 && a.Nspin() == 2) {
       FieldOrderCB<Float,2,2,1,order> A(a);
-      print_vector(A, x);
-    }
-    else if (a.Ncolor() == 4 && a.Nspin() == 2) {
-      FieldOrderCB<Float,2,4,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 24 && a.Nspin() == 2) {

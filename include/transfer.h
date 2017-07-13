@@ -43,12 +43,6 @@ namespace quda {
     /** GPU copy of the block-normalized null-space components that define the prolongator */
     ColorSpinorField *V_d;
 
-    /** The Dirac operator to use for smoothed intergrid transfers, this will be optimized in future updates */
-    DiracMatrix *matSmoothTransfer;
-
-    /** smoothed transfer parameter */
-    std::complex<double> alpha;
-
     /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
     ColorSpinorField *fine_tmp_h;
 
@@ -89,9 +83,7 @@ namespace quda {
     /** The spin blocking */
     int spin_bs;
 
-    /** The mapping onto coarse spin from fine spin 
-        A.S.: For the top-level staggered this map is underfined (NULL) 
-        and is trivial one-to-one for the other levels*/
+    /** The mapping onto coarse spin from fine spin */
     int *spin_map;
 
     /** Whether the transfer operator is to be applied to full fields or single parity fields */
@@ -173,10 +165,11 @@ namespace quda {
      * @param geo_bs The geometric block sizes to use
      * @param spin_bs The spin block sizes to use
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
+     * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField*> &B, DiracMatrix *matSmoothTransfer, std::complex<double> alpha, int Nvec, int *geo_bs, int spin_bs,
-	     bool enable_gpu, TimeProfile &profile);
+    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
+	     QudaPrecision null_precision, bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
@@ -197,28 +190,12 @@ namespace quda {
 
     /**
      * Returns a const reference to the V field
+     * @param location Which memory space are we requesting
      * @return The V field const reference
      */
-    const ColorSpinorField& Vectors() const { return *V_h; }
-
-    /**
-     * Returns a const reference to the B container
-     * @return The B field const reference
-     */
-    const std::vector<ColorSpinorField*>& RawVectors() const {return B;}
-
-    /** 
-     * Returns smoothing parameter
-     *
-     */
-
-    const std::complex<double> Alpha() const {return alpha;}
-
-    /** 
-     * Set smoothing parameter 
-     */ 
-
-    void SetAlpha(std::complex<double> _alpha) { alpha = _alpha;}
+    const ColorSpinorField& Vectors(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const {
+      return (location == QUDA_CUDA_FIELD_LOCATION) ? *V_d : *V_h;
+    }
 
     /**
      * Returns the number of near nullvectors
@@ -285,10 +262,11 @@ namespace quda {
      @param[in] Nvec Vector length
      @param[in] geo_bs Geometric block size
      @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] coarse_to_fine Coarse-to-fine lookup table (linear indices)
      @param[in] spin_bs Spin block size
    */
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
-			  const int *fine_to_coarse, int spin_bs);
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *fine_to_coarse,
+			  const int *coarse_to_fine, const int *geo_bs, int spin_bs);
 
   /**
      @brief Apply the prolongation operator

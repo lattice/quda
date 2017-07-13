@@ -49,6 +49,7 @@ namespace quda {
     void ax(const double &a, ColorSpinorField &x);
     void xpy(ColorSpinorField &x, ColorSpinorField &y);
     void xpay(ColorSpinorField &x, const double &a, ColorSpinorField &y);
+    void xpayz(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z);
     void mxpy(ColorSpinorField &x, ColorSpinorField &y);
 
     void axpyZpbx(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, const double &b);
@@ -93,6 +94,15 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
+    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
+
+    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
     /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
@@ -100,8 +110,7 @@ namespace quda {
        y = x * a + y
 
        The dimensions of a can be rectangular, e.g., the width of x
-       and y need not be same, though the maximum width for both is
-       16.
+       and y need not be same.
 
        @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields
@@ -122,20 +131,143 @@ namespace quda {
     void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
 
     /**
-       @brief Compute the block "axpy" with over the set of
+       @brief Compute the block "caxpy_U" with over the set of
        ColorSpinorFields.  E.g., it computes
 
        y = x * a + y
+
+       Where 'a' must be a square, upper triangular matrix.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void caxpy_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "caxpy_U" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void caxpy_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the block "caxpy_L" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       Where 'a' must be a square, lower triangular matrix.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void caxpy_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "caxpy_U" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void caxpy_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the block "caxpyz" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       z = x * a + y
 
        The dimensions of a can be rectangular, e.g., the width of x
        and y need not be same, though the maximum width for both is
        16.
 
-       @param a[in] Matrix of real coefficients
+       @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields
-       @param y[in,out] vector of input/output ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
     */
-    void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+    void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z);
+
+    /**
+       @brief This is a wrapper for calling the block "caxpyz" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       z = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in] Computed output matrix
+       @param z[out] vector of input/output ColorSpinorFields
+    */
+    void caxpyz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    /**
+       @brief Compute the block "caxpyz" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       z = x * a + y
+
+       Where 'a' is assumed to be upper triangular. 
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    void caxpyz_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z);
+
+    /**
+       @brief This is a wrapper for calling the block "caxpyz" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       z = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in] Computed output matrix
+       @param z[out] vector of input/output ColorSpinorFields
+    */
+    void caxpyz_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    /**
+       @brief Compute the block "caxpyz" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       z = x * a + y
+
+       Where 'a' is assumed to be lower triangular
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    void caxpyz_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z);
+
+    /**
+       @brief This is a wrapper for calling the block "caxpyz" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       z = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in] Computed output matrix
+       @param z[out] vector of input/output ColorSpinorFields
+    */
+    void caxpyz_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
 
     /**
        @brief Compute the vectorized "axpyBzpcx" with over the set of
@@ -178,8 +310,53 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_);
 
-    void reDotProduct(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
-    void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
+    void reDotProduct(double* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+
+    /**
+       @brief Computes the matrix of inner products between the vector set a and the vector set b
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+
+    /**
+       @brief Computes the matrix of inner products between the vector
+       set a and the vector set b.  This routine is specifically for
+       the case where the result matrix is guarantted to be Hermitian.
+       Requires a.size()==b.size().
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    void hDotProduct(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+
+    /**
+       @brief Computes the matrix of inner products between the vector
+       set a and the vector set b.  This routine is specifically for
+       the case where the result matrix is guarantted to be Hermitian.
+       Uniquely defined for cases like (p, Ap) where the output is Hermitian,
+       but there's an A-norm instead of an L2 norm.
+       Requires a.size()==b.size().
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    void hDotProduct_Anorm(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+
+
+    /**
+       @brief Computes the matrix of inner products between the vector set a and the vector set b, and copies b into c
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+       @param c[out] set of output ColorSpinorFields
+    */
+    void cDotProductCopy(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b, std::vector<ColorSpinorField*>& c);
 
   } // namespace blas
 

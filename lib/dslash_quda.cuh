@@ -1,12 +1,5 @@
 //#define DSLASH_TUNE_TILE
 
-static FaceBuffer *face[2];
-
-void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
-  face[0] = (FaceBuffer*)&(Face1); 
-  face[1] = (FaceBuffer*)&(Face2); // nasty
-}
-
 #define EVEN_MORE_GENERIC_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (x==0) {								\
     if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
@@ -344,6 +337,7 @@ protected:
 
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+  bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
   // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
   unsigned int minThreads() const { return dslashParam.threads; }
   char aux[8][TuneKey::aux_n];
@@ -448,6 +442,18 @@ public:
   virtual ~DslashCuda() { }
   virtual TuneKey tuneKey() const  
   { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
+
+  const char* getAux(KernelType type) const {
+    return aux[type];
+  }
+
+  void setAux(KernelType type, const char *aux_) {
+    strcpy(aux[type], aux_);
+  }
+
+  void augmentAux(KernelType type, const char *extra) {
+    strcat(aux[type], extra);
+  }
 
   virtual int Nface() { return 2; }
 

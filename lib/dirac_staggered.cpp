@@ -8,17 +8,13 @@ namespace quda {
 #include <dslash_init.cuh>
   }
 
-  static double stag_omega = 0.0;//temporary hack
-
-  DiracStaggered::DiracStaggered(const DiracParam &param) : 
-    Dirac(param), face1(param.gauge->X(), 4, 6, 1, param.gauge->Precision()), face2(param.gauge->X(), 4, 6, 1, param.gauge->Precision())
+  DiracStaggered::DiracStaggered(const DiracParam &param) : Dirac(param)
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
     staggered::initConstants(*param.gauge, profile);
   }
 
-  DiracStaggered::DiracStaggered(const DiracStaggered &dirac) 
-  : Dirac(dirac), face1(dirac.face1), face2(dirac.face2)
+  DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac)
   {
     staggered::initConstants(*dirac.gauge, profile);
   }
@@ -29,8 +25,6 @@ namespace quda {
   {
     if (&dirac != this) {
       Dirac::operator=(dirac);
-      face1 = dirac.face1;
-      face2 = dirac.face2;
     }
     return *this;
   }
@@ -67,10 +61,9 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      staggered::setFace(face1, face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
 			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
-			  dagger, 0, 0.0, 0.0, commDim, profile);
+			  dagger, 0, 0, commDim, profile);
     } else {
       errorQuda("Not supported");
     }
@@ -85,10 +78,9 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      staggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			  &static_cast<const cudaColorSpinorField&>(x), (k + 2*stag_omega), stag_omega, commDim, profile);
+			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
     } else {
       errorQuda("Not supported");
     }  
@@ -99,17 +91,8 @@ namespace quda {
   // Full staggered operator
   void DiracStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    double _2m = 2*mass; 
-
-    if(dagger == QUDA_DAG_YES) _2m *= -1.0;
-    stag_omega = omega;
-
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), _2m);  
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), _2m);
-
-    stag_omega = 0.0;
-
-    //if(dagger == QUDA_DAG_YES) blas::ax(-1.0, out);
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
+    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
   }
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -145,23 +128,9 @@ namespace quda {
     // do nothing
   }
 
-  /* Creates the coarse grid dirac operator
-  Takes: multigrid transfer class, which knows
-  about the coarse grid blocking, as well as
-  having prolongate and restrict member functions
-  
-  Returns: Color matrices Y[0..2*dim] corresponding
-  to the coarse grid operator.  The first 2*dim
-  matrices correspond to the forward/backward
-  hopping terms on the coarse grid.  X[2*dim] is
-  the color matrix that is diagonal on the coarse
-  grid , this one is trivial but let's keep it for the moment
-  */
-
-  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    CoarseKSOp(Y, X, Xinv, Yhat, T, gauge, nullptr,  2*mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);//
+  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, double kappa, double mu, double mu_factor) const {
+     CoarseKSOp(Y, X, Xinv, T, gauge, nullptr,  2*mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);//
   }
-
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
     : DiracStaggered(param)
@@ -191,7 +160,9 @@ namespace quda {
 
   void DiracStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    errorQuda("DiracStaggeredPC::M() is not implemented\n");
+    //This is identical to DiracStaggeredPC::MdagM:
+    MdagM(out, in);
+    return;
   }
 
   void DiracStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -239,7 +210,7 @@ namespace quda {
       } else {
         errorQuda("MatPCType %d not valid for DiracStaggeredPC", matpcType);
       }
-    }
+    }  
   }
 
   void DiracStaggeredPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
@@ -250,7 +221,9 @@ namespace quda {
       return;//do nothing
 
     } else {//hack: 1) compute -1.0*be-D_eo b_o and 2) apply - (1 / 2m)
-      checkFullSpinor(x, b);
+      checkParitySpinor(x.Even(), b.Even());
+      checkParitySpinor(x.Odd(), b.Odd());
+
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       // x_o = 1.0 / 2m ( b_o - D_oe x_e)
         DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), -1.0);
@@ -260,7 +233,7 @@ namespace quda {
         DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), -1.0);
         blas::ax(-1.0 / (2*mass), x.Even());
       } else {
-        errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
+        errorQuda("MatPCType %d not valid for DiracStaggeredPC", matpcType);
       }
     }
   }

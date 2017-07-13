@@ -62,9 +62,6 @@ extern "C" {
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
 
-    bool _2d_u1_emulation;  /**< Experimental : whether we want 2d u1 field*/
-    bool _2link_term; /**< Experimental : whether we want compute 2-link term in staggered dslash*/
-
     double i_mu; /**< Imaginary chemical potential */
 
     int overlap; /**< Width of overlapping domains */
@@ -116,6 +113,16 @@ extern "C" {
     int maxiter; /**< Maximum number of iterations in the linear solver */
     double reliable_delta; /**< Reliable update tolerance */
     int use_sloppy_partial_accumulator; /**< Whether to keep the partial solution accumuator in sloppy precision */
+
+    /**< This parameter determines how often we accumulate into the
+       solution vector from the direction vectors in the solver.
+       E.g., running with solution_accumulator_pipeline = 4, means we
+       will update the solution vector every four iterations using the
+       direction vectors from the prior four iterations.  This
+       increases performance of mixed-precision solvers since it means
+       less high-precision vector round-trip memory travel, but
+       requires more low-precision memory allocation. */
+    int solution_accumulator_pipeline;
 
     /**< This parameter determines how many consective reliable update
     residual increases we tolerate before terminating the solver,
@@ -193,7 +200,6 @@ extern "C" {
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
-    QudaComputeNullVector compute_null_vector;
 
     double clover_coeff;                   /**< Coefficient of the clover term */
 
@@ -238,6 +244,9 @@ extern "C" {
 
     /** Preconditioner instance, e.g., multigrid */
     void *preconditioner;
+
+    /** Deflation instance */
+    void *deflation_op;
 
     /**
       Dirac Dslash used in preconditioner
@@ -333,6 +342,7 @@ extern "C" {
   typedef struct QudaEigParam_s {
 
     QudaInvertParam *invert_param;
+//specific for Lanczos method:
     QudaSolutionType  RitzMat_lanczos;
     QudaSolutionType  RitzMat_Convcheck;
     QudaEigType eig_type;
@@ -344,6 +354,30 @@ extern "C" {
     int np;
     int f_size;
     double eigen_shift;
+//more general stuff:
+    /** Whether to load eigenvectors */
+    QudaBoolean import_vectors;
+
+    /** The precision of the Ritz vectors */
+    QudaPrecision cuda_prec_ritz;
+
+    /** Location where deflation should be done */
+    QudaFieldLocation location;
+
+    /** Whether to run the verification checks once set up is complete */
+    QudaBoolean run_verify;
+
+    /** Filename prefix where to load the null-space vectors */
+    char vec_infile[256];
+
+    /** Filename prefix for where to save the null-space vectors */
+    char vec_outfile[256];
+
+    /** The Gflops rate of the multigrid solver setup */
+    double gflops;
+
+    /**< The time taken by the multigrid solver setup */
+    double secs;
 
   } QudaEigParam;
 
@@ -364,8 +398,59 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Precision to store the null-space vectors in (post block orthogonalization) */
+    QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
+
+    /** Verbosity on each level of the multigrid */
+    QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
+
+    /** Inverter to use in the setup phase */
+    QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of setup iterations */
+    int num_setup_iter[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use in the setup phase */
+    double setup_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Null-space type to use in the setup phase */
+    QudaSetupType setup_type;
+
+    /** Pre orthonormalize vectors in the setup phase */
+    QudaBoolean pre_orthonormalize;
+
+    /** Post orthonormalize vectors in the setup phase */
+    QudaBoolean post_orthonormalize;
+
+    /** The solver that wraps around the coarse grid correction and smoother */
+    QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use for the smoother / solver on each level */
+    double smoother_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Number of pre-smoother applications on each level */
+    int nu_pre[QUDA_MAX_MG_LEVEL];
+
+    /** Number of post-smoother applications on each level */
+    int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Over/under relaxation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
+    QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of Schwarz cycles to apply */
+    int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
 	type of solution to receive back from this coarse grid */
@@ -374,23 +459,8 @@ extern "C" {
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
     QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL];
 
-    /** Experimental : the type of null solve to do on top grid (e/o preconditioning or not)*/
-    QudaSolveType null_solve_type;
-
     /** The type of multigrid cycle to perform at each level */
     QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
-
-    /** Number of pre-smoother applications on each level */
-    int nu_pre[QUDA_MAX_MG_LEVEL];
-
-    /** Number of post-smoother applications on each level */
-    int nu_post[QUDA_MAX_MG_LEVEL];
-
-    /** Tolerance to use for the smoother / solver on each level */
-    double smoother_tol[QUDA_MAX_MG_LEVEL];
-
-    /** Over/under relaxation factor for the smoother at each level */
-    double omega[QUDA_MAX_MG_LEVEL];
 
     /** Whether to use global reductions or not for the smoother / solver at each level */
     QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
@@ -400,9 +470,6 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
-
-    /**< The precision used by the input fermion fields in the eigensolver */
-    QudaPrecision eigensolver_precision;//hack to use full precision eigensolver. Then will be used for mixed precision eigensolver 
  
     /** Whether to generate on all levels or just on level 0 */
     QudaBoolean generate_all_levels; 
@@ -422,14 +489,8 @@ extern "C" {
     /**< The time taken by the multigrid solver setup */
     double secs;
 
-    /**< Experimental: for 2d U1 tests */
-    bool _2d_u1_emulation;
-
-    /**< Experimental: smoothed transfer operator (requires emulation!) */
-    void* alpha;
-
-    /**< Staggered 2link term parameter */
-    double stag_2link_scale; 
+    /** Multiplicative factor for the mu parameter */
+    double mu_factor[QUDA_MAX_MG_LEVEL];
 
   } QudaMultigridParam;
 
@@ -691,20 +752,16 @@ extern "C" {
   void* newMultigridQuda(QudaMultigridParam *param);
 
   /**
-   * Free resources allocated by the multigrid solver
+   * @brief Free resources allocated by the multigrid solver
+   * @param mg_instance Pointer to instance of multigrid_solver
    */
   void destroyMultigridQuda(void *mg_instance);
 
   /**
-   * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).
-   * @param _h_x    Outnput: array of solution spinor fields (typically O(10))
-   * @param _h_b    Input: array of source spinor fields (typically O(10))
-   * @param _h_u    Input/Output: array of Ritz spinor fields (typically O(100))
-   * @param _h_h    Input/Output: complex projection mutirx (typically O(100))
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
+   * @brief Updates the multigrid preconditioner for the new gauge / clover field
+   * @param mg_instance Pointer to instance of multigrid_solver
    */
-  void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals);
+  void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
@@ -986,6 +1043,12 @@ extern "C" {
                       const QudaGaugeParam* param);
 
   /**
+   * Generate Gaussian distributed gauge field
+   * @param seed Seed
+   */
+  void gaussGaugeQuda(long seed);
+
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
@@ -1004,6 +1067,14 @@ extern "C" {
    * @param rho    Rho coefficient for STOUT smearing.
    */
   void performSTOUTnStep(unsigned int nSteps, double rho);
+
+  /**
+   * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param rho    Rho coefficient for STOUT smearing.
+   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
+   */
+  void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
 
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
@@ -1073,10 +1144,16 @@ extern "C" {
   void closeMagma();
 
   /**
-  * Clean deflation solver resources.
+  * Create deflation solver resources.
   *
   **/
-  void destroyDeflationQuda(QudaInvertParam *param, const int *X, void *_h_u, double *inv_eigenvals);
+
+  void* newDeflationQuda(QudaEigParam *param);
+
+  /**
+   * Free resources allocated by the deflated solver
+   */
+  void destroyDeflationQuda(void *df_instance);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
+
 #include <multigrid.h>
 
 namespace quda {
@@ -9,9 +10,7 @@ namespace quda {
   }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) : 
-    Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
-    face1(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()),
-    face2(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
+    Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge))
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
     improvedstaggered::initConstants(*param.gauge, profile);    
@@ -19,7 +18,7 @@ namespace quda {
   }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac) 
-  : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face1(dirac.face1), face2(dirac.face2)
+  : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge)
   {
     improvedstaggered::initConstants(*dirac.gauge, profile);
     improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
@@ -33,8 +32,6 @@ namespace quda {
       Dirac::operator=(dirac);
       fatGauge = dirac.fatGauge;
       longGauge = dirac.longGauge;
-      face1 = dirac.face1;
-      face2 = dirac.face2;
     }
     return *this;
   }
@@ -71,7 +68,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
 				  dagger, 0, 0, commDim, profile);
@@ -89,7 +85,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
@@ -140,21 +135,8 @@ namespace quda {
     // do nothing
   }
 
-  /* Creates the coarse grid dirac operator
-  Takes: multigrid transfer class, which knows
-  about the coarse grid blocking, as well as
-  having prolongate and restrict member functions
-  
-  Returns: Color matrices Y[0..2*dim] corresponding
-  to the coarse grid operator.  The first 2*dim
-  matrices correspond to the forward/backward
-  hopping terms on the coarse grid.  X[2*dim] is
-  the color matrix that is diagonal on the coarse
-  grid , this one is trivial but let's keep it for the moment
-  */
-
-  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
-    CoarseKSOp(Y, X, Xinv, Yhat, T, &fatGauge, &longGauge,  2*mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);//
+  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, double kappa, double mu, double mu_factor) const {
+    CoarseKSOp(Y, X, Xinv, T, &fatGauge, &longGauge,  2*mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);//
   }
 
   DiracImprovedStaggeredPC::DiracImprovedStaggeredPC(const DiracParam &param)
@@ -185,7 +167,9 @@ namespace quda {
 
   void DiracImprovedStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    errorQuda("DiracImprovedStaggeredPC::M() is not implemented\n");
+    //errorQuda("DiracImprovedStaggeredPC::M() is not implemented\n");
+    MdagM(out, in);
+    return;
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -239,13 +223,14 @@ namespace quda {
   void DiracImprovedStaggeredPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				     const QudaSolutionType solType) const
   {
-
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
       return;//do nothing
 
     } else {//hack: 1) compute -1.0*be-D_eo b_o and 2) apply - (1 / 2m)
-      checkFullSpinor(x, b);
+      checkParitySpinor(x.Even(), b.Even());
+      checkParitySpinor(x.Odd(), b.Odd());
+
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       // x_o = 1.0 / 2m ( b_o + D_oe x_e)
         DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), -1.0);

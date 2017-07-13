@@ -5,7 +5,7 @@
 namespace quda {
 
   GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u),
-    nColor(3),
+    nColor(u.Ncolor()),
     nFace(u.Nface()),
     reconstruct(u.Reconstruct()),
     order(u.Order()),
@@ -14,25 +14,23 @@ namespace quda {
     t_boundary(u.TBoundary()),
     anisotropy(u.Anisotropy()),
     tadpole(u.Tadpole()),
-    scale(u.Scale()),
     gauge(NULL),
     create(QUDA_NULL_FIELD_CREATE),
     geometry(u.Geometry()),
     compute_fat_link_max(false),
     staggeredPhaseType(u.StaggeredPhase()),
     staggeredPhaseApplied(u.StaggeredPhaseApplied()),
-    staggered_u1_emulation(u.StaggeredU1Emulation()),
-    staggered_2link_term(u.Staggered2LinkTerm()),
     i_mu(u.iMu()) { }
+
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
     LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
     geometry(param.geometry), reconstruct(param.reconstruct), 
     nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
     order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
-    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
-    create(param.create),  
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), staggered_u1_emulation(param.staggered_u1_emulation), staggered_2link_term(param.staggered_2link_term), i_mu(param.i_mu)
+    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0),
+    create(param.create),
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
   {
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
       errorQuda("nColor must be 3, not %d for this link type", nColor);
@@ -240,7 +238,6 @@ namespace quda {
     output << "t_boundary = " << param.t_boundary << std::endl;
     output << "anisotropy = " << param.anisotropy << std::endl;
     output << "tadpole = " << param.tadpole << std::endl;
-    output << "scale = " << param.scale << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;

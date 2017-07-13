@@ -224,11 +224,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(reliable_delta, INVALID_DOUBLE);
 #ifdef INIT_PARAM 
   P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
+  P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
   P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
  #else
   P(use_sloppy_partial_accumulator, INVALID_INT);
+  P(solution_accumulator_pipeline, INVALID_INT);
   P(max_res_increase, INVALID_INT);
   P(max_res_increase_total, INVALID_INT);
   P(heavy_quark_check, INVALID_INT);
@@ -492,21 +494,80 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   int n_level = param->n_level;
 #endif
 
+#ifdef INIT_PARAM
+  P(setup_type, QUDA_NULL_VECTOR_SETUP);
+#else
+  P(setup_type, QUDA_INVALID_SETUP_TYPE);
+#endif
+
+#ifdef INIT_PARAM
+  P(pre_orthonormalize, QUDA_BOOLEAN_NO);
+#else
+  P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(post_orthonormalize, QUDA_BOOLEAN_YES);
+#else
+  P(post_orthonormalize, QUDA_BOOLEAN_INVALID);
+#endif
+
   for (int i=0; i<n_level; i++) {
+#ifdef INIT_PARAM
+    P(verbosity[i], QUDA_SILENT);
+#else
+    P(verbosity[i], QUDA_INVALID_VERBOSITY);
+#endif
+#ifdef INIT_PARAM
+    P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
+#else
+    P(setup_inv_type[i], QUDA_INVALID_INVERTER);
+#endif
+#ifdef INIT_PARAM
+    P(num_setup_iter[i], 1);
+#else
+    P(num_setup_iter[i], INVALID_INT);
+#endif
+#ifdef INIT_PARAM
+    P(setup_tol[i], 5e-6);
+#else
+    P(setup_tol[i], INVALID_DOUBLE);
+#endif
+
+    P(coarse_solver[i], QUDA_INVALID_INVERTER);
+    P(coarse_solver_maxiter[i], INVALID_INT);
     P(smoother[i], QUDA_INVALID_INVERTER);
     P(smoother_solve_type[i], QUDA_INVALID_SOLVE);
+
+#ifndef CHECK_PARAM
+    P(smoother_schwarz_type[i], QUDA_INVALID_SCHWARZ);
+    P(smoother_schwarz_cycle[i], 1);
+#else
+    P(smoother_schwarz_cycle[i], INVALID_INT);
+#endif
 
     // these parameters are not set for the bottom grid
     if (i<n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
       P(spin_block_size[i], INVALID_INT);
       P(n_vec[i], INVALID_INT);
+#ifdef INIT_PARAM
+      P(precision_null[i], QUDA_SINGLE_PRECISION);
+#else
+      P(precision_null[i], INVALID_INT);
+#endif
       P(cycle_type[i], QUDA_MG_CYCLE_INVALID);
       P(nu_pre[i], INVALID_INT);
       P(nu_post[i], INVALID_INT);
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
 
+#ifdef INIT_PARAM
+    P(mu_factor[i], 1);
+#else
+    P(mu_factor[i], INVALID_DOUBLE);
+#endif
+    P(coarse_solver_tol[i], INVALID_DOUBLE);
     P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
     P(global_reduction[i], QUDA_BOOLEAN_YES);

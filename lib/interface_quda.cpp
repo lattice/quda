@@ -27,8 +27,11 @@
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
+#include <random_quda.h>
 
 #include <multigrid.h>
+
+#include <deflation.h>
 
 #ifdef NUMA_NVML
 #include <numa_affinity.h>
@@ -91,7 +94,7 @@ static bool InitMagma = false;
 void openMagma() {
 
   if (!InitMagma) {
-    BlasMagmaArgs::OpenMagma();
+    OpenMagma();
     InitMagma = true;
   } else {
     printfQuda("\nMAGMA library was already initialized..\n");
@@ -102,7 +105,7 @@ void openMagma() {
 void closeMagma(){
 
   if (InitMagma) {
-    BlasMagmaArgs::CloseMagma();
+    CloseMagma();
     InitMagma = false;
   } else {
     printfQuda("\nMAGMA library was not initialized..\n");
@@ -205,11 +208,17 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
+//!<Profiler for gaussQuda
+static TimeProfile profileGauss("gaussQuda");
+
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
 //!< Profiler for STOUTQuda
 static TimeProfile profileSTOUT("STOUTQuda");
+
+//!< Profiler for OvrImpSTOUTQuda
+static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
 
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
@@ -541,6 +550,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->type == QUDA_ASQTAD_FAT_LINKS)
     gauge_param.compute_fat_link_max = true;
 
+  if (gauge_param.order <= 4) gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) :
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
@@ -1270,10 +1280,11 @@ void endQuda(void)
 
   assertAllMemFree();
 
-#if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
-  // end this CUDA context
-  cudaDeviceReset();
-#endif
+  char *device_reset_env = getenv("QUDA_DEVICE_RESET");
+  if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
+    // end this CUDA context
+    cudaDeviceReset();
+  }
 
 }
 
@@ -1352,7 +1363,6 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
-    diracParam.omega = 0.0;//it's needed for AMG preconditioner only
 
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
   }
@@ -1410,7 +1420,8 @@ namespace quda {
 
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    setDiracPreParam(diracPreParam, &param, pc_solve, false);
+    bool comms_flag = (param.inv_type != QUDA_INC_EIGCG_INVERTER) ?  false : true ;//inc eigCG needs 2 sloppy precisions.
+    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -2168,7 +2179,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 }
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
-  : m(nullptr), mSmooth(nullptr), mSmoothSloppy(nullptr), dEigen(nullptr), dEigenSloppy(nullptr), mEigen(nullptr), mEigenSloppy(nullptr), profile(profile) {
+  : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
 
@@ -2178,15 +2189,10 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
     errorQuda("Requested MG levels %d greater than allowed maximum %d", mg_param.n_level, QUDA_MAX_MG_LEVEL);
-
-  if (((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[0] != QUDA_NORMOP_PC_SOLVE)) && ((param->dslash_type != QUDA_STAGGERED_DSLASH && param->dslash_type != QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[0] != QUDA_DIRECT_PC_SOLVE))) 
-     errorQuda("Unsupported smoother solve type %d on level 0", mg_param.smoother_solve_type[0]);
-
-  for (int i=1; i<mg_param.n_level; i++) {
+  for (int i=0; i<mg_param.n_level; i++) {
     if (mg_param.smoother_solve_type[i] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[i] != QUDA_DIRECT_PC_SOLVE)
       errorQuda("Unsupported smoother solve type %d on level %d", mg_param.smoother_solve_type[i], i);
   }
-
   if (param->solve_type != QUDA_DIRECT_SOLVE)
     errorQuda("Outer MG solver can only use QUDA_DIRECT_SOLVE at present");
 
@@ -2204,12 +2210,10 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   // create the dirac operators for the fine grid
 
   // this is the Dirac operator we use for inter-grid residual computation
-  // at present this doesn't support preconditioning
   DiracParam diracParam;
   setDiracSloppyParam(diracParam, param, outer_pc_solve);
   d = Dirac::create(diracParam);
-  m   =  new DiracM(*d);
-
+  m = new DiracM(*d);
 
   // this is the Dirac operator we use for smoothing
   DiracParam diracSmoothParam;
@@ -2217,78 +2221,45 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
     (mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
   setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
   dSmooth = Dirac::create(diracSmoothParam);
-  mSmooth = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE) ? static_cast<DiracMatrix*>( new DiracMdagM(*dSmooth) ) : static_cast<DiracMatrix*>( new DiracM(*dSmooth) );
+  mSmooth = new DiracM(*dSmooth);
 
   // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
   DiracParam diracSmoothSloppyParam;
-  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
+  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve,
+		   mg_param.smoother_schwarz_type[0] == QUDA_INVALID_SCHWARZ ? true : false);
+
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
-  mSmoothSloppy = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE) ? static_cast<DiracMatrix*>( new DiracMdagM(*dSmoothSloppy)) : static_cast<DiracMatrix*>( new DiracM(*dSmoothSloppy) );
+  mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
-  if(mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR && mg_param.eigensolver_precision == param->cuda_prec)
-  {
-    DiracParam diracEigenParam;
-    diracEigenParam.type = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE)) ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
-    setDiracParam(diracEigenParam, param, mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? fine_grid_pc_solve : !fine_grid_pc_solve);
-    dEigen   = Dirac::create(diracEigenParam);
-    mEigen   = mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? static_cast<DiracMatrix*>( new DiracMdagM(*dEigen) ) : static_cast<DiracMatrix*>( new DiracM(*dEigen) );
-
-    if( mg_param.null_solve_type == mg_param.smoother_solve_type[0] ) 
-    {
-      mEigenSloppy = mSmooth;
-    }
-    else
-    {
-      DiracParam diracEigenSloppyParam;
-      diracEigenSloppyParam.type = ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE)) ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
-      setDiracSloppyParam(diracEigenParam, param, mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? fine_grid_pc_solve : !fine_grid_pc_solve);
-      dEigenSloppy   = Dirac::create(diracEigenSloppyParam);
-      mEigenSloppy   = mg_param.null_solve_type == QUDA_NORMOP_PC_SOLVE ? static_cast<DiracMatrix*>( new DiracMdagM(*dEigenSloppy) ) : static_cast<DiracMatrix*>(  new DiracM(*dEigenSloppy) );
-    }
-  }
-  else if(mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR && mg_param.eigensolver_precision == param->cuda_prec_sloppy)
-  {
-    if(mg_param.null_solve_type == mg_param.smoother_solve_type[0])
-    {
-      mEigen       = mSmooth;
-      mEigenSloppy = mSmoothSloppy;
-    }
-    else 
-    {
-      errorQuda("\nCurrently not implemented.\n");
-    }
-  }
- 
   printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
   ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
   cpuParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuParam.setPrecision( param->cuda_prec_sloppy );
-  cpuParam.reduceDimensionality();
-  B.reserve(mg_param.n_vec[0]);
-  for (int i=0; i<mg_param.n_vec[0]; i++) B.push_back( new cpuColorSpinorField(cpuParam) );
+  cpuParam.precision = param->cuda_prec_sloppy;
+  B.resize(mg_param.n_vec[0]);
+  for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
 
   // fill out the MG parameters for the fine level
-  mgParam = new MGParam(mg_param, B, *m, *mSmooth, *mSmoothSloppy);
-
-  if( mg_param.compute_null_vector == QUDA_COMPUTE_LOW_MODE_VECTOR ) mgParam->setMatEigen( *mEigen, *mEigenSloppy );
+  mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
   profile.TPSTOP(QUDA_PROFILE_INIT);
 }
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  openMagma();
 
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
 
-  closeMagma();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   saveProfile(__func__);
   flushProfile();
+  saveTuneCache();
   return static_cast<void*>(mg);
 }
 
@@ -2296,6 +2267,153 @@ void destroyMultigridQuda(void *mg) {
   delete static_cast<multigrid_solver*>(mg);
 }
 
+void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
+
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  multigrid_solver *mg = static_cast<multigrid_solver*>(mg_);
+  checkMultigridParam(mg_param);
+
+  QudaInvertParam *param = mg_param->invert_param;
+  checkInvertParam(param);
+
+  // for reporting level 1 is the fine level but internally use level 0 for indexing
+  // sprintf(mg->prefix,"MG level 1 (%s): ", param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+  // setOutputPrefix(prefix);
+  setOutputPrefix("MG level 1 (GPU): "); //fix me
+
+  printfQuda("Updating operator on level 1 of %d levels\n", mg->mgParam->Nlevel);
+
+  bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+
+  // free the previous dirac operators
+  if (mg->m) delete mg->m;
+  if (mg->mSmooth) delete mg->mSmooth;
+  if (mg->mSmoothSloppy) delete mg->mSmoothSloppy;
+
+  if (mg->d) delete mg->d;
+  if (mg->dSmooth) delete mg->dSmooth;
+  if (mg->dSmoothSloppy && mg->dSmoothSloppy != mg->dSmooth) delete mg->dSmoothSloppy;
+
+  // create new fine dirac operators
+
+  // this is the Dirac operator we use for inter-grid residual computation
+  DiracParam diracParam;
+  setDiracSloppyParam(diracParam, param, outer_pc_solve);
+  mg->d = Dirac::create(diracParam);
+  mg->m = new DiracM(*(mg->d));
+
+  // this is the Dirac operator we use for smoothing
+  DiracParam diracSmoothParam;
+  bool fine_grid_pc_solve = (mg_param->smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
+    (mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
+  setDiracSloppyParam(diracSmoothParam, param, fine_grid_pc_solve);
+  mg->dSmooth = Dirac::create(diracSmoothParam);
+  mg->mSmooth = new DiracM(*(mg->dSmooth));
+
+  // this is the Dirac operator we use for sloppy smoothing (we use the preconditioner fields for this)
+  DiracParam diracSmoothSloppyParam;
+  setDiracPreParam(diracSmoothSloppyParam, param, fine_grid_pc_solve, true);
+  mg->dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);;
+  mg->mSmoothSloppy = new DiracM(*(mg->dSmoothSloppy));
+
+  mg->mgParam->matResidual = mg->m;
+  mg->mgParam->matSmooth = mg->mSmooth;
+  mg->mgParam->matSmoothSloppy = mg->mSmoothSloppy;
+
+  mg->mgParam->updateInvertParam(*param);
+  if(mg->mgParam->mg_global.invert_param != param)
+    mg->mgParam->mg_global.invert_param = param;
+
+  mg->mg->updateCoarseOperator();
+
+  setOutputPrefix("");
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
+  : d(nullptr), m(nullptr), RV(nullptr), deflParam(nullptr), defl(nullptr),  profile(profile) {
+
+  QudaInvertParam *param = eig_param.invert_param;
+  
+  if(param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER)  return;
+
+  profile.TPSTART(QUDA_PROFILE_INIT);
+
+  cudaGaugeField *cudaGauge = checkGauge(param);
+  eig_param.secs   = 0;
+  eig_param.gflops = 0;
+
+  DiracParam diracParam;
+  if(eig_param.cuda_prec_ritz == param->cuda_prec)
+  {
+    setDiracParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
+  } else {
+    setDiracSloppyParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
+  }
+
+  const bool pc_solve = (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+
+  d = Dirac::create(diracParam);
+  m = pc_solve ? static_cast<DiracMatrix*>( new DiracMdagM(*d) ) : static_cast<DiracMatrix*>( new DiracM(*d));
+
+  ColorSpinorParam ritzParam(0, *param, cudaGauge->X(), pc_solve, eig_param.location);
+
+  ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
+  ritzParam.is_composite  = true;
+  ritzParam.is_component  = false;
+  ritzParam.composite_dim = param->nev*param->deflation_grid;
+
+  ritzParam.setPrecision(param->cuda_prec_ritz);
+
+  if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
+    ritzParam.fieldOrder = (param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ) ?  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  }
+
+  int ritzVolume = 1;
+  for(int d = 0; d < ritzParam.nDim; d++) ritzVolume *= ritzParam.x[d];
+
+  if( getVerbosity() == QUDA_DEBUG_VERBOSE ) { 
+
+    size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.precision);
+    printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)" , byte_estimate, ritzVolume, ritzParam.precision);
+
+  }
+
+  //ritzParam.mem_type = QUDA_MEMORY_MAPPED;
+  RV = ColorSpinorField::Create(ritzParam);
+
+  deflParam = new DeflationParam(eig_param, RV, *m);
+
+  defl = new Deflation(*deflParam, profile);
+
+  profile.TPSTOP(QUDA_PROFILE_INIT);
+}
+
+void* newDeflationQuda(QudaEigParam *eig_param) {
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+#ifdef MAGMA_LIB
+  openMagma();
+#endif
+  deflated_solver *defl = new deflated_solver(*eig_param, profileInvert);
+
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  saveProfile(__func__);
+  flushProfile();
+  return static_cast<void*>(defl);
+}
+
+void destroyDeflationQuda(void *df) {
+#ifdef MAGMA_LIB
+  closeMagma();
+#endif
+  delete static_cast<deflated_solver*>(df);
+}
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
@@ -2472,16 +2590,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Normal-error solve requires Mat solution");
   }
 
-  //if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution))
-      //errorQuda("Multigrid preconditioning only supported for direct solves");
-  if (param->inv_type_precondition == QUDA_MG_INVERTER && ( ((param->dslash_type != QUDA_STAGGERED_DSLASH && param->dslash_type != QUDA_ASQTAD_DSLASH) && (!direct_solve || !mat_solution)) || ((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (!(direct_solve || param->solve_type == QUDA_NORMOP_PC_SOLVE) || !mat_solution)) )  )
-      errorQuda("Multigrid preconditioning only supported for direct solves");
+  if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution)) {
+    errorQuda("Multigrid preconditioning only supported for direct solves");
+  }
 
   if (param->use_resident_chrono && (direct_solve || norm_error_solve) ){
     errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
   }
 
-  if (mat_solution && !direct_solve && !norm_error_solve && ((param->dslash_type != QUDA_STAGGERED_DSLASH && param->dslash_type != QUDA_ASQTAD_DSLASH))) { // prepare source: b' = A^dag b
+  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
@@ -3338,286 +3455,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileMulti.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
-
-void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals)
-{
-
-  openMagma();
-
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
-
-  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-
-  if (!initialized) errorQuda("QUDA not initialized");
-
-  pushVerbosity(param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
-
-  checkInvertParam(param);
-
-  // check the gauge fields have been created
-  cudaGaugeField *cudaGauge = checkGauge(param);
-
-  // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
-  // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
-  // for now, though, so here we factorize everything for convenience.
-
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
-    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
-  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
-    (param->solution_type ==  QUDA_MATPC_SOLUTION);
-  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
-    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
-
-  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
-  if (!pc_solve) param->spinorGiB *= 2;
-  param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
-  if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-    param->spinorGiB *= ((param->inv_type == QUDA_EIGCG_INVERTER || param->inv_type == QUDA_INC_EIGCG_INVERTER) ? 5 : 7)/(double)(1<<30);
-  } else {
-    param->spinorGiB *= ((param->inv_type == QUDA_EIGCG_INVERTER || param->inv_type == QUDA_INC_EIGCG_INVERTER) ? 8 : 9)/(double)(1<<30);
-  }
-
-  param->secs = 0;
-  param->gflops = 0;
-  param->iter = 0;
-
-  DiracParam diracParam;
-  DiracParam diracSloppyParam;
-  //DiracParam diracDeflateParam;
-//!
-  DiracParam diracHalfPrecParam;//sloppy precision for initCG
-//!
-  setDiracParam(diracParam, param, pc_solve);
-  setDiracSloppyParam(diracSloppyParam, param, pc_solve);
-
-  if(param->cuda_prec_precondition != QUDA_HALF_PRECISION)
-  {
-     errorQuda("\nInitCG requires sloppy gauge field in half precision. It seems that the half precision field is not loaded,\n please check you cuda_prec_precondition parameter.\n");
-  }
-
-//!half precision Dirac field (for the initCG)
-  setDiracParam(diracHalfPrecParam, param, pc_solve);
-
-  diracHalfPrecParam.gauge = gaugePrecondition;
-  diracHalfPrecParam.fatGauge = gaugeFatPrecondition;
-  diracHalfPrecParam.longGauge = gaugeLongPrecondition;
-
-  diracHalfPrecParam.clover = cloverPrecondition;
-
-  for (int i=0; i<4; i++) {
-      diracHalfPrecParam.commDim[i] = 1; // comms are on.
-  }
-//!
-
-  Dirac *d        = Dirac::create(diracParam); // create the Dirac operator
-  Dirac *dSloppy  = Dirac::create(diracSloppyParam);
-  //Dirac *dDeflate = Dirac::create(diracPreParam);
-  Dirac *dHalfPrec = Dirac::create(diracHalfPrecParam);
-
-  Dirac &dirac = *d;
-  Dirac &diracSloppy   = *dSloppy;
-  Dirac &diracHalf     = *dHalfPrec;
-  Dirac &diracDeflate  = (param->cuda_prec_ritz == param->cuda_prec) ? *d : *dSloppy;
-
-  profileInvert.TPSTART(QUDA_PROFILE_H2D);
-
-  ColorSpinorField *b = NULL;
-  ColorSpinorField *x = NULL;
-  ColorSpinorField *in = NULL;
-  ColorSpinorField *out = NULL;
-
-  const int *X = cudaGauge->X();
-
-  // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(_h_b, *param, X, pc_solution);
-  ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
-  cpuParam.v = _h_x;
-  ColorSpinorField *h_x = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
-  // download source
-  ColorSpinorParam cudaParam(cpuParam, *param);
-  cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  b = new cudaColorSpinorField(*h_b, cudaParam);
-
-  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
-    // initial guess only supported for single-pass solvers
-    if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
-        (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
-      errorQuda("Initial guess not supported for two-pass solver");
-    }
-
-    x = new cudaColorSpinorField(*h_x, cudaParam); // solution
-  } else { // zero initial guess
-    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-    x = new cudaColorSpinorField(cudaParam); // solution
-  }
-
-  profileInvert.TPSTOP(QUDA_PROFILE_H2D);
-
-  double nb = blas::norm2(*b);
-  if (nb==0.0) errorQuda("Source has zero norm");
-
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    double nh_b = blas::norm2(*h_b);
-    double nh_x = blas::norm2(*h_x);
-    double nx = blas::norm2(*x);
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
-    printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
-  }
-
-  // rescale the source and solution vectors to help prevent the onset of underflow
-  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0/sqrt(nb), *b);
-    blas::ax(1.0/sqrt(nb), *x);
-  }
-
-  massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
-
-  dirac.prepare(in, out, *x, *b, param->solution_type);
-//here...
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = blas::norm2(*in);
-    double nout = blas::norm2(*out);
-    printfQuda("Prepared source = %g\n", nin);
-    printfQuda("Prepared solution = %g\n", nout);
-  }
-
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = blas::norm2(*in);
-    printfQuda("Prepared source post mass rescale = %g\n", nin);
-  }
-
-  if (param->max_search_dim == 0 || param->nev == 0 || (param->max_search_dim < param->nev))
-     errorQuda("\nIncorrect eigenvector space setup...\n");
-
-  if (pc_solution && !pc_solve) {
-    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
-  }
-
-  if (!mat_solution && !pc_solution && pc_solve) {
-    errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
-  }
-
-  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
-    cudaColorSpinorField tmp(*in);
-    dirac.Mdag(*in, tmp);
-  }
-
-  if(param->inv_type == QUDA_INC_EIGCG_INVERTER || param->inv_type == QUDA_EIGCG_INVERTER)
-  {
-    DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
-    SolverParam solverParam(*param);
-
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, &m, &mSloppy, &mHalf, &mDeflate, &profileInvert);
-
-    (*solve)(static_cast<cudaColorSpinorField*>(out), static_cast<cudaColorSpinorField*>(in));//run solver
-
-    solverParam.updateInvertParam(*param);//will update rhs_idx as well...
-
-    delete solve;
-  }
-  else if (param->inv_type == QUDA_GMRESDR_INVERTER && direct_solve)
-  {
-    DiracM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
-    //DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);//use for tests only.
-    SolverParam solverParam(*param);
-
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, &m, &mSloppy, &mHalf, &mHalf, &profileInvert);  //mDeflate - > mHalf
-
-    (*solve)(static_cast<cudaColorSpinorField*>(out), static_cast<cudaColorSpinorField*>(in));//run solver
-
-    solverParam.updateInvertParam(*param);//will update rhs_idx as well...
-
-    delete solve;
-
-  }
-  else if (param->inv_type == QUDA_GMRESDR_PROJ_INVERTER && direct_solve)
-  {
-     DiracM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
-     SolverParam solverParam(*param);
-     DeflatedSolver *solve = DeflatedSolver::create(solverParam, &m, &mSloppy, &mHalf, &mHalf, &profileInvert);
-
-     (*solve)(static_cast<cudaColorSpinorField*>(out), static_cast<cudaColorSpinorField*>(in));//run solver
-     solverParam.updateInvertParam(*param);//will update rhs_idx as well...
-
-     delete solve;
-  }
-  else
-  {
-    errorQuda("\nUnknown deflated solver...\n");
-  }
-
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    printfQuda("Solution = %g\n",nx);
-  }
-  dirac.reconstruct(*x, *b, param->solution_type);
-
-  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    // rescale the solution
-    blas::ax(sqrt(nb), *x);
-  }
-
-  profileInvert.TPSTART(QUDA_PROFILE_D2H);
-  *h_x = *x;
-  profileInvert.TPSTOP(QUDA_PROFILE_D2H);
-
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    double nh_x = blas::norm2(*h_x);
-    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
-  }
-
-  delete h_b;
-  delete h_x;
-  delete b;
-  delete x;
-
-  delete d;
-  delete dSloppy;
-//  delete dDeflate;
-  delete dHalfPrec;
-
-  popVerbosity();
-
-  closeMagma();
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
-
-  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-
-void destroyDeflationQuda(QudaInvertParam *param, const int *X,  void *_h_u, double *inv_eigenvals)
-{
-   SolverParam solverParam(*param);
-   DeflatedSolver *solve = DeflatedSolver::create(solverParam, NULL, NULL, NULL, NULL, NULL);
-
-   if(param->inv_type == QUDA_INC_EIGCG_INVERTER || param->inv_type == QUDA_EIGCG_INVERTER){
-      if(_h_u) solve->StoreRitzVecs(_h_u, inv_eigenvals, X, param, param->nev);
-      printfQuda("\nDelete incremental EigCG solver resources...\n");
-      //clean resources:
-      solve->CleanResources();
-      //
-      printfQuda("\n...done.\n");
-   }
-   else
-   {
-      solve->CleanResources();
-   }
-
-   return;
-}
-
 
 void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param) {
 
@@ -5508,6 +5345,43 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
+
+
+void gaussGaugeQuda(long seed)
+{
+#ifdef GPU_GAUGE_TOOLS
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+
+  profileGauss.TPSTART(QUDA_PROFILE_INIT);
+  if (!gaugePrecise)
+    errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
+
+  cudaGaugeField *data = NULL;
+  data = gaugePrecise;
+
+  profileGauss.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+  RNG* randstates = new RNG(data->Volume(), seed, data->X());
+  randstates->Init();
+  quda::gaugeGauss(*data, *randstates);
+  randstates->Release();
+  delete randstates;
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  if (extendedGaugeResident) {
+
+    extendedGaugeResident = gaugePrecise;
+    extendedGaugeResident -> exchangeExtendedGhost(R,redundant_comms);
+  }
+#else
+  errorQuda("Gauge tools are not build");
+#endif
+}
+
+
 /*
  * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
  */
@@ -5595,7 +5469,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after 0 APE steps: %le\n", plq.x);
+    printfQuda("Plaquette after 0 APE steps: %le %le %le\n", plq.x, plq.y, plq.z);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
@@ -5610,7 +5484,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq.x);
+    printfQuda("Plaquette after %d APE steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
 
   profileAPE.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -5640,7 +5514,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after 0 STOUT steps: %le\n", plq.x);
+    printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plq.x, plq.y, plq.z);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
@@ -5655,10 +5529,55 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    printfQuda("Plaquette after %d STOUT steps: %le\n", nSteps, plq.x);
+    printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
   }
 
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+ void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
+{
+  profileOvrImpSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == NULL) errorQuda("Gauge field must be loaded");
+  
+  GaugeFieldParam gParam(*gaugePrecise);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  for(int dir=0; dir<4; ++dir) {
+    gParam.x[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+    gParam.r[dir] = R[dir];
+  }
+
+  if (gaugeSmeared != NULL) delete gaugeSmeared;
+
+  gaugeSmeared = new cudaGaugeField(gParam);
+
+  copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+  cudaGaugeField *cudaGaugeTemp = new cudaGaugeField(gParam);
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after 0 OvrImpSTOUT steps: %le %le %le\n", plq.x, plq.y, plq.z);
+  }
+
+  for (unsigned int i=0; i<nSteps; i++) {
+    cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->exchangeExtendedGhost(R,redundant_comms);
+    OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, epsilon);
+  }
+
+  delete cudaGaugeTemp;
+
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", nSteps, plq.x, plq.y, plq.z);
+  }
+
+  profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 

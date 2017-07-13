@@ -10,6 +10,7 @@
 #include <register_traits.h>
 #include <clover_field.h>
 #include <complex_quda.h>
+#include <thrust_helper.cuh>
 
 namespace quda {
 
@@ -99,28 +100,92 @@ namespace quda {
 
     */
 
+    template<typename Float> struct abs_ { __host__ __device__ Float operator()(quda::complex<Float> x) { return abs(x); } };
+
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
+      Accessor(const CloverField &A, bool inverse=false) {
+	errorQuda("Not implemented for order %d", order);
+      }
+
       __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row, int s_col,
 							    int c_row, int c_col) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
 	return dummy;
+      }
+    };
+
+    template<int N>
+      __device__ __host__ inline int indexFloatN(int k, int stride, int x) {
+      int j = k / N;
+      int i = k % N;
+      return (j*stride+x)*N + i;
+    };
+
+    template<typename Float, int nColor, int nSpin>
+      struct Accessor<Float,nColor,nSpin,QUDA_FLOAT4_CLOVER_ORDER> {
+      Float *a;
+      int stride;
+      size_t offset_cb;
+      static constexpr int N = nSpin * nColor / 2;
+    Accessor(const CloverField &A, bool inverse=false)
+      : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()),
+	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
+
+      __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
+	// if not in the diagonal chiral block then return 0.0
+	if (s_col / 2 != s_row / 2) { return complex<Float>(0.0); }
+
+	const int chirality = s_col / 2;
+
+	int row = s_row%2 * nColor + c_row;
+	int col = s_col%2 * nColor + c_col;
+	Float *a_ = a+parity*offset_cb+stride*chirality*N*N;
+
+	if (row == col) {
+	  return 2*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(row, stride, x) ];
+	} else if (col < row) {
+	  // switch coordinates to count from bottom right instead of top left of matrix
+	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
+          int idx = N + 2*k;
+
+          return 2*complex<Float>(a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
+				  a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+	} else {
+	  // requesting upper triangular so return conjugate transpose
+	  // switch coordinates to count from bottom right instead of top left of matrix
+	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+          int idx = N + 2*k;
+
+          return 2*complex<Float>( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
+				  -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+	}
+
+      }
+
+      __host__ double device_absmax() const {
+	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
+	// just use offset_cb, since factor of two from parity is equivalent to complexity
+	return thrust::transform_reduce(thrust::retag<my_tag>(ptr), thrust::retag<my_tag>(ptr+offset_cb),
+					abs_<Float>(), 0.0, thrust::maximum<Float>());
+      }
+
+      __host__ double device_absmin() const {
+	thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
+	// just use offset_cb, since factor of two from parity is equivalent to complexity
+	return thrust::transform_reduce(thrust::retag<my_tag>(ptr), thrust::retag<my_tag>(ptr+offset_cb),
+					abs_<Float>(), 0.0, thrust::minimum<Float>());
       }
     };
 
     template<typename Float, int nColor, int nSpin> 
       struct Accessor<Float,nColor,nSpin,QUDA_PACKED_CLOVER_ORDER> { 
       Float *a[2];
-      int volumeCB;
       const int N = nSpin * nColor / 2;
       complex<Float> zero;
-    Accessor(const CloverField &A, bool inverse=false) : volumeCB(A.VolumeCB()) { 
+      Accessor(const CloverField &A, bool inverse=false) {
 	// even
 	a[0] = static_cast<Float*>(const_cast<void*>(A.V(inverse)));
 	// odd
-	//a[1] = static_cast<Float*>(static_cast<char*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/2);
 	a[1] = static_cast<Float*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/(2*sizeof(Float));
 	zero = complex<Float>(0.0,0.0);
       }
@@ -141,14 +206,24 @@ namespace quda {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = (x*2 + chirality)*N*N + N + 2*k;
-          complex<Float> tmp(a[parity][idx], a[parity][idx+1]);
-          return tmp;
+          return complex<Float>(a[parity][idx], a[parity][idx+1]);
 	} else {
-	  // requesting upper triangular so return conjugate transpose
-	  return conj(operator()(parity,x,s_col,s_row,c_col,c_row) );
+	  // switch coordinates to count from bottom right instead of top left of matrix
+	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+          int idx = (x*2 + chirality)*N*N + N + 2*k;
+          return complex<Float>(a[parity][idx], -a[parity][idx+1]);
 	}
       }
 
+      __host__ double device_absmax() const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+
+      __host__ double device_absmin() const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
     };
 
     /**
@@ -164,13 +239,15 @@ namespace quda {
 	CloverField &A;
 	const int volumeCB;
 	const Accessor<Float,nColor,nSpin,order> accessor;
+	bool inverse;
 
       public:
 	/** 
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-      FieldOrder(CloverField &A, bool inverse=false) : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse)
+      FieldOrder(CloverField &A, bool inverse=false)
+      : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse), inverse(inverse)
 	{ }
 	
 	CloverField& Field() { return A; }
@@ -244,6 +321,51 @@ namespace quda {
 	  constexpr int chiral_block = n * n / 2;
 	  return static_cast<size_t>(volumeCB) * chiral_block * 2ll * 2ll * sizeof(Float); // 2 from complex, 2 from chirality
 	}
+
+	/**
+	 * @brief Returns the Linfinity norm of the field
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Linfinity norm
+	 */
+	__host__ double abs_max(int dim) const {
+	  double absmax = 0;
+	  if (A.Location() == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmax = accessor.device_absmax();
+	  } else {
+	    // do simple norm on host memory
+	    complex<Float> *a = static_cast<complex<Float>*>(A.V(inverse));
+	    absmax = 0.0;
+	    for (size_t i=0; i<A.Bytes()/sizeof(complex<Float>); i++) {
+	      absmax = (abs(a[i]) > absmax) ? abs(a[i]) : absmax;
+	    }
+	  }
+	  comm_allreduce_max(&absmax);
+	  return absmax;
+	}
+
+	/**
+	 * @brief Returns the minimum absolute value of the field
+	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
+	 * @return Minimum norm
+	 */
+	__host__ double abs_min(int dim) const {
+	  double absmin = 0;
+	  if (A.Location() == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmin = accessor.device_absmin();
+	  } else {
+	    // do simple norm on host memory
+	    complex<Float> *a = static_cast<complex<Float>*>(A.V(inverse));
+	    absmin = 0.0;
+	    for (size_t i=0; i<A.Bytes()/sizeof(complex<Float>); i++) {
+	      absmin = (abs(a[i]) > absmin) ? abs(a[i]) : absmin;
+	    }
+	  }
+	  comm_allreduce_min(&absmin);
+	  return absmin;
+	}
+
       };
 
     /**

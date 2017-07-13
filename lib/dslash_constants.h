@@ -77,6 +77,9 @@ enum KernelType {
     double mferm;
     float mferm_f;
 
+    double tProjScale;
+    float tProjScale_f;
+
     void *out;
     float *outNorm;
     
@@ -259,10 +262,6 @@ __constant__ bool Pt0;
 
 // Are we processor Nt-1 in time?
 __constant__ bool PtNm1;
-
-// factor of 2 (or 1) for T-dimensional spin projection
-__constant__ double tProjScale;
-__constant__ float tProjScale_f;
 
 //for link fattening/gauge force/fermion force code
 __constant__ int E1, E2, E3, E4, E1h;
@@ -500,15 +499,7 @@ void initDslashConstants(TimeProfile &profile)
   float pi_f_h = M_PI;
   cudaMemcpyToSymbol(pi_f, &pi_f_h, sizeof(float));
 
-  // temporary additions (?) for checking Ron's T-packing kernel with old multi-gpu kernel
-
-  double tProjScale_h = (getKernelPackT() ? 1.0 : 2.0);
-  cudaMemcpyToSymbol(tProjScale, &tProjScale_h, sizeof(double));
-
-  float tProjScale_fh = (float)tProjScale_h;
-  cudaMemcpyToSymbol(tProjScale_f, &tProjScale_fh, sizeof(float));
-
-  // set these for naive staggered
+   // set these for naive staggered
   float coeff_fh = 1.0;
   cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
 

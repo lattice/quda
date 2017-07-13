@@ -17,23 +17,22 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, DiracMatrix *matSmoothTransfer, std::complex<double> alpha, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu, TimeProfile &profile)
-    : B(B), Nvec(Nvec), V_h(nullptr), V_d(nullptr), matSmoothTransfer(nullptr), alpha(0.0, 0.0),  
-      fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
-      fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), 
-      fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr), 
-      spin_bs(spin_bs), spin_map(nullptr), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, bool enable_gpu, TimeProfile &profile)
+    : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
+      fine_to_coarse_h(0), coarse_to_fine_h(0), 
+      fine_to_coarse_d(0), coarse_to_fine_d(0), 
+      spin_bs(spin_bs), spin_map(0), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
       flops_(0), profile(profile)
   {
     int ndim = B[0]->Ndim();
 
     for (int d = 0; d < ndim; d++) {
+      if(d == 4 && geo_bs[d] == 1) continue;//no blocking in 5th dim, so there is nothing to check 
       while (geo_bs[d] > 0) {
 	if (d==0 && B[0]->X(0) == geo_bs[0])
 	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
-	else if ( ((B[0]->X(d)/geo_bs[d]+1)%2 == 0) && (B[0]->X(d) != geo_bs[2]))//temporary hack for 2d U1 emulation
+	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
 	  warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0]->X(d)/geo_bs[d]);
 	else if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
 	  warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0]->X(d), geo_bs[d]);
@@ -74,13 +73,7 @@ namespace quda {
       param.x[0] *= 2;
     }
 
-    if (param.nSpin == 1){
-      //param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//host orthogonalization is implemented for SPIN_COLOR order only!
-      printfQuda("Transfer: creating V field with location %d\n", param.location);
-    }
-    else{
-      printfQuda("Transfer: creating V field with basis %d with location %d\n", param.gammaBasis, param.location);    
-    }
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: creating V field with location %d\n", param.location);
 
     // for cpu transfer this is the V field, for gpu it's just a temporary until we port the block orthogonalization
     V_h = ColorSpinorField::Create(param);
@@ -88,14 +81,15 @@ namespace quda {
     param.location = QUDA_CUDA_FIELD_LOCATION;
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//ok for staggered
 
-    V_d = enable_gpu ? ColorSpinorField::Create(param) : 0;
+    param.precision = null_precision;
+    V_d = enable_gpu ? ColorSpinorField::Create(param) : nullptr;
+    param.precision = V_h->Precision();
 
-    printfQuda("Transfer: filling V field with zero\n");
-    fillV(*V_h); // copy the null space vectors into V
-
-    param = ColorSpinorParam(*B[0]);
+    ColorSpinorField *V_tmp = (V_d && V_d->Precision() != V_h->Precision())
+      ? ColorSpinorField::Create(param) : V_d;
 
     // used for cpu<->gpu transfers
+    param = ColorSpinorParam(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
     fine_tmp_h = ColorSpinorField::Create(param);
 
@@ -125,28 +119,49 @@ namespace quda {
 
     createGeoMap(geo_bs);
 
-    // allocate the fine-to-coarse spin map (underfined for the top level staggered.)
-    if (param.nSpin != 1){
-      spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
-      createSpinMap(spin_bs);
+    spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));//let's do it for staggered as well
+    if (param.nSpin == 1 && spin_bs != 1){
+      errorQuda("Cannot create spin_map for spin %d field and spin_bs %d\n", B[0]->Nspin(), spin_bs);
+    }
+    createSpinMap(spin_bs);
+
+#if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
+    bool gpu_setup = true;
+#else
+    bool gpu_setup = false;
+#endif
+
+    if (gpu_setup) {
+
+      printfQuda("Transfer: filling V field with null-space components\n");
+      fillV(*V_tmp);  // copy the null space vectors into V
+
+      // orthogonalize the blocks
+      printfQuda("Transfer: block orthogonalizing\n");
+      BlockOrthogonalize(*V_tmp, Nvec, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
+
+      *V_h = *V_tmp;
+      if (V_d != V_tmp) {
+	*V_d = *V_tmp;
+	delete V_tmp;
+      }
+      printfQuda("Transferred prolongator back to CPU\n");
+    } else {
+
+      printfQuda("Transfer: filling V field with null-space components\n");
+      fillV(*V_h); // copy the null space vectors into V
+
+      // orthogonalize the blocks
+      printfQuda("Transfer: block orthogonalizing\n");
+      BlockOrthogonalize(*V_h, Nvec, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
+
+      if (enable_gpu) {
+	*V_d = *V_h;
+	printfQuda("Transferred prolongator to GPU\n");
+      }
+
     }
 
-    // orthogonalize the blocks
-    printfQuda("Transfer: block orthogonalizing\n");
-    BlockOrthogonalize(*V_h, Nvec, geo_bs, fine_to_coarse_h, spin_bs);
-    //for (int x=0; x<Vh->Volume(); x++) static_cast<cpuColorSpinorField*>(Vh)->PrintVector(x);
-    //printfQuda("Vh->Volume() = %d Vh->Nspin() = %d Vh->Ncolor = %d Vh->Length() = %d\n", Vh->Volume(), Vh->Nspin(), Vh->Ncolor(), Vh->Length());
-
-    if (enable_gpu) {
-      *V_d = *V_h;
-      printfQuda("Transferred prolongator to GPU\n");
-    }
-
-    if( alpha.real() != 0.0 ||  alpha.imag() != 0.0 )//for staggered multigrid
-    {
-      this->matSmoothTransfer = matSmoothTransfer;
-      this->alpha = alpha;
-    }
   }
 
   Transfer::~Transfer() {
@@ -168,7 +183,7 @@ namespace quda {
   }
 
   void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_) {
-    if (parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
+    if (site_subset_ == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
     parity = parity_;
 
     if (site_subset == site_subset_) return;
@@ -180,26 +195,26 @@ namespace quda {
     if (site_subset == QUDA_PARITY_SITE_SUBSET) {
       // if doing single-parity then delete full field V and replace with single parity
 
-      delete V_d;
-
       ColorSpinorParam param(*V_h);
       param.location = QUDA_CUDA_FIELD_LOCATION;
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
       param.x[0] /= 2;
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      param.precision = V_d->Precision();
 
+      delete V_d;
       V_d = ColorSpinorField::Create(param);
       *V_d = parity == QUDA_EVEN_PARITY ? V_h->Even() : V_h->Odd();
 
     } else if (site_subset == QUDA_FULL_SITE_SUBSET) {
       // if doing full field then delete single parity V and replace with single parity
 
-      delete V_d;
-
       ColorSpinorParam param(*V_h);
       param.location = QUDA_CUDA_FIELD_LOCATION;
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      param.precision = V_d->Precision();
 
+      delete V_d;
       V_d = ColorSpinorField::Create(param);
       *V_d = *V_h;
 
@@ -210,7 +225,25 @@ namespace quda {
   }
 
   void Transfer::fillV(ColorSpinorField &V) { 
-    FillV(V, B, Nvec);  //printfQuda("V fill check %e\n", norm2(*V));
+    if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      std::vector<ColorSpinorField*> Bgpu;
+      Bgpu.reserve(Nvec);
+      ColorSpinorParam param(*B[0]);
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      for (int i=0; i<Nvec; i++) {
+	Bgpu.push_back(ColorSpinorField::Create(param));
+	*Bgpu[i] = *B[i];
+      }
+
+      FillV(V, Bgpu, Nvec);
+
+      for (int i=0; i<Nvec; i++) {
+	delete Bgpu[i];
+      }
+    } else {
+      FillV(V, B, Nvec);
+    }
   }
 
   struct Int2 {
@@ -267,8 +300,6 @@ namespace quda {
   // compute the fine spin to coarse spin map
   void Transfer::createSpinMap(int spin_bs) {
 
-    if(!spin_map) errorQuda("\nSpin map is underfined (was not allocated).\n");
-
     for (int s=0; s<B[0]->Nspin(); s++) {
       spin_map[s] = s / spin_bs;
     }
@@ -284,8 +315,6 @@ namespace quda {
     const ColorSpinorField *V = use_gpu ? V_d : V_h;
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
-    if(out.Ndim() == 5 || in.Ndim() == 5) errorQuda("\n5-d fileds are not supported.\n");
-
     if (use_gpu) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
       if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
@@ -294,7 +323,6 @@ namespace quda {
     } else {
       if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
 	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
-      if (in.Location() == QUDA_CUDA_FIELD_LOCATION) input = coarse_tmp_h;
     }
 
     *input = in; // copy result to input field (aliasing handled automatically)
@@ -308,34 +336,6 @@ namespace quda {
     }
 
     Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
-
-    if(alpha.real() != 0.0 ||  alpha.imag() != 0.0)
-    {
-      if (use_gpu)
-      {
-         ColorSpinorParam  csParam = ColorSpinorParam(*fine_tmp_d);
-         csParam.extendDimensionality();   
-         csParam.create = QUDA_ZERO_FIELD_CREATE;
-         csParam.siteSubset = out.SiteSubset();
-
-         ColorSpinorField *smoothed_5d_d    = ColorSpinorField::Create(csParam);
-         ColorSpinorField *prolongated_5d_d = ColorSpinorField::Create(csParam);
-
-         *prolongated_5d_d = *output;
-
-         (*matSmoothTransfer)( *smoothed_5d_d, *prolongated_5d_d);
-         blas::caxpy(-alpha, *smoothed_5d_d, *prolongated_5d_d);
-
-         *output = *prolongated_5d_d;
-         
-         delete smoothed_5d_d;
-         delete prolongated_5d_d; 
-      }
-      else
-      {
-         warningQuda("\nSmoothed prolongator is disabled\n");
-      } 
-    }
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
@@ -355,8 +355,6 @@ namespace quda {
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
 
-    if(out.Ndim() == 5 || in.Ndim() == 5) errorQuda("\n5-d fileds are not supported.\n");
-
     if (use_gpu) {
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
       if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
@@ -365,43 +363,9 @@ namespace quda {
     } else {
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
 	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
-      if (out.Location() == QUDA_CUDA_FIELD_LOCATION) output = coarse_tmp_h;
     }
 
     *input = in;
-
-    if(alpha.real() != 0.0 || alpha.imag() != 0.0)
-    {
-      if (use_gpu)
-      {
- //        Dirac &dirac_smooth  = const_cast<Dirac&>(*(matSmoothTransfer->Expose()));
- //        dirac_smooth.Dagger(QUDA_DAG_YES);//!
-
-         ColorSpinorParam  csParam = ColorSpinorParam(*fine_tmp_d);
-         csParam.extendDimensionality();
-         csParam.create = QUDA_ZERO_FIELD_CREATE;
-         csParam.siteSubset = in.SiteSubset();
-
-         ColorSpinorField *smoothed_5d_d         = ColorSpinorField::Create(csParam);
-         ColorSpinorField *to_be_restricted_5d_d = ColorSpinorField::Create(csParam);
-
-         *to_be_restricted_5d_d = *input;
-
-         (*matSmoothTransfer)( *smoothed_5d_d, *to_be_restricted_5d_d);
-         blas::caxpy(-conj(alpha), *smoothed_5d_d, *to_be_restricted_5d_d);//in fact, we compute -Ddagger
-
-         *input = *to_be_restricted_5d_d;
-
-         delete to_be_restricted_5d_d; 
-         delete smoothed_5d_d;
-
-//         dirac_smooth.Dagger(QUDA_DAG_NO);
-      }
-      else
-      {
-         warningQuda("\nSmoothed restrictor is disabled\n");
-      } 
-    }
 
     if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot restrict a full field since only have single parity null-space components");

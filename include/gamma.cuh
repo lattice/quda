@@ -8,7 +8,7 @@ namespace quda {
   template <typename ValueType, QudaGammaBasis basis, int dir>
   class Gamma {
   private:
-    const int ndim;
+    static constexpr int ndim = 4;
 
   protected:
 
@@ -29,7 +29,7 @@ namespace quda {
 
   public:
 
-    __device__ __host__ Gamma() : ndim(4) {
+    Gamma() {
       complex<ValueType> I(0,1);
       if((dir==0) || (dir==1)) {
 	coupling[0] = 3;
@@ -118,14 +118,12 @@ namespace quda {
       }
     }
 
-    Gamma(const Gamma &g) : ndim(4) {
+    Gamma(const Gamma &g) {
       for(int i = 0; i < ndim+1; i++) {
 	coupling[i] = g.coupling[i];
 	elem[i] = g.elem[i];
       }
     }
-
-    __device__ __host__ ~Gamma() {}
 
     //Returns the matrix element.
     __device__ __host__ inline complex<ValueType> getelem(int row, int col) const {
@@ -140,9 +138,7 @@ namespace quda {
     }
 
     //Returns the type of Gamma matrix
-    inline int Dir() const {
-      return dir;
-    }
+    inline constexpr int Dir() const { return dir;  }
   };
 
 } // namespace quda

@@ -155,20 +155,23 @@ namespace quda {
     }
 
     /**
-       Functor to perform the operation y = x + a*y
+       Functor to perform the operation z = x + a*y
     */
     template <typename Float2, typename FloatN>
-    struct xpay_ : public BlasFunctor<Float2,FloatN> {
+    struct xpayz_ : public BlasFunctor<Float2,FloatN> {
       const Float2 a;
-      xpay_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { y = x + a.x*y; }
+      xpayz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) { z = x + a.x*y; }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 2; } //! flops per element
     };
 
     void xpay(ColorSpinorField &x, const double &a, ColorSpinorField &y) {
-      blasCuda<xpay_,0,1,0,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0),
-			     x, y, x, x);
+      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, y, x);
+    }
+
+    void xpayz(ColorSpinorField &x, const double &a, ColorSpinorField &y, ColorSpinorField &z) {
+      blasCuda<xpayz_,0,0,1,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x);
     }
 
     /**
@@ -609,6 +612,53 @@ namespace quda {
 	blasCuda<tripleCGUpdate_,0,1,1,1>(make_double2(a, 0.0), make_double2(b, 0.0),
 					  make_double2(0.0, 0.0), x, y, z, w);
       }
+    }
+
+    /**
+       void doubleCG3Init(d a, V x, V y, V z){}
+        y = x;
+        x += a.x*z;
+    */
+    template <typename Float2, typename FloatN>
+    struct doubleCG3Init_ : public BlasFunctor<Float2,FloatN> {
+      Float2 a;
+      doubleCG3Init_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) {
+        y = x;
+        x += a.x*z;
+      }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 3; } //! flops per element
+    };
+
+    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+	blasCuda<doubleCG3Init_,1,1,0,0>(make_double2(a, 0.0), make_double2(0.0, 0.0),
+                                         make_double2(0.0, 0.0), x, y, z, z);
+    }
+
+    /**
+       void doubleCG3Update(d a, d b, V x, V y, V z){}
+        tmp = x;
+        x = b.x*(x+a.x*z) + b.y*y;
+        y = tmp;
+    */
+    template <typename Float2, typename FloatN>
+    struct doubleCG3Update_ : public BlasFunctor<Float2,FloatN> {
+      Float2 a, b;
+      doubleCG3Update_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+      FloatN tmp{};
+      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w) {
+        tmp = x;
+        x = b.x*(x+a.x*z) + b.y*y;
+        y = tmp;
+      }
+      static int streams() { return 4; } //! total number of input and output streams
+      static int flops() { return 7; } //! flops per element
+    };
+
+    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+	blasCuda<doubleCG3Update_,1,1,0,0>(make_double2(a, 0.0), make_double2(b, 1.0-b),
+                                           make_double2(0.0, 0.0), x, y, z, z);
     }
 
   } // namespace blas

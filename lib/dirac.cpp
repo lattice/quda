@@ -31,7 +31,7 @@ namespace quda {
 
   Dirac& Dirac::operator=(const Dirac &dirac)
   {
-    if(&dirac != this) {
+    if (&dirac != this) {
       gauge = dirac.gauge;
       kappa = dirac.kappa;
       matpcType = dirac.matpcType;
@@ -44,6 +44,8 @@ namespace quda {
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 
       profile = dirac.profile;
+
+      if (type != dirac.type) errorQuda("Trying to copy between incompatible types %d %d", type, dirac.type);
     }
     return *this;
   }
