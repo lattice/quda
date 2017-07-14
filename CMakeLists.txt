@@ -217,7 +217,7 @@ if (QUDA_DOWNLOAD_EIGEN)
     INSTALL_COMMAND ""
   )
   ExternalProject_Get_Property(Eigen source_dir)
-  set(EIGEN_INCLUDE_DIRS ${source_dir}/EIGEN)
+  set(EIGEN_INCLUDE_DIRS ${source_dir})
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)
