@@ -320,6 +320,17 @@ namespace quda {
     /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
 
+    void precisionCheck() {
+      switch(precision) {
+      case QUDA_HALF_PRECISION:
+      case QUDA_SINGLE_PRECISION:
+      case QUDA_DOUBLE_PRECISION:
+	break;
+      default:
+	errorQuda("Unknown precision %d\n", precision);
+      }
+    }
+
   public:
 
     /**

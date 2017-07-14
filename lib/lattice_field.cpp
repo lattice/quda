@@ -63,6 +63,7 @@ namespace quda {
       scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
       my_face_h{nullptr,nullptr}, my_face_hd{nullptr,nullptr}, initComms(false), mem_type(param.mem_type)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
@@ -93,6 +94,7 @@ namespace quda {
       scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange),
       my_face_h{nullptr,nullptr}, my_face_hd{nullptr,nullptr}, initComms(false), mem_type(field.mem_type)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
