@@ -2,6 +2,8 @@
 #include <qio_field.h>
 #include <string.h>
 
+#include <memory>
+
 #ifdef DEFLATEDSOLVER
 
 #ifdef MAGMA_LIB
@@ -9,7 +11,6 @@
 #endif
 
 #include <Eigen/Dense>
-#include <Eigen/Sparse>
 
 #endif
 
@@ -101,25 +102,23 @@ namespace quda {
     const int nevs_to_print = param.cur_dim;
     if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n"); 
 
-    Complex *projm  = new Complex [param.ld*param.cur_dim];
+    std::unique_ptr<Complex[], std::default_delete<Complex[]> > projm(new Complex[param.ld*param.cur_dim]);
 
     if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
 #ifdef MAGMA_LIB
       memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
-      double *evals = new double[param.ld];
+      std::unique_ptr<double[], std::default_delete<double[]> > evals(new double[param.ld]);
 
-      cudaHostRegister(static_cast<void *>(projm), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
-      magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
+      cudaHostRegister(static_cast<void *>(projm.get()), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
+      magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
       cudaHostUnregister(projm);
-
-      delete [] evals;
 #else
       errorQuda("MAGMA library was not built.\n");
 #endif
     } else {
 
       Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-      Map<MatrixXcd, Unaligned, DynamicStride> evecs_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+      Map<MatrixXcd, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
 
       SelfAdjointEigenSolver<MatrixXcd> es_projm( projm_ );
       evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
@@ -150,7 +149,6 @@ namespace quda {
        printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i+1, eval, relerr);
     }
 
-    delete [] projm;
 #endif
     return;
   }
@@ -162,7 +160,7 @@ namespace quda {
 
     if(param.cur_dim == 0) return;//nothing to do
 
-    Complex  *vec   = new Complex[param.ld];
+    std::unique_ptr<Complex[], std::default_delete<Complex[]> > vec(new Complex[param.ld]);
 
     double check_nrm2 = norm2(b);
 
@@ -175,19 +173,19 @@ namespace quda {
     std::vector<ColorSpinorField*> in_;
     in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
 
-    blas::cDotProduct(vec, rv_, in_);//<i, b>
+    blas::cDotProduct(vec.get(), rv_, in_);//<i, b>
 
     if(!param.use_inv_ritz) 
     {
       if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
 #ifdef MAGMA_LIB
-        magma_Xgesv(vec, param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
+        magma_Xgesv(vec.get(), param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
 #else
         errorQuda("MAGMA library was not built.\n");
 #endif
       } else {
         Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-        Map<VectorXcd, Unaligned> vec_ (vec, param.cur_dim);
+        Map<VectorXcd, Unaligned> vec_ (vec.get(), param.cur_dim);
 
         VectorXcd  vec2_(param.cur_dim);
         vec2_ = projm_.fullPivHouseholderQr().solve(vec_);
@@ -201,12 +199,11 @@ namespace quda {
     std::vector<ColorSpinorField*> out_;
     out_.push_back(&x);
 
-    blas::caxpy(vec, rv_, out_); //multiblas
+    blas::caxpy(vec.get(), rv_, out_); //multiblas
 
     check_nrm2 = norm2(x);
     printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
 
-    delete [] vec;
 #endif
     return;
   }
@@ -235,7 +232,7 @@ namespace quda {
 
     for(int i = first_idx; i < (first_idx + nev); i++)
     {
-      Complex *alpha = new Complex[i];
+      std::unique_ptr<Complex[], std::default_delete<Complex[]> > alpha(new Complex[i]);
 
       ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &param.RV->Component(i);
       *accum = param.RV->Component(i);
@@ -249,10 +246,10 @@ namespace quda {
         std::vector<ColorSpinorField*> vi_;
 	vi_.push_back(accum);
 
-        blas::cDotProduct(alpha, vj_, vi_);
+        blas::cDotProduct(alpha.get(), vj_, vi_);
         for (int j = 0; j < local_length; j++) alpha[j] = -alpha[j];
 
-        blas::caxpy(alpha, vj_, vi_); //i-<j,i>j
+        blas::caxpy(alpha.get(), vj_, vi_); //i-<j,i>j
 
         offset += cdot_pipeline_length;
       }
@@ -274,15 +271,13 @@ namespace quda {
         std::vector<ColorSpinorField*> av_;
 	av_.push_back(Av_sloppy);
 
-	blas::cDotProduct(alpha, vj_, av_);
+	blas::cDotProduct(alpha.get(), vj_, av_);
 
         for (int j = 0; j < i; j++) {
           param.matProj[i*param.ld+j] = alpha[j];
           param.matProj[j*param.ld+i] = conj(alpha[j]);//conj
         }
       }
-
-      delete [] alpha;
     }
 
     param.cur_dim += nev;
@@ -301,20 +296,20 @@ namespace quda {
         max_nev = param.cur_dim;
      }
 
-     double *evals   = (double*)calloc(param.cur_dim, sizeof(double));//WARNING: Ritz values always in double.
+     std::unique_ptr<double[], std::default_delete<double[]> > evals(new double[param.cur_dim]);
 
      Complex *projm  = (Complex*)mapped_malloc(param.ld*param.cur_dim * sizeof(Complex));
      memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
 
      if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
 #ifdef MAGMA_LIB
-       magma_Xheev(projm, param.cur_dim, param.ld, evals, sizeof(Complex));
+       magma_Xheev(projm, param.cur_dim, param.ld, evals.get(), sizeof(Complex));
 #else
        errorQuda("MAGMA library was not built.\n");
 #endif
      } else {
        Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-       Map<VectorXd, Unaligned> evals_(evals, param.cur_dim);
+       Map<VectorXd, Unaligned> evals_(evals.get(), param.cur_dim);
 
        SelfAdjointEigenSolver<MatrixXcd> es(projm_);
 
@@ -344,7 +339,7 @@ namespace quda {
      csParam.composite_dim = max_nev;
 
      csParam.mem_type       = QUDA_MEMORY_MAPPED;
-     ColorSpinorField *buff = ColorSpinorField::Create(csParam);
+     std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
 
      int idx       = 0;
      double relerr = 0.0;
@@ -357,9 +352,7 @@ namespace quda {
        res.push_back(r);
 
        blas::zero(*r);
-
        blas::caxpy(&projm[idx*param.ld], rv, res);//multiblas
-
        blas::copy(buff->Component(idx), *r);
 
        if( do_residual_check ) //if tol=0.0 then disable relative residual norm check
@@ -389,10 +382,7 @@ namespace quda {
      param.cur_dim = idx;//idx never exceeds cur_dim.
      param.tot_dim = idx;
 
-     free(evals);
      host_free(projm);
-
-     delete buff;
 #endif
      return;
   }

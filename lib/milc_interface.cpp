@@ -1218,7 +1218,8 @@ void qudaEigCGInvert(int external_precision,
 
   if(rhs_idx == 0) invertParam.rhs_idx  = 0;
 
-  invertParam.inv_type = QUDA_INC_EIGCG_INVERTER;
+  if((inv_args.solver_type != QUDA_INC_EIGCG_INVERTER) && (inv_args.solver_type != QUDA_EIGCG_INVERTER)) errorQuda("Incorrect inverter type.\n");
+  invertParam.inv_type = inv_args.solver_type;
 
   setDeflationParam(eig_args.prec_ritz, eig_args.location_ritz, eig_args.mem_type_ritz, eig_args.deflation_ext_lib, eig_args.vec_infile, eig_args.vec_outfile, &df_param);
 //!
@@ -1638,7 +1639,8 @@ void qudaEigCGCloverInvert(int external_precision,
 
   if(rhs_idx == 0) invertParam.rhs_idx  = 0;
 
-  invertParam.inv_type = QUDA_INC_EIGCG_INVERTER;
+  if((inv_args.solver_type != QUDA_INC_EIGCG_INVERTER) && (inv_args.solver_type != QUDA_EIGCG_INVERTER)) errorQuda("Incorrect inverter type.\n");
+  invertParam.inv_type = inv_args.solver_type;
 
   setDeflationParam(eig_args.prec_ritz, eig_args.location_ritz, eig_args.mem_type_ritz, eig_args.deflation_ext_lib, eig_args.vec_infile, eig_args.vec_outfile, &df_param);
 

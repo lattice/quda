@@ -13,6 +13,8 @@
 
 #include <face_quda.h>
 
+#include <memory>
+
 #include <iostream>
 
 #ifdef MAGMA_LIB 
@@ -21,8 +23,8 @@
 
 #ifdef DEFLATEDSOLVER
 #include <Eigen/Dense>
-#include <Eigen/Sparse>
 #endif
+
 #include <deflation.h>
 
 
@@ -73,10 +75,14 @@ namespace quda {
   
        bool run_residual_correction;//used in mixed precision cycles 
 
-       EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
-       m(m), k(k), id(0), restarts(0), global_stop(0.0), run_residual_correction(false) { }
+       ColorSpinorFieldSet *V2k; //eigCG accumulation vectors needed to update Tm (spinor matrix of size eigen_vector_length x (2*k))
 
-       ~EigCGArgs() { }
+       EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
+       m(m), k(k), id(0), restarts(0), global_stop(0.0), run_residual_correction(false), V2k(nullptr) { }
+
+       ~EigCGArgs() { 
+         if(V2k) delete V2k;
+       }
 
        //method for constructing Lanczos matrix :
        inline void SetLanczos(Complex diag_val, Complex offdiag_val) { 
@@ -99,6 +105,9 @@ namespace quda {
          Tm.setZero(); 
          Tmvals.setZero(); 
          ritzVecs.setZero();
+
+         if(V2k) delete V2k;
+         V2k = nullptr;
        }
 
        inline void ResetSearchIdx() {  id = 2*k;  restarts += 1; }
@@ -107,7 +116,8 @@ namespace quda {
        {
          Tm.setZero();
 
-         Complex *s  = new Complex[2*k];
+         std::unique_ptr<Complex[], std::default_delete<Complex[]> > s(new Complex[2*k]);
+
          for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
 
 	 std::vector<ColorSpinorField*> w_;
@@ -115,15 +125,13 @@ namespace quda {
 
 	 std::vector<ColorSpinorField*> v_(v->Components().begin(), v->Components().begin()+2*k);
 
-	 blas::cDotProduct(s, w_, v_);
+	 blas::cDotProduct(s.get(), w_, v_);
 
-	 Map<VectorXcd, Unaligned > s_(s, 2*k);
+	 Map<VectorXcd, Unaligned > s_(s.get(), 2*k);
 	 s_ *= inv_sqrt_r2;
 
 	 Tm.col(2*k).segment(0, 2*k) = s_;
 	 Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
-
-	 delete [] s;
 
 	 return;
        }
@@ -288,7 +296,7 @@ namespace quda {
 
     if(init)
     {
-      if(Vm) delete Vm;
+      if(Vm)  delete Vm;
 
       delete tmpp;
       delete rp;
@@ -321,25 +329,18 @@ namespace quda {
       ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
     }
 
-    //Create intermediate model:
-    ColorSpinorParam csParam(Vm->Component(0));
-    //
-    csParam.is_composite  = true;
-    csParam.composite_dim = (2*args.k);
-    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-    ColorSpinorFieldSet *V2k = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
     //Restart V:
+
+    blas::zero(*args.V2k);
+
     std::vector<ColorSpinorField*> vm (Vm->Components());
-    std::vector<ColorSpinorField*> v2k(V2k->Components());
+    std::vector<ColorSpinorField*> v2k(args.V2k->Components());
 
     RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
     blas::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
 
-    for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), V2k->Component(i));
+    for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), args.V2k->Component(i));
 
-    delete V2k;
     //Restart T:
     ColorSpinorField *omega = nullptr;
 
@@ -433,6 +434,7 @@ namespace quda {
       csParam.composite_dim = param.m;
 
       Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+
       eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
       init = true;
@@ -448,13 +450,21 @@ namespace quda {
       return Kparam.iter; 
     }
 
+//!
+    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+
+    csParam.create        = QUDA_ZERO_FIELD_CREATE;
+    csParam.is_composite  = true;
+    csParam.composite_dim = (2*args.k);
+
+    args.V2k = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+//!
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &tmp = *tmpp;
 
     csParam.setPrecision(param.precision_sloppy);
     csParam.is_composite  = false;
-    csParam.create        = QUDA_ZERO_FIELD_CREATE;
 
     // compute initial residual
     matSloppy(r, x, y);
@@ -545,7 +555,7 @@ namespace quda {
       converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(r2, heavy_quark_res, local_stop, param.tol_hq);
     }
 
-    args.ResetArgs();//eigCG cycle finished.
+    args.ResetArgs();//eigCG cycle finished, this cleans V2k as well
 
     blas::xpy(y, x);
 

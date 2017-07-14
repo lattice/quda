@@ -20,6 +20,7 @@
 #endif
 
 #include <algorithm>
+#include <memory>
 
 #ifdef DEFLATEDSOLVER
 #include <Eigen/Dense>
@@ -76,17 +77,20 @@ namespace quda {
 
        Complex      *c;
 
+       ColorSpinorFieldSet *Vkp1;//high-precision accumulation array
+
        GMResDRArgs(int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)),
-       eta(Vector::Zero(m)), m(m), k(nev), restarts(0) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
+       eta(Vector::Zero(m)), m(m), k(nev), restarts(0), Vkp1(nullptr) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
 
        inline void ResetArgs() {
          ritzVecs.setZero();
          H.setZero();
          eta.setZero();
-         //memset(c, 0, (args.m+1) * sizeof(Complex));//already done within ritzVecs
        }
 #endif
-       ~GMResDRArgs(){ }
+       ~GMResDRArgs(){
+          if(Vkp1) delete Vkp1;
+       }
    };
 
 #ifdef DEFLATEDSOLVER
@@ -328,16 +332,9 @@ namespace quda {
    args.H.setZero();
    args.H.topLeftCorner(args.k+1, args.k) = Res;
 
-   ColorSpinorParam csParam(Vm->Component(0));
+   blas::zero( *args.Vkp1 );
 
-   csParam.is_composite  = true;
-   csParam.composite_dim = (args.k+1);
-   csParam.create = QUDA_ZERO_FIELD_CREATE;
-   csParam.setPrecision(QUDA_DOUBLE_PRECISION);
-
-   ColorSpinorFieldSet *Vkp1 = ColorSpinorFieldSet::Create(csParam);
-
-   std::vector<ColorSpinorField*> vkp1(Vkp1->Components());
+   std::vector<ColorSpinorField*> vkp1(args.Vkp1->Components());
    std::vector<ColorSpinorField*> vm  (Vm->Components());
 
    RowMajorDenseMatrix Alpha(Qkp1);//convert Qkp1 to Row-major format first  
@@ -347,8 +344,8 @@ namespace quda {
    {
      if(i < (args.k+1) )
      {
-       blas::copy(Vm->Component(i), Vkp1->Component(i));
-       blas::zero(Vkp1->Component(i));
+       blas::copy(Vm->Component(i), args.Vkp1->Component(i));
+       blas::zero(args.Vkp1->Component(i));
      }
      else blas::zero(Vm->Component(i));
    }
@@ -356,19 +353,17 @@ namespace quda {
    if( Zm->V() != Vm->V() )
    {
      std::vector<ColorSpinorField*> z (Zm->Components());
-     std::vector<ColorSpinorField*> vk(Vkp1->Components().begin(),Vkp1->Components().begin()+args.k);
+     std::vector<ColorSpinorField*> vk(args.Vkp1->Components().begin(),args.Vkp1->Components().begin()+args.k);
 
      RowMajorDenseMatrix Beta(Qkp1.topLeftCorner(args.m,args.k));
      blas::caxpy(static_cast<Complex*>(Beta.data()), z , vk);
 
      for(int i = 0; i < (args.m); i++)
      {
-       if( i < (args.k) ) blas::copy(Zm->Component(i), Vkp1->Component(i));
+       if( i < (args.k) ) blas::copy(Zm->Component(i), args.Vkp1->Component(i));
        else               blas::zero(Zm->Component(i));
      }
    }
-
-   delete Vkp1;
 
    checkCudaError();
 
@@ -393,9 +388,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    GMResDRArgs &args = *gmresdr_args;
    ColorSpinorField &tmp = *tmpp;
 
-   Complex *givensH = (do_givens) ? new Complex[(args.m+1)*args.m] : nullptr;
-   Complex *cn      = (do_givens) ? new Complex[args.m]            : nullptr;
-   double  *sn      = (do_givens) ? new double [args.m]            : nullptr;
+   std::unique_ptr<Complex[], std::default_delete<Complex[]> > givensH((do_givens) ? new Complex[(args.m+1)*args.m] : nullptr);
+   std::unique_ptr<Complex[], std::default_delete<Complex[]> > cn((do_givens) ? new Complex[args.m] : nullptr);
+   std::unique_ptr<double[],  std::default_delete<double[]>  > sn((do_givens) ? new double[args.m] : nullptr);
 
    Complex c0 = args.c[0];
 
@@ -449,16 +444,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    if(do_givens)
    {
-     Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH, args.m, args.m, DynamicStride(args.m+1,1) );
+     Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH.get(), args.m, args.m, DynamicStride(args.m+1,1) );
      memcpy(args.eta.data(),  args.c, args.m*sizeof(Complex));
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
      args.c[0] = c0;
 
      givensH_.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
-
-     delete[] givensH;
-     delete[] cn;
-     delete[] sn;
 
    } else {
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
@@ -516,6 +507,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.composite_dim = param.m;
 
       Zm = K ? ColorSpinorFieldSet::Create(csParam) : Vm;
+
+
+      csParam.composite_dim = (param.nev+1);
+      csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+
+      gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
       init = true;
     }
