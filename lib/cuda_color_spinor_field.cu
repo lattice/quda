@@ -553,9 +553,9 @@ namespace quda {
     } else {
       void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
-	resizeBufferDevice(src.Bytes()+src.NormBytes());
-	Src = bufferDevice;
-	srcNorm = (char*)bufferDevice + src.Bytes();
+	buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
+	Src = buffer;
+	srcNorm = static_cast<char*>(buffer)+src.Bytes();
 	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
 	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
@@ -564,13 +564,14 @@ namespace quda {
 	memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
 
 	cudaHostGetDevicePointer(&Src, buffer, 0);
-	srcNorm = (void*)((char*)Src + src.Bytes());
+	srcNorm = static_cast<void*>(static_cast<char*>(Src) + src.Bytes());
       }
 
       cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
 
       if (zeroCopy) pool_pinned_free(buffer);
+      else pool_device_free(buffer);
     }
 
     return;
@@ -591,9 +592,9 @@ namespace quda {
     } else {
       void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
-	resizeBufferDevice(dest.Bytes()+dest.NormBytes());
-	dst = bufferDevice;
-	dstNorm = (char*)bufferDevice+dest.Bytes();
+	buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());
+	dst = buffer;
+	dstNorm = (char*)buffer+dest.Bytes();
       } else {
 	buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
 	cudaHostGetDevicePointer(&dst, buffer, 0);
@@ -610,6 +611,7 @@ namespace quda {
       }
 
       if (zeroCopy) pool_pinned_free(buffer);
+      else pool_device_free(buffer);
     }
 
     return;
