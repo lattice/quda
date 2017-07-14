@@ -1,7 +1,4 @@
-#ifndef __STAGGERED_OPROD_H__
-#define __STAGGERED_OPROD_H__
-
-#include <face_quda.h>
+#pragma once
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 
@@ -26,6 +23,3 @@ namespace quda {
   void computeStaggeredOprod(GaugeField *out[], ColorSpinorField& in, const double coeff[], int nFace);
 
 } // namespace quda
-  
-
-#endif
