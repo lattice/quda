@@ -87,10 +87,11 @@ namespace quda {
          H.setZero();
          eta.setZero();
        }
-#endif
+
        ~GMResDRArgs(){
           if(Vkp1) delete Vkp1;
        }
+#endif
    };
 
 #ifdef DEFLATEDSOLVER
