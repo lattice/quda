@@ -827,7 +827,6 @@ namespace quda {
     setOutputPrefix(prefix);
 
     SolverParam solverParam(param);  // Set solver field parameters:
-
     // set null-space generation options - need to expose these
     solverParam.maxiter = 500;
     solverParam.tol = param.mg_global.setup_tol[param.level];
@@ -862,12 +861,21 @@ namespace quda {
 
     std::vector<ColorSpinorField*> B_gpu;
 
+    // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
+    bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
+    if (schwarz_reset) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
+      int commDim[QUDA_MAX_DIM];
+      for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
+      diracSmootherSloppy->setCommDim(commDim);
+    }
+
     Solver *solve;
     DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
       solverParam.maxiter = 2000;
-      solve = Solver::create(solverParam, *mdagm, *mdagm, *mdagmSloppy, profile);
+      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother
       if (!transfer) createSmoother();
@@ -889,7 +897,7 @@ namespace quda {
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
       solverParam.inv_type = QUDA_MG_INVERTER;
     } else {
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy, profile);
+      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
 
     for(int i=0; i<(int)B.size(); i++) {
@@ -979,6 +987,14 @@ namespace quda {
     if (mdagm) delete mdagm;
     if (mdagmSloppy) delete mdagmSloppy;
     delete b;
+
+    // reenable Schwarz
+    if (schwarz_reset) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Reenabling Schwarz for null-space finding");
+      int commDim[QUDA_MAX_DIM];
+      for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
+      diracSmootherSloppy->setCommDim(commDim);
+    }
 
     // storing and freeing B_gpu
     for (int i=0; i<(int)B.size(); i++) {

@@ -69,6 +69,7 @@ namespace quda {
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i=0; i<Ls; i++) printfQuda("b_5[%d] = %e\t c_5[%d] = %e\n", i,b_5[i],i,c_5[i]);
     }
+
   };
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
@@ -108,7 +109,7 @@ namespace quda {
 
     QudaTune tune;
 
-    int commDim[QUDA_MAX_DIM]; // whether do comms or not
+    mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
     mutable TimeProfile profile;
 
@@ -117,6 +118,15 @@ namespace quda {
     Dirac(const Dirac &dirac);
     virtual ~Dirac();
     Dirac& operator=(const Dirac &dirac);
+
+    /**
+       @brief Enable / disable communications for the Dirac operator
+       @param[in] commDim_ Array of booleans which determines whether
+       communications are enabled
+     */
+    void setCommDim(const int commDim_[QUDA_MAX_DIM]) const {
+      for (int i=0; i<QUDA_MAX_DIM; i++) { commDim[i] = commDim_[i]; }
+    }
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     virtual void checkFullSpinor(const ColorSpinorField &, const ColorSpinorField &) const;
