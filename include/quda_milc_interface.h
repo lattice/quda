@@ -216,8 +216,7 @@ extern "C" {
 
 
   /**
-   * Solve Ax=b using an improved staggered operator with a
-   * domain-decomposition preconditioner.  All fields are fields
+   * Solve Ax=b for an improved staggered operator. All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
    * function requires that persistent gauge and clover fields have
    * been created prior.  This interface is experimental.
@@ -228,7 +227,6 @@ extern "C" {
    * @param inv_args Struct setting some solver metedata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
-   * @param domain_overlap Array specifying the overlap of the domains in each dimension
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
    * @param tadpole Tadpole improvement facter
@@ -253,60 +251,45 @@ extern "C" {
 		  double* const final_rel_resid,
 		  int* num_iters);
 
-      void qudaInvertMsrc(int external_precision,
-          int quda_precision,
-          double mass,
-          QudaInvertArgs_t inv_args,
-          double target_residual,
-          double target_fermilab_residual,
-          const void* const fatlink,
-          const void* const longlink,
-          const double tadpole,
-          void** sourceArray,
-          void** solutionArray,
-          double* const final_residual,
-          double* const final_fermilab_residual,
-          int* num_iters,
-          int num_src);
-
- /**
-   * Solve  using an improved
-   * staggered operator with a domain-decomposition preconditioner.
-   * All fields are fields passed and returned are host (CPU) field in
-   * MILC order.  This function requires that persistent gauge and
-   * clover fields have been created prior.  When a pure
-   * double-precision solver is requested no reliable updates are
-   * used, else reliable updates are used with a reliable_delta
-   * parameter of 0.1.  This interface is experimental.
+  /**
+   * Solve Ax=b for an improved staggered operator with many right hand sides. 
+   * All fields are fields passed and returned are host (CPU) field in MILC order.
+   * This function requires that persistent gauge and clover fields have
+   * been created prior.  This interface is experimental.
    *
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
-   * @param precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param mass Fermion mass parameter
    * @param inv_args Struct setting some solver metedata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
-   * @param domain_overlap Array specifying the overlap of the domains in each dimension
-   * @param fatlink Fat-link field on the host
-   * @param longlink Long-link field on the host
-   * @param source Right-hand side source field
-   * @param solution Solution spinor field
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param tadpole Tadpole improvement facter
+   * @param source array of right-hand side source fields
+   * @param solution array of solution spinor fields
    * @param final_residual True residual
    * @param final_relative_residual True Fermilab residual
    * @param num_iters Number of iterations taken
+   * @param num_src Number of source fields
    */
-  void qudaDDInvert(int external_precision,
-		    int quda_precision,
-		    double mass,
-		    QudaInvertArgs_t inv_args,
-		    double target_residual,
-		    double target_fermilab_residual,
-		    const int * const domain_overlap,
-		    const void* const fatlink,
-		    const void* const longlink,
-		    void* source,
-		    void* solution,
-		    double* const final_residual,
-		    double* const final_fermilab_residual,
-		    int* num_iters);
+
+
+  void qudaInvertMsrc(int external_precision,
+                      int quda_precision,
+                      double mass,
+                      QudaInvertArgs_t inv_args,
+                      double target_residual,
+                      double target_fermilab_residual,
+                      const void* const fatlink,
+                      const void* const longlink,
+                      const double tadpole,
+                      void** sourceArray,
+                      void** solutionArray,
+                      double* const final_residual,
+                      double* const final_fermilab_residual,
+                      int* num_iters,
+                      int num_src);
 
   /**
    * Solve for multiple shifts (e.g., masses) using an improved

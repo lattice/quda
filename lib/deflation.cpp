@@ -23,6 +23,9 @@ namespace quda {
   using DynamicStride = Stride<Dynamic, Dynamic>;
 #endif
 
+  static auto allocator = [=] (size_t bytes ) { return static_cast<Complex*>(mapped_malloc(bytes)); };
+  static auto deleter   = [ ] (Complex *hptr) { host_free(hptr); };
+
   //static bool debug = false;
 
   Deflation::Deflation(DeflationParam &param, TimeProfile &profile)
@@ -297,18 +300,18 @@ namespace quda {
      }
 
      std::unique_ptr<double[], std::default_delete<double[]> > evals(new double[param.cur_dim]);
+     std::unique_ptr<Complex, decltype(deleter) > projm( allocator(param.ld*param.cur_dim * sizeof(Complex)), deleter);
 
-     Complex *projm  = (Complex*)mapped_malloc(param.ld*param.cur_dim * sizeof(Complex));
-     memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
+     memcpy(projm.get(), param.matProj, param.ld*param.cur_dim*sizeof(Complex));
 
      if( param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB ) {
 #ifdef MAGMA_LIB
-       magma_Xheev(projm, param.cur_dim, param.ld, evals.get(), sizeof(Complex));
+       magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
 #else
        errorQuda("MAGMA library was not built.\n");
 #endif
      } else {
-       Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+       Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
        Map<VectorXd, Unaligned> evals_(evals.get(), param.cur_dim);
 
        SelfAdjointEigenSolver<MatrixXcd> es(projm_);
@@ -352,7 +355,7 @@ namespace quda {
        res.push_back(r);
 
        blas::zero(*r);
-       blas::caxpy(&projm[idx*param.ld], rv, res);//multiblas
+       blas::caxpy(&projm.get()[idx*param.ld], rv, res);//multiblas
        blas::copy(buff->Component(idx), *r);
 
        if( do_residual_check ) //if tol=0.0 then disable relative residual norm check
@@ -382,7 +385,6 @@ namespace quda {
      param.cur_dim = idx;//idx never exceeds cur_dim.
      param.tot_dim = idx;
 
-     host_free(projm);
 #endif
      return;
   }
