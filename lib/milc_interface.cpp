@@ -1215,27 +1215,24 @@ void qudaEigCGInvert(int external_precision,
   invertParam.max_restart_num    = eig_args.max_restart_num;
   invertParam.inc_tol            = eig_args.inc_tol;
   invertParam.eigenval_tol       = eig_args.eigenval_tol;
-
-  if(rhs_idx == 0) invertParam.rhs_idx  = 0;
+  invertParam.rhs_idx            = rhs_idx;
 
   if((inv_args.solver_type != QUDA_INC_EIGCG_INVERTER) && (inv_args.solver_type != QUDA_EIGCG_INVERTER)) errorQuda("Incorrect inverter type.\n");
   invertParam.inv_type = inv_args.solver_type;
 
+  if(inv_args.solver_type == QUDA_INC_EIGCG_INVERTER) invertParam.inv_type_precondition = QUDA_INVALID_INVERTER;
+
   setDeflationParam(eig_args.prec_ritz, eig_args.location_ritz, eig_args.mem_type_ritz, eig_args.deflation_ext_lib, eig_args.vec_infile, eig_args.vec_outfile, &df_param);
-//!
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
 
-  const int fat_pad  = getFatLinkPadding(localDim);
-  const int long_pad = 3*fat_pad;
-
-  // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1  || !canReuseResidentGauge(&invertParam) ) {
-    invalidateGaugeQuda();
-  }
-
   if((invalidate_quda_gauge || !create_quda_gauge) && (rhs_idx == 0)){//do this for the first RHS
+
+    const int fat_pad  = getFatLinkPadding(localDim);
+    const int long_pad = 3*fat_pad;
+
+    printfQuda("Initialize gauge field.\n"); 
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
@@ -1251,11 +1248,9 @@ void qudaEigCGInvert(int external_precision,
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
 
-  if(rhs_idx == 0) {
-    df_preconditioner = newDeflationQuda(&df_param);
-    invertParam.deflation_op = df_preconditioner;
-  }
-
+  if(rhs_idx == 0) df_preconditioner = newDeflationQuda(&df_param);
+  
+  invertParam.deflation_op = df_preconditioner;
 
   invertQuda((char*)solution + quark_offset*host_precision,
 	     (char*)source + quark_offset*host_precision,
@@ -1636,18 +1631,18 @@ void qudaEigCGCloverInvert(int external_precision,
   invertParam.max_restart_num    = eig_args.max_restart_num;
   invertParam.inc_tol            = eig_args.inc_tol;
   invertParam.eigenval_tol       = eig_args.eigenval_tol;
+  invertParam.rhs_idx            = rhs_idx;
 
-  if(rhs_idx == 0) invertParam.rhs_idx  = 0;
 
   if((inv_args.solver_type != QUDA_INC_EIGCG_INVERTER) && (inv_args.solver_type != QUDA_EIGCG_INVERTER)) errorQuda("Incorrect inverter type.\n");
   invertParam.inv_type = inv_args.solver_type;
 
+  if(inv_args.solver_type == QUDA_INC_EIGCG_INVERTER) invertParam.inv_type_precondition = QUDA_INVALID_INVERTER;
+
   setDeflationParam(eig_args.prec_ritz, eig_args.location_ritz, eig_args.mem_type_ritz, eig_args.deflation_ext_lib, eig_args.vec_infile, eig_args.vec_outfile, &df_param);
 
-  if(rhs_idx == 0) {
-    df_preconditioner = newDeflationQuda(&df_param);
-    invertParam.deflation_op = df_preconditioner;
-  }
+  if(rhs_idx == 0)  df_preconditioner = newDeflationQuda(&df_param);
+  invertParam.deflation_op = df_preconditioner;
 
   invertQuda(solution, source, &invertParam);
 

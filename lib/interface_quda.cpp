@@ -2400,7 +2400,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
   if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
     ritzParam.fieldOrder = (param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ) ?  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-    ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    if(ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
     //select memory location here, by default ritz vectors will be allocated on the device
     //but if not sufficient device memory, then the user may choose mapped type of memory

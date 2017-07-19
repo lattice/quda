@@ -49,7 +49,7 @@ namespace quda {
     if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
       // all coarse GPU vectors use FLOAT2 ordering
       csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      if(csParam.nSpin != 1) csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     }
 
     r  = ColorSpinorField::Create(csParam);
