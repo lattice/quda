@@ -116,7 +116,7 @@ namespace quda {
        {
          Tm.setZero();
 
-         std::unique_ptr<Complex[], std::default_delete<Complex[]> > s(new Complex[2*k]);
+         std::unique_ptr<Complex[] > s(new Complex[2*k]);
 
          for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
 

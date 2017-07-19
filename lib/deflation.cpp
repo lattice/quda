@@ -105,16 +105,16 @@ namespace quda {
     const int nevs_to_print = param.cur_dim;
     if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n"); 
 
-    std::unique_ptr<Complex[], std::default_delete<Complex[]> > projm(new Complex[param.ld*param.cur_dim]);
+    std::unique_ptr<Complex[] > projm(new Complex[param.ld*param.cur_dim]);
 
     if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
 #ifdef MAGMA_LIB
-      memcpy(projm, param.matProj, param.ld*param.cur_dim*sizeof(Complex));
-      std::unique_ptr<double[], std::default_delete<double[]> > evals(new double[param.ld]);
+      memcpy(projm.get(), param.matProj, param.ld*param.cur_dim*sizeof(Complex));
+      std::unique_ptr<double[] > evals(new double[param.ld]);
 
       cudaHostRegister(static_cast<void *>(projm.get()), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
       magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
-      cudaHostUnregister(projm);
+      cudaHostUnregister(projm.get());
 #else
       errorQuda("MAGMA library was not built.\n");
 #endif
@@ -163,7 +163,7 @@ namespace quda {
 
     if(param.cur_dim == 0) return;//nothing to do
 
-    std::unique_ptr<Complex[], std::default_delete<Complex[]> > vec(new Complex[param.ld]);
+    std::unique_ptr<Complex[] > vec(new Complex[param.ld]);
 
     double check_nrm2 = norm2(b);
 
@@ -235,7 +235,7 @@ namespace quda {
 
     for(int i = first_idx; i < (first_idx + nev); i++)
     {
-      std::unique_ptr<Complex[], std::default_delete<Complex[]> > alpha(new Complex[i]);
+      std::unique_ptr<Complex[] > alpha(new Complex[i]);
 
       ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &param.RV->Component(i);
       *accum = param.RV->Component(i);
@@ -299,7 +299,7 @@ namespace quda {
         max_nev = param.cur_dim;
      }
 
-     std::unique_ptr<double[], std::default_delete<double[]> > evals(new double[param.cur_dim]);
+     std::unique_ptr<double[] > evals(new double[param.cur_dim]);
      std::unique_ptr<Complex, decltype(deleter) > projm( allocator(param.ld*param.cur_dim * sizeof(Complex)), deleter);
 
      memcpy(projm.get(), param.matProj, param.ld*param.cur_dim*sizeof(Complex));

@@ -389,9 +389,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    GMResDRArgs &args = *gmresdr_args;
    ColorSpinorField &tmp = *tmpp;
 
-   std::unique_ptr<Complex[], std::default_delete<Complex[]> > givensH((do_givens) ? new Complex[(args.m+1)*args.m] : nullptr);
-   std::unique_ptr<Complex[], std::default_delete<Complex[]> > cn((do_givens) ? new Complex[args.m] : nullptr);
-   std::unique_ptr<double[],  std::default_delete<double[]>  > sn((do_givens) ? new double[args.m] : nullptr);
+   std::unique_ptr<Complex[] > givensH((do_givens) ? new Complex[(args.m+1)*args.m] : nullptr);
+   std::unique_ptr<Complex[] > cn((do_givens) ? new Complex[args.m] : nullptr);
+   std::unique_ptr<double[]  > sn((do_givens) ? new double[args.m] : nullptr);
 
    Complex c0 = args.c[0];
 
