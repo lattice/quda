@@ -23,8 +23,8 @@ namespace quda {
   using DynamicStride = Stride<Dynamic, Dynamic>;
 #endif
 
-  static auto allocator = [=] (size_t bytes ) { return static_cast<Complex*>(mapped_malloc(bytes)); };
-  static auto deleter   = [ ] (Complex *hptr) { host_free(hptr); };
+  static auto allocator = [] (size_t bytes ) { return static_cast<Complex*>(mapped_malloc(bytes)); };
+  static auto deleter   = [] (Complex *hptr) { host_free(hptr); };
 
   //static bool debug = false;
 
