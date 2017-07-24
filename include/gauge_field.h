@@ -31,12 +31,6 @@ namespace quda {
     // always set to false, requires external override
     bool compute_fat_link_max; 
 
-    /** The extended gauge field radius (if applicable) */
-    int r[QUDA_MAX_DIM];
-
-    /** The type of ghost exchange to be done with this field */
-    QudaGhostExchange ghostExchange;
-
     /** The staggered phase convention to use */
     QudaStaggeredPhase staggeredPhaseType;
 
@@ -62,61 +56,40 @@ namespace quda {
       create(QUDA_REFERENCE_FIELD_CREATE), 
       geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false),
-      ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
-
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
+      staggeredPhaseType(QUDA_STAGGERED_PHASE_NO),
       staggeredPhaseApplied(false),
       i_mu(0.0)
-	{
-	  // variables declared in LatticeFieldParam
-	  precision = QUDA_INVALID_PRECISION;
-	  nDim = 4;
-	  pad  = 0;
-	  for(int dir=0; dir<nDim; ++dir) {
-	    x[dir] = 0;
-	    r[dir] = 0;
-	  }
-	}
+	{ }
 
     GaugeFieldParam(const GaugeField &u);
 
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
-		  const int pad, const QudaFieldGeometry geometry, 
+		  const int pad, const QudaFieldGeometry geometry,
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
-    : LatticeFieldParam(), nColor(3), nFace(0), reconstruct(reconstruct),
+    : LatticeFieldParam(4, x, pad, precision, ghostExchange), nColor(3), nFace(0), reconstruct(reconstruct),
       order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO),
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
-      compute_fat_link_max(false), ghostExchange(ghostExchange),
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), i_mu(0.0)
-      {
-	// variables declared in LatticeFieldParam
-	this->precision = precision;
-	this->nDim = 4;
-	this->pad = pad;
-	for(int dir=0; dir<nDim; ++dir) {
-	  this->x[dir] = x[dir];
-	  this->r[dir] = 0;
-	}
-      }
+      compute_fat_link_max(false), staggeredPhaseType(QUDA_STAGGERED_PHASE_NO),
+      staggeredPhaseApplied(false), i_mu(0.0)
+      { }
 
-  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
-      nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order), 
-      fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
-      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
+  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
+    : LatticeFieldParam(param), nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
+      order(param.gauge_order), fixed(param.gauge_fix),
+      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
+      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
-      compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
-      staggeredPhaseType(param.staggered_phase_type), 
+      compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
       staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu)
 	{
-	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
+	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS || link_type == QUDA_SMEARED_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
-	  else errorQuda("Error: invalid link type(%d)\n", link_type);
-	  for (int d=0; d<nDim; d++) r[d] = 0;
+	  else if (link_type == QUDA_INVALID_LINKS) errorQuda("Error: invalid link type(%d)\n", link_type);
 	}
     
     /**
-       Helper function for setting the precision and corresponding
+       @brief Helper function for setting the precision and corresponding
        field order for QUDA internal fields.
        @param precision The precision to use 
      */
@@ -154,14 +127,9 @@ namespace quda {
     double fat_link_max;
     double scale;
 
-
     QudaFieldCreate create; // used to determine the type of field created
 
-    /** Array storing the length of dimension */
-    int r[QUDA_MAX_DIM];
-
-    QudaGhostExchange ghostExchange; // the type of ghost exchange to perform
-    mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
+    mutable void *ghost[2*QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
 
     /** The staggered phase convention to use */
     QudaStaggeredPhase staggeredPhaseType;
@@ -184,8 +152,8 @@ namespace quda {
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
 
-    virtual void exchangeGhost() = 0;
-    virtual void injectGhost() = 0;
+    virtual void exchangeGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
+    virtual void injectGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
 
     int Length() const { return length; }
     int Ncolor() const { return nColor; }
@@ -199,8 +167,6 @@ namespace quda {
     QudaGaugeFixed GaugeFixed() const { return fixed; }
     QudaGaugeFieldOrder FieldOrder() const { return order; }
     QudaFieldGeometry Geometry() const { return geometry; }
-    const int* R() const { return r; }
-    QudaGhostExchange GhostExchange() const { return ghostExchange; }
     QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
     bool StaggeredPhaseApplied() const { return staggeredPhaseApplied; }
 
@@ -222,7 +188,7 @@ namespace quda {
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
 
-    void checkField(const GaugeField &);
+    void checkField(const LatticeField &) const;
 
     /**
        This function returns true if the field is stored in an
@@ -230,7 +196,7 @@ namespace quda {
     */ 
     bool isNative() const;
 
-    size_t Bytes() const { if (order == QUDA_TIFR_PADDED_GAUGE_ORDER) warningQuda("method will evaluate incorrectly for TIFR padded fields"); return bytes; }
+    size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
 
@@ -296,14 +262,18 @@ namespace quda {
 
     /**
        @brief Exchange the ghost and store store in the padded region
+       @param[in] link_direction Which links are we exchanging: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void exchangeGhost();
+    void exchangeGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief The opposite of exchangeGhost: take the ghost zone on x,
        send to node x-1, and inject back into the field
+       @param[in] link_direction Which links are we injecting: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void injectGhost();
+    void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief This does routine will populate the border / halo region of a
@@ -371,19 +341,30 @@ namespace quda {
     void **gauge; // the actual gauge field
 
   public:
-    cpuGaugeField(const GaugeFieldParam &);
+    /**
+       @brief Constructor for cpuGaugeField from a GaugeFieldParam
+       @param[in,out] param Parameter struct - note that in the case
+       that we are wrapping host-side extended fields, this param is
+       modified for subsequent creation of fields that are not
+       extended.
+    */
+    cpuGaugeField(const GaugeFieldParam &param);
     virtual ~cpuGaugeField();
 
     /**
        @brief Exchange the ghost and store store in the padded region
+       @param[in] link_direction Which links are we extracting: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void exchangeGhost();
+    void exchangeGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief The opposite of exchangeGhost: take the ghost zone on x,
        send to node x-1, and inject back into the field
+       @param[in] link_direction Which links are we injecting: this
+       flag only applies to bi-directional coarse-link fields
      */
-    void injectGhost();
+    void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
        @brief This does routine will populate the border / halo region of a
@@ -473,8 +454,13 @@ namespace quda {
      @param u The gauge field from which we want to extract the ghost zone
      @param ghost The array where we want to pack the ghost zone into
      @param extract Where we are extracting into ghost or injecting from ghost
+     @param offset By default we exchange the nDim site-vector of
+     links in the first nDim dimensions; offset allows us to instead
+     exchange the links in nDim+offset dimensions.  This is used to
+     faciliate sending bi-directional links which is needed for the
+     coarse links.
   */
-  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true);
+  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true, int offset=0);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

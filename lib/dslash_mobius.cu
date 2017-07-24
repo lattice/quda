@@ -65,7 +65,7 @@ namespace quda {
     const int DS_type;
 
     bool checkGrid(TuneParam &param) const {
-      if (param.grid.x > deviceProp.maxGridSize[0] || param.grid.y > deviceProp.maxGridSize[1]) {
+      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0] || param.grid.y > (unsigned int)deviceProp.maxGridSize[1]) {
         warningQuda("Autotuner is skipping blockDim=(%u,%u,%u), gridDim=(%u,%u,%u) because lattice volume is too large",
 		    param.block.x, param.block.y, param.block.z, 
 		    param.grid.x, param.grid.y, param.grid.z);
@@ -84,7 +84,7 @@ namespace quda {
 
       // first try to advance block.x
       param.block.x += step[0];
-      if (param.block.x > deviceProp.maxThreadsDim[0] || 
+      if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0] ||
           sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
         advance[0] = false;
         param.block.x = step[0]; // reset block.x
@@ -95,7 +95,7 @@ namespace quda {
       if (!advance[0]) {  // if failed to advance block.x, now try block.y
         param.block.y += step[1];
 
-        if (param.block.y > in->X(4) || 
+        if (param.block.y > (unsigned)in->X(4) ||
             sharedBytesPerThread()*param.block.x*param.block.y > max_shared) {
           advance[1] = false;
           param.block.y = step[1]; // reset block.x
@@ -178,6 +178,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
+      // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
+      dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
+      dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
       switch(DS_type){
@@ -267,7 +271,7 @@ namespace quda {
 		      const int *commOverride, const int DS_type, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inSpinor->allocateGhostBuffer(1);
+    inSpinor->createComms(1);
 
     dslashParam.parity = parity;
 
@@ -315,14 +319,8 @@ namespace quda {
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
-#ifndef GPU_COMMS
       DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger,  in->Volume()/in->X(4), ghostFace, profile);
       dslash_policy.apply(0);
-#else
-      dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-      (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
-      delete dslashImp;
-#endif
     }
 
     delete dslash;

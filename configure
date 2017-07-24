@@ -586,10 +586,10 @@ PACKAGE_URL=''
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
-BUILD_MAGMA_VARS
-BUILD_MAGMA
 BUILD_ARPACK_VARS
 BUILD_ARPACK
+BUILD_MAGMA_VARS
+BUILD_MAGMA
 QDP_INSTALL_PATH
 USE_QDPJIT
 FERMI_DBLE_TEX
@@ -601,7 +601,6 @@ FEF90
 FECXX
 FECC
 BUILD_QIO
-DEVICE_PACK
 BUILD_TIFR_INTERFACE
 BUILD_BQCD_INTERFACE
 BUILD_QDPJIT_INTERFACE
@@ -610,7 +609,6 @@ BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
 INTERFACE_NVTX
 MPI_NVTX
-GPU_COMMS
 GPU_DIRECT
 POSIX_THREADS
 BUILD_MPI
@@ -733,10 +731,8 @@ enable_contract
 enable_dynamic_clover
 enable_multi_gpu
 enable_gpu_direct
-enable_gpu_comms
 enable_mpi_nvtx
 enable_interface_nvtx
-enable_device_pack
 with_mpi
 enable_pthreads
 with_qmp
@@ -745,6 +741,8 @@ enable_qdp_jit
 with_qdp
 enable_magma
 enable_magma_vars
+enable_arpack
+enable_arpack_vars
 enable_blas_tex
 enable_fermi_double_tex
 enable_force_ac
@@ -1422,14 +1420,10 @@ Optional Features:
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
-  --enable-gpu-comms      Enable direct CUDA-NIC communication (experimental,
-                          default: disabled)
   --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
                           the visual profiler (default: disabled)
   --enable-interface-nvtx Enable NVTX markup for profiling interface calls in
                           the visual profiler (default: disabled)
-  --enable-device-pack    Enable the packing / unpacking of fields on the
-                          device (default: disabled)
   --enable-pthreads       Enable pthreads in the multi-GPU dslash build
                           (default: disabled)
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
@@ -1438,9 +1432,10 @@ Optional Features:
                           magma)
   --enable-magma-vars     Build with MAGMA using env vars: MAGMA_INC and
                           MAGMA_LIB
-  --enable-arpack          Build with (P)ARPACK (requires pkg-config to detect
+  --enable-arpack         Build with ARPACK (requires pkg-config to detect
                           arpack)
-  --enable-arpack-vars     Build with (P)ARPACK using env vars: ARPACK_LIB
+  --enable-arpack-vars    Build with ARPACK using env vars: ARPACK_INC and
+                          ARPACK_LIB
   --enable-blas-tex       Enable texture reads for blas (default: enabled)
   --enable-fermi-double-tex
                           Enable double-precision texture reads on Fermi
@@ -2326,15 +2321,6 @@ else
 fi
 
 
-# Check whether --enable-gpu-comms was given.
-if test "${enable_gpu_comms+set}" = set; then :
-  enableval=$enable_gpu_comms;  gpu_comms=${enableval}
-else
-   gpu_comms="no"
-
-fi
-
-
 # Check whether --enable-mpi-nvtx was given.
 if test "${enable_mpi_nvtx+set}" = set; then :
   enableval=$enable_mpi_nvtx;  mpi_nvtx=${enableval}
@@ -2349,15 +2335,6 @@ if test "${enable_interface_nvtx+set}" = set; then :
   enableval=$enable_interface_nvtx;  interface_nvtx=${enableval}
 else
    interface_nvtx="no"
-
-fi
-
-
-# Check whether --enable-device-pack was given.
-if test "${enable_device_pack+set}" = set; then :
-  enableval=$enable_device_pack;  device_pack=${enableval}
-else
-   device_pack="no"
 
 fi
 
@@ -3904,6 +3881,25 @@ else
 fi
 
 
+# Check whether --enable-arpack was given.
+if test "${enable_arpack+set}" = set; then :
+  enableval=$enable_arpack;  build_arpack=${enableval}
+else
+   build_arpack="no"
+
+fi
+
+
+# Check whether --enable-arpack-vars was given.
+if test "${enable_arpack_vars+set}" = set; then :
+  enableval=$enable_arpack_vars;  build_arpack_vars=${enableval}
+else
+   build_arpack_vars="no"
+
+fi
+
+
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: User supplied NVCCFLAGS: ${NVCCFLAGS} " >&5
 $as_echo "$as_me: User supplied NVCCFLAGS: ${NVCCFLAGS} " >&6;}
@@ -4264,13 +4260,6 @@ yes|no);;
   ;;
 esac
 
-case ${gpu_comms} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-gpu-comms " "$LINENO" 5
-  ;;
-esac
-
 case ${mpi_nvtx} in
 yes|no);;
 *)
@@ -4509,11 +4498,6 @@ $as_echo "$as_me: Setting GPU_DIRECT= ${gpu_direct}" >&6;}
 GPU_DIRECT=${gpu_direct}
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_COMMS= ${gpu_comms}" >&5
-$as_echo "$as_me: Setting GPU_COMMS= ${gpu_comms}" >&6;}
-GPU_COMMS=${gpu_comms}
-
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_NVTXS= ${mpi_nvtx}" >&5
 $as_echo "$as_me: Setting MPI_NVTXS= ${mpi_nvtx}" >&6;}
 MPI_NVTX=${mpi_nvtx}
@@ -4552,11 +4536,6 @@ BUILD_BQCD_INTERFACE=${build_bqcd_interface}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}" >&5
 $as_echo "$as_me: Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}" >&6;}
 BUILD_TIFR_INTERFACE=${build_tifr_interface}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DEVICE_PACK= ${device_pack}" >&5
-$as_echo "$as_me: Setting DEVICE_PACK= ${device_pack}" >&6;}
-DEVICE_PACK=${device_pack}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QIO = ${build_qio} " >&5
@@ -4618,13 +4597,21 @@ QDP_INSTALL_PATH=${qdp_home}
 $as_echo "$as_me: Setting BUILD_MAGMA = ${build_magma}" >&6;}
 BUILD_MAGMA=${build_magma}
 
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MAGMA_VARS = ${build_magma_vars}" >&5
+$as_echo "$as_me: Setting BUILD_MAGMA_VARS = ${build_magma_vars}" >&6;}
+BUILD_MAGMA_VARS=${build_magma_vars}
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_ARPACK = ${build_arpack}" >&5
 $as_echo "$as_me: Setting BUILD_ARPACK = ${build_arpack}" >&6;}
 BUILD_ARPACK=${build_arpack}
 
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_ARPACK_VARS = ${build_arpack_vars}" >&5
 $as_echo "$as_me: Setting BUILD_ARPACK_VARS = ${build_arpack_vars}" >&6;}
 BUILD_ARPACK_VARS=${build_arpack_vars}
+
 
 
 if test "X${force_ac}X" = "XnoX";

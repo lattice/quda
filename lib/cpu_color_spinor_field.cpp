@@ -221,14 +221,14 @@ namespace quda {
   // print out the vector at volume point x
   void cpuColorSpinorField::PrintVector(unsigned int x) { genericPrintVector(*this, x); }
 
-  void cpuColorSpinorField::allocateGhostBuffer(void) const
+  void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
     int spinor_size = 2*nSpin*nColor*precision;
     bool resize = false;
 
     // resize face only if requested size is larger than previously allocated one
     for (int i=0; i<nDimComms; i++) {
-      size_t nbytes = siteSubset*Nface()*surfaceCB[i]*spinor_size;
+      size_t nbytes = siteSubset*nFace*surfaceCB[i]*spinor_size;
       resize = (nbytes > ghostFaceBytes[i]) ? true : resize;
       ghostFaceBytes[i] = (nbytes > ghostFaceBytes[i]) ? nbytes : ghostFaceBytes[i];
     }
@@ -260,9 +260,9 @@ namespace quda {
   }
 
 
-  void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int dagger) const
+  void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
   {
-    genericPackGhost(ghost, *this, parity, dagger);
+    genericPackGhost(ghost, *this, parity, nFace, dagger);
     return;
   }
 
@@ -274,24 +274,24 @@ namespace quda {
     }
   }
 
-  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int dagger) const
+  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *dummy1,
+					  const MemoryLocation *dummy2, bool dummy3, bool dummy4) const
   {
     // allocate ghost buffer if not yet allocated
-    allocateGhostBuffer();
+    allocateGhostBuffer(nFace);
 
     void **sendbuf = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
 
     for (int i=0; i<nDimComms; i++) {
       sendbuf[2*i + 0] = backGhostFaceSendBuffer[i];
       sendbuf[2*i + 1] = fwdGhostFaceSendBuffer[i];
-      ghost_fixme[2*i + 0] = backGhostFaceBuffer[i];
-      ghost_fixme[2*i + 1] = fwdGhostFaceBuffer[i];
+      ghost_buf[2*i + 0] = backGhostFaceBuffer[i];
+      ghost_buf[2*i + 1] = fwdGhostFaceBuffer[i];
     }
 
-    packGhost(sendbuf, parity, dagger);
+    packGhost(sendbuf, parity, nFace, dagger);
 
-    int nFace = (nSpin == 1) ? 3 : 1;
-    exchange(ghost_fixme, sendbuf, nFace);
+    exchange(ghost_buf, sendbuf, nFace);
 
     host_free(sendbuf);
   }

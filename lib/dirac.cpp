@@ -31,7 +31,7 @@ namespace quda {
 
   Dirac& Dirac::operator=(const Dirac &dirac)
   {
-    if(&dirac != this) {
+    if (&dirac != this) {
       gauge = dirac.gauge;
       kappa = dirac.kappa;
       matpcType = dirac.matpcType;
@@ -44,6 +44,8 @@ namespace quda {
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 
       profile = dirac.profile;
+
+      if (type != dirac.type) errorQuda("Trying to copy between incompatible types %d %d", type, dirac.type);
     }
     return *this;
   }
@@ -206,9 +208,17 @@ namespace quda {
     } else if (param.type == QUDA_COARSEPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
       return new DiracCoarsePC(param);
+    } else if (param.type == QUDA_GAUGE_LAPLACE_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeLaplace operator\n");
+      return new GaugeLaplace(param);
+    } else if (param.type == QUDA_GAUGE_LAPLACEPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeLaplacePC operator\n");
+      return new GaugeLaplacePC(param);
+    } else {
+      errorQuda("Unsupported Dirac type %d", param.type);
     }
 
-    return 0;
+    return nullptr;
   }
   
   // Count the number of stencil applications per dslash application.
@@ -218,6 +228,7 @@ namespace quda {
     switch (type)
     {
       case QUDA_COARSE_DIRAC: // single fused operator
+      case QUDA_GAUGE_LAPLACE_DIRAC:
 	steps = 1;
 	break;
       case QUDA_WILSON_DIRAC:
@@ -240,6 +251,7 @@ namespace quda {
       case QUDA_TWISTED_CLOVERPC_DIRAC:
       case QUDA_TWISTED_MASSPC_DIRAC:
       case QUDA_COARSEPC_DIRAC:
+      case QUDA_GAUGE_LAPLACEPC_DIRAC:
         steps = 2;
         break;
 	  default:

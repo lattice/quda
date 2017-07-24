@@ -19,30 +19,151 @@
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <fast_intdiv.h>
+#include <type_traits>
+#include <atomic.cuh>
+#include <thrust/device_ptr.h>
+#include <thrust/transform_reduce.h>
 
 namespace quda {
 
+  /**
+     @brief gauge_wrapper is an internal class that is used to wrap
+     instances of gauge accessors, currying in a specific location on
+     the field.  The operator() accessors in gauge-field accessors
+     return instances to this class, allowing us to then use operator
+     overloading upon this class to interact with the Matrix class.
+     As a result we can include gauge-field accessors directly in
+     Matrix expressions in kernels without having to declare
+     temporaries with explicit calls to the load/save methods in the
+     gauge-field accessors.
+   */
+  template <typename Float, typename T>
+    struct gauge_wrapper {
+      const int dim;
+      const int x_cb;
+      const int parity;
+      T &gauge;
+
+      /**
+	 @brief gauge_wrapper constructor
+	 @param[in] gauge Gauge field accessor we are wrapping
+	 @param[in] dim Dimension we are accessing
+	 @param[in] x_cb Checkerboarded space-time index we are accessing
+	 @param[in] parity Parity we are accessing
+       */
+      __device__ __host__ inline gauge_wrapper<Float,T>(T &gauge, int dim, int x_cb, int parity)
+	: gauge(gauge), dim(dim), x_cb(x_cb), parity(parity) { }
+
+      /**
+	 @brief Assignment operator with Matrix instance as input
+	 @param[in] M Matrix we want to store in this accessot
+       */
+      template<typename M>
+      __device__ __host__ inline void operator=(const M &a) {
+	gauge.save((Float*)a.data, x_cb, dim, parity);
+      }
+    };
+
+  /**
+     @brief Copy constructor for the Matrix class with a gauge_wrapper input.
+     @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
+   */
+  template <typename T, int N>
+    template <typename S>
+    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<typename RealType<T>::type,S> &a) {
+    a.gauge.load((typename RealType<T>::type*)data, a.x_cb, a.dim, a.parity);
+  }
+
+  /**
+     @brief Assignment operator for the Matrix class with a gauge_wrapper input.
+     @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
+   */
+  template <typename T, int N>
+    template <typename S>
+    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<typename RealType<T>::type,S> &a) {
+    a.gauge.load((typename RealType<T>::type*)data, a.x_cb, a.dim, a.parity);
+  }
+
+  /**
+     @brief gauge_ghost_wrapper is an internal class that is used to
+     wrap instances of gauge ghost accessors, currying in a specific
+     location and dimension on the field.  The Ghost() accessors in
+     gauge-field accessors return instances to this class, allowing us
+     to then use operator overloading upon this class to interact with
+     the Matrix class.  As a result we can include gauge-field ghost
+     accessors directly in Matrix expressions in kernels without
+     having to declare temporaries with explicit calls to the
+     load/save methods in the gauge-field accessors.
+   */
+  template <typename Float, typename T>
+    struct gauge_ghost_wrapper {
+      const int dim;
+      const int ghost_idx;
+      const int parity;
+      T &gauge;
+
+      /**
+	 @brief gauge_wrapper constructor
+	 @param[in] gauge Gauge field accessor we are wrapping
+	 @param[in] dim Dimension we are accessing
+	 @param[in] ghost_idx Ghost index we are accessing
+	 @param[in] parity Parity we are accessing
+       */
+      __device__ __host__ inline gauge_ghost_wrapper<Float,T>(T &gauge, int dim, int ghost_idx, int parity)
+	: gauge(gauge), dim(dim), ghost_idx(ghost_idx), parity(parity) { }
+
+      /**
+	 @brief Assignment operator with Matrix instance as input
+	 @param[in] M Matrix we want to store in this accessot
+       */
+      template<typename M>
+      __device__ __host__ inline void operator=(const M &a) {
+	gauge.saveGhost((Float*)a.data, ghost_idx, dim, parity);
+      }
+    };
+
+  /**
+     @brief Copy constructor for the Matrix class with a gauge_ghost_wrapper input.
+     @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
+   */
+  template <typename T, int N>
+    template <typename S>
+    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_ghost_wrapper<typename RealType<T>::type,S> &a) {
+    a.gauge.loadGhost((typename RealType<T>::type*)data, a.ghost_idx, a.dim, a.parity);
+  }
+
+  /**
+     @brief Assignment operator for the Matrix class with a gauge_ghost_wrapper input.
+     @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
+   */
+  template <typename T, int N>
+    template <typename S>
+    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_ghost_wrapper<typename RealType<T>::type,S> &a) {
+    a.gauge.loadGhost((typename RealType<T>::type*)data, a.ghost_idx, a.dim, a.parity);
+  }
+
   namespace gauge {
 
+    template<typename ReduceType, typename Float> struct square { __host__ __device__ ReduceType operator()(quda::complex<Float> x) { return static_cast<ReduceType>(norm(x)); } };
 
     template<typename Float, int nColor, QudaGaugeFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
-      Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) { }
+      Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
+	errorQuda("Not implemented for order=%d", order);
+      }
       __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
 	return dummy;
       }
     };
 
-    template<typename Float, int nColor, QudaGaugeFieldOrder order> struct GhostAccessor {
+    template<typename Float, int nColor, QudaGaugeFieldOrder order, bool native_ghost>
+    struct GhostAccessor {
       mutable complex<Float> dummy;
-      GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) { }
+      GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) {
+	errorQuda("Not implemented for order=%d", order);
+      }
       __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
-#ifndef __CUDA_ARCH__
-	errorQuda("Not implemented");
-#endif
 	return dummy;
       }
     };
@@ -63,21 +184,97 @@ namespace quda {
       }
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
+
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+#ifdef __CUDA_ARCH__
+	typedef typename vector<Float,2>::type vec2;
+	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
+	atomicAdd(u2, (vec2&)val);
+#else
+	u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col] += val;
+#endif
+      }
+
+      __host__ double device_norm2(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
     };
 
-    template<typename Float, int nColor>
-      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> {
-      complex<Float> *ghost[4];
-      int ghostOffset[4];
+    template<typename Float, int nColor, bool native_ghost>
+      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> {
+      complex<Float> *ghost[8];
+      int ghostOffset[8];
       GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
 	for (int d=0; d<4; d++) {
 	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
 	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+
+	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+	    ghost_ ? static_cast<complex<Float>*>(ghost_[d+4]) :
+	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d+4]));
+	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
       }
-      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> &a) {
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER,native_ghost> &a) {
+	for (int d=0; d<8; d++) {
+	  ghost[d] = a.ghost[d];
+	  ghostOffset[d] = a.ghostOffset[d];
+	}
+      }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      { return ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col]; }
+    };
+
+    template<typename Float, int nColor>
+      struct Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> {
+      complex<Float> *u;
+      const int volumeCB;
+      const int geometry;
+    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
+	  static_cast<complex<Float>*>(const_cast<void *>(U.Gauge_p()))),
+	volumeCB(U.VolumeCB()), geometry(U.Geometry()) { }
+    Accessor(const Accessor<Float,nColor,QUDA_MILC_GAUGE_ORDER> &a)
+      : u(a.u), volumeCB(a.volumeCB), geometry(a.geometry) { }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      { return 	u[(((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col]; }
+
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+#ifdef __CUDA_ARCH__
+	typedef typename vector<Float,2>::type vec2;
+	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
+	atomicAdd(u2, (vec2&)val);
+#else
+	u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col] += val;
+#endif
+      }
+
+      __host__ double device_norm2(int dim) const {
+	errorQuda("Not implemented");
+	return 0.0;
+      }
+    };
+
+    template<typename Float, int nColor, bool native_ghost>
+      struct GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> {
+      complex<Float> *ghost[8];
+      int ghostOffset[8];
+      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
 	for (int d=0; d<4; d++) {
+	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
+	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
+	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+
+	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+	    ghost_ ? static_cast<complex<Float>*>(ghost_[d+4]) :
+	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d+4]));
+	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+	}
+      }
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_MILC_GAUGE_ORDER,native_ghost> &a) {
+	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
@@ -101,26 +298,73 @@ namespace quda {
       complex<Float> *u;
       const int offset_cb;
       const int stride;
+      const int geometry;
     Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
       : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
 	  static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
-	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride())
+	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride()), geometry(U.Geometry())
 	{  }
-    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a): u(a.u), offset_cb(a.offset_cb), stride(a.stride) {  }
+    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
+      : u(a.u), offset_cb(a.offset_cb), stride(a.stride), geometry(a.geometry) {  }
+
       __device__ __host__ inline complex<Float>& operator()(int dim, int parity, int x_cb, int row, int col) const
       { return u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb]; }
+
+      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, complex<Float> &val) const {
+#ifdef __CUDA_ARCH__
+	typedef typename vector<Float,2>::type vec2;
+	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
+	atomicAdd(u2, (vec2&)val);
+#else
+	u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb] += val;
+#endif
+      }
+
+      __host__ double device_norm2(int dim) const {
+	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+	thrust::device_ptr<complex<Float> > ptr(u);
+	double even = thrust::transform_reduce(ptr+0*offset_cb+(dim+0)*stride*nColor*nColor,
+					       ptr+0*offset_cb+(dim+1)*stride*nColor*nColor,
+					       square<double,Float>(), 0.0, thrust::plus<double>());
+	double odd  = thrust::transform_reduce(ptr+1*offset_cb+(dim+0)*stride*nColor*nColor,
+					       ptr+1*offset_cb+(dim+1)*stride*nColor*nColor,
+					       square<double,Float>(), 0.0, thrust::plus<double>());
+	return even + odd;
+      }
     };
 
-    template<typename Float, int nColor>
-      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> {
+    template<typename Float, int nColor, bool native_ghost>
+      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> {
+      complex<Float> *ghost[8];
       const int volumeCB;
+      int ghostVolumeCB[8];
       Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> accessor;
     GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-      : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_) {  }
-    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
-      : volumeCB(a.volumeCB), accessor(a.accessor) {  }
+      : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_)
+      {
+	if (!native_ghost) assert(ghost_ != nullptr);
+	for (int d=0; d<4; d++) {
+	  ghost[d] = !native_ghost ? static_cast<complex<Float>*>(ghost_[d]) : nullptr;
+	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
+	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<Float>*>(ghost_[d+4]) : nullptr;
+	  ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
+	}
+      }
+    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER,native_ghost> &a)
+      : volumeCB(a.volumeCB), accessor(a.accessor)
+      {
+	for (int d=0; d<8; d++) {
+	  ghost[d] = a.ghost[d];
+	  ghostVolumeCB[d] = a.ghostVolumeCB[d];
+	}
+      }
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x_cb, int row, int col) const
-      { return accessor(d, parity, x_cb+volumeCB, row, col); }
+      {
+	if (native_ghost)
+	  return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
+	else
+	  return ghost[d][ ((parity*nColor + row)*nColor+col)*ghostVolumeCB[d] + x_cb ];
+      }
     };
 
 
@@ -129,7 +373,7 @@ namespace quda {
        deploy for a specifc field ordering, the two operator()
        accessors have to be specialized for that ordering.
      */
-    template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order>
+  template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost=true>
       struct FieldOrder {
 
       protected:
@@ -138,9 +382,10 @@ namespace quda {
 	const int nDim;
 	const int geometry;
 	static constexpr int nColorCoarse = nColor / nSpinCoarse;
+	QudaFieldLocation location;
 
 	const Accessor<Float,nColor,order> accessor;
-	const GhostAccessor<Float,nColor,order> ghostAccessor;
+	const GhostAccessor<Float,nColor,order,native_ghost> ghostAccessor;
 
       public:
 	/**
@@ -149,6 +394,7 @@ namespace quda {
 	 */
       FieldOrder(GaugeField &U, void *gauge_=0, void **ghost_=0)
       : volumeCB(U.VolumeCB()), nDim(U.Ndim()), geometry(U.Geometry()),
+	  location(U.Location()),
 	  accessor(U, gauge_, ghost_), ghostAccessor(U, gauge_, ghost_)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO)
@@ -266,6 +512,11 @@ namespace quda {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
 
+	__device__ __host__ inline void atomicAdd(int d, int parity, int x, int s_row, int s_col,
+						  int c_row, int c_col, complex<Float> &val) {
+	  accessor.atomic_add(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col, val);
+	}
+
 	/** Returns the number of field colors */
 	__device__ __host__ inline int Ncolor() const { return nColor; }
 
@@ -287,15 +538,26 @@ namespace quda {
 	/** Returns the number of coarse gauge field colors */
 	__device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
 
-
+	/**
+	 * @brief Returns the L2 norm squared of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the norm of
+	 * @return L2 norm squared
+	 */
 	__host__ double norm2(int dim) const {
-	  double nrm2 = 0.0;
-	  for (int parity=0; parity<2; parity++)
-	    for (int x_cb=0; x_cb<volumeCB; x_cb++) {
-	      for (int row=0; row<nColor; row++)
-		for (int col=0; col<nColor; col++)
-		  nrm2 += norm((*this)(dim,parity,x_cb,row,col));
-	    }
+	  double nrm2 = 0;
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    nrm2 = accessor.device_norm2(dim);
+	  } else {
+	    // do simple norm on host memory
+	    for (int parity=0; parity<2; parity++)
+	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		for (int row=0; row<nColor; row++)
+		  for (int col=0; col<nColor; col++)
+		    nrm2 += norm((*this)(dim,parity,x_cb,row,col));
+	      }
+	  }
+	  comm_allreduce(&nrm2);
 	  return nrm2;
 	}
 
@@ -313,7 +575,9 @@ namespace quda {
 	__device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx ) const {
 	  for (int i=0; i<N; i++) out[i] = in[i];
 	}
-	__device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir, const RegType phase) const {
+	template<typename I>
+	__device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
+					       const RegType phase, const I *X, const int *R) const {
 	  for (int i=0; i<N; i++) out[i] = in[i];
 	}
 	__device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
@@ -330,17 +594,13 @@ namespace quda {
       __device__ __host__ inline void Pack(RegType out[18], const RegType in[18], int idx) const {
 	for (int i=0; i<18; i++) out[i] = in[i] / scale;
       }
-      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[18],
-					     int idx, int dir, const RegType phase) const {
+      template<typename I>
+      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[18], int idx, int dir,
+					     const RegType phase, const I *X, const int *R) const {
 	for (int i=0; i<18; i++) out[i] = scale * in[i];
       }
       __device__ __host__ inline RegType getPhase(const RegType in[18]) const { return 0; }
     };
-
-      template <typename Float>
-      __device__ __host__ inline Float timeBoundary(int idx, const int X[QUDA_MAX_DIM], QudaTboundary tBoundary,
-						    bool isFirstTimeSlice, bool isLastTimeSlice) {
-      }
 
       /**
 	 timeBoundary variant for extended gauge field
@@ -352,10 +612,10 @@ namespace quda {
 	 @param isLastTimeSlide if we're on the last time slice of nodes
 	 @param ghostExchange if the field is extended or not (determines indexing type)
       */
-      template <typename Float>
-      __device__ __host__ inline Float timeBoundary(int idx, const int X[QUDA_MAX_DIM], const int R[QUDA_MAX_DIM],
+      template <typename Float, typename I>
+      __device__ __host__ inline Float timeBoundary(int idx, const I X[QUDA_MAX_DIM], const int R[QUDA_MAX_DIM],
 						    QudaTboundary tBoundary, bool isFirstTimeSlice, bool isLastTimeSlice,
-						    QudaGhostExchange ghostExchange) {
+						    QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_NO) {
 	if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	  if ( idx >= X[3]*X[2]*X[1]*X[0]/2 ) { // halo region on the first time slice
 	    return isFirstTimeSlice ? static_cast<Float>(tBoundary) : static_cast<Float>(1.0);
@@ -377,12 +637,23 @@ namespace quda {
 	}
       }
 
+      // not actually used - here for reference
+      template <typename Float, typename I>
+      __device__ __host__ inline Float milcStaggeredPhase(int dim, const int x[], const I R[]) {
+	// could consider non-extended varient too?
+	Float sign = static_cast<Float>(1.0);
+	switch (dim) {
+	case 0: if ( ((x[3] - R[3]) & 1) != 0)                             sign = -static_cast<Float>(1.0); break;
+	case 1: if ( ((x[0] - R[0] + x[3] - R[3]) & 1) != 0)               sign = -static_cast<Float>(1.0); break;
+	case 2: if ( ((x[0] - R[0] + x[1] - R[1] + x[3] - R[3]) & 1) != 0) sign = -static_cast<Float>(1.0); break;
+	}
+	return sign;
+      }
+
       template <typename Float>
       struct Reconstruct<12,Float> {
 	typedef typename mapper<Float>::type RegType;
 	typedef complex<RegType> Complex;
-	int X[QUDA_MAX_DIM];
-	int R[QUDA_MAX_DIM];
 	const RegType anisotropy;
 	const QudaTboundary tBoundary;
 	bool isFirstTimeSlice;
@@ -390,20 +661,17 @@ namespace quda {
 	QudaGhostExchange ghostExchange;
 
       Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
-	  isFirstTimeSlice(comm_coord(3) == 0 ?true : false),
+	  isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
 	  isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false),
-	  ghostExchange(u.GhostExchange()) {
-	  for (int i=0; i<QUDA_MAX_DIM; i++) {
-	    X[i] = u.X()[i];
-	    R[i] = u.R()[i];
-	  }
-	}
+	  ghostExchange(u.GhostExchange()) { }
 
 	__device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
 	  for (int i=0; i<12; i++) out[i] = in[i];
 	}
 
-	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir, const RegType phase) const {
+	template<typename I>
+	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir,
+					       const RegType phase, const I *X, const int *R) const {
 	  const Complex *In = reinterpret_cast<const Complex*>(in);
 	  Complex *Out = reinterpret_cast<Complex*>(out);
 
@@ -437,8 +705,9 @@ namespace quda {
 	  out[9] = 0.0;
 	}
 
-	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[10],
-					       int idx, int dir, const RegType phase) const {
+	template<typename I>
+	__device__ __host__ inline void Unpack(RegType out[18], const RegType in[10], int idx, int dir,
+					       const RegType phase, const I *X, const int *R) const {
 	  out[0] = 0.0;
 	  out[1] = in[6];
 	  for (int i=0; i<4; i++) out[i+2] = in[i];
@@ -473,7 +742,9 @@ namespace quda {
 	reconstruct_12.Pack(out, in, idx);
       }
 
-      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir, const RegType phase) const {
+      template<typename I>
+      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[12], int idx, int dir,
+					     const RegType phase, const I *X, const int *R) const {
 	const Complex *In = reinterpret_cast<const Complex*>(in);
 	Complex *Out = reinterpret_cast<Complex*>(out);
 	const RegType coeff = static_cast<RegType>(1.0)/scale;
@@ -517,8 +788,6 @@ namespace quda {
     struct Reconstruct<8,Float> {
     typedef typename mapper<Float>::type RegType;
     typedef complex<RegType> Complex;
-    int X[QUDA_MAX_DIM];
-    int R[QUDA_MAX_DIM];
     const RegType anisotropy;
     const QudaTboundary tBoundary;
     bool isFirstTimeSlice;
@@ -528,12 +797,7 @@ namespace quda {
   Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
       isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
       isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false),
-      ghostExchange(u.GhostExchange()) {
-      for (int i=0; i<QUDA_MAX_DIM; i++) {
-	X[i] = u.X()[i];
-	R[i] = u.R()[i];
-      }
-    }
+      ghostExchange(u.GhostExchange()) { }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
       out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
@@ -541,8 +805,9 @@ namespace quda {
       for (int i=2; i<8; i++) out[i] = in[i];
     }
 
-    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8],
-					   int idx, int dir, const RegType phase, const RegType scale=1.0) const {
+    template<typename I>
+    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase,
+					   const I *X, const int *R, const RegType scale=1.0) const {
       const Complex *In = reinterpret_cast<const Complex*>(in);
       Complex *Out = reinterpret_cast<Complex*>(out);
 
@@ -622,8 +887,10 @@ namespace quda {
 	reconstruct_8.Pack(out, reinterpret_cast<RegType*>(su3), idx);
       }
 
-      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase) const {
-	reconstruct_8.Unpack(out, in, idx, dir, phase, scale);
+      template<typename I>
+      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir,
+					     const RegType phase, const I *X, const int *R) const {
+	reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, scale);
 	RegType cos_sin[2];
 	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
@@ -632,7 +899,18 @@ namespace quda {
 
     };
 
-  template <typename Float, int length, int N, int reconLenParam>
+  __host__ __device__ inline constexpr int ct_sqrt(int n, int i = 1){
+    return n == i ? n : (i * i < n ? ct_sqrt(n, i + 1) : i);
+  }
+
+  /**
+     @brief Return the number of colors of the accessor based on the length of the field
+     @param[in] length Number of real numbers per link
+     @return Number of colors (=sqrt(length/2))
+   */
+  __host__ __device__ inline constexpr int Ncolor(int length) { return ct_sqrt(length/2); }
+
+  template <typename Float, int length, int N, int reconLenParam, QudaStaggeredPhase stag_phase=QUDA_STAGGERED_PHASE_NO>
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;
       Reconstruct<reconLenParam,Float> reconstruct;
@@ -641,6 +919,10 @@ namespace quda {
       Float *gauge;
       size_t offset;
       Float *ghost[4];
+      QudaGhostExchange ghostExchange;
+      int coords[QUDA_MAX_DIM];
+      int_fastdiv X[QUDA_MAX_DIM];
+      int R[QUDA_MAX_DIM];
       const int volumeCB;
       int faceVolumeCB[4];
       const int stride;
@@ -651,11 +933,18 @@ namespace quda {
 
       FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	offset(u.Bytes()/(2*sizeof(Float))),
+	offset(u.Bytes()/(2*sizeof(Float))), ghostExchange(u.GhostExchange()),
 	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
 	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
       {
+	if (geometry == QUDA_COARSE_GEOMETRY)
+	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
+
+	static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
+		       "staggered phase only presently supported for 18 and 12 reconstruct");
 	for (int i=0; i<4; i++) {
+	  X[i] = u.X()[i];
+	  R[i] = u.R()[i];
 	  ghost[i] = ghost_ ? ghost_[i] : 0;
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
 	}
@@ -663,10 +952,13 @@ namespace quda {
 
     FloatNOrder(const FloatNOrder &order)
       : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
+	ghostExchange(order.ghostExchange),
         volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry),
 	phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
       {
 	for (int i=0; i<4; i++) {
+	  X[i] = order.X[i];
+	  R[i] = order.R[i];
 	  ghost[i] = order.ghost[i];
 	  faceVolumeCB[i] = order.faceVolumeCB[i];
 	}
@@ -692,7 +984,16 @@ namespace quda {
         if(hasPhase) copy(phase, (gauge+parity*offset)[phaseOffset/sizeof(Float) + stride*dir + x]);
 
         // The phases come after the ghost matrices
-        reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);
+        reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase, X, R);
+
+	// FIXME - this is a hack from hell - needs to be moved into the reconstruct type
+	if (stag_phase == QUDA_STAGGERED_PHASE_MILC && reconLenParam == 12) {
+	  Float sign = (dir == 0 && ((coords[3] - R[3]) & 1) != 0) ||
+	    ( dir == 1 && ((coords[0] - R[0] + coords[3] - R[3]) & 1) != 0) ||
+	    ( dir == 2 && ((coords[0] - R[0] + coords[1] - R[1] + coords[3] - R[3]) & 1) != 0) ? -1.0 : 1.0;
+
+	  for (int i=12; i<18; i++) v[i] *= sign;
+	}
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
@@ -718,6 +1019,37 @@ namespace quda {
         }
       }
 
+      /**
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >
+	   operator()(int dim, int x_cb, int parity) {
+	return gauge_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >(*this, dim, x_cb, parity);
+      }
+
+      /**
+	 @brief This accessor routine returns a const gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline const gauge_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >
+	   operator()(int dim, int x_cb, int parity) const {
+	return gauge_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >
+	(const_cast<FloatNOrder<Float,length,N,reconLenParam,stag_phase>&>(*this), dim, x_cb, parity);
+      }
+
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
         if (!ghost[dir]) { // load from main field not separate array
           load(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
@@ -739,7 +1071,7 @@ namespace quda {
           }
           RegType phase=0.;
           if(hasPhase) copy(phase, ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x]);
-          reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);
+          reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase, X, R);
         }
       }
 
@@ -771,6 +1103,37 @@ namespace quda {
 	}
       }
 
+      /**
+	 @brief This accessor routine returns a gauge_ghost_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] ghost_idx Ghost index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_ghost_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >
+	   Ghost(int dim, int ghost_idx, int parity) {
+	return gauge_ghost_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >(*this, dim, ghost_idx, parity);
+      }
+
+      /**
+	 @brief This accessor routine returns a const gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] ghost_idx Ghost index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline const gauge_ghost_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >
+	   Ghost(int dim, int ghost_idx, int parity) const {
+	return gauge_ghost_wrapper<Float,FloatNOrder<Float,length,N,reconLenParam,stag_phase> >
+	(const_cast<FloatNOrder<Float,length,N,reconLenParam,stag_phase>&>(*this), dim, ghost_idx, parity);
+      }
+
       __device__ __host__ inline void loadGhostEx(RegType v[length], int buff_idx, int extended_idx, int dir,
 						    int dim, int g, int parity, const int R[]) const {
 	const int M = reconLen / N;
@@ -792,7 +1155,7 @@ namespace quda {
 					    + R[dim]*faceVolumeCB[dim]*M*N + buff_idx]);
 
 	// use the extended_idx to determine the boundary condition
-	reconstruct.Unpack(v, tmp, extended_idx, g, 2.*M_PI*phase);
+	reconstruct.Unpack(v, tmp, extended_idx, g, 2.*M_PI*phase, X, R);
       }
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int buff_idx, int extended_idx,
@@ -870,6 +1233,9 @@ namespace quda {
 
       LegacyOrder(const GaugeField &u, Float **ghost_)
       : volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()), hasPhase(0) {
+	if (geometry == QUDA_COARSE_GEOMETRY)
+	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
+
 	for (int i=0; i<4; i++) {
 	  ghost[i] = (ghost_) ? ghost_[i] : (Float*)(u.Ghost()[i]);
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
@@ -1079,15 +1445,14 @@ namespace quda {
     Float *gauge;
     const int volumeCB;
     const Float anisotropy;
-    const int Nc;
+    static constexpr int Nc = 3;
     const int geometry;
   CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
     : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3),
-      geometry(u.Geometry())
+      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), geometry(u.Geometry())
       { if (length != 18) errorQuda("Gauge length %d not supported", length); }
   CPSOrder(const CPSOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge),
-      volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3), geometry(order.geometry)
+      volumeCB(order.volumeCB), anisotropy(order.anisotropy), geometry(order.geometry)
       { ; }
     virtual ~CPSOrder() { ; }
 
@@ -1139,7 +1504,10 @@ namespace quda {
   };
 
     /**
-       struct to define BQCD ordered gauge fields:
+       @brief struct to define BQCD ordered gauge fields:
+
+       Note the convention in BQCD is to store the gauge field
+       variables in and extended fields with inline halos
        [mu][parity][volumecb+halos][col][row]
     */
     template <typename Float, int length> struct BQCDOrder : LegacyOrder<Float,length> {
@@ -1147,16 +1515,16 @@ namespace quda {
       Float *gauge;
       const int volumeCB;
       int exVolumeCB; // extended checkerboard volume
-      const int Nc;
+      static constexpr int Nc = 3;
     BQCDOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
-      : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()), Nc(3) {
+      : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
 	// compute volumeCB + halo region
 	exVolumeCB = u.X()[0]/2 + 2;
 	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
       }
     BQCDOrder(const BQCDOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge),
-	volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB), Nc(3) {
+	volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
@@ -1215,15 +1583,15 @@ namespace quda {
       typedef typename mapper<Float>::type RegType;
       Float *gauge;
       const int volumeCB;
-      const int Nc;
+      static constexpr int Nc = 3;
       const Float scale;
     TIFROrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	volumeCB(u.VolumeCB()), Nc(3), scale(u.Scale()) {
+	volumeCB(u.VolumeCB()), scale(u.Scale()) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
     TIFROrder(const TIFROrder &order)
-      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), Nc(3), scale(order.scale) {
+      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), scale(order.scale) {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
@@ -1283,13 +1651,13 @@ namespace quda {
       Float *gauge;
       const int volumeCB;
       int exVolumeCB;
-      const int Nc;
+      static constexpr int Nc = 3;
       const Float scale;
       const int dim[4];
       const int exDim[4];
     TIFRPaddedOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	volumeCB(u.VolumeCB()), exVolumeCB(1), Nc(3), scale(u.Scale()),
+	volumeCB(u.VolumeCB()), exVolumeCB(1), scale(u.Scale()),
 	dim{ u.X()[0], u.X()[1], u.X()[2], u.X()[3] },
 	exDim{ u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3] } {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
@@ -1300,7 +1668,7 @@ namespace quda {
       }
 
     TIFRPaddedOrder(const TIFRPaddedOrder &order)
-      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB), Nc(3), scale(order.scale),
+      : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), exVolumeCB(order.exVolumeCB), scale(order.scale),
 	  dim{order.dim[0], order.dim[1], order.dim[2], order.dim[3]},
 	  exDim{order.exDim[0], order.exDim[1], order.exDim[2], order.exDim[3]} {
 	if (length != 18) errorQuda("Gauge length %d not supported", length);
@@ -1376,28 +1744,28 @@ namespace quda {
   } // namespace gauge
 
   // Use traits to reduce the template explosion
-  template<typename T,QudaReconstructType,int N=18> struct gauge_mapper { };
+  template<typename T,QudaReconstructType,int N=18,QudaStaggeredPhase stag=QUDA_STAGGERED_PHASE_NO> struct gauge_mapper { };
 
   // double precision
-  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_NO,N> { typedef gauge::FloatNOrder<double, N, 2, N> type; };
-  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_13,N> { typedef gauge::FloatNOrder<double, N, 2, 13> type; };
-  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_12,N> { typedef gauge::FloatNOrder<double, N, 2, 12> type; };
-  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_9,N> { typedef gauge::FloatNOrder<double, N, 2, 9> type; };
-  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_8,N> { typedef gauge::FloatNOrder<double, N, 2, 8> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<double,QUDA_RECONSTRUCT_NO,N,stag> { typedef gauge::FloatNOrder<double, N, 2, N, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<double,QUDA_RECONSTRUCT_13,N,stag> { typedef gauge::FloatNOrder<double, N, 2, 13, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<double,QUDA_RECONSTRUCT_12,N,stag> { typedef gauge::FloatNOrder<double, N, 2, 12, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<double,QUDA_RECONSTRUCT_9,N,stag> { typedef gauge::FloatNOrder<double, N, 2, 9, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<double,QUDA_RECONSTRUCT_8,N,stag> { typedef gauge::FloatNOrder<double, N, 2, 8, stag> type; };
 
   // single precision
-  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_NO,N> { typedef gauge::FloatNOrder<float, N, 2, N> type; };
-  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_13,N> { typedef gauge::FloatNOrder<float, N, 4, 13> type; };
-  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_12,N> { typedef gauge::FloatNOrder<float, N, 4, 12> type; };
-  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_9,N> { typedef gauge::FloatNOrder<float, N, 4, 9> type; };
-  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_8,N> { typedef gauge::FloatNOrder<float, N, 4, 8> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<float,QUDA_RECONSTRUCT_NO,N,stag> { typedef gauge::FloatNOrder<float, N, 2, N, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<float,QUDA_RECONSTRUCT_13,N,stag> { typedef gauge::FloatNOrder<float, N, 4, 13, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<float,QUDA_RECONSTRUCT_12,N,stag> { typedef gauge::FloatNOrder<float, N, 4, 12, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<float,QUDA_RECONSTRUCT_9,N,stag> { typedef gauge::FloatNOrder<float, N, 4, 9, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<float,QUDA_RECONSTRUCT_8,N,stag> { typedef gauge::FloatNOrder<float, N, 4, 8, stag> type; };
 
   // half precision
-  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_NO,N> { typedef gauge::FloatNOrder<short, N, 2, N> type; };
-  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_13,N> { typedef gauge::FloatNOrder<short, N, 4, 13> type; };
-  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N> { typedef gauge::FloatNOrder<short, N, 4, 12> type; };
-  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N> { typedef gauge::FloatNOrder<short, N, 4, 9> type; };
-  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N> { typedef gauge::FloatNOrder<short, N, 4, 8> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<short,QUDA_RECONSTRUCT_NO,N,stag> { typedef gauge::FloatNOrder<short, N, 2, N, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<short,QUDA_RECONSTRUCT_13,N,stag> { typedef gauge::FloatNOrder<short, N, 4, 13, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N,stag> { typedef gauge::FloatNOrder<short, N, 4, 12, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N,stag> { typedef gauge::FloatNOrder<short, N, 4, 9, stag> type; };
+  template<int N,QudaStaggeredPhase stag> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N,stag> { typedef gauge::FloatNOrder<short, N, 4, 8, stag> type; };
 
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };

@@ -46,6 +46,9 @@ static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
 
+static char partition_string[16];
+static char topology_string[16];
+
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
   int initialized;
@@ -101,6 +104,9 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   comm_peer2peer_init(hostname_recv_buf);
 
   host_free(hostname_recv_buf);
+
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
 }
 
 void comm_peer2peer_init(const char* hostname_recv_buf)
@@ -158,6 +164,15 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   }
 
   peer2peer_init = true;
+
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    printfQuda("Enabling GPU-Direct RDMA access\n");
+  } else {
+    printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
+
+  checkCudaErrorNoSync();
   return;
 }
 
@@ -390,8 +405,16 @@ void comm_barrier(void)
 
 void comm_abort(int status)
 {
-  #ifdef HOST_DEBUG
+#ifdef HOST_DEBUG
   raise(SIGINT);
-  #endif
+#endif
   MPI_Abort(MPI_COMM_WORLD, status) ;
+}
+
+const char* comm_dim_partitioned_string() {
+  return partition_string;
+}
+
+const char* comm_dim_topology_string() {
+  return topology_string;
 }

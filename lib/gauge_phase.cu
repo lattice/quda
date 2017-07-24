@@ -54,7 +54,7 @@ namespace quda {
   template <int dim, typename Float, QudaStaggeredPhase phaseType, typename Arg>
   __device__ __host__ Float getPhase(int x, int y, int z, int t, Arg &arg) {
     Float phase = 1.0;
-    if (phaseType == QUDA_MILC_STAGGERED_PHASE) {
+    if (phaseType == QUDA_STAGGERED_PHASE_MILC) {
       if (dim==0) {
 	phase = (1.0 - 2.0 * (t % 2) );		
       } else if (dim == 1) {
@@ -64,7 +64,7 @@ namespace quda {
       } else if (dim == 3) { // also apply boundary condition
 	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
       }
-    } if (phaseType == QUDA_TIFR_STAGGERED_PHASE) {
+    } if (phaseType == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim==0) {
 	phase = (1.0 - 2.0 * ((3 + t + z + y) % 2) );		
       } else if (dim == 1) {
@@ -74,7 +74,7 @@ namespace quda {
       } else if (dim == 3) { // also apply boundary condition
 	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
       }
-    } else if (phaseType == QUDA_CPS_STAGGERED_PHASE) {
+    } else if (phaseType == QUDA_STAGGERED_PHASE_CPS) {
       if (dim==0) {
 	phase = 1.0;
       } else if (dim == 1) {
@@ -196,19 +196,19 @@ namespace quda {
 
   template <typename Float, int length, typename Order>
   void gaugePhase(Order order, const GaugeField &u,  QudaFieldLocation location) {
-    if (u.StaggeredPhase() == QUDA_MILC_STAGGERED_PHASE) {
+    if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
       GaugePhaseArg<Float,Order> arg(order, u);
-      GaugePhase<Float,length,QUDA_MILC_STAGGERED_PHASE,
+      GaugePhase<Float,length,QUDA_STAGGERED_PHASE_MILC,
 		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
-    } else if (u.StaggeredPhase() == QUDA_CPS_STAGGERED_PHASE) {
+    } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_CPS) {
       GaugePhaseArg<Float,Order> arg(order, u);
-      GaugePhase<Float,length,QUDA_CPS_STAGGERED_PHASE,
+      GaugePhase<Float,length,QUDA_STAGGERED_PHASE_CPS,
 		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
-    } else if (u.StaggeredPhase() == QUDA_TIFR_STAGGERED_PHASE) {
+    } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
       GaugePhaseArg<Float,Order> arg(order, u);
-      GaugePhase<Float,length,QUDA_TIFR_STAGGERED_PHASE,
+      GaugePhase<Float,length,QUDA_STAGGERED_PHASE_TIFR,
 		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
     } else {
@@ -230,11 +230,8 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	gaugePhase<Float,length>(G(u), u, location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
-	gaugePhase<Float,length>(G(u), u, location);
       } else {
-	errorQuda("Unsupported recsontruction type");
+	errorQuda("Unsupported reconstruction type");
       }
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());

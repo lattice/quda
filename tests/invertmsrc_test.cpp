@@ -458,7 +458,7 @@ int main(int argc, char **argv)
 //      ax(0, spinorCheck[i], V*spinorSiteSize, inv_param.cpu_prec);
 //
 //      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-//	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
+//	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET)
 //	  errorQuda("Twisted mass solution type not supported");
 //        tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
 //                 inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
@@ -493,7 +493,7 @@ int main(int argc, char **argv)
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-	if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)
+	if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)
 	  tm_mat(spinorCheck[i], gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
 	else
 	{
@@ -533,7 +533,7 @@ int main(int argc, char **argv)
     } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
+	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorCheck[i], gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
@@ -579,7 +579,7 @@ int main(int argc, char **argv)
       ax(0, spinorCheck[i], V*spinorSiteSize, inv_param.cpu_prec);
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
+	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);

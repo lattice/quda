@@ -9,22 +9,17 @@ namespace quda {
 #include <dslash_init.cuh>
   }
 
-  DiracWilson::DiracWilson(const DiracParam &param) : 
-    Dirac(param), face1(param.gauge->X(), 4, 12, 1, param.gauge->Precision()),
-                  face2(param.gauge->X(), 4, 12, 1, param.gauge->Precision()) 
+  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param)
     { 
       wilson::initConstants(*param.gauge, profile);
     }
 
-  DiracWilson::DiracWilson(const DiracWilson &dirac) : 
-    Dirac(dirac), face1(dirac.face1), face2(dirac.face2) 
+  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac)
     { 
       wilson::initConstants(*dirac.gauge, profile);
     }
 
-  DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : 
-    Dirac(param), face1(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls),
-    face2(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) 
+  DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : Dirac(param)
   { 
     wilson::initConstants(*param.gauge, profile);
     
@@ -36,8 +31,6 @@ namespace quda {
   {
     if (&dirac != this) {
       Dirac::operator=(dirac);
-      face1 = dirac.face1;
-      face2 = dirac.face2;
     }
     return *this;
   }
@@ -48,8 +41,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
     } else {
@@ -66,8 +58,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
@@ -156,9 +147,10 @@ namespace quda {
   grid
   */
 
-  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T) const {
+  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, 0.0, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, c, kappa, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)
@@ -207,15 +199,10 @@ namespace quda {
 
   void DiracWilsonPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-#ifdef MULTI_GPU
     bool reset = newTmp(&tmp2, in);
     M(*tmp2, in);
     Mdag(out, *tmp2);
     deleteTmp(&tmp2, reset);
-#else
-    M(out, in);
-    Mdag(out, out);
-#endif
   }
 
   void DiracWilsonPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,

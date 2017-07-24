@@ -98,7 +98,7 @@
 
 #if	(DD_PREC==0)
 
-	#define TPROJSCALE tProjScale
+	#define TPROJSCALE param.tProjScale
 
 	// double-precision gauge field
 	#if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
@@ -155,7 +155,7 @@
 	#define SPINOR_HOP 12
 
 #else
-	#define TPROJSCALE tProjScale_f
+	#define TPROJSCALE param.tProjScale_f
 
 	// single-precision gauge field
 	#ifdef DIRECT_ACCESS_LINK

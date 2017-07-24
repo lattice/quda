@@ -12,7 +12,7 @@ using namespace quda;
    @file cub_helper.cuh
 
    @section Description
- 
+
    Provides helper functors for custom datatypes for cub algorithms.
  */
 
@@ -48,6 +48,50 @@ namespace quda {
     }
   };
 
+  /**
+     Helper functor for doubledouble4 addition reduction.
+  */
+  template <>
+  struct Summ<double4>{
+    __host__ __device__ __forceinline__ double4 operator() (const double4 &a, const double4 &b){
+      return make_double4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+    }
+  };
+
+
+  /**
+     struct which acts as a wrapper to a vector of data.
+   */
+  template <typename scalar, int n>
+  struct vector_type {
+    scalar data[n];
+    __device__ __host__ inline scalar& operator[](int i) { return data[i]; }
+    __device__ __host__ inline const scalar& operator[](int i) const { return data[i]; }
+    __device__ __host__ inline static constexpr int size() { return n; }
+    __device__ __host__ inline void operator+=(const vector_type &a) {
+#pragma unroll
+      for (int i=0; i<n; i++) data[i] += a[i];
+    }
+    __device__ __host__ vector_type() {
+#pragma unroll
+      for (int i=0; i<n; i++) zero(data[i]);
+    }
+  };
+
+  template<typename scalar, int n>
+  __device__ __host__ inline void zero(vector_type<scalar,n> &v) {
+#pragma unroll
+    for (int i=0; i<n; i++) zero(v.data[i]);
+  }
+
+  template<typename scalar, int n>
+  __device__ __host__ inline vector_type<scalar,n> operator+(const vector_type<scalar,n> &a, const vector_type<scalar,n> &b) {
+    vector_type<scalar,n> c;
+#pragma unroll
+    for (int i=0; i<n; i++) c[i] = a[i] + b[i];
+    return c;
+  }
+
 
   template <typename T>
   struct ReduceArg {
@@ -57,7 +101,7 @@ namespace quda {
     ReduceArg() :
       partial(static_cast<T*>(blas::getDeviceReduceBuffer())),
       result_d(static_cast<T*>(blas::getMappedHostReduceBuffer())),
-      result_h(static_cast<T*>(blas::getHostReduceBuffer())) 
+      result_h(static_cast<T*>(blas::getHostReduceBuffer()))
     {
       //  write reduction to GPU memory if asynchronous
       if (commAsyncReduction()) result_d = partial;
@@ -172,19 +216,6 @@ namespace quda {
     }
   }
 #endif // __COMPUTE_CAPABILITY__ >= 300
-
-  /**
-     struct which acts as a wrapper to a vector of data.
-   */
-  template <typename scalar, int n>
-  struct vector_type {
-    scalar data[n];
-    __device__ __host__ inline scalar& operator[](int i) { return data[i]; }
-    __device__ __host__ inline const scalar& operator[](int i) const { return data[i]; }
-    __device__ __host__ inline static constexpr int size() { return n; }
-    __device__ __host__ inline void operator+=(const vector_type &a) { for (int i=0; i<n; i++) data[i] += a[i]; }
-    __device__ __host__ vector_type() { for (int i=0; i<n; i++) zero(data[i]); }
-  };
 
   /**
      functor that defines how to do a row-wise vector reduction

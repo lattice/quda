@@ -9,11 +9,13 @@
 #endif
 
 #include <cub_helper.cuh>
+#include <algorithm>
 
 template<typename> struct ScalarType { };
 template<> struct ScalarType<double> { typedef double type; };
 template<> struct ScalarType<double2> { typedef double type; };
 template<> struct ScalarType<double3> { typedef double type; };
+template<> struct ScalarType<double4> { typedef double type; };
 
 template<typename> struct Vec2Type { };
 template<> struct Vec2Type<double> { typedef double2 type; };
@@ -25,15 +27,15 @@ template<> struct Vec2Type<double> { typedef double2 type; };
 template<> struct ScalarType<doubledouble> { typedef doubledouble type; };
 template<> struct ScalarType<doubledouble2> { typedef doubledouble type; };
 template<> struct ScalarType<doubledouble3> { typedef doubledouble type; };
+template<> struct ScalarType<doubledouble4> { typedef doubledouble type; };
 template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
 #else
 #define QudaSumFloat double
 #define QudaSumFloat2 double2
 #define QudaSumFloat3 double3
+#define QudaSumFloat4 double4
 #endif
 
-
-#define REDUCE_MAX_BLOCKS 65536
 
 void checkSpinor(const ColorSpinorField &a, const ColorSpinorField &b) {
   if (a.Precision() != b.Precision())
@@ -75,10 +77,34 @@ namespace quda {
 
     void initReduce()
     {
+      /* we have these different reductions to cater for:
 
-      const int MaxReduce = 16;
-      // reduction buffer size
-      size_t bytes = 2*MaxReduce*3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat); // Factor of N for composite reductions
+	 - regular reductions (reduce_quda.cu) where are reducing to a
+           single vector type (max length 4 presently), with possibly
+           parity dimension, and a grid-stride loop with max number of
+           blocks = 2 x SM count
+
+	 - multi-reductions where we are reducing to a matrix of size
+	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
+	   possible parity dimension, and a grid-stride loop with
+	   maximum number of blocks = 2 x SM count
+
+	- inline reductions in kernels where we cannot assume a grid
+           stride loop - hence max blocks is given by the architecture
+           limit
+
+      */
+
+      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount; // FIXME - should set this according to what's used in tune_quda.h
+
+      const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
+      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
+
+      const int max_generic_blocks = 65336; // FIXME - this isn't quite right
+      const int max_generic_reduce = 2 * MAX_MULTI_BLAS_N * max_generic_blocks * 4 * sizeof(QudaSumFloat);
+
+      // reduction buffer size 
+      size_t bytes = std::max(std::max(max_reduce, max_multi_reduce), max_generic_reduce);
 
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 
@@ -726,7 +752,7 @@ namespace quda {
     }
 
     /**
-       double3 tripleCGUpdate(V x, V y, V z){}
+       double3 tripleCGReduction(V x, V y, V z){}
        First performs the operation norm2(x)
        Second performs the operatio norm2(y)
        Third performs the operation dotPropduct(y,z)
@@ -819,6 +845,32 @@ namespace quda {
     }
 ///END EXPERIMENTAL
 
+#ifdef ALTRELIABLE
+    /**
+       double4 quadrupleCGReduction(V x, V y, V z){}
+       First performs the operation norm2(x)
+       Second performs the operatio norm2(y)
+       Third performs the operation dotPropduct(y,z)
+       Fourth performs the operation norm(z)
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      quadrupleCGReduction_(const Float2 &a, const Float2 &b) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+  typedef typename ScalarType<ReduceType>::type scalar;
+  norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
+      }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 8; } //! flops per element
+    };
+
+    double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
+  (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+    }
+
+#endif
+>>>>>>> develop
 
    } // namespace blas
 

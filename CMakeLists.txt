@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
-set(CMAKE_CXX_STANDARD_REQUIRED 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_STANDARD 11)
 # disable in source builds
 # this is only a temporary fix, but for now we need it as cmake will
@@ -48,6 +48,10 @@ endif()
 # PROJECT is QUDA
 #
 project("QUDA" VERSION 0.9.0)
+
+if(NOT GITVERSION)
+  set(GITVERSION ${CMAKE_VERSION})
+endif()
 
 
 #######################################################################
@@ -106,11 +110,15 @@ set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
 
 # QDPJIT
 set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
+set(QUDA_QDPJITHOME "" CACHE PATH "path to QDPJIT installation")
 
 # Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
+set(QUDA_LIMEHOME "" CACHE PATH "path to LIME")
 set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
+set(QUDA_MAGMAHOME "" CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
+set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link against magma")
 
 #######################################################################
 #QUDA ADVANCED OPTIONS
@@ -122,6 +130,8 @@ set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity" )
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
+set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
+
 
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
@@ -129,16 +139,15 @@ set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for t
 
 # GPUdirect options
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
-set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
-
-# Packing option
-set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
 
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
-set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
+set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
+set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
+set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
+set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -146,29 +155,26 @@ mark_as_advanced(QUDA_BLAS_TEX)
 mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
+mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 mark_as_advanced(QUDA_GPU_DIRECT)
-mark_as_advanced(QUDA_GPU_COMMS)
-
-mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
-mark_as_advanced(QUDA_EIGEN)
+mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
-mark_as_advanced(QUDA_MULTIGRID)
+mark_as_advanced(QUDA_ALTRELIABLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
-set(CPU_ARCH x86_64)
+set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 
 #######################################################################
 # everything below here is processing the setup
 #######################################################################
-
 # we need to check for some packages
 find_package(PythonInterp)
 
@@ -184,6 +190,45 @@ else()
   set(USING_CUDA_LANG_SUPPORT False)
 endif()
 
+#######################################################################
+## QUDA depends on Eigen
+## this part makes sure we can download eigen if it is not found
+if (QUDA_DOWNLOAD_EIGEN)
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2)
+  set(EIGEN_SHA dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6)
+  if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION} )
+    message(STATUS "Checking for Eigen tarball and downloading if necessary.")
+  endif()
+  FILE(DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${EIGEN_SHA} STATUS EIGEN_DOWNLOADED)
+  list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
+  list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
+  if(${EIGEN_DOWNLOADED_CODE})
+    message(SEND_ERROR "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again.")
+  endif()
+
+  include(ExternalProject)
+  ExternalProject_Add(Eigen
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2
+    URL_HASH SHA256=${EIGEN_SHA}
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND COMMAND ""
+    INSTALL_COMMAND ""
+  )
+  ExternalProject_Get_Property(Eigen source_dir)
+  set(EIGEN_INCLUDE_DIRS ${source_dir})
+else()
+  # fall back to using find_package
+  find_package(Eigen QUIET)
+  if(NOT EIGEN_FOUND)
+    message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
+  endif()
+endif()
+include_directories(${EIGEN_INCLUDE_DIRS})
+## Now we hopefully found some way to get eigen to work
+
+# We need threads
 find_package(Threads REQUIRED)
 
 # do all the build definitions
@@ -194,6 +239,19 @@ if(QUDA_MPI OR QUDA_QMP)
   find_package(MPI)
 else()
   set(COMM_OBJS comm_single.cpp)
+endif()
+
+if(QUDA_QDPJIT)
+  if(NOT QUDA_QMP)
+    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+  endif()
+  add_definitions(-DUSE_QDPJIT)
+  include_directories(SYSTEM ${QUDA_QDPJITHOME}/include)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  FIND_LIBRARY(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
+  FIND_LIBRARY(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
+  FIND_LIBRARY(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
 if(QUDA_MPI AND QUDA_QMP)
@@ -207,31 +265,53 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_QMP)
+  if("${QUDA_QMPHOME}" STREQUAL "")
+    message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is set" )
+  endif()
   add_definitions(-DQMP_COMMS)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
+  set(QUDA_QMP_LDFLAGS  "" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+  set(QUDA_QMP_LIBS  "" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  #FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
+  include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
 if(QUDA_QIO)
+  if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
+    message( FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is set" )
+  endif()
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
-  FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
+  FIND_LIBRARY(LIME_LIB lime ${QUDA_LIMEHOME}/lib/)
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
+  include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
 endif()
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(MAGMA  magma)
-  include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
-  message(${MAGMA_INCLUDEDIR})
   find_package(OpenMP)
-  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  if("${QUDA_MAGMAHOME}" STREQUAL "")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MAGMA magma)
+    include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
+    message("${MAGMA_INCLUDEDIR}")
+    find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  else()
+    # prefer static library
+    find_library(MAGMA libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
+    # append additional libraries required by magma
+    LIST(APPEND MAGMA ${CUDA_cublas_LIBRARY})
+    LIST(APPEND MAGMA ${CUDA_cusparse_LIBRARY})
+    LIST(APPEND MAGMA ${QUDA_MAGMA_LIBS})
+    # and any additional OpenMP linker flags
+    SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_CXX_FLAGS}" )
+    include_directories(SYSTEM ${QUDA_MAGMAHOME}/include)
+  endif()  
 endif(QUDA_MAGMA)
 
 # This selects arpack or parpack for Multi GPU
@@ -258,25 +338,35 @@ if(QUDA_ARPACK)
 endif(QUDA_ARPACK)
 
 
+# MAX_MULTI_BLAS_N
+add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
+
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
 
 if (QUDA_MULTIGRID)
+  add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
+  LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
 endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
-  set(QUDA_NVTX ON)
 endif()
 
-if(QUDA_EIGEN)
-  add_definitions(-DEIGEN)
+if(QUDA_DEFLATEDSOLVER)
+  add_definitions(-DDEFLATEDSOLVER)
   find_package(Eigen REQUIRED)
   include_directories(${EIGEN_INCLUDE_DIRS})
+endif()
+
+if(QUDA_ALTRELIABLE)
+  add_definitions(-DALTRELIABE)
+endif()
+
+if(QUDA_USE_EIGEN)
+  add_definitions(-DEIGEN)
 endif()
 
 if(QUDA_POSIX_THREADS)
@@ -300,7 +390,7 @@ if(QUDA_DIRAC_CLOVER)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
-  add_definitions(-DGPU_TWISTED_MASS_DIRAC)
+  add_definitions(-DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_TWISTED_MASS)
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
@@ -373,10 +463,6 @@ if(GPU_DIRECT)
   add_definitions(-DGPU_DIRECT)
 endif(GPU_DIRECT)
 
-if(GPU_COMMS)
-  add_definitions(-DGPU_COMMS)
-endif(GPU_COMMS)
-
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
 endif(QUDA_INTERFACE_QDP)
@@ -407,10 +493,6 @@ if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
   enable_language(Fortran)
 endif()
 
-if(DEVICE_PACK)
-  add_definitions(-DDEVICE_PACK)
-endif(DEVICE_PACK)
-
 
 
 if(QUDA_NUMA_NVML)
@@ -438,6 +520,11 @@ STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG}
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
+
+# this allows simplified running of clang-tidy 
+if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
+   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
@@ -449,6 +536,9 @@ if(DEBUG_BUILD)
     set(GITVERSION debug)
   endif()
 endif()
+
+set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
+
 
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
@@ -479,7 +569,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 ## define CUDA flags when CMake < 3.8
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_STRICT ${CUDA_NVCC_FLAGS_DEVEL} CACHE STRING
@@ -499,7 +589,7 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     FORCE )
 
 ## define CUDA flags when CMake >= 3.8
-set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
+set(CMAKE_CUDA_FLAGS_DEVEL "${QUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field -O3 -lineinfo" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CMAKE_CUDA_FLAGS_STRICT "${CMAKE_CUDA_FLAGS_DEVEL}" CACHE STRING
@@ -522,7 +612,7 @@ set(CMAKE_CUDA_FLAGS_DEBUG "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G" CACHE STRING
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall ${CLANG_FORCE_COLOR}" CACHE STRING
 "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT  "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}" CACHE STRING
-"Flags used by the C++ compiler during rstrict jenkins builds.")
+"Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}" CACHE STRING

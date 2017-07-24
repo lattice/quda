@@ -138,8 +138,8 @@ namespace quda {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
     for (int x=0; x<volume; x++) {
-      RegTypeIn in[Ns*Nc*2];
-      RegTypeOut out[Ns*Nc*2];
+      RegTypeIn in[Ns*Nc*2] = { };
+      RegTypeOut out[Ns*Nc*2] = { };
       inOrder.load(in, x);
       basis(out, in);
       outOrder.save(out, x);
@@ -155,8 +155,8 @@ namespace quda {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     if (x >= volume) return;
 
-    RegTypeIn in[Ns*Nc*2];
-    RegTypeOut out[Ns*Nc*2];
+    RegTypeIn in[Ns*Nc*2] = { };
+    RegTypeOut out[Ns*Nc*2] = { };
     inOrder.load(in, x);
     basis(out, in);
     outOrder.save(out, x);
@@ -255,27 +255,27 @@ namespace quda {
 
     if (out.isNative()) {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
-      ColorSpinor outOrder(out, Out, outNorm);
+      ColorSpinor outOrder(out, 1, Out, outNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
       // this is needed for single-precision mg for changing basis in the transfer
       typedef typename colorspinor::FloatNOrder<float, 4, Nc, 2> ColorSpinor;
-      ColorSpinor outOrder(out, (float*)Out, outNorm);
+      ColorSpinor outOrder(out, 1, (float*)Out, outNorm);
       genericCopyColorSpinor<float,FloatIn,4,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
+      SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-      SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
+      SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      PaddedSpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
+      PaddedSpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
 #else
@@ -285,7 +285,7 @@ namespace quda {
     } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
-      QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, Out);
+      QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
 #else
@@ -305,23 +305,23 @@ namespace quda {
 
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
-      ColorSpinor inOrder(in, In, inNorm);
+      ColorSpinor inOrder(in, 1, In, inNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
       // this is needed for single-precision mg for changing basis in the transfer
       typedef typename colorspinor::FloatNOrder<float, 4, Nc, 2> ColorSpinor;
-      ColorSpinor inOrder(in, (float*)In, inNorm);
+      ColorSpinor inOrder(in, 1, (float*)In, inNorm);
       genericCopyColorSpinor<FloatOut,float,4,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
+      SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-      SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, In);
+      SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      PaddedSpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
+      PaddedSpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
 #else
       errorQuda("TIFR interface has not been built\n");
@@ -330,7 +330,7 @@ namespace quda {
     } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
-      QDPJITDiracOrder<FloatIn, Ns, Nc> inOrder(in, In);
+      QDPJITDiracOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
 #else
       errorQuda("QDPJIT interface has not been built\n");
