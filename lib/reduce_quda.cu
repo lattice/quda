@@ -153,8 +153,8 @@ namespace quda {
 #include <reduce_core.h>
 #include <reduce_mixed_core.h>
 
-//EXPERIMENTAL:
-#include <exp_reduce_core.cuh>
+//EXPERIMENTAL STUFF:
+//#include <exp_reduce_core.cuh>
 #include <exp_reduce_core.h>
 
     } // namespace reduce
@@ -773,6 +773,34 @@ namespace quda {
 	(make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
+
+#ifdef ALTRELIABLE
+    /**
+       double4 quadrupleCGReduction(V x, V y, V z){}
+       First performs the operation norm2(x)
+       Second performs the operatio norm2(y)
+       Third performs the operation dotPropduct(y,z)
+       Fourth performs the operation norm(z)
+    */
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct quadrupleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      quadrupleCGReduction_(const Float2 &a, const Float2 &b) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
+  typedef typename ScalarType<ReduceType>::type scalar;
+  norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
+      }
+      static int streams() { return 3; } //! total number of input and output streams
+      static int flops() { return 8; } //! flops per element
+    };
+
+    double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+      return reduce::reduceCuda<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
+  (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+    }
+
+#endif
+
+
 ///EXPERIMENTAL:
     template <typename ReduceType, typename Float2, typename FloatN>
     struct ReduceFunctorExp {
@@ -838,39 +866,11 @@ namespace quda {
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
-      } else {
-	return reduce::reduceCudaExp<double3, QudaSumFloat3,pipePCGMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+      } 
+      return reduce::reduceCudaExp<double3, QudaSumFloat3,pipePCGMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
 	  (make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
-      }
     }
 ///END EXPERIMENTAL
-
-#ifdef ALTRELIABLE
-    /**
-       double4 quadrupleCGReduction(V x, V y, V z){}
-       First performs the operation norm2(x)
-       Second performs the operatio norm2(y)
-       Third performs the operation dotPropduct(y,z)
-       Fourth performs the operation norm(z)
-    */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct quadrupleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      quadrupleCGReduction_(const Float2 &a, const Float2 &b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) {
-  typedef typename ScalarType<ReduceType>::type scalar;
-  norm2_<scalar>(sum.x,x); norm2_<scalar>(sum.y,y); dot_<scalar>(sum.z,y,z); norm2_<scalar>(sum.w,w);
-      }
-      static int streams() { return 3; } //! total number of input and output streams
-      static int flops() { return 8; } //! flops per element
-    };
-
-    double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
-      return reduce::reduceCuda<double4,QudaSumFloat4,quadrupleCGReduction_,0,0,0,0,0,false>
-  (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
-    }
-
-#endif
->>>>>>> develop
 
    } // namespace blas
 

@@ -24,7 +24,7 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
                    ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
 
   doubleN value;
-  if (Location(x, u, r, p, z) == QUDA_CUDA_FIELD_LOCATION) {//must be 10 args.
+  if (checkLocation(x, u, r, p, z) == QUDA_CUDA_FIELD_LOCATION) {//must be 10 args.
 
     // cannot do site unrolling for arbitrary color (needs JIT)
     if (siteUnroll && x.Ncolor()!=3) errorQuda("Not supported");

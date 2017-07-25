@@ -84,8 +84,8 @@ template <typename doubleN, typename ReduceType, typename FloatN, int M_, typena
           typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
 doubleN reduceLaunchExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,SpinorU,SpinorR,SpinorS,SpinorM,SpinorQ,SpinorW,SpinorN,SpinorZ, Reducer> &arg,
 		     const TuneParam &tp, const cudaStream_t &stream) {
-  if (tp.grid.x > REDUCE_MAX_BLOCKS)
-    errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
+  if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
+     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
   LAUNCH_KERNEL(reduceKernelExp,tp,stream,arg,ReduceType,FloatN,M_);
 
@@ -256,6 +256,8 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
   Reducer<ReduceType, Float2, RegType> reducer_((Float2)vec2(a), (Float2)vec2(b));
   doubleN value;
 
+  int partitions = (x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset());
+
   ReduceCudaExp<doubleN,ReduceType,RegType,M_,
   Spinor<RegType,StoreType,M_,writeX,0>,
   Spinor<RegType,StoreType,M_,writeP,1>,
@@ -268,7 +270,7 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
   Spinor<RegType,StoreType,M_,writeN,8>,
   Spinor<RegType,    zType,M_,writeZ,9>,
     Reducer<ReduceType, Float2, RegType> >
-    reduce(value, X, P, U, R, S, M, Q, W, N, Z, reducer_, length, x.SiteSubset(), bytes, norm_bytes);
+    reduce(value, X, P, U, R, S, M, Q, W, N, Z, reducer_, length, partitions, bytes, norm_bytes);
   reduce.apply(*(blas::getStream()));
 
   blas::bytes += reduce.bytes();

@@ -257,6 +257,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
   return value;
 }
 
+//EXPERIMENTAL
+#include <exp_reduce_core.cuh>
+
 /**
    Generic reduce kernel with four loads and up to four stores.
    FIXME - this is hacky due to the lack of std::complex support in
