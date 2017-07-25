@@ -219,7 +219,7 @@ extern "C" {
   /*just allocates handle*/
   MsgHandle *comm_handle(void);
   /*async allreduce*/
-  void comm_allreduce_array_async(double* data, size_t size, MsgHandle *mh);
+  void comm_allreduce_array_async(double *recvfbuff, double* data, size_t size, MsgHandle *mh);
 
 #ifdef __cplusplus
 }

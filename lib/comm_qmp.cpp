@@ -340,7 +340,7 @@ MsgHandle *comm_handle(void)
   return mh;
 }
 
-void comm_allreduce_array_async(double* data, size_t size, MsgHandle *mh)
+void comm_allreduce_array_async(double *recvfbuff, double* data, size_t size, MsgHandle *mh)
 {
   errorQuda("\nNot implemented.\n"); 
 }

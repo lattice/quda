@@ -374,12 +374,9 @@ MsgHandle *comm_handle(void)
 }
 
 
-void comm_allreduce_array_async(double* data, size_t size, MsgHandle *mh)
+void comm_allreduce_array_async(double* recvbuf, double* data, size_t size, MsgHandle *mh)
 {
-  double *recvbuf = new double[size];
-  MPI_CHECK( MPI_Iallreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), &(mh->request));
-  memcpy(data, recvbuf, size*sizeof(double));
-  delete []recvbuf;
+  MPI_CHECK( MPI_Iallreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &(mh->request)));
 }
 
 void comm_allreduce_int(int* data)

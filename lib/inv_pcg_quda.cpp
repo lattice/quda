@@ -19,10 +19,12 @@
 ***/
 
 #define USE_WORKER
-//#define PIPECG_DEBUG 
 
 #ifndef USE_WORKER
+
+#define NONBLOCK_REDUCE
 #include <comm_quda.h>
+
 #endif
 
 namespace quda {
@@ -100,13 +102,21 @@ namespace quda {
   class GlobalMPIallreduce : public Worker {
      double *buffer;
      int     size;
+     int     elem;
+     bool    stop; 
     public:
-    GlobalMPIallreduce(double *buffer, int size) : buffer(buffer), size(size) { }
+    GlobalMPIallreduce(double *buffer, int size) : buffer(buffer), size(size), elem(0), stop(false) { }
 
     virtual ~GlobalMPIallreduce() { }
 
+    void reset() { elem = 0; stop = false; }
+
     void apply(const cudaStream_t &stream) {  //this has nothing to do with GPU streaming but should work as well, we may need non-blocked MPI allreduce, see cooments below
-      reduceDoubleArray((double*)&buffer, size);  
+      if(stop) return;
+      reduceDoubleArray(&buffer[elem], 1);
+      elem +=1;
+      if(elem == size) stop = true;  
+      return;
     }
   };
 
@@ -225,20 +235,20 @@ namespace quda {
     // now create the worker class for updating the gradient vectors
 #ifdef USE_WORKER
     GlobalMPIallreduce global_reduce((double*)&buffer, 3);
-    dslash::aux_worker = &global_reduce;
+    dslash::aux_worker = nullptr;//&global_reduce;
 #else
-    //MsgHandle* allreduceHandle = comm_handle();
+    MsgHandle* allreduceHandle = comm_handle();
+    double *recvbuff = new double[3];//mpi buffer for async global reduction
 #endif
 
     int j = 0;
 
     double heavy_quark_res = 0.0;
-
     //
     m = w;
     mat(n, m, tmp);
 
-    PrintStats( "PreconCG", j, (mNorm*mNorm), b2, heavy_quark_res);
+    PrintStats( "PreconCG", j, mNorm, b2, heavy_quark_res);
 
     while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
 
@@ -269,12 +279,15 @@ namespace quda {
         dslash::aux_worker = &global_reduce;
         mat(n, m, tmp);
         dslash::aux_worker = nullptr;
+        global_reduce.reset();
       }
 #else
       {
-        //comm_allreduce_array_async((double*) &buffer, 3, allreduceHandle);
+#ifdef NONBLOCK_REDUCE
+        comm_allreduce_array_async(recvbuff, (double*)&buffer, 3, allreduceHandle);
+#else
         reduceDoubleArray((double*)&buffer, 3);
-
+#endif
         if(K) {
           if( !precMatch )  rPre = w;
          
@@ -288,11 +301,12 @@ namespace quda {
         }
         //
         mat(n, m, tmp);
-
-        //comm_wait(allreduceHandle);
+#ifdef NONBLOCK_REDUCE//sync point
+        comm_wait(allreduceHandle);
+        memcpy(&buffer, recvbuff, sizeof(double3));
+#endif
       }
 #endif
-
       gammajm1 = gamma;
       gamma = buffer.x;
       delta = buffer.y;
@@ -302,12 +316,12 @@ namespace quda {
       mat(n, m, tmp);
 
       j += 1;
-      PrintStats( "PreconCG", j, mNorm, b2, heavy_quark_res);
+      PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
     }
-#ifdef USE_WORKER
-    dslash::aux_worker = nullptr;
-#else
-    //comm_free(allreduceHandle);
+
+#ifdef NONBLOCK_REDUCE
+    host_free(allreduceHandle);
+    delete [] recvbuff;
 #endif
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -332,14 +346,6 @@ namespace quda {
     matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-
-#ifdef PIPECG_DEBUG
-    delete tz;
-    delete tu;
-    delete ts;
-    delete tq;
-#endif
-
 
     return;
   }
