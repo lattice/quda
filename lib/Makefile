@@ -9,7 +9,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o		\
 	gauge_ape.o gauge_stout.o gauge_plaq.o laplace.o gauge_laplace.o\
 	inv_gcr_quda.o inv_mr_quda.o inv_bicgstabl_quda.o     		\
-	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\
+	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_pipepcg_quda.o inv_mre.o		\
 	interface_quda.o util_quda.o color_spinor_field.o		\
 	color_spinor_util.o cpu_color_spinor_field.o			\
 	color_spinor_wuppertal.o					\
