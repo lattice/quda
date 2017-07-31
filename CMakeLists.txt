@@ -194,25 +194,39 @@ endif()
 ## QUDA depends on Eigen
 ## this part makes sure we can download eigen if it is not found
 if (QUDA_DOWNLOAD_EIGEN)
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2)
+  set(EIGEN_SHA dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6)
+  if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION} )
+    message(STATUS "Checking for Eigen tarball and downloading if necessary.")
+  endif()
+  FILE(DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${EIGEN_SHA} STATUS EIGEN_DOWNLOADED)
+  list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
+  list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
+  if(${EIGEN_DOWNLOADED_CODE})
+    message(SEND_ERROR "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again.")
+  endif()
+
   include(ExternalProject)
   ExternalProject_Add(Eigen
-    URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2
-    URL_HASH SHA256=dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/eigen/
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2
+    URL_HASH SHA256=${EIGEN_SHA}
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
     CONFIGURE_COMMAND ""
     BUILD_COMMAND COMMAND ""
     INSTALL_COMMAND ""
   )
   ExternalProject_Get_Property(Eigen source_dir)
-  set(EIGEN_INCLUDE_DIRS ${source_dir}/EIGEN)
+  set(EIGEN_INCLUDE_DIRS ${source_dir})
 else()
+  # fall back to using find_package
   find_package(Eigen QUIET)
   if(NOT EIGEN_FOUND)
     message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
   endif()
 endif()
 include_directories(${EIGEN_INCLUDE_DIRS})
-
+## Now we hopefully found some way to get eigen to work
 
 # We need threads
 find_package(Threads REQUIRED)
@@ -507,6 +521,10 @@ STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
 
+# this allows simplified running of clang-tidy 
+if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
+   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version
