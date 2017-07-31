@@ -60,10 +60,6 @@ namespace quda {
       errorQuda("Extended Steepest Descent is multi-gpu only");
 #endif
       break;
-    case QUDA_PCG_INVERTER:
-      report("PCG");
-      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
-      break;
     case QUDA_MPCG_INVERTER:
       report("MPCG");
       solver = new MPCG(mat, param, profile);
@@ -102,6 +98,10 @@ namespace quda {
     case QUDA_CGNR_INVERTER:
       report("CGNR");
       solver = new CGNR(mat, matSloppy, param, profile);
+      break;
+    case QUDA_PIPEPCG_INVERTER:
+      report("PipePCG");
+      solver = new PipePCG(mat, matSloppy, matPrecon, param, profile);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);

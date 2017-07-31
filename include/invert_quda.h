@@ -466,8 +466,7 @@ namespace quda {
   };
 
 
-
-  class PreconCG : public Solver {
+  class PipePCG : public Solver {
     private:
       const DiracMatrix &mat;
       const DiracMatrix &matSloppy;
@@ -492,19 +491,15 @@ namespace quda {
       ColorSpinorField *p_pre;    //! preconditioner result
 
     public:
-      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      PipePCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
       /**
         @param K Preconditioner
       */
-      PreconCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      PipePCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
-      virtual ~PreconCG();
+      virtual ~PipePCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
-      //optimization methods:
-      void ComputeBeta(double *beta, int begin, int size);
-      void UpdateP(double *beta, int begin, int j, int size);
-      void orthoDir(int mk, int j, int pipeline); 
   };
 
 
