@@ -18,7 +18,7 @@
 * Source P. Ghysels and W. Vanroose "Hiding global synchronization latency in the preconditioned Conjugate Gradient algorithm" 
 ***/
 
-#define USE_WORKER
+//#define USE_WORKER
 
 #ifndef USE_WORKER
 
@@ -189,8 +189,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    const bool precMatch           = (param.precision_precondition != param.precision) ? false : true;
-
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     double alpha, beta;
@@ -201,18 +199,14 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if(K) {
-      if( !precMatch )  rPre = r;
-      else w = r;
- 
+      rPre = r;
+
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
       commGlobalReductionSet(true);
 
-      if( !precMatch ) u = pPre;
-      else {
-       u = m; 
-       blas::zero(m);
-      }
+      u = pPre;
+      blas::zero(m);
     } else {
       printfQuda("\nNo preconditioning...\n");
       u = r;
@@ -245,7 +239,19 @@ namespace quda {
 
     double heavy_quark_res = 0.0;
     //
-    m = w;
+    //m = w;
+    if(K) {
+      rPre = w; 
+
+      commGlobalReductionSet(false);
+      (*K)(pPre, rPre);
+      commGlobalReductionSet(true);
+
+      m = pPre;
+    } else {
+      m = w;
+    }
+
     mat(n, m, tmp);
 
     PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
@@ -267,13 +273,13 @@ namespace quda {
         //in this approach all reduce is overlapped with matvec only.
         //more robust way just to call non-blocking allreduce and then synchronize 
         if(K) {
-          if( !precMatch )  rPre = w;
-         
+          rPre = w;
+
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
 
-          if( !precMatch ) u = pPre;
+          m = pPre;
         } else {
           m = w;
         }        
@@ -281,6 +287,7 @@ namespace quda {
         dslash::aux_worker = &global_reduce;
         mat(n, m, tmp);
         dslash::aux_worker = nullptr;
+
         global_reduce.reset();
       }
 #else
@@ -291,13 +298,13 @@ namespace quda {
         reduceDoubleArray((double*)&buffer, 3);
 #endif
         if(K) {
-          if( !precMatch )  rPre = w;
+          rPre = w;
          
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
 
-          if( !precMatch ) u = pPre;
+          m = pPre;
         } else {
           m = w;
         }
@@ -308,14 +315,11 @@ namespace quda {
         memcpy(&buffer, recvbuff, sizeof(double3));
 #endif
       }
-#endif
+#endif //end of USE_WORKER
       gammajm1 = gamma;
       gamma = buffer.x;
       delta = buffer.y;
       mNorm = buffer.z;
-      //
-      m = w;
-      mat(n, m, tmp);
 
       j += 1;
       PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
