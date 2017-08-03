@@ -112,14 +112,14 @@ dw_dslash5inv_core.h dw_dslash5inv_dagger_core.h dw_dslash_core.h	\
 dw_dslash_dagger_core.h dw_fused_exterior_dslash4_core.h		\
 dw_fused_exterior_dslash4_dagger_core.h					\
 dw_fused_exterior_dslash_core.h dw_fused_exterior_dslash_dagger_core.h	\
-gamma5.h staggered_dslash_core.h					\
+staggered_dslash_core.h							\
 staggered_fused_exterior_dslash_core.h tmc_core.h			\
 tmc_dslash_dagger_fermi_core.h tmc_dslash_dagger_gt200_core.h		\
 tmc_dslash_fermi_core.h tmc_dslash_gt200_core.h				\
 tmc_fused_exterior_dslash_dagger_fermi_core.h				\
 tmc_fused_exterior_dslash_dagger_gt200_core.h				\
 tmc_fused_exterior_dslash_fermi_core.h					\
-tmc_fused_exterior_dslash_gt200_core.h tmc_gamma_core.h tm_core.h	\
+tmc_fused_exterior_dslash_gt200_core.h 					\
 tm_dslash_dagger_fermi_core.h tm_dslash_dagger_gt200_core.h		\
 tm_dslash_fermi_core.h tm_dslash_gt200_core.h				\
 tm_fused_exterior_dslash_dagger_fermi_core.h				\
