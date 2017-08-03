@@ -8,7 +8,7 @@
 namespace quda {
 
   cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
-    GaugeField(param), gauge(0), even(0), odd(0), backed_up(false)
+    GaugeField(param), gauge(0), even(0), odd(0)
   {
     if ((order == QUDA_QDP_GAUGE_ORDER || order == QUDA_QDPJIT_GAUGE_ORDER) &&
         create != QUDA_REFERENCE_FIELD_CREATE) {

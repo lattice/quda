@@ -237,15 +237,6 @@ namespace quda {
      */
     virtual void copy(const GaugeField &src) = 0;
 
-    /**
-       @brief Backs up the cpuGaugeField
-    */
-    virtual void backup() const = 0;
-
-    /**
-       @brief Restores the cpuGaugeField
-    */
-    virtual void restore() = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -318,8 +309,12 @@ namespace quda {
     const cudaTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
 #endif
 
-    mutable char *backup_h;
-    mutable bool backed_up;
+    void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
+
+    /**
+       Set all field elements to zero
+    */
+    void zero();
 
     /**
        @brief Backs up the cudaGaugeField to CPU memory
@@ -331,12 +326,6 @@ namespace quda {
     */
     void restore();
 
-    void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
-
-    /**
-       Set all field elements to zero
-    */
-    void zero();
   };
 
   class cpuGaugeField : public GaugeField {
@@ -393,11 +382,15 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
-    mutable char *backup_h;
-    mutable bool backed_up;
+    void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
-     @brief Backs up the cpuGaugeField
+       Set all field elements to zero
+    */
+    void zero();
+
+    /**
+       @brief Backs up the cpuGaugeField
     */
     void backup() const;
 
@@ -406,12 +399,6 @@ namespace quda {
     */
     void restore();
 
-    void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
-
-    /**
-       Set all field elements to zero
-    */
-    void zero();
   };
 
   /**

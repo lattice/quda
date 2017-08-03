@@ -212,6 +212,33 @@ namespace quda {
     }
   }
 
+  void cpuColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Field already backed up");
+
+    backup_h = new char[bytes];
+    memcpy(backup_h, v, bytes);
+
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      memcpy(backup_norm_h, norm, norm_bytes);
+    }
+
+    backed_up = true;
+  }
+
+  void cpuColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+
+    memcpy(v, backup_h, bytes);
+    delete []backup_h;
+    if (norm_bytes) {
+      memcpy(norm, backup_norm_h, norm_bytes);
+      delete []backup_norm_h;
+    }
+
+    backed_up = false;
+  }
+
   void cpuColorSpinorField::zero() {
     if (fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) memset(v, '\0', bytes);
     else for (int i=0; i<x[nDim-1]; i++) memset(((void**)v)[i], '\0', bytes/x[nDim-1]);
