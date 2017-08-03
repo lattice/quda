@@ -367,8 +367,8 @@ namespace quda {
 	typedef typename TexVectorType<RegType,N>::type TexVector;
 	cudaTextureObject_t tex;
 	cudaTextureObject_t normTex;
-	const int tex_offset;
 #endif
+	const int tex_offset;
 	const int volumeCB;
 	const int stride;
 

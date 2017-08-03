@@ -127,11 +127,11 @@ namespace quda {
      @param[in] kappa kappa parameter
      @param[in] mu mu parameter
      @param[in] epsilon epsilon parameter
-       if (!inverse) apply (Clover + i*a*gamma_5) to the input spinor
-       else apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
      @param[in] Field parity (if color-spinor field is single parity)
      @param[in] dagger Whether we are applying the dagger or not
      @param[in] twist The type of kernel we are doing
+       if (twist == QUDA_TWIST_GAMMA5_DIRECT) apply (Clover + i*a*gamma_5) to the input spinor
+       else if (twist == QUDA_TWIST_GAMMA5_INVERSE) apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
   */
   void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist);
