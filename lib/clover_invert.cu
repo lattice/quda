@@ -30,7 +30,7 @@ namespace quda {
      Here we use an inplace inversion which hopefully reduces register pressure
    */
   template <int blockSize, typename Float, typename Clover, bool computeTrLog, bool twist>
-  __device__ __host__ inline double cloverInvertCompute(CloverInvertArg<Clover> arg, int x, int parity) {
+  __device__ __host__ inline double cloverInvertCompute(CloverInvertArg<Clover> &arg, int x, int parity) {
 
     double trlogA = 0.0;
 
