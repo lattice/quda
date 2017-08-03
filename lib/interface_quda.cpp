@@ -4608,7 +4608,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
       profileCloverForce.TPSTOP(QUDA_PROFILE_H2D);
 
       profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-      gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Even()), static_cast<cudaColorSpinorField*>(&x.Even()));
+      gamma5(x.Even(), x.Even());
     } else {
       x.Even() = *(solutionResident[i]);
     }
@@ -4619,10 +4619,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY);
     dirac->Dagger(QUDA_DAG_NO);
 
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Even()), static_cast<cudaColorSpinorField*>(&x.Even()));
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Odd()), static_cast<cudaColorSpinorField*>(&x.Odd()));
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Even()), static_cast<cudaColorSpinorField*>(&p.Even()));
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Odd()), static_cast<cudaColorSpinorField*>(&p.Odd()));
+    gamma5(x, x);
+    gamma5(p, p);
 
     force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
   }

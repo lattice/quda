@@ -78,15 +78,7 @@ namespace quda {
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover);     // regular clover term
-      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		 &static_cast<const cudaColorSpinorField&>(in), parity);
-    } else {
-      errorQuda("Not implemented");
-    }
-
+    ApplyClover(out, in, clover, false, parity);
     flops += 504ll*in.Volume();
   }
 
@@ -184,16 +176,7 @@ namespace quda {
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      // needs to be cloverinv
-      FullClover cs(clover, true);
-      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		 &static_cast<const cudaColorSpinorField&>(in), parity);
-    } else {
-      errorQuda("Not supported");
-    }
-
+    ApplyClover(out, in, clover, true, parity);
     flops += 504ll*in.Volume();
   }
 

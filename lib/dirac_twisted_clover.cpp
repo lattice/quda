@@ -17,14 +17,12 @@ namespace quda {
     : DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), clover(*(param.clover))
   {
     twistedclover::initConstants(*param.gauge,profile);
-    dslash_aux::initConstants(*param.gauge,profile);
   }
 
   DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac) 
     : DiracWilson(dirac), mu(dirac.mu), epsilon(dirac.epsilon), clover(dirac.clover)
   {
     twistedclover::initConstants(*dirac.gauge,profile);
-    dslash_aux::initConstants(*dirac.gauge,profile);
   }
 
   DiracTwistedClover::~DiracTwistedClover() { }
@@ -49,34 +47,13 @@ namespace quda {
   }
 
   // Protected method for applying twist
-
   void DiracTwistedClover::twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType, const int parity) const
   {
     checkParitySpinor(out, in);
+    ApplyTwistClover(out, in, clover, kappa, mu, 0.0, parity, dagger, twistType);
 
-    if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
-      errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
-
-    if (in.TwistFlavor() == QUDA_TWIST_SINGLET)
-      {
-
-	FullClover *cs = new FullClover(clover, false);
-	FullClover *cI = new FullClover(clover, true);
-
-	twistCloverGamma5Cuda(&static_cast<cudaColorSpinorField&>(out),
-			      &static_cast<const cudaColorSpinorField&>(in),
-			      dagger, kappa, mu, 0.0, twistType, cs, cI, parity);
-
-	if (twistType == QUDA_TWIST_GAMMA5_INVERSE)
-	  flops += 1056ll*in.Volume();
-	else
-	  flops += 552ll*in.Volume();
-
-	delete cs;
-	delete cI;
-      }
-    else
-      errorQuda("DiracTwistedClover::twistedCloverApply method for flavor doublet is not implemented..\n");
+    if (twistType == QUDA_TWIST_GAMMA5_INVERSE) flops += 1056ll*in.Volume();
+    else flops += 552ll*in.Volume();
   }
 
 
