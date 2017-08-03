@@ -951,7 +951,7 @@ namespace quda {
       : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
 	offset(u.Bytes()/(2*sizeof(Float))), ghostExchange(u.GhostExchange()),
 	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
-	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
+	phaseOffset(u.PhaseOffset()), backup_h(nullptr), bytes(u.Bytes())
       {
 	if (geometry == QUDA_COARSE_GEOMETRY)
 	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
@@ -970,7 +970,7 @@ namespace quda {
       : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
 	ghostExchange(order.ghostExchange),
         volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry),
-	phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
+	phaseOffset(order.phaseOffset), backup_h(nullptr), bytes(order.bytes)
       {
 	for (int i=0; i<4; i++) {
 	  X[i] = order.X[i];
@@ -1202,7 +1202,7 @@ namespace quda {
 	}
 
       /**
-	 used to backup the field to the host when tuning
+	 @brief Backup the field to the host when tuning
       */
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
@@ -1212,12 +1212,12 @@ namespace quda {
       }
 
       /**
-	 restore the field from the host after tuning
+	 @brief Restore the field from the host after tuning
       */
       void load() {
 	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
 	host_free(backup_h);
-	backup_h = 0;
+	backup_h = nullptr;
 	checkCudaError();
       }
 
