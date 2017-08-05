@@ -606,12 +606,12 @@ namespace quda {
   // else apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
   template <bool inverse, typename Float, int nSpin, int nColor, typename Arg>
   __device__ __host__ inline void twistCloverApply(Arg &arg, int x_cb, int parity) {
-    using namespace linalg; // for cholesky decomposition
-
+    using namespace linalg; // for Cholesky
+    constexpr int N = nColor*nSpin/2;
     typedef typename mapper<Float>::type RegType;
     typedef ColorSpinor<RegType,nColor,nSpin> Spinor;
     typedef ColorSpinor<RegType,nColor,nSpin/2> HalfSpinor;
-    typedef HMatrix<RegType,nColor*nSpin/2> Mat;
+    typedef HMatrix<RegType,N> Mat;
     int spinor_parity = arg.nParity == 2 ? parity : 0;
     Spinor in = arg.in(x_cb, spinor_parity);
     Spinor out;
@@ -632,8 +632,8 @@ namespace quda {
 	if (arg.dynamic_clover) {
 	  Mat A2 = A.square();
 	  A2 += arg.a*arg.a*static_cast<RegType>(0.25);
-	  Mat L = cholesky(A2);
-	  out_chi = static_cast<RegType>(0.25)*backward(L, forward(L, out_chi));
+	  Cholesky<HMatrix,RegType,N> cholesky(A2);
+	  out_chi = static_cast<RegType>(0.25)*cholesky.backward(cholesky.forward(out_chi));
 	} else {
 	  Mat Ainv = arg.cloverInv(x_cb, parity, chirality);
 	  out_chi = static_cast<RegType>(2.0)*(Ainv*out_chi);

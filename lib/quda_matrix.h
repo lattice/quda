@@ -316,7 +316,7 @@ namespace quda {
 	return result;
       }
 
-      __device__ __host__ void print() {
+      __device__ __host__ void print() const {
 	for (int i=0; i<N; i++) {
 	  printf("i=%d ", i);
 	  for (int j=0; j<N; j++) {
@@ -432,10 +432,10 @@ namespace quda {
   /**
      @brief Generic implementation of matrix multiplication
   */
-  template<class T, int N>
-    __device__ __host__ inline Matrix<T,N> operator*(const Matrix<T,N> &a, const Matrix<T,N> &b)
+  template< template<typename,int> class Mat, class T, int N>
+    __device__ __host__ inline Mat<T,N> operator*(const Mat<T,N> &a, const Mat<T,N> &b)
     {
-      Matrix<T,N> result;
+      Mat<T,N> result;
       for (int i=0; i<N; i++) {
 	for (int k=0; k<N; k++) {
 	  result(i,k) = a(i,0) * b(0,k);
@@ -448,68 +448,22 @@ namespace quda {
     }
 
   /**
-     @brief Specialization of N=3 matrix multiplication
-  */
-  template<class T>  __device__ __host__ inline
-    Matrix<T,3> operator*(const Matrix<T,3> &a, const Matrix<T,3> &b)
-    {
-      Matrix<T,3> result;
-#pragma unroll
-      for (int i=0; i<3; i++) {
-#pragma unroll
-	for (int k=0; k<3; k++) {
-	  result(i,k)  = a(i,0) * b(0,k);
-	  result(i,k) += a(i,1) * b(1,k);
-	  result(i,k) += a(i,2) * b(2,k);
-	}
-      }
-      return result;
-    }
-
-  /**
-     @brief FP32 specialization of N=3 matrix multiplication that will issue optimal fma instructions
+     @brief Specialization of complex matrix multiplication that will issue optimal fma instructions
    */
-  template<>  __device__ __host__ inline
-    Matrix<complex<float>,3> operator*(const Matrix<complex<float>,3> &a, const Matrix<complex<float>,3> &b)
+  template< template<typename> class complex, typename T, int N>
+    __device__ __host__ inline Matrix<complex<T>,N> operator*(const Matrix<complex<T>,N> &a, const Matrix<complex<T>,N> &b)
     {
-      Matrix<complex<float>,3> result;
+      Matrix<complex<T>,N> result;
 #pragma unroll
-      for (int i=0; i<3; i++) {
+      for (int i=0; i<N; i++) {
 #pragma unroll
-	for (int k=0; k<3; k++) {
+	for (int k=0; k<N; k++) {
 	  result(i,k).x  = a(i,0).real() * b(0,k).real();
 	  result(i,k).x -= a(i,0).imag() * b(0,k).imag();
 	  result(i,k).y  = a(i,0).real() * b(0,k).imag();
 	  result(i,k).y += a(i,0).imag() * b(0,k).real();
 #pragma unroll
-	  for (int j=1; j<3; j++) {
-	    result(i,k).x += a(i,j).real() * b(j,k).real();
-	    result(i,k).x -= a(i,j).imag() * b(j,k).imag();
-	    result(i,k).y += a(i,j).real() * b(j,k).imag();
-	    result(i,k).y += a(i,j).imag() * b(j,k).real();
-	  }
-	}
-      }
-      return result;
-    }
-
-  /**
-     @brief FP64 specialization of N=3 matrix multiplication that will issue optimal fma instructions
-   */
-  template<> __device__ __host__ inline
-    Matrix<complex<double>,3> operator*(const Matrix<complex<double>,3> &a, const Matrix<complex<double>,3> &b)
-    {
-      Matrix<complex<double>,3> result;
-#pragma unroll
-      for (int i=0; i<3; i++) {
-#pragma unroll
-	for (int k=0; k<3; k++) {
-	  result(i,k).x  = a(i,0).real() * b(0,k).real();
-	  result(i,k).x -= a(i,0).imag() * b(0,k).imag();
-	  result(i,k).y  = a(i,0).real() * b(0,k).imag();
-	  result(i,k).y += a(i,0).imag() * b(0,k).real();
-#pragma unroll
-	  for (int j=1; j<3; j++) {
+	  for (int j=1; j<N; j++) {
 	    result(i,k).x += a(i,j).real() * b(j,k).real();
 	    result(i,k).x -= a(i,j).imag() * b(j,k).imag();
 	    result(i,k).y += a(i,j).real() * b(j,k).imag();
@@ -541,22 +495,6 @@ namespace quda {
 	  for (int j=1; j<N; j++) {
 	    result(i,k) += a(i,j) * b(j,k);
 	  }
-	}
-      }
-      return result;
-    }
-
-
-  template<class T, class U>
-    __device__ __host__ inline
-    Matrix<typename PromoteTypeId<T,U>::Type,3> operator*(const Matrix<T,3> &a, const Matrix<U,3> &b)
-    {
-      Matrix<typename PromoteTypeId<T,U>::Type,3> result;
-#pragma unroll
-      for (int i=0; i<3; i++) {
-#pragma unroll
-	for (int k=0; k<3; k++) {
-	  result(i,k) = a(i,0) * b(0,k) + a(i,1) * b(1,k) + a(i,2) * b(2,k);
 	}
       }
       return result;

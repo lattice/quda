@@ -70,6 +70,37 @@ namespace quda {
 
       template<typename S>
       __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
+
+      /**
+	 @brief 2-d accessor functor
+	 @param[in] s Spin index
+	 @param[in] c Color index
+	 @return Complex number at this spin and color index
+      */
+      __device__ __host__ inline complex<Float>& operator()(int s, int c) { return data[s*Nc + c]; }
+
+      /**
+	 @brief 2-d accessor functor
+	 @param[in] s Spin index
+	 @param[in] c Color index
+	 @return Complex number at this spin and color index
+      */
+      __device__ __host__ inline const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
+
+      /**
+	 @brief 1-d accessor functor
+	 @param[in[ idx Index
+	 @return Complex number at this index
+      */
+      __device__ __host__ inline complex<Float>& operator()(int idx) { return data[idx]; }
+
+      /**
+	 @brief 1-d accessor functor
+	 @param[in[ idx Index
+	 @return Complex number at this index
+      */
+      __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
+
     };
 
   /**
