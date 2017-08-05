@@ -14,27 +14,15 @@ namespace quda {
   struct CloverArg {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4]; 
-#endif
-    double cloverCoeff;
+    Float cloverCoeff;
 
     Clover clover;
     Fmunu f;
     
     CloverArg(Clover &clover, Fmunu& f, const GaugeField &meta, double cloverCoeff)
-      : threads(meta.Volume()), 
-        cloverCoeff(cloverCoeff),
-        clover(clover),
-	f(f)
+      : threads(meta.VolumeCB()), cloverCoeff(cloverCoeff), clover(clover), f(f)
     { 
       for(int dir=0; dir<4; ++dir) X[dir] = meta.X()[dir];
-      
-#ifdef MULTI_GPU
-      for(int dir=0; dir<4; ++dir){
-	border[dir] = 2;
-      }
-#endif
     }
   };
 
@@ -63,104 +51,92 @@ namespace quda {
        |  -c*I*(F[2]+F[3]) + c*(F[1]-F[4]),     1 + c*I*(F[0] + F[5])     |
        \                                                                  /
   */
-
   // Core routine for constructing clover term from field strength
-  template<typename Float, typename Clover, typename Fmunu>
-    __device__ __host__
-  void cloverComputeCore(CloverArg<Float,Clover,Fmunu>& arg, int idx){
+  template<typename Float, typename Arg>
+  __device__ __host__ void cloverComputeCore(Arg &arg, int x_cb, int parity){
 
-      int parity = 0;  
-      if(idx >= arg.threads/2){
-        parity = 1;
-        idx -= arg.threads/2;
+    constexpr int nColor = 3;
+    constexpr int nSpin = 4;
+    constexpr int N = nColor*nSpin/2;
+    typedef complex<Float> Complex;
+    typedef Matrix<Complex,nColor> Link;
+
+    // Load the field-strength tensor from global memory
+    Link F[6];
+#pragma unroll
+    for (int i=0; i<6; ++i) F[i] = arg.f(i, x_cb, parity);
+
+    Complex I(0.0,1.0);
+    Complex coeff(0.0,arg.cloverCoeff);
+    Link block1[2], block2[2];
+    block1[0] =  coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops
+    block1[1] =  coeff*(F[0]+F[5]); // 72 floating-point ops
+    block2[0] =  arg.cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
+    block2[1] =  arg.cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
+
+    // This uses lots of unnecessary memory
+#pragma unroll
+    for (int ch=0; ch<2; ++ch) {
+      HMatrix<Float,N> A;
+      // c = 0(1) => positive(negative) chiral block
+      // Compute real diagonal elements
+#pragma unroll
+      for(int i=0; i<N/2; ++i){
+	A(i+0,i+0) = 1.0 - block1[ch](i,i).real();
+	A(i+3,i+3) = 1.0 + block1[ch](i,i).real();
       }
-      typedef complex<Float> Complex;
 
-      // Load the field-strength tensor from global memory
-      Matrix<Complex,3> F[6];
-      for(int i=0; i<6; ++i){
-	arg.f.load((Float*)(F[i].data), idx, i, parity);
-      }
+      // Compute off diagonal components
+      // First row
+      A(1,0) = -block1[ch](1,0);
+      // Second row
+      A(2,0) = -block1[ch](2,0);
+      A(2,1) = -block1[ch](2,1);
+      // Third row
+      A(3,0) =  block2[ch](0,0);
+      A(3,1) =  block2[ch](0,1);
+      A(3,2) =  block2[ch](0,2);
+      // Fourth row
+      A(4,0) =  block2[ch](1,0);
+      A(4,1) =  block2[ch](1,1);
+      A(4,2) =  block2[ch](1,2);
+      A(4,3) =  block1[ch](1,0);
+      // Fifth row
+      A(5,0) =  block2[ch](2,0);
+      A(5,1) =  block2[ch](2,1);
+      A(5,2) =  block2[ch](2,2);
+      A(5,3) =  block1[ch](2,0);
+      A(5,4) =  block1[ch](2,1);
+      A *= static_cast<Float>(0.5);
 
-      Complex I; I.x = 0; I.y = 1.0;
-      Complex coeff; coeff.x = 0; coeff.y = arg.cloverCoeff;
-      Matrix<Complex,3> block1[2];
-      Matrix<Complex,3> block2[2];
-      block1[0] =  coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops 
-      block1[1] =  coeff*(F[0]+F[5]); // 72 floating-point ops 
-      block2[0] =  arg.cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
-      block2[1] =  arg.cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
+      arg.clover(x_cb, parity, ch) = A;
+    } // ch
+    // 84 floating-point ops
 
-
-      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-      Float diag[6];
-      Complex triangle[15];
-
-      // This uses lots of unnecessary memory
-      for(int ch=0; ch<2; ++ch){ 
-        // c = 0(1) => positive(negative) chiral block
-        // Compute real diagonal elements
-        for(int i=0; i<3; ++i){
-          diag[i]   = 1.0 - block1[ch](i,i).x;
-          diag[i+3] = 1.0 + block1[ch](i,i).x;
-        }
-
-        // Compute off diagonal components
-        // First row
-        triangle[0]  = - block1[ch](1,0);
-        // Second row
-        triangle[1]  = - block1[ch](2,0);
-        triangle[2]  = - block1[ch](2,1);
-        // Third row
-        triangle[3]  =   block2[ch](0,0);
-        triangle[4]  =   block2[ch](0,1);
-        triangle[5]  =   block2[ch](0,2);
-        // Fourth row 
-        triangle[6]  =   block2[ch](1,0);
-        triangle[7]  =   block2[ch](1,1);
-        triangle[8]  =   block2[ch](1,2);
-        triangle[9]  =   block1[ch](1,0);
-        // Fifth row
-        triangle[10] =   block2[ch](2,0);
-        triangle[11] =   block2[ch](2,1);
-        triangle[12] =   block2[ch](2,2);
-        triangle[13] =   block1[ch](2,0);
-        triangle[14] =   block1[ch](2,1);
-
-
-	Float A[36];
-        for(int i=0; i<6; ++i) A[i] = static_cast<Float>(0.5)*diag[i];
-
-        for(int i=0; i<15; ++i){
-          A[6+2*i]     = 0.5*triangle[idtab[i]].x;
-          A[6+2*i + 1] = 0.5*triangle[idtab[i]].y;
-        } 
-	arg.clover.save(A, idx, parity, ch);
-      } // ch
-      // 84 floating-point ops
-
-      return;
-    }
+    return;
+  }
 
 
   template<typename Float, typename Clover, typename Fmunu>
-    __global__
-  void cloverComputeKernel(CloverArg<Float,Clover,Fmunu> arg){
-      int idx = threadIdx.x + blockIdx.x*blockDim.x;
-      if(idx >= arg.threads) return;
-      cloverComputeCore(arg, idx);
-    }
+  __global__ void cloverComputeKernel(CloverArg<Float,Clover,Fmunu> arg){
+    int x_cb = threadIdx.x + blockIdx.x*blockDim.x;
+    int parity = threadIdx.y + blockIdx.y*blockDim.y;
+    if (x_cb >= arg.threads) return;
+    cloverComputeCore<Float>(arg, x_cb, parity);
+  }
 
   template<typename Float, typename Clover, typename Fmunu>
   void cloverComputeCPU(CloverArg<Float,Clover,Fmunu> arg){
-      for(int idx=0; idx<arg.threads; ++idx){
-        cloverComputeCore(arg, idx);
+    for (int parity = 0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.threads; x_cb++){
+	cloverComputeCore<Float>(arg, x_cb, parity);
       }
     }
+  }
 
 
   template<typename Float, typename Clover, typename Fmunu>
-    class CloverCompute : Tunable {
+  class CloverCompute : TunableVectorY {
     CloverArg<Float,Clover,Fmunu> arg;
       const GaugeField &meta;
       const QudaFieldLocation location;
@@ -175,7 +151,7 @@ namespace quda {
 
       public:
       CloverCompute(CloverArg<Float,Clover,Fmunu> &arg, const GaugeField &meta, QudaFieldLocation location) 
-        : arg(arg), meta(meta), location(location) {
+        : TunableVectorY(2), arg(arg), meta(meta), location(location) {
 	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
       }
 
@@ -194,8 +170,8 @@ namespace quda {
 	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
-      long long flops() const { return 480*arg.threads; } 
-      long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } 
+      long long flops() const { return 2*arg.threads*480ll; }
+      long long bytes() const { return 2*arg.threads*(6*arg.f.Bytes() + arg.clover.Bytes()); }
     };
 
 
