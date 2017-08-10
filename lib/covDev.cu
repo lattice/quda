@@ -596,7 +596,7 @@ namespace quda
     DslashCuda *covdev = 0;
     size_t regSize = sizeof(float);
 
-        if (Location(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
+        if (checkLocation(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
           errorQuda("Error: CPU fields not supported for covariant derivative");
 
         if(in->Precision() == QUDA_HALF_PRECISION)

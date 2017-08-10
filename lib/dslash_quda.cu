@@ -52,10 +52,6 @@
 
 namespace quda {
 
-  namespace dslash_aux {
-    //#include <dslash_constants.h>
-  }
-
   // these should not be namespaced!!
   // determines whether the temporal ghost zones are packed with a gather kernel,
   // as opposed to multiple calls to cudaMemcpy()
