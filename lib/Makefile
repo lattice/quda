@@ -38,7 +38,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_hs.o copy_color_spinor_hh.o			\
 	extract_gauge_ghost_extended.o copy_gauge_double.o		\
 	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
-	copy_clover.o staggered_oprod.o	staggered_oprod_new.o		\
+	copy_clover.o staggered_oprod.o					\
 	clover_trace_quda.o						\
 	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\

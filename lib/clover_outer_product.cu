@@ -167,7 +167,7 @@ namespace quda {
 
 
   // Get the  coordinates for the exterior kernels
-  __device__ void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
+  __device__ static void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
   {
     int Xh[2] = {X[0]/2, X[1]/2};
     switch(dir){
