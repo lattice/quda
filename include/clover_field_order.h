@@ -7,6 +7,12 @@
  *
  */
 
+// trove requires the warp shuffle instructions introduced with Fermi
+#if __COMPUTE_CAPABILITY__ >= 300
+#include <trove/ptr.h>
+#else
+#define DISABLE_TROVE
+#endif
 #include <register_traits.h>
 #include <clover_field.h>
 #include <complex_quda.h>
@@ -478,6 +484,7 @@ namespace quda {
 	   @param[in] chirality Chiral block index
 	 */
 	__device__ __host__ inline void save(const RegType v[block], int x, int parity, int chirality) {
+
 	  // find the norm of each chiral block
 	  RegType scale = 0.0;
 	  if (sizeof(Float)==sizeof(short)) {
@@ -562,6 +569,13 @@ namespace quda {
 	}
       };
 
+    /**
+       @brief This is just a dummy structure we use for trove to define the
+       required structure size
+       @tparam real Real number type
+       @tparam length Number of elements in the structure
+    */
+    template <typename real, int length> struct S { real v[length]; };
 
     /**
        QDP ordering for clover fields
@@ -569,28 +583,45 @@ namespace quda {
     template <typename Float, int length>
       struct QDPOrder {
 	typedef typename mapper<Float>::type RegType;
-	Float *clover[2];
+	Float *clover;
 	const int volumeCB;
 	const int stride;
+	const int offset;
 
 	const bool twisted;
 	const Float mu2;
 
       QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
-      : volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
-	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
+      : volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
+	twisted(clover.Twisted()), mu2(clover.Mu2()) {
+	this->clover = clover_ ? clover_ : (Float*)(clover.V(inverse));
       }
 
 	bool  Twisted()	const	{return twisted;}
 	Float Mu2()	const	{return mu2;}
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
-	  for (int i=0; i<length; i++) v[i] = 0.5*clover[parity][x*length+i]; // factor of 0.5 comes from basis change
+	  // factor of 0.5 comes from basis change
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> clover_((structure*)clover);
+	  structure v_ = clover_[parity*volumeCB + x];
+	  for (int i=0; i<length; i++) v[i] = 0.5*(RegType)v_.v[i];
+#else
+	  for (int i=0; i<length; i++) v[i] = 0.5*clover[parity*offset + x*length+i];
+#endif
 	}
   
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
-	  for (int i=0; i<length; i++) clover[parity][x*length+i] = 2.0*v[i];
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> clover_((structure*)clover);
+	  structure v_;
+	  for (int i=0; i<length; i++) v_.v[i] = 2.0*(Float)v[i];
+	  clover_[parity*volumeCB + x] = v_;
+#else
+	  for (int i=0; i<length; i++) clover[parity*offset + x*length+i] = 2.0*v[i];
+#endif
 	}
 
 	size_t Bytes() const { return length*sizeof(Float); }
@@ -627,7 +658,7 @@ namespace quda {
 	      v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 	    }
 
-	  // the off diagonal elements
+	    // the off diagonal elements
 	    for (int i=0; i<30; i++) {
 	      int z = i%2;
 	      int off = i/2;
