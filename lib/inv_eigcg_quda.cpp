@@ -325,8 +325,10 @@ namespace quda {
 
     if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
       ComputeRitz<libtype::magma_lib>(args);
-    } else {
+    } else if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
       ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
+    } else {
+      errorQuda( "Library type %d is currently not supported.\n",param.extlib_type );
     }
 
     //Restart V:

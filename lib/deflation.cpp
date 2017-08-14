@@ -23,8 +23,8 @@ namespace quda {
   using DynamicStride = Stride<Dynamic, Dynamic>;
 #endif
 
-  static auto allocator = [] (size_t bytes ) { return static_cast<Complex*>(mapped_malloc(bytes)); };
-  static auto deleter   = [] (Complex *hptr) { host_free(hptr); };
+  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<Complex*>(pool_pinned_malloc(bytes)); };
+  static auto pinned_deleter   = [] (Complex *hptr) { pool_pinned_free(hptr); };
 
   //static bool debug = false;
 
@@ -105,26 +105,24 @@ namespace quda {
     const int nevs_to_print = param.cur_dim;
     if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n"); 
 
-    std::unique_ptr<Complex[] > projm(new Complex[param.ld*param.cur_dim]);
+    std::unique_ptr<Complex, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(Complex)), pinned_deleter);
 
     if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
 #ifdef MAGMA_LIB
       memcpy(projm.get(), param.matProj, param.ld*param.cur_dim*sizeof(Complex));
       std::unique_ptr<double[] > evals(new double[param.ld]);
-
-      cudaHostRegister(static_cast<void *>(projm.get()), param.ld*param.cur_dim*sizeof(Complex),  cudaHostRegisterDefault);
       magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
-      cudaHostUnregister(projm.get());
 #else
       errorQuda("MAGMA library was not built.\n");
 #endif
-    } else {
-
+    } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
       Map<MatrixXcd, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
 
       SelfAdjointEigenSolver<MatrixXcd> es_projm( projm_ );
       evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
+    } else {
+      errorQuda("Library type %d is currently not supported.\n", param.eig_global.extlib_type);
     }
 
     std::vector<ColorSpinorField*> rv(param.RV->Components().begin(), param.RV->Components().begin() + param.cur_dim);
@@ -186,7 +184,7 @@ namespace quda {
 #else
         errorQuda("MAGMA library was not built.\n");
 #endif
-      } else {
+      } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) { 
         Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
         Map<VectorXcd, Unaligned> vec_ (vec.get(), param.cur_dim);
 
@@ -194,6 +192,8 @@ namespace quda {
         vec2_ = projm_.fullPivHouseholderQr().solve(vec_);
 
         vec_  = vec2_;
+      } else {
+        errorQuda("Library type %d is currently not supported.\n", param.eig_global.extlib_type);
       }
     } else {
       for(int i = 0; i < param.cur_dim; i++) vec[i] *= param.invRitzVals[i];
@@ -300,7 +300,7 @@ namespace quda {
      }
 
      std::unique_ptr<double[] > evals(new double[param.cur_dim]);
-     std::unique_ptr<Complex, decltype(deleter) > projm( allocator(param.ld*param.cur_dim * sizeof(Complex)), deleter);
+     std::unique_ptr<Complex, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(Complex)), pinned_deleter);
 
      memcpy(projm.get(), param.matProj, param.ld*param.cur_dim*sizeof(Complex));
 
@@ -310,7 +310,7 @@ namespace quda {
 #else
        errorQuda("MAGMA library was not built.\n");
 #endif
-     } else {
+     } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
        Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
        Map<VectorXd, Unaligned> evals_(evals.get(), param.cur_dim);
 
@@ -318,6 +318,8 @@ namespace quda {
 
        projm_ = es.eigenvectors();
        evals_ = es.eigenvalues();
+     } else {
+       errorQuda("Library type %d is currently not supported.\n", param.eig_global.extlib_type);
      }
 
      //reset projection matrix, now we will use inverse ritz values when deflate an initial guess:

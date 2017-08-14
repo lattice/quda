@@ -290,9 +290,11 @@ namespace quda {
    if(do_gels) {
      if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
        ComputeEta<libtype::magma_lib>(args);
-     } else {
+     } else if (  param.extlib_type == QUDA_EIGEN_EXTLIB ) {
        ComputeEta<libtype::eigen_lib>(args);
-     } 
+     } else {
+       errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
+     }
    }
 
    std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().begin()+args.m);
@@ -320,9 +322,11 @@ namespace quda {
 
    if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
      ComputeHarmonicRitz<libtype::magma_lib>(args);
-   } else {
+   } else if(param.extlib_type == QUDA_EIGEN_EXTLIB) {
      ComputeHarmonicRitz<libtype::eigen_lib>(args);
-   } 
+   } else {
+     errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
+   }
 
    DenseMatrix Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
 

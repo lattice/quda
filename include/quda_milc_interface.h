@@ -273,8 +273,6 @@ extern "C" {
    * @param num_iters Number of iterations taken
    * @param num_src Number of source fields
    */
-
-
   void qudaInvertMsrc(int external_precision,
                       int quda_precision,
                       double mass,
@@ -362,7 +360,6 @@ extern "C" {
    * @param final_relative_residual Array of true Fermilab residuals
    * @param num_iters Number of iterations taken
    */
-
   void qudaEigCGInvert(
       int external_precision,
       int quda_precision,
@@ -448,8 +445,6 @@ extern "C" {
    * @param final_relative_residual Array of true Fermilab residuals
    * @param num_iters Number of iterations taken
    */
-
-
   void qudaEigCGCloverInvert(
       int external_precision,
       int quda_precision,
