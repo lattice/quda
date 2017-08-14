@@ -357,8 +357,6 @@ endif()
 
 if(QUDA_DEFLATEDSOLVER)
   add_definitions(-DDEFLATEDSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_ALTRELIABLE)
