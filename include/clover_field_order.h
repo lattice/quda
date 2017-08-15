@@ -7,7 +7,7 @@
  *
  */
 
-// trove requires the warp shuffle instructions introduced with Fermi
+// trove requires the warp shuffle instructions introduced with Kepler
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <trove/ptr.h>
 #else

@@ -12,6 +12,12 @@
  *  also.
  */
 
+// trove requires the warp shuffle instructions introduced with Kepler
+#if __COMPUTE_CAPABILITY__ >= 300
+#include <trove/ptr.h>
+#else
+#define DISABLE_TROVE
+#endif
 #include <register_traits.h>
 #include <typeinfo>
 #include <complex_quda.h>
@@ -636,6 +642,14 @@ namespace quda {
 	size_t Bytes() const { return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (typeid(Float) == typeid(short) ? sizeof(float) : 0)); }
       };
 
+    /**
+       @brief This is just a dummy structure we use for trove to define the
+       required structure size
+       @tparam real Real number type
+       @tparam length Number of elements in the structure
+    */
+    template <typename real, int length> struct S { real v[length]; };
+
     template <typename Float, int Ns, int Nc>
       struct SpaceColorSpinorOrder {
 	typedef typename mapper<Float>::type RegType;
@@ -661,6 +675,18 @@ namespace quda {
 	virtual ~SpaceColorSpinorOrder() { ; }
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> field_((structure*)field);
+	  structure v_ = field_[parity*volumeCB + x];
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v[(s*Nc+c)*2+z] = (RegType)v_.v[(c*Ns + s)*2 + z];
+	      }
+	    }
+	  }
+#else
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -668,9 +694,23 @@ namespace quda {
 	      }
 	    }
 	  }
+#endif
 	}
 
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> field_((structure*)field);
+	  structure v_;
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v_.v[(c*Ns + s)*2 + z] = (Float)v[(s*Nc+c)*2+z];
+	      }
+	    }
+	  }
+	  field_[parity*volumeCB + x] = v_;
+#else
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -678,6 +718,7 @@ namespace quda {
 	      }
 	    }
 	  }
+#endif
 	}
 
 	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
@@ -728,6 +769,18 @@ namespace quda {
 	virtual ~SpaceSpinorColorOrder() { ; }
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> field_((structure*)field);
+	  structure v_ = field_[parity*volumeCB + x];
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v[(s*Nc+c)*2+z] = (RegType)v_.v[(s*Nc + c)*2 + z];
+	      }
+	    }
+	  }
+#else
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -735,9 +788,23 @@ namespace quda {
 	      }
 	    }
 	  }
+#endif
 	}
 
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> field_((structure*)field);
+	  structure v_;
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v_.v[(s*Nc + c)*2 + z] = (Float)v[(s*Nc+c)*2+z];
+	      }
+	    }
+	  }
+	  field_[parity*volumeCB + x] = v_;
+#else
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -745,6 +812,7 @@ namespace quda {
 	      }
 	    }
 	  }
+#endif
 	}
 
 	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
