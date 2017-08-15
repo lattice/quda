@@ -8,66 +8,12 @@
 #include <iomanip>
 #include <cuda.h>
 
+#include <register_traits.h>
 #include <float_vector.h>
 
 #include <complex_quda.h>
 
 namespace quda {
-
-  template<class T, class U>
-    struct PromoteTypeId
-    {
-      typedef T Type;
-    };
-
-  template<>
-    struct PromoteTypeId<complex<float>, float>
-    {
-      typedef complex<float> Type;
-    };
-
-  template<>
-    struct PromoteTypeId<float, complex<float> >
-    {
-      typedef complex<float> Type;
-    };
-
-  template<>
-    struct PromoteTypeId<complex<double>, double>
-    {
-      typedef complex<double> Type;
-    };
-
-  template<>
-    struct PromoteTypeId<double, complex<double> >
-    {
-      typedef complex<double> Type;
-    };
-
-  template<>
-    struct PromoteTypeId<double,int>
-    {
-      typedef double Type;
-    };
-
-  template<>
-    struct PromoteTypeId<int,double>
-    {
-      typedef double Type;
-    };
-
-  template<>
-    struct PromoteTypeId<float,int>
-    {
-      typedef float Type;
-    };
-
-  template<>
-    struct PromoteTypeId<int,float>
-    {
-      typedef float Type;
-    };
-
 
 
   template<class T>
