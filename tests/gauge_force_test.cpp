@@ -383,20 +383,12 @@ gauge_force_test(void)
   void* sitelink = nullptr;
   void* sitelink_1d = nullptr;
   
-#ifdef GPU_DIRECT
   sitelink_1d = pinned_malloc(4*V*gaugeSiteSize*gSize);
-#else
-  sitelink_1d = safe_malloc(4*V*gaugeSiteSize*gSize);
-#endif
   
   // this is a hack to have site link generated in 2d 
   // then copied to 1d array in "MILC" format
   void* sitelink_2d[4];
-#ifdef GPU_DIRECT
   for(int i=0;i<4;i++) sitelink_2d[i] = pinned_malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec); 
-#else
-  for(int i=0;i<4;i++) sitelink_2d[i] = safe_malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
-#endif
   
   // fills the gauge field with random numbers
   createSiteLinkCPU(sitelink_2d, qudaGaugeParam.cpu_prec, 0);
