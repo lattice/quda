@@ -545,6 +545,8 @@ public:
 
   // cast operators
   inline operator std::complex<float>() const { return std::complex<float>(real(),imag()); }
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
   // inline operator float() const { return real(); }
 };
 
@@ -662,10 +664,11 @@ public:
 
   // cast operators
   inline operator std::complex<double>() const { return std::complex<double>(real(),imag()); }
+
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
   // inline operator double() { return real(); }
 };
-
-
 
   // Binary arithmetic operations
   // At the moment I'm implementing the basic functions, and the
