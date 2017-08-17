@@ -79,6 +79,18 @@ namespace quda {
 
   template <typename T, int Nc>
     template <typename S>
+    __device__ __host__ inline void ColorSpinor<T,Nc,2>::operator=(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
+    __device__ __host__ inline ColorSpinor<T,Nc,2>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
+    a.field.load((T*)data, a.x_cb, a.parity);
+  }
+
+  template <typename T, int Nc>
+    template <typename S>
     __device__ __host__ inline void ColorSpinor<T,Nc,4>::operator=(const colorspinor_wrapper<T,S> &a) {
     a.field.load((T*)data, a.x_cb, a.parity);
   }
@@ -721,6 +733,35 @@ namespace quda {
 #endif
 	}
 
+	/**
+	   @brief This accessor routine returns a colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline colorspinor_wrapper<RegType,SpaceColorSpinorOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) {
+	  return colorspinor_wrapper<RegType,SpaceColorSpinorOrder<Float,Ns,Nc> >(*this, x_cb, parity);
+	}
+
+	/**
+	   @brief This accessor routine returns a const colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline const colorspinor_wrapper<RegType,SpaceColorSpinorOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) const {
+	  return colorspinor_wrapper<RegType,SpaceColorSpinorOrder<Float,Ns,Nc> >
+	    (const_cast<SpaceColorSpinorOrder<Float,Ns,Nc>&>(*this), x_cb, parity);
+	}
+
 	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
@@ -815,6 +856,35 @@ namespace quda {
 #endif
 	}
 
+	/**
+	   @brief This accessor routine returns a colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline colorspinor_wrapper<RegType,SpaceSpinorColorOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) {
+	  return colorspinor_wrapper<RegType,SpaceSpinorColorOrder<Float,Ns,Nc> >(*this, x_cb, parity);
+	}
+
+	/**
+	   @brief This accessor routine returns a const colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline const colorspinor_wrapper<RegType,SpaceSpinorColorOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) const {
+	  return colorspinor_wrapper<RegType,SpaceSpinorColorOrder<Float,Ns,Nc> >
+	    (const_cast<SpaceSpinorColorOrder<Float,Ns,Nc>&>(*this), x_cb, parity);
+	}
+
 	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
@@ -890,6 +960,18 @@ namespace quda {
 	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
 	  int y = getPaddedIndex(x, parity);
 
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> field_((structure*)field);
+	  structure v_ = field_[parity*exVolumeCB + y];
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v[(s*Nc+c)*2+z] = (RegType)v_.v[(s*Nc + c)*2 + z];
+	      }
+	    }
+	  }
+#else
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -897,11 +979,25 @@ namespace quda {
 	      }
 	    }
 	  }
+#endif
 	}
 
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
 	  int y = getPaddedIndex(x, parity);
 
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+	  typedef S<Float,length> structure;
+	  trove::coalesced_ptr<structure> field_((structure*)field);
+	  structure v_;
+	  for (int s=0; s<Ns; s++) {
+	    for (int c=0; c<Nc; c++) {
+	      for (int z=0; z<2; z++) {
+		v_.v[(s*Nc + c)*2 + z] = (Float)v[(s*Nc+c)*2+z];
+	      }
+	    }
+	  }
+	  field_[parity*exVolumeCB + y] = v_;
+#else
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -909,6 +1005,36 @@ namespace quda {
 	      }
 	    }
 	  }
+#endif
+	}
+
+	/**
+	   @brief This accessor routine returns a colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline colorspinor_wrapper<RegType,PaddedSpaceSpinorColorOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) {
+	  return colorspinor_wrapper<RegType,PaddedSpaceSpinorColorOrder<Float,Ns,Nc> >(*this, x_cb, parity);
+	}
+
+	/**
+	   @brief This accessor routine returns a const colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline const colorspinor_wrapper<RegType,PaddedSpaceSpinorColorOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) const {
+	  return colorspinor_wrapper<RegType,PaddedSpaceSpinorColorOrder<Float,Ns,Nc> >
+	    (const_cast<PaddedSpaceSpinorColorOrder<Float,Ns,Nc>&>(*this), x_cb, parity);
 	}
 
 	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
@@ -965,6 +1091,35 @@ namespace quda {
 	      }
 	    }
 	  }
+	}
+
+	/**
+	   @brief This accessor routine returns a colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline colorspinor_wrapper<RegType,QDPJITDiracOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) {
+	  return colorspinor_wrapper<RegType,QDPJITDiracOrder<Float,Ns,Nc> >(*this, x_cb, parity);
+	}
+
+	/**
+	   @brief This accessor routine returns a const colorspinor_wrapper to this object,
+	   allowing us to overload various operators for manipulating at
+	   the site level interms of matrix operations.
+	   @param[in] x_cb Checkerboarded space-time index we are requesting
+	   @param[in] parity Parity we are requesting
+	   @return Instance of a colorspinor_wrapper that curries in access to
+	   this field at the above coordinates.
+	*/
+	__device__ __host__ inline const colorspinor_wrapper<RegType,QDPJITDiracOrder<Float,Ns,Nc> >
+	  operator()(int x_cb, int parity) const {
+	  return colorspinor_wrapper<RegType,QDPJITDiracOrder<Float,Ns,Nc> >
+	    (const_cast<QDPJITDiracOrder<Float,Ns,Nc>&>(*this), x_cb, parity);
 	}
 
 	size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }

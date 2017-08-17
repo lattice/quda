@@ -816,6 +816,18 @@ namespace quda {
      */
     __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
+    template<typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+
+    template<typename S>
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+
+    template<typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
+
+    template<typename S>
+      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
+
     __device__ __host__ void print() {
       for (int s=0; s<Ns; s++) {
 	for (int c=0; c<Nc; c++) {
