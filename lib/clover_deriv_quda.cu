@@ -192,32 +192,31 @@ namespace quda {
       // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
       {
 	DECLARE_ARRAY(d,0);
-	Link U1, U2, U3, U4, Oprod1, Oprod2;
 
 	// load U(x)_(+mu)
-	arg.gauge.load((real*)(U1.data), linkIndexShift(x, d, arg.E), mu, arg.parity);
+	Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
 
 	// load U(x+mu)_(+nu)
 	d[mu]++;
-	arg.gauge.load((real*)(U2.data), linkIndexShift(x, d, arg.E), nu, otherparity);
+	Link U2 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
 	d[mu]--;
 
 	// load U(x+nu)_(+mu)
 	d[nu]++;
-	arg.gauge.load((real*)(U3.data), linkIndexShift(x, d, arg.E), mu, otherparity);
+	Link U3 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
 	d[nu]--;
       
 	// load U(x)_(+nu)
-	arg.gauge.load((real*)(U4.data), linkIndexShift(x, d, arg.E), nu, arg.parity);
+	Link U4 = arg.gauge(nu, linkIndexShift(x, d, arg.E), arg.parity);
 
 	// load Oprod
-	arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
+	Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
 
         if (nu < mu) sub(force, U1*U2*conj(U3)*conj(U4)*Oprod1);
 	else   	     add(force, U1*U2*conj(U3)*conj(U4)*Oprod1);
 
 	d[mu]++; d[nu]++;
-	arg.oprod.load((real*)(Oprod2.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
+	Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
 	d[mu]--; d[nu]--;
 
         if (nu < mu) sub(force, U1*U2*Oprod2*conj(U3)*conj(U4));
@@ -226,34 +225,33 @@ namespace quda {
  
       {
 	DECLARE_ARRAY(d,0);
-	Link U1, U2, U3, U4, Oprod1, Oprod4;
 
 	// load U(x-nu)(+nu)
 	d[nu]--;
-	arg.gauge.load((real*)(U1.data), linkIndexShift(x, d, arg.E), nu, otherparity);
+	Link U1 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
 	d[nu]++;
 
 	// load U(x-nu)(+mu)
 	d[nu]--;
-	arg.gauge.load((real*)(U2.data), linkIndexShift(x, d, arg.E), mu, otherparity);
+	Link U2 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
 	d[nu]++;
 
 	// load U(x+mu-nu)(nu)
 	d[mu]++; d[nu]--;
-	arg.gauge.load((real*)(U3.data), linkIndexShift(x, d, arg.E), nu, arg.parity);
+	Link U3 = arg.gauge(nu, linkIndexShift(x, d, arg.E), arg.parity);
 	d[mu]--; d[nu]++;
 
 	// load U(x)_(+mu)
-	arg.gauge.load((real*)(U4.data), linkIndexShift(x, d, arg.E), mu, arg.parity);
+	Link U4 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
 
 	d[mu]++; d[nu]--;
-	arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
+	Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
 	d[mu]--; d[nu]++;
 
         if (nu < mu) add(force, conj(U1)*U2*Oprod1*U3*conj(U4));
 	else         sub(force, conj(U1)*U2*Oprod1*U3*conj(U4));
 
-	arg.oprod.load((real*)(Oprod4.data), linkIndexShift(x, d, arg.E), tidx, arg.parity);
+	Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
 
         if (nu < mu) add(force, Oprod4*conj(U1)*U2*U3*conj(U4));
 	else         sub(force, Oprod4*conj(U1)*U2*U3*conj(U4));
@@ -266,27 +264,26 @@ namespace quda {
 
       {
 	DECLARE_ARRAY(d,0);
-	Link U1, U2, U3, U4, Oprod3, Oprod4;
 
 	// load U(x)_(+mu)
-	arg.gauge.load((real*)(U1.data), linkIndexShift(y, d, arg.E), mu, otherparity);
+	Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
 
 	// load U(x+mu)_(+nu)
 	d[mu]++;
-	arg.gauge.load((real*)(U2.data), linkIndexShift(y, d, arg.E), nu, arg.parity);
+	Link U2 = arg.gauge(nu, linkIndexShift(y, d, arg.E), arg.parity);
 	d[mu]--;
 
 	// load U(x+nu)_(+mu)
 	d[nu]++;
-	arg.gauge.load((real*)(U3.data), linkIndexShift(y, d, arg.E), mu, arg.parity);
+	Link U3 = arg.gauge(mu, linkIndexShift(y, d, arg.E), arg.parity);
 	d[nu]--;
 
 	// load U(x)_(+nu)
-	arg.gauge.load((real*)(U4.data), linkIndexShift(y, d, arg.E), nu, otherparity);
+	Link U4 = arg.gauge(nu, linkIndexShift(y, d, arg.E), otherparity);
 
 	// load opposite parity Oprod
 	d[nu]++;
-	arg.oprod.load((real*)(Oprod3.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
+	Link Oprod3 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
 	d[nu]--;
 
 	if (nu < mu) sub(force, U1*U2*conj(U3)*Oprod3*conj(U4));
@@ -294,7 +291,7 @@ namespace quda {
 
 	// load Oprod(x+mu)
 	d[mu]++;
-	arg.oprod.load((real*)(Oprod4.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
+	Link Oprod4 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
 	d[mu]--;
 
 	if (nu < mu) sub(force, U1*Oprod4*U2*conj(U3)*conj(U4));
@@ -305,36 +302,35 @@ namespace quda {
       // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
       {
 	DECLARE_ARRAY(d,0);
-	Link U1, U2, U3, U4, Oprod1, Oprod2;
 
 	// load U(x-nu)(+nu)
 	d[nu]--;
-	arg.gauge.load((real*)(U1.data), linkIndexShift(y, d, arg.E), nu, arg.parity);
+	Link U1 = arg.gauge(nu, linkIndexShift(y, d, arg.E), arg.parity);
 	d[nu]++;
 
 	// load U(x-nu)(+mu)
 	d[nu]--;
-	arg.gauge.load((real*)(U2.data), linkIndexShift(y, d, arg.E), mu, arg.parity);
+	Link U2 = arg.gauge(mu, linkIndexShift(y, d, arg.E), arg.parity);
 	d[nu]++;
 
 	// load U(x+mu-nu)(nu)
 	d[mu]++; d[nu]--;
-	arg.gauge.load((real*)(U3.data), linkIndexShift(y, d, arg.E), nu, otherparity);
+	Link U3 = arg.gauge(nu, linkIndexShift(y, d, arg.E), otherparity);
 	d[mu]--; d[nu]++;
 
 	// load U(x)_(+mu)
-	arg.gauge.load((real*)(U4.data), linkIndexShift(y, d, arg.E), mu, otherparity);
+	Link U4 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
 
 	// load Oprod(x+mu)
 	d[mu]++;
-	arg.oprod.load((real*)(Oprod1.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
+	Link Oprod1 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
 	d[mu]--;
 
 	if (nu < mu) add(force, conj(U1)*U2*U3*Oprod1*conj(U4));
 	else         sub(force, conj(U1)*U2*U3*Oprod1*conj(U4));
 
 	d[nu]--;
-	arg.oprod.load((real*)(Oprod2.data), linkIndexShift(y, d, arg.E), tidx, arg.parity);
+	Link Oprod2 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
 	d[nu]++;
 
 	if (nu < mu) add(force, conj(U1)*Oprod2*U2*U3*conj(U4));
