@@ -252,7 +252,7 @@ namespace quda {
     if (typeid(src) == typeid(cudaCloverField)) {
       if (src.V(false))	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION);
       if (src.V(true)) copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION);
-    } else if (typeid(src) == typeid(cpuCloverField)) {
+    } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuCloverField)) {
       void *packClover = pool_pinned_malloc(bytes + norm_bytes);
       void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
       
@@ -271,6 +271,27 @@ namespace quda {
       }
 
       pool_pinned_free(packClover);
+    } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && typeid(src) == typeid(cpuCloverField)) {
+      void *packClover = pool_device_malloc(src.Bytes() + src.NormBytes());
+      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + src.Bytes() : 0;
+
+      if (src.V(false)) {
+	qudaMemcpy(packClover, src.V(false), src.Bytes(), cudaMemcpyHostToDevice);
+	if (precision == QUDA_HALF_PRECISION)
+	  qudaMemcpy(packCloverNorm, src.Norm(false), src.NormBytes(), cudaMemcpyHostToDevice);
+
+	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
+      }
+
+      if (src.V(true) && inverse) {
+	qudaMemcpy(packClover, src.V(true), src.Bytes(), cudaMemcpyHostToDevice);
+	if (precision == QUDA_HALF_PRECISION)
+	  qudaMemcpy(packCloverNorm, src.Norm(true), src.NormBytes(), cudaMemcpyHostToDevice);
+
+	copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
+      }
+
+      pool_device_free(packClover);
     } else {
       errorQuda("Invalid clover field type");
     }

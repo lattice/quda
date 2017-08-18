@@ -848,6 +848,8 @@ get_dslash_type(char* s)
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
   }else if (strcmp(s, "mobius") == 0){
     ret =  QUDA_MOBIUS_DWF_DSLASH;
+  }else if (strcmp(s, "laplace") == 0){
+    ret =  QUDA_LAPLACE_DSLASH;
   }else{
     fprintf(stderr, "Error: invalid dslash type\n");	
     exit(1);
@@ -882,13 +884,16 @@ get_dslash_str(QudaDslashType type)
     break;
   case QUDA_DOMAIN_WALL_DSLASH:
     ret = "domain-wall";
-      break;
+    break;
   case QUDA_DOMAIN_WALL_4D_DSLASH:
     ret = "domain_wall_4d";
-      break;
+    break;
   case QUDA_MOBIUS_DWF_DSLASH:
     ret = "mobius";
-      break;
+    break;
+  case QUDA_LAPLACE_DSLASH:
+    ret = "laplace";
+    break;
   default:
     ret = "unknown";	
     break;
@@ -1217,4 +1222,61 @@ get_quda_ver_str()
 	  ext_num);
   return vstr;
 }
+
+
+QudaExtLibType
+get_solve_ext_lib_type(char* s)
+{
+  QudaExtLibType ret = QUDA_EXTLIB_INVALID;
+
+  if (strcmp(s, "eigen") == 0) {
+    ret = QUDA_EIGEN_EXTLIB;
+  } else if (strcmp(s, "magma") == 0) {
+    ret = QUDA_MAGMA_EXTLIB;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+QudaFieldLocation
+get_df_location_ritz(char* s)
+{
+  QudaFieldLocation ret = QUDA_INVALID_FIELD_LOCATION;
+
+  if (strcmp(s, "host") == 0) {
+    ret = QUDA_CPU_FIELD_LOCATION;
+  } else if (strcmp(s, "cuda") == 0) {
+    ret = QUDA_CUDA_FIELD_LOCATION;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+
+QudaMemoryType
+get_df_mem_type_ritz(char* s)
+{
+  QudaMemoryType ret = QUDA_MEMORY_INVALID;
+
+  if (strcmp(s, "device") == 0) {
+    ret = QUDA_MEMORY_DEVICE;
+  } else if (strcmp(s, "pinned") == 0) {
+    ret = QUDA_MEMORY_PINNED;
+  } else if (strcmp(s, "mapped") == 0) {
+    ret = QUDA_MEMORY_MAPPED;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+
 

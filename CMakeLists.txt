@@ -141,17 +141,15 @@ set(QUDA_BLOCKSOLVER_NVTX OFF CACHE BOOL "add nvtx markup to block solver calls 
 # GPUdirect options
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
 
-# Packing option
-set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
-
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
 set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
-set(QUDA_EIGEN OFF CACHE BOOL "build with EIGEN library")
 set(QUDA_SWIZZLE OFF CACHE BOOL "use swizzle optimization for Dslash")
+set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
+set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -168,21 +166,19 @@ mark_as_advanced(QUDA_BLOCKSOLVER_NVTX)
 
 mark_as_advanced(QUDA_GPU_DIRECT)
 
-mark_as_advanced(QUDA_DEVICE_PACK)
-
 mark_as_advanced(QUDA_SSTEP)
-mark_as_advanced(QUDA_EIGEN)
+mark_as_advanced(QUDA_USE_EIGEN)
+mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
 mark_as_advanced(QUDA_SWIZZLE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
-set(CPU_ARCH x86_64)
+set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 #######################################################################
 # everything below here is processing the setup
 #######################################################################
-
 # we need to check for some packages
 find_package(PythonInterp)
 
@@ -198,6 +194,45 @@ else()
   set(USING_CUDA_LANG_SUPPORT False)
 endif()
 
+#######################################################################
+## QUDA depends on Eigen
+## this part makes sure we can download eigen if it is not found
+if (QUDA_DOWNLOAD_EIGEN)
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2)
+  set(EIGEN_SHA dd254beb0bafc695d0f62ae1a222ff85b52dbaa3a16f76e781dce22d0d20a4a6)
+  if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION} )
+    message(STATUS "Checking for Eigen tarball and downloading if necessary.")
+  endif()
+  FILE(DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${EIGEN_SHA} STATUS EIGEN_DOWNLOADED)
+  list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
+  list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
+  if(${EIGEN_DOWNLOADED_CODE})
+    message(SEND_ERROR "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again.")
+  endif()
+
+  include(ExternalProject)
+  ExternalProject_Add(Eigen
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/3.3.4.tar.bz2
+    URL_HASH SHA256=${EIGEN_SHA}
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND COMMAND ""
+    INSTALL_COMMAND ""
+  )
+  ExternalProject_Get_Property(Eigen source_dir)
+  set(EIGEN_INCLUDE_DIRS ${source_dir})
+else()
+  # fall back to using find_package
+  find_package(Eigen QUIET)
+  if(NOT EIGEN_FOUND)
+    message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
+  endif()
+endif()
+include_directories(${EIGEN_INCLUDE_DIRS})
+## Now we hopefully found some way to get eigen to work
+
+# We need threads
 find_package(Threads REQUIRED)
 
 # do all the build definitions
@@ -211,6 +246,9 @@ else()
 endif()
 
 if(QUDA_QDPJIT)
+  if(NOT QUDA_QMP)
+    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+  endif()
   add_definitions(-DUSE_QDPJIT)
   include_directories(SYSTEM ${QUDA_QDPJITHOME}/include)
   execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -235,11 +273,14 @@ if(QUDA_QMP)
     message( FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is set" )
   endif()
   add_definitions(-DQMP_COMMS)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
+  set(QUDA_QMP_LDFLAGS  "" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
+  set(QUDA_QMP_LIBS  "" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  #FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
+  include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 
@@ -320,8 +361,6 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 # MAX_MULTI_BLAS_N
@@ -330,18 +369,14 @@ add_definitions(-DMAX_MULTI_BLAS_N=${QUDA_MAX_MULTI_BLAS_N})
 
 if(QUDA_DEFLATEDSOLVER)
   add_definitions(-DDEFLATEDSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_ALTRELIABLE)
   add_definitions(-DALTRELIABLE)
 endif()
 
-if(QUDA_EIGEN)
+if(QUDA_USE_EIGEN)
   add_definitions(-DEIGEN)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
 endif()
 
 if(QUDA_POSIX_THREADS)
@@ -473,10 +508,6 @@ if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
   enable_language(Fortran)
 endif()
 
-if(DEVICE_PACK)
-  add_definitions(-DDEVICE_PACK)
-endif(DEVICE_PACK)
-
 
 
 if(QUDA_NUMA_NVML)
@@ -505,6 +536,10 @@ STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
 
+# this allows simplified running of clang-tidy 
+if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
+   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
 
 # build up git version

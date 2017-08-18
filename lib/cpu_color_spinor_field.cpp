@@ -18,14 +18,19 @@ namespace quda {
 
   cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
     ColorSpinorField(param), init(false), reference(false) {
+
+    // need to set this before create
+    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+      v = param.v;
+      reference = true;
+    }
+
     create(param.create);
-    if (param.create == QUDA_NULL_FIELD_CREATE) {
+
+    if (param.create == QUDA_NULL_FIELD_CREATE || param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
-    } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      v = param.v;
-      reference = true;
     } else {
       errorQuda("Creation type %d not supported", param.create);
     }
@@ -65,6 +70,7 @@ namespace quda {
       errorQuda("Undefined behaviour"); // else silent bug possible?
     }
 
+    // need to set this before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = (void*)src.V();
       norm = (void*)src.Norm();
@@ -124,7 +130,7 @@ namespace quda {
     // means a ghost zone is set.  So we unset it here.  This will be
     // fixed when clean up the ghost code with the peer-2-peer branch
     bytes = length * precision;
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
 
     if (pad != 0) errorQuda("Non-zero pad not supported");  
@@ -159,6 +165,10 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
       param.norm = norm;
+      param.is_composite  = false;
+      param.composite_dim = 0;
+      param.is_component  = composite_descr.is_component;
+      param.component_id  = composite_descr.id;
       even = new cpuColorSpinorField(*this, param);
       odd = new cpuColorSpinorField(*this, param);
 
@@ -192,10 +202,9 @@ namespace quda {
 
   void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
     checkField(*this, src);
-    if (fieldOrder == src.fieldOrder) {
+    if (fieldOrder == src.fieldOrder && bytes == src.Bytes()) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	// FIXME (HJ Kim): I think this is a bug, we should copy the data with amount of "bytes/Ls"
-        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes); 
+        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes/x[nDim-1]);
       else 
         memcpy(v, src.v, bytes);
     } else {
@@ -221,14 +230,14 @@ namespace quda {
   // print out the vector at volume point x
   void cpuColorSpinorField::PrintVector(unsigned int x) { genericPrintVector(*this, x); }
 
-  void cpuColorSpinorField::allocateGhostBuffer(void) const
+  void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
     int spinor_size = 2*nSpin*nColor*precision;
     bool resize = false;
 
     // resize face only if requested size is larger than previously allocated one
     for (int i=0; i<nDimComms; i++) {
-      size_t nbytes = siteSubset*Nface()*surfaceCB[i]*spinor_size;
+      size_t nbytes = siteSubset*nFace*surfaceCB[i]*spinor_size;
       resize = (nbytes > ghostFaceBytes[i]) ? true : resize;
       ghostFaceBytes[i] = (nbytes > ghostFaceBytes[i]) ? nbytes : ghostFaceBytes[i];
     }
@@ -260,9 +269,9 @@ namespace quda {
   }
 
 
-  void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int dagger) const
+  void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
   {
-    genericPackGhost(ghost, *this, parity, dagger);
+    genericPackGhost(ghost, *this, parity, nFace, dagger);
     return;
   }
 
@@ -278,7 +287,7 @@ namespace quda {
 					  const MemoryLocation *dummy2, bool dummy3, bool dummy4) const
   {
     // allocate ghost buffer if not yet allocated
-    allocateGhostBuffer();
+    allocateGhostBuffer(nFace);
 
     void **sendbuf = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
 
@@ -289,7 +298,7 @@ namespace quda {
       ghost_buf[2*i + 1] = fwdGhostFaceBuffer[i];
     }
 
-    packGhost(sendbuf, parity, dagger);
+    packGhost(sendbuf, parity, nFace, dagger);
 
     exchange(ghost_buf, sendbuf, nFace);
 

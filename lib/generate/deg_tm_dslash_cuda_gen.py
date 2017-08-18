@@ -9,13 +9,13 @@ def complexToStr(c):
     def fltToString(a):
         if a == int(a): return `int(a)`
         else: return `a`
-    
+
     def imToString(a):
         if a == 0: return "0i"
         elif a == -1: return "-i"
         elif a == 1: return "i"
         else: return fltToString(a)+"i"
-    
+
     re = c.real
     im = c.imag
     if re == 0 and im == 0: return "0"
@@ -133,7 +133,7 @@ def acc_im(s, c): return "acc"+`s`+`c`+"_im"
 def tmp_re(s, c): return "tmp"+`s`+`c`+"_re"
 def tmp_im(s, c): return "tmp"+`s`+`c`+"_im"
 
-def spinor(name, s, c, z): 
+def spinor(name, s, c, z):
     if z==0: return name+`s`+`c`+"_re"
     else: return name+`s`+`c`+"_im"
 
@@ -142,7 +142,7 @@ def def_input_spinor():
     str += "// input spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
     str += "#define spinorFloat double\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_DOUBLE2\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_DOUBLE2\n"
 
@@ -159,7 +159,7 @@ def def_input_spinor():
                 str += "#define "+acc_im(s,c)+" accum"+nthFloat2(2*i+1)+"\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#define WRITE_SPINOR_SHARED WRITE_SPINOR_SHARED_FLOAT4\n"
         str += "#define READ_SPINOR_SHARED READ_SPINOR_SHARED_FLOAT4\n"
     for s in range(0,4):
@@ -197,7 +197,7 @@ def def_gauge():
 
     str += "\n"
     str += "#endif // GAUGE_DOUBLE\n\n"
-            
+
     str += "// conjugated gauge link\n"
     for m in range(0,3):
         for n in range(0,3):
@@ -274,7 +274,7 @@ def prolog():
 
 
     # set the pointer if using shared memory for pseudo registers
-    if sharedFloats > 0 and not sharedDslash: 
+    if sharedFloats > 0 and not sharedDslash:
         prolog_str += (
 """
 extern __shared__ char s_data[];
@@ -377,7 +377,7 @@ def gen(dir, pack_only=False):
     projStr = projectorToStr(projectors[projIdx])
     def proj(i,j):
         return projectors[projIdx][4*i+j]
-    
+
     # if row(i) = (j, c), then the i'th row of the projector can be represented
     # as a multiple of the j'th row: row(i) = c row(j)
     def row(i):
@@ -405,7 +405,7 @@ def gen(dir, pack_only=False):
     cond += "#endif\n"
 
     str = ""
-    
+
     projName = "P"+`dir/2`+["-","+"][projIdx%2]
     str += "// Projector "+projName+"\n"
     for l in projStr.splitlines():
@@ -546,7 +546,7 @@ def gen(dir, pack_only=False):
                     elif re==0:
                         strRe += sign(-im)+in_im(s,c)
                         strIm += sign(im)+in_re(s,c)
-                
+
             project += h1_re(h,c)+" = "+strRe+";\n"
             project += h1_im(h,c)+" = "+strIm+";\n"
 
@@ -620,7 +620,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
     if sharedDslash:
         if dir == 0:
             prep_half += indent(load_spinor)
-            prep_half += indent(write_shared)            
+            prep_half += indent(write_shared)
             prep_half += indent(project)
         elif dir == 1:
             prep_half += indent(load_shared_1)
@@ -628,7 +628,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         elif dir == 2:
             prep_half += indent("if (threadIdx.y == blockDim.y-1 && blockDim.y < X2 ) {\n")
             prep_half += indent(load_spinor)
-            prep_half += indent(project)            
+            prep_half += indent(project)
             prep_half += indent("} else {")
             prep_half += indent(load_shared_2)
             prep_half += indent(project)
@@ -636,7 +636,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         elif dir == 3:
             prep_half += indent("if (threadIdx.y == 0 && blockDim.y < X2) {\n")
             prep_half += indent(load_spinor)
-            prep_half += indent(project)            
+            prep_half += indent(project)
             prep_half += indent("} else {")
             prep_half += indent(load_shared_3)
             prep_half += indent(project)
@@ -644,7 +644,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         elif dir == 4:
             prep_half += indent("if (threadIdx.z == blockDim.z-1 && blockDim.z < X3) {\n")
             prep_half += indent(load_spinor)
-            prep_half += indent(project)            
+            prep_half += indent(project)
             prep_half += indent("} else {")
             prep_half += indent(load_shared_4)
             prep_half += indent(project)
@@ -652,7 +652,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         elif dir == 5:
             prep_half += indent("if (threadIdx.z == 0 && blockDim.z < X3) {\n")
             prep_half += indent(load_spinor)
-            prep_half += indent(project)            
+            prep_half += indent(project)
             prep_half += indent("} else {")
             prep_half += indent(load_shared_5)
             prep_half += indent(project)
@@ -673,14 +673,14 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
     prep_half += "}\n"
     prep_half += "#endif // MULTI_GPU\n"
     prep_half += "\n"
-    
+
     ident = "// identity gauge matrix\n"
     for m in range(0,3):
         for h in range(0,2):
             ident += "spinorFloat "+h2_re(h,m)+" = " + h1_re(h,m) + "; "
             ident += "spinorFloat "+h2_im(h,m)+" = " + h1_im(h,m) + ";\n"
     ident += "\n"
-    
+
     mult = ""
     for m in range(0,3):
         mult += "// multiply row "+`m`+"\n"
@@ -694,7 +694,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
                 im += h2_im(h,m) + " += " + g_im(dir,m,c) + " * "+h1_re(h,c)+";\n"
             mult += re + im
         mult += "\n"
-    
+
     reconstruct = ""
     for m in range(0,3):
 
@@ -705,7 +705,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 
             reconstruct += out_re(h_out, m) + " += " + h2_re(h,m) + ";\n"
             reconstruct += out_im(h_out, m) + " += " + h2_im(h,m) + ";\n"
-    
+
         for s in range(2,4):
             (h,c) = row(s)
             re = c.real
@@ -717,7 +717,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
             elif re == 0:
                     reconstruct += out_re(s, m) + " " + sign(-im) + "= " + h2_im(h,m) + ";\n"
                     reconstruct += out_im(s, m) + " " + sign(+im) + "= " + h2_re(h,m) + ";\n"
-        
+
         reconstruct += "\n"
 
     if dir >= 6:
@@ -727,7 +727,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         str += block(decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct)
     else:
         str += decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct
-    
+
     if pack_only:
         out = load_spinor + decl_half + project
         out = out.replace("sp_idx", "idx")
@@ -803,7 +803,7 @@ def epilog():
         if twist:
             str += "#ifdef MULTI_GPU\n"
         else:
-            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
+            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"
         str += (
 """
 int incomplete = 0; // Have all 8 contributions been computed for this site?
@@ -819,21 +819,21 @@ case EXTERIOR_KERNEL_Y:
   incomplete = incomplete || (param.commDim[0] && (coord[0]==0 || coord[0]==X1m1));
 }
 
-""")    
+""")
         str += "if (!incomplete)\n"
         str += "#endif // MULTI_GPU\n"
 
     block_str = ""
     block_str += twisted_xpay()
     str += block( block_str )
-    
+
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
     str += "WRITE_SPINOR(param.sp_stride);\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"
-    if sharedDslash: 
+    if sharedDslash:
         str += "#undef WRITE_SPINOR_SHARED\n"
         str += "#undef READ_SPINOR_SHARED\n"
     if sharedFloats > 0: str += "#undef SHARED_STRIDE\n\n"
@@ -872,7 +872,7 @@ case EXTERIOR_KERNEL_Y:
                     str += "#undef "+out_im(s,c)+"\n"
     str += "\n"
 
-    str += "#undef VOLATILE\n" 
+    str += "#undef VOLATILE\n"
 
     return str
 # end def epilog
@@ -936,7 +936,7 @@ def generate_dslash_kernels(arch):
     sharedFloats = 0
     if arch >= 200:
         sharedFloats = 24
-        sharedDslash = True    
+        sharedDslash = True
         name = "fermi"
     elif arch >= 120:
         sharedFloats = 0
