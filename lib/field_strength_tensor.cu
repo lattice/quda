@@ -31,8 +31,8 @@ namespace quda {
 
       typedef Matrix<complex<Float>,3> Link;
 
-      int x[4], X[4];
-      for (int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
+      int x[4];
+      auto &X = arg.X;
 
       getCoords(x, idx, X, parity);
       for (int dir=0; dir<4; ++dir) {
@@ -161,7 +161,7 @@ namespace quda {
 	// 36 floating point operations here
       }
 
-      int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
+      constexpr int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
       arg.f(munu_idx, idx, parity) = F;
    }
 
