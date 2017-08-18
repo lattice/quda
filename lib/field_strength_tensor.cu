@@ -27,7 +27,7 @@ namespace quda {
   };
 
   template <int mu, int nu, typename Float, typename Arg>
-  __host__ __device__ void computeFmunuCore(Arg &arg, int idx, int parity) {
+  __device__ __forceinline__ void computeFmunuCore(Arg &arg, int idx, int parity) {
 
       typedef Matrix<complex<Float>,3> Link;
 
