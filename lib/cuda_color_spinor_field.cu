@@ -15,12 +15,9 @@ int zeroCopy = 0;
 
 namespace quda {
 
-  bool cudaColorSpinorField::initGhostFaceBuffer = false;
-  size_t cudaColorSpinorField::ghostFaceBytes = 0;
-
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -43,7 +40,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -53,7 +50,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -101,7 +98,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
-      ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+      ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -483,8 +480,10 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    if (!composite_descr.is_composite || composite_descr.is_component) {
       destroyTexObject();
+      destroyGhostTexObject();
+    }
 #endif
 
   }
@@ -648,79 +647,13 @@ namespace quda {
 
     createGhostZone(nFace, spin_project);
 
-    // temporary work around until the ghost buffer for fine and
-    // coarse grid are merged: this ensures we reset the fine ghost
-    // buffer if the coarse grid operator allocates a ghost buffer
-    // that is larger than the fine grid operator
-    static size_t ghostFaceBytes_ = 0;
-
-    // only allocate if not already allocated or buffer required is bigger than previously
-    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes || ghost_bytes > ghostFaceBytes_) {
-
-      if (initGhostFaceBuffer) {
-#ifdef USE_TEXTURE_OBJECTS
-	destroyGhostTexObject();
-#endif
-	if (ghost_bytes) {
-	  for (int b=0; b<2; b++) {
-	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_pinned_free(ghost_send_buffer_d[b]);
-	    host_free(ghost_pinned_buffer_h[b]);
-	  }
-	}
-      }
-
-      if (ghost_bytes > 0) {
-	for (int b=0; b<2; ++b) {
-	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-
-	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-
-	  // pinned buffer used for sending and receiving
-	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
-
-	  // set the matching device-mapper pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
-	}
-
-	initGhostFaceBuffer = true;
-	ghostFaceBytes = ghost_bytes;
-	ghostFaceBytes_ = ghost_bytes;
-      }
-
-      LatticeField::ghost_field_reset = true; // this signals that we must reset the IPC comms
-    }
+    LatticeField::allocateGhostBuffer(ghost_bytes);
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
     if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1]) destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
-  }
-
-  void cudaColorSpinorField::freeGhostBuffer(void)
-  {
-    destroyIPCComms();
-
-    if (!initGhostFaceBuffer) return;
-  
-    for (int b=0; b<2; b++) {
-      // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
-      ghost_recv_buffer_d[b] = nullptr;
-
-      // free send buffer
-      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
-      ghost_send_buffer_d[b] = nullptr;
-
-      // free pinned memory buffers
-      if (ghost_pinned_buffer_h[b]) host_free(ghost_pinned_buffer_h[b]);
-      ghost_pinned_buffer_h[b] = nullptr;
-      ghost_pinned_buffer_hd[b] = nullptr;
-    }
-    initGhostFaceBuffer = false;
   }
 
   // pack the ghost zone into a contiguous buffer for communications
@@ -965,6 +898,7 @@ namespace quda {
   void cudaColorSpinorField::createComms(int nFace, bool spin_project) {
 
     allocateGhostBuffer(nFace,spin_project); // allocate the ghost buffer if not yet allocated
+    int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
 
     // ascertain if this instance needs its comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
@@ -974,8 +908,6 @@ namespace quda {
     if (!initComms || comms_reset) {
 
       destroyComms(); // if we are requesting a new number of faces destroy and start over
-
-      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
 
       for (int i=0; i<nDimComms; i++) { // compute size of ghost buffers required
 	if (!commDimPartitioned(i)) { ghost_face_bytes[i] = 0; continue; }

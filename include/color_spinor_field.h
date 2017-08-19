@@ -486,9 +486,6 @@ namespace quda {
 
     bool reference; // whether the field is a reference or not
 
-    static size_t ghostFaceBytes;
-    static bool initGhostFaceBuffer;
-
     mutable void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
 
     void create(const QudaFieldCreate);
@@ -542,11 +539,6 @@ namespace quda {
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
     void allocateGhostBuffer(int nFace, bool spin_project=true) const;
-
-    /**
-       @brief Free statically allocated ghost buffers
-    */
-    static void freeGhostBuffer(void);
 
     /**
        @brief Packs the cudaColorSpinorField's ghost zone

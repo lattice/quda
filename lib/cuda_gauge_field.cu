@@ -251,44 +251,31 @@ namespace quda {
 
   void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
     
-    void *send[QUDA_MAX_DIM];
-    void *recv[QUDA_MAX_DIM];
-    void *send_d[QUDA_MAX_DIM];
-    void *recv_d[QUDA_MAX_DIM];
+    void   *send[QUDA_MAX_DIM],  *recv[QUDA_MAX_DIM];
+    void *send_d[QUDA_MAX_DIM], *recv_d[QUDA_MAX_DIM];
+    void *send_h[QUDA_MAX_DIM], *recv_h[QUDA_MAX_DIM];
     size_t bytes[QUDA_MAX_DIM];
-
+    size_t ghost_bytes = 0;
     for (int d=0; d<nDim; d++) {
       if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
       // store both parities and directions in each
       bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-      send_d[d] = pool_device_malloc(2 * bytes[d]);
-      recv_d[d] = pool_device_malloc(2 * bytes[d]);
+      ghost_bytes += 2*bytes[d]; // factor of two comes from direction
     }
 
-#ifndef GPU_COMMS
-    void *send_h[QUDA_MAX_DIM];
-    void *recv_h[QUDA_MAX_DIM];
-    size_t total_bytes = 0;
-    for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-      total_bytes += 4*bytes[d]; // (2 from send/recv) x (2 from fwd/back)
-    }
-    void *buffer = total_bytes > 0 ? pool_pinned_malloc(total_bytes) : nullptr;
+    allocateGhostBuffer(ghost_bytes);
 
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-      recv_h[d] = static_cast<char*>(buffer) + offset;
-      send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
-      offset += 4*bytes[d];
-    }
-#endif
+      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
+      send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset;
+      recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset;
 
-    // do the exchange
-    MsgHandle *mh_recv_back[QUDA_MAX_DIM];
-    MsgHandle *mh_recv_fwd[QUDA_MAX_DIM];
-    MsgHandle *mh_send_fwd[QUDA_MAX_DIM];
-    MsgHandle *mh_send_back[QUDA_MAX_DIM];
+      send_h[d] = static_cast<char*>(ghost_pinned_buffer_h[bufferIndex]) + 0*ghost_bytes + offset;
+      recv_h[d] = static_cast<char*>(ghost_pinned_buffer_h[bufferIndex]) + 1*ghost_bytes + offset;
+
+      offset += 2*bytes[d]; // factor of two from fwd/back
+    }
 
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
@@ -301,22 +288,18 @@ namespace quda {
 #endif
 
       // look into storing these for later
-      mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-      mh_recv_fwd[d]  = comm_declare_receive_relative(static_cast<char*>(recv[d])+bytes[d], 
-						      d, +1, bytes[d]);
-      mh_send_back[d] = comm_declare_send_relative(send[d], d, -1, bytes[d]);
-      mh_send_fwd[d]  = comm_declare_send_relative(static_cast<char*>(send[d])+bytes[d], 
-						   d, +1, bytes[d]);
+      mh_recv_back[bufferIndex][d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
+      mh_recv_fwd[bufferIndex][d]  = comm_declare_receive_relative(static_cast<char*>(recv[d])+bytes[d], d, +1, bytes[d]);
+      mh_send_back[bufferIndex][d] = comm_declare_send_relative(send[d], d, -1, bytes[d]);
+      mh_send_fwd[bufferIndex][d]  = comm_declare_send_relative(static_cast<char*>(send[d])+bytes[d], d, +1, bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
       if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
 
-      // FIXME why does this break if the order is switched?
-      // prepost the receives
       if (commDimPartitioned(d)) {
-	comm_start(mh_recv_fwd[d]);
-	comm_start(mh_recv_back[d]);
+	comm_start(mh_recv_fwd[bufferIndex][d]);
+	comm_start(mh_recv_back[bufferIndex][d]);
       }
 
       //extract into a contiguous buffer
@@ -326,34 +309,27 @@ namespace quda {
 	
 	// pipeline the forwards and backwards sending
 #ifndef GPU_COMMS
-	cudaMemcpyAsync(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, streams[0]);
-	cudaMemcpyAsync(static_cast<char*>(send_h[d])+bytes[d], 
-			static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
-#endif      
-	
-#ifndef GPU_COMMS
-	cudaStreamSynchronize(streams[0]);
+	qudaMemcpy(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost);
 #endif
-	comm_start(mh_send_back[d]);
-	
+	comm_start(mh_send_back[bufferIndex][d]);
+
 #ifndef GPU_COMMS
-	cudaStreamSynchronize(streams[1]);
+	qudaMemcpy(static_cast<char*>(send_h[d])+bytes[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost);
 #endif
-	comm_start(mh_send_fwd[d]);
-	
+	comm_start(mh_send_fwd[bufferIndex][d]);
+
 	// forwards recv
-	comm_wait(mh_send_back[d]);
-	comm_wait(mh_recv_fwd[d]);
+	comm_wait(mh_send_back[bufferIndex][d]);
+	comm_wait(mh_recv_fwd[bufferIndex][d]);
 #ifndef GPU_COMMS
-	cudaMemcpyAsync(static_cast<char*>(recv_d[d])+bytes[d], 
-			static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
+	qudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice);
 #endif      
 	
 	// backwards recv
-	comm_wait(mh_send_fwd[d]);
-	comm_wait(mh_recv_back[d]);
+	comm_wait(mh_send_fwd[bufferIndex][d]);
+	comm_wait(mh_recv_back[bufferIndex][d]);
 #ifndef GPU_COMMS
-	cudaMemcpyAsync(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice, streams[1]);
+	qudaMemcpy(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice);
 #endif      
       } else { // if just doing a local exchange to fill halo then need to swap faces
 	qudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], send_d[d], bytes[d], cudaMemcpyDeviceToDevice);
@@ -364,22 +340,15 @@ namespace quda {
       extractExtendedGaugeGhost(*this, d, R, recv_d, false);
     }
 
-#ifndef GPU_COMMS
-    if (total_bytes > 0) pool_pinned_free(buffer);
-#endif
-
     for (int d=0; d<nDim; d++) {
       if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
 
       if (commDimPartitioned(d)) {
-	comm_free(mh_send_fwd[d]);
-	comm_free(mh_send_back[d]);
-	comm_free(mh_recv_back[d]);
-	comm_free(mh_recv_fwd[d]);
+	comm_free(mh_send_fwd[bufferIndex][d]);
+	comm_free(mh_send_back[bufferIndex][d]);
+	comm_free(mh_recv_back[bufferIndex][d]);
+	comm_free(mh_recv_fwd[bufferIndex][d]);
       }
-
-      pool_device_free(send_d[d]);
-      pool_device_free(recv_d[d]);
     }
 
   }

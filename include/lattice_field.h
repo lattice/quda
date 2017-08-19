@@ -217,6 +217,16 @@ namespace quda {
     */
     static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
+    /**
+       The current size of the ghost allocations
+    */
+    static size_t ghostFaceBytes;
+
+    /**
+       Whether the ghost buffers have been initialized
+    */
+    static bool initGhostFaceBuffer;
+
     /** Pinned memory buffer used for sending all messages */
     void *my_face_h[2];
     /** Mapped version of my_face_h */
@@ -339,9 +349,20 @@ namespace quda {
     virtual ~LatticeField();
     
     /**
+       @brief Allocate the static ghost buffers
+       @param[in] ghost_bytes Size of the ghost buffer to allocate
+    */
+    void allocateGhostBuffer(size_t ghost_bytes) const;
+
+    /**
        Free the pinned-memory buffer
     */
     static void freeBuffer(int index=0);
+
+    /**
+       @brief Free statically allocated ghost buffers
+    */
+    static void freeGhostBuffer(void);
 
     /**
        Create the inter-process communication handlers

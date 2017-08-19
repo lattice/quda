@@ -1243,9 +1243,9 @@ void endQuda(void)
 
   LatticeField::freeBuffer(0);
   LatticeField::freeBuffer(1);
+  LatticeField::freeGhostBuffer();
   cudaColorSpinorField::freeBuffer(0);
   cudaColorSpinorField::freeBuffer(1);
-  cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
   FaceBuffer::flushPinnedCache();
 

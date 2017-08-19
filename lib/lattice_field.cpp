@@ -45,6 +45,9 @@ namespace quda {
 
   void* LatticeField::ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
+  bool LatticeField::initGhostFaceBuffer = false;
+  size_t LatticeField::ghostFaceBytes = 0;
+
   int LatticeField::bufferIndex = 0;
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
@@ -118,6 +121,68 @@ namespace quda {
   }
 
   LatticeField::~LatticeField() { }
+
+  void LatticeField::allocateGhostBuffer(size_t ghost_bytes) const
+  {
+    // only allocate if not already allocated or buffer required is bigger than previously
+    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes) {
+
+      if (initGhostFaceBuffer) {
+	if (ghost_bytes) {
+	  for (int b=0; b<2; b++) {
+	    device_pinned_free(ghost_recv_buffer_d[b]);
+	    device_pinned_free(ghost_send_buffer_d[b]);
+	    host_free(ghost_pinned_buffer_h[b]);
+	  }
+	}
+      }
+
+      if (ghost_bytes > 0) {
+	for (int b=0; b<2; ++b) {
+	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+
+	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+
+	  // pinned buffer used for sending and receiving
+	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
+
+	  // set the matching device-mapper pointer
+	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
+	}
+
+	initGhostFaceBuffer = true;
+	ghostFaceBytes = ghost_bytes;
+      }
+
+      LatticeField::ghost_field_reset = true; // this signals that we must reset the IPC comms
+    }
+
+  }
+
+  void LatticeField::freeGhostBuffer(void)
+  {
+    destroyIPCComms();
+
+    if (!initGhostFaceBuffer) return;
+
+    for (int b=0; b<2; b++) {
+      // free receive buffer
+      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
+      ghost_recv_buffer_d[b] = nullptr;
+
+      // free send buffer
+      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
+      ghost_send_buffer_d[b] = nullptr;
+
+      // free pinned memory buffers
+      if (ghost_pinned_buffer_h[b]) host_free(ghost_pinned_buffer_h[b]);
+      ghost_pinned_buffer_h[b] = nullptr;
+      ghost_pinned_buffer_hd[b] = nullptr;
+    }
+    initGhostFaceBuffer = false;
+  }
 
   void LatticeField::createIPCComms() {
     if ( initIPCComms && !ghost_field_reset ) return;
@@ -360,12 +425,11 @@ namespace quda {
 	       typeid(*this)==typeid(cpuColorSpinorField) ||
 	       typeid(*this)==typeid(cpuGaugeField)) {
       location = QUDA_CPU_FIELD_LOCATION;
-      location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
     }
     return location;
-}
+  }
 
   void LatticeField::read(char *filename) {
     errorQuda("Not implemented");
