@@ -280,9 +280,6 @@ namespace quda {
     mutable int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
     mutable int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
-    mutable size_t ghost_length; // length of ghost zone
-    mutable size_t ghost_norm_length; // length of ghost zone for norm
-
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     size_t bytes; // size in bytes of spinor field
@@ -304,6 +301,11 @@ namespace quda {
     //
     CompositeColorSpinorField components;
 
+    /**
+       Compute the required extended ghost zone sizes and offsets
+       @param[in] nFace The depth of the halo
+       @param[in] spin_project Whether we are spin projecting
+    */
     void createGhostZone(int nFace, bool spin_project=true) const;
 
     // resets the above attributes based on contents of param
@@ -403,7 +405,6 @@ namespace quda {
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-    size_t GhostLength() const { return ghost_length; }
     const int *GhostFace() const { return ghostFace; }
     int GhostOffset(const int i) const { return ghostOffset[i][0]; }
     int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
