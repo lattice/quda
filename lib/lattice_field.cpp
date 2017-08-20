@@ -43,7 +43,7 @@ namespace quda {
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
     : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
-      siteSubset(field.SiteSubset()), mem_type(field.MemType()),  ghostExchange(field.GhostExchange())
+      siteSubset(field.SiteSubset()), mem_type(field.MemType()), ghostExchange(field.GhostExchange())
   {
     for(int dir=0; dir<nDim; ++dir) {
       x[dir] = field.X()[dir];
@@ -53,7 +53,8 @@ namespace quda {
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
-      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), initComms(false), mem_type(param.mem_type),
+      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), ghost_bytes(0),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
@@ -83,7 +84,8 @@ namespace quda {
 
   LatticeField::LatticeField(const LatticeField &field)
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
-      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), initComms(false), mem_type(field.mem_type),
+      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
@@ -173,6 +175,102 @@ namespace quda {
       ghost_pinned_buffer_hd[b] = nullptr;
     }
     initGhostFaceBuffer = false;
+  }
+
+  void LatticeField::createComms()
+  {
+    destroyComms(); // if we are requesting a new number of faces destroy and start over
+
+    // initialize the ghost pinned buffers
+    for (int b=0; b<2; b++) {
+      my_face_h[b] = ghost_pinned_buffer_h[b];
+      my_face_hd[b] = ghost_pinned_buffer_hd[b];
+      from_face_h[b] = static_cast<char*>(my_face_h[b]) + ghost_bytes;
+      from_face_hd[b] = static_cast<char*>(my_face_hd[b]) + ghost_bytes;
+    }
+
+    // initialize ghost send pointers
+    size_t offset = 0;
+    for (int i=0; i<nDimComms; i++) {
+      if (!commDimPartitioned(i)) continue;
+
+      for (int b=0; b<2; ++b) {
+	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
+	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
+
+	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
+	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
+
+	my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
+      } // loop over b
+
+      offset += ghost_face_bytes[i];
+
+      for (int b=0; b<2; ++b) {
+	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
+	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
+
+	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
+	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
+
+	my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
+      } // loop over b
+      offset += ghost_face_bytes[i];
+
+    } // loop over dimension
+
+    bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled
+
+    // initialize the message handlers
+    for (int i=0; i<nDimComms; i++) {
+      if (!commDimPartitioned(i)) continue;
+
+      for (int b=0; b<2; ++b) {
+	mh_send_fwd[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
+	mh_send_back[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
+
+	mh_recv_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
+	mh_recv_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
+
+	mh_send_rdma_fwd[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	mh_send_rdma_back[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
+
+	mh_recv_rdma_fwd[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	mh_recv_rdma_back[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
+      } // loop over b
+
+    } // loop over dimension
+
+    initComms = true;
+    checkCudaError();
+  }
+
+  void LatticeField::destroyComms()
+  {
+    if (initComms) {
+
+      for (int b=0; b<2; ++b) {
+	for (int i=0; i<nDimComms; i++) {
+	  if (commDimPartitioned(i)) {
+	    if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
+	    if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
+	    if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
+	    if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
+
+	    if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
+	    if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
+	    if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
+	    if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
+	  }
+	}
+      } // loop over b
+
+      initComms = false;
+      checkCudaError();
+    }
+
   }
 
   void LatticeField::createIPCComms() {

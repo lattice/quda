@@ -2,7 +2,6 @@
 #include <string.h>
 #include <iostream>
 #include <typeinfo>
-#include <face_quda.h>
 
 namespace quda {
 
@@ -16,8 +15,8 @@ namespace quda {
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
     : LatticeField(param), init(false), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
-      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
+      ghost( ), ghostNorm( ), ghostFace( ),
+      bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
@@ -28,8 +27,8 @@ namespace quda {
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
     : LatticeField(field), init(false), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), ghostOffset( ), ghostNormOffset( ),
-      bytes(0), norm_bytes(0), ghost_bytes(0), even(0), odd(0),
+      ghost( ), ghostNorm( ), ghostFace( ),
+      bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor,
@@ -55,7 +54,7 @@ namespace quda {
     int x5   = nDim == 5 ? x[4] : 1; ///includes DW  and non-degenerate TM ghosts
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
-      if (commDimPartitioned(i)) {
+      if (comm_dim_partitioned(i)) {
 	ghostFace[i] = 1;
 	for (int j=0; j<dims; j++) {
 	  if (i==j) continue;
@@ -86,6 +85,10 @@ namespace quda {
       } else {
         ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
       }
+
+      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
+      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*precision;
+      if (precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
 
     } // dim
 
@@ -245,8 +248,8 @@ namespace quda {
   }
 
   // Resets the attributes of this field if param disagrees (and is defined)
-  void ColorSpinorField::reset(const ColorSpinorParam &param) {
-
+  void ColorSpinorField::reset(const ColorSpinorParam &param)
+  {
     if (param.nColor != 0) nColor = param.nColor;
     if (param.nSpin != 0) nSpin = param.nSpin;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;

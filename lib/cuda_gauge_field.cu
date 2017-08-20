@@ -1,6 +1,5 @@
 #include <string.h>
 #include <gauge_field.h>
-#include <face_quda.h>
 #include <typeinfo>
 #include <misc_helpers.h>
 #include <blas_quda.h>
@@ -249,108 +248,84 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
-    
-    void   *send[QUDA_MAX_DIM],  *recv[QUDA_MAX_DIM];
-    void *send_d[QUDA_MAX_DIM], *recv_d[QUDA_MAX_DIM];
-    void *send_h[QUDA_MAX_DIM], *recv_h[QUDA_MAX_DIM];
-    size_t bytes[QUDA_MAX_DIM];
-    size_t ghost_bytes = 0;
-    for (int d=0; d<nDim; d++) {
-      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
-      // store both parities and directions in each
-      bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-      ghost_bytes += 2*bytes[d]; // factor of two comes from direction
-    }
+  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill) const
+  {
+    createGhostZone(R, no_comms_fill);
+    LatticeField::allocateGhostBuffer(ghost_bytes);
+  }
 
-    allocateGhostBuffer(ghost_bytes);
+  void cudaGaugeField::createComms(const int *R, bool no_comms_fill)
+  {
+    allocateGhostBuffer(R, no_comms_fill); // allocate the ghost buffer if not yet allocated
+
+    // ascertain if this instance needs it comms buffers to be updated
+    bool comms_reset = ghost_field_reset || // FIXME add send buffer check
+      (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]); // pinned buffers
+
+    if (!initComms || comms_reset) LatticeField::createComms();
+  }
+
+  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill)
+  {
+    const int b = bufferIndex;
+    void *send_d[QUDA_MAX_DIM], *recv_d[QUDA_MAX_DIM];
+
+    createComms(R, no_comms_fill);
 
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
-      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
-      send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset;
-      recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset;
-
-      send_h[d] = static_cast<char*>(ghost_pinned_buffer_h[bufferIndex]) + 0*ghost_bytes + offset;
-      recv_h[d] = static_cast<char*>(ghost_pinned_buffer_h[bufferIndex]) + 1*ghost_bytes + offset;
-
-      offset += 2*bytes[d]; // factor of two from fwd/back
+      if ( !(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
+      send_d[d] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+      recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[b]) + offset;
+      offset += 2*ghost_face_bytes[d]; // factor of two from fwd/back
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-#ifdef GPU_COMMS
-      recv[d] = recv_d[d];
-      send[d] = send_d[d];
-#else
-      recv[d] = recv_h[d];
-      send[d] = send_h[d];
-#endif
+      if ( !(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
 
-      // look into storing these for later
-      mh_recv_back[bufferIndex][d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-      mh_recv_fwd[bufferIndex][d]  = comm_declare_receive_relative(static_cast<char*>(recv[d])+bytes[d], d, +1, bytes[d]);
-      mh_send_back[bufferIndex][d] = comm_declare_send_relative(send[d], d, -1, bytes[d]);
-      mh_send_fwd[bufferIndex][d]  = comm_declare_send_relative(static_cast<char*>(send[d])+bytes[d], d, +1, bytes[d]);
-    }
-
-    for (int d=0; d<nDim; d++) {
-      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
-
-      if (commDimPartitioned(d)) {
-	comm_start(mh_recv_fwd[bufferIndex][d]);
-	comm_start(mh_recv_back[bufferIndex][d]);
+      if (comm_dim_partitioned(d)) {
+	comm_start(mh_recv_fwd[b][d]);
+	comm_start(mh_recv_back[b][d]);
       }
 
       //extract into a contiguous buffer
       extractExtendedGaugeGhost(*this, d, R, send_d, true);
 
-      if (commDimPartitioned(d)) {
-	
+      if (comm_dim_partitioned(d)) {
 	// pipeline the forwards and backwards sending
-#ifndef GPU_COMMS
-	qudaMemcpy(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost);
-#endif
-	comm_start(mh_send_back[bufferIndex][d]);
+	qudaMemcpy(my_face_dim_dir_h[b][d][0], my_face_dim_dir_d[b][d][0],
+		   ghost_face_bytes[d], cudaMemcpyDeviceToHost);
+	comm_start(mh_send_back[b][d]);
 
-#ifndef GPU_COMMS
-	qudaMemcpy(static_cast<char*>(send_h[d])+bytes[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost);
-#endif
-	comm_start(mh_send_fwd[bufferIndex][d]);
+	qudaMemcpy(my_face_dim_dir_h[b][d][1], my_face_dim_dir_d[b][d][1],
+		   ghost_face_bytes[d], cudaMemcpyDeviceToHost);
+	comm_start(mh_send_fwd[b][d]);
 
 	// forwards recv
-	comm_wait(mh_send_back[bufferIndex][d]);
-	comm_wait(mh_recv_fwd[bufferIndex][d]);
-#ifndef GPU_COMMS
-	qudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice);
-#endif      
-	
+	comm_wait(mh_send_back[b][d]);
+	comm_wait(mh_recv_fwd[b][d]);
+
+	qudaMemcpy(from_face_dim_dir_d[b][d][1], from_face_dim_dir_h[b][d][1],
+		   ghost_face_bytes[d], cudaMemcpyHostToDevice);
+
 	// backwards recv
-	comm_wait(mh_send_fwd[bufferIndex][d]);
-	comm_wait(mh_recv_back[bufferIndex][d]);
-#ifndef GPU_COMMS
-	qudaMemcpy(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice);
-#endif      
+	comm_wait(mh_send_fwd[b][d]);
+	comm_wait(mh_recv_back[b][d]);
+
+	qudaMemcpy(from_face_dim_dir_d[b][d][0], from_face_dim_dir_h[b][d][0],
+		   ghost_face_bytes[d], cudaMemcpyHostToDevice);
       } else { // if just doing a local exchange to fill halo then need to swap faces
-	qudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], send_d[d], bytes[d], cudaMemcpyDeviceToDevice);
-	qudaMemcpy(recv_d[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(from_face_dim_dir_d[b][d][1], my_face_dim_dir_d[b][d][0],
+		   ghost_face_bytes[d], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(from_face_dim_dir_d[b][d][0], my_face_dim_dir_d[b][d][1],
+		   ghost_face_bytes[d], cudaMemcpyDeviceToDevice);
       }
 
       // inject back into the gauge field
       extractExtendedGaugeGhost(*this, d, R, recv_d, false);
     }
 
-    for (int d=0; d<nDim; d++) {
-      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
-
-      if (commDimPartitioned(d)) {
-	comm_free(mh_send_fwd[bufferIndex][d]);
-	comm_free(mh_send_back[bufferIndex][d]);
-	comm_free(mh_recv_back[bufferIndex][d]);
-	comm_free(mh_recv_fwd[bufferIndex][d]);
-      }
-    }
-
+    destroyComms();
   }
 
   void cudaGaugeField::setGauge(void *gauge_)

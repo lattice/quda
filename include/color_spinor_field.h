@@ -277,15 +277,11 @@ namespace quda {
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
     mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
-    mutable int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
-    mutable int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-    mutable size_t ghost_bytes; // size in bytes of the ghost field
-    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -528,11 +524,6 @@ namespace quda {
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
     void createComms(int nFace, bool spin_project=true);
-
-    /**
-       @brief Destroy the communication handlers and buffers
-    */
-    void destroyComms();
 
     /**
        @brief Allocate the ghost buffers

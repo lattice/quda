@@ -139,6 +139,8 @@ namespace quda {
 
     mutable void *ghost[2*QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
 
+    mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
+
     /** The staggered phase convention to use */
     QudaStaggeredPhase staggeredPhaseType;
 
@@ -147,14 +149,22 @@ namespace quda {
 
     /**
        @brief Exchange the buffers across all dimensions in a given direction
-       @param recv[out] Reicve buffer
-       @param send[in] Send buffer
-       @param dir[in] Direction in which we are sending (forwards OR backwards only)
+       @param[out] recv Receive buffer
+       @param[in] send Send buffer
+       @param[in] dir Direction in which we are sending (forwards OR backwards only)
     */
     void exchange(void **recv, void **send, QudaDirection dir) const;
 
     /** Imaginary chemical potential */
     double i_mu;
+
+    /**
+       Compute the required extended ghost zone sizes and offsets
+       @param[in] R Radius of the ghost zone
+       @param[in] no_comms_fill If true we create a full halo
+       regardless of partitioning
+    */
+    void createGhostZone(const int *R, bool no_comms_fill) const;
 
   public:
     GaugeField(const GaugeFieldParam &param);
@@ -275,9 +285,24 @@ namespace quda {
     void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
+       @brief Create the communication handlers and buffers
+       @param R The thickness of the extended region in each dimension
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    void createComms(const int *R, bool no_comms_fill);
+
+    /**
+       @brief Allocate the ghost buffers
+       @param R The thickness of the extended region in each dimension
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    void allocateGhostBuffer(const int *R, bool no_comms_fill) const;
+
+    /**
        @brief This does routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.  
-
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions

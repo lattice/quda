@@ -83,6 +83,28 @@ namespace quda {
 
   }
 
+  void GaugeField::createGhostZone(const int *R, bool no_comms_fill) const
+  {
+    if (typeid(*this) == typeid(cpuGaugeField)) return;
+
+    // calculate size of ghost zone required
+    ghost_bytes = 0;
+    for (int i=0; i<nDim; i++) {
+      ghost_face_bytes[i] = 0;
+      if ( !(comm_dim_partitioned(i) || (no_comms_fill && R[i])) ) ghostFace[i] = 0;
+      else ghostFace[i] = surface[i] * R[i]; // includes the radius (unlike ColorSpinorField)
+
+      ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1]*geometry*nInternal;
+      ghostOffset[i][1] = ghostOffset[i][0] + ghostFace[i]*geometry*nInternal;
+
+      ghost_face_bytes[i] = ghostFace[i] * geometry * nInternal * precision;
+      ghost_bytes += 2*ghost_face_bytes[i]; // factor of two from direction
+    }
+
+    if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
+
+  } // createGhostZone
+
   void GaugeField::applyStaggeredPhase() {
     if (staggeredPhaseApplied) errorQuda("Staggered phases already applied");
     applyGaugePhase(*this);

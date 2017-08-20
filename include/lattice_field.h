@@ -191,7 +191,7 @@ namespace quda {
     static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
     /**
-       The current size of the ghost allocations
+       The current size of the static ghost allocation
     */
     static size_t ghostFaceBytes;
 
@@ -199,6 +199,26 @@ namespace quda {
        Whether the ghost buffers have been initialized
     */
     static bool initGhostFaceBuffer;
+
+    /**
+       Size in bytes of this ghost field
+    */
+    mutable size_t ghost_bytes;
+
+    /**
+       Size in bytes of the ghost in each dimension
+    */
+    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
+
+    /**
+       Real-number offsets to each ghost zone
+    */
+    mutable int ghostOffset[QUDA_MAX_DIM][2];
+
+    /**
+       Real-number (in floats) offsets to each ghost zone for norm field
+    */
+    mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
     /** Pinned memory buffer used for sending all messages */
     void *my_face_h[2];
@@ -331,6 +351,16 @@ namespace quda {
        @brief Free statically allocated ghost buffers
     */
     static void freeGhostBuffer(void);
+
+    /**
+       Create the communication handlers (both host and device)
+    */
+    void createComms();
+
+    /**
+       Destroy the communication handlers
+    */
+    void destroyComms();
 
     /**
        Create the inter-process communication handlers

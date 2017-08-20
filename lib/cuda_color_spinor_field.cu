@@ -637,13 +637,7 @@ namespace quda {
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {
 
-    if (!comm_partitioned()) {
-      for (int i=0; i<4; i++) ghost_face_bytes[i] = 0;
-      return;
-    }
-
     createGhostZone(nFace, spin_project);
-
     LatticeField::allocateGhostBuffer(ghost_bytes);
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -895,7 +889,6 @@ namespace quda {
   void cudaColorSpinorField::createComms(int nFace, bool spin_project) {
 
     allocateGhostBuffer(nFace,spin_project); // allocate the ghost buffer if not yet allocated
-    int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
 
     // ascertain if this instance needs its comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
@@ -904,23 +897,9 @@ namespace quda {
 
     if (!initComms || comms_reset) {
 
-      destroyComms(); // if we are requesting a new number of faces destroy and start over
+      LatticeField::createComms();
 
-      for (int i=0; i<nDimComms; i++) { // compute size of ghost buffers required
-	if (!commDimPartitioned(i)) { ghost_face_bytes[i] = 0; continue; }
-	ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*precision;
-	if (precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
-      }
-
-      // initialize the ghost pinned buffers
-      for (int b=0; b<2; b++) {
-	my_face_h[b] = ghost_pinned_buffer_h[b];
-	my_face_hd[b] = ghost_pinned_buffer_hd[b];
-	from_face_h[b] = static_cast<char*>(my_face_h[b]) + ghost_bytes;
-	from_face_hd[b] = static_cast<char*>(my_face_hd[b]) + ghost_bytes;
-      }
-
-      // initialize the ghost receive pointers
+      // reinitialize the ghost receive pointers
       for (int i=0; i<nDimComms; ++i) {
 	if (commDimPartitioned(i)) {
 	  for (int b=0; b<2; b++) {
@@ -930,92 +909,10 @@ namespace quda {
 	  }
 	}
       }
-
-      // initialize ghost send pointers
-      size_t offset = 0;
-      for (int i=0; i<nDimComms; i++) {
-	if (!commDimPartitioned(i)) continue;
-
-	for (int b=0; b<2; ++b) {
-	  my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
-	  from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
-
-	  my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
-	  from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
-
-	  my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	  from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
-	} // loop over b
-	offset += ghost_face_bytes[i];
-
-	for (int b=0; b<2; ++b) {
-	  my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
-	  from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
-
-	  my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
-	  from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
-
-	  my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	  from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
-	} // loop over b
-	offset += ghost_face_bytes[i];
-
-      } // loop over dimension
-
-      bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled
-
-      // initialize the message handlers
-      for (int i=0; i<nDimComms; i++) {
-	if (!commDimPartitioned(i)) continue;
-
-	for (int b=0; b<2; ++b) {
-	  mh_send_fwd[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_send_back[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
-
-	  mh_recv_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_recv_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
-
-	  mh_send_rdma_fwd[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
-	  mh_send_rdma_back[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
-
-	  mh_recv_rdma_fwd[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
-	  mh_recv_rdma_back[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
-	} // loop over b
-
-      } // loop over dimension
-     
-      initComms = true;
-      checkCudaError();
     }
 
     if (LatticeField::ghost_field_reset) destroyIPCComms();
     createIPCComms();
-  }
-
-  void cudaColorSpinorField::destroyComms()
-  {
-    if (initComms) {
-
-      for (int b=0; b<2; ++b) {
-	for (int i=0; i<nDimComms; i++) {
-	  if (commDimPartitioned(i)) {
-	    if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
-	    if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
-	    if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
-	    if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
-
-	    if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
-	    if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
-	    if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
-	    if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
-	  }
-	}
-      } // loop over b
-
-      initComms = false;
-      checkCudaError();
-    }
-
   }
 
   void cudaColorSpinorField::streamInit(cudaStream_t *stream_p) {
