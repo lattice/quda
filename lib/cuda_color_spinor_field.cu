@@ -576,24 +576,22 @@ namespace quda {
     } else {
       void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
-	resizeBufferDevice(src.Bytes()+src.NormBytes());
-	Src = bufferDevice;
-	srcNorm = (char*)bufferDevice + src.Bytes();
+	Src = pool_device_malloc(src.Bytes()+src.NormBytes());
+	srcNorm = static_cast<char*>(Src) + src.Bytes();
 	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
 	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
 	buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
 	memcpy(buffer, src.V(), src.Bytes());
 	memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
-
 	cudaHostGetDevicePointer(&Src, buffer, 0);
-	srcNorm = (void*)((char*)Src + src.Bytes());
+	srcNorm = static_cast<char*>(Src) + src.Bytes();
       }
 
       cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
 
-      if (zeroCopy) pool_pinned_free(buffer);
+      if (zeroCopy) { pool_pinned_free(buffer); } else { pool_device_free(Src); }
     }
 
     return;
@@ -614,13 +612,12 @@ namespace quda {
     } else {
       void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
-	resizeBufferDevice(dest.Bytes()+dest.NormBytes());
-	dst = bufferDevice;
-	dstNorm = (char*)bufferDevice+dest.Bytes();
+	dst = pool_device_malloc(dest.Bytes()+dest.NormBytes());
+	dstNorm = static_cast<char*>(dst) + dest.Bytes();
       } else {
 	buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
 	cudaHostGetDevicePointer(&dst, buffer, 0);
-	dstNorm = (char*)dst+dest.Bytes();
+	dstNorm = static_cast<char*>(dst)+dest.Bytes();
       }
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
 
@@ -632,7 +629,7 @@ namespace quda {
 	memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
       }
 
-      if (zeroCopy) pool_pinned_free(buffer);
+      if (zeroCopy) { pool_pinned_free(buffer); } else { pool_device_free(dst); }
     }
 
     return;

@@ -154,33 +154,6 @@ namespace quda {
     /** Type of ghost exchange to perform */
     QudaGhostExchange ghostExchange;
 
-    /** Pinned-memory buffer that is used by all derived classes */
-    static void *bufferPinned[2]; 
-
-    /** Whether the pinned-memory buffer has already been initialized or not */
-    static bool bufferPinnedInit[2];
-
-    /** The size in bytes of pinned-memory buffer */
-    static size_t bufferPinnedBytes[2];
-
-    /** Resize the pinned-memory buffer */
-    void resizeBufferPinned(size_t bytes, const int index=0) const;
-
-    /** Keep track of resizes to the pinned memory buffers */
-    static size_t bufferPinnedResizeCount;
-
-    /** Device-memory buffer that is used by all derived classes */
-    static void *bufferDevice; 
-
-    /** Whether the device-memory buffer has already been initialized or not */
-    static bool bufferDeviceInit;
-
-    /** The size in bytes of device-memory buffer */
-    static size_t bufferDeviceBytes;
-
-    /** Resize the device-memory buffer */
-    void resizeBufferDevice(size_t bytes) const;
-
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
 
     /** The number of dimensions we partition for communication */
@@ -353,11 +326,6 @@ namespace quda {
        @param[in] ghost_bytes Size of the ghost buffer to allocate
     */
     void allocateGhostBuffer(size_t ghost_bytes) const;
-
-    /**
-       Free the pinned-memory buffer
-    */
-    static void freeBuffer(int index=0);
 
     /**
        @brief Free statically allocated ghost buffers

@@ -8,15 +8,6 @@
 
 namespace quda {
 
-  void* LatticeField::bufferPinned[] = {NULL};
-  bool LatticeField::bufferPinnedInit[] = {false};
-  size_t LatticeField::bufferPinnedBytes[] = {0};
-  size_t LatticeField::bufferPinnedResizeCount = 0;
-
-  void* LatticeField::bufferDevice = NULL;
-  bool LatticeField::bufferDeviceInit = false;
-  size_t LatticeField::bufferDeviceBytes = 0;
-
   bool LatticeField::initIPCComms = false;
 
   int LatticeField::buffer_send_p2p_fwd[2][QUDA_MAX_DIM] { };
@@ -456,41 +447,6 @@ namespace quda {
 
     errorQuda("Unsupported field type");
     return -1;
-  }
-
-  void LatticeField::resizeBufferPinned(size_t bytes, const int idx) const {
-    if ((bytes > bufferPinnedBytes[idx] || bufferPinnedInit[idx] == 0) && bytes > 0) {
-      if (bufferPinnedInit[idx]) host_free(bufferPinned[idx]);
-      bufferPinned[idx] = pinned_malloc(bytes);
-      bufferPinnedBytes[idx] = bytes;
-      bufferPinnedInit[idx] = true;
-      bufferPinnedResizeCount++;
-      if (bufferPinnedResizeCount == 0) bufferPinnedResizeCount = 1; // keep 0 as initialization state
-    }
-  }
-
-  void LatticeField::resizeBufferDevice(size_t bytes) const {
-    if ((bytes > bufferDeviceBytes || bufferDeviceInit == 0) && bytes > 0) {
-      if (bufferDeviceInit) device_free(bufferDevice);
-      bufferDevice = device_malloc(bytes);
-      bufferDeviceBytes = bytes;
-      bufferDeviceInit = true;
-    }
-  }
-
-  void LatticeField::freeBuffer(int index) {
-    if (bufferPinnedInit[index]) {
-      host_free(bufferPinned[index]);
-      bufferPinned[index] = NULL;
-      bufferPinnedBytes[index] = 0;
-      bufferPinnedInit[index] = false;
-    }
-    if (bufferDeviceInit) {
-      device_free(bufferDevice);
-      bufferDevice = NULL;
-      bufferDeviceBytes = 0;
-      bufferDeviceInit = false;
-    }
   }
 
   // This doesn't really live here, but is fine for the moment

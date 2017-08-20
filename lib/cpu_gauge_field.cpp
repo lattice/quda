@@ -303,7 +303,7 @@ namespace quda {
       }
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
-      // copy field and ghost zone into bufferPinned
+      // copy field and ghost zone directly
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge,
 		       const_cast<void*>(static_cast<const cpuGaugeField&>(src).Gauge_p()));
     } else {
