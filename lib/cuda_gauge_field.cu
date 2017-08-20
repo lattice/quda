@@ -146,6 +146,8 @@ namespace quda {
     destroyTexObject();
 #endif
 
+    destroyComms();
+
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (gauge) pool_device_free(gauge);
     }
@@ -283,37 +285,56 @@ namespace quda {
     for (int d=0; d<nDim; d++) {
       if ( !(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
 
-      if (comm_dim_partitioned(d)) {
-	comm_start(mh_recv_fwd[b][d]);
-	comm_start(mh_recv_back[b][d]);
-      }
-
       //extract into a contiguous buffer
       extractExtendedGaugeGhost(*this, d, R, send_d, true);
 
       if (comm_dim_partitioned(d)) {
-	// pipeline the forwards and backwards sending
-	qudaMemcpy(my_face_dim_dir_h[b][d][0], my_face_dim_dir_d[b][d][0],
-		   ghost_face_bytes[d], cudaMemcpyDeviceToHost);
-	comm_start(mh_send_back[b][d]);
 
-	qudaMemcpy(my_face_dim_dir_h[b][d][1], my_face_dim_dir_d[b][d][1],
-		   ghost_face_bytes[d], cudaMemcpyDeviceToHost);
-	comm_start(mh_send_fwd[b][d]);
+	if (comm_gdr_enabled()) {
+	  // pre-post receive
+	  comm_start(mh_recv_rdma_fwd[b][d]);
+	  comm_start(mh_recv_rdma_back[b][d]);
 
-	// forwards recv
-	comm_wait(mh_send_back[b][d]);
-	comm_wait(mh_recv_fwd[b][d]);
+	  cudaDeviceSynchronize(); // need to sync before we commence any communication
 
-	qudaMemcpy(from_face_dim_dir_d[b][d][1], from_face_dim_dir_h[b][d][1],
-		   ghost_face_bytes[d], cudaMemcpyHostToDevice);
+	  comm_start(mh_send_rdma_back[b][d]);
+	  comm_start(mh_send_rdma_fwd[b][d]);
 
-	// backwards recv
-	comm_wait(mh_send_fwd[b][d]);
-	comm_wait(mh_recv_back[b][d]);
+	  // forwards recv
+	  comm_wait(mh_send_rdma_back[b][d]);
+	  comm_wait(mh_recv_rdma_fwd[b][d]);
 
-	qudaMemcpy(from_face_dim_dir_d[b][d][0], from_face_dim_dir_h[b][d][0],
-		   ghost_face_bytes[d], cudaMemcpyHostToDevice);
+	  // backwards recv
+	  comm_wait(mh_send_rdma_fwd[b][d]);
+	  comm_wait(mh_recv_rdma_back[b][d]);
+	} else { // stage in CPU memory
+	  // pre-post receive
+	  comm_start(mh_recv_fwd[b][d]);
+	  comm_start(mh_recv_back[b][d]);
+
+	  // pipeline the forwards and backwards sending
+	  qudaMemcpy(my_face_dim_dir_h[b][d][0], my_face_dim_dir_d[b][d][0],
+		     ghost_face_bytes[d], cudaMemcpyDeviceToHost);
+	  comm_start(mh_send_back[b][d]);
+
+	  qudaMemcpy(my_face_dim_dir_h[b][d][1], my_face_dim_dir_d[b][d][1],
+		     ghost_face_bytes[d], cudaMemcpyDeviceToHost);
+	  comm_start(mh_send_fwd[b][d]);
+
+	  // forwards recv
+	  comm_wait(mh_send_back[b][d]);
+	  comm_wait(mh_recv_fwd[b][d]);
+
+	  qudaMemcpy(from_face_dim_dir_d[b][d][1], from_face_dim_dir_h[b][d][1],
+		     ghost_face_bytes[d], cudaMemcpyHostToDevice);
+
+	  // backwards recv
+	  comm_wait(mh_send_fwd[b][d]);
+	  comm_wait(mh_recv_back[b][d]);
+
+	  qudaMemcpy(from_face_dim_dir_d[b][d][0], from_face_dim_dir_h[b][d][0],
+		     ghost_face_bytes[d], cudaMemcpyHostToDevice);
+	}
       } else { // if just doing a local exchange to fill halo then need to swap faces
 	qudaMemcpy(from_face_dim_dir_d[b][d][1], my_face_dim_dir_d[b][d][0],
 		   ghost_face_bytes[d], cudaMemcpyDeviceToDevice);
@@ -325,7 +346,7 @@ namespace quda {
       extractExtendedGaugeGhost(*this, d, R, recv_d, false);
     }
 
-    destroyComms();
+    bufferIndex = 1-bufferIndex;
   }
 
   void cudaGaugeField::setGauge(void *gauge_)
