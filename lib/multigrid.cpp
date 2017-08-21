@@ -494,7 +494,7 @@ namespace quda {
     
     void *evalsBuffer =  arpPrecision == QUDA_DOUBLE_PRECISION ? static_cast<void*>(new std::complex<double>[nmodes+1]) : static_cast<void*>( new std::complex<float>[nmodes+1]);
     //
-    arpackSolve( evecsBuffer, evalsBuffer, param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
+    arpackSolve( evecsBuffer, evalsBuffer, *param.matSmooth,  matPrecision,  arpPrecision, arpack_tol, nmodes, ncv,  which);
 
     for (int i=0; i<nmodes; i++) {
       // as well as copying to the correct location this also changes basis if necessary

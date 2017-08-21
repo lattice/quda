@@ -1223,3 +1223,60 @@ get_quda_ver_str()
   return vstr;
 }
 
+
+QudaExtLibType
+get_solve_ext_lib_type(char* s)
+{
+  QudaExtLibType ret = QUDA_EXTLIB_INVALID;
+
+  if (strcmp(s, "eigen") == 0) {
+    ret = QUDA_EIGEN_EXTLIB;
+  } else if (strcmp(s, "magma") == 0) {
+    ret = QUDA_MAGMA_EXTLIB;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+QudaFieldLocation
+get_df_location_ritz(char* s)
+{
+  QudaFieldLocation ret = QUDA_INVALID_FIELD_LOCATION;
+
+  if (strcmp(s, "host") == 0) {
+    ret = QUDA_CPU_FIELD_LOCATION;
+  } else if (strcmp(s, "cuda") == 0) {
+    ret = QUDA_CUDA_FIELD_LOCATION;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+
+QudaMemoryType
+get_df_mem_type_ritz(char* s)
+{
+  QudaMemoryType ret = QUDA_MEMORY_INVALID;
+
+  if (strcmp(s, "device") == 0) {
+    ret = QUDA_MEMORY_DEVICE;
+  } else if (strcmp(s, "pinned") == 0) {
+    ret = QUDA_MEMORY_PINNED;
+  } else if (strcmp(s, "mapped") == 0) {
+    ret = QUDA_MEMORY_MAPPED;
+  } else {
+    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+
+

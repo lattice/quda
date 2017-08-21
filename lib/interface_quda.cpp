@@ -2379,12 +2379,17 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   ritzParam.is_composite  = true;
   ritzParam.is_component  = false;
   ritzParam.composite_dim = param->nev*param->deflation_grid;
-
   ritzParam.setPrecision(param->cuda_prec_ritz);
 
   if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
     ritzParam.fieldOrder = (param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ) ?  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-    ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    if(ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+    //select memory location here, by default ritz vectors will be allocated on the device
+    //but if not sufficient device memory, then the user may choose mapped type of memory
+    ritzParam.mem_type = eig_param.mem_type_ritz;
+  } else { //host location
+    ritzParam.mem_type = QUDA_MEMORY_PINNED;
   }
 
   int ritzVolume = 1;
@@ -2394,10 +2399,10 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
     size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.precision);
     printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)" , byte_estimate, ritzVolume, ritzParam.precision);
-
+    if(ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
+    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED) printfQuda("Using mapped memory type.\n"); 
   }
 
-  //ritzParam.mem_type = QUDA_MEMORY_MAPPED;
   RV = ColorSpinorField::Create(ritzParam);
 
   deflParam = new DeflationParam(eig_param, RV, *m);
