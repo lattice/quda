@@ -261,7 +261,7 @@ module quda_fortran
      integer(4)::chrono_index
 
      ! Which external library to use in the linear solvers (MAGMA or Eigen) */
-     QudaExtLibType::extlib_type;
+     QudaExtLibType::extlib_type
 
   end type quda_invert_param
 
