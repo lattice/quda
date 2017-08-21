@@ -141,10 +141,14 @@ namespace quda {
 
     mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
 
-    /** The staggered phase convention to use */
+    /**
+       The staggered phase convention to use
+    */
     QudaStaggeredPhase staggeredPhaseType;
 
-    /** Whether the staggered phase factor has been applied */
+    /**
+       Whether the staggered phase factor has been applied
+    */
     bool staggeredPhaseApplied;
 
     /**
@@ -155,7 +159,9 @@ namespace quda {
     */
     void exchange(void **recv, void **send, QudaDirection dir) const;
 
-    /** Imaginary chemical potential */
+    /**
+       Imaginary chemical potential
+    */
     double i_mu;
 
     /**
@@ -299,6 +305,29 @@ namespace quda {
        region in non-partitioned dimensions
     */
     void allocateGhostBuffer(const int *R, bool no_comms_fill) const;
+
+    /**
+       @brief Start the receive communicators
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+    */
+    void recvStart(int dim, int dir);
+
+    /**
+       @brief Start the sending communicators
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+       @param[in] stream_p Pointer to CUDA stream to post the
+       communication in (if 0, then use null stream)
+    */
+    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+
+    /**
+       @brief Wait for communication to complete
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+    */
+    void commsComplete(int dim, int dir);
 
     /**
        @brief This does routine will populate the border / halo region of a

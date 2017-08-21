@@ -1111,7 +1111,7 @@ namespace quda {
       if (dir == 0) {
 	// record the event
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], *copy_stream);
-	// send to the propcessor in the -1 direction
+	// send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);

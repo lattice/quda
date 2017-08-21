@@ -265,6 +265,111 @@ namespace quda {
       (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]); // pinned buffers
 
     if (!initComms || comms_reset) LatticeField::createComms();
+
+    if (ghost_field_reset) destroyIPCComms();
+    createIPCComms();
+  }
+
+  void cudaGaugeField::recvStart(int dim, int dir) {
+    if (!comm_dim_partitioned(dim)) return;
+
+    if (dir==0) { // sending backwards
+      // receive from the processor in the +1 direction
+      if (comm_peer2peer_enabled(1,dim)) {
+	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
+      } else if (comm_gdr_enabled()) {
+        comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
+      } else {
+        comm_start(mh_recv_fwd[bufferIndex][dim]);
+      }
+    } else { //sending forwards
+      // receive from the processor in the -1 direction
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
+      } else if (comm_gdr_enabled()) {
+        comm_start(mh_recv_rdma_back[bufferIndex][dim]);
+      } else {
+        comm_start(mh_recv_back[bufferIndex][dim]);
+      }
+    }
+  }
+
+  void cudaGaugeField::sendStart(int dim, int dir, cudaStream_t* stream_p) {
+
+    if (!comm_dim_partitioned(dim)) return;
+
+    if (!comm_peer2peer_enabled(dir,dim)) {
+      if (dir == 0)
+	if (comm_gdr_enabled()) comm_start(mh_send_rdma_back[bufferIndex][dim]);
+	else comm_start(mh_send_back[bufferIndex][dim]);
+      else
+	if (comm_gdr_enabled()) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
+	else comm_start(mh_send_fwd[bufferIndex][dim]);
+    } else { // doing peer-to-peer
+
+      void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
+	+ precision*ghostOffset[dim][(dir+1)%2];
+
+      cudaMemcpyAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir],
+		      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice,
+		      stream_p ? *stream_p : 0);
+
+      if (dir == 0) {
+	// record the event
+	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream_p ? *stream_p : 0);
+	// send to the processor in the -1 direction
+	comm_start(mh_send_p2p_back[bufferIndex][dim]);
+      } else {
+	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream_p ? *stream_p : 0);
+	// send to the processor in the +1 direction
+	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
+      }
+    }
+  }
+
+  void cudaGaugeField::commsComplete(int dim, int dir) {
+
+    if (!comm_dim_partitioned(dim)) return;
+
+    if (dir==0) {
+      if (comm_peer2peer_enabled(1,dim)) {
+	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_recv_fwd[bufferIndex][dim]);
+      }
+
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_send_back[bufferIndex][dim]);
+      }
+    } else {
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_recv_back[bufferIndex][dim]);
+      }
+
+      if (comm_peer2peer_enabled(1,dim)) {
+	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
+	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_send_fwd[bufferIndex][dim]);
+      }
+    }
+
+    return;
   }
 
   void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill)
@@ -290,51 +395,13 @@ namespace quda {
 
       if (comm_dim_partitioned(d)) {
 
-	if (comm_gdr_enabled()) {
-	  // pre-post receive
-	  comm_start(mh_recv_rdma_fwd[b][d]);
-	  comm_start(mh_recv_rdma_back[b][d]);
+	for (int dir=0; dir<2; dir++) recvStart(d, dir);
+	if (comm_gdr_enabled()) cudaDeviceSynchronize();
 
-	  cudaDeviceSynchronize(); // need to sync before we commence any communication
+	// if we pass a stream to sendStart then we must ensure that stream is synchronized
+	for (int dir=0; dir<2; dir++) sendStart(d, dir);
+	for (int dir=0; dir<2; dir++) commsComplete(d, dir);
 
-	  comm_start(mh_send_rdma_back[b][d]);
-	  comm_start(mh_send_rdma_fwd[b][d]);
-
-	  // forwards recv
-	  comm_wait(mh_send_rdma_back[b][d]);
-	  comm_wait(mh_recv_rdma_fwd[b][d]);
-
-	  // backwards recv
-	  comm_wait(mh_send_rdma_fwd[b][d]);
-	  comm_wait(mh_recv_rdma_back[b][d]);
-	} else { // stage in CPU memory
-	  // pre-post receive
-	  comm_start(mh_recv_fwd[b][d]);
-	  comm_start(mh_recv_back[b][d]);
-
-	  // pipeline the forwards and backwards sending
-	  qudaMemcpy(my_face_dim_dir_h[b][d][0], my_face_dim_dir_d[b][d][0],
-		     ghost_face_bytes[d], cudaMemcpyDeviceToHost);
-	  comm_start(mh_send_back[b][d]);
-
-	  qudaMemcpy(my_face_dim_dir_h[b][d][1], my_face_dim_dir_d[b][d][1],
-		     ghost_face_bytes[d], cudaMemcpyDeviceToHost);
-	  comm_start(mh_send_fwd[b][d]);
-
-	  // forwards recv
-	  comm_wait(mh_send_back[b][d]);
-	  comm_wait(mh_recv_fwd[b][d]);
-
-	  qudaMemcpy(from_face_dim_dir_d[b][d][1], from_face_dim_dir_h[b][d][1],
-		     ghost_face_bytes[d], cudaMemcpyHostToDevice);
-
-	  // backwards recv
-	  comm_wait(mh_send_fwd[b][d]);
-	  comm_wait(mh_recv_back[b][d]);
-
-	  qudaMemcpy(from_face_dim_dir_d[b][d][0], from_face_dim_dir_h[b][d][0],
-		     ghost_face_bytes[d], cudaMemcpyHostToDevice);
-	}
       } else { // if just doing a local exchange to fill halo then need to swap faces
 	qudaMemcpy(from_face_dim_dir_d[b][d][1], my_face_dim_dir_d[b][d][0],
 		   ghost_face_bytes[d], cudaMemcpyDeviceToDevice);
