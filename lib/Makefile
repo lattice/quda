@@ -45,7 +45,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\
 	eig_lanczos_quda.o ritz_quda.o eig_solver.o 			\
 	blas_cublas.o blas_magma.o					\
-	misc_helpers.o inv_mpcg_quda.o inv_mpbicgstab_quda.o		\
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o				\
 	pgauge_exchange.o pgauge_init.o pgauge_heatbath.o random.o	\
 	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
 	pgauge_det_trace.o clover_outer_product.o			\
@@ -67,7 +67,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h	\
 	random_quda.h pgauge_monte.h unitarization_links.h		\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
-	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
+	numa_affinity.h texture.h object.h momentum.h			\
 	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
 	qio_util.h quda_arpack_interface.h deflation.h
 

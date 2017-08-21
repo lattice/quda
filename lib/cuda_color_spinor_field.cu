@@ -1,13 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <typeinfo>
+#include <string.h>
+#include <iostream>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
-
-#include <string.h>
-#include <iostream>
-#include <misc_helpers.h>
 #include <dslash_quda.h>
 
 int zeroCopy = 0;

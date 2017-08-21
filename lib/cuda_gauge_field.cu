@@ -1,7 +1,6 @@
 #include <string.h>
 #include <gauge_field.h>
 #include <typeinfo>
-#include <misc_helpers.h>
 #include <blas_quda.h>
 
 namespace quda {
