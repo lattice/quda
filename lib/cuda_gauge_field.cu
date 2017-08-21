@@ -270,7 +270,8 @@ namespace quda {
     createIPCComms();
   }
 
-  void cudaGaugeField::recvStart(int dim, int dir) {
+  void cudaGaugeField::recvStart(int dim, int dir)
+  {
     if (!comm_dim_partitioned(dim)) return;
 
     if (dir==0) { // sending backwards
@@ -294,17 +295,27 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::sendStart(int dim, int dir, cudaStream_t* stream_p) {
-
+  void cudaGaugeField::sendStart(int dim, int dir, cudaStream_t* stream_p)
+  {
     if (!comm_dim_partitioned(dim)) return;
 
     if (!comm_peer2peer_enabled(dir,dim)) {
       if (dir == 0)
-	if (comm_gdr_enabled()) comm_start(mh_send_rdma_back[bufferIndex][dim]);
-	else comm_start(mh_send_back[bufferIndex][dim]);
+	if (comm_gdr_enabled()) {
+	  comm_start(mh_send_rdma_back[bufferIndex][dim]);
+	} else {
+	  qudaMemcpy(my_face_dim_dir_h[bufferIndex][dim][0], my_face_dim_dir_d[bufferIndex][dim][0],
+		     ghost_face_bytes[dim], cudaMemcpyDeviceToHost);
+	  comm_start(mh_send_back[bufferIndex][dim]);
+	}
       else
-	if (comm_gdr_enabled()) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
-	else comm_start(mh_send_fwd[bufferIndex][dim]);
+	if (comm_gdr_enabled()) {
+	  comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
+	} else {
+	  qudaMemcpy(my_face_dim_dir_h[bufferIndex][dim][1], my_face_dim_dir_d[bufferIndex][dim][1],
+		     ghost_face_bytes[dim], cudaMemcpyDeviceToHost);
+	  comm_start(mh_send_fwd[bufferIndex][dim]);
+	}
     } else { // doing peer-to-peer
 
       void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
@@ -327,8 +338,8 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::commsComplete(int dim, int dir) {
-
+  void cudaGaugeField::commsComplete(int dim, int dir)
+  {
     if (!comm_dim_partitioned(dim)) return;
 
     if (dir==0) {
@@ -339,6 +350,8 @@ namespace quda {
 	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
 	comm_wait(mh_recv_fwd[bufferIndex][dim]);
+	qudaMemcpy(from_face_dim_dir_d[bufferIndex][dim][1], from_face_dim_dir_h[bufferIndex][dim][1],
+		   ghost_face_bytes[dim], cudaMemcpyHostToDevice);
       }
 
       if (comm_peer2peer_enabled(0,dim)) {
@@ -357,6 +370,8 @@ namespace quda {
 	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
 	comm_wait(mh_recv_back[bufferIndex][dim]);
+	qudaMemcpy(from_face_dim_dir_d[bufferIndex][dim][0], from_face_dim_dir_h[bufferIndex][dim][0],
+		   ghost_face_bytes[dim], cudaMemcpyHostToDevice);
       }
 
       if (comm_peer2peer_enabled(1,dim)) {
@@ -368,8 +383,6 @@ namespace quda {
 	comm_wait(mh_send_fwd[bufferIndex][dim]);
       }
     }
-
-    return;
   }
 
   void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill)
@@ -380,37 +393,35 @@ namespace quda {
     createComms(R, no_comms_fill);
 
     size_t offset = 0;
-    for (int d=0; d<nDim; d++) {
-      if ( !(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
-      send_d[d] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-      recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[b]) + offset;
-      offset += 2*ghost_face_bytes[d]; // factor of two from fwd/back
+    for (int dim=0; dim<nDim; dim++) {
+      if ( !(comm_dim_partitioned(dim) || (no_comms_fill && R[dim])) ) continue;
+      send_d[dim] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+      recv_d[dim] = static_cast<char*>(ghost_recv_buffer_d[b]) + offset;
+      offset += 2*ghost_face_bytes[dim]; // factor of two from fwd/back
     }
 
-    for (int d=0; d<nDim; d++) {
-      if ( !(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
+    for (int dim=0; dim<nDim; dim++) {
+      if ( !(comm_dim_partitioned(dim) || (no_comms_fill && R[dim])) ) continue;
 
       //extract into a contiguous buffer
-      extractExtendedGaugeGhost(*this, d, R, send_d, true);
+      extractExtendedGaugeGhost(*this, dim, R, send_d, true);
 
-      if (comm_dim_partitioned(d)) {
-
-	for (int dir=0; dir<2; dir++) recvStart(d, dir);
+      if (comm_dim_partitioned(dim)) {
+	for (int dir=0; dir<2; dir++) recvStart(dim, dir);
 	if (comm_gdr_enabled()) cudaDeviceSynchronize();
 
 	// if we pass a stream to sendStart then we must ensure that stream is synchronized
-	for (int dir=0; dir<2; dir++) sendStart(d, dir);
-	for (int dir=0; dir<2; dir++) commsComplete(d, dir);
-
+	for (int dir=0; dir<2; dir++) sendStart(dim, dir);
+	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
       } else { // if just doing a local exchange to fill halo then need to swap faces
-	qudaMemcpy(from_face_dim_dir_d[b][d][1], my_face_dim_dir_d[b][d][0],
-		   ghost_face_bytes[d], cudaMemcpyDeviceToDevice);
-	qudaMemcpy(from_face_dim_dir_d[b][d][0], my_face_dim_dir_d[b][d][1],
-		   ghost_face_bytes[d], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0],
+		   ghost_face_bytes[dim], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(from_face_dim_dir_d[b][dim][0], my_face_dim_dir_d[b][dim][1],
+		   ghost_face_bytes[dim], cudaMemcpyDeviceToDevice);
       }
 
       // inject back into the gauge field
-      extractExtendedGaugeGhost(*this, d, R, recv_d, false);
+      extractExtendedGaugeGhost(*this, dim, R, recv_d, false);
     }
 
     bufferIndex = 1-bufferIndex;
