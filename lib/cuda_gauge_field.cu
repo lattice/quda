@@ -304,16 +304,12 @@ namespace quda {
 	if (comm_gdr_enabled()) {
 	  comm_start(mh_send_rdma_back[bufferIndex][dim]);
 	} else {
-	  qudaMemcpy(my_face_dim_dir_h[bufferIndex][dim][0], my_face_dim_dir_d[bufferIndex][dim][0],
-		     ghost_face_bytes[dim], cudaMemcpyDeviceToHost);
 	  comm_start(mh_send_back[bufferIndex][dim]);
 	}
       else
 	if (comm_gdr_enabled()) {
 	  comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
 	} else {
-	  qudaMemcpy(my_face_dim_dir_h[bufferIndex][dim][1], my_face_dim_dir_d[bufferIndex][dim][1],
-		     ghost_face_bytes[dim], cudaMemcpyDeviceToHost);
 	  comm_start(mh_send_fwd[bufferIndex][dim]);
 	}
     } else { // doing peer-to-peer
@@ -350,8 +346,6 @@ namespace quda {
 	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
 	comm_wait(mh_recv_fwd[bufferIndex][dim]);
-	qudaMemcpy(from_face_dim_dir_d[bufferIndex][dim][1], from_face_dim_dir_h[bufferIndex][dim][1],
-		   ghost_face_bytes[dim], cudaMemcpyHostToDevice);
       }
 
       if (comm_peer2peer_enabled(0,dim)) {
@@ -370,8 +364,6 @@ namespace quda {
 	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
 	comm_wait(mh_recv_back[bufferIndex][dim]);
-	qudaMemcpy(from_face_dim_dir_d[bufferIndex][dim][0], from_face_dim_dir_h[bufferIndex][dim][0],
-		   ghost_face_bytes[dim], cudaMemcpyHostToDevice);
       }
 
       if (comm_peer2peer_enabled(1,dim)) {
@@ -408,11 +400,30 @@ namespace quda {
 
       if (comm_dim_partitioned(dim)) {
 	for (int dir=0; dir<2; dir++) recvStart(dim, dir);
-	if (comm_gdr_enabled()) cudaDeviceSynchronize();
+
+	for (int dir=0; dir<2; dir++) {
+	  // issue host-to-device copies if needed
+	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
+	    cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+			    ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[dir]);
+	  }
+	}
+
+	// if neither direction is peer-to-peer then we need to synchronize
+	if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) cudaDeviceSynchronize();
 
 	// if we pass a stream to sendStart then we must ensure that stream is synchronized
-	for (int dir=0; dir<2; dir++) sendStart(dim, dir);
+	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
 	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
+
+	for (int dir=0; dir<2; dir++) {
+	  // issue host-to-device copies if needed
+	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
+	    cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
+			    ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
+	  }
+	}
+
       } else { // if just doing a local exchange to fill halo then need to swap faces
 	qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0],
 		   ghost_face_bytes[dim], cudaMemcpyDeviceToDevice);
