@@ -9,12 +9,7 @@
 #include "gauge_force_reference.h"
 #include "gauge_force_quda.h"
 #include <sys/time.h>
-#include "fat_force_quda.h"
 #include <dslash_quda.h>
-
-#ifdef MULTI_GPU
-#include <face_quda.h>
-#endif
 
 extern int device;
 

@@ -11,7 +11,6 @@
 #include "misc.h"
 #include <blas_quda.h>
 
-#include <face_quda.h>
 #include <blas_reference.h>
 
 extern void *memset(void *s, int c, size_t n);

@@ -4,7 +4,6 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
-#include <face_quda.h>
 
 namespace quda {
 

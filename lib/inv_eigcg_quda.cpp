@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,12 +9,7 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
 #include <string.h>
-
-#include <face_quda.h>
-
-#include <iostream>
 
 #ifdef MAGMA_LIB 
 #include <blas_magma.h>

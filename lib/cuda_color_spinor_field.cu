@@ -8,7 +8,6 @@
 #include <string.h>
 #include <iostream>
 #include <misc_helpers.h>
-#include <face_quda.h>
 #include <dslash_quda.h>
 
 int zeroCopy = 0;

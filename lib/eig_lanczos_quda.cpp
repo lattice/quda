@@ -11,8 +11,6 @@
 #include <sys/time.h>
 #include <lanczos_quda.h>
 
-#include <face_quda.h>
-
 #include <iostream>
 
 namespace quda {

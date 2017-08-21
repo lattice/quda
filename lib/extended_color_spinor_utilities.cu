@@ -4,7 +4,6 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <face_quda.h>
 #include <tune_quda.h>
 
 #define PRESERVE_SPINOR_NORM

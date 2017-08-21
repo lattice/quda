@@ -17,8 +17,6 @@
 #include <staggered_dslash_reference.h>
 #include <gauge_field.h>
 
-#include <face_quda.h>
-
 #include <assert.h>
 #include <gtest.h>
 

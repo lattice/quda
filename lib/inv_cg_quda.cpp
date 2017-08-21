@@ -11,9 +11,6 @@
 #include <sys/time.h>
 #include <limits>
 #include <cmath>
-
-#include <face_quda.h>
-
 #include <iostream>
 
 #ifdef BLOCKSOLVER

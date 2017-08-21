@@ -12,7 +12,6 @@
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
-#include <face_quda.h>
 
 using namespace quda;
 

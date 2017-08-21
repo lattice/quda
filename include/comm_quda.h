@@ -216,6 +216,19 @@ extern "C" {
   void comm_barrier(void);
   void comm_abort(int status);
 
+  void reduceMaxDouble(double &);
+  void reduceDouble(double &);
+  void reduceDoubleArray(double *, const int len);
+  int commDim(int);
+  int commCoords(int);
+  int commDimPartitioned(int dir);
+  void commDimPartitionedSet(int dir);
+  bool commGlobalReduction();
+  void commGlobalReductionSet(bool global_reduce);
+
+  bool commAsyncReduction();
+  void commAsyncReductionSet(bool global_reduce);
+
 #ifdef __cplusplus
 }
 #endif

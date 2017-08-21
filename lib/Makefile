@@ -20,7 +20,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
-	fat_force_quda.o llfat_quda.o					\
+	llfat_quda.o							\
 	gauge_force.o field_strength_tensor.o clover_quda.o		\
 	dslash_quda.o covDev.o dslash_wilson.o dslash_clover.o		\
 	dslash_clover_asym.o dslash_twisted_mass.o			\
@@ -28,8 +28,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
 	blas_quda.o multi_blas_quda.o copy_quda.o 			\
-	reduce_quda.o multi_reduce_quda.o face_buffer.o			\
-	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
+	reduce_quda.o multi_reduce_quda.o				\
+	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
 	copy_color_spinor_ds.o copy_color_spinor_dh.o			\
@@ -60,7 +60,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	dirac_quda.h dslash_quda.h enum_quda.h gauge_force_quda.h	\
 	gauge_update_quda.h invert_quda.h llfat_quda.h quda.h		\
-	quda_internal.h util_quda.h face_quda.h tune_quda.h		\
+	quda_internal.h util_quda.h tune_quda.h				\
 	comm_quda.h lattice_field.h gauge_field.h double_single.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
@@ -82,7 +82,7 @@ CSF_INLN =
 
 # These are only inlined into dslash_quda.cu
 DSLASH_INLN = dslash_constants.h dslash_textures.h io_spinor.h	\
-	clover_def.h staggered_dslash_def.h wilson_dslash_def.h	\
+	staggered_dslash_def.h wilson_dslash_def.h	\
 	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h	\
 	dslash_events.cuh dslash_index.cuh dslash_policy.cuh	\
 	dslash_quda.cuh
@@ -102,7 +102,7 @@ asym_wilson_clover_dslash_gt200_core.h					\
 asym_wilson_clover_fused_exterior_dslash_dagger_fermi_core.h		\
 asym_wilson_clover_fused_exterior_dslash_dagger_gt200_core.h		\
 asym_wilson_clover_fused_exterior_dslash_fermi_core.h			\
-asym_wilson_clover_fused_exterior_dslash_gt200_core.h clover_core.h	\
+asym_wilson_clover_fused_exterior_dslash_gt200_core.h 			\
 contract_core.h contract_core_minus.h contract_core_plus.h		\
 covDev_mu0_core.h covDev_mu0_dagger_core.h covDev_mu1_core.h		\
 covDev_mu1_dagger_core.h covDev_mu2_core.h covDev_mu2_dagger_core.h	\

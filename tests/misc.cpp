@@ -215,7 +215,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
 
   // only apply temporal boundary condition if I'm the last node in T
 #ifdef MULTI_GPU
-  bool last_node_in_t = (commCoords(3) == commDim(3)-1);
+  bool last_node_in_t = (comm_coord(3) == comm_dim(3)-1);
 #else
   bool last_node_in_t = true;
 #endif
