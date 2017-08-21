@@ -1,6 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <sys/time.h>
+#include <limits>
+#include <memory>
+
+#ifdef BLOCKSOLVER
+#include <Eigen/Dense>
+#endif
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,17 +15,11 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
-#include <limits>
-#include <cmath>
-
 #include <face_quda.h>
 
-#include <iostream>
 
-#ifdef BLOCKSOLVER
-#include <Eigen/Dense>
-#endif
+
+
 
 
 namespace quda {
@@ -399,11 +400,11 @@ namespace quda {
 	  } else {
 
 	    if ( (j+1)%Np == 0 ) {
-	      Complex alpha_[Np];
+	      const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	      for (int i=0; i<Np; i++) alpha_[i] = alpha[i];
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-	      blas::caxpy(alpha_, p, x_);
+	      blas::caxpy(alpha_.get(), p, x_);
 	      blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
 	    }
 
@@ -436,13 +437,13 @@ namespace quda {
       } else {
 
 	{
-	  Complex alpha_[Np];
+	  const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	  for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	  std::vector<ColorSpinorField*> x_;
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	  blas::caxpy(alpha_, p_, x_);
+	  blas::caxpy(alpha_.get(), p_, x_);
 	  blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
 	}
 
@@ -546,13 +547,13 @@ namespace quda {
 
       // if we have converged and need to update any trailing solutions
       if (converged && steps_since_reliable > 0 && (j+1)%Np != 0 ) {
-	Complex alpha_[Np];
+	const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
 	for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	std::vector<ColorSpinorField*> x_;
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	blas::caxpy(alpha_, p_, x_);
+	blas::caxpy(alpha_.get(), p_, x_);
 	blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
       }
 

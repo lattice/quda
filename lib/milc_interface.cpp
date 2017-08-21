@@ -746,15 +746,21 @@ static void setColorSpinorParams(const int dim[4],
 }
 
 void setDeflationParam(QudaPrecision ritz_prec,
+                       QudaFieldLocation location_ritz,
+                       QudaMemoryType mem_type_ritz,
+                       QudaExtLibType deflation_ext_lib,
                        char vec_infile[],
                        char vec_outfile[],
                        QudaEigParam *df_param) 
 {
 
   df_param->import_vectors = strcmp(vec_infile,"") ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  df_param->cuda_prec_ritz = ritz_prec;
 
-  df_param->location       = QUDA_CUDA_FIELD_LOCATION;
+  df_param->cuda_prec_ritz = ritz_prec;
+  df_param->location       = location_ritz;
+  df_param->mem_type_ritz  = mem_type_ritz;
+
+
   df_param->run_verify     = QUDA_BOOLEAN_NO;
 
   df_param->nk       = df_param->invert_param->nev;
@@ -1146,13 +1152,7 @@ void qudaEigCGInvert(int external_precision,
     const double tadpole,
     void* source,//array of source vectors -> overwritten on exit
     void* solution,//temporary
-    int ritz_prec,
-    char vec_infile[],
-    char vec_outfile[],
-    const int max_search_dim,
-    const int nev,
-    const int deflation_grid,
-    double tol_restart,//e.g.: 5e+3*target_residual
+    QudaEigArgs_t eig_args,
     const int rhs_idx,//current rhs
     const int last_rhs_flag,//is this the last rhs to solve
     double* const final_residual,
@@ -1206,36 +1206,33 @@ void qudaEigCGInvert(int external_precision,
   df_param.invert_param = &invertParam;
 
   invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
-  invertParam.nev = nev; 
-  invertParam.max_search_dim = 64;//!
-  invertParam.deflation_grid = deflation_grid; 
-  invertParam.cuda_prec_ritz = ritz_prec == 2 ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION ;
-  invertParam.tol_restart = 5e+3*invertParam.tol;//think about this...
-  invertParam.use_reduced_vector_set = true;
-  invertParam.use_cg_updates = false;
-  invertParam.cg_iterref_tol = 5e-2;
-  invertParam.eigcg_max_restarts = 3;
-  invertParam.max_restart_num = 3;
-  invertParam.inc_tol = 1e-2;
-  invertParam.eigenval_tol = 1e-2;
+  invertParam.nev                = eig_args.nev;
+  invertParam.max_search_dim     = eig_args.max_search_dim;
+  invertParam.deflation_grid     = eig_args.deflation_grid;
+  invertParam.cuda_prec_ritz     = eig_args.prec_ritz;
+  invertParam.tol_restart        = eig_args.tol_restart;
+  invertParam.eigcg_max_restarts = eig_args.eigcg_max_restarts;
+  invertParam.max_restart_num    = eig_args.max_restart_num;
+  invertParam.inc_tol            = eig_args.inc_tol;
+  invertParam.eigenval_tol       = eig_args.eigenval_tol;
+  invertParam.rhs_idx            = rhs_idx;
 
-  invertParam.inv_type = QUDA_INC_EIGCG_INVERTER;
+  if((inv_args.solver_type != QUDA_INC_EIGCG_INVERTER) && (inv_args.solver_type != QUDA_EIGCG_INVERTER)) errorQuda("Incorrect inverter type.\n");
+  invertParam.inv_type = inv_args.solver_type;
 
-  setDeflationParam(invertParam.cuda_prec_ritz, vec_infile, vec_outfile, &df_param);
-//!
+  if(inv_args.solver_type == QUDA_INC_EIGCG_INVERTER) invertParam.inv_type_precondition = QUDA_INVALID_INVERTER;
+
+  setDeflationParam(eig_args.prec_ritz, eig_args.location_ritz, eig_args.mem_type_ritz, eig_args.deflation_ext_lib, eig_args.vec_infile, eig_args.vec_outfile, &df_param);
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
 
-  const int fat_pad  = getFatLinkPadding(localDim);
-  const int long_pad = 3*fat_pad;
-
-  // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1  || !canReuseResidentGauge(&invertParam) ) {
-    invalidateGaugeQuda();
-  }
-
   if((invalidate_quda_gauge || !create_quda_gauge) && (rhs_idx == 0)){//do this for the first RHS
+
+    const int fat_pad  = getFatLinkPadding(localDim);
+    const int long_pad = 3*fat_pad;
+
+    printfQuda("Initialize gauge field.\n"); 
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
@@ -1251,11 +1248,9 @@ void qudaEigCGInvert(int external_precision,
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
 
-  if(rhs_idx == 0) {
-    df_preconditioner = newDeflationQuda(&df_param);
-    invertParam.deflation_op = df_preconditioner;
-  }
-
+  if(rhs_idx == 0) df_preconditioner = newDeflationQuda(&df_param);
+  
+  invertParam.deflation_op = df_preconditioner;
 
   invertQuda((char*)solution + quark_offset*host_precision,
 	     (char*)source + quark_offset*host_precision,
@@ -1584,16 +1579,9 @@ void qudaEigCGCloverInvert(int external_precision,
     void* cloverInverse,
     void* source,//array of source vectors -> overwritten on exit!
     void* solution,//temporary
-    int ritz_prec,
-    char vec_infile[],
-    char vec_outfile[],
-    const int max_search_dim,
-    const int nev,
-    const int deflation_grid,
-    double tol_restart,//e.g.: 5e+3*target_residual
+    QudaEigArgs_t eig_args,    
     const int rhs_idx,//current rhs
     const int last_rhs_flag,//is this the last rhs to solve?
-
     double* const final_residual,
     double* const final_fermilab_residual,
     int *num_iters)
@@ -1634,27 +1622,27 @@ void qudaEigCGCloverInvert(int external_precision,
   df_param.invert_param = &invertParam;
 
   invertParam.solve_type = QUDA_NORMOP_PC_SOLVE;
-  invertParam.nev = nev; 
-  invertParam.max_search_dim = 64;//!
-  invertParam.deflation_grid = deflation_grid; 
-  invertParam.cuda_prec_ritz = ritz_prec == 2 ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  invertParam.tol_restart = 5e+3*invertParam.tol;//think about this...
-  invertParam.use_reduced_vector_set = true;
-  invertParam.use_cg_updates = false;
-  invertParam.cg_iterref_tol = 5e-2;
-  invertParam.eigcg_max_restarts = 3;
-  invertParam.max_restart_num = 3;
-  invertParam.inc_tol = 1e-2;
-  invertParam.eigenval_tol = 1e-2;
+  invertParam.nev                = eig_args.nev;
+  invertParam.max_search_dim     = eig_args.max_search_dim;
+  invertParam.deflation_grid     = eig_args.deflation_grid;
+  invertParam.cuda_prec_ritz     = eig_args.prec_ritz;
+  invertParam.tol_restart        = eig_args.tol_restart;
+  invertParam.eigcg_max_restarts = eig_args.eigcg_max_restarts;
+  invertParam.max_restart_num    = eig_args.max_restart_num;
+  invertParam.inc_tol            = eig_args.inc_tol;
+  invertParam.eigenval_tol       = eig_args.eigenval_tol;
+  invertParam.rhs_idx            = rhs_idx;
 
-  invertParam.inv_type = QUDA_INC_EIGCG_INVERTER;
 
-  setDeflationParam(invertParam.cuda_prec_ritz, vec_infile, vec_outfile, &df_param);
-//!
-  if(rhs_idx == 0) {
-    df_preconditioner = newDeflationQuda(&df_param);
-    invertParam.deflation_op = df_preconditioner;
-  }
+  if((inv_args.solver_type != QUDA_INC_EIGCG_INVERTER) && (inv_args.solver_type != QUDA_EIGCG_INVERTER)) errorQuda("Incorrect inverter type.\n");
+  invertParam.inv_type = inv_args.solver_type;
+
+  if(inv_args.solver_type == QUDA_INC_EIGCG_INVERTER) invertParam.inv_type_precondition = QUDA_INVALID_INVERTER;
+
+  setDeflationParam(eig_args.prec_ritz, eig_args.location_ritz, eig_args.mem_type_ritz, eig_args.deflation_ext_lib, eig_args.vec_infile, eig_args.vec_outfile, &df_param);
+
+  if(rhs_idx == 0)  df_preconditioner = newDeflationQuda(&df_param);
+  invertParam.deflation_op = df_preconditioner;
 
   invertQuda(solution, source, &invertParam);
 
