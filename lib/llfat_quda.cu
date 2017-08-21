@@ -447,8 +447,8 @@ namespace quda {
       return 2*arg.n_mu*arg.threads*( 4*198 + 18 + 36 );
     }
     long long bytes() const {
-      return 2*arg.n_mu*meta.VolumeCB()*arg.fat.Bytes()*2 // fat load/store is only done on interior
-	+ arg.n_mu*2*arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + save_staple ? arg.staple.Bytes() : 0);
+      return arg.n_mu*2*meta.VolumeCB()*arg.fat.Bytes()*2 // fat load/store is only done on interior
+	+ arg.n_mu*2*arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + (save_staple ? arg.staple.Bytes() : 0));
     }
   };
 
