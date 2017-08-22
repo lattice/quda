@@ -348,7 +348,6 @@ namespace quda {
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
 
     if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-      //printfQuda("Allocating clover field of size %lu with precision %lu\n", bytes, precision);
       if(order != QUDA_PACKED_CLOVER_ORDER) {errorQuda("cpuCloverField only supports QUDA_PACKED_CLOVER_ORDER");}
       clover = (void *) safe_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) norm = (void *) safe_malloc(norm_bytes);
