@@ -62,7 +62,7 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    double *trlog;
+    mutable double trlog[2];
 
   public:
     CloverField(const CloverFieldParam &param);

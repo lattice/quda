@@ -35,7 +35,7 @@ namespace quda {
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
     clover(0), norm(0), cloverInv(0), invNorm(0), order(param.order), create(param.create),
-    trlog(static_cast<double*>(pinned_malloc(2*sizeof(double))))
+    trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -56,9 +56,7 @@ namespace quda {
     mu2 = 0.0; //param.mu2;
   }
   
-  CloverField::~CloverField() {
-    host_free(trlog);
-  }
+  CloverField::~CloverField() { }
 
   bool CloverField::isNative() const {
     if (precision == QUDA_DOUBLE_PRECISION) {
