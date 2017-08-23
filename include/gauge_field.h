@@ -253,6 +253,11 @@ namespace quda {
      */
     virtual void copy(const GaugeField &src) = 0;
 
+    /**
+     * Compute hash of this gauge field
+     * @return hash value
+     */
+    virtual size_t hash() const = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -380,6 +385,13 @@ namespace quda {
     */
     void restore();
 
+    /**
+     * @brief compute hash of this gauge field.  For GPU gauge field
+     * this presently undefined (returns 0).
+     * @return hash value
+     */
+    size_t hash() const { return 0; }
+
   };
 
   class cpuGaugeField : public GaugeField {
@@ -452,6 +464,12 @@ namespace quda {
        @brief Restores the cpuGaugeField
     */
     void restore();
+
+    /**
+     * @brief Compute hash of this gauge field.
+     * @return hash value
+     */
+    size_t hash() const;
 
   };
 
