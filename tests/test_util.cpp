@@ -1105,22 +1105,23 @@ static void constructCloverField(Float *res, double norm, double diag) {
     for (int j = 0; j < 72; j++) {
       res[i*72 + j] = c*rand() - norm;
     }
-    for (int j = 0; j<6; j++) {
-      res[i*72 + j] += diag;
-      res[i*72 + j+36] += diag;
-    }
 
     //impose clover symmetry on each chiral block
     for (int ch=0; ch<2; ch++) {
-      res[i*72 + 3 + 36*ch] = 1-res[i*72 + 3 + 36*ch];
-      res[i*72 + 4 + 36*ch] = 1-res[i*72 + 4 + 36*ch];
-      res[i*72 + 5 + 36*ch] = 1-res[i*72 + 5 + 36*ch];
+      res[i*72 + 3 + 36*ch] = -res[i*72 + 0 + 36*ch];
+      res[i*72 + 4 + 36*ch] = -res[i*72 + 1 + 36*ch];
+      res[i*72 + 5 + 36*ch] = -res[i*72 + 2 + 36*ch];
       res[i*72 + 30 + 36*ch] = -res[i*72 + 6 + 36*ch];
       res[i*72 + 31 + 36*ch] = -res[i*72 + 7 + 36*ch];
       res[i*72 + 32 + 36*ch] = -res[i*72 + 8 + 36*ch];
       res[i*72 + 33 + 36*ch] = -res[i*72 + 9 + 36*ch];
       res[i*72 + 34 + 36*ch] = -res[i*72 + 16 + 36*ch];
       res[i*72 + 35 + 36*ch] = -res[i*72 + 17 + 36*ch];
+    }
+
+    for (int j = 0; j<6; j++) {
+      res[i*72 + j] += diag;
+      res[i*72 + j+36] += diag;
     }
   }
 }
