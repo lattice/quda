@@ -78,6 +78,15 @@ namespace quda {
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
 
+    switch (precision) {
+    case QUDA_DOUBLE_PRECISION:
+    case QUDA_SINGLE_PRECISION:
+    case QUDA_HALF_PRECISION:
+      break;
+    default:
+      errorQuda("Unknown precision %d", precision);
+    }
+
     setTuningString();
   }
 
