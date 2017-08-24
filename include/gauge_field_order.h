@@ -569,19 +569,20 @@ namespace quda {
     /** Generic reconstruction is no reconstruction */
     template <int N, typename Float>
       struct Reconstruct {
-	typedef typename mapper<Float>::type RegType;
-	Reconstruct(const GaugeField &u) { ; }
+      typedef typename mapper<Float>::type RegType;
+    Reconstruct(const GaugeField &u) { }
+    Reconstruct(const Reconstruct<N,Float> &recon) { }
 
-	__device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx ) const {
-	  for (int i=0; i<N; i++) out[i] = in[i];
-	}
-	template<typename I>
-	__device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
+      __device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx ) const {
+	for (int i=0; i<N; i++) out[i] = in[i];
+      }
+      template<typename I>
+      __device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
 					       const RegType phase, const I *X, const int *R) const {
-	  for (int i=0; i<N; i++) out[i] = in[i];
-	}
-	__device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
-      };
+	for (int i=0; i<N; i++) out[i] = in[i];
+      }
+      __device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
+    };
 
     /** No reconstruction but we scale the result. This is used for
 	half-precision non-unitary fields, e.g., staggered fat link */
@@ -589,7 +590,8 @@ namespace quda {
       struct Reconstruct<19,Float> {
       typedef typename mapper<Float>::type RegType;
       RegType scale;
-    Reconstruct(const GaugeField &u) : scale(u.LinkMax()) { ; }
+    Reconstruct(const GaugeField &u) : scale(u.LinkMax()) { }
+    Reconstruct(const Reconstruct<19,Float> &recon) : scale(recon.scale) { }
 
       __device__ __host__ inline void Pack(RegType out[18], const RegType in[18], int idx) const {
 	for (int i=0; i<18; i++) out[i] = in[i] / scale;
@@ -665,6 +667,10 @@ namespace quda {
 	  isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false),
 	  ghostExchange(u.GhostExchange()) { }
 
+      Reconstruct(const Reconstruct<12,Float> &recon) : anisotropy(recon.anisotropy),
+	  tBoundary(recon.tBoundary), isFirstTimeSlice(recon.isFirstTimeSlice),
+	  isLastTimeSlice(recon.isLastTimeSlice), ghostExchange(recon.ghostExchange) { }
+
 	__device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
 	  for (int i=0; i<12; i++) out[i] = in[i];
 	}
@@ -694,6 +700,7 @@ namespace quda {
 	typedef typename mapper<Float>::type RegType;
 
 	Reconstruct(const GaugeField &u) { ; }
+	Reconstruct(const Reconstruct<11,Float> &recon) { }
 
 	__device__ __host__ inline void Pack(RegType out[10], const RegType in[18], int idx) const {
 	  for (int i=0; i<4; i++) out[i] = in[i+2];
@@ -730,16 +737,18 @@ namespace quda {
       };
 
       template <typename Float>
-      struct Reconstruct<13,Float> {
-      typedef typename mapper<Float>::type RegType;
-      typedef complex<RegType> Complex;
-      const Reconstruct<12,Float> reconstruct_12;
-      const RegType scale;
+	struct Reconstruct<13,Float> {
+	typedef typename mapper<Float>::type RegType;
+	typedef complex<RegType> Complex;
+	const Reconstruct<12,Float> reconstruct_12;
+	const RegType scale;
 
-    Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()) {}
+      Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale()) { }
+      Reconstruct(const Reconstruct<13,Float> &recon) : reconstruct_12(recon.reconstruct_12),
+	  scale(recon.scale) { }
 
-      __device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
-	reconstruct_12.Pack(out, in, idx);
+	__device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
+	  reconstruct_12.Pack(out, in, idx);
       }
 
       template<typename I>
@@ -784,7 +793,7 @@ namespace quda {
     };
 
 
- template <typename Float>
+    template <typename Float>
     struct Reconstruct<8,Float> {
     typedef typename mapper<Float>::type RegType;
     typedef complex<RegType> Complex;
@@ -794,10 +803,14 @@ namespace quda {
     bool isLastTimeSlice;
     QudaGhostExchange ghostExchange;
 
-  Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
+    Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
       isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
       isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false),
       ghostExchange(u.GhostExchange()) { }
+
+    Reconstruct(const Reconstruct<8,Float> &recon) : anisotropy(recon.anisotropy),
+      tBoundary(recon.tBoundary), isFirstTimeSlice(recon.isFirstTimeSlice),
+      isLastTimeSlice(recon.isLastTimeSlice), ghostExchange(recon.ghostExchange) { }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
       out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
@@ -859,6 +872,9 @@ namespace quda {
       const RegType scale;
 
     Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale()) {}
+
+    Reconstruct(const Reconstruct<9,Float> &recon) : reconstruct_8(recon.reconstruct_8),
+	scale(recon.scale) { }
 
       __device__ __host__ inline RegType getPhase(const RegType in[18]) const {
 #if 1 // phase from cross product
@@ -1135,7 +1151,7 @@ namespace quda {
       }
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int buff_idx, int extended_idx, int dir,
-						    int dim, int g, int parity, const int R[]) const {
+						  int dim, int g, int parity, const int R[]) const {
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	typedef typename VectorType<Float,N>::type Vector;
@@ -1159,7 +1175,7 @@ namespace quda {
       }
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int buff_idx, int extended_idx,
-						    int dir, int dim, int g, int parity, const int R[]) {
+						  int dir, int dim, int g, int parity, const int R[]) {
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	// use the extended_idx to determine the boundary condition

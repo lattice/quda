@@ -20,6 +20,7 @@
 #endif
 
 #include <algorithm>
+#include <memory>
 
 #ifdef DEFLATEDSOLVER
 #include <Eigen/Dense>
@@ -33,11 +34,6 @@ See also: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES 
 */
 
 namespace quda {
-//Notes:
-//GMResDR does not require large m (and esp. nev), so this will use normal LAPACK routines.
-//TODO : 
-//Control precision of Vm/Zm (?)
-//Proj cycles
 
     using namespace blas;
     using namespace std;
@@ -81,17 +77,21 @@ namespace quda {
 
        Complex      *c;
 
+       ColorSpinorFieldSet *Vkp1;//high-precision accumulation array
+
        GMResDRArgs(int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)),
-       eta(Vector::Zero(m)), m(m), k(nev), restarts(0) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
+       eta(Vector::Zero(m)), m(m), k(nev), restarts(0), Vkp1(nullptr) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
 
        inline void ResetArgs() {
          ritzVecs.setZero();
          H.setZero();
          eta.setZero();
-         //memset(c, 0, (args.m+1) * sizeof(Complex));//already done within ritzVecs
+       }
+
+       ~GMResDRArgs(){
+          if(Vkp1) delete Vkp1;
        }
 #endif
-       ~GMResDRArgs(){ }
    };
 
 #ifdef DEFLATEDSOLVER
@@ -210,8 +210,8 @@ namespace quda {
 
       inner.inv_type_precondition = QUDA_INVALID_INVERTER;
       inner.is_preconditioner = true; 
-
-      inner.global_reduction = false;
+      inner.global_reduction  = false;
+      if(inner.global_reduction) warningQuda("Set global reduction flag for preconditioner to true.\n");
 
       if (outer.precision_sloppy != outer.precision_precondition)
         inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
@@ -258,7 +258,7 @@ namespace quda {
       delete Vm;
       Vm = nullptr;
 
-      if (param.precision_sloppy != param.precision)  delete r_sloppy;
+      delete r_sloppy;
 
       if(K && (param.precision_precondition != param.precision_sloppy))
       {
@@ -281,18 +281,20 @@ namespace quda {
    profile.TPSTOP(QUDA_PROFILE_FREE);
  }
 
-#define EIGEN_GELS
+
  void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
  {
 #ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
 
    if(do_gels) {
-#ifdef EIGEN_GELS
-     ComputeEta<libtype::eigen_lib>(args);
-#else
-     ComputeEta<libtype::magma_lib>(args);
-#endif
+     if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+       ComputeEta<libtype::magma_lib>(args);
+     } else if (  param.extlib_type == QUDA_EIGEN_EXTLIB ) {
+       ComputeEta<libtype::eigen_lib>(args);
+     } else {
+       errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
+     }
    }
 
    std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().begin()+args.m);
@@ -312,17 +314,19 @@ namespace quda {
    return;
  }
 
-//#define USE_MAGMA
 
  void GMResDR::RestartVZH()
  {
 #ifdef DEFLATEDSOLVER
    GMResDRArgs &args = *gmresdr_args;
-#ifdef USE_MAGMA
-   ComputeHarmonicRitz<libtype::magma_lib>(args);
-#else
-   ComputeHarmonicRitz<libtype::eigen_lib>(args);
-#endif
+
+   if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+     ComputeHarmonicRitz<libtype::magma_lib>(args);
+   } else if(param.extlib_type == QUDA_EIGEN_EXTLIB) {
+     ComputeHarmonicRitz<libtype::eigen_lib>(args);
+   } else {
+     errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
+   }
 
    DenseMatrix Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
 
@@ -333,16 +337,9 @@ namespace quda {
    args.H.setZero();
    args.H.topLeftCorner(args.k+1, args.k) = Res;
 
-   ColorSpinorParam csParam(Vm->Component(0));
+   blas::zero( *args.Vkp1 );
 
-   csParam.is_composite  = true;
-   csParam.composite_dim = (args.k+1);
-   csParam.create = QUDA_ZERO_FIELD_CREATE;
-   csParam.setPrecision(QUDA_DOUBLE_PRECISION);
-
-   ColorSpinorFieldSet *Vkp1 = ColorSpinorFieldSet::Create(csParam);
-
-   std::vector<ColorSpinorField*> vkp1(Vkp1->Components());
+   std::vector<ColorSpinorField*> vkp1(args.Vkp1->Components());
    std::vector<ColorSpinorField*> vm  (Vm->Components());
 
    RowMajorDenseMatrix Alpha(Qkp1);//convert Qkp1 to Row-major format first  
@@ -352,8 +349,8 @@ namespace quda {
    {
      if(i < (args.k+1) )
      {
-       blas::copy(Vm->Component(i), Vkp1->Component(i));
-       blas::zero(Vkp1->Component(i));
+       blas::copy(Vm->Component(i), args.Vkp1->Component(i));
+       blas::zero(args.Vkp1->Component(i));
      }
      else blas::zero(Vm->Component(i));
    }
@@ -361,19 +358,17 @@ namespace quda {
    if( Zm->V() != Vm->V() )
    {
      std::vector<ColorSpinorField*> z (Zm->Components());
-     std::vector<ColorSpinorField*> vk(Vkp1->Components().begin(),Vkp1->Components().begin()+args.k);
+     std::vector<ColorSpinorField*> vk(args.Vkp1->Components().begin(),args.Vkp1->Components().begin()+args.k);
 
      RowMajorDenseMatrix Beta(Qkp1.topLeftCorner(args.m,args.k));
      blas::caxpy(static_cast<Complex*>(Beta.data()), z , vk);
 
      for(int i = 0; i < (args.m); i++)
      {
-       if( i < (args.k) ) blas::copy(Zm->Component(i), Vkp1->Component(i));
+       if( i < (args.k) ) blas::copy(Zm->Component(i), args.Vkp1->Component(i));
        else               blas::zero(Zm->Component(i));
      }
    }
-
-   delete Vkp1;
 
    checkCudaError();
 
@@ -398,9 +393,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    GMResDRArgs &args = *gmresdr_args;
    ColorSpinorField &tmp = *tmpp;
 
-   Complex *givensH = (do_givens) ? new Complex[(args.m+1)*args.m] : nullptr;
-   Complex *cn      = (do_givens) ? new Complex[args.m]            : nullptr;
-   double  *sn      = (do_givens) ? new double [args.m]            : nullptr;
+   std::unique_ptr<Complex[] > givensH((do_givens) ? new Complex[(args.m+1)*args.m] : nullptr);
+   std::unique_ptr<Complex[] > cn((do_givens) ? new Complex[args.m] : nullptr);
+   std::unique_ptr<double[]  > sn((do_givens) ? new double[args.m] : nullptr);
 
    Complex c0 = args.c[0];
 
@@ -454,16 +449,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    if(do_givens)
    {
-     Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH, args.m, args.m, DynamicStride(args.m+1,1) );
+     Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH.get(), args.m, args.m, DynamicStride(args.m+1,1) );
      memcpy(args.eta.data(),  args.c, args.m*sizeof(Complex));
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
      args.c[0] = c0;
 
      givensH_.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
-
-     delete[] givensH;
-     delete[] cn;
-     delete[] sn;
 
    } else {
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
@@ -502,7 +493,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.setPrecision(param.precision_sloppy);
 
       tmpp     = ColorSpinorField::Create(csParam);
-      r_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : rp;
+      r_sloppy = ColorSpinorField::Create(csParam);
 
       if ( K && (param.precision_precondition != param.precision_sloppy) ) {
 
@@ -521,6 +512,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.composite_dim = param.m;
 
       Zm = K ? ColorSpinorFieldSet::Create(csParam) : Vm;
+
+
+      csParam.composite_dim = (param.nev+1);
+      csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+
+      gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
       init = true;
     }
@@ -549,14 +546,13 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
 
+    rSloppy = r;
 
     if(param.precision_sloppy != param.precision) {
       blas::axpy(1.0 / args.c[0].real(), r, y);
-      blas::copy(rSloppy, r);
-      blas::copy(Vm->Component(0), y);
+      Vm->Component(0) = y;
       blas::zero(y);
     } else {
-      blas::zero(Vm->Component(0));
       blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));   
     }
 
