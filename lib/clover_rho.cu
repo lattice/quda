@@ -11,7 +11,8 @@ namespace quda {
   struct CloverRhoArg  {
     Clover clover;
     real rho;
-    CloverRhoArg(Clover &clover, real rho) : clover(clover), rho(rho) {}
+    CloverRhoArg(Clover &clover, real rho, const CloverField &meta)
+      : clover(clover), rho(rho - meta.Rho()) {}
   };
 
   template <int nSpin, int nColor, typename Arg>
@@ -67,7 +68,7 @@ namespace quda {
 
   template <typename Float, int nSpin, int nColor, typename Clover>
   void cloverRho(Clover clover, const CloverField &meta, double rho) {
-    CloverRhoArg<Float,Clover> arg(clover, rho);
+    CloverRhoArg<Float,Clover> arg(clover, rho, meta);
     CloverRho<nSpin,nColor,CloverRhoArg<Float,Clover>> clover_rho(arg, meta);
     clover_rho.apply(0);
   }

@@ -20,8 +20,10 @@ namespace quda {
       norm(NULL),
       cloverInv(NULL),
       invNorm(NULL),
+      csw(a.Csw()),
       twisted(a.Twisted()),
       mu2(a.Mu2()),
+      rho(a.Rho()),
       order(a.Order()),
       create(QUDA_NULL_FIELD_CREATE)
       {
@@ -34,8 +36,8 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), order(param.order), create(param.create),
-    trlog{0, 0}
+    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
+    order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -66,6 +68,12 @@ namespace quda {
       if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
     }
     return false;
+  }
+
+  void CloverField::setRho(double rho_)
+  {
+    cloverRho(*this, rho_);
+    rho = rho_;
   }
 
   cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
@@ -393,8 +401,10 @@ namespace quda {
     output << "norm = "      << param.norm << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "invNorm = "   << param.invNorm << std::endl;
+    output << "csw = "       << param.csw << std::endl;
     output << "twisted = "   << param.twisted << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
+    output << "rho = "       << param.rho << std::endl;
     output << "order = "     << param.order << std::endl;
     output << "create = "    << param.create << std::endl;
     return output;  // for multiple << operators.
