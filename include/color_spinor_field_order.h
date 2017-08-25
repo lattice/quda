@@ -458,8 +458,8 @@ namespace quda {
 	typedef typename TexVectorType<RegType,N>::type TexVector;
 	cudaTextureObject_t tex;
 	cudaTextureObject_t texNorm;
-#endif
 	const int tex_offset;
+#endif
 	int volumeCB;
 	int faceVolumeCB[4];
 	int stride;
@@ -469,8 +469,11 @@ namespace quda {
 	size_t bytes;
 
       FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0)
-      : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))), tex_offset(offset/N),
-	norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
+      : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
+	  norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
+#ifdef USE_TEXTURE_OBJECTS
+	  tex(0), texNorm(0), tex_offset(offset/N),
+#endif
 	  volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset()), backup_h(nullptr), bytes(a.Bytes())
 	{
 	  for (int i=0; i<4; i++) {
