@@ -373,8 +373,8 @@ namespace quda {
 	typedef typename TexVectorType<RegType,N>::type TexVector;
 	cudaTextureObject_t tex;
 	cudaTextureObject_t normTex;
-#endif
 	const int tex_offset;
+#endif
 	const int volumeCB;
 	const int stride;
 
@@ -386,9 +386,11 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 	void *backup_norm_h; //! host memory for backing up norm when tuning
 
-        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, float *norm_=0) :
-	  offset(clover.Bytes()/(2*sizeof(Float))), tex_offset(offset/N),
-	  norm_offset(clover.NormBytes()/(2*sizeof(float))),
+        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, float *norm_=0)
+	: offset(clover.Bytes()/(2*sizeof(Float))), norm_offset(clover.NormBytes()/(2*sizeof(float))),
+#ifdef USE_TEXTURE_OBJECTS
+	  tex(0), normTex(0), tex_offset(offset/N),
+#endif
 	  volumeCB(clover.VolumeCB()), stride(clover.Stride()),
 	  twisted(clover.Twisted()), mu2(clover.Mu2()), bytes(clover.Bytes()),
 	  norm_bytes(clover.NormBytes()), backup_h(nullptr), backup_norm_h(nullptr)
