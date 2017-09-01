@@ -31,10 +31,15 @@ namespace quda{
   #define BLOCKSOLVER_MULTIFUNCTIONS
   #define BLOCKSOLVE_DSLASH5D
 #endif
-//#define BLOCKSOLVER_VERBOSE
+#define BLOCKSOLVER_VERBOSE
 
 // Run algorithm with Q in high precision.
-#define BLOCKSOLVER_PRECISE_Q
+// DOES NOT WORK IF BLOCKSOLVER_MULTIFUNCTIONS IS DEFINED.
+// Currently investigating.
+//#define BLOCKSOLVER_PRECISE_Q
+
+// Mathias' testing area for Pollock-Ribiere or however it's spelled.
+//#define BLOCKSOLVER_ALTERNATIVE_BETA
 
 // Explicitly reorthogonalize Q^\dagger P on reliable update.
 //#define BLOCKSOLVER_EXPLICIT_QP_ORTHO
@@ -280,6 +285,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     yp = ColorSpinorField::CreateSmartPtr(b, csParam);
 #ifdef BLOCKSOLVER_PRECISE_Q // high precision Q
     qp = ColorSpinorField::CreateSmartPtr(csParam);
+    tmpp = ColorSpinorField::CreateSmartPtr(csParam);
 #endif
     // sloppy fields
     csParam.setPrecision(param.precision_sloppy);
@@ -289,9 +295,9 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     p_oldp = ColorSpinorField::CreateSmartPtr(csParam);
 #else
     qp = ColorSpinorField::CreateSmartPtr(csParam); // We need a sloppy q.
+    tmpp = ColorSpinorField::CreateSmartPtr(csParam);
 #endif
     App = ColorSpinorField::CreateSmartPtr(csParam);
-    tmpp = ColorSpinorField::CreateSmartPtr(csParam);
     tmp_matsloppyp = ColorSpinorField::CreateSmartPtr(csParam);
     init = true;
 
@@ -507,10 +513,22 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   // Create the worker class for updating x_sloppy. 
   // When we hit matSloppy, tmpp contains P.
+#ifdef BLOCKSOLVER_PRECISE_Q
+
+#ifdef BLOCKSOLVER_MULTIFUNCTIONS
+  BlockCGUpdate blockcg_update(x_sloppyp, p_oldp, alpha_raw);
+#else
+  BlockCGUpdate blockcg_update(x_sloppyp, p_oldp, alpha);
+#endif
+
+#else // !BLOCKSOLVER_PRECISE_Q
+
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
   BlockCGUpdate blockcg_update(x_sloppyp, tmpp, alpha_raw);
 #else
   BlockCGUpdate blockcg_update(x_sloppyp, tmpp, alpha);
+#endif
+
 #endif
 
   profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -591,7 +609,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   }
 #endif
 
-#else // !BLOCKSOLVER_PRECISE_Q
+#else
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
   blas::copy(*tmpp, r); // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
@@ -605,6 +623,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   }
 #endif
 
+#endif // BLOCKSOLVER_PRECISE_Q
 
   // Step 9: P = Q; additionally set P to thin QR decompoistion of r
   blas::copy(*pp, *qp);
@@ -715,6 +734,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 #endif
 
 //MWALTBETA
+    #ifdef BLOCKSOLVER_ALTERNATIVE_BETA
     #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     blas::zero(*tmpp);
     blas::caxpy(beta_raw, Ap, *tmpp);
@@ -722,6 +742,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     L = H.llt().matrixL();
     S = L.adjoint();
     // std::cout << "altS" << S;
+    #endif
     #endif
     POP_RANGE
 
@@ -757,7 +778,6 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // swap.
 
     Linv = S.inverse();
-    blas::zero(*tmpp);
   POP_RANGE
   PUSH_RANGE("BLAS",2)
   blas::zero(*tmpp);
@@ -1051,14 +1071,15 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     // Need to copy tmpp into p_oldp to reduce precision, then swap so p_oldp
     // actually holds the old p and pp actually holds the new one.
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    blas::copy(p_oldp, tmpp);
+    blas::copy(*p_oldp, *tmpp);
 #else
     for (int i = 0; i < nsrc; i++) {
       blas::copy(p_oldp->Component(i), tmpp->Component(i));
     }
 #endif
     std::swap(pp,p_oldp);
-#else // !BLOCKSOLVER_PRECISE_Q
+
+#else 
     std::swap(pp,tmpp); // now P contains P, tmp now contains P_old
 #endif
 
@@ -1135,7 +1156,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
     std::cout << " pTp " << std::endl << pTp << std::endl;
     std::cout <<  "S " << S<<  std::endl << "C " << C << std::endl;
-    #endif
+#endif
 
     k++;
     PrintStats("Block-CG", k, r2avg / nsrc, b2avg, 0);
@@ -1170,8 +1191,8 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
         blas::caxpy(alpha(i,j), p_oldp->Component(i), x_sloppy.Component(j));
     }
     }
-  }
 #endif
+  }
 
 #else // !BLOCKSOLVER_PRECISE_Q
   // But remember tmpp holds the old P. 
@@ -1273,7 +1294,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
   BlockCG::BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     BlockSolver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr), App(nullptr), tmpp(nullptr),
-    x_sloppy_savedp(nullptr), pp(nullptr), qp(nullptr), tmp_matsloppyp(nullptr), p_oldp(nullptr)
+    x_sloppy_savedp(nullptr), pp(nullptr), qp(nullptr), tmp_matsloppyp(nullptr), p_oldp(nullptr),
     init(false) {
 #ifndef BLOCKSOLVER
   warningQuda("QUDA_BLOCKSOLVER not built with MULTI-BLAS / Dslash options Performance will be slow.");
@@ -1294,6 +1315,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 //       if (pp) delete pp;
 // #ifdef BLOCKSOLVER_PRECISE_Q
 //       if (p_oldp) delete p_oldp;
+// #endif
 //       if (qp) delete qp;
 //       if (tmp_matsloppyp) delete tmp_matsloppyp;
  // #endif
