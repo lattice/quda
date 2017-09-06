@@ -238,7 +238,7 @@
 #define CLOVERTEX cloverTexDouble
 #endif
 
-#if (DD_CLOVER==2)
+#if (DD_CLOVER==3)
 #define READ_CLOVER READ_CLOVER2_DOUBLE_TEX
 #else
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX
