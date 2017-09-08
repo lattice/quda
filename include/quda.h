@@ -414,6 +414,9 @@ extern "C" {
     /** Tolerance to use in the setup phase */
     double setup_tol[QUDA_MAX_MG_LEVEL];
 
+    /** Maximum number of iterations for each setup solver */
+    int setup_maxiter[QUDA_MAX_MG_LEVEL];
+
     /** Null-space type to use in the setup phase */
     QudaSetupType setup_type;
 

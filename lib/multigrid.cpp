@@ -828,7 +828,7 @@ namespace quda {
 
     SolverParam solverParam(param);  // Set solver field parameters:
     // set null-space generation options - need to expose these
-    solverParam.maxiter = 500;
+    solverParam.maxiter = param.mg_global.setup_maxiter[param.level];
     solverParam.tol = param.mg_global.setup_tol[param.level];
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-1;
@@ -874,14 +874,12 @@ namespace quda {
     DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
     DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
     if(solverParam.inv_type == QUDA_CG_INVERTER) {
-      solverParam.maxiter = 2000;
       solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, profile);
     } else if(solverParam.inv_type == QUDA_MG_INVERTER) {
       // in case MG has not been created, we create the Smoother
       if (!transfer) createSmoother();
 
       // run GCR with the MG as a preconditioner
-      solverParam.maxiter = 10;
       solverParam.inv_type_precondition = QUDA_MG_INVERTER;
       solverParam.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
       solverParam.precondition_cycle = 1;

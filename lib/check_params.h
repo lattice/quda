@@ -532,8 +532,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 #ifdef INIT_PARAM
     P(setup_tol[i], 5e-6);
+    P(setup_maxiter[i], 500);
 #else
     P(setup_tol[i], INVALID_DOUBLE);
+    P(setup_tol[i], INVALID_INT);
 #endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
