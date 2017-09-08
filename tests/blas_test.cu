@@ -16,7 +16,7 @@
 
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
-extern int nvec;
+extern int nvec[QUDA_MAX_MG_LEVEL];
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -960,7 +960,8 @@ int main(int argc, char** argv)
   // override spin setting if mg solver is set to test coarse grids
   if (inv_type == QUDA_MG_INVERTER) {
     Nspin = 2;
-    Ncolor = nvec;
+    Ncolor = nvec[0];
+    if (Ncolor == 0) Ncolor = 24;
   } else {
     // set spin according to the type of dslash
     Nspin = (dslash_type == QUDA_ASQTAD_DSLASH ||
