@@ -437,7 +437,7 @@ namespace quda {
 
     }
 
-    if (total_iter > 0) blas::copy(x, y);
+    blas::copy(x, y);
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
