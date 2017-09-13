@@ -899,21 +899,21 @@ namespace quda {
     DiracMatrix &matSloppy;
     DiracMatrix &matPrecon;
 
-    Solver *K;
+    std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    ColorSpinorFieldSet *Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+    std::shared_ptr<ColorSpinorFieldSet> Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
-    ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *yp;       //! high precision accumulator
-    ColorSpinorField* p;  // conjugate vector
-    ColorSpinorField* Ap; // mat * conjugate vector
-    ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField* Az; // mat * conjugate vector from the previous iteration 
-    ColorSpinorField *r_pre;    //! residual passed to preconditioner
-    ColorSpinorField *p_pre;    //! preconditioner result
+    std::shared_ptr<ColorSpinorField> rp;       //! residual vector
+    std::shared_ptr<ColorSpinorField> yp;       //! high precision accumulator
+    std::shared_ptr<ColorSpinorField> p;  // conjugate vector
+    std::shared_ptr<ColorSpinorField> Ap; // mat * conjugate vector
+    std::shared_ptr<ColorSpinorField> tmpp;     //! temporary for mat-vec
+    std::shared_ptr<ColorSpinorField> Az; // mat * conjugate vector from the previous iteration 
+    std::shared_ptr<ColorSpinorField> r_pre;    //! residual passed to preconditioner
+    std::shared_ptr<ColorSpinorField> p_pre;    //! preconditioner result
 
-    EigCGArgs *eigcg_args;
+    std::shared_ptr<EigCGArgs>  eigcg_args;
 
     TimeProfile &profile;    //time profile for initCG solver
 
@@ -929,6 +929,8 @@ namespace quda {
     void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2); 
     //EigCG solver:
     int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    //pipeEigCG solver:
+    int pipeEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //InitCG solver:
     int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver (for eigcg and initcg calls)
