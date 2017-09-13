@@ -821,6 +821,7 @@ namespace quda {
     std::shared_ptr<ColorSpinorField> yp, rp, App, tmpp;
     std::vector<ColorSpinorField*> p;
     std::shared_ptr<ColorSpinorField> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
+    std::shared_ptr<ColorSpinorField> p_oldp; // only for BLOCKSOLVER_PRECISE_Q
     bool init;
 
     template <int n>

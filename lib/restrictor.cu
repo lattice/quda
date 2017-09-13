@@ -7,7 +7,9 @@
 #include <fast_intdiv.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
+#ifndef SWIZZLE
 #define SWIZZLE
+#endif
 
 namespace quda {
 

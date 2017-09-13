@@ -313,7 +313,7 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
   multi::SpinorTexture<RegType,StoreType,M,0> X[NXZ];
   multi::Spinor<RegType,    yType,M,write::Y,1> Y[MAX_MULTI_BLAS_N];
   multi::SpinorTexture<RegType,StoreType,M,2> Z[NXZ];
-  multi::Spinor<RegType,StoreType,M,write::W,3> W[MAX_MULTI_BLAS_N];
+  multi::Spinor<RegType,    yType,M,write::W,3> W[MAX_MULTI_BLAS_N];
 
   //MWFIXME
   for (int i=0; i<NXZ; i++) { X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i])); Z[i].set(*dynamic_cast<cudaColorSpinorField *>(z[i]));}
@@ -327,7 +327,7 @@ void multiblasCuda(const coeff_array<T> &a, const coeff_array<T> &b, const coeff
 		multi::SpinorTexture<RegType,StoreType,M,0>,
 		multi::Spinor<RegType,    yType,M,write::Y,1>,
 		multi::SpinorTexture<RegType,StoreType,M,2>,
-		multi::Spinor<RegType,StoreType,M,write::W,3>,
+		multi::Spinor<RegType,    yType,M,write::W,3>,
 		decltype(f) >
     blas(X, Y, Z, W, f, NYW, length, x[0]->SiteSubset(), y, w);
   blas.apply(*getStream());
