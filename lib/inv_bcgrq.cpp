@@ -31,12 +31,10 @@ namespace quda{
   #define BLOCKSOLVER_MULTIFUNCTIONS
   #define BLOCKSOLVE_DSLASH5D
 #endif
-#define BLOCKSOLVER_VERBOSE
+//#define BLOCKSOLVER_VERBOSE
 
 // Run algorithm with Q in high precision.
-// DOES NOT WORK IF BLOCKSOLVER_MULTIFUNCTIONS IS DEFINED.
-// Currently investigating.
-//#define BLOCKSOLVER_PRECISE_Q
+#define BLOCKSOLVER_PRECISE_Q
 
 // Mathias' testing area for Pollock-Ribiere or however it's spelled.
 //#define BLOCKSOLVER_ALTERNATIVE_BETA
@@ -586,8 +584,10 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
   std::cout << "RELUP " << C.norm() << " " << rNorm << std::endl;
   Linv = C.inverse();
 
+  rNorm = C.norm();
   maxrx = C.norm();
   maxrr = C.norm();
+  printfQuda("rNorm = %.8e on iteration %d!\n", rNorm, 0);
 
   #ifdef BLOCKSOLVER_VERBOSE
   std::cout << "r2\n " << H << std::endl;
@@ -835,6 +835,7 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
     bool did_reliable = false;
 #endif
     rNorm = C.norm();
+    printfQuda("rNorm = %.8e on iteration %d!\n", rNorm, k);
 
     // reliable update
     if (block_reliable(rNorm, maxrx, maxrr, r2, delta))
@@ -983,7 +984,9 @@ void BlockCG::solve_n(ColorSpinorField& x, ColorSpinorField& b) {
 
       // Reliable updates step 9: Set S = C * C_old^{-1} (equation 6.1 in the blockCGrQ paper)
       // S = C * C_old.inverse();
+#ifdef BLOCKSOLVER_VERBOSE
       std::cout << "reliable S " << S << std::endl;
+#endif
       POP_RANGE
 
       // Reliable updates step 10: Recompute residuals, reset rNorm, etc.
