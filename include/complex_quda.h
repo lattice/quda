@@ -104,7 +104,11 @@ namespace quda
   template <typename ValueType, typename ExponentType>
     __host__ __device__
     inline ValueType pow(ValueType x, ExponentType e){
+#if (CUDA_VERSION < 7050)
+    return std::pow(x,static_cast<ValueType>(e));
+#else
     return std::pow(x,e);
+#endif
   }
   template <typename ValueType>
     __host__ __device__

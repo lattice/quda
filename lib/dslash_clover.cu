@@ -182,7 +182,6 @@ namespace quda {
     inSpinor->createComms(1);
 
 #ifdef GPU_CLOVER_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();

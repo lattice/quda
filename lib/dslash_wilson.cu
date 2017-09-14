@@ -116,7 +116,6 @@ namespace quda {
     inSpinor->createComms(1);
 
 #ifdef GPU_WILSON_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
         

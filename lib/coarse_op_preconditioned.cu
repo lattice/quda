@@ -152,9 +152,6 @@ namespace quda {
   template<typename storeFloat, typename Float, int N, QudaGaugeFieldOrder gOrder>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
   {
-
-    QudaFieldLocation location = checkLocation(Yhat, Y, X, Xinv);
-
     // invert the clover matrix field
     const int n = X.Ncolor();
     if (X.Location() == QUDA_CUDA_FIELD_LOCATION && X.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
@@ -243,8 +240,6 @@ namespace quda {
   // template on the number of coarse degrees of freedom
   template <typename storeFloat, typename Float>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    const int n = Y.Ncolor();
-
     switch (Y.Ncolor()) {
     case  2: calculateYhat<storeFloat,Float, 2>(Yhat, Xinv, Y, X); break;
     case  4: calculateYhat<storeFloat,Float, 4>(Yhat, Xinv, Y, X); break;
