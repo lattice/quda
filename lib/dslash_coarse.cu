@@ -2,10 +2,16 @@
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
+#include <cub_helper.cuh> // for vector_type
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
 #endif
 #include <int32_to_char.h>
+
+// splitting the dot-product between threads is buggy with CUDA 7.0
+#if __COMPUTE_CAPABILITY__ >= 300 && CUDA_VERSION >= 7050
+#define DOT_PRODUCT_SPLIT
+#endif
 
 namespace quda {
 
@@ -331,22 +337,21 @@ namespace quda {
 	    bool dslash, bool clover, bool dagger, DslashType type, int dir, int dim, typename Arg>
   __device__ __host__ inline void coarseDslash(Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset)
   {
-    complex <Float> out[Mc];
-#pragma unroll
-    for (int c=0; c<Mc; c++) out[c] = 0.0;
-    if (dslash) applyDslash<Float,nDim,Ns,Nc,Mc,color_stride,dim_thread_split,dir,dim,dagger,type>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-    if (doBulk<type>() && clover && dir==0 && dim==0) applyClover<Float,Ns,Nc,Mc,color_stride,dagger>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+    vector_type<complex <Float>, Mc> out;
+    if (dslash) applyDslash<Float,nDim,Ns,Nc,Mc,color_stride,dim_thread_split,dir,dim,dagger,type>(out.data, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+    if (doBulk<type>() && clover && dir==0 && dim==0) applyClover<Float,Ns,Nc,Mc,color_stride,dagger>(out.data, arg, x_cb, src_idx, parity, s, color_block, color_offset);
 
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
-#pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
 #if __CUDA_ARCH__ >= 300
 	// reduce down to the first group of column-split threads
 	constexpr int warp_size = 32; // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
-	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2) out[color_local] += __shfl_down(out[color_local], offset);
+	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2) out += __shfl_down(out, offset);
 #endif
+
+#pragma unroll
+      for (int color_local=0; color_local<Mc; color_local++) {
 	int c = color_block + color_local; // global color index
 	if (color_offset == 0) {
 	  // if not halo we just store, else we accumulate
@@ -355,6 +360,7 @@ namespace quda {
 	}
       }
     }
+
   }
 
   // CPU kernel for applying the coarse Dslash to a vector
@@ -524,7 +530,7 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
 
-#if __COMPUTE_CAPABILITY__ >= 300
+#ifdef DOT_PRODUCT_SPLIT
       // we can only split the dot product on Kepler and later since we need the __shfl instruction
       if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0 &&
 	  param.block.x % deviceProp.warpSize == 0) {
@@ -671,6 +677,7 @@ namespace quda {
 	  case 1:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
+#ifdef DOT_PRODUCT_SPLIT
 	  case 2:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
@@ -681,7 +688,8 @@ namespace quda {
 	  case 8:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,1,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#endif
+#endif // EIGHT_WAY_WARP_SPLIT
+#endif // DOT_PRODUCT_SPLIT
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
 	  }
@@ -691,6 +699,7 @@ namespace quda {
 	  case 1:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
+#ifdef DOT_PRODUCT_SPLIT
 	  case 2:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
@@ -701,7 +710,8 @@ namespace quda {
 	  case 8:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,2,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#endif
+#endif // EIGHT_WAY_WARP_SPLIT
+#endif // DOT_PRODUCT_SPLIT
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
 	  }
@@ -711,6 +721,7 @@ namespace quda {
 	  case 1:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,1,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
+#ifdef DOT_PRODUCT_SPLIT
 	  case 2:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,2,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
@@ -721,7 +732,8 @@ namespace quda {
 	  case 8:
 	    coarseDslashKernel<Float,nDim,Ns,Nc,Mc,8,4,dslash,clover,dagger,type> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	    break;
-#endif
+#endif // EIGHT_WAY_WARP_SPLIT
+#endif // DOT_PRODUCT_SPLIT
 	  default:
 	    errorQuda("Color column stride %d not valid", tp.aux.x);
 	  }
