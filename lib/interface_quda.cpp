@@ -1887,7 +1887,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   double kappa = inv_param->kappa;
   if (pc) {
     if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
-      blas::ax(1.0/pow(2.0*kappa,4), out);
+      blas::ax(1.0/quda::pow(2.0*kappa,4), out);
     } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
       blas::ax(0.25/(kappa*kappa), out);
     }
@@ -3348,7 +3348,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	the iterated residual tolerance of the previous multi-shift
 	solver (iter_res_offset[i]), which ever is greater.
       */
-      const double prec_tol = pow(10.,(-2*(int)param->cuda_prec+2));
+      const double prec_tol = quda::pow(10.,(-2*(int)param->cuda_prec+2));
       const double iter_tol = (param->iter_res_offset[i] < prec_tol ? prec_tol : (param->iter_res_offset[i] *1.1));
       const double refine_tol = (param->tol_offset[i] == 0.0 ? iter_tol : param->tol_offset[i]);
       // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0

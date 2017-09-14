@@ -106,7 +106,7 @@ namespace quda {
   }
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
+    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
 
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
