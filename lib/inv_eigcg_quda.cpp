@@ -80,7 +80,7 @@ namespace quda {
        EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
        m(m), k(k), id(0), restarts(0), global_stop(0.0), run_residual_correction(false), V2k(nullptr) { }
 
-       ~EigCGArgs() { if(init_shrp) V2k.reset(); }
+       ~EigCGArgs() { V2k.reset(); }
 
        //method for constructing Lanczos matrix :
        inline void SetLanczos(Complex diag_val, Complex offdiag_val) { 
@@ -107,7 +107,7 @@ namespace quda {
          csParam.is_composite  = true;
          csParam.composite_dim = (2*k);
 
-         V2k.reset( ColorSpinorFieldSet::CreateSmartPtr(csParam) ); 
+         V2k.reset( ColorSpinorFieldSet::Create(csParam) ); 
        }
 
        inline void ResetSearchIdx() {  id = 2*k;  restarts += 1; }
@@ -123,7 +123,7 @@ namespace quda {
          //V2k = nullptr;
        }
 
-       void RestartLanczos(std::shared_ptr<ColorSpinorField> w, std::shared_ptr<ColorSpinorFieldSet> v, const double inv_sqrt_r2)
+       inline void RestartLanczos(std::vector<ColorSpinorField*> w, std::vector<ColorSpinorField*> v, const double inv_sqrt_r2)
        {
          Tm.setZero();
 
@@ -131,12 +131,7 @@ namespace quda {
 
          for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
 
-	 std::vector<ColorSpinorField*> w_;
-	 w_.push_back(w);
-
-	 std::vector<ColorSpinorField*> v_(v->Components().begin(), v->Components().begin()+2*k);
-
-	 blas::cDotProduct(s.get(), w_, v_);
+	 blas::cDotProduct(s.get(), w, v);
 
 	 Map<VectorXcd, Unaligned > s_(s.get(), 2*k);
 	 s_ *= inv_sqrt_r2;
@@ -289,11 +284,11 @@ namespace quda {
     }
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
-      K = make_shared< CG >(matPrecon, matPrecon, Kparam, profile);
+      K = std::make_shared< CG >(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
-      K = make_shared< MR >(matPrecon, matPrecon, Kparam, profile);
+      K = std::make_shared< MR >(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
-      K = make_shared< SD >(matPrecon, Kparam, profile);
+      K = std::make_shared< SD >(matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
@@ -322,28 +317,26 @@ namespace quda {
 
     blas::zero(*args.V2k);
 
-    std::vector<ColorSpinorField*> vm (Vm->Components());
-    std::vector<ColorSpinorField*> v2k(args.V2k->Components());
-
     RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
-    blas::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
+    blas::caxpy( static_cast<Complex*>(Alpha.data()), Vm->Components(), args.V2k->Components());
 
-    for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), args.V2k->Component(i));
+
+    std::vector<ColorSpinorField*> v2k( Vm->Components().begin(), Vm->Components().begin()+2*args.k );
+
+    for (int i = 0; i < 2*args.k; i++) blas::copy(*v2k[i], args.V2k->Component(i));
 
     //Restart T:
-    std::shared_ptr<ColorSpinorField> omega = nullptr;
-
     //Compute Az = Ap - beta*Ap_old(=Az):
     blas::xpay(*Ap, -beta, *Az);
 
-    if(Vm->Precision() != Az->Precision())//we may not need this if multiprec blas is used
-    {
-      Vm->Component(args.m-1) = *Az;//use the last vector as a temporary
-      omega = &Vm->Component(args.m-1);
-    }
-    else omega = Az;
+    //if(Vm->Precision() != Az->Precision()) Vm->Component(args.m-1) = *Az;
+    Vm->Component(args.m-1) = *Az;
 
-    args.RestartLanczos(omega, Vm, 1.0 / rho);
+    std::vector<ColorSpinorField*> omega;
+    //omega.push_back( Vm->Precision() != Az->Precision() ? &Vm->Component(args.m-1) : Az ); 
+    omega.push_back( &Vm->Component(args.m-1) );
+
+    args.RestartLanczos(omega, v2k, 1.0 / rho);
 #endif
     return;
   }
@@ -452,7 +445,7 @@ namespace quda {
     matSloppy(r, x, y);
     double r2 = blas::xmyNorm(b, r);
 
-    std::shared_ptr<ColorSpinorField> *z  = (K != nullptr) ? ColorSpinorField::CreateSmartPtr(csParam) : rp;//
+    std::shared_ptr<ColorSpinorField> z  = (K != nullptr) ? ColorSpinorField::CreateSmartPtr(csParam) : rp;//
 
     if( K ) {//apply preconditioner
       if (param.precision_precondition == param.precision_sloppy) { r_pre = rp; p_pre = z; }
@@ -585,17 +578,23 @@ namespace quda {
 
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    std::shared_ptr<ColorSpinorField> *tmpp2 = ColorSpinorField::CreateSmartPtr(csParam);//full precision accumulator
+    std::shared_ptr<ColorSpinorField> tmpp2 = ColorSpinorField::CreateSmartPtr(csParam);
     ColorSpinorField &tmp2  = *tmpp2;
-    std::shared_ptr<ColorSpinorField> *rp    = ColorSpinorField::CreateSmartPtr(csParam);//full precision residual
+    std::shared_ptr<ColorSpinorField> rp    = ColorSpinorField::CreateSmartPtr(csParam);//full precision residual
     ColorSpinorField &r = *rp;
 
     csParam.setPrecision(param.precision_ritz);
 
-    std::shared_ptr<ColorSpinorField> *xp_proj =  ( param.precision_ritz == param.precision ) ? &x : ColorSpinorField::CreateSmartPtr(csParam);
+    std::shared_ptr<ColorSpinorField> xp_proj;
+
+    if(param.precision_ritz != param.precision)
+      xp_proj = ColorSpinorField::CreateSmartPtr(csParam);
+    else //still bad practice!
+      xp_proj.reset(&x);
+
     ColorSpinorField &xProj = *xp_proj;
 
-    std::shared_ptr<ColorSpinorField> *rp_proj =  ( param.precision_ritz == param.precision ) ? rp : ColorSpinorField::CreateSmartPtr(csParam);
+    std::shared_ptr<ColorSpinorField> rp_proj =  ( param.precision_ritz == param.precision ) ? rp : ColorSpinorField::CreateSmartPtr(csParam);
     ColorSpinorField &rProj = *rp_proj;
 
     int restart_idx  = 0;
@@ -603,15 +602,15 @@ namespace quda {
     xProj = x;
     rProj = b; 
     //launch initCG:
+
     while((Kparam.tol >= full_tol) && (restart_idx < param.max_restart_num)) {
       restart_idx += 1;
 
       defl(xProj, rProj);
       x = xProj;      
 
-      K = new CG(mat, matPrecon, Kparam, profile);
+      K.reset( new CG(mat, matPrecon, Kparam, profile) );
       (*K)(x, b);
-      delete K;
 
       mat(r, x, tmp2);
       blas::xpay(b, -1.0, r);
@@ -665,9 +664,9 @@ namespace quda {
      ColorSpinorParam csParam(in);
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     std::shared_ptr<ColorSpinorField> *ep = ColorSpinorField::CreateSmartPtr(csParam);//full precision accumulator
+     std::shared_ptr<ColorSpinorField> ep = ColorSpinorField::CreateSmartPtr(csParam);//full precision accumulator
      ColorSpinorField &e = *ep;
-     std::shared_ptr<ColorSpinorField> *rp = ColorSpinorField::CreateSmartPtr(csParam);//full precision residual
+     std::shared_ptr<ColorSpinorField> rp = ColorSpinorField::CreateSmartPtr(csParam);//full precision residual
      ColorSpinorField &r = *rp;
 
      //deflate initial guess ('out'-field):
@@ -677,9 +676,9 @@ namespace quda {
 
      csParam.setPrecision(param.precision_sloppy);
 
-     std::shared_ptr<ColorSpinorField> *ep_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : ep;
+     std::shared_ptr<ColorSpinorField> ep_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : ep;
      ColorSpinorField &eSloppy = *ep_sloppy;
-     std::shared_ptr<ColorSpinorField> *rp_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : rp;
+     std::shared_ptr<ColorSpinorField> rp_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : rp;
      ColorSpinorField &rSloppy = *rp_sloppy;
 
      const double stop = b2*param.tol*param.tol;
@@ -693,10 +692,10 @@ namespace quda {
        eSloppy = e, rSloppy = r;
 
        if( dcg_cycle ) { //run DCG instead
-         if(!K) {
+         if(K == nullptr) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
-           K = new CG(matSloppy, matPrecon, Kparam, profile);   
+           K.reset( new CG(matSloppy, matPrecon, Kparam, profile) );   
          }
 
          eigcg_args->run_residual_correction = true;      
