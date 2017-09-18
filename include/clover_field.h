@@ -241,6 +241,7 @@ namespace quda {
     size_t bytes; // sizeof each clover field (per parity)
     size_t norm_bytes; // sizeof each norm field (per parity)
     int stride; // stride (volume + pad)
+    double rho; // rho additive factor
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t &evenTex;
@@ -254,7 +255,8 @@ namespace quda {
 #endif
 
     FullClover(const cudaCloverField &clover, bool inverse=false) :
-    precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes), stride(clover.stride)
+    precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes),
+      stride(clover.stride), rho(clover.rho)
 #ifdef USE_TEXTURE_OBJECTS
 	, evenTex(inverse ? clover.evenInvTex : clover.evenTex)
 	, evenNormTex(inverse ? clover.evenInvNormTex : clover.evenNormTex)

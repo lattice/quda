@@ -72,7 +72,6 @@ namespace quda {
 
   void CloverField::setRho(double rho_)
   {
-    cloverRho(*this, rho_);
     rho = rho_;
   }
 

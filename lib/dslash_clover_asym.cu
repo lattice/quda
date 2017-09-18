@@ -74,7 +74,7 @@ namespace quda {
     AsymCloverDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
 			 const QudaReconstructType reconstruct, const cFloat *clover, 
 			 const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in,
-			 const cudaColorSpinorField *x, const double a, const int dagger)
+			 const cudaColorSpinorField *x, const double a, const double rho, const int dagger)
       : SharedDslashCuda(out, in, x, reconstruct, dagger)
     { 
       bindSpinorTex<sFloat>(in, out, x);
@@ -85,6 +85,9 @@ namespace quda {
       dslashParam.a = a;
       dslashParam.a_f = a;
       dslashParam.cl_stride = cl_stride;
+      dslashParam.rho = rho;
+      dslashParam.rho_f = rho;
+
       if (!x) errorQuda("Asymmetric clover dslash only defined for Xpay");
     }
 
@@ -150,7 +153,7 @@ namespace quda {
 
 #include <dslash_policy.cuh>
 
-  void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover cloverInv,
+  void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover,
 			    const cudaColorSpinorField *in, const int parity, const int dagger, 
 			    const cudaColorSpinorField *x, const double &a, const int *commOverride,
 			    TimeProfile &profile)
@@ -170,7 +173,7 @@ namespace quda {
     }
 
     void *cloverP, *cloverNormP;
-    QudaPrecision clover_prec = bindCloverTex(cloverInv, parity, &cloverP, &cloverNormP);
+    QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
 
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
@@ -187,16 +190,16 @@ namespace quda {
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
       dslash = new AsymCloverDslashCuda<double2, double2, double2>
 	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), 
-	 (double2*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
+	 (double2*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
       regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new AsymCloverDslashCuda<float4, float4, float4>
 	(out, (float4*)gauge0, (float4*)gauge1, gauge.Reconstruct(), 
-	 (float4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
+	 (float4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new AsymCloverDslashCuda<short4, short4, short4>
 	(out, (short4*)gauge0, (short4*)gauge1, gauge.Reconstruct(), 
-	 (short4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
+	 (short4*)cloverP, (float*)cloverNormP, clover.stride, in, x, a, clover.rho, dagger);
     }
 
     DslashPolicyTune dslash_policy(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
@@ -204,7 +207,7 @@ namespace quda {
 
     delete dslash;
     unbindGaugeTex(gauge);
-    unbindCloverTex(cloverInv);
+    unbindCloverTex(clover);
 
     checkCudaError();
 #else
