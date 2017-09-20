@@ -4930,9 +4930,11 @@ void mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatDagMatQuda(h_out, h_in, inv_param); }
 void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) {
+  fflush(stdout);
   // ensure that fifth dimension is set to 1
   if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
   invertQuda(hp_x, hp_b, param);
+  fflush(stdout);
 }
 
 void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
@@ -4956,8 +4958,17 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
   invertMultiShiftQuda(hp_x, hp_b, param);
 }
 
-void flush_chrono_quda_(int index) { flushChronoQuda(index); }
+void flush_chrono_quda_(int *index) { flushChronoQuda(*index); }
 
+void register_pinned_quda_(void *ptr, size_t *bytes) {
+  cudaHostRegister(ptr, *bytes, cudaHostRegisterDefault);
+  checkCudaError();
+}
+
+void unregister_pinned_quda_(void *ptr) {
+  cudaHostUnregister(ptr);
+  checkCudaError();
+}
 
 void new_quda_gauge_param_(QudaGaugeParam *param) {
   *param = newQudaGaugeParam();
