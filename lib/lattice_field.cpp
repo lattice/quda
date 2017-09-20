@@ -185,7 +185,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms()
+  void LatticeField::createComms(bool no_comms_fill)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -200,7 +200,7 @@ namespace quda {
     // initialize ghost send pointers
     size_t offset = 0;
     for (int i=0; i<nDimComms; i++) {
-      if (!commDimPartitioned(i)) continue;
+      if (!commDimPartitioned(i) && no_comms_fill==false) continue;
 
       for (int b=0; b<2; ++b) {
 	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;

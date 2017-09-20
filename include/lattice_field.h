@@ -354,8 +354,10 @@ namespace quda {
 
     /**
        Create the communication handlers (both host and device)
+       @param[in] no_comms_fill Whether to allocate halo buffers for
+       dimensions that are not partitioned
     */
-    void createComms();
+    void createComms(bool no_comms_fill=false);
 
     /**
        Destroy the communication handlers

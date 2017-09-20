@@ -263,7 +263,7 @@ namespace quda {
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
       (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]); // pinned buffers
 
-    if (!initComms || comms_reset) LatticeField::createComms();
+    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
 
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
