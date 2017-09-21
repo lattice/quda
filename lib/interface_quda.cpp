@@ -761,8 +761,10 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   if (extendedGaugeResident) {
     // updated the resident gauge field if needed
-    const auto R_ = extendedGaugeResident->R();
-    const int R[] = { R_[0], R_[1], R_[2], R_[3] };
+    //const int *R_ = extendedGaugeResident->R();
+    //const int R[] = { R_[0], R_[1], R_[2], R_[3] };
+    int R[4];
+    for (int d=0; d<4; d++) R[d] = (d==0 ? 2 : 1) * (redundant_comms || commDimPartitioned(d));
     QudaReconstructType recon = extendedGaugeResident->Reconstruct();
     delete extendedGaugeResident;
     extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGauge, false, recon);
