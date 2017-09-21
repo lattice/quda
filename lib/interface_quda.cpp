@@ -762,7 +762,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (extendedGaugeResident) {
     // updated the resident gauge field if needed
     const auto R_ = extendedGaugeResident->R();
-    const int R[] = { R_[0], R[1], R[2], R[3] };
+    const int R[] = { R_[0], R_[1], R_[2], R_[3] };
     QudaReconstructType recon = extendedGaugeResident->Reconstruct();
     delete extendedGaugeResident;
     extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGauge, false, recon);
