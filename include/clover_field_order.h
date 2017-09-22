@@ -367,7 +367,6 @@ namespace quda {
       struct FloatNOrder {
 	typedef typename mapper<Float>::type RegType;
 	typedef typename VectorType<Float,N>::type Vector;
-	typedef typename VectorType<RegType,N>::type RegVector;
 	typedef typename AllocType<huge_alloc>::type AllocInt;
 	static const int M=length/(N*2); // number of short vectors per chiral block
 	static const int block=length/2; // chiral block size
@@ -392,7 +391,7 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 	void *backup_norm_h; //! host memory for backing up norm when tuning
 
-        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, float *norm_=0)
+      FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_=0, float *norm_=0, bool override=false)
 	: offset(clover.Bytes()/(2*sizeof(Float))), norm_offset(clover.NormBytes()/(2*sizeof(float))),
 #ifdef USE_TEXTURE_OBJECTS
 	  tex(0), normTex(0), tex_offset(offset/N),
@@ -413,7 +412,7 @@ namespace quda {
 	      normTex = static_cast<const cudaCloverField&>(clover).NormTex();
 	    }
 	    if (!huge_alloc && (this->clover != clover.V(is_inverse) ||
-				(clover.Precision() == QUDA_HALF_PRECISION && this->norm != clover.Norm()) ) ) {
+				(clover.Precision() == QUDA_HALF_PRECISION && this->norm != clover.Norm(is_inverse)) ) && !override) {
 	      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
 	    }
 	  }
@@ -469,7 +468,8 @@ namespace quda {
 	    if (!huge_alloc) { // use textures unless we have a huge alloc
 	      TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
 	      // second do vectorized copy converting into register type
-	      copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
+#pragma unroll
+	      for (int j=0; j<N; j++) copy(v[i*N+j], reinterpret_cast<RegType*>(&vecTmp)[j]);
 	    } else
 #endif
 	    {

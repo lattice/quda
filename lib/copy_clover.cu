@@ -110,8 +110,9 @@ namespace quda {
  void copyClover(const InOrder &inOrder, CloverField &out, bool inverse, QudaFieldLocation location, FloatOut *Out, float *outNorm) {
 
     if (out.isNative()) {
+      const bool override = true;
       typedef typename clover_mapper<FloatOut>::type C;
-      copyClover<FloatOut,FloatIn,length>(C(out, inverse, Out, outNorm), inOrder, out, location);
+      copyClover<FloatOut,FloatIn,length>(C(out, inverse, Out, outNorm, override), inOrder, out, location);
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out, location);
@@ -138,8 +139,9 @@ namespace quda {
 
     // reconstruction only supported on FloatN fields currently
    if (in.isNative()) {
+      const bool override = true;
       typedef typename clover_mapper<FloatIn>::type C;
-      copyClover<FloatOut,FloatIn,length>(C(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
+      copyClover<FloatOut,FloatIn,length>(C(in, inverse, In, inNorm, override), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);

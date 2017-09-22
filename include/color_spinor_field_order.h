@@ -468,7 +468,7 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 	size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0)
+      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0, bool override=false)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
 	  norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
 #ifdef USE_TEXTURE_OBJECTS
@@ -486,7 +486,7 @@ namespace quda {
 	    tex = static_cast<const cudaColorSpinorField&>(a).Tex();
 	    texNorm = static_cast<const cudaColorSpinorField&>(a).TexNorm();
 	  }
-	  if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) ) ) {
+	  if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) ) && !override) {
 	    errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
 	  }
 #endif
