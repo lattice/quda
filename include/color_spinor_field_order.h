@@ -451,8 +451,8 @@ namespace quda {
 	static const int length = 2 * Ns * Nc;
 	static const int M = length / N;
 	Float *field;
-	const AllocInt offset; // offset can be 32-bit or 64-bit
 	float *norm;
+	const AllocInt offset; // offset can be 32-bit or 64-bit
 	const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
 	typedef typename TexVectorType<RegType,N>::type TexVector;
@@ -468,7 +468,7 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 	size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0)
+      FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0, bool override=false)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
 	  norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
 #ifdef USE_TEXTURE_OBJECTS
@@ -485,6 +485,9 @@ namespace quda {
 	  if (a.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	    tex = static_cast<const cudaColorSpinorField&>(a).Tex();
 	    texNorm = static_cast<const cudaColorSpinorField&>(a).TexNorm();
+	  }
+	  if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) ) && !override) {
+	    errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
 	  }
 #endif
 	}

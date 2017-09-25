@@ -9,37 +9,42 @@ namespace quda {
     int faceVolumeCB[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
     if (out.isNative()) {
+      // this overrides the check that the texture maps to the gauge
+      // pointer - this is safe here since it only occurs when running
+      // the copier on the host when we will not be using texture
+      // reads
+      const bool override = true;
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  copyGauge<short,FloatIn,length>
-	    (FloatNOrder<short,length,2,19>(out, (short*)Out, (short**)outGhost), inOrder,
+	    (FloatNOrder<short,length,2,19>(out, (short*)Out, (short**)outGhost, override), inOrder,
 	     out.Volume(), faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
 	} else {
 	  typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO>::type G;
 	  copyGauge<FloatOut,FloatIn,length>
-	    (G(out,Out,outGhost), inOrder, out.Volume(), faceVolumeCB,
+	    (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
 	     out.Ndim(), out.Geometry(), out, location, type);
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
 	copyGauge<FloatOut,FloatIn,length>
-	  (G(out,Out,outGhost), inOrder, out.Volume(), faceVolumeCB,
+	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
 	   out.Ndim(), out.Geometry(), out, location, type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
 	copyGauge<FloatOut,FloatIn,length> 
-	  (G(out,Out,outGhost), inOrder, out.Volume(), faceVolumeCB,
+	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
 	   out.Ndim(), out.Geometry(), out, location, type);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
         copyGauge<FloatOut,FloatIn,length>
-	  (G(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB,
+	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
 	   out.Ndim(),  out.Geometry(), out, location, type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_9>::type G;
         copyGauge<FloatOut,FloatIn,length>
-	  (G(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB,
+	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
 	   out.Ndim(), out.Geometry(), out, location, type);
 #endif
       } else {
@@ -127,28 +132,33 @@ namespace quda {
 
     // reconstruction only supported on FloatN fields currently
     if (in.isNative()) {      
+      // this overrides the check that the texture maps to the gauge
+      // pointer - this is safe here since it only occurs when running
+      // the copier on the host when we will not be using texture
+      // reads
+      const bool override = true;
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  copyGauge<FloatOut,short,length> (FloatNOrder<short,length,2,19>
-					    (in,(short*)In,(short**)inGhost),
+					    (in,(short*)In,(short**)inGhost,override),
 					    out, location, Out, outGhost, type);
 	} else {
 	  typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
-	  copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
+	  copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
 	}
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_9>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
@@ -262,19 +272,25 @@ namespace quda {
       int faceVolumeCB[QUDA_MAX_DIM];
       for (int d=0; d<in.Ndim(); d++) faceVolumeCB[d] = in.SurfaceCB(d) * in.Nface();
 
+      // this overrides the check that the texture maps to the gauge
+      // pointer - this is safe here since it only occurs when running
+      // the copier on the host when we will not be using texture
+      // reads
+      const bool override = true;
+
       // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef MILCOrder<FloatIn,10> momIn;
-	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,in,location);
 #else
@@ -284,7 +300,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
 	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
 	    typedef TIFROrder<FloatIn,18> momIn;
-	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
 #else
@@ -294,7 +310,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
 	    typedef FloatNOrder<FloatOut,18,2,11> momOut;
 	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
-	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
 #else
@@ -308,7 +324,7 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
@@ -328,7 +344,7 @@ namespace quda {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
-	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
@@ -348,7 +364,7 @@ namespace quda {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
-	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
 	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
 	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {

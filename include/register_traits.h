@@ -112,6 +112,14 @@ namespace quda {
 
   template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
 
+  template<> __host__ __device__ inline void copy(double &a, const int2 &b) {
+#ifdef __CUDA_ARCH__
+    a = __hiloint2double(b.y, b.x);
+#else
+    errorQuda("Undefined");
+#endif
+  }
+
   template<> __host__ __device__ inline void copy(double2 &a, const int4 &b) {
 #ifdef __CUDA_ARCH__
     a.x = __hiloint2double(b.y, b.x); a.y = __hiloint2double(b.w, b.z);
