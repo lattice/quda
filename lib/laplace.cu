@@ -21,7 +21,7 @@ namespace quda {
 
     F out;                // output vector field
     const F in;           // input vector field
-    const F x;            // inpuot vector when doing xpay
+    const F x;            // input vector when doing xpay
     const G U;            // the gauge field
     const Float kappa;    // kappa parameter = 1/(8+m)
     const int parity;     // only use this for single parity fields
@@ -34,9 +34,9 @@ namespace quda {
     __host__ __device__ static constexpr bool isXpay() { return xpay; }
 
     LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-	       Float kappa, const ColorSpinorField *x, int parity)
+           Float kappa, const ColorSpinorField *x, int parity)
       : out(out), in(in), U(U), kappa(kappa), x(xpay ? *x : in), parity(parity), nParity(in.SiteSubset()), nFace(1),
-	dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
+    dim{ (3-nParity) * in.X(0), in.X(1), in.X(2), in.X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(in.VolumeCB())
     {
@@ -55,6 +55,7 @@ namespace quda {
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
    */
+  extern __shared__ float s[];
   template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
@@ -71,18 +72,18 @@ namespace quda {
       const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 
       if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
-	const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+    const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
-	const Link U = arg.U(d, x_cb, parity);
-	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+    const Link U = arg.U(d, x_cb, parity);
+    const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
 
-	out += U * in;
-	} else {
+    out += U * in;
+    } else {
 
-	const Link U = arg.U(d, x_cb, parity);
-	const Vector in = arg.in(fwd_idx, their_spinor_parity);
+    const Link U = arg.U(d, x_cb, parity);
+    const Vector in = arg.in(fwd_idx, their_spinor_parity);
 
-	out += U * in;
+    out += U * in;
       }
 
       //Backward gather - compute back offset for spinor and gauge fetch
@@ -90,18 +91,18 @@ namespace quda {
       const int gauge_idx = back_idx;
 
       if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
-	const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+    const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
-	const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
-	const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+    const Link U = arg.U.Ghost(d, ghost_idx, 1-parity);
+    const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
 
-	out += conj(U) * in;
+    out += conj(U) * in;
       } else {
-	
-	const Link U = arg.U(d, gauge_idx, 1-parity);
-	const Vector in = arg.in(back_idx, their_spinor_parity);
+    
+    const Link U = arg.U(d, gauge_idx, 1-parity);
+    const Vector in = arg.in(back_idx, their_spinor_parity);
 
-	out += conj(U) * in;
+    out += conj(U) * in;
       }
     } //nDim
 
@@ -121,7 +122,7 @@ namespace quda {
       Vector x = arg.x(x_cb, parity);
       out = x + arg.kappa * out;
     }
-    arg.out(x_cb, parity) = out;
+    arg.out(x_cb, arg.nParity == 2 ? parity : 0) = out;
   }
 
   // CPU kernel for applying the Laplace operator to a vector
@@ -134,7 +135,7 @@ namespace quda {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
-	laplace<Float,nDim,nColor>(arg, x_cb, parity);
+    laplace<Float,nDim,nColor>(arg, x_cb, parity);
       } // 4-d volumeCB
     } // parity
 
@@ -147,7 +148,7 @@ namespace quda {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
 
     // for full fields set parity from y thread index else use arg setting
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
 
     if (x_cb >= arg.volumeCB) return;
     if (parity >= arg.nParity) return;
@@ -169,7 +170,7 @@ namespace quda {
     long long bytes() const
     {
       return arg.out.Bytes() + 2*nDim*arg.in.Bytes() + arg.nParity*2*nDim*arg.U.Bytes()*meta.VolumeCB() +
-	(arg.isXpay() ? arg.x.Bytes() : 0);
+    (arg.isXpay() ? arg.x.Bytes() : 0);
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
@@ -195,10 +196,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	laplaceCPU<Float,nDim,nColor>(arg);
+    laplaceCPU<Float,nDim,nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	laplaceGPU<Float,nDim,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+    laplaceGPU<Float,nDim,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
 
@@ -208,7 +209,7 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
     void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		      double kappa, const ColorSpinorField *x, int parity)
+              double kappa, const ColorSpinorField *x, int parity)
   {
     constexpr int nDim = 4;
     if (x) {
@@ -225,7 +226,7 @@ namespace quda {
   // template on the gauge reconstruction
   template <typename Float, int nColor>
     void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		      double kappa, const ColorSpinorField *x, int parity)
+              double kappa, const ColorSpinorField *x, int parity)
   {
     if (U.Reconstruct()== QUDA_RECONSTRUCT_NO) {
       ApplyLaplace<Float,nColor,QUDA_RECONSTRUCT_NO>(out, in, U, kappa, x, parity);
@@ -241,7 +242,7 @@ namespace quda {
   // template on the number of colors
   template <typename Float>
     void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		      double kappa, const ColorSpinorField *x, int parity)
+              double kappa, const ColorSpinorField *x, int parity)
   {
     if (in.Ncolor() == 3) {
       ApplyLaplace<Float,3>(out, in, U, kappa, x, parity);
@@ -260,7 +261,7 @@ namespace quda {
   //out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   //Uses the kappa normalization for the Wilson operator.
   void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-		    double kappa, const ColorSpinorField *x, int parity)		    
+            double kappa, const ColorSpinorField *x, int parity)            
   {
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
