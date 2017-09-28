@@ -286,7 +286,7 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
 
-    if (isNative()) {
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
       if (texInit) errorQuda("Already bound textures");
       
       // create the texture for the field components
@@ -296,8 +296,8 @@ namespace quda {
       if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
       
-      // staggered and coarse fields in half and single are always two component
-      if ( (nSpin == 1 || nSpin == 2) && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
+      // all FLOAT2-ordred fields that are not double precision
+      if (precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
 	desc.x = 8*precision;
 	desc.y = 8*precision;
 	desc.z = 0;
@@ -352,7 +352,7 @@ namespace quda {
 
   void cudaColorSpinorField::createGhostTexObject() const {
     // create the ghost texture object
-    if (isNative() && ghost_bytes) {
+    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && ghost_bytes) {
       if (ghostTexInit) errorQuda("Already bound ghost texture");
 
       for (int b=0; b<2; b++) {
@@ -361,8 +361,8 @@ namespace quda {
 	if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
 	else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
 
-	// staggered and coarse fields in half and single are always two component
-	if ( (nSpin == 1 || nSpin == 2) && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
+	// all FLOAT2-ordred fields that are not double precision
+	if (precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
 	  desc.x = 8*precision;
 	  desc.y = 8*precision;
 	  desc.z = 0;
@@ -427,7 +427,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::destroyTexObject() {
-    if (isNative() && texInit) {
+    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && texInit) {
       cudaDestroyTextureObject(tex);
       if (ghost_bytes) {
 	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
@@ -443,7 +443,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::destroyGhostTexObject() const {
-    if (isNative() && ghostTexInit) {
+    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
       if (precision == QUDA_HALF_PRECISION) {
 	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
@@ -487,6 +487,30 @@ namespace quda {
       destroyTexObject();
 #endif
 
+  }
+
+  void cudaColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Gauge field already backed up");
+    backup_h = new char[bytes];
+    cudaMemcpy(backup_h, v, bytes, cudaMemcpyDeviceToHost);
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+    checkCudaError();
+    backed_up = true;
+  }
+
+  void cudaColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+    cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
+    delete []backup_h;
+    if (norm_bytes) {
+      cudaMemcpy(v, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      delete []backup_norm_h;
+    }
+    checkCudaError();
+    backed_up = false;
   }
 
   // cuda's floating point format, IEEE-754, represents the floating point

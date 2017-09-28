@@ -13,6 +13,8 @@
 
 #include <face_quda.h>
 
+#include <memory>
+
 #include <iostream>
 
 #ifdef MAGMA_LIB 
@@ -21,8 +23,8 @@
 
 #ifdef DEFLATEDSOLVER
 #include <Eigen/Dense>
-#include <Eigen/Sparse>
 #endif
+
 #include <deflation.h>
 
 
@@ -73,10 +75,14 @@ namespace quda {
   
        bool run_residual_correction;//used in mixed precision cycles 
 
-       EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
-       m(m), k(k), id(0), restarts(0), global_stop(0.0), run_residual_correction(false) { }
+       ColorSpinorFieldSet *V2k; //eigCG accumulation vectors needed to update Tm (spinor matrix of size eigen_vector_length x (2*k))
 
-       ~EigCGArgs() { }
+       EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
+       m(m), k(k), id(0), restarts(0), global_stop(0.0), run_residual_correction(false), V2k(nullptr) { }
+
+       ~EigCGArgs() { 
+         if(V2k) delete V2k;
+       }
 
        //method for constructing Lanczos matrix :
        inline void SetLanczos(Complex diag_val, Complex offdiag_val) { 
@@ -99,6 +105,9 @@ namespace quda {
          Tm.setZero(); 
          Tmvals.setZero(); 
          ritzVecs.setZero();
+
+         if(V2k) delete V2k;
+         V2k = nullptr;
        }
 
        inline void ResetSearchIdx() {  id = 2*k;  restarts += 1; }
@@ -107,7 +116,8 @@ namespace quda {
        {
          Tm.setZero();
 
-         Complex *s  = new Complex[2*k];
+         std::unique_ptr<Complex[] > s(new Complex[2*k]);
+
          for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
 
 	 std::vector<ColorSpinorField*> w_;
@@ -115,15 +125,13 @@ namespace quda {
 
 	 std::vector<ColorSpinorField*> v_(v->Components().begin(), v->Components().begin()+2*k);
 
-	 blas::cDotProduct(s, w_, v_);
+	 blas::cDotProduct(s.get(), w_, v_);
 
-	 Map<VectorXcd, Unaligned > s_(s, 2*k);
+	 Map<VectorXcd, Unaligned > s_(s.get(), 2*k);
 	 s_ *= inv_sqrt_r2;
 
 	 Tm.col(2*k).segment(0, 2*k) = s_;
 	 Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
-
-	 delete [] s;
 
 	 return;
        }
@@ -288,7 +296,7 @@ namespace quda {
 
     if(init)
     {
-      if(Vm) delete Vm;
+      if(Vm)  delete Vm;
 
       delete tmpp;
       delete rp;
@@ -315,27 +323,26 @@ namespace quda {
 #ifdef DEFLATEDSOLVER
     EigCGArgs &args = *eigcg_args;
 
-    ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
+    if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
+      ComputeRitz<libtype::magma_lib>(args);
+    } else if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
+      ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
+    } else {
+      errorQuda( "Library type %d is currently not supported.\n",param.extlib_type );
+    }
 
-    //Create intermediate model:
-    ColorSpinorParam csParam(Vm->Component(0));
-    //
-    csParam.is_composite  = true;
-    csParam.composite_dim = (2*args.k);
-    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-    ColorSpinorFieldSet *V2k = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
     //Restart V:
+
+    blas::zero(*args.V2k);
+
     std::vector<ColorSpinorField*> vm (Vm->Components());
-    std::vector<ColorSpinorField*> v2k(V2k->Components());
+    std::vector<ColorSpinorField*> v2k(args.V2k->Components());
 
     RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
     blas::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
 
-    for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), V2k->Component(i));
+    for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), args.V2k->Component(i));
 
-    delete V2k;
     //Restart T:
     ColorSpinorField *omega = nullptr;
 
@@ -429,6 +436,7 @@ namespace quda {
       csParam.composite_dim = param.m;
 
       Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+
       eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
       init = true;
@@ -444,13 +452,21 @@ namespace quda {
       return Kparam.iter; 
     }
 
+//!
+    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+
+    csParam.create        = QUDA_ZERO_FIELD_CREATE;
+    csParam.is_composite  = true;
+    csParam.composite_dim = (2*args.k);
+
+    args.V2k = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+//!
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &tmp = *tmpp;
 
     csParam.setPrecision(param.precision_sloppy);
     csParam.is_composite  = false;
-    csParam.create        = QUDA_ZERO_FIELD_CREATE;
 
     // compute initial residual
     matSloppy(r, x, y);
@@ -541,7 +557,7 @@ namespace quda {
       converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(r2, heavy_quark_res, local_stop, param.tol_hq);
     }
 
-    args.ResetArgs();//eigCG cycle finished.
+    args.ResetArgs();//eigCG cycle finished, this cleans V2k as well
 
     blas::xpy(y, x);
 
@@ -582,8 +598,8 @@ namespace quda {
     deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
     Deflation &defl         = *(defl_p->defl);
 
-    double full_tol    = Kparam.tol;
-    double restart_tol = Kparam.tol_restart;
+    const double full_tol    = Kparam.tol;
+    Kparam.tol         = Kparam.tol_restart;
 
     ColorSpinorParam csParam(x);
 
@@ -607,12 +623,11 @@ namespace quda {
     xProj = x;
     rProj = b; 
     //launch initCG:
-    while((restart_tol > full_tol) && (restart_idx < param.max_restart_num)) {//currently just one restart, think about better algorithm for the restarts.
+    while((Kparam.tol >= full_tol) && (restart_idx < param.max_restart_num)) {
+      restart_idx += 1;
 
       defl(xProj, rProj);
       x = xProj;      
-
-      Kparam.tol = (restart_tol > full_tol) ? restart_tol : full_tol;
 
       K = new CG(mat, matPrecon, Kparam, profile);
       (*K)(x, b);
@@ -626,22 +641,12 @@ namespace quda {
 
       if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
 
-      restart_tol *= param.inc_tol;
-      restart_idx += 1;
+      Kparam.tol *= param.inc_tol;
+
+      if(restart_idx == (param.max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
 
       param.secs   += Kparam.secs;
     }
-
-    defl(xProj, rProj);
-    x = xProj;      
-
-    Kparam.tol = full_tol;
-
-    K = new CG(mat, matPrecon, Kparam, profile);
-    (*K)(x, b);
-    delete K;
-
-    K = nullptr;
 
     if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
     //
@@ -664,8 +669,10 @@ namespace quda {
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
 #ifdef DEFLATEDSOLVER
+     if(param.rhs_idx == 0) max_eigcg_cycles = param.eigcg_max_restarts;
+
      const bool mixed_prec = (param.precision != param.precision_sloppy);
-     const double b2 = norm2(in);
+     const double b2       = norm2(in);
 
      deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
      Deflation &defl         = *(defl_p->defl);
@@ -715,7 +722,7 @@ namespace quda {
        if( dcg_cycle ) { //run DCG instead
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
-           Kparam.tol         = param.cg_iterref_tol;
+           Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
            K = new CG(matSloppy, matPrecon, Kparam, profile);   
          }
 
@@ -751,7 +758,9 @@ namespace quda {
        param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
        PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2);
 
-       if( !dcg_cycle &&  (eigcg_args->restarts > 1) && !defl.is_complete() ) defl.verify();
+       if( getVerbosity() >= QUDA_VERBOSE ) { 
+         if( !dcg_cycle &&  (eigcg_args->restarts > 1) && !defl.is_complete() ) defl.verify();
+       }
      } while ((r2 > stop) && mixed_prec);
 
      delete ep;

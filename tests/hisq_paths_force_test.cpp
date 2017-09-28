@@ -226,17 +226,12 @@ hisq_force_init()
   int gSize = qudaGaugeParam.cpu_prec;
   // this is a hack to get the gauge field to appear as a void** rather than void*
   for(int i=0;i < 4;i++){
-#ifdef GPU_DIRECT
     if(cudaMallocHost(&siteLink_2d[i], V*gaugeSiteSize* qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
       errorQuda("ERROR: cudaMallocHost failed for sitelink_2d\n");
     }
     if(cudaMallocHost((void**)&siteLink_ex_2d[i], V_ex*gaugeSiteSize*qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
       errorQuda("ERROR: cudaMallocHost failed for sitelink_ex_2d\n");
     }
-#else
-    siteLink_2d[i] = malloc(V*gaugeSiteSize* qudaGaugeParam.cpu_prec);
-    siteLink_ex_2d[i] = malloc(V_ex*gaugeSiteSize*qudaGaugeParam.cpu_prec);
-#endif
     if(siteLink_2d[i] == NULL || siteLink_ex_2d[i] == NULL){
       errorQuda("malloc failed for siteLink_2d/siteLink_ex_2d\n");
     }
@@ -489,13 +484,8 @@ hisq_force_init()
 hisq_force_end()
 {
   for(int i = 0;i < 4; i++){
-#ifdef GPU_DIRECT
     cudaFreeHost(siteLink_2d[i]);
     cudaFreeHost(siteLink_ex_2d[i]);
-#else
-    free(siteLink_2d[i]);
-    free(siteLink_ex_2d[i]);
-#endif
   }
   free(siteLink_1d);
 

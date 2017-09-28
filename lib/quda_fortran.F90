@@ -260,6 +260,9 @@ module quda_fortran
      ! The index to indeicate which chrono history we are augmenting */
      integer(4)::chrono_index
 
+     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     QudaExtLibType::extlib_type
+
   end type quda_invert_param
 
 end module quda_fortran

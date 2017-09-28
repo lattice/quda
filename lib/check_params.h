@@ -149,6 +149,8 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, 0);
   P(f_size, 0);
   P(eigen_shift, 0.0);
+  P(extlib_type, QUDA_EIGEN_EXTLIB);
+  P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
   P(NPoly, INVALID_INT);
   P(Stp_residual, INVALID_DOUBLE);
@@ -156,6 +158,14 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, INVALID_INT);
   P(f_size, INVALID_INT);
   P(eigen_shift, INVALID_DOUBLE);
+  P(extlib_type, QUDA_EXTLIB_INVALID);
+  P(mem_type_ritz, QUDA_MEMORY_INVALID);
+#endif
+
+#if defined INIT_PARAM
+  P(location, QUDA_CUDA_FIELD_LOCATION);
+#else
+  P(location, QUDA_INVALID_FIELD_LOCATION);
 #endif
 
 #ifdef INIT_PARAM
@@ -417,28 +427,26 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 
 #if defined INIT_PARAM
-  P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
-  P(nev, 0);
-  P(max_search_dim, 0);
+  P(cuda_prec_ritz, QUDA_SINGLE_PRECISION);
+  P(nev, 8);
+  P(max_search_dim, 64);
   P(rhs_idx, 0);
-  P(deflation_grid, 0);
+  P(deflation_grid, 1);
 
-  P(use_reduced_vector_set, true);
-  P(use_cg_updates, false);
-  P(cg_iterref_tol, 5e-2);
-  P(eigcg_max_restarts, 2);
+  P(eigcg_max_restarts, 4);
   P(max_restart_num, 3);
+  P(tol_restart,5e-5);
   P(inc_tol, 1e-2);
   P(eigenval_tol, 1e-1);
 #else
-  //P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
+  P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
   P(nev, INVALID_INT);
   P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
   P(deflation_grid, INVALID_INT);
-  P(cg_iterref_tol, INVALID_DOUBLE);
   P(eigcg_max_restarts, INVALID_INT);
   P(max_restart_num, INVALID_INT);
+  P(tol_restart,INVALID_DOUBLE);
   P(inc_tol, INVALID_DOUBLE);
   P(eigenval_tol, INVALID_DOUBLE);
 #endif
@@ -462,6 +470,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(make_resident_chrono, INVALID_INT);
   P(max_chrono_dim, INVALID_INT);
   P(chrono_index, INVALID_INT);
+#endif
+
+#if defined INIT_PARAM
+  P(extlib_type, QUDA_EIGEN_EXTLIB);
+#else
+  P(extlib_type, QUDA_EXTLIB_INVALID);
 #endif
 
 #ifdef INIT_PARAM

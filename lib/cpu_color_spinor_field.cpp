@@ -18,14 +18,19 @@ namespace quda {
 
   cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
     ColorSpinorField(param), init(false), reference(false) {
+
+    // need to set this before create
+    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+      v = param.v;
+      reference = true;
+    }
+
     create(param.create);
-    if (param.create == QUDA_NULL_FIELD_CREATE) {
+
+    if (param.create == QUDA_NULL_FIELD_CREATE || param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
-    } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      v = param.v;
-      reference = true;
     } else {
       errorQuda("Creation type %d not supported", param.create);
     }
@@ -65,6 +70,7 @@ namespace quda {
       errorQuda("Undefined behaviour"); // else silent bug possible?
     }
 
+    // need to set this before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = (void*)src.V();
       norm = (void*)src.Norm();
@@ -124,7 +130,7 @@ namespace quda {
     // means a ghost zone is set.  So we unset it here.  This will be
     // fixed when clean up the ghost code with the peer-2-peer branch
     bytes = length * precision;
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
 
     if (pad != 0) errorQuda("Non-zero pad not supported");  
@@ -159,6 +165,10 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
       param.norm = norm;
+      param.is_composite  = false;
+      param.composite_dim = 0;
+      param.is_component  = composite_descr.is_component;
+      param.component_id  = composite_descr.id;
       even = new cpuColorSpinorField(*this, param);
       odd = new cpuColorSpinorField(*this, param);
 
@@ -192,15 +202,41 @@ namespace quda {
 
   void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
     checkField(*this, src);
-    if (fieldOrder == src.fieldOrder) {
+    if (fieldOrder == src.fieldOrder && bytes == src.Bytes()) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	// FIXME (HJ Kim): I think this is a bug, we should copy the data with amount of "bytes/Ls"
-        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes); 
+        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes/x[nDim-1]);
       else 
         memcpy(v, src.v, bytes);
     } else {
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION);
     }
+  }
+
+  void cpuColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Field already backed up");
+
+    backup_h = new char[bytes];
+    memcpy(backup_h, v, bytes);
+
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      memcpy(backup_norm_h, norm, norm_bytes);
+    }
+
+    backed_up = true;
+  }
+
+  void cpuColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+
+    memcpy(v, backup_h, bytes);
+    delete []backup_h;
+    if (norm_bytes) {
+      memcpy(norm, backup_norm_h, norm_bytes);
+      delete []backup_norm_h;
+    }
+
+    backed_up = false;
   }
 
   void cpuColorSpinorField::zero() {

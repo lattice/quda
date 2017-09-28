@@ -8,7 +8,7 @@
 namespace quda {
 
   cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
-    GaugeField(param), backed_up(false)
+    GaugeField(param)
   {
     if (precision == QUDA_HALF_PRECISION) {
       errorQuda("CPU fields do not support half precision");

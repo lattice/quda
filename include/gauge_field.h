@@ -81,9 +81,17 @@ namespace quda {
       compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
       staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu)
 	{
-	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS || link_type == QUDA_SMEARED_LINKS) nFace = 1;
-	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
-	  else if (link_type == QUDA_INVALID_LINKS) errorQuda("Error: invalid link type(%d)\n", link_type);
+	  switch(link_type) {
+	  case QUDA_SU3_LINKS:
+	  case QUDA_GENERAL_LINKS:
+	  case QUDA_SMEARED_LINKS:
+	  case QUDA_MOMENTUM_LINKS:
+	    nFace = 1; break;
+	  case QUDA_THREE_LINKS:
+	    nFace = 3; break;
+	  default:
+	    errorQuda("Error: invalid link type(%d)\n", link_type);
+	  }
 	}
     
     /**
@@ -225,15 +233,6 @@ namespace quda {
      */
     virtual void copy(const GaugeField &src) = 0;
 
-    /**
-       @brief Backs up the cpuGaugeField
-    */
-    virtual void backup() const = 0;
-
-    /**
-       @brief Restores the cpuGaugeField
-    */
-    virtual void restore() = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -249,11 +248,13 @@ namespace quda {
     void zeroPad();
 
 #ifdef USE_TEXTURE_OBJECTS
+    cudaTextureObject_t tex;
     cudaTextureObject_t evenTex;
     cudaTextureObject_t oddTex;
+    cudaTextureObject_t phaseTex;
     cudaTextureObject_t evenPhaseTex;
     cudaTextureObject_t oddPhaseTex;
-    void createTexObject(cudaTextureObject_t &tex, void *gauge, int isPhase=0);
+    void createTexObject(cudaTextureObject_t &tex, void *gauge, bool full, bool isPhase=false);
     void destroyTexObject();
 #endif
 
@@ -305,14 +306,19 @@ namespace quda {
     const void* Odd_p() const { return odd; }	
 
 #ifdef USE_TEXTURE_OBJECTS
+    const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& EvenTex() const { return evenTex; }
     const cudaTextureObject_t& OddTex() const { return oddTex; }
     const cudaTextureObject_t& EvenPhaseTex() const { return evenPhaseTex; }
     const cudaTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
 #endif
 
-    mutable char *backup_h;
-    mutable bool backed_up;
+    void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
+
+    /**
+       Set all field elements to zero
+    */
+    void zero();
 
     /**
        @brief Backs up the cudaGaugeField to CPU memory
@@ -324,12 +330,6 @@ namespace quda {
     */
     void restore();
 
-    void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
-
-    /**
-       Set all field elements to zero
-    */
-    void zero();
   };
 
   class cpuGaugeField : public GaugeField {
@@ -386,11 +386,15 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
-    mutable char *backup_h;
-    mutable bool backed_up;
+    void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
-     @brief Backs up the cpuGaugeField
+       Set all field elements to zero
+    */
+    void zero();
+
+    /**
+       @brief Backs up the cpuGaugeField
     */
     void backup() const;
 
@@ -399,12 +403,6 @@ namespace quda {
     */
     void restore();
 
-    void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
-
-    /**
-       Set all field elements to zero
-    */
-    void zero();
   };
 
   /**

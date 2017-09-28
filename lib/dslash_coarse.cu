@@ -343,12 +343,22 @@ namespace quda {
 
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
-#if __CUDA_ARCH__ >= 300
+#if __CUDA_ARCH__ >= 300 // only have warp shuffle on Kepler and above
+
+#pragma unroll
+      for (int color_local=0; color_local<Mc; color_local++) {
 	// reduce down to the first group of column-split threads
 	constexpr int warp_size = 32; // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
-	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2) out += __shfl_down(out, offset);
+	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2)
+#if (CUDA_VERSION >= 9000)
+	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
+#else
+	  out[color_local] += __shfl_down(out[color_local], offset);
 #endif
+      }
+
+#endif // __CUDA_VERSION__ >= 300
 
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
