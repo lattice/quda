@@ -467,7 +467,7 @@ gauge_force_test(void)
   
 #endif
 
-  void* mom = safe_malloc(4*V*momSiteSize*gSize);
+  void* mom = pinned_malloc(4*V*momSiteSize*gSize);
   void* refmom = safe_malloc(4*V*momSiteSize*gSize);
 
   memset(mom, 0, 4*V*momSiteSize*gSize);

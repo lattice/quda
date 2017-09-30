@@ -533,7 +533,7 @@ void initQuda(int dev)
 
 // helper for creating extended gauge fields
 static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
-				    bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
+					   bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
 {
   profile.TPSTART(QUDA_PROFILE_INIT);
   int y[4];
@@ -3643,11 +3643,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
     cudaSiteLink->loadCPUField(*cpuSiteLink);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
+
+    profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
   }
-
-  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeForce);
-
-  profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
 
   GaugeFieldParam gParamMom(mom, *qudaGaugeParam, QUDA_ASQTAD_MOM_LINKS);
   // FIXME - test program always uses MILC for mom but can use QDP for gauge
@@ -3671,9 +3669,15 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     gParamMom.precision = qudaGaugeParam->cuda_prec;
     gParamMom.create = QUDA_ZERO_FIELD_CREATE;
     cudaMom = new cudaGaugeField(gParamMom);
-    if (!qudaGaugeParam->overwrite_mom) cudaMom->loadCPUField(*cpuMom);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
+    if (!qudaGaugeParam->overwrite_mom) {
+      profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
+      cudaMom->loadCPUField(*cpuMom);
+      profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
+    }
   }
+
+  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeForce);
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);

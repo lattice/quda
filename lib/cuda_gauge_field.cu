@@ -437,6 +437,7 @@ namespace quda {
     }
 
     bufferIndex = 1-bufferIndex;
+    cudaDeviceSynchronize();
   }
 
   void cudaGaugeField::setGauge(void *gauge_)
@@ -566,7 +567,11 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) { copy(cpu); }
+  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
+    copy(cpu);
+    cudaDeviceSynchronize();
+    checkCudaError();
+  }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const
   {
@@ -621,6 +626,9 @@ namespace quda {
 
     cpu.staggeredPhaseApplied = staggeredPhaseApplied;
     cpu.staggeredPhaseType = staggeredPhaseType;
+
+    cudaDeviceSynchronize();
+    checkCudaError();
   }
 
   void cudaGaugeField::backup() const {
