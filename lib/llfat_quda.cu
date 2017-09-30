@@ -57,7 +57,16 @@ namespace quda {
     if (idx >= arg.threads) return;
     if (dir >= 4) return;
 
-    int x[4], dx[4] = {0, 0, 0, 0};
+    int x[4];
+
+#ifdef __CUDA_ARCH__
+    extern __shared__ int s[];
+    int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
+    s[tid] = 0;
+    signed char *dx = (signed char*)&s[tid];
+#else
+    int dx[4] = {0, 0, 0, 0};
+#endif
     int *y = arg.u.coords;
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
@@ -81,6 +90,7 @@ namespace quda {
   class LongLink : public TunableVectorYZ {
     Arg &arg;
     const GaugeField &meta;
+    unsigned int sharedBytesPerThread() const { return 4; } // for dynamic indexing array
     unsigned int minThreads() const { return arg.threads; }
     bool tuneGridDim() const { return false; }
 
@@ -90,7 +100,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeLongLink<Float><<<tp.grid,tp.block>>>(arg);
+      computeLongLink<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     }
 
     TuneKey tuneKey() const {
