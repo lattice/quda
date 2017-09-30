@@ -48,25 +48,11 @@ namespace quda {
     }
   };
 
-  template <typename Float, typename Arg>
-  __global__ void computeLongLink(Arg arg) {
-
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = blockIdx.y*blockDim.y + threadIdx.y;
-    int dir = blockIdx.z*blockDim.z + threadIdx.z;
-    if (idx >= arg.threads) return;
-    if (dir >= 4) return;
-
+  template <typename Float, int dir, typename Arg>
+  __device__ void longLinkDir(Arg &arg, int idx, int parity) {
     int x[4];
-
-#ifdef __CUDA_ARCH__
-    extern __shared__ int s[];
-    int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
-    s[tid] = 0;
-    signed char *dx = (signed char*)&s[tid];
-#else
     int dx[4] = {0, 0, 0, 0};
-#endif
+
     int *y = arg.u.coords;
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
@@ -83,6 +69,23 @@ namespace quda {
     dx[dir]-=2;
 
     arg.link(dir, idx, parity) = arg.coeff * a * b * c;
+  }
+
+  template <typename Float, typename Arg>
+  __global__ void computeLongLink(Arg arg) {
+
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = blockIdx.y*blockDim.y + threadIdx.y;
+    int dir = blockIdx.z*blockDim.z + threadIdx.z;
+    if (idx >= arg.threads) return;
+    if (dir >= 4) return;
+
+    switch(dir) {
+    case 0: longLinkDir<Float, 0>(arg, idx, parity); break;
+    case 1: longLinkDir<Float, 1>(arg, idx, parity); break;
+    case 2: longLinkDir<Float, 2>(arg, idx, parity); break;
+    case 3: longLinkDir<Float, 3>(arg, idx, parity); break;
+    }
     return;
   }
 
@@ -90,7 +93,6 @@ namespace quda {
   class LongLink : public TunableVectorYZ {
     Arg &arg;
     const GaugeField &meta;
-    unsigned int sharedBytesPerThread() const { return 4; } // for dynamic indexing array
     unsigned int minThreads() const { return arg.threads; }
     bool tuneGridDim() const { return false; }
 
