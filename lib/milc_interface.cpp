@@ -817,12 +817,10 @@ void qudaMultishiftInvert(int external_precision,
   const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
                                      ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
   QudaPrecision device_precision_sloppy;
-  if(inv_args.mixed_precision == 2){
-    device_precision_sloppy = QUDA_HALF_PRECISION;
-  }else if(inv_args.mixed_precision == 1){
-    device_precision_sloppy = QUDA_SINGLE_PRECISION;
-  }else{
-    device_precision_sloppy = device_precision;
+  switch(inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
   }
 
   QudaPrecision device_precision_precondition = device_precision_sloppy;
@@ -930,7 +928,6 @@ void qudaInvert(int external_precision,
     double* const final_fermilab_residual,
     int* num_iters)
 {
-
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -939,23 +936,16 @@ void qudaInvert(int external_precision,
     exit(1);
   }
 
-  //  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-  //                                 ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
-
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy;
 
-  if(inv_args.mixed_precision == 2){
-    device_precision_sloppy = QUDA_HALF_PRECISION;
-  }else if(inv_args.mixed_precision == 1){
-    device_precision_sloppy = QUDA_SINGLE_PRECISION;
-  }else{
-    device_precision_sloppy = device_precision;
+  switch(inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
   }
-
-
 
   QudaPrecision device_precision_precondition = device_precision_sloppy;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
@@ -967,7 +957,6 @@ void qudaInvert(int external_precision,
   invertParam.residual_type = (target_residual != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
   invertParam.residual_type = (target_fermilab_residual != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
 
-
   QudaParity local_parity = inv_args.evenodd;
   //double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
   double& target_res = target_residual;
@@ -978,8 +967,6 @@ void qudaInvert(int external_precision,
       mass, target_res, target_res_hq, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   invertParam.use_sloppy_partial_accumulator = 0;
   if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
-
-
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
@@ -1049,23 +1036,16 @@ void qudaInvertMsrc(int external_precision,
     exit(1);
   }
 
-  //  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-  //                                 ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
-
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy;
 
-  if(inv_args.mixed_precision == 2){
-    device_precision_sloppy = QUDA_HALF_PRECISION;
-  }else if(inv_args.mixed_precision == 1){
-    device_precision_sloppy = QUDA_SINGLE_PRECISION;
-  }else{
-    device_precision_sloppy = device_precision;
+  switch(inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
   }
-
-
 
   QudaPrecision device_precision_precondition = device_precision_sloppy;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
@@ -1172,14 +1152,11 @@ void qudaEigCGInvert(int external_precision,
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy;
 
-  if(inv_args.mixed_precision == 2){
-    device_precision_sloppy = QUDA_HALF_PRECISION;
-  }else if(inv_args.mixed_precision == 1){
-    device_precision_sloppy = QUDA_SINGLE_PRECISION;
-  }else{
-    device_precision_sloppy = device_precision;
+  switch(inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
   }
-
 
   QudaPrecision device_precision_precondition = device_precision_sloppy;
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
@@ -1349,12 +1326,10 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
   const QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy;
 
-  if(inv_args.mixed_precision == 2){
-    device_precision_sloppy = QUDA_HALF_PRECISION;
-  }else if(inv_args.mixed_precision == 1){
-    device_precision_sloppy = QUDA_SINGLE_PRECISION;
-  }else{
-    device_precision_sloppy = device_precision;
+  switch(inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
   }
 
   for(int dir=0; dir<4; ++dir) gaugeParam.X[dir] = dim[dir];
@@ -1398,12 +1373,10 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   const QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   const QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy;
-  if(inv_args.mixed_precision == 2){
-    device_precision_sloppy = QUDA_HALF_PRECISION;
-  }else if(inv_args.mixed_precision == 1){
-    device_precision_sloppy = QUDA_SINGLE_PRECISION;
-  }else{
-    device_precision_sloppy = device_precision;
+  switch(inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
   }
 
   static const QudaVerbosity verbosity = getVerbosity();
