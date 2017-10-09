@@ -48,9 +48,16 @@ namespace quda {
 			    const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
 			    const double &k, const int *commDim, TimeProfile &profile);
 
-  // solo clover term
-  void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover,
-      const cudaColorSpinorField *in, const int oddBit);
+  /**
+     @brief Apply clover-matrix field to a color-spinor field
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] clover Clover-matrix field
+     @param[in] inverse Whether we are applying the inverse or not
+     @param[in] Field parity (if color-spinor field is single parity)
+  */
+  void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in,
+		   const CloverField &clover, bool inverse, int parity);
 
   // domain wall Dslash  
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
@@ -98,14 +105,37 @@ namespace quda {
 			       const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim,
 			       TimeProfile &profile);
 
-  // solo twist term
-  void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger,
-                       const double &kappa, const double &mu, const double &epsilon,
-                       const QudaTwistGamma5Type);
+  /**
+     @brief Apply the twisted-mass gamma operator to a color-spinor field.
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] d Which gamma matrix we are applying (C counting, so gamma_5 has d=4)
+     @param[in] kappa kappa parameter
+     @param[in] mu mu parameter
+     @param[in] epsilon epsilon parameter
+     @param[in] dagger Whether we are applying the dagger or not
+     @param[in] twist The type of kernel we are doing
+  */
+  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu,
+		       double epsilon, int dagger, QudaTwistGamma5Type type);
 
-  // solo twist clover term
-  void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger, const double &kappa, const double &mu,
-			     const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity);
+  /**
+     @brief Apply twisted clover-matrix field to a color-spinor field
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] clover Clover-matrix field
+     @param[in] kappa kappa parameter
+     @param[in] mu mu parameter
+     @param[in] epsilon epsilon parameter
+     @param[in] Field parity (if color-spinor field is single parity)
+     @param[in] dagger Whether we are applying the dagger or not
+     @param[in] twist The type of kernel we are doing
+       if (twist == QUDA_TWIST_GAMMA5_DIRECT) apply (Clover + i*a*gamma_5) to the input spinor
+       else if (twist == QUDA_TWIST_GAMMA5_INVERSE) apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+  */
+  void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
+			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist);
+
 
   /**
      @brief Dslash face packing routine
@@ -130,11 +160,11 @@ namespace quda {
 			const int face_num, const cudaStream_t &stream, const bool unpack=false);
 
   /**
-     out = gamma_5 in
-     @param out Output field
-     @param in Input field
-   */
-  void gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in);
+     @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
+     @param[out] out Output field
+     @param[in] in Input field
+  */
+  void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
 }
 

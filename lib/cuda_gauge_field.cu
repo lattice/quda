@@ -8,7 +8,7 @@
 namespace quda {
 
   cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
-    GaugeField(param), gauge(0), even(0), odd(0), backed_up(false)
+    GaugeField(param), gauge(0), even(0), odd(0)
   {
     if ((order == QUDA_QDP_GAUGE_ORDER || order == QUDA_QDPJIT_GAUGE_ORDER) &&
         create != QUDA_REFERENCE_FIELD_CREATE) {
@@ -64,20 +64,22 @@ namespace quda {
     odd = (char*)gauge + bytes/2; 
 
 #ifdef USE_TEXTURE_OBJECTS
-    createTexObject(evenTex, even);
-    createTexObject(oddTex, odd);
+    createTexObject(tex, gauge, true);
+    createTexObject(evenTex, even, false);
+    createTexObject(oddTex, odd, false);
     if(reconstruct == QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9)
     {  // Create texture objects for the phases
-      const int isPhase = 1;
-      createTexObject(evenPhaseTex, (char*)even + phase_offset, isPhase);
-      createTexObject(oddPhaseTex, (char*)odd + phase_offset, isPhase);
+      bool isPhase = true;
+      createTexObject(phaseTex, (char*)gauge + phase_offset, true, isPhase);
+      createTexObject(evenPhaseTex, (char*)even + phase_offset, false, isPhase);
+      createTexObject(oddPhaseTex, (char*)odd + phase_offset, false, isPhase);
     }
 #endif
 
   }
 
 #ifdef USE_TEXTURE_OBJECTS
-  void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, int isPhase) {
+  void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
 
     if( isNative() ){
       // create the texture for the field components
@@ -106,8 +108,8 @@ namespace quda {
         } else {
           desc.x = 8*precision;
           desc.y = 8*precision;
-          desc.z = (reconstruct == 18) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
-          desc.w = (reconstruct == 18) ? 0 : 8*precision;
+          desc.z = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
+          desc.w = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision;
         }
       }
 
@@ -116,7 +118,7 @@ namespace quda {
       resDesc.resType = cudaResourceTypeLinear;
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/2 : (bytes-phase_bytes)/2;
+      resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/(!full ? 2 : 1) : (bytes-phase_bytes)/(!full ? 2 : 1);
 
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));

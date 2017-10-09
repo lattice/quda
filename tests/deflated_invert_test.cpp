@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <algorithm>
 
 #include <util_quda.h>
 #include <test_util.h>

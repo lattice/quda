@@ -67,8 +67,8 @@ if(NOT QUDA_GPU_ARCH)
   message ("-- Building QUDA for arch " "${QUDA_DEFAULT_GPU_ARCH}")
 endif()
 
-set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
@@ -137,9 +137,6 @@ set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
 
-# GPUdirect options
-set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
-
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
@@ -159,8 +156,6 @@ mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
-
-mark_as_advanced(QUDA_GPU_DIRECT)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
@@ -456,10 +451,6 @@ endif(NOT QUDA_BLAS_TEX)
 if(NOT QUDA_FERMI_DBLE_TEX)
   add_definitions(-DFERMI_NO_DBLE_TEX)
 endif(NOT QUDA_FERMI_DBLE_TEX)
-
-if(GPU_DIRECT)
-  add_definitions(-DGPU_DIRECT)
-endif(GPU_DIRECT)
 
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)

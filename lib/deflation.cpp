@@ -133,7 +133,7 @@ namespace quda {
     {
        zero(*r);
 
-       blas::caxpy(&projm[i*param.ld], rv, res);//multiblas
+       blas::caxpy(&projm.get()[i*param.ld], rv, res);//multiblas
 
        *r_sloppy = *r;
 

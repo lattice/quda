@@ -33,6 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <trove/static_gcd.h>
 #include <trove/warp.h>
 
+#define WARP_CONVERGED 0xffffffff
+
 namespace trove {
 namespace detail {
 
@@ -417,7 +419,11 @@ template<typename T, int m>
 struct warp_shuffle<array<T, m>, array<int, m> > {
     __device__ static void impl(array<T, m>& d,
                                 const array<int, m>& i) {
+#if (__CUDACC_VER_MAJOR__ >= 9)
+        d.head = __shfl_sync(WARP_CONVERGED, d.head, i.head);
+#else
         d.head = __shfl(d.head, i.head);
+#endif
         warp_shuffle<array<T, m-1>, array<int, m-1> >::impl(d.tail,
                                                             i.tail);
     }
@@ -427,7 +433,11 @@ template<typename T>
 struct warp_shuffle<array<T, 1>, array<int, 1> > {
     __device__ static void impl(array<T, 1>& d,
                                 const array<int, 1>& i) {
+#if (__CUDACC_VER_MAJOR__ >= 9)
+        d.head = __shfl_sync(WARP_CONVERGED, d.head, i.head);
+#else
         d.head = __shfl(d.head, i.head);
+#endif
     }
 };
 

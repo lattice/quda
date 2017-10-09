@@ -671,6 +671,16 @@ namespace quda {
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 
     void PrintVector(unsigned int x);
+
+    /**
+       @brief Backs up the cudaColorSpinorField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cudaColorSpinorField
+    */
+    void restore();
   };
 
   // CPU implementation
@@ -726,7 +736,7 @@ namespace quda {
     void zero();
 
     /**
-       @brieff This is a unified ghost exchange function for doing a complete
+       @brief This is a unified ghost exchange function for doing a complete
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
@@ -741,6 +751,15 @@ namespace quda {
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
+    /**
+       @brief Backs up the cudaColorSpinorField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cudaColorSpinorField
+    */
+    void restore();
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

@@ -95,14 +95,14 @@ namespace quda {
       int lnkdir = isForwards(path0) ? path0 : flipDir(path0);
 
       if (isForwards(path0)) {
-        arg.u.load((Float*)linkB.data, linkIndexShift(x,dx,arg.E), lnkdir, nbr_oddbit);
+        linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
         linkA = linkB;
         dx[lnkdir]++; // now have to update location
 	nbr_oddbit = nbr_oddbit^1;
       } else {
         dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
         nbr_oddbit = nbr_oddbit^1;
-	arg.u.load((Float*)linkB.data, linkIndexShift(x,dx,arg.E), lnkdir, nbr_oddbit);
+	linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
         linkA = conj(linkB);
       }
 	
@@ -112,14 +112,14 @@ namespace quda {
         int lnkdir = isForwards(pathj) ? pathj : flipDir(pathj);
 
         if (isForwards(pathj)) {
-          arg.u.load((Float*)linkB.data, linkIndexShift(x,dx,arg.E), lnkdir, nbr_oddbit);
+          linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
           linkA = linkA * linkB;
           dx[lnkdir]++; // now have to update to new location
           nbr_oddbit = nbr_oddbit^1;	
         } else {
           dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
 	  nbr_oddbit = nbr_oddbit^1;
-          arg.u.load((Float*)linkB.data, linkIndexShift(x,dx,arg.E), lnkdir, nbr_oddbit);
+          linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
           linkA = linkA * conj(linkB);
         }
       } //j
@@ -127,15 +127,14 @@ namespace quda {
     } //i
 
     // multiply by U(x)
-    arg.u.load((Float*)linkA.data, linkIndex(x,arg.E), dir, parity);
+    linkA = arg.u(dir, linkIndex(x,arg.E), parity);
     linkA = linkA * staple;
 
     // update mom(x)
-    Link mom;
-    arg.mom.load((Float*)mom.data, idx, dir, parity);
+    Link mom = arg.mom(dir, idx, parity);
     mom = mom - arg.coeff * linkA;
     makeAntiHerm(mom);
-    arg.mom.save((Float*)mom.data, idx, dir, parity);
+    arg.mom(dir, idx, parity) = mom;
     return;
   }
 

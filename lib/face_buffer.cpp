@@ -51,17 +51,10 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     from_fwd_face[i] = (char*)from_face + offset;
     offset += nbytes[i];
 
-#ifdef GPU_DIRECT //  just alias the pointer
     ib_my_fwd_face[i] = my_fwd_face[i];
     ib_my_back_face[i] = my_back_face[i];
     ib_from_fwd_face[i] = from_fwd_face[i];
     ib_from_back_face[i] = from_back_face[i];
-#else // if no GPUDirect so need separate IB and GPU host buffers
-    ib_my_fwd_face[i] = safe_malloc(nbytes[i]);
-    ib_my_back_face[i] = safe_malloc(nbytes[i]);
-    ib_from_fwd_face[i] = safe_malloc(nbytes[i]);
-    ib_from_back_face[i] = safe_malloc(nbytes[i]);
-#endif
   }
 
   for (int i=0; i<nDimComms; i++) {
@@ -85,12 +78,6 @@ FaceBuffer::~FaceBuffer()
 {  
   for (int i=0; i<nDimComms; i++) {
     if (commDimPartitioned(i)) {
-#ifndef GPU_DIRECT
-      host_free(ib_my_fwd_face[i]);
-      host_free(ib_my_back_face[i]);
-      host_free(ib_from_fwd_face[i]);
-      host_free(ib_from_back_face[i]);
-#endif
       comm_free(mh_send_fwd[i]);
       comm_free(mh_send_back[i]);
       comm_free(mh_recv_fwd[i]);
@@ -273,9 +260,6 @@ void CUDART_CB commCallback(cudaStream_t stream, cudaError_t status, void *data)
   const unsigned long long dir = (unsigned long long)data;
 
   comm_start(commCB[dir].mh_recv);
-#ifndef GPU_DIRECT
-  memcpy(commCB[dir].ib_buffer, commCB[dir].face_buffer, commCB[dir].bytes);
-#endif
   comm_start(commCB[dir].mh_send);
 
 }
@@ -310,17 +294,11 @@ void FaceBuffer::commsStart(int dir) {
   if (dir%2 == 0) { // sending backwards
     // Prepost receive
     comm_start(mh_recv_fwd[dim]);
-#ifndef GPU_DIRECT
-    memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
-#endif
     comm_start(mh_send_back[dim]);
   } else { //sending forwards
     // Prepost receive
     comm_start(mh_recv_back[dim]);
     // Begin forward send
-#ifndef GPU_DIRECT
-    memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
-#endif
     comm_start(mh_send_fwd[dim]);
   }
 }
@@ -342,15 +320,9 @@ void FaceBuffer::sendStart(int dir){
   if(!commDimPartitioned(dim)) return;
 
   if (dir%2 == 0) { // sending backwards
-#ifndef GPU_DIRECT
-    memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
-#endif
     comm_start(mh_send_back[dim]);
   } else { //sending forwards
     // Begin forward send
-#ifndef GPU_DIRECT
-    memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
-#endif
     comm_start(mh_send_fwd[dim]);
   }
 }
@@ -365,16 +337,10 @@ int FaceBuffer::commsQuery(int dir)
 
   if(dir%2==0) {
     if (comm_query(mh_recv_fwd[dim]) && comm_query(mh_send_back[dim])) {
-#ifndef GPU_DIRECT
-      memcpy(from_fwd_face[dim], ib_from_fwd_face[dim], nbytes[dim]);		
-#endif
       return 1;
     }
   } else {
     if (comm_query(mh_recv_back[dim]) && comm_query(mh_send_fwd[dim])) {
-#ifndef GPU_DIRECT
-      memcpy(from_back_face[dim], ib_from_back_face[dim], nbytes[dim]);		
-#endif
       return 1;
     }
   }

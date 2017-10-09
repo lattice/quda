@@ -314,6 +314,10 @@ namespace quda {
     /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
 
+    mutable char *backup_h;
+    mutable char *backup_norm_h;
+    mutable bool backed_up;
+
   public:
 
     /**
@@ -492,6 +496,12 @@ namespace quda {
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
+
+    /** @brief Backs up the LatticeField */
+    virtual void backup() const { errorQuda("Not implemented"); }
+
+    /** @brief Restores the cpuGaugeField */
+    virtual void restore() { errorQuda("Not implemented"); }
   };
   
   /**

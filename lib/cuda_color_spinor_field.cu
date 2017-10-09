@@ -489,6 +489,30 @@ namespace quda {
 
   }
 
+  void cudaColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Gauge field already backed up");
+    backup_h = new char[bytes];
+    cudaMemcpy(backup_h, v, bytes, cudaMemcpyDeviceToHost);
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+    checkCudaError();
+    backed_up = true;
+  }
+
+  void cudaColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+    cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
+    delete []backup_h;
+    if (norm_bytes) {
+      cudaMemcpy(v, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      delete []backup_norm_h;
+    }
+    checkCudaError();
+    backed_up = false;
+  }
+
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
