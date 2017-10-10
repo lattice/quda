@@ -1,5 +1,10 @@
 #include <quda_arpack_interface.h>
 
+#if (defined (QMP_COMMS) || defined (MPI_COMMS))
+#include <mpi.h>
+#endif
+
+
 //using namespace quda ;
 
   struct SortEvals{
