@@ -40,6 +40,12 @@ namespace quda {
     /** Imaginary chemical potential */
     double i_mu;
 
+    /** Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t site_offset;
+
+    /** Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t site_size;
+
     // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
       nColor(3),
@@ -58,7 +64,9 @@ namespace quda {
       compute_fat_link_max(false),
       staggeredPhaseType(QUDA_STAGGERED_PHASE_NO),
       staggeredPhaseApplied(false),
-      i_mu(0.0)
+      i_mu(0.0),
+      site_offset(0),
+      site_size(0)
 	{ }
 
     GaugeFieldParam(const GaugeField &u);
@@ -71,7 +79,7 @@ namespace quda {
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0),
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry),
       compute_fat_link_max(false), staggeredPhaseType(QUDA_STAGGERED_PHASE_NO),
-      staggeredPhaseApplied(false), i_mu(0.0)
+      staggeredPhaseApplied(false), i_mu(0.0), site_offset(0), site_size(0)
       { }
 
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
@@ -81,7 +89,8 @@ namespace quda {
       anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
-      staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu)
+      staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu),
+      site_offset(param.gauge_offset), site_size(param.site_size)
 	{
 	  switch(link_type) {
 	  case QUDA_SU3_LINKS:
@@ -165,6 +174,16 @@ namespace quda {
     double i_mu;
 
     /**
+       Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+    */
+    size_t site_offset;
+
+    /**
+       Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+    */
+    size_t site_size;
+
+    /**
        Compute the required extended ghost zone sizes and offsets
        @param[in] R Radius of the ghost zone
        @param[in] no_comms_fill If true we create a full halo
@@ -241,6 +260,18 @@ namespace quda {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
       return ghost;
     }
+
+    /**
+       @return The offset into the struct to the start of the gauge
+       field (only for order = QUDA_MILC_SITE_GAUGE_ORDER)
+     */
+    size_t SiteOffset() const { return site_offset; }
+
+    /**
+       @return The size of the struct into which the gauge
+       field is packed (only for order = QUDA_MILC_SITE_GAUGE_ORDER)
+     */
+    size_t SiteSize() const { return site_size; }
 
     /**
        Set all field elements to zero (virtual)

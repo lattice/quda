@@ -18,7 +18,7 @@ namespace quda {
     if (reconstruct != QUDA_RECONSTRUCT_NO && reconstruct != QUDA_RECONSTRUCT_10) {
       errorQuda("Reconstruction type %d not supported", reconstruct);
     }
-    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER) {
+    if (reconstruct == QUDA_RECONSTRUCT_10 && order != QUDA_MILC_GAUGE_ORDER && order != QUDA_MILC_SITE_GAUGE_ORDER) {
       errorQuda("10-reconstruction only supported with MILC gauge order");
     }
 
@@ -34,6 +34,8 @@ namespace quda {
       bytes = siteDim * (x[0]*x[1]*(x[2]+4)*x[3]) * nInternal * precision;
     } else if (order == QUDA_BQCD_GAUGE_ORDER) {
       bytes = siteDim * (x[0]+4)*(x[1]+2)*(x[2]+2)*(x[3]+2) * nInternal * precision;
+    } else if (order == QUDA_MILC_SITE_GAUGE_ORDER) {
+      bytes = volume * site_size;
     }
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
@@ -51,9 +53,13 @@ namespace quda {
 	}
       }
     
-    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  || 
+    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  ||
 	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER ||
-	       order == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+	       order == QUDA_TIFR_PADDED_GAUGE_ORDER || order == QUDA_MILC_SITE_GAUGE_ORDER) {
+
+      if (order == QUDA_MILC_SITE_GAUGE_ORDER && create != QUDA_REFERENCE_FIELD_CREATE) {
+	errorQuda("MILC site gauge order only supported for reference fields");
+      }
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
 	gauge = (void **) safe_malloc(bytes);
