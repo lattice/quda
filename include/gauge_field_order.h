@@ -376,7 +376,6 @@ namespace quda {
   template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost=true>
       struct FieldOrder {
 
-      protected:
 	/** An internal reference to the actual field we are accessing */
 	const int volumeCB;
 	const int nDim;
@@ -1070,7 +1069,7 @@ namespace quda {
 #pragma unroll
 	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
-	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
+	  vector_store(gauge + parity*offset, x + dir*stride*M + stride*i, vecTmp);
         }
         if(hasPhase){
           RegType phase = reconstruct.getPhase(v);
@@ -1147,8 +1146,7 @@ namespace quda {
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector*>
-	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
+	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
           }
 
 	  if (hasPhase) {
@@ -1225,9 +1223,8 @@ namespace quda {
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy to memory
-	    reinterpret_cast< Vector* >
-	      (ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase))
-	      [i*R[dim]*faceVolumeCB[dim]+buff_idx] = vecTmp;
+	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
+			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
 	  }
 	  if (hasPhase) {
 	    RegType phase = reconstruct.getPhase(v);

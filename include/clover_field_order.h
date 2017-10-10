@@ -521,7 +521,7 @@ namespace quda {
 	      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], v[i*N+j]);
 
 	    // second do vectorized copy into memory
-	    reinterpret_cast<Vector*>(clover + parity*offset)[x + stride*(chirality*M+i)] = vecTmp;
+	    vector_store(clover + parity*offset, x + stride*(chirality*M+i), vecTmp);
 	  }
 	}
 
