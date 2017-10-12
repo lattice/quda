@@ -180,6 +180,7 @@ namespace quda {
     diracSmoother = param.matSmooth->Expose();
     diracSmootherSloppy = param.matSmoothSloppy->Expose();
 
+    if (presmoother) delete presmoother;
     if (param_presmooth) delete param_presmooth;
     param_presmooth = new SolverParam(param);
 
@@ -207,11 +208,11 @@ namespace quda {
     // inner solver should recompute the true residual after each cycle if using Schwarz preconditioning
     param_presmooth->compute_true_res = (param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) ? true : false;
 
-    if (presmoother) delete presmoother;
     presmoother = ( (param.level < param.Nlevel-1 || param_presmooth->schwarz_type != QUDA_INVALID_SCHWARZ) &&  param_presmooth->inv_type != QUDA_INVALID_INVERTER) ?
       Solver::create(*param_presmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
+      if (postsmoother) delete postsmoother;
       if (param_postsmooth) delete param_postsmooth;
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
@@ -223,7 +224,6 @@ namespace quda {
       // we never need to compute the true residual for a post smoother
       param_postsmooth->compute_true_res = false;
 
-      if (postsmoother) delete postsmoother;
       postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER) ?
 	Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
     }
@@ -294,6 +294,7 @@ namespace quda {
       coarse_solver = coarse;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Assigned coarse solver to coarse MG operator\n");
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
+      if (coarse_solver) delete coarse_solver;
       if (param_coarse_solver) delete param_coarse_solver;
       param_coarse_solver = new SolverParam(param);
 
@@ -319,7 +320,6 @@ namespace quda {
       // need this to ensure we don't use half precision on the preconditioner in GCR
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
-      if (coarse_solver) delete coarse_solver;
       if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
 	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
 	sprintf(coarse_prefix,"MG level %d (%s): ", param.level+2, param.mg_global.location[param.level+1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );

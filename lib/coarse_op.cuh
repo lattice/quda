@@ -1851,15 +1851,15 @@ namespace quda {
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
 
-    int x_size[5];
+    int x_size[QUDA_MAX_DIM] = { };
     for (int i=0; i<4; i++) x_size[i] = v.X(i);
     x_size[4] = 1;
 
-    int xc_size[5];
+    int xc_size[QUDA_MAX_DIM] = { };
     for (int i=0; i<4; i++) xc_size[i] = X_.X()[i];
     xc_size[4] = 1;
 
-    int geo_bs[QUDA_MAX_DIM];
+    int geo_bs[QUDA_MAX_DIM] = { };
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 
