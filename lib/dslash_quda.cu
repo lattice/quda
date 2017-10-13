@@ -43,30 +43,14 @@
 
 #include <inline_ptx.h>
 
+
+#include <color_spinor_field_order.h>
+#include <clover_field_order.h>
+#include <index_helper.cuh>
+#include <color_spinor.h>
+#include <linalg.cuh>
+
 namespace quda {
-
-  namespace dslash_aux {
-#include <dslash_constants.h>
-#include <dslash_textures.h>
-#include <dslash_index.cuh>
-#include <io_spinor.h>
-
-#include <tm_core.h>              // solo twisted mass kernel
-#include <tmc_core.h>              // solo twisted mass kernel
-#include <clover_def.h>           // kernels for applying the clover term alone
-  }
-
-#ifndef DSLASH_SHARED_FLOATS_PER_THREAD
-#define DSLASH_SHARED_FLOATS_PER_THREAD 0
-#endif
-
-#ifndef CLOVER_SHARED_FLOATS_PER_THREAD
-#define CLOVER_SHARED_FLOATS_PER_THREAD 0
-#endif
-
-#ifndef NDEGTM_SHARED_FLOATS_PER_THREAD
-#define NDEGTM_SHARED_FLOATS_PER_THREAD 0
-#endif
 
   // these should not be namespaced!!
   // determines whether the temporal ghost zones are packed with a gather kernel,
@@ -158,480 +142,622 @@ namespace quda {
     checkCudaError();
   }
 
-  using namespace dslash_aux;
-
-#include <gamma5.h>		// g5 kernel
-  
   /**
-     Class for the gamma5 kernels, sFloat is the typename of the spinor components (double2, float4...)
-  */
+     @brief Parameter structure for driving the Gamma operator
+   */
+  template <typename Float, int nColor>
+  struct GammaArg {
+    typedef typename colorspinor_mapper<Float,4,nColor>::type F;
+    typedef typename mapper<Float>::type RegType;
 
-  template <typename sFloat>
-  class Gamma5Cuda : public Tunable {
-    
-  private:
-    cudaColorSpinorField *out;		//Output spinor
-    const cudaColorSpinorField *in;		//Input spinor
-    
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
-    
-    char *saveOut, *saveOutNorm;
-    
-  public:
-    Gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in) :
-      out(out), in(in) {
-      bindSpinorTex<sFloat>(in, out);
-      dslashParam.out = out->V();
-      dslashParam.outNorm = (float*)out->Norm();
-      dslashParam.in = (void*)in->V();
-      dslashParam.inNorm = (float*)in->Norm();
-      dslashParam.sp_stride = in->Stride();
-      strcpy(aux,"gamma5");
-    }
-    
-    virtual ~Gamma5Cuda() { unbindSpinorTex<sFloat>(in, out); }
-    
-    TuneKey tuneKey() const
+    F out;                // output vector field
+    const F in;           // input vector field
+    const int d;          // which gamma matrix are we applying
+    const int nParity;    // number of parities we're working on
+    bool doublet;         // whether we applying the operator to a doublet
+    const int volumeCB;   // checkerboarded volume
+    RegType a;
+    RegType b;
+    RegType c;
+
+    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
+	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
+	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
+      : out(out), in(in), d(d), nParity(in.SiteSubset()),
+	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+	volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
     {
-      return TuneKey(in->VolString(), typeid(*this).name());
-    }
-    
-    void apply(const cudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-	gamma5DKernel<<<tp.grid, tp.block, tp.shared_bytes>>> (dslashParam);
-      } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-	gamma5SKernel<<<tp.grid, tp.block, tp.shared_bytes>>> (dslashParam);
-      } else {
-	errorQuda("Undefined for precision %d", in->Precision());
+      if (d < 0 || d > 4) errorQuda("Undefined gamma matrix %d", d);
+      if (in.Nspin() != 4) errorQuda("Cannot apply gamma5 to nSpin=%d field", in.Nspin());
+      if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+
+      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+	  a = 2.0 * kappa * mu;
+	  b = 1.0;
+	} else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+	  a = -2.0 * kappa * mu;
+	  b = 1.0 / (1.0 + a*a);
+	}
+	c = 0.0;
+	if (dagger) a *= -1.0;
+      } else if (doublet) {
+	a = (twist == QUDA_TWIST_GAMMA5_INVERSE) ? -2.0 * kappa * mu : 2.0 * kappa * mu;
+	b = 2.0 * kappa * epsilon;
+	c = 1.0 / (1.0 + a*a - b*b);
+	if (c<=0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
       }
     }
-    
-    void preTune()
-    {
-      saveOut = new char[out->Bytes()];
-      cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
-
-      if (typeid(sFloat) == typeid(short4))
-	{
-	  saveOutNorm = new char[out->NormBytes()];
-	  cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
-	}
-    }
-    
-    void postTune()
-    {
-      cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-      
-      if (typeid(sFloat) == typeid(short4))
-	{
-	  cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
-	  delete[] saveOutNorm;
-	}
-    }
-    
-    long long flops() const { return 12ll * in->VolumeCB(); }
-    long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
   };
 
-  /**
-     Applies a gamma5 matrix to a spinor, this is the function to be called in interfaces and it requires only
-     pointers to the output spinor (out) and the input spinor (in), in that order
-  */
-
-  void gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in)
+  // CPU kernel for applying the gamma matrix to a colorspinor
+  template <typename Float, int nColor, typename Arg>
+  void gammaCPU(Arg arg)
   {
-    dslashParam.threads = in->Volume();
+    typedef typename mapper<Float>::type RegType;
+    for (int parity= 0; parity < arg.nParity; parity++) {
 
-    Tunable *gamma5 = 0;
+      for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
+	ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
+	arg.out(x_cb, parity) = in.gamma(arg.d);
+      } // 4-d volumeCB
+    } // parity
 
-    if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-      gamma5 = new Gamma5Cuda<double2>(out, in);
-    } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      gamma5 = new Gamma5Cuda<float4>(out, in);
-    } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      errorQuda("Half precision not supported for gamma5 kernel yet");
-    }
-
-    gamma5->apply(streams[Nstream-1]);
-    checkCudaError();
-
-    delete gamma5;
   }
 
-template <typename sFloat, typename cFloat>
-class CloverCuda : public Tunable {
-  private:
-    cudaColorSpinorField *out;
-    float *outNorm;
-    char *saveOut, *saveOutNorm;
-    const cFloat *clover;
-    const float *cloverNorm;
-    const cudaColorSpinorField *in;
+  // GPU Kernel for applying the gamma matrix to a colorspinor
+  template <typename Float, int nColor, int d, typename Arg>
+  __global__ void gammaGPU(Arg arg)
+  {
+    typedef typename mapper<Float>::type RegType;
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+
+    if (x_cb >= arg.volumeCB) return;
+    if (parity >= arg.nParity) return;
+
+    ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
+    arg.out(x_cb, parity) = in.gamma(d);
+  }
+
+  template <typename Float, int nColor, typename Arg>
+  class Gamma : public TunableVectorY {
 
   protected:
-    unsigned int sharedBytesPerThread() const
-    {
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return CLOVER_SHARED_FLOATS_PER_THREAD * reg_size;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return in->VolumeCB(); }
+    Arg &arg;
+    const ColorSpinorField &meta;
+
+    long long flops() const { return 0; }
+    long long bytes() const { return arg.out.Bytes() + arg.in.Bytes(); }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    CloverCuda(cudaColorSpinorField *out, const cFloat *clover, const float *cloverNorm, 
-	       int cl_stride, const cudaColorSpinorField *in)
-      : out(out), clover(clover), cloverNorm(cloverNorm), in(in)
+    Gamma(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
     {
-      bindSpinorTex<sFloat>(in);
-
-      dslashParam.out = (void*)out->V();
-      dslashParam.outNorm = (float*)out->Norm();
-      dslashParam.in = (void*)in->V();
-      dslashParam.inNorm = (float*)in->Norm();
-      dslashParam.clover = (void*)clover;
-      dslashParam.cloverNorm = (float*)cloverNorm;
-
-      dslashParam.sp_stride = in->Stride();
-#ifdef GPU_CLOVER_DIRAC
-      dslashParam.cl_stride = cl_stride;
-#endif
+      strcpy(aux, meta.AuxString());
     }
-    virtual ~CloverCuda() { unbindSpinorTex<sFloat>(in); }
-    void apply(const cudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      if (typeid(sFloat)==typeid(double2)) {
-	cloverDKernel <<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
-      } else if (typeid(sFloat)==typeid(float4)) {
-	cloverSKernel <<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+    virtual ~Gamma() { }
+
+    void apply(const cudaStream_t &stream) {
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+	gammaCPU<Float,nColor>(arg);
       } else {
-	cloverHKernel <<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
-      }
-    }
-    virtual TuneKey tuneKey() const { return TuneKey(in->VolString(), typeid(*this).name()); }
-
-    // Need to save the out field if it aliases the in field
-    void preTune() {
-      if (in == out) {
-        saveOut = new char[out->Bytes()];
-        cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
-        if (typeid(sFloat) == typeid(short4)) {
-          saveOutNorm = new char[out->NormBytes()];
-          cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
-        }
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	switch (arg.d) {
+	case 4: gammaGPU<Float,nColor,4> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+	default: errorQuda("%d not instantiated", arg.d);
+	}
       }
     }
 
-    // Restore if the in and out fields alias
-    void postTune() {
-      if (in == out) {
-        cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
-        delete[] saveOut;
-        if (typeid(sFloat) == typeid(short4)) {
-          cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
-          delete[] saveOutNorm;
-        }
-      }
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-    long long flops() const { return 504ll * in->VolumeCB(); }
-};
+    void preTune() { arg.out.save(); }
+    void postTune() { arg.out.load(); }
+  };
 
 
-void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
-		const cudaColorSpinorField *in, const int parity) {
-
-  dslashParam.parity = parity;
-  dslashParam.threads = in->Volume();
-
-#ifdef GPU_CLOVER_DIRAC
-  Tunable *clov = 0;
-  void *cloverP, *cloverNormP;
-  QudaPrecision clover_prec = bindCloverTex(clover, parity, &cloverP, &cloverNormP);
-
-  if (in->Precision() != clover_prec)
-    errorQuda("Mixing clover and spinor precision not supported");
-
-  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-    clov = new CloverCuda<double2, double2>(out, (double2*)cloverP, (float*)cloverNormP, clover.stride, in);
-  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    clov = new CloverCuda<float4, float4>(out, (float4*)cloverP, (float*)cloverNormP, clover.stride, in);
-  } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    clov = new CloverCuda<short4, short4>(out, (short4*)cloverP, (float*)cloverNormP, clover.stride, in);
-  }
-  clov->apply(0);
-
-  unbindCloverTex(clover);
-  checkCudaError();
-
-  delete clov;
-#else
-  errorQuda("Clover dslash has not been built");
-#endif
-}
-
-
-template <typename sFloat>
-class TwistGamma5Cuda : public Tunable {
-
-  private:
-    cudaColorSpinorField *out;
-    const cudaColorSpinorField *in;
-
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
-
-    char *saveOut, *saveOutNorm;
-
-  public:
-    TwistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-        double kappa, double mu, double epsilon, const int dagger, QudaTwistGamma5Type twist) :
-      out(out), in(in) 
+  template <typename Float, int nColor>
+  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
   {
-    bindSpinorTex<sFloat>(in);
-    dslashParam.out = (void*)out->V();
-    dslashParam.outNorm = (float*)out->Norm();
-    dslashParam.in = (void*)in->V();
-    dslashParam.inNorm = (float*)in->Norm();
-    dslashParam.sp_stride = in->Stride();
-    if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {
-      setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, twist);
-      dslashParam.c = 0.0;
-#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-      dslashParam.fl_stride = in->VolumeCB();
-#endif
-    } else {//twist doublet
-      dslashParam.a = kappa, dslashParam.b = mu, dslashParam.c = epsilon;
-#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-      dslashParam.fl_stride = in->VolumeCB()/2;
-#endif
-    }
-    dslashParam.a_f = dslashParam.a;
-    dslashParam.b_f = dslashParam.b;
-    dslashParam.c_f = dslashParam.c;
+    GammaArg<Float,nColor> arg(out, in, d);
+    Gamma<Float,nColor,GammaArg<Float,nColor> > gamma(arg, in);
+    gamma.apply(streams[Nstream-1]);
   }
 
-    virtual ~TwistGamma5Cuda() { unbindSpinorTex<sFloat>(in); }
-
-    TuneKey tuneKey() const { return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString()); }
-
-    void apply(const cudaStream_t &stream) 
-    {
-#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {
-        twistGamma5Kernel<sFloat,false><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
-      } else {
-        twistGamma5Kernel<sFloat,true><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
-      }
-#endif
+  // template on the number of colors
+  template <typename Float>
+  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
+  {
+    if (in.Ncolor() == 3) {
+      ApplyGamma<Float,3>(out, in, d);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", in.Ncolor());
     }
-
-    void preTune() {
-      saveOut = new char[out->Bytes()];
-      cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
-      if (typeid(sFloat) == typeid(short4)) {
-        saveOutNorm = new char[out->NormBytes()];
-        cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
-      }
-    }
-
-    void postTune() {
-      cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-      if (typeid(sFloat) == typeid(short4)) {
-        cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
-        delete[] saveOutNorm;
-      }
-    }
-
-    long long flops() const { return 24ll * in->VolumeCB(); }
-    long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
-};
-
-//!ndeg tm: 
-void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-    const int dagger, const double &kappa, const double &mu, const double &epsilon,   const QudaTwistGamma5Type twist)
-{
-  if(in->TwistFlavor() == QUDA_TWIST_SINGLET)
-    dslashParam.threads = in->Volume();
-  else //twist doublet    
-    dslashParam.threads = in->Volume() / 2;
-
-#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-  Tunable *twistGamma5 = 0;
-
-  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-    twistGamma5 = new TwistGamma5Cuda<double2>(out, in, kappa, mu, epsilon, dagger, twist);
-  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    twistGamma5 = new TwistGamma5Cuda<float4>(out, in, kappa, mu, epsilon, dagger, twist);
-  } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    twistGamma5 = new TwistGamma5Cuda<short4>(out, in, kappa, mu, epsilon, dagger, twist);
   }
 
-  twistGamma5->apply(streams[Nstream-1]);
-  checkCudaError();
+  //Apply the Gamma matrix to a colorspinor field
+  //out(x) = gamma_d*in
+  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
+  {
+    checkPrecision(out, in);    // check all precisions match
+    checkLocation(out, in);     // check all locations match
 
-  delete twistGamma5;
-#else
-  errorQuda("Twisted mass dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
-}
+    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyGamma<double>(out, in, d);
+    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyGamma<float>(out, in, d);
+    } else if (in.Precision() == QUDA_HALF_PRECISION) {
+      ApplyGamma<short>(out, in, d);
+    } else {
+      errorQuda("Unsupported precision %d\n", in.Precision());
+    }
+  }
 
-#if defined(GPU_TWISTED_CLOVER_DIRAC)
-#include "dslash_core/tmc_gamma_core.h"
-#endif
+  // CPU kernel for applying the gamma matrix to a colorspinor
+  template <bool doublet, typename Float, int nColor, typename Arg>
+  void twistGammaCPU(Arg arg)
+  {
+    typedef typename mapper<Float>::type RegType;
+    for (int parity= 0; parity < arg.nParity; parity++) {
+      for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
+	if (!doublet) {
+	  ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
+	  arg.out(x_cb, parity) = arg.b*(in + arg.a*in.igamma(arg.d));
+	} else {
+	  ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
+	  ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
+	  arg.out(x_cb+0*arg.volumeCB, parity) = arg.c*(in_1 - arg.a*in_1.igamma(arg.d) + arg.b*in_2);
+	  arg.out(x_cb+1*arg.volumeCB, parity) = arg.c*(in_2 + arg.a*in_2.igamma(arg.d) + arg.b*in_1);
+	}
+      } // 4-d volumeCB
+    } // parity
 
-template <typename cFloat, typename sFloat>
-class TwistCloverGamma5Cuda : public Tunable {
-  private:
-    const cFloat *clover;
-    const float *cNorm;
-    const cFloat *cloverInv;
-    const float *cNrm2;
-    QudaTwistGamma5Type twist;
-    cudaColorSpinorField *out;
-    const cudaColorSpinorField *in;
+  }
 
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
-    char *saveOut, *saveOutNorm;
-    char aux_string[TuneKey::aux_n];
+  // GPU Kernel for applying the gamma matrix to a colorspinor
+  template <bool doublet, typename Float, int nColor, int d, typename Arg>
+  __global__ void twistGammaGPU(Arg arg)
+  {
+    typedef typename mapper<Float>::type RegType;
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    if (x_cb >= arg.volumeCB) return;
+
+    if (!doublet) {
+      ColorSpinor<RegType,nColor,4> in = arg.in(x_cb, parity);
+      arg.out(x_cb, parity) = arg.b*(in + arg.a*in.igamma(d));
+    } else {
+      ColorSpinor<RegType,nColor,4> in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
+      ColorSpinor<RegType,nColor,4> in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
+      arg.out(x_cb+0*arg.volumeCB, parity) = arg.c*(in_1 - arg.a*in_1.igamma(d) + arg.b*in_2);
+      arg.out(x_cb+1*arg.volumeCB, parity) = arg.c*(in_2 + arg.a*in_2.igamma(d) + arg.b*in_1);
+    }
+  }
+
+  template <typename Float, int nColor, typename Arg>
+  class TwistGamma : public TunableVectorY {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &meta;
+
+    long long flops() const { return 0; }
+    long long bytes() const { return arg.out.Bytes() + arg.in.Bytes(); }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    TwistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-        double kappa, double mu, double epsilon, const int dagger, QudaTwistGamma5Type tw,
-			  cFloat *clov, const float *cN, cFloat *clovInv, const float *cN2, int cl_stride) :
-      clover(clov), cNorm(cN), cloverInv(clovInv), cNrm2(cN2), twist(tw), out(out), in(in)
+    TwistGamma(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
     {
-      bindSpinorTex<sFloat>(in);
-      dslashParam.out = (void*)out->V();
-      dslashParam.outNorm = (float*)out->Norm();
-      dslashParam.in = (void*)in->V();
-      dslashParam.inNorm = (float*)in->Norm();
-      dslashParam.clover = (void*)clov;
-      dslashParam.cloverNorm = (float*)cN;
-      dslashParam.clover = (void*)clovInv;
-      dslashParam.cloverNorm = (float*)cN2;
-      dslashParam.sp_stride = in->Stride();
-#ifdef GPU_TWISTED_CLOVER_DIRAC
-      dslashParam.cl_stride = cl_stride;
-      dslashParam.fl_stride = in->VolumeCB();
-#endif
+      strcpy(aux, meta.AuxString());
+    }
+    virtual ~TwistGamma() { }
 
-      if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {
-	setTwistParam(dslashParam.a, dslashParam.b, kappa, mu, dagger, tw);
-      } else {//twist doublet
+    void apply(const cudaStream_t &stream) {
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+	if (arg.doublet) twistGammaCPU<true,Float,nColor>(arg);
+	twistGammaCPU<false,Float,nColor>(arg);
+      } else {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	if (arg.doublet)
+	  switch (arg.d) {
+	  case 4: twistGammaGPU<true,Float,nColor,4> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+	  default: errorQuda("%d not instantiated", arg.d);
+	  }
+	else
+	  switch (arg.d) {
+	  case 4: twistGammaGPU<false,Float,nColor,4> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+	  default: errorQuda("%d not instantiated", arg.d);
+	  }
+      }
+    }
+
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    void preTune() { if (arg.out.field == arg.in.field) arg.out.save(); }
+    void postTune() { if (arg.out.field == arg.in.field) arg.out.load(); }
+  };
+
+
+  template <typename Float, int nColor>
+  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
+  {
+    GammaArg<Float,nColor> arg(out, in, d, kappa, mu, epsilon, dagger, type);
+    TwistGamma<Float,nColor,GammaArg<Float,nColor> > gamma(arg, in);
+    gamma.apply(streams[Nstream-1]);
+
+    checkCudaError();
+  }
+
+  // template on the number of colors
+  template <typename Float>
+  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
+  {
+    if (in.Ncolor() == 3) {
+      ApplyTwistGamma<Float,3>(out, in, d, kappa, mu, epsilon, dagger, type);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", in.Ncolor());
+    }
+  }
+
+  //Apply the Gamma matrix to a colorspinor field
+  //out(x) = gamma_d*in
+  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
+  {
+    checkPrecision(out, in);    // check all precisions match
+    checkLocation(out, in);     // check all locations match
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyTwistGamma<double>(out, in, d, kappa, mu, epsilon, dagger, type);
+    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyTwistGamma<float>(out, in, d, kappa, mu, epsilon, dagger, type);
+    } else if (in.Precision() == QUDA_HALF_PRECISION) {
+      ApplyTwistGamma<short>(out, in, d, kappa, mu, epsilon, dagger, type);
+    } else {
+      errorQuda("Unsupported precision %d\n", in.Precision());
+    }
+#else
+    errorQuda("Twisted mass dslash has not been built");
+#endif // GPU_TWISTED_MASS_DIRAC
+  }
+
+  // Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)
+  void gamma5(ColorSpinorField &out, const ColorSpinorField &in) { ApplyGamma(out,in,4); }
+
+  /**
+     @brief Parameteter structure for driving the clover and twist-clover application kernels
+     @tparam Float Underlying storage precision
+     @tparam nSpin Number of spin components
+     @tparam nColor Number of colors
+     @tparam dynamic_clover Whether we are inverting the clover field on the fly
+  */
+  template <typename Float, int nSpin, int nColor, bool dynamic_clover_=false>
+  struct CloverArg {
+    static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
+    static constexpr bool dynamic_clover = dynamic_clover_;
+
+    typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
+    typedef typename clover_mapper<Float,length>::type C;
+    typedef typename mapper<Float>::type RegType;
+
+    F out;                // output vector field
+    const F in;           // input vector field
+    const C clover;       // clover field
+    const C cloverInv;    // inverse clover field (only set if not dynamic clover and doing twisted clover)
+    const int nParity;    // number of parities we're working on
+    const int parity;     // which parity we're acting on (if nParity=1)
+    bool inverse;         // whether we are applying the inverse
+    bool doublet;         // whether we applying the operator to a doublet
+    const int volumeCB;   // checkerboarded volume
+    RegType a;
+    RegType b;
+    RegType c;
+    QudaTwistGamma5Type twist;
+
+    CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
+	      bool inverse, int parity, RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
+	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
+      : out(out), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
+	cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
+	in(in), nParity(in.SiteSubset()), parity(parity), inverse(inverse),
+	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+        volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
+    {
+      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+	  a = 2.0 * kappa * mu;
+	  b = 1.0;
+	} else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+	  a = -2.0 * kappa * mu;
+	  b = 1.0 / (1.0 + a*a);
+	}
+	c = 0.0;
+	if (dagger) a *= -1.0;
+      } else if (doublet) {
 	errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
       }
-      dslashParam.a_f = dslashParam.a;
-      dslashParam.b_f = dslashParam.b;
+    }
+  };
 
-      strcpy(aux_string,in->AuxString());
-      strcat(aux_string, twist == QUDA_TWIST_GAMMA5_DIRECT ? ",direct" : ",inverse");
+  template <typename Float, int nSpin, int nColor, typename Arg>
+  __device__ __host__ inline void cloverApply(Arg &arg, int x_cb, int parity) {
+    typedef typename mapper<Float>::type RegType;
+    int spinor_parity = arg.nParity == 2 ? parity : 0;
+    ColorSpinor<RegType,nColor,nSpin> in = arg.in(x_cb, spinor_parity);
+    ColorSpinor<RegType,nColor,nSpin> out;
+
+    in.toRel(); // change to chiral basis here
+
+#pragma unroll
+    for (int chirality=0; chirality<2; chirality++) {
+      HMatrix<RegType,nColor*nSpin/2> A = arg.clover(x_cb, parity, chirality);
+      out += (A * in.chiral_project(chirality)).chiral_reconstruct(chirality);
     }
 
-    virtual ~TwistCloverGamma5Cuda() { unbindSpinorTex<sFloat>(in); }
+    out.toNonRel(); // change basis back
 
-    TuneKey tuneKey() const {
-      return TuneKey(in->VolString(), typeid(*this).name(), aux_string);
-    }  
+    arg.out(x_cb, spinor_parity) = out;
+  }
+
+  template <typename Float, int nSpin, int nColor, typename Arg>
+  void cloverCPU(Arg &arg) {
+    for (int parity=0; parity<arg.nParity; parity++) {
+      parity = (arg.nParity == 2) ? parity : arg.parity;
+      for (int x_cb=0; x_cb<arg.volumeCB; x_cb++) cloverApply<Float,nSpin,nColor>(arg, x_cb, parity);
+    }
+  }
+
+  template <typename Float, int nSpin, int nColor, typename Arg>
+  __global__ void cloverGPU(Arg arg) {
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    if (x_cb >= arg.volumeCB) return;
+    cloverApply<Float,nSpin,nColor>(arg, x_cb, parity);
+  }
+
+  template <typename Float, int nSpin, int nColor, typename Arg>
+  class Clover : public TunableVectorY {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &meta;
+
+  protected:
+    long long flops() const { return arg.nParity*arg.volumeCB*504ll; }
+    long long bytes() const { return arg.out.Bytes() + arg.in.Bytes() + arg.nParity*arg.volumeCB*arg.clover.Bytes(); }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.volumeCB; }
+
+  public:
+    Clover(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
+    {
+      strcpy(aux, meta.AuxString());
+    }
+    virtual ~Clover() { }
 
     void apply(const cudaStream_t &stream)
     {
-#if defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      if(in->TwistFlavor() == QUDA_TWIST_SINGLET) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)
-        if (twist == QUDA_TWIST_GAMMA5_DIRECT)
-          twistCloverGamma5Kernel<sFloat><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
-        else if (twist == QUDA_TWIST_GAMMA5_INVERSE)
-          twistCloverGamma5InvKernel<sFloat><<<gridDim, tp.block, tp.shared_bytes, stream>>>(dslashParam);
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+	cloverCPU<Float,nSpin,nColor>(arg);
       } else {
-        errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
-      }
-#endif
-    }
-
-    void preTune() {
-      saveOut = new char[out->Bytes()];
-      cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
-      if (typeid(sFloat) == typeid(short4)) {
-        saveOutNorm = new char[out->NormBytes()];
-        cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
+	cloverGPU<Float,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
 
-    void postTune() {
-      cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-      if (typeid(sFloat) == typeid(short4)) {
-        cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
-        delete[] saveOutNorm;
-      }
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    void preTune() { if (arg.out.field == arg.in.field) arg.out.save(); }  // Need to save the out field if it aliases the in field
+    void postTune() { if (arg.out.field == arg.in.field) arg.out.load(); } // Restore if the in and out fields alias
+  };
 
 
-    long long flops() const { return 24ll * in->VolumeCB(); }	//TODO FIX THIS NUMBER!!!
-    long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
-};
+  template <typename Float, int nColor>
+  void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
+  {
+    if (in.Nspin() != 4) errorQuda("Unsupported nSpin=%d", in.Nspin());
+    constexpr int nSpin = 4;
+    CloverArg<Float,nSpin,nColor> arg(out, in, clover, inverse, parity);
+    Clover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor> > worker(arg, in);
+    worker.apply(streams[Nstream-1]);
 
-void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger, const double &kappa, const double &mu,
-    const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity)
-{
-  if(in->TwistFlavor() == QUDA_TWIST_SINGLET)
-    dslashParam.threads = in->Volume();
-  else //twist doublet    
-    errorQuda("Twisted doublet not supported in twisted clover dslash");
-
-#ifdef GPU_TWISTED_CLOVER_DIRAC
-  Tunable *tmClovGamma5 = 0;
-
-  void *clover=0, *cNorm=0, *cloverInv=0, *cNorm2=0;
-  QudaPrecision clover_prec = bindTwistedCloverTex(*clov, *clovInv, parity, &clover, &cNorm, &cloverInv, &cNorm2);
-
-  if (in->Precision() != clover_prec)
-    errorQuda("ERROR: Clover precision and spinor precision do not match\n");
-
-#ifndef DYNAMIC_CLOVER
-  if (clov->stride != clovInv->stride) 
-    errorQuda("clover and cloverInv must have matching strides (%d != %d)", clov->stride, clovInv->stride);
-#endif
-    
-
-  if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-    tmClovGamma5 = new TwistCloverGamma5Cuda<double2,double2>
-      (out, in, kappa, mu, epsilon, dagger, twist, (double2 *) clover, (float *) cNorm, (double2 *) cloverInv, (float *) cNorm2, clov->stride);
-  } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    tmClovGamma5 = new TwistCloverGamma5Cuda<float4,float4>
-      (out, in, kappa, mu, epsilon, dagger, twist, (float4 *) clover, (float *) cNorm, (float4 *) cloverInv, (float *) cNorm2, clov->stride);
-  } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    tmClovGamma5 = new TwistCloverGamma5Cuda<short4,short4>
-      (out, in, kappa, mu, epsilon, dagger, twist, (short4 *) clover, (float *) cNorm, (short4 *) cloverInv, (float *) cNorm2, clov->stride);
+    checkCudaError();
   }
 
-  tmClovGamma5->apply(streams[Nstream-1]);
-  checkCudaError();
+  // template on the number of colors
+  template <typename Float>
+  void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
+  {
+    if (in.Ncolor() == 3) {
+      ApplyClover<Float,3>(out, in, clover, inverse, parity);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", in.Ncolor());
+    }
+  }
 
-  delete tmClovGamma5;
-  unbindTwistedCloverTex(*clov);
+  //Apply the clvoer matrix field to a colorspinor field
+  //out(x) = clover*in
+  void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
+  {
+    checkPrecision(out, clover, in);    // check all precisions match
+    checkLocation(out, clover, in);     // check all locations match
+
+#ifdef GPU_CLOVER_DIRAC
+    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyClover<double>(out, in, clover, inverse, parity);
+    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyClover<float>(out, in, clover, inverse, parity);
+    } else if (in.Precision() == QUDA_HALF_PRECISION) {
+      ApplyClover<short>(out, in, clover, inverse, parity);
+    } else {
+      errorQuda("Unsupported precision %d\n", in.Precision());
+    }
 #else
-  errorQuda("Twisted clover dslash has not been built");
+    errorQuda("Clover dslash has not been built");
 #endif // GPU_TWISTED_MASS_DIRAC
-}
+  }
+
+  // if (!inverse) apply (Clover + i*a*gamma_5) to the input spinor
+  // else apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
+  template <bool inverse, typename Float, int nSpin, int nColor, typename Arg>
+  __device__ __host__ inline void twistCloverApply(Arg &arg, int x_cb, int parity) {
+    using namespace linalg; // for Cholesky
+    constexpr int N = nColor*nSpin/2;
+    typedef typename mapper<Float>::type RegType;
+    typedef ColorSpinor<RegType,nColor,nSpin> Spinor;
+    typedef ColorSpinor<RegType,nColor,nSpin/2> HalfSpinor;
+    typedef HMatrix<RegType,N> Mat;
+    int spinor_parity = arg.nParity == 2 ? parity : 0;
+    Spinor in = arg.in(x_cb, spinor_parity);
+    Spinor out;
+
+    in.toRel(); // change to chiral basis here
+
+#pragma unroll
+    for (int chirality=0; chirality<2; chirality++) {
+      // factor of 2 comes from clover normalization we need to correct for
+      const complex<RegType> j(0.0, chirality == 0 ? static_cast<RegType>(0.5) : -static_cast<RegType>(0.5));
+
+      Mat A = arg.clover(x_cb, parity, chirality);
+
+      HalfSpinor in_chi = in.chiral_project(chirality);
+      HalfSpinor out_chi = A*in_chi + j*arg.a*in_chi;
+
+      if (inverse) {
+	if (arg.dynamic_clover) {
+	  Mat A2 = A.square();
+	  A2 += arg.a*arg.a*static_cast<RegType>(0.25);
+	  Cholesky<HMatrix,RegType,N> cholesky(A2);
+	  out_chi = static_cast<RegType>(0.25)*cholesky.backward(cholesky.forward(out_chi));
+	} else {
+	  Mat Ainv = arg.cloverInv(x_cb, parity, chirality);
+	  out_chi = static_cast<RegType>(2.0)*(Ainv*out_chi);
+	}
+      }
+
+      out += (out_chi).chiral_reconstruct(chirality);
+    }
+
+    out.toNonRel(); // change basis back
+
+    arg.out(x_cb, spinor_parity) = out;
+  }
+
+  template <bool inverse, typename Float, int nSpin, int nColor, typename Arg>
+  void twistCloverCPU(Arg &arg) {
+    for (int parity=0; parity<arg.nParity; parity++) {
+      parity = (arg.nParity == 2) ? parity : arg.parity;
+      for (int x_cb=0; x_cb<arg.volumeCB; x_cb++) twistCloverApply<inverse,Float,nSpin,nColor>(arg, x_cb, parity);
+    }
+  }
+
+  template <bool inverse, typename Float, int nSpin, int nColor, typename Arg>
+  __global__ void twistCloverGPU(Arg arg) {
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    if (x_cb >= arg.volumeCB) return;
+    twistCloverApply<inverse,Float,nSpin,nColor>(arg, x_cb, parity);
+  }
+
+  template <typename Float, int nSpin, int nColor, typename Arg>
+  class TwistClover : public TunableVectorY {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &meta;
+
+  protected:
+    long long flops() const { return (arg.inverse ? 1056ll : 552ll) * arg.nParity*arg.volumeCB; }
+    long long bytes() const {
+      long long rtn = arg.out.Bytes() + arg.in.Bytes() + arg.nParity*arg.volumeCB*arg.clover.Bytes();
+      if (arg.twist == QUDA_TWIST_GAMMA5_INVERSE && !arg.dynamic_clover)
+	rtn += arg.nParity*arg.volumeCB*arg.cloverInv.Bytes();
+      return rtn;
+    }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.volumeCB; }
+
+  public:
+    TwistClover(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
+    {
+      strcpy(aux, meta.AuxString());
+      strcat(aux, arg.inverse ? ",inverse" : ",direct");
+    }
+    virtual ~TwistClover() { }
+
+    void apply(const cudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+	if (arg.inverse) twistCloverCPU<true,Float,nSpin,nColor>(arg);
+	else twistCloverCPU<false,Float,nSpin,nColor>(arg);
+      } else {
+	if (arg.inverse) twistCloverGPU<true,Float,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	else twistCloverGPU<false,Float,nSpin,nColor> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      }
+    }
+
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    void preTune() { if (arg.out.field == arg.in.field) arg.out.save(); }  // Need to save the out field if it aliases the in field
+    void postTune() { if (arg.out.field == arg.in.field) arg.out.load(); } // Restore if the in and out fields alias
+  };
+
+
+  template <typename Float, int nColor>
+  void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
+			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
+  {
+    if (in.Nspin() != 4) errorQuda("Unsupported nSpin=%d", in.Nspin());
+    constexpr int nSpin = 4;
+    bool inverse = twist == QUDA_TWIST_GAMMA5_DIRECT ? false : true;
+
+#ifdef DYNAMIC_CLOVER
+    constexpr bool dynamic_clover = true;
+#else
+    constexpr bool dynamic_clover = false;
+#endif
+
+    CloverArg<Float,nSpin,nColor,dynamic_clover> arg(out, in, clover, inverse, parity, kappa, mu, epsilon, dagger, twist);
+    TwistClover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor,dynamic_clover> > worker(arg, in);
+    worker.apply(streams[Nstream-1]);
+
+    checkCudaError();
+  }
+
+  // template on the number of colors
+  template <typename Float>
+  void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
+			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
+  {
+    if (in.Ncolor() == 3) {
+      ApplyTwistClover<Float,3>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", in.Ncolor());
+    }
+  }
+
+  //Apply the twisted-clover matrix field to a colorspinor field
+  void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
+			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
+  {
+    checkPrecision(out, clover, in);    // check all precisions match
+    checkLocation(out, clover, in);     // check all locations match
+
+#ifdef GPU_CLOVER_DIRAC
+    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+      ApplyTwistClover<double>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+      ApplyTwistClover<float>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+    } else if (in.Precision() == QUDA_HALF_PRECISION) {
+      ApplyTwistClover<short>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
+    } else {
+      errorQuda("Unsupported precision %d\n", in.Precision());
+    }
+#else
+    errorQuda("Clover dslash has not been built");
+#endif // GPU_TWISTED_MASS_DIRAC
+  }
 
 } // namespace quda
 

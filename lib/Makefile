@@ -82,7 +82,7 @@ CSF_INLN =
 
 # These are only inlined into dslash_quda.cu
 DSLASH_INLN = dslash_constants.h dslash_textures.h io_spinor.h	\
-	clover_def.h staggered_dslash_def.h wilson_dslash_def.h	\
+	staggered_dslash_def.h wilson_dslash_def.h		\
 	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h	\
 	dslash_events.cuh dslash_index.cuh dslash_policy.cuh	\
 	dslash_quda.cuh
@@ -102,7 +102,7 @@ asym_wilson_clover_dslash_gt200_core.h					\
 asym_wilson_clover_fused_exterior_dslash_dagger_fermi_core.h		\
 asym_wilson_clover_fused_exterior_dslash_dagger_gt200_core.h		\
 asym_wilson_clover_fused_exterior_dslash_fermi_core.h			\
-asym_wilson_clover_fused_exterior_dslash_gt200_core.h clover_core.h	\
+asym_wilson_clover_fused_exterior_dslash_gt200_core.h			\
 contract_core.h contract_core_minus.h contract_core_plus.h		\
 covDev_mu0_core.h covDev_mu0_dagger_core.h covDev_mu1_core.h		\
 covDev_mu1_dagger_core.h covDev_mu2_core.h covDev_mu2_dagger_core.h	\
@@ -112,14 +112,14 @@ dw_dslash5inv_core.h dw_dslash5inv_dagger_core.h dw_dslash_core.h	\
 dw_dslash_dagger_core.h dw_fused_exterior_dslash4_core.h		\
 dw_fused_exterior_dslash4_dagger_core.h					\
 dw_fused_exterior_dslash_core.h dw_fused_exterior_dslash_dagger_core.h	\
-gamma5.h staggered_dslash_core.h					\
+staggered_dslash_core.h							\
 staggered_fused_exterior_dslash_core.h tmc_core.h			\
 tmc_dslash_dagger_fermi_core.h tmc_dslash_dagger_gt200_core.h		\
 tmc_dslash_fermi_core.h tmc_dslash_gt200_core.h				\
 tmc_fused_exterior_dslash_dagger_fermi_core.h				\
 tmc_fused_exterior_dslash_dagger_gt200_core.h				\
 tmc_fused_exterior_dslash_fermi_core.h					\
-tmc_fused_exterior_dslash_gt200_core.h tmc_gamma_core.h tm_core.h	\
+tmc_fused_exterior_dslash_gt200_core.h 					\
 tm_dslash_dagger_fermi_core.h tm_dslash_dagger_gt200_core.h		\
 tm_dslash_fermi_core.h tm_dslash_gt200_core.h				\
 tm_fused_exterior_dslash_dagger_fermi_core.h				\

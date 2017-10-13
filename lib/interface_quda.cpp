@@ -383,7 +383,7 @@ void initQudaDevice(int dev) {
 #endif
   }
 
-#if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
+#if defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
   // not needed for CUDA >= 4.1
   char* cni_str = getenv("CUDA_NIC_INTEROP");
@@ -1530,8 +1530,8 @@ namespace quda {
         break;
       case QUDA_MATPCDAG_MATPC_SOLUTION:
         if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-	  blas::ax(16.0*pow(kappa,4), b);
-	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*pow(kappa,4);
+	  blas::ax(16.0*std::pow(kappa,4), b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*std::pow(kappa,4);
         } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
 	  blas::ax(4.0*kappa*kappa, b);
 	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
@@ -1887,7 +1887,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   double kappa = inv_param->kappa;
   if (pc) {
     if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
-      blas::ax(1.0/quda::pow(2.0*kappa,4), out);
+      //blas::ax(1.0/quda::pow(2.0*kappa,4), out);
+      blas::ax(1.0/std::pow(2.0*kappa,4), out);
     } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
       blas::ax(0.25/(kappa*kappa), out);
     }
@@ -3348,7 +3349,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	the iterated residual tolerance of the previous multi-shift
 	solver (iter_res_offset[i]), which ever is greater.
       */
-      const double prec_tol = quda::pow(10.,(-2*(int)param->cuda_prec+2));
+      //const double prec_tol = quda::pow(10.,(-2*(int)param->cuda_prec+2));
+      const double prec_tol = std::pow(10.,(-2*(int)param->cuda_prec+2));
       const double iter_tol = (param->iter_res_offset[i] < prec_tol ? prec_tol : (param->iter_res_offset[i] *1.1));
       const double refine_tol = (param->tol_offset[i] == 0.0 ? iter_tol : param->tol_offset[i]);
       // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0
@@ -4628,7 +4630,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
       profileCloverForce.TPSTOP(QUDA_PROFILE_H2D);
 
       profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-      gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Even()), static_cast<cudaColorSpinorField*>(&x.Even()));
+      gamma5(x.Even(), x.Even());
     } else {
       x.Even() = *(solutionResident[i]);
     }
@@ -4639,10 +4641,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY);
     dirac->Dagger(QUDA_DAG_NO);
 
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Even()), static_cast<cudaColorSpinorField*>(&x.Even()));
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&x.Odd()), static_cast<cudaColorSpinorField*>(&x.Odd()));
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Even()), static_cast<cudaColorSpinorField*>(&p.Even()));
-    gamma5Cuda(static_cast<cudaColorSpinorField*>(&p.Odd()), static_cast<cudaColorSpinorField*>(&p.Odd()));
+    gamma5(x, x);
+    gamma5(p, p);
 
     force_coeff[i] = 2.0*dt*coeff[i]*kappa2;
   }

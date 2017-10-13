@@ -1255,12 +1255,12 @@ dslash = False
 pack = False
 
 # generate clover solo term
-clover = True
-cloverSharedFloats = 0
-sharedFloats = cloverSharedFloats
-# for the clover term, only makes sense to use shared memory as pseudo registers
-sharedDslash = False
-print sys.argv[0] + ": generating clover_core.h";
-f = open('dslash_core/clover_core.h', 'w')
-f.write(generate_clover())
-f.close()
+#clover = True
+#cloverSharedFloats = 0
+#sharedFloats = cloverSharedFloats
+## for the clover term, only makes sense to use shared memory as pseudo registers
+#sharedDslash = False
+#print sys.argv[0] + ": generating clover_core.h";
+#f = open('dslash_core/clover_core.h', 'w')
+#f.write(generate_clover())
+#f.close()

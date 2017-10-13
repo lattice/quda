@@ -102,6 +102,10 @@ namespace quda {
     void compute(const cudaGaugeField &gauge);
 
 #ifdef USE_TEXTURE_OBJECTS
+    cudaTextureObject_t tex;
+    cudaTextureObject_t normTex;
+    cudaTextureObject_t invTex;
+    cudaTextureObject_t invNormTex;
     cudaTextureObject_t evenTex;
     cudaTextureObject_t evenNormTex;
     cudaTextureObject_t oddTex;
@@ -110,7 +114,7 @@ namespace quda {
     cudaTextureObject_t evenInvNormTex;
     cudaTextureObject_t oddInvTex;
     cudaTextureObject_t oddInvNormTex;
-    void createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm);
+    void createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm, bool full);
     void destroyTexObject();
 #endif
 
@@ -121,6 +125,10 @@ namespace quda {
     virtual ~cudaCloverField();
 
 #ifdef USE_TEXTURE_OBJECTS
+    const cudaTextureObject_t& Tex() const { return tex; }
+    const cudaTextureObject_t& NormTex() const { return normTex; }
+    const cudaTextureObject_t& InvTex() const { return invTex; }
+    const cudaTextureObject_t& InvNormTex() const { return invNormTex; }
     const cudaTextureObject_t& EvenTex() const { return evenTex; }
     const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
     const cudaTextureObject_t& OddTex() const { return oddTex; }

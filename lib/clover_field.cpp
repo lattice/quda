@@ -130,7 +130,7 @@ namespace quda {
 	evenNorm = evenInvNorm;
 	oddNorm = oddInvNorm;
       }
-    } 
+    }
 
     if (!param.inverse) {
       cloverInv = clover;
@@ -142,11 +142,14 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    createTexObject(evenTex, evenNormTex, even, evenNorm);
-    createTexObject(oddTex, oddNormTex, odd, oddNorm);
+    createTexObject(tex, normTex, clover, norm, true);
+    createTexObject(invTex, invNormTex, cloverInv, invNorm, true);
 
-    createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm);
-    createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm);
+    createTexObject(evenTex, evenNormTex, even, evenNorm, false);
+    createTexObject(oddTex, oddNormTex, odd, oddNorm, false);
+
+    createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm, false);
+    createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm, false);
 #endif
     twisted = param.twisted;
     mu2 = param.mu2;
@@ -155,7 +158,7 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
   void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
-					void *field, void *norm) {
+					void *field, void *norm, bool full) {
     if (isNative()) {
       // create the texture for the field components
       
@@ -175,7 +178,7 @@ namespace quda {
       resDesc.resType = cudaResourceTypeLinear;
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = bytes/2;
+      resDesc.res.linear.sizeInBytes = bytes/(!full ? 2 : 1);
       
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
@@ -197,7 +200,7 @@ namespace quda {
 	resDesc.resType = cudaResourceTypeLinear;
 	resDesc.res.linear.devPtr = norm;
 	resDesc.res.linear.desc = desc;
-	resDesc.res.linear.sizeInBytes = norm_bytes/2;
+	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
 	
 	cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
