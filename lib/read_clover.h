@@ -46,9 +46,11 @@
   double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9;			\
   double2 C10, C11, C12, C13, C14, C15, C16, C17;			\
   double2* clover = (double2*)clover_;					\
-  load_streaming_double2(C0, &clover[sid + (18*chi+0)*param.cl_stride]);	\
-  load_streaming_double2(C1, &clover[sid + (18*chi+1)*param.cl_stride]);	\
-  C2 = make_double2(1.0-C0.y, 1.0-C1.x);				\
+  load_streaming_double2(C0, &clover[sid + (18*chi+0)*param.cl_stride]); \
+  load_streaming_double2(C1, &clover[sid + (18*chi+1)*param.cl_stride]); \
+  double diag = 0.5*(C0.x + C1.y);					\
+  double diag_inv = 1.0/diag;						\
+  C2 = make_double2(diag*(2-C0.y*diag_inv), diag*(2-C1.x*diag_inv));	\
   load_streaming_double2(C3, &clover[sid + (18*chi+3)*param.cl_stride]);	\
   load_streaming_double2(C4, &clover[sid + (18*chi+4)*param.cl_stride]);	\
   load_streaming_double2(C5, &clover[sid + (18*chi+5)*param.cl_stride]);	\
@@ -163,7 +165,9 @@
 #define READ_CLOVER2_DOUBLE_TEX(clover, chi)			       \
   double2 C0 = fetch_double2((clover), sid + (18*chi+0)*param.cl_stride);    \
   double2 C1 = fetch_double2((clover), sid + (18*chi+1)*param.cl_stride);    \
-  double2 C2 = make_double2(1.0-C0.y, 1.0-C1.x);			     \
+  double diag = 0.5*(C0.x + C1.y);					\
+  double diag_inv = 1.0/diag;						\
+  double2 C2 = make_double2(diag*(2-C0.y*diag_inv), diag*(2-C1.x*diag_inv)); \
   double2 C3 = fetch_double2((clover), sid + (18*chi+3)*param.cl_stride);    \
   double2 C4 = fetch_double2((clover), sid + (18*chi+4)*param.cl_stride);    \
   double2 C5 = fetch_double2((clover), sid + (18*chi+5)*param.cl_stride);    \
