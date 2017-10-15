@@ -1,5 +1,5 @@
-#ifndef _COMM_QUDA_H
-#define _COMM_QUDA_H
+#pragma once
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -212,6 +212,7 @@ extern "C" {
   void comm_allreduce_max(double* data);
   void comm_allreduce_array(double* data, size_t size);
   void comm_allreduce_int(int* data);
+  void comm_allreduce_xor(uint64_t *data);
   void comm_broadcast(void *data, size_t nbytes);
   void comm_barrier(void);
   void comm_abort(int status);
@@ -232,5 +233,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _COMM_QUDA_H */

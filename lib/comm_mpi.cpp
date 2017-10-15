@@ -374,6 +374,14 @@ void comm_allreduce_int(int* data)
   *data = recvbuf;
 }
 
+void comm_allreduce_xor(uint64_t *data)
+{
+  if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
+  uint64_t recvbuf;
+  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_UNSIGNED_LONG, MPI_BXOR, MPI_COMM_WORLD) );
+  *data = recvbuf;
+}
+
 
 /**  broadcast from rank 0 */
 void comm_broadcast(void *data, size_t nbytes)
