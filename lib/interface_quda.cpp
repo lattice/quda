@@ -1396,6 +1396,9 @@ namespace quda {
     case QUDA_LAPLACE_DSLASH:
       diracParam.type = pc ? QUDA_GAUGE_LAPLACEPC_DIRAC : QUDA_GAUGE_LAPLACE_DIRAC;
       break;
+    case QUDA_COVDEV_DSLASH:
+      diracParam.type = QUDA_GAUGE_COVDEV_DIRAC;
+      break;
     default:
       errorQuda("Unsupported dslash_type %d", inv_param->dslash_type);
     }
