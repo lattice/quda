@@ -254,10 +254,14 @@ namespace quda {
     virtual void copy(const GaugeField &src) = 0;
 
     /**
-     * Compute hash of this gauge field
-     * @return hash value
+       Compute checksum of this gauge field: this uses a XOR-based checksum method
+       @param[in] mini Whether to compute a mini checksum or global checksum.
+       A mini checksum only computes the checksum over a subset of the lattice
+       sites and is to be used for online comparisons, e.g., checking
+       a field has changed with a global update algorithm.
+       @return checksum value
      */
-    virtual size_t hash() const = 0;
+    uint64_t checksum(bool mini=false) const;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -388,13 +392,6 @@ namespace quda {
     */
     void restore();
 
-    /**
-     * @brief compute hash of this gauge field.  For GPU gauge field
-     * this presently undefined (returns 0).
-     * @return hash value
-     */
-    size_t hash() const { return 0; }
-
   };
 
   class cpuGaugeField : public GaugeField {
@@ -468,12 +465,6 @@ namespace quda {
     */
     void restore();
 
-    /**
-     * @brief Compute hash of this gauge field.
-     * @return hash value
-     */
-    size_t hash() const;
-
   };
 
   /**
@@ -546,17 +537,26 @@ namespace quda {
   /**
      This function is used to calculate the maximum absolute value of
      a gauge field array.  Defined in max_gauge.cu.  
-
-     @param u The gauge field from which we want to compute the max
+     @param[in] u The gauge field from which we want to compute the max
   */
   double maxGauge(const GaugeField &u);
 
   /** 
-      Apply the staggered phase factor to the gauge field.
-
-      @param u The gauge field to which we apply the staggered phase factors
+     Apply the staggered phase factor to the gauge field.
+     @param[in] u The gauge field to which we apply the staggered phase factors
   */
   void applyGaugePhase(GaugeField &u);
+
+  /**
+     Compute XOR-based checksum of this gauge field: each gauge field entry is
+     converted to type uint64_t, and compute the cummulative XOR of these values.
+     @param[in] mini Whether to compute a mini checksum or global checksum.
+     A mini checksum only computes over a subset of the lattice
+     sites and is to be used for online comparisons, e.g., checking
+     a field has changed with a global update algorithm.
+     @return checksum value
+  */
+  uint64_t Checksum(const GaugeField &u, bool mini=false);
 
 } // namespace quda
 

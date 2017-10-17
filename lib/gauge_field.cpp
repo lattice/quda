@@ -314,4 +314,10 @@ namespace quda {
     return nrm1;
   }
 
+  uint64_t GaugeField::checksum(bool mini) const {
+    return Checksum(*this, mini);
+  }
+
+
+
 } // namespace quda

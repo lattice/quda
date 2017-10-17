@@ -367,21 +367,6 @@ namespace quda {
     memset(gauge, 0, bytes);
   }
 
-  size_t cpuGaugeField::hash() const {
-
-    size_t hash_ = 0;
-
-    // for now this is quick hack and only implemented for BQCD fields
-    if (order == QUDA_BQCD_GAUGE_ORDER) {
-      const size_t *h = reinterpret_cast<const size_t*>(gauge);
-      for (int i=0; i<10; i++) hash_ += h[i];
-    } else {
-      warningQuda("Hash not implemented");
-    }
-
-    return hash_;
-  }
-
 /*template <typename Float>
 void print_matrix(const Float &m, unsigned int x) {
 

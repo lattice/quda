@@ -127,6 +127,20 @@ namespace quda {
 
 	template<typename S>
 	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+
+	/**
+	   Return 64-bit XOR checksum computed from the
+	   elements of the matrix.  Compute the checksum on each
+	   64-bit word that constitutes the Matrix
+	 */
+	__device__ __host__ inline uint64_t checksum() const {
+	  // ensure length is rounded up to 64-bit multiple
+	  constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
+	  const uint64_t* base = reinterpret_cast<const uint64_t*>( static_cast< const void* >(data) );
+	  uint64_t checksum_ = base[0];
+	  for (int i=1; i<length; i++) checksum_ ^= base[i];
+	  return checksum_;
+        }
     };
 
   /**

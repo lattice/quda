@@ -598,17 +598,17 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
 
   if (in->Order() == QUDA_BQCD_GAUGE_ORDER) {
-    static size_t hash = SIZE_MAX;
-    size_t in_hash = in->hash();
-    if (in_hash == hash) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gauge field unchanged - using cached gauge field\n");
+    static size_t checksum = SIZE_MAX;
+    size_t in_checksum = in->checksum(true);
+    if (in_checksum == checksum) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gauge field unchanged - using cached gauge field %lu\n", checksum);
       profileGauge.TPSTOP(QUDA_PROFILE_INIT);
       profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
       delete in;
       invalidate_clover = false;
       return;
     }
-    hash = in_hash;
+    checksum = in_checksum;
     invalidate_clover = true;
   }
 
