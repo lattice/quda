@@ -343,7 +343,7 @@ void comm_allreduce_int(int* data)
 void comm_allreduce_xor(uint64_t *data)
 {
   if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
-  QMP_CHECK( QMP_global_xor(); );
+  QMP_CHECK( QMP_xor_ulong(data); );
 }
 
 void comm_broadcast(void *data, size_t nbytes)
