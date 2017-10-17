@@ -272,7 +272,7 @@ namespace quda {
 
     int count = 0;
     for (int dir=0; dir<4; dir++) {
-      input_path_d[dir] = (int*)device_malloc(bytes);
+      input_path_d[dir] = (int*)pool_device_malloc(bytes);
       cudaMemset(input_path_d[dir], 0, bytes);
 
       int* input_path_h = (int*)safe_malloc(bytes);
@@ -291,11 +291,11 @@ namespace quda {
     }
       
     //length
-    int* length_d = (int*)device_malloc(num_paths*sizeof(int));
+    int* length_d = (int*)pool_device_malloc(num_paths*sizeof(int));
     qudaMemcpy(length_d, length_h, num_paths*sizeof(int), cudaMemcpyHostToDevice);
 
     //path_coeff
-    double* path_coeff_d = (double*)device_malloc(num_paths*sizeof(double));
+    double* path_coeff_d = (double*)pool_device_malloc(num_paths*sizeof(double));
     qudaMemcpy(path_coeff_d, path_coeff_h, num_paths*sizeof(double), cudaMemcpyHostToDevice);
 
     GaugeForceArg<Mom,Gauge> arg(mom, u, num_paths, path_max_length, coeff, input_path_d,
@@ -304,9 +304,10 @@ namespace quda {
     gauge_force.apply(0);
     checkCudaError();
 
-    device_free(length_d);
-    device_free(path_coeff_d);
-    for (int dir=0; dir<4; dir++) device_free(input_path_d[dir]);
+    pool_device_free(length_d);
+    pool_device_free(path_coeff_d);
+    for (int dir=0; dir<4; dir++) pool_device_free(input_path_d[dir]);
+    cudaDeviceSynchronize();
   }
 
   template <typename Float>

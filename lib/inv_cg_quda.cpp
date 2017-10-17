@@ -1,9 +1,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
-#include <sys/time.h>
 #include <limits>
 #include <memory>
+#include <iostream>
 
 #ifdef BLOCKSOLVER
 #include <Eigen/Dense>
@@ -15,12 +15,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <face_quda.h>
-
-
-
-
-
 
 namespace quda {
 

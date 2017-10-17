@@ -21,16 +21,22 @@ namespace quda {
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
 
-}
+  // strip path from __FILE__
+  inline constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
+  inline constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
+  inline constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
+  inline constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
 
-#define device_malloc(size) quda::device_malloc_(__func__, __FILE__, __LINE__, size)
-#define device_pinned_malloc(size) quda::device_pinned_malloc_(__func__, __FILE__, __LINE__, size)
-#define safe_malloc(size) quda::safe_malloc_(__func__, __FILE__, __LINE__, size)
-#define pinned_malloc(size) quda::pinned_malloc_(__func__, __FILE__, __LINE__, size)
-#define mapped_malloc(size) quda::mapped_malloc_(__func__, __FILE__, __LINE__, size)
-#define device_free(ptr) quda::device_free_(__func__, __FILE__, __LINE__, ptr)
-#define device_pinned_free(ptr) quda::device_pinned_free_(__func__, __FILE__, __LINE__, ptr)
-#define host_free(ptr) quda::host_free_(__func__, __FILE__, __LINE__, ptr)
+} // namespace quda
+
+#define device_malloc(size) quda::device_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
+#define device_pinned_malloc(size) quda::device_pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
+#define safe_malloc(size) quda::safe_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
+#define pinned_malloc(size) quda::pinned_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
+#define mapped_malloc(size) quda::mapped_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
+#define device_free(ptr) quda::device_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define device_pinned_free(ptr) quda::device_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
 
 namespace quda {

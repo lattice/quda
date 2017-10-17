@@ -196,6 +196,36 @@ namespace quda {
     */
     static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
+    /**
+       The current size of the static ghost allocation
+    */
+    static size_t ghostFaceBytes;
+
+    /**
+       Whether the ghost buffers have been initialized
+    */
+    static bool initGhostFaceBuffer;
+
+    /**
+       Size in bytes of this ghost field
+    */
+    mutable size_t ghost_bytes;
+
+    /**
+       Size in bytes of the ghost in each dimension
+    */
+    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
+
+    /**
+       Real-number offsets to each ghost zone
+    */
+    mutable int ghostOffset[QUDA_MAX_DIM][2];
+
+    /**
+       Real-number (in floats) offsets to each ghost zone for norm field
+    */
+    mutable int ghostNormOffset[QUDA_MAX_DIM][2];
+
     /** Pinned memory buffer used for sending all messages */
     void *my_face_h[2];
     /** Mapped version of my_face_h */
@@ -329,9 +359,27 @@ namespace quda {
     virtual ~LatticeField();
     
     /**
-       Free the pinned-memory buffer
+       @brief Allocate the static ghost buffers
+       @param[in] ghost_bytes Size of the ghost buffer to allocate
     */
-    static void freeBuffer(int index=0);
+    void allocateGhostBuffer(size_t ghost_bytes) const;
+
+    /**
+       @brief Free statically allocated ghost buffers
+    */
+    static void freeGhostBuffer(void);
+
+    /**
+       Create the communication handlers (both host and device)
+       @param[in] no_comms_fill Whether to allocate halo buffers for
+       dimensions that are not partitioned
+    */
+    void createComms(bool no_comms_fill=false);
+
+    /**
+       Destroy the communication handlers
+    */
+    void destroyComms();
 
     /**
        Create the inter-process communication handlers

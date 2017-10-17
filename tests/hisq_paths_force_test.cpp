@@ -5,13 +5,10 @@
 #include <quda.h>
 #include "test_util.h"
 #include "gauge_field.h"
-#include "fat_force_quda.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include "hw_quda.h"
-#include <fat_force_quda.h>
-#include <face_quda.h>
 #include <dslash_quda.h> 
 #include <sys/time.h>
 

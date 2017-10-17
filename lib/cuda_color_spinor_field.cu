@@ -1,26 +1,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <typeinfo>
+#include <string.h>
+#include <iostream>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
-
-#include <string.h>
-#include <iostream>
-#include <misc_helpers.h>
-#include <face_quda.h>
 #include <dslash_quda.h>
 
 int zeroCopy = 0;
 
 namespace quda {
 
-  bool cudaColorSpinorField::initGhostFaceBuffer = false;
-  size_t cudaColorSpinorField::ghostFaceBytes = 0;
-
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -43,7 +37,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -53,7 +47,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -101,7 +95,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
-      ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+      ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -483,8 +477,10 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    if (!composite_descr.is_composite || composite_descr.is_component) {
       destroyTexObject();
+      destroyGhostTexObject();
+    }
 #endif
 
   }
@@ -579,16 +575,15 @@ namespace quda {
       if (!zeroCopy) {
 	buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
 	Src = buffer;
-	srcNorm = static_cast<char*>(buffer)+src.Bytes();
+	srcNorm = static_cast<char*>(Src) + src.Bytes();
 	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
 	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
 	buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
 	memcpy(buffer, src.V(), src.Bytes());
 	memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
-
 	cudaHostGetDevicePointer(&Src, buffer, 0);
-	srcNorm = static_cast<void*>(static_cast<char*>(Src) + src.Bytes());
+	srcNorm = static_cast<char*>(Src) + src.Bytes();
       }
 
       cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
@@ -618,11 +613,11 @@ namespace quda {
       if (!zeroCopy) {
 	buffer = pool_device_malloc(dest.Bytes()+dest.NormBytes());
 	dst = buffer;
-	dstNorm = (char*)buffer+dest.Bytes();
+	dstNorm = static_cast<char*>(dst) + dest.Bytes();
       } else {
 	buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
 	cudaHostGetDevicePointer(&dst, buffer, 0);
-	dstNorm = (char*)dst+dest.Bytes();
+	dstNorm = static_cast<char*>(dst)+dest.Bytes();
       }
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
 
@@ -643,86 +638,14 @@ namespace quda {
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {
 
-    if (!comm_partitioned()) {
-      for (int i=0; i<4; i++) ghost_face_bytes[i] = 0;
-      return;
-    }
-
     createGhostZone(nFace, spin_project);
-
-    // temporary work around until the ghost buffer for fine and
-    // coarse grid are merged: this ensures we reset the fine ghost
-    // buffer if the coarse grid operator allocates a ghost buffer
-    // that is larger than the fine grid operator
-    static size_t ghostFaceBytes_ = 0;
-
-    // only allocate if not already allocated or buffer required is bigger than previously
-    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes || ghost_bytes > ghostFaceBytes_) {
-
-      if (initGhostFaceBuffer) {
-#ifdef USE_TEXTURE_OBJECTS
-	destroyGhostTexObject();
-#endif
-	if (ghost_bytes) {
-	  for (int b=0; b<2; b++) {
-	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_pinned_free(ghost_send_buffer_d[b]);
-	    host_free(ghost_pinned_buffer_h[b]);
-	  }
-	}
-      }
-
-      if (ghost_bytes > 0) {
-	for (int b=0; b<2; ++b) {
-	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-
-	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-
-	  // pinned buffer used for sending and receiving
-	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
-
-	  // set the matching device-mapper pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
-	}
-
-	initGhostFaceBuffer = true;
-	ghostFaceBytes = ghost_bytes;
-	ghostFaceBytes_ = ghost_bytes;
-      }
-
-      LatticeField::ghost_field_reset = true; // this signals that we must reset the IPC comms
-    }
+    LatticeField::allocateGhostBuffer(ghost_bytes);
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
     if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1]) destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
-  }
-
-  void cudaColorSpinorField::freeGhostBuffer(void)
-  {
-    destroyIPCComms();
-
-    if (!initGhostFaceBuffer) return;
-  
-    for (int b=0; b<2; b++) {
-      // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
-      ghost_recv_buffer_d[b] = nullptr;
-
-      // free send buffer
-      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
-      ghost_send_buffer_d[b] = nullptr;
-
-      // free pinned memory buffers
-      if (ghost_pinned_buffer_h[b]) host_free(ghost_pinned_buffer_h[b]);
-      ghost_pinned_buffer_h[b] = nullptr;
-      ghost_pinned_buffer_hd[b] = nullptr;
-    }
-    initGhostFaceBuffer = false;
   }
 
   // pack the ghost zone into a contiguous buffer for communications
@@ -975,25 +898,9 @@ namespace quda {
 
     if (!initComms || comms_reset) {
 
-      destroyComms(); // if we are requesting a new number of faces destroy and start over
+      LatticeField::createComms();
 
-      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
-
-      for (int i=0; i<nDimComms; i++) { // compute size of ghost buffers required
-	if (!commDimPartitioned(i)) { ghost_face_bytes[i] = 0; continue; }
-	ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*precision;
-	if (precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
-      }
-
-      // initialize the ghost pinned buffers
-      for (int b=0; b<2; b++) {
-	my_face_h[b] = ghost_pinned_buffer_h[b];
-	my_face_hd[b] = ghost_pinned_buffer_hd[b];
-	from_face_h[b] = static_cast<char*>(my_face_h[b]) + ghost_bytes;
-	from_face_hd[b] = static_cast<char*>(my_face_hd[b]) + ghost_bytes;
-      }
-
-      // initialize the ghost receive pointers
+      // reinitialize the ghost receive pointers
       for (int i=0; i<nDimComms; ++i) {
 	if (commDimPartitioned(i)) {
 	  for (int b=0; b<2; b++) {
@@ -1003,92 +910,10 @@ namespace quda {
 	  }
 	}
       }
-
-      // initialize ghost send pointers
-      size_t offset = 0;
-      for (int i=0; i<nDimComms; i++) {
-	if (!commDimPartitioned(i)) continue;
-
-	for (int b=0; b<2; ++b) {
-	  my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
-	  from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
-
-	  my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
-	  from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
-
-	  my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	  from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
-	} // loop over b
-	offset += ghost_face_bytes[i];
-
-	for (int b=0; b<2; ++b) {
-	  my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
-	  from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
-
-	  my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
-	  from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
-
-	  my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	  from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
-	} // loop over b
-	offset += ghost_face_bytes[i];
-
-      } // loop over dimension
-
-      bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled
-
-      // initialize the message handlers
-      for (int i=0; i<nDimComms; i++) {
-	if (!commDimPartitioned(i)) continue;
-
-	for (int b=0; b<2; ++b) {
-	  mh_send_fwd[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_send_back[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
-
-	  mh_recv_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_recv_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
-
-	  mh_send_rdma_fwd[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
-	  mh_send_rdma_back[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
-
-	  mh_recv_rdma_fwd[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
-	  mh_recv_rdma_back[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
-	} // loop over b
-
-      } // loop over dimension
-     
-      initComms = true;
-      checkCudaError();
     }
 
     if (LatticeField::ghost_field_reset) destroyIPCComms();
     createIPCComms();
-  }
-
-  void cudaColorSpinorField::destroyComms()
-  {
-    if (initComms) {
-
-      for (int b=0; b<2; ++b) {
-	for (int i=0; i<nDimComms; i++) {
-	  if (commDimPartitioned(i)) {
-	    if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
-	    if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
-	    if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
-	    if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
-
-	    if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
-	    if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
-	    if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
-	    if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
-	  }
-	}
-      } // loop over b
-
-      initComms = false;
-      checkCudaError();
-    }
-
   }
 
   void cudaColorSpinorField::streamInit(cudaStream_t *stream_p) {
@@ -1287,7 +1112,7 @@ namespace quda {
       if (dir == 0) {
 	// record the event
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], *copy_stream);
-	// send to the propcessor in the -1 direction
+	// send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);

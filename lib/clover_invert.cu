@@ -2,7 +2,6 @@
 #include <clover_field_order.h>
 #include <complex_quda.h>
 #include <launch_kernel.cuh>
-#include <face_quda.h>
 #include <atomic.cuh>
 #include <cub_helper.cuh>
 #include <quda_matrix.h>

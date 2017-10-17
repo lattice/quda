@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -10,17 +11,13 @@
 #include <util_quda.h>
 #include <sys/time.h>
 
-#include <face_quda.h>
-#include <iostream>
-
-
 namespace quda {
 
   XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
     Solver(param,profile), mat(mat)
   {
     sd = new SD(mat,param,profile);
-    for(int i=0; i<4; ++i) R[i] = param.overlap_precondition*commDimPartitioned(i);
+    for(int i=0; i<4; ++i) R[i] = param.overlap_precondition*comm_dim_partitioned(i);
   }
 
   XSD::~XSD(){

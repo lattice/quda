@@ -6,7 +6,6 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
-#include <face_quda.h>
 
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
