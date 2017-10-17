@@ -2284,7 +2284,6 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   if (param->solve_type != QUDA_DIRECT_SOLVE)
     errorQuda("Outer MG solver can only use QUDA_DIRECT_SOLVE at present");
 
-  pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaMultigridParam(&mg_param);
   mg_param.secs = 0;
   mg_param.gflops = 0;
@@ -2319,7 +2318,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
   mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
-  printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
+  if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
   ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
   cpuParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -2339,15 +2338,17 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 }
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
+  pushVerbosity(mg_param->invert_param->verbosity);
+
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
-
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   saveProfile(__func__);
   flushProfile();
   saveTuneCache();
+
+  popVerbosity();
   return static_cast<void*>(mg);
 }
 
@@ -2356,6 +2357,8 @@ void destroyMultigridQuda(void *mg) {
 }
 
 void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
+
+  pushVerbosity(mg_param->invert_param->verbosity);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
   multigrid_solver *mg = static_cast<multigrid_solver*>(mg_);
@@ -2369,7 +2372,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   // setOutputPrefix(prefix);
   setOutputPrefix("MG level 1 (GPU): "); //fix me
 
-  printfQuda("Updating operator on level 1 of %d levels\n", mg->mgParam->Nlevel);
+  if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Updating operator on level 1 of %d levels\n", mg->mgParam->Nlevel);
 
   bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE);
@@ -2420,6 +2423,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  popVerbosity();
 }
 
 deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
