@@ -91,7 +91,7 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
 
-    if( isNative() ){
+    if( isNative() && geometry != QUDA_COARSE_GEOMETRY ){
       // create the texture for the field components
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
@@ -141,7 +141,7 @@ namespace quda {
   }
 
   void cudaGaugeField::destroyTexObject() {
-    if( isNative() ){
+    if( isNative() && geometry != QUDA_COARSE_GEOMETRY ){
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
       if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13){
