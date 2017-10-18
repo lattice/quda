@@ -244,8 +244,20 @@ extern "C" {
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
    */
-  void flush_chrono_quda_(int index);
+  void flush_chrono_quda_(int *index);
 
+  /**
+   * @brief Pinned a pre-existing memory allocation
+   * @param[in] ptr Pointer to buffer to be pinned
+   * @param[in] size Size of allocation
+   */
+  void register_pinned_quda_(void *ptr, size_t *bytes);
+
+  /**
+   * @brief Pinned a pre-existing memory allocation
+   * @param[in] ptr Pointer to buffer to be unpinned
+   */
+  void unregister_pinned_quda_(void *ptr);
 
 #ifdef __cplusplus
 }

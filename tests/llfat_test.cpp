@@ -13,7 +13,6 @@
 #include "malloc_quda.h"
 
 #ifdef MULTI_GPU
-#include "face_quda.h"
 #include "comm_quda.h"
 #endif
 
@@ -293,7 +292,7 @@ static void llfat_test()
   }
 
   int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
-  long long flops= 61632 * niter;
+  long long flops= 61632 * (long long)niter;
   flops += (252*4)*(long long)niter; // long-link contribution
 
   double perf = flops*volume/(secs*1024*1024*1024);

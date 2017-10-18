@@ -55,6 +55,8 @@ void comm_allreduce_array(double* data, size_t size) {}
 
 void comm_allreduce_int(int* data) {}
 
+void comm_allreduce_xor(uint64_t *data) {}
+
 void comm_broadcast(void *data, size_t nbytes) {}
 
 void comm_barrier(void) {}

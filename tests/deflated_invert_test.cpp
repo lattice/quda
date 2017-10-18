@@ -13,8 +13,6 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#include "face_quda.h"
-
 #if defined(QMP_COMMS)
 #include <qmp.h>
 #elif defined(MPI_COMMS)

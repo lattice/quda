@@ -70,6 +70,9 @@ enum KernelType {
     double a_inv;
     float a_inv_f;
 
+    double rho;
+    float rho_f;
+
     double mferm;
     float mferm_f;
 

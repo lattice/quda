@@ -13,13 +13,11 @@
 #include "misc.h"
 #include "util_quda.h"
 #include "llfat_quda.h"
-#include "fat_force_quda.h"
 #include <unitarization_links.h>
 #include "dslash_quda.h"
 #include "ks_improved_force.h"
 
 #ifdef MULTI_GPU
-#include "face_quda.h"
 #include "comm_quda.h"
 #endif
 

@@ -48,16 +48,11 @@ namespace quda {
     }
   };
 
-  template <typename Float, typename Arg>
-  __global__ void computeLongLink(Arg arg) {
+  template <typename Float, int dir, typename Arg>
+  __device__ void longLinkDir(Arg &arg, int idx, int parity) {
+    int x[4];
+    int dx[4] = {0, 0, 0, 0};
 
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = blockIdx.y*blockDim.y + threadIdx.y;
-    int dir = blockIdx.z*blockDim.z + threadIdx.z;
-    if (idx >= arg.threads) return;
-    if (dir >= 4) return;
-
-    int x[4], dx[4] = {0, 0, 0, 0};
     int *y = arg.u.coords;
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
@@ -74,6 +69,23 @@ namespace quda {
     dx[dir]-=2;
 
     arg.link(dir, idx, parity) = arg.coeff * a * b * c;
+  }
+
+  template <typename Float, typename Arg>
+  __global__ void computeLongLink(Arg arg) {
+
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = blockIdx.y*blockDim.y + threadIdx.y;
+    int dir = blockIdx.z*blockDim.z + threadIdx.z;
+    if (idx >= arg.threads) return;
+    if (dir >= 4) return;
+
+    switch(dir) {
+    case 0: longLinkDir<Float, 0>(arg, idx, parity); break;
+    case 1: longLinkDir<Float, 1>(arg, idx, parity); break;
+    case 2: longLinkDir<Float, 2>(arg, idx, parity); break;
+    case 3: longLinkDir<Float, 3>(arg, idx, parity); break;
+    }
     return;
   }
 
@@ -90,7 +102,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      computeLongLink<Float><<<tp.grid,tp.block>>>(arg);
+      computeLongLink<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     }
 
     TuneKey tuneKey() const {
@@ -447,8 +459,8 @@ namespace quda {
       return 2*arg.n_mu*arg.threads*( 4*198 + 18 + 36 );
     }
     long long bytes() const {
-      return 2*arg.n_mu*meta.VolumeCB()*arg.fat.Bytes()*2 // fat load/store is only done on interior
-	+ arg.n_mu*2*arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + save_staple ? arg.staple.Bytes() : 0);
+      return arg.n_mu*2*meta.VolumeCB()*arg.fat.Bytes()*2 // fat load/store is only done on interior
+	+ arg.n_mu*2*arg.threads*(4*arg.u.Bytes() + 2*arg.mulink.Bytes() + (save_staple ? arg.staple.Bytes() : 0));
     }
   };
 

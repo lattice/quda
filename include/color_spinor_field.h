@@ -277,18 +277,11 @@ namespace quda {
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
     mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
-    mutable int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
-    mutable int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
-
-    mutable size_t ghost_length; // length of ghost zone
-    mutable size_t ghost_norm_length; // length of ghost zone for norm
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-    mutable size_t ghost_bytes; // size in bytes of the ghost field
-    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -304,6 +297,11 @@ namespace quda {
     //
     CompositeColorSpinorField components;
 
+    /**
+       Compute the required extended ghost zone sizes and offsets
+       @param[in] nFace The depth of the halo
+       @param[in] spin_project Whether we are spin projecting
+    */
     void createGhostZone(int nFace, bool spin_project=true) const;
 
     // resets the above attributes based on contents of param
@@ -403,7 +401,6 @@ namespace quda {
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-    size_t GhostLength() const { return ghost_length; }
     const int *GhostFace() const { return ghostFace; }
     int GhostOffset(const int i) const { return ghostOffset[i][0]; }
     int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
@@ -486,9 +483,6 @@ namespace quda {
 
     bool reference; // whether the field is a reference or not
 
-    static size_t ghostFaceBytes;
-    static bool initGhostFaceBuffer;
-
     mutable void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
 
     void create(const QudaFieldCreate);
@@ -532,21 +526,11 @@ namespace quda {
     void createComms(int nFace, bool spin_project=true);
 
     /**
-       @brief Destroy the communication handlers and buffers
-    */
-    void destroyComms();
-
-    /**
        @brief Allocate the ghost buffers
        @param[in] nFace Depth of each halo
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
     void allocateGhostBuffer(int nFace, bool spin_project=true) const;
-
-    /**
-       @brief Free statically allocated ghost buffers
-    */
-    static void freeGhostBuffer(void);
 
     /**
        @brief Packs the cudaColorSpinorField's ghost zone

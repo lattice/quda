@@ -1,6 +1,5 @@
 #include <quda_internal.h>
 #include <gauge_field.h>
-#include <face_quda.h>
 #include <assert.h>
 #include <string.h>
 #include <typeinfo>
@@ -185,18 +184,18 @@ namespace quda {
     size_t bytes[QUDA_MAX_DIM];
     // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
-      if (!(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
+      if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
       bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
       send[d] = safe_malloc(2 * bytes[d]);
       recv[d] = safe_malloc(2 * bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
+      if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
       //extract into a contiguous buffer
       extractExtendedGaugeGhost(*this, d, R, send, true);
 
-      if (commDimPartitioned(d)) {
+      if (comm_dim_partitioned(d)) {
 	// do the exchange
 	MsgHandle *mh_recv_back;
 	MsgHandle *mh_recv_fwd;
@@ -232,7 +231,7 @@ namespace quda {
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
+      if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
       host_free(send[d]);
       host_free(recv[d]);
     }
@@ -303,7 +302,7 @@ namespace quda {
       }
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
-      // copy field and ghost zone into bufferPinned
+      // copy field and ghost zone directly
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge,
 		       const_cast<void*>(static_cast<const cpuGaugeField&>(src).Gauge_p()));
     } else {
