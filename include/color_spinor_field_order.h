@@ -849,7 +849,7 @@ namespace quda {
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector* >(field + parity*offset)[x + stride*i] = vecTmp;
+	    vector_store(field + parity*offset, x + stride*i, vecTmp);
 	  }
 	}
 
@@ -904,8 +904,7 @@ namespace quda {
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast< RegVector* >(v)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector*>
-	      (ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N)[i*faceVolumeCB[dim]+x] = vecTmp;
+	    vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N, i*faceVolumeCB[dim]+x, vecTmp);
           }
 	}
 

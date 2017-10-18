@@ -338,12 +338,19 @@ void qudaComputeOprod(int prec, int num_terms, double** coeff,
 }
 
 
-void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
+void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
+  void *gauge = arg->site ? arg->site : arg->link;
+  void *mom = arg->site ? arg->site : arg->mom;
+
+  gaugeParam.gauge_offset = arg->link_offset;
+  gaugeParam.mom_offset = arg->mom_offset;
+  gaugeParam.site_size = arg->size;
+  gaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
   if (!invalidate_quda_mom) {
     gaugeParam.use_resident_mom = true;
@@ -353,7 +360,7 @@ void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
     gaugeParam.make_resident_mom = false;
   }
 
-  updateGaugeFieldQuda(link, momentum, eps, 0, 0, &gaugeParam);
+  updateGaugeFieldQuda(gauge, mom, eps, 0, 0, &gaugeParam);
   qudamilc_called<false>(__func__);
   return;
 }
@@ -375,12 +382,17 @@ void qudaRephase(int prec, void *gauge, int flag, double i_mu)
   return;
 }
 
-void qudaUnitarizeSU3(int prec, void *gauge, double tol)
+void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 						QUDA_GENERAL_LINKS);
+
+  void *gauge = arg->site ? arg->site : arg->link;
+  gaugeParam.gauge_offset = arg->link_offset;
+  gaugeParam.site_size = arg->size;
+  gaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
   projectSU3Quda(gauge, tol, &gaugeParam);
   qudamilc_called<false>(__func__);
@@ -475,13 +487,11 @@ static void createGaugeForcePaths(int **paths, int dir, int num_loop_types){
 }
 
 
-
 void qudaGaugeForce( int precision,
 		     int num_loop_types,
 		     double milc_loop_coeff[3],
 		     double eb3,
-		     void* milc_sitelink,
-		     void* milc_momentum )
+		     QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);
 
@@ -503,6 +513,13 @@ void qudaGaugeForce( int precision,
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_SU3_LINKS);
+  void *gauge = arg->site ? arg->site : arg->link;
+  void *mom = arg->site ? arg->site : arg->mom;
+
+  qudaGaugeParam.gauge_offset = arg->link_offset;
+  qudaGaugeParam.mom_offset = arg->mom_offset;
+  qudaGaugeParam.site_size = arg->size;
+  qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
   double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
   int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
@@ -545,12 +562,12 @@ void qudaGaugeForce( int precision,
     // this means we compute momentum into a fresh field, copy it back
     // and sum to current momentum in MILC.  This saves an initial
     // CPU->GPU download of the current momentum.
-    qudaGaugeParam.overwrite_mom = true;
+    qudaGaugeParam.overwrite_mom = false;
   }
 
   int max_length = 6;
 
-  computeGaugeForceQuda(milc_momentum, milc_sitelink,  input_path_buf, length,
+  computeGaugeForceQuda(mom, gauge, input_path_buf, length,
 			loop_coeff, numPaths, max_length, eb3, &qudaGaugeParam);
 
   for(int dir=0; dir<4; ++dir){

@@ -20,7 +20,10 @@ namespace quda {
     compute_fat_link_max(false),
     staggeredPhaseType(u.StaggeredPhase()),
     staggeredPhaseApplied(u.StaggeredPhaseApplied()),
-    i_mu(u.iMu()) { }
+    i_mu(u.iMu()),
+    site_offset(u.SiteOffset()),
+    site_size(u.SiteSize())
+  { }
 
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
@@ -30,7 +33,8 @@ namespace quda {
     order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0),
     create(param.create),
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu),
+    site_offset(param.site_offset), site_size(param.site_size)
   {
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
       errorQuda("nColor must be 3, not %d for this link type", nColor);

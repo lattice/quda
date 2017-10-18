@@ -116,6 +116,9 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(make_resident_mom, 0);
   P(return_result_gauge, 1);
   P(return_result_mom, 1);
+  P(gauge_offset, 0);
+  P(mom_offset, 0);
+  P(site_size, 0);
 #else
   P(overwrite_mom, INVALID_INT);
   P(use_resident_gauge, INVALID_INT);
