@@ -86,28 +86,33 @@ namespace quda {
       if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
 
-      if(isPhase){
-        if(precision == QUDA_DOUBLE_PRECISION){
+      int texel_size = 1;
+      if (isPhase) {
+        if (precision == QUDA_DOUBLE_PRECISION) {
           desc.x = 8*sizeof(int);
           desc.y = 8*sizeof(int);
           desc.z = 0;
           desc.w = 0;
-        }else{
+          texel_size = 2*sizeof(int);
+        } else {
           desc.x = 8*precision;
           desc.y = desc.z = desc.w = 0;
+          texel_size = precision;
         }
-      }else{
+      } else {
         // always four components regardless of precision
         if (precision == QUDA_DOUBLE_PRECISION) {
           desc.x = 8*sizeof(int);
           desc.y = 8*sizeof(int);
           desc.z = 8*sizeof(int);
           desc.w = 8*sizeof(int);
+	  texel_size = 4*sizeof(int);
         } else {
           desc.x = 8*precision;
           desc.y = 8*precision;
           desc.z = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
           desc.w = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision;
+          texel_size = (reconstruct == 18 || reconstruct == 10 ? 2 : 4) * precision;
         }
       }
 
@@ -117,6 +122,11 @@ namespace quda {
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/(!full ? 2 : 1) : (bytes-phase_bytes)/(!full ? 2 : 1);
+
+      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
+      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
+	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
+      }
 
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));

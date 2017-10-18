@@ -291,16 +291,19 @@ namespace quda {
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
       
       // staggered and coarse fields in half and single are always two component
+      int texel_size = 1;
       if ( (nSpin == 1 || nSpin == 2) && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
 	desc.x = 8*precision;
 	desc.y = 8*precision;
 	desc.z = 0;
 	desc.w = 0;
+	texel_size = 2*precision;
       } else { // all others are four component (double2 is spread across int4)
-	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
       }
       
       cudaResourceDesc resDesc;
@@ -314,7 +317,12 @@ namespace quda {
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
-      
+
+      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
+      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
+	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
+      }
+
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
       // create the texture for the norm components
