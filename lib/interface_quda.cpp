@@ -5517,9 +5517,19 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
   cudaColorSpinorField out(in, cudaParam);
   int parity = 0;
 
+
+  double nrmW = 1./(1. + 6*alpha);
+  double alphaW[4];
+
+  // For standard Wuppertal smearing, alphaW and bW need to be
+  // defined as below
+  for(int iw=0;iw<4;iw++) alphaW[iw] = alpha*nrmW;
+  double bW = 8.0*alpha * nrmW;
+  
   for (unsigned int i=0; i<nSteps; i++) {
     if(i) in = out;
-    wuppertalStep(out, in, parity, *precise, alpha);
+    wuppertalStep(out, in, parity, *precise, alphaW, bW);
+    //wuppertalStep(out, in, parity, *precise, alpha);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
