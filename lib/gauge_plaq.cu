@@ -19,8 +19,8 @@ namespace quda {
 #ifdef JITIFY
   using namespace jitify;
   using namespace jitify::reflection;
-  static KernelCache kernel_cache;
-  static Program program = kernel_cache.program("/home/kate/github/quda-multireduce/lib/gauge_plaq.cuh", 0, {"-std=c++11"});
+  static JitCache kernel_cache;
+  static Program program = kernel_cache.program("/home/kate/github/quda/lib/gauge_plaq.cuh", 0, {"-std=c++11"});
 #endif
 
   template<typename Float, typename Gauge>
@@ -52,7 +52,7 @@ namespace quda {
 #ifdef JITIFY
 
 #if 1
-	jitify_error = (tp.block.x*tp.block.y*tp.block.z > deviceProp.maxThreadsPerBlock) ?
+	jitify_error = (tp.block.x*tp.block.y*tp.block.z > (unsigned)deviceProp.maxThreadsPerBlock) ?
 	  CUDA_ERROR_LAUNCH_FAILED  : program.kernel("quda::computePlaq")
 	  .instantiate((int)tp.block.x,Type<Float>(),Type<Gauge>())
 	  .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
@@ -60,7 +60,7 @@ namespace quda {
 	// use TunableVectorY for this
 	// experiment with splitting spatial / temporal components across z blocks
 	tp.block.z = 1; tp.grid.z = 2;
-	jitify_error = (tp.block.x*tp.block.y*tp.block.z > deviceProp.maxThreadsPerBlock) ?
+	jitify_error = (tp.block.x*tp.block.y*tp.block.z > (unsigned)deviceProp.maxThreadsPerBlock) ?
 	  CUDA_ERROR_LAUNCH_FAILED  : program.kernel("quda::computePlaq2")
 	  .instantiate((int)tp.block.x,(int)tp.block.y,Type<Float>(),Type<Gauge>())
 	  .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
