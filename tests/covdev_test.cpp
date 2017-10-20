@@ -76,6 +76,8 @@ extern int Nsrc; // number of spinors to apply to simultaneously
 
 GaugeCovDev* dirac;
 
+const int nColor = 3;
+
 void init()
 {    
 
@@ -142,7 +144,7 @@ void init()
   inv_param.sp_pad = tmpint;
 
   ColorSpinorParam csParam;
-  csParam.nColor=3;
+  csParam.nColor=nColor;
   csParam.nSpin=4;
   csParam.nDim=4;
   for(int d = 0; d < 4; d++) {
@@ -352,9 +354,6 @@ static int dslashTest()
       }
       printfQuda("Executing %d kernel loops...", niter);
 
-      // reset flop counter
-      dirac->Flops();
-
       double secs = dslashCUDA(niter, muCuda);
 
       if (!transfer) *spinorOut = *cudaSpinorOut;
@@ -362,7 +361,7 @@ static int dslashTest()
       printfQuda("\n%fms per loop\n", 1000*secs);
       covdevRef(muCpu);
 
-      unsigned long long flops = dirac->Flops();
+      unsigned long long flops = niter * 8*nColor*nColor*2*(long long)cudaSpinor->VolumeCB();
       printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
       printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
 		 1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
