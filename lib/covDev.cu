@@ -11,6 +11,8 @@
 
 namespace quda {
 
+#ifdef GPU_CONTRACT
+
   /**
      @brief Parameter structure for driving the covariant derivative
    */
@@ -164,7 +166,6 @@ namespace quda {
     }
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / arg.nParity; }
 
   public:
     CovDev(Arg &arg, const ColorSpinorField &meta) : TunableVectorY(arg.nParity), arg(arg), meta(meta)
@@ -247,11 +248,14 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
+#endif // GPU_CONTRACT
+
   //Apply the covariant derivative operator
   //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu)		    
   {
+#ifdef GPU_CONTRACT
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
@@ -274,7 +278,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+#else
+    errorQuda("Contraction kernels have not been built");
+#endif
   }
-
 
 } // namespace quda

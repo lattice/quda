@@ -13,3 +13,6 @@ profile.tsv
 config.log
 CMakeCache.txt
 CMakeFiles
+externals
+.tags*
+

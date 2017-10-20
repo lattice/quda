@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include <quda_internal.h>
-#include "face_quda.h"
 #include <complex>
 
 #define XUP 0

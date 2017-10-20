@@ -130,6 +130,28 @@ namespace quda {
     }
 
     /**
+     * @brief For reason this can't be queried from the device properties, so
+     * here we set set this.  Based on Table 14 of the CUDA
+     * Programming Guide 9.0 (Technical Specifications per Compute Capability)
+     * @return The maximum number of simultaneously resident blocks per SM
+     */
+    unsigned int maxBlocksPerSM() const {
+      switch (deviceProp.major) {
+      case 2:
+	return 8;
+      case 3:
+	return 16;
+      case 5:
+      case 6:
+      case 7:
+	return 32;
+      default:
+	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
+	return 0;
+      }
+    }
+
+    /**
      * The goal here is to throttle the number of thread blocks per SM by over-allocating shared memory (in order to improve
      * L2 utilization, etc.).  Note that:
      * - On Fermi/Kepler, requesting greater than 16 KB will switch the cache config, so we restrict ourselves to 16 KB for now.
@@ -140,7 +162,7 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
 	const int max_shared = deviceProp.sharedMemPerBlock;
-	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), 8u);
+	const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);

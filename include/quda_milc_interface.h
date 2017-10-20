@@ -30,6 +30,33 @@ extern "C" {
     QudaInverterType solver_type; /** Type of solver to use */
   } QudaInvertArgs_t;
 
+  /**
+   * Parameters related to deflated solvers.
+   */
+
+  typedef struct {
+    QudaPrecision  prec_ritz;
+    int nev;
+    int max_search_dim;
+    int deflation_grid;
+    double tol_restart;
+
+    int eigcg_max_restarts;
+    int max_restart_num;
+    double inc_tol;
+    double eigenval_tol;
+
+    QudaExtLibType   solver_ext_lib;
+    QudaExtLibType   deflation_ext_lib;
+
+    QudaFieldLocation location_ritz;
+    QudaMemoryType    mem_type_ritz;
+
+    char *vec_infile;
+    char *vec_outfile;
+
+  } QudaEigArgs_t;
+
 
   /**
    * Parameters related to problem size and machine topology.
@@ -150,6 +177,29 @@ extern "C" {
 
 
   /**
+   * Apply the improved staggered operator to a field. All fields
+   * passed and returned are host (CPU) field in MILC order.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param inv_args Struct setting some solver metadata
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param tadpole Tadpole improvement facter
+   * @param source Right-hand side source field
+   * @param solution Solution spinor field
+   */
+  void qudaDslash(int external_precision,
+		  int quda_precision,
+		  QudaInvertArgs_t inv_args,
+		  const void* const milc_fatlink,
+		  const void* const milc_longlink,
+		  const double tadpole,
+		  void* source,
+		  void* solution,
+		  int* num_iters);
+
+  /**
    * Solve Ax=b using an improved staggered operator with a
    * domain-decomposition preconditioner.  All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
@@ -159,7 +209,7 @@ extern "C" {
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param mass Fermion mass parameter
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
    * @param domain_overlap Array specifying the overlap of the domains in each dimension
@@ -189,8 +239,7 @@ extern "C" {
 
 
   /**
-   * Solve Ax=b using an improved staggered operator with a
-   * domain-decomposition preconditioner.  All fields are fields
+   * Solve Ax=b for an improved staggered operator. All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
    * function requires that persistent gauge and clover fields have
    * been created prior.  This interface is experimental.
@@ -198,10 +247,9 @@ extern "C" {
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param mass Fermion mass parameter
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
-   * @param domain_overlap Array specifying the overlap of the domains in each dimension
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
    * @param tadpole Tadpole improvement facter
@@ -226,60 +274,43 @@ extern "C" {
 		  double* const final_rel_resid,
 		  int* num_iters);
 
-      void qudaInvertMsrc(int external_precision,
-          int quda_precision,
-          double mass,
-          QudaInvertArgs_t inv_args,
-          double target_residual,
-          double target_fermilab_residual,
-          const void* const fatlink,
-          const void* const longlink,
-          const double tadpole,
-          void** sourceArray,
-          void** solutionArray,
-          double* const final_residual,
-          double* const final_fermilab_residual,
-          int* num_iters,
-          int num_src);
-
- /**
-   * Solve  using an improved
-   * staggered operator with a domain-decomposition preconditioner.
-   * All fields are fields passed and returned are host (CPU) field in
-   * MILC order.  This function requires that persistent gauge and
-   * clover fields have been created prior.  When a pure
-   * double-precision solver is requested no reliable updates are
-   * used, else reliable updates are used with a reliable_delta
-   * parameter of 0.1.  This interface is experimental.
+  /**
+   * Solve Ax=b for an improved staggered operator with many right hand sides. 
+   * All fields are fields passed and returned are host (CPU) field in MILC order.
+   * This function requires that persistent gauge and clover fields have
+   * been created prior.  This interface is experimental.
    *
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
-   * @param precision Precision for QUDA to use (2 - double, 1 - single)
-   * @param inv_args Struct setting some solver metedata
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param mass Fermion mass parameter
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
-   * @param domain_overlap Array specifying the overlap of the domains in each dimension
-   * @param fatlink Fat-link field on the host
-   * @param longlink Long-link field on the host
-   * @param source Right-hand side source field
-   * @param solution Solution spinor field
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param tadpole Tadpole improvement facter
+   * @param source array of right-hand side source fields
+   * @param solution array of solution spinor fields
    * @param final_residual True residual
    * @param final_relative_residual True Fermilab residual
    * @param num_iters Number of iterations taken
+   * @param num_src Number of source fields
    */
-  void qudaDDInvert(int external_precision,
-		    int quda_precision,
-		    double mass,
-		    QudaInvertArgs_t inv_args,
-		    double target_residual,
-		    double target_fermilab_residual,
-		    const int * const domain_overlap,
-		    const void* const fatlink,
-		    const void* const longlink,
-		    void* source,
-		    void* solution,
-		    double* const final_residual,
-		    double* const final_fermilab_residual,
-		    int* num_iters);
+  void qudaInvertMsrc(int external_precision,
+                      int quda_precision,
+                      double mass,
+                      QudaInvertArgs_t inv_args,
+                      double target_residual,
+                      double target_fermilab_residual,
+                      const void* const fatlink,
+                      const void* const longlink,
+                      const double tadpole,
+                      void** sourceArray,
+                      void** solutionArray,
+                      double* const final_residual,
+                      double* const final_fermilab_residual,
+                      int* num_iters,
+                      int num_src);
 
   /**
    * Solve for multiple shifts (e.g., masses) using an improved
@@ -294,7 +325,7 @@ extern "C" {
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param num_offsets Number of shifts to solve for
    * @param offset Array of shift offset values
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
@@ -337,7 +368,7 @@ extern "C" {
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param num_offsets Number of shifts to solve for
    * @param offset Array of shift offset values
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
@@ -345,20 +376,13 @@ extern "C" {
    * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solution Array of solution spinor fields
-   * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
-   * @param vec_infile input file location 
-   * @param vec_outfile output file location
-   * @param max_search_dim eigCG parameter: search space dimention
-   * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
-   * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
-   * @param tol_restart initCG parameter : at what tolerance value to restart initCG solver
+   * @param eig_args contains info about deflation space
    * @param rhs_idx  bookkeep current rhs
    * @param last_rhs_flag  is this the last rhs to solve?
    * @param final_residual Array of true residuals
    * @param final_relative_residual Array of true Fermilab residuals
    * @param num_iters Number of iterations taken
    */
-
   void qudaEigCGInvert(
       int external_precision,
       int quda_precision,
@@ -371,13 +395,7 @@ extern "C" {
       const double tadpole,
       void* source,
       void* solution,
-      int ritz_prec,
-      char vec_infile[],
-      char vec_outfile[],
-      const int max_search_dim,
-      const int nev,
-      const int deflation_grid,
-      double tol_restart,//e.g.: 5e+3*target_residual
+      QudaEigArgs_t eig_args,
       const int rhs_idx,//current rhs
       const int last_rhs_flag,//is this the last rhs to solve?
       double* const final_residual,
@@ -394,7 +412,7 @@ extern "C" {
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param milc_link Gauge field on the host
    * @param milc_clover Clover field on the host
@@ -435,7 +453,7 @@ extern "C" {
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param milc_link Gauge field on the host
    * @param milc_clover Clover field on the host
@@ -443,21 +461,13 @@ extern "C" {
    * @param clover_coeff Clover coefficient
    * @param source Right-hand side source field
    * @param solution Solution spinor field
-   * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
-   * @param vec_infile input file location 
-   * @param vec_outfile output file location
-   * @param max_search_dim eigCG parameter: search space dimention
-   * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
-   * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
-   * @param tol_restart initCG parameter : at what tolerance value to restart initCG solver
+   * @param eig_args contains info about deflation space
    * @param rhs_idx  bookkeep current rhs
    * @param last_rhs_flag  is this the last rhs to solve?
    * @param final_residual Array of true residuals
    * @param final_relative_residual Array of true Fermilab residuals
    * @param num_iters Number of iterations taken
    */
-
-
   void qudaEigCGCloverInvert(
       int external_precision,
       int quda_precision,
@@ -471,13 +481,7 @@ extern "C" {
       void* milc_clover_inv,
       void* source,
       void* solution,
-      int ritz_prec,
-      char vec_infile[],
-      char vec_outfile[],
-      const int max_search_dim,
-      const int nev,
-      const int deflation_grid,
-      double tol_restart,//e.g.: 5e+3*target_residual
+      QudaEigArgs_t eig_args,
       const int rhs_idx,//current rhs
       const int last_rhs_flag,//is this the last rhs to solve?
       double* const final_residual,
@@ -552,7 +556,7 @@ extern "C" {
    * @param offset Array of shift offset values
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param milc_link Ignored
    * @param milc_clover Ignored

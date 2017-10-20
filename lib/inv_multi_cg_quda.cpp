@@ -8,7 +8,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <face_quda.h>
 
 /*!
  * Generic Multi Shift Solver 

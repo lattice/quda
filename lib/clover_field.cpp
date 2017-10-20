@@ -20,8 +20,10 @@ namespace quda {
       norm(NULL),
       cloverInv(NULL),
       invNorm(NULL),
+      csw(a.Csw()),
       twisted(a.Twisted()),
       mu2(a.Mu2()),
+      rho(a.Rho()),
       order(a.Order()),
       create(QUDA_NULL_FIELD_CREATE)
       {
@@ -34,8 +36,8 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), order(param.order), create(param.create),
-    trlog(static_cast<double*>(pinned_malloc(2*sizeof(double))))
+    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
+    order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -56,9 +58,7 @@ namespace quda {
     mu2 = 0.0; //param.mu2;
   }
   
-  CloverField::~CloverField() {
-    host_free(trlog);
-  }
+  CloverField::~CloverField() { }
 
   bool CloverField::isNative() const {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -68,6 +68,11 @@ namespace quda {
       if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
     }
     return false;
+  }
+
+  void CloverField::setRho(double rho_)
+  {
+    rho = rho_;
   }
 
   cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
@@ -130,7 +135,7 @@ namespace quda {
 	evenNorm = evenInvNorm;
 	oddNorm = oddInvNorm;
       }
-    } 
+    }
 
     if (!param.inverse) {
       cloverInv = clover;
@@ -142,11 +147,14 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    createTexObject(evenTex, evenNormTex, even, evenNorm);
-    createTexObject(oddTex, oddNormTex, odd, oddNorm);
+    createTexObject(tex, normTex, clover, norm, true);
+    createTexObject(invTex, invNormTex, cloverInv, invNorm, true);
 
-    createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm);
-    createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm);
+    createTexObject(evenTex, evenNormTex, even, evenNorm, false);
+    createTexObject(oddTex, oddNormTex, odd, oddNorm, false);
+
+    createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm, false);
+    createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm, false);
 #endif
     twisted = param.twisted;
     mu2 = param.mu2;
@@ -155,7 +163,7 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
   void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
-					void *field, void *norm) {
+					void *field, void *norm, bool full) {
     if (isNative()) {
       // create the texture for the field components
       
@@ -175,7 +183,7 @@ namespace quda {
       resDesc.resType = cudaResourceTypeLinear;
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = bytes/2;
+      resDesc.res.linear.sizeInBytes = bytes/(!full ? 2 : 1);
       
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
@@ -197,7 +205,7 @@ namespace quda {
 	resDesc.resType = cudaResourceTypeLinear;
 	resDesc.res.linear.devPtr = norm;
 	resDesc.res.linear.desc = desc;
-	resDesc.res.linear.sizeInBytes = norm_bytes/2;
+	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
 	
 	cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
@@ -347,7 +355,6 @@ namespace quda {
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
 
     if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-      //printfQuda("Allocating clover field of size %lu with precision %lu\n", bytes, precision);
       if(order != QUDA_PACKED_CLOVER_ORDER) {errorQuda("cpuCloverField only supports QUDA_PACKED_CLOVER_ORDER");}
       clover = (void *) safe_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) norm = (void *) safe_malloc(norm_bytes);
@@ -393,8 +400,10 @@ namespace quda {
     output << "norm = "      << param.norm << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "invNorm = "   << param.invNorm << std::endl;
+    output << "csw = "       << param.csw << std::endl;
     output << "twisted = "   << param.twisted << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
+    output << "rho = "       << param.rho << std::endl;
     output << "order = "     << param.order << std::endl;
     output << "create = "    << param.create << std::endl;
     return output;  // for multiple << operators.
