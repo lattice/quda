@@ -264,27 +264,32 @@ void covdev_dslash_mg4dir(cpuColorSpinorField* out, void **link, void** ghostLin
 template <typename sFloat, typename gFloat>
 void Mat_mg4dir(cpuColorSpinorField *out, gFloat **link, gFloat **ghostLink, cpuColorSpinorField *in, int daggerBit, int mu) 
 {
-  sFloat *inEven  = static_cast<sFloat*>(in->V());
-  sFloat *inOdd   = static_cast<sFloat*>(in->V())  + Vh*mySpinorSiteSize;
-  sFloat *outEven = static_cast<sFloat*>(out->V());
-  sFloat *outOdd  = static_cast<sFloat*>(out->V()) + Vh*mySpinorSiteSize;
+  const int nFace = 1;
+  {
+    cpuColorSpinorField &inEven = static_cast<cpuColorSpinorField&>(in->Even());
+    cpuColorSpinorField &outOdd  = static_cast<cpuColorSpinorField&>(out->Odd());
 
-  int nFace = 1;
+    inEven.exchangeGhost(QUDA_EVEN_PARITY, nFace, daggerBit);
 
-  in->exchangeGhost(QUDA_ODD_PARITY, nFace, daggerBit);
+    covdevReference_mg4dir(reinterpret_cast<sFloat*>(outOdd.V()), link, ghostLink,
+			   reinterpret_cast<sFloat*>(inEven.V()),
+			   reinterpret_cast<sFloat**>(inEven.fwdGhostFaceBuffer),
+			   reinterpret_cast<sFloat**>(inEven.backGhostFaceBuffer),
+			   1, daggerBit, mu);
+  }
 
-  void **fwd_nbr_spinor  = in->fwdGhostFaceBuffer;
-  void **back_nbr_spinor = in->backGhostFaceBuffer;
-    
-  covdevReference_mg4dir(outOdd,  link, ghostLink, inEven, (sFloat**) fwd_nbr_spinor, (sFloat**) back_nbr_spinor, 1, daggerBit, mu);
+  {
+    cpuColorSpinorField &inOdd  = static_cast<cpuColorSpinorField&>(in->Odd());
+    cpuColorSpinorField &outEven = static_cast<cpuColorSpinorField&>(out->Even());
 
-  in->exchangeGhost(QUDA_EVEN_PARITY, nFace, daggerBit);
+    inOdd.exchangeGhost(QUDA_ODD_PARITY, nFace, daggerBit);
 
-  // I guess I can remove these two
-//  fwd_nbr_spinor  = in->fwdGhostFaceBuffer;
-//  back_nbr_spinor = in->backGhostFaceBuffer;
-    
-  covdevReference_mg4dir(outEven, link, ghostLink, inOdd,  (sFloat**) fwd_nbr_spinor, (sFloat**) back_nbr_spinor,  0, daggerBit, mu);
+    covdevReference_mg4dir(reinterpret_cast<sFloat*>(outEven.V()), link, ghostLink,
+			   reinterpret_cast<sFloat*>(inOdd.V()),
+			   reinterpret_cast<sFloat**>(inOdd.fwdGhostFaceBuffer),
+			   reinterpret_cast<sFloat**>(inOdd.backGhostFaceBuffer),
+			   0, daggerBit, mu);
+  }
 }
 
 
