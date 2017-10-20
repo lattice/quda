@@ -202,12 +202,11 @@ namespace quda {
     };
 
     template<int nSpin, int nColor, int nVec, int N>
-      __device__ __host__ inline int indexFloatN(int parity, int x_cb, int s, int c, int v, int stride, int offset_cb) {
-      int j = (((s*nColor+c)*nVec+v)*2) / N; // factor of two for complexity
-      int i = (((s*nColor+c)*nVec+v)*2) % N;      
-      int index = ((j*stride+x_cb)*2+i) / 2; // back to a complex offset
-      index += parity*offset_cb;
-      return index;
+      __device__ __host__ inline int indexFloatN(int x_cb, int s, int c, int v, int stride) {
+      int k = ((s*nColor+c)*nVec+v)*2; // factor of two for complexity
+      int j = k / N; // factor of two for complexity
+      int i = k % N;      
+      return ((j*stride+x_cb)*N+i) / 2; // back to a complex offset
     };
 
     template<typename Float, int nSpin, int nColor, int nVec> 
@@ -232,6 +231,30 @@ namespace quda {
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((s*nColor+c)*nVec+v)*faceVolumeCB[dim] + x_cb; }
+    };
+
+    template<typename Float, int nSpin, int nColor, int nVec> 
+      struct AccessorCB<Float,nSpin,nColor,nVec,QUDA_FLOAT4_FIELD_ORDER> { 
+      const int stride;
+      const int offset_cb;
+    AccessorCB(const ColorSpinorField &field): stride(field.Stride()), 
+	offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
+      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const 
+      { return parity*offset_cb + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, stride); }
+    };
+
+    template<typename Float, int nSpin, int nColor, int nVec>
+      struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_FLOAT4_FIELD_ORDER> {
+      int faceVolumeCB[4];
+      int ghostOffset[4];
+      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
+	for (int d=0; d<4; d++) {
+	  faceVolumeCB[d] = nFace*a.SurfaceCB(d);
+	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
+	}
+      }
+      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]); }
     };
 
 
