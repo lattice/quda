@@ -118,6 +118,10 @@ namespace quda {
     case 1: applyCovDev<Float,nDim,nColor,1>(out, arg, x_cb, parity); break;
     case 2: applyCovDev<Float,nDim,nColor,2>(out, arg, x_cb, parity); break;
     case 3: applyCovDev<Float,nDim,nColor,3>(out, arg, x_cb, parity); break;
+    case 4: applyCovDev<Float,nDim,nColor,4>(out, arg, x_cb, parity); break;
+    case 5: applyCovDev<Float,nDim,nColor,5>(out, arg, x_cb, parity); break;
+    case 6: applyCovDev<Float,nDim,nColor,6>(out, arg, x_cb, parity); break;
+    case 7: applyCovDev<Float,nDim,nColor,7>(out, arg, x_cb, parity); break;
     }
     arg.out(x_cb, parity) = out;
   }
