@@ -574,11 +574,13 @@ namespace quda {
     Reconstruct(const Reconstruct<N,Float> &recon) { }
 
       __device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx ) const {
+#pragma unroll
 	for (int i=0; i<N; i++) out[i] = in[i];
       }
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir,
 					       const RegType phase, const I *X, const int *R) const {
+#pragma unroll
 	for (int i=0; i<N; i++) out[i] = in[i];
       }
       __device__ __host__ inline RegType getPhase(const RegType in[N]) const { return 0; }
@@ -594,11 +596,13 @@ namespace quda {
     Reconstruct(const Reconstruct<19,Float> &recon) : scale(recon.scale) { }
 
       __device__ __host__ inline void Pack(RegType out[18], const RegType in[18], int idx) const {
+#pragma unroll
 	for (int i=0; i<18; i++) out[i] = in[i] / scale;
       }
       template<typename I>
       __device__ __host__ inline void Unpack(RegType out[18], const RegType in[18], int idx, int dir,
 					     const RegType phase, const I *X, const int *R) const {
+#pragma unroll
 	for (int i=0; i<18; i++) out[i] = scale * in[i];
       }
       __device__ __host__ inline RegType getPhase(const RegType in[18]) const { return 0; }
@@ -672,6 +676,7 @@ namespace quda {
 	  isLastTimeSlice(recon.isLastTimeSlice), ghostExchange(recon.ghostExchange) { }
 
 	__device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
+#pragma unroll
 	  for (int i=0; i<12; i++) out[i] = in[i];
 	}
 
@@ -684,6 +689,7 @@ namespace quda {
 	  const RegType u0 = dir < 3 ? anisotropy :
 	    timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
+#pragma unroll
 	  for(int i=0; i<6; ++i) Out[i] = In[i];
 
 	  Out[6] = u0*conj(Out[1]*Out[5] - Out[2]*Out[4]);
@@ -703,6 +709,7 @@ namespace quda {
 	Reconstruct(const Reconstruct<11,Float> &recon) { }
 
 	__device__ __host__ inline void Pack(RegType out[10], const RegType in[18], int idx) const {
+#pragma unroll
 	  for (int i=0; i<4; i++) out[i] = in[i+2];
 	  out[4] = in[10];
 	  out[5] = in[11];
@@ -717,6 +724,7 @@ namespace quda {
 					       const RegType phase, const I *X, const int *R) const {
 	  out[0] = 0.0;
 	  out[1] = in[6];
+#pragma unroll
 	  for (int i=0; i<4; i++) out[i+2] = in[i];
 	  out[6] = -out[2];
 	  out[7] =  out[3];
@@ -758,6 +766,7 @@ namespace quda {
 	Complex *Out = reinterpret_cast<Complex*>(out);
 	const RegType coeff = static_cast<RegType>(1.0)/scale;
 
+#pragma unroll
 	for(int i=0; i<6; ++i) Out[i] = In[i];
 
 	Out[6] = coeff*conj(Out[1]*Out[5] - Out[2]*Out[4]);
@@ -783,6 +792,7 @@ namespace quda {
 	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
 #else // phase from determinant
 	Matrix<Complex,3> a;
+#pragma unroll
 	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
 	const Complex det = getDeterminant( a );
 	RegType phase = arg(det)/3;
@@ -815,6 +825,7 @@ namespace quda {
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
       out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
       out[1] = Trig<isHalf<Float>::value,RegType>::Atan2(in[13], in[12]);
+#pragma unroll
       for (int i=2; i<8; i++) out[i] = in[i];
     }
 
@@ -885,6 +896,7 @@ namespace quda {
 	RegType phase = arg(expI3Phase)/static_cast<RegType>(3.0);
 #else // phase from determinant
 	Matrix<Complex,3> a;
+#pragma unroll
 	for (int i=0; i<9; i++) a(i) = Complex(in[2*i]/scale, in[2*i+1]/scale);
 	const Complex det = getDeterminant( a );
 	RegType phase = arg(det)/3;
@@ -899,6 +911,7 @@ namespace quda {
 	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
 	Complex su3[9];
+#pragma unroll
 	for (int i=0; i<9; i++) su3[i] = z * reinterpret_cast<const Complex*>(in)[i];
 	reconstruct_8.Pack(out, reinterpret_cast<RegType*>(su3), idx);
       }
@@ -910,6 +923,7 @@ namespace quda {
 	RegType cos_sin[2];
 	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
+#pragma unroll
 	for (int i=0; i<9; i++) reinterpret_cast<Complex*>(out)[i] *= z;
       }
 
@@ -1038,6 +1052,7 @@ namespace quda {
 	    ( dir == 1 && ((coords[0] - R[0] + coords[3] - R[3]) & 1) != 0) ||
 	    ( dir == 2 && ((coords[0] - R[0] + coords[1] - R[1] + coords[3] - R[3]) & 1) != 0) ? -1.0 : 1.0;
 
+#pragma unroll
 	  for (int i=12; i<18; i++) v[i] *= sign;
 	}
       }
@@ -1386,6 +1401,37 @@ namespace quda {
 #endif
       }
 
+      /**
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_wrapper<Float,QDPOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) {
+	return gauge_wrapper<Float,QDPOrder<Float,length> >(*this, dim, x_cb, parity);
+      }
+
+      /**
+	 @brief This accessor routine returns a const gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline const gauge_wrapper<Float,QDPOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) const {
+	return gauge_wrapper<Float,QDPOrder<Float,length> >
+	(const_cast<QDPOrder<Float,length>&>(*this), dim, x_cb, parity);
+      }
+
       size_t Bytes() const { return length * sizeof(Float); }
     };
 
@@ -1419,6 +1465,37 @@ namespace quda {
 	  int rolcol = i/2;
 	  gauge[dir][((z*(length/2) + rolcol)*2 + parity)*volumeCB + x] = (Float)v[i];
 	}
+      }
+
+      /**
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_wrapper<Float,QDPJITOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) {
+	return gauge_wrapper<Float,QDPJITOrder<Float,length> >(*this, dim, x_cb, parity);
+      }
+
+      /**
+	 @brief This accessor routine returns a const gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline const gauge_wrapper<Float,QDPJITOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) const {
+	return gauge_wrapper<Float,QDPJITOrder<Float,length> >
+	(const_cast<QDPJITOrder<Float,length>&>(*this), dim, x_cb, parity);
       }
 
       size_t Bytes() const { return length * sizeof(Float); }
@@ -1466,6 +1543,37 @@ namespace quda {
 	gauge[((parity*volumeCB+x)*geometry + dir)*length + i] = (Float)v[i];
       }
 #endif
+    }
+
+    /**
+       @brief This accessor routine returns a gauge_wrapper to this object,
+       allowing us to overload various operators for manipulating at
+       the site level interms of matrix operations.
+       @param[in] dir Which dimension are we requesting
+       @param[in] x_cb Checkerboarded space-time index we are requesting
+       @param[in] parity Parity we are requesting
+       @return Instance of a gauge_wrapper that curries in access to
+       this field at the above coordinates.
+    */
+    __device__ __host__ inline gauge_wrapper<Float,MILCOrder<Float,length> >
+      operator()(int dim, int x_cb, int parity) {
+      return gauge_wrapper<Float,MILCOrder<Float,length> >(*this, dim, x_cb, parity);
+    }
+
+    /**
+       @brief This accessor routine returns a const gauge_wrapper to this object,
+       allowing us to overload various operators for manipulating at
+       the site level interms of matrix operations.
+       @param[in] dir Which dimension are we requesting
+       @param[in] x_cb Checkerboarded space-time index we are requesting
+       @param[in] parity Parity we are requesting
+       @return Instance of a gauge_wrapper that curries in access to
+       this field at the above coordinates.
+    */
+    __device__ __host__ inline const gauge_wrapper<Float,MILCOrder<Float,length> >
+      operator()(int dim, int x_cb, int parity) const {
+      return gauge_wrapper<Float,MILCOrder<Float,length> >
+	(const_cast<MILCOrder<Float,length>&>(*this), dim, x_cb, parity);
     }
 
     size_t Bytes() const { return length * sizeof(Float); }
@@ -1534,6 +1642,37 @@ namespace quda {
 	}
       }
 #endif
+    }
+
+    /**
+       @brief This accessor routine returns a gauge_wrapper to this object,
+       allowing us to overload various operators for manipulating at
+       the site level interms of matrix operations.
+       @param[in] dir Which dimension are we requesting
+       @param[in] x_cb Checkerboarded space-time index we are requesting
+       @param[in] parity Parity we are requesting
+       @return Instance of a gauge_wrapper that curries in access to
+       this field at the above coordinates.
+    */
+    __device__ __host__ inline gauge_wrapper<Float,CPSOrder<Float,length> >
+      operator()(int dim, int x_cb, int parity) {
+      return gauge_wrapper<Float,CPSOrder<Float,length> >(*this, dim, x_cb, parity);
+    }
+
+    /**
+       @brief This accessor routine returns a const gauge_wrapper to this object,
+       allowing us to overload various operators for manipulating at
+       the site level interms of matrix operations.
+       @param[in] dir Which dimension are we requesting
+       @param[in] x_cb Checkerboarded space-time index we are requesting
+       @param[in] parity Parity we are requesting
+       @return Instance of a gauge_wrapper that curries in access to
+       this field at the above coordinates.
+    */
+    __device__ __host__ inline const gauge_wrapper<Float,CPSOrder<Float,length> >
+      operator()(int dim, int x_cb, int parity) const {
+      return gauge_wrapper<Float,CPSOrder<Float,length> >
+	(const_cast<CPSOrder<Float,length>&>(*this), dim, x_cb, parity);
     }
 
     size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1608,6 +1747,37 @@ namespace quda {
 #endif
       }
 
+      /**
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_wrapper<Float,BQCDOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) {
+	return gauge_wrapper<Float,BQCDOrder<Float,length> >(*this, dim, x_cb, parity);
+      }
+
+      /**
+	 @brief This accessor routine returns a const gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline const gauge_wrapper<Float,BQCDOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) const {
+	return gauge_wrapper<Float,BQCDOrder<Float,length> >
+	(const_cast<BQCDOrder<Float,length>&>(*this), dim, x_cb, parity);
+      }
+
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
     };
 
@@ -1673,6 +1843,37 @@ namespace quda {
 	  }
 	}
 #endif
+      }
+
+      /**
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_wrapper<Float,TIFROrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) {
+	return gauge_wrapper<Float,TIFROrder<Float,length> >(*this, dim, x_cb, parity);
+      }
+
+      /**
+	 @brief This accessor routine returns a const gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline const gauge_wrapper<Float,TIFROrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) const {
+	return gauge_wrapper<Float,TIFROrder<Float,length> >
+	(const_cast<TIFROrder<Float,length>&>(*this), dim, x_cb, parity);
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -1774,6 +1975,37 @@ namespace quda {
 #endif
       }
 
+      /**
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline gauge_wrapper<Float,TIFRPaddedOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) {
+	return gauge_wrapper<Float,TIFRPaddedOrder<Float,length> >(*this, dim, x_cb, parity);
+      }
+
+      /**
+	 @brief This accessor routine returns a const gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
+       */
+      __device__ __host__ inline const gauge_wrapper<Float,TIFRPaddedOrder<Float,length> >
+	   operator()(int dim, int x_cb, int parity) const {
+	return gauge_wrapper<Float,TIFRPaddedOrder<Float,length> >
+	(const_cast<TIFRPaddedOrder<Float,length>&>(*this), dim, x_cb, parity);
+      }
+
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
     };
 
@@ -1805,6 +2037,11 @@ namespace quda {
 
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDPJIT_GAUGE_ORDER,Nc> { typedef gauge::QDPJITOrder<T, 2*Nc*Nc> type; };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_MILC_GAUGE_ORDER,Nc> { typedef gauge::MILCOrder<T, 2*Nc*Nc> type; };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_BQCD_GAUGE_ORDER,Nc> { typedef gauge::BQCDOrder<T, 2*Nc*Nc> type; };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_GAUGE_ORDER,Nc> { typedef gauge::TIFROrder<T, 2*Nc*Nc> type; };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> { typedef gauge::TIFRPaddedOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
 
   // experiments in reducing template instantation boilerplate

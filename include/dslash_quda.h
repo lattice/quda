@@ -3,7 +3,6 @@
 
 #include <quda_internal.h>
 #include <tune_quda.h>
-#include <face_quda.h>
 #include <gauge_field.h>
 
 #include <worker.h>

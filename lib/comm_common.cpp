@@ -477,3 +477,29 @@ bool comm_gdr_enabled() {
 #endif
   return gdr_enabled;
 }
+
+static bool globalReduce = true;
+static bool asyncReduce = false;
+
+void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
+
+void reduceDouble(double &sum) { if (globalReduce) comm_allreduce(&sum); }
+
+void reduceDoubleArray(double *sum, const int len)
+{ if (globalReduce) comm_allreduce_array(sum, len); }
+
+int commDim(int dir) { return comm_dim(dir); }
+
+int commCoords(int dir) { return comm_coord(dir); }
+
+int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
+
+void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+bool commGlobalReduction() { return globalReduce; }
+
+void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduction; }
+
+bool commAsyncReduction() { return asyncReduce; }
+
+void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }

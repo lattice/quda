@@ -13,10 +13,10 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-
-//for twisted mass only:
+    double csw;  //! Clover coefficient
     bool twisted; // whether to create twisted mass clover
     double mu2;
+    double rho;
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
@@ -28,13 +28,13 @@ namespace quda {
 
     CloverFieldParam() :  LatticeFieldParam(),
       direct(true), inverse(true), clover(nullptr), norm(nullptr),
-      cloverInv(nullptr), invNorm(nullptr), twisted(false), mu2(0.0) { }
+      cloverInv(nullptr), invNorm(nullptr), twisted(false), mu2(0.0), rho(0.0) { }
 
     CloverFieldParam(const CloverFieldParam &param) :  LatticeFieldParam(param),
       direct(param.direct), inverse(param.inverse),
       clover(param.clover), norm(param.norm),
       cloverInv(param.cloverInv), invNorm(param.invNorm),
-      twisted(param.twisted), mu2(param.mu2) { }
+      twisted(param.twisted), mu2(param.mu2), rho(param.rho) { }
 
     CloverFieldParam(const CloverField &field);
   };
@@ -56,13 +56,15 @@ namespace quda {
     void *cloverInv;
     void *invNorm;
 
+    double csw;
     bool twisted; 
     double mu2;
+    double rho;
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    double *trlog;
+    mutable double trlog[2];
 
   public:
     CloverField(const CloverFieldParam &param);
@@ -74,19 +76,57 @@ namespace quda {
     const void* Norm(bool inverse=false) const { return inverse ? invNorm : norm; }
 
     /**
-       This function returns true if the field is stored in an
-       internal field order for the given precision.
+       @return True if the field is stored in an internal field order
+       for the given precision.
     */
     bool isNative() const;
 
+    /**
+       @return Pointer to array storing trlog on each parity
+    */
     double* TrLog() const { return trlog; }
     
+    /**
+       @return The order of the field
+     */
     QudaCloverFieldOrder Order() const { return order; }
+
+    /**
+       @return The size of the fieldallocation
+     */
     size_t Bytes() const { return bytes; }
+
+    /**
+       @return The size of the norm allocation
+     */
     size_t NormBytes() const { return norm_bytes; }
-//new!
-    bool Twisted() const {return twisted; }
-    double Mu2() const {return mu2; }
+
+    /**
+       @return Clover coefficient (usually includes kappa)
+    */
+    bool Csw() const { return csw; }
+
+    /**
+       @return If the clover field is associated with twisted-clover fermions
+    */
+    bool Twisted() const { return twisted; }
+
+    /**
+       @return mu^2 factor baked into inverse clover field (for twisted-clover inverse)
+    */
+    double Mu2() const { return mu2; }
+
+    /**
+       @return rho factor backed into the clover field, (for real
+       diagonal additive Hasenbusch), e.g., A + rho
+    */
+    double Rho() const { return rho; }
+
+    /**
+       @brief Bakes in the rho factor into the clover field, (for real
+       diagonal additive Hasenbusch), e.g., A + rho
+    */
+    void setRho(double rho);
   };
 
   class cudaCloverField : public CloverField {
@@ -201,6 +241,7 @@ namespace quda {
     size_t bytes; // sizeof each clover field (per parity)
     size_t norm_bytes; // sizeof each norm field (per parity)
     int stride; // stride (volume + pad)
+    double rho; // rho additive factor
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t &evenTex;
@@ -214,7 +255,8 @@ namespace quda {
 #endif
 
     FullClover(const cudaCloverField &clover, bool inverse=false) :
-    precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes), stride(clover.stride)
+    precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes),
+      stride(clover.stride), rho(clover.rho)
 #ifdef USE_TEXTURE_OBJECTS
 	, evenTex(inverse ? clover.evenInvTex : clover.evenTex)
 	, evenNormTex(inverse ? clover.evenInvNormTex : clover.evenNormTex)

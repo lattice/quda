@@ -12,8 +12,6 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#include "face_quda.h"
-
 #if defined(QMP_COMMS)
 #include <qmp.h>
 #elif defined(MPI_COMMS)
@@ -199,6 +197,9 @@ int main(int argc, char **argv)
   } else {
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
+
+  //inv_param.solution_type = QUDA_MAT_SOLUTION;
+
   inv_param.matpc_type = matpc_type;
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -215,6 +216,7 @@ int main(int argc, char **argv)
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
   }
+
 
   inv_param.pipeline = pipeline;
 

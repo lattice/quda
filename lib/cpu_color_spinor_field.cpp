@@ -122,8 +122,6 @@ namespace quda {
     // these need to be reset to ensure no ghost zones for the cpu
     // fields since we can't determine during the parent's constructor
     // whether the field is a cpu or cuda field
-    ghost_length = 0;
-    ghost_norm_length = 0;
 
     // set this again here.  this is a hack since we can determine we
     // have a cpu or cuda field in ColorSpinorField::create(), which

@@ -177,6 +177,29 @@ extern "C" {
 
 
   /**
+   * Apply the improved staggered operator to a field. All fields
+   * passed and returned are host (CPU) field in MILC order.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param inv_args Struct setting some solver metadata
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param tadpole Tadpole improvement facter
+   * @param source Right-hand side source field
+   * @param solution Solution spinor field
+   */
+  void qudaDslash(int external_precision,
+		  int quda_precision,
+		  QudaInvertArgs_t inv_args,
+		  const void* const milc_fatlink,
+		  const void* const milc_longlink,
+		  const double tadpole,
+		  void* source,
+		  void* solution,
+		  int* num_iters);
+
+  /**
    * Solve Ax=b using an improved staggered operator with a
    * domain-decomposition preconditioner.  All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
@@ -186,7 +209,7 @@ extern "C" {
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param mass Fermion mass parameter
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
    * @param domain_overlap Array specifying the overlap of the domains in each dimension
@@ -224,7 +247,7 @@ extern "C" {
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param mass Fermion mass parameter
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
    * @param milc_fatlink Fat-link field on the host
@@ -260,7 +283,7 @@ extern "C" {
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param mass Fermion mass parameter
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
    * @param milc_fatlink Fat-link field on the host
@@ -302,7 +325,7 @@ extern "C" {
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param num_offsets Number of shifts to solve for
    * @param offset Array of shift offset values
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
@@ -345,7 +368,7 @@ extern "C" {
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param num_offsets Number of shifts to solve for
    * @param offset Array of shift offset values
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
@@ -389,7 +412,7 @@ extern "C" {
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param milc_link Gauge field on the host
    * @param milc_clover Clover field on the host
@@ -430,7 +453,7 @@ extern "C" {
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param milc_link Gauge field on the host
    * @param milc_clover Clover field on the host
@@ -533,7 +556,7 @@ extern "C" {
    * @param offset Array of shift offset values
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param milc_link Ignored
    * @param milc_clover Ignored

@@ -139,22 +139,38 @@ namespace quda {
 
     mutable void *ghost[2*QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
 
-    /** The staggered phase convention to use */
+    mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
+
+    /**
+       The staggered phase convention to use
+    */
     QudaStaggeredPhase staggeredPhaseType;
 
-    /** Whether the staggered phase factor has been applied */
+    /**
+       Whether the staggered phase factor has been applied
+    */
     bool staggeredPhaseApplied;
 
     /**
        @brief Exchange the buffers across all dimensions in a given direction
-       @param recv[out] Reicve buffer
-       @param send[in] Send buffer
-       @param dir[in] Direction in which we are sending (forwards OR backwards only)
+       @param[out] recv Receive buffer
+       @param[in] send Send buffer
+       @param[in] dir Direction in which we are sending (forwards OR backwards only)
     */
     void exchange(void **recv, void **send, QudaDirection dir) const;
 
-    /** Imaginary chemical potential */
+    /**
+       Imaginary chemical potential
+    */
     double i_mu;
+
+    /**
+       Compute the required extended ghost zone sizes and offsets
+       @param[in] R Radius of the ghost zone
+       @param[in] no_comms_fill If true we create a full halo
+       regardless of partitioning
+    */
+    void createGhostZone(const int *R, bool no_comms_fill) const;
 
   public:
     GaugeField(const GaugeFieldParam &param);
@@ -237,6 +253,15 @@ namespace quda {
      */
     virtual void copy(const GaugeField &src) = 0;
 
+    /**
+       Compute checksum of this gauge field: this uses a XOR-based checksum method
+       @param[in] mini Whether to compute a mini checksum or global checksum.
+       A mini checksum only computes the checksum over a subset of the lattice
+       sites and is to be used for online comparisons, e.g., checking
+       a field has changed with a global update algorithm.
+       @return checksum value
+     */
+    uint64_t checksum(bool mini=false) const;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -277,9 +302,47 @@ namespace quda {
     void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     /**
+       @brief Create the communication handlers and buffers
+       @param R The thickness of the extended region in each dimension
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    void createComms(const int *R, bool no_comms_fill);
+
+    /**
+       @brief Allocate the ghost buffers
+       @param R The thickness of the extended region in each dimension
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    void allocateGhostBuffer(const int *R, bool no_comms_fill) const;
+
+    /**
+       @brief Start the receive communicators
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+    */
+    void recvStart(int dim, int dir);
+
+    /**
+       @brief Start the sending communicators
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+       @param[in] stream_p Pointer to CUDA stream to post the
+       communication in (if 0, then use null stream)
+    */
+    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+
+    /**
+       @brief Wait for communication to complete
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+    */
+    void commsComplete(int dim, int dir);
+
+    /**
        @brief This does routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.  
-
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
@@ -474,17 +537,26 @@ namespace quda {
   /**
      This function is used to calculate the maximum absolute value of
      a gauge field array.  Defined in max_gauge.cu.  
-
-     @param u The gauge field from which we want to compute the max
+     @param[in] u The gauge field from which we want to compute the max
   */
   double maxGauge(const GaugeField &u);
 
   /** 
-      Apply the staggered phase factor to the gauge field.
-
-      @param u The gauge field to which we apply the staggered phase factors
+     Apply the staggered phase factor to the gauge field.
+     @param[in] u The gauge field to which we apply the staggered phase factors
   */
   void applyGaugePhase(GaugeField &u);
+
+  /**
+     Compute XOR-based checksum of this gauge field: each gauge field entry is
+     converted to type uint64_t, and compute the cummulative XOR of these values.
+     @param[in] mini Whether to compute a mini checksum or global checksum.
+     A mini checksum only computes over a subset of the lattice
+     sites and is to be used for online comparisons, e.g., checking
+     a field has changed with a global update algorithm.
+     @return checksum value
+  */
+  uint64_t Checksum(const GaugeField &u, bool mini=false);
 
 } // namespace quda
 
