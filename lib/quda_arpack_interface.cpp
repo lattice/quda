@@ -117,7 +117,7 @@ namespace quda{
       QudaMatvec(DiracMatrix &matEigen, QudaPrecision prec, ColorSpinorField &meta) : matEigen(matEigen), matPrecision(prec) { 
          ColorSpinorParam csParam(meta);
          //csParam.extendDimensionality();//4d -> 5d
-         csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+         csParam.fieldOrder = (meta.Nspin() == 1 || matPrecision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
          csParam.location   = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
          csParam.create     = QUDA_ZERO_FIELD_CREATE;
          csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
