@@ -321,6 +321,9 @@ struct DslashTime {
 
 DslashTime dslashCUDA(int niter) {
 
+  DslashTime dslash_time;
+  timeval tstart, tstop;
+
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
@@ -453,11 +456,11 @@ static int dslashTest()
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
-    printfQuda("\n%fms per loop\n", 1000*secs);
+    printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
     staggeredDslashRef();
 
     unsigned long long flops = dirac->Flops();
-    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
+    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
 
     printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
 	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
