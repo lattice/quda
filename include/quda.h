@@ -75,6 +75,10 @@ extern "C" {
     int return_result_gauge; /**< Return the result gauge field */
     int return_result_mom;   /**< Return the result momentum field */
 
+    size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+
   } QudaGaugeParam;
 
 
