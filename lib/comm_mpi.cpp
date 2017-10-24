@@ -120,6 +120,14 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     disable_peer_to_peer = true;
   }
 
+  // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
+  // and comm_dim(dim) == 2 (used for perf benchmarking)
+  bool disable_peer_to_peer_bidir = false;
+  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "-1") == 0) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling bi-directional peer-to-peer access\n");
+    disable_peer_to_peer_bidir = true;
+  }
+
   if (!peer2peer_init && !disable_peer_to_peer) {
 
     // first check that the local GPU supports UVA
@@ -142,6 +150,10 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
       for(int dim=0; dim<4; ++dim){
 	int neighbor_rank = comm_neighbor_rank(dir,dim);
 	if(neighbor_rank == rank) continue;
+
+	// disable peer-to-peer comms in one direction
+	if ( ((rank > neighbor_rank && dir == 0) || (rank < neighbor_rank && dir == 1)) &&
+	     disable_peer_to_peer_bidir && comm_dim(dim) == 2 ) continue;
 
 	// if the neighbors are on the same
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
