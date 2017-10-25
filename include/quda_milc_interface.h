@@ -18,6 +18,18 @@ extern "C" {
 #endif
 
   /**
+   * Parameters related to MILC site struct
+   */
+  typedef struct {
+    void *site; /** Pointer to beginning of site array */
+    void *link; /** Pointer to link field (only used if site is not set) */
+    size_t link_offset; /** Offset to link entry in site struct (bytes) */
+    void *mom; /** Pointer to link field (only used if site is not set) */
+    size_t mom_offset; /** Offset to mom entry in site struct (bytes) */
+    size_t size; /** Size of site struct (bytes) */
+  } QudaMILCSiteArg_t;
+
+  /**
    * Parameters related to linear solvers.
    */
   typedef struct {
@@ -638,18 +650,16 @@ extern "C" {
    * match.
    *
    * @param precision The precision of the field (2 - double, 1 - single)
-   * @param dummy Not presently used
+   * @param num_loop_types 1, 2 or 3
    * @param milc_loop_coeff Coefficients of the different loops in the Symanzik action
    * @param eb3 The integration step size (for MILC this is dt*beta/3)
-   * @param milc_sitelink The gauge field from which we compute the force
-   * @param milc_momentum The momentum field to be updated
+   * @param arg Metadata for MILC's internal site struct array
    */
   void qudaGaugeForce(int precision,
-		      int dummy,
+		      int num_loop_types,
 		      double milc_loop_coeff[3],
 		      double eb3,
-		      void* milc_sitelink,
-		      void* milc_momentum);
+		      QudaMILCSiteArg_t *arg);
 
   /**
    * Compute the staggered quark-field outer product needed for gauge generation
@@ -673,13 +683,11 @@ extern "C" {
    *
    * @param precision Precision of the field (2 - double, 1 - single)
    * @param dt The integration step size step
-   * @param momentum The momentum field
-   * @param The gauge field to be updated
+   * @param arg Metadata for MILC's internal site struct array
    */
   void qudaUpdateU(int precision,
 		   double eps,
-		   void* momentum,
-		   void* link);
+		   QudaMILCSiteArg_t *arg);
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
@@ -712,10 +720,10 @@ extern "C" {
    * tolerance is not met, this routine will give a runtime error.
    *
    * @param prec Precision of the gauge field
-   * @param gauge_h The gauge field to be updated
    * @param tol The tolerance to which we iterate
+   * @param arg Metadata for MILC's internal site struct array
    */
-  void qudaUnitarizeSU3(int prec, void *gauge, double tol);
+  void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg);
 
   /**
    * Compute the clover force contributions in each dimension mu given
