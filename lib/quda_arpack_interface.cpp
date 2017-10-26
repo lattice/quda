@@ -1,5 +1,10 @@
 #include <quda_arpack_interface.h>
 
+#if (defined (QMP_COMMS) || defined (MPI_COMMS))
+#include <mpi.h>
+#endif
+
+
 //using namespace quda ;
 
   struct SortEvals{
@@ -111,8 +116,8 @@ namespace quda{
 
       QudaMatvec(DiracMatrix &matEigen, QudaPrecision prec, ColorSpinorField &meta) : matEigen(matEigen), matPrecision(prec) { 
          ColorSpinorParam csParam(meta);
-         //csParam.extendDimensionality();//4d -> 5d
-         csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+         //we need an explicit fieldOrder setup here since meta is a none-native field. 
+         csParam.fieldOrder = (meta.Nspin() == 1 || matPrecision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
          csParam.location   = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
          csParam.create     = QUDA_ZERO_FIELD_CREATE;
          csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
@@ -134,7 +139,6 @@ namespace quda{
   void QudaMatvec<Float>::operator() (std::complex<Float> *out, std::complex<Float> *in)
   {
       ColorSpinorParam csParam(*cuda_in);
-      //csParam.extendDimensionality();//4d -> 5d
       csParam.setPrecision(sizeof(Float) == sizeof(float) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
       csParam.location = QUDA_CPU_FIELD_LOCATION;
       csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
