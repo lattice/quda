@@ -291,16 +291,19 @@ namespace quda {
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
       
       // staggered and coarse fields in half and single are always two component
+      int texel_size = 1;
       if ( (nSpin == 1 || nSpin == 2) && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
 	desc.x = 8*precision;
 	desc.y = 8*precision;
 	desc.z = 0;
 	desc.w = 0;
+	texel_size = 2*precision;
       } else { // all others are four component (double2 is spread across int4)
-	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
       }
       
       cudaResourceDesc resDesc;
@@ -314,7 +317,12 @@ namespace quda {
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
-      
+
+      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
+      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
+	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
+      }
+
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
       // create the texture for the norm components
@@ -962,7 +970,7 @@ namespace quda {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (dir%2 == 0) { // sending backwards
       if (comm_peer2peer_enabled(1,dim)) {
@@ -993,7 +1001,7 @@ namespace quda {
     int dim = d/2;
     int dir = d%2;
     if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
     int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
@@ -1133,52 +1141,42 @@ namespace quda {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return 0;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (dir%2==0) {
 
-      if (comm_peer2peer_enabled(1,dim)) {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr) {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
-      }
-
       if (comm_peer2peer_enabled(0,dim)) {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
       } else if (gdr) {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_rdma_back[bufferIndex][dim]);
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][dim]);
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
       }
 
-      if (complete_recv_fwd[dim] && complete_send_back[dim]) {
-	complete_recv_fwd[dim] = false;
+      if (complete_recv_back[dim] && complete_send_back[dim]) {
+	complete_recv_back[dim] = false;
 	complete_send_back[dim] = false;
 	return 1;
       }
 
     } else { // dir%2 == 1
 
-      if (comm_peer2peer_enabled(0,dim)) {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr) {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
-      }
-
       if (comm_peer2peer_enabled(1,dim)) {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
       } else if (gdr) {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
       }
 
-      if (complete_recv_back[dim] && complete_send_fwd[dim]) {
-	complete_recv_back[dim] = false;
+      if (complete_recv_fwd[dim] && complete_send_fwd[dim]) {
+	complete_recv_fwd[dim] = false;
 	complete_send_fwd[dim] = false;
 	return 1;
       }
@@ -1191,45 +1189,38 @@ namespace quda {
   void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger, cudaStream_t *stream_p, bool gdr) {
     int dim = dir / 2;
     if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (dir%2==0) {
+
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+      } else if (gdr) {
+	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
+	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_recv_back[bufferIndex][dim]);
+	comm_wait(mh_send_back[bufferIndex][dim]);
+      }
+
+    } else {
 
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr) {
-	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_fwd[bufferIndex][dim]);
-      }
-
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr) {
-	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_send_back[bufferIndex][dim]);
-      }
-    } else {
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr) {
-	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_back[bufferIndex][dim]);
-      }
-
-      if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
       } else if (gdr) {
+	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
 	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
+	comm_wait(mh_recv_fwd[bufferIndex][dim]);
 	comm_wait(mh_send_fwd[bufferIndex][dim]);
       }
+
     }
 
     return;
@@ -1266,7 +1257,7 @@ namespace quda {
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv)  const {
-    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
     // first set default values to device if needed

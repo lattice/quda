@@ -140,6 +140,21 @@ extern "C" {
   int comm_gpuid(void);
 
   /**
+     @brief Gather all hostnames
+     @param[out] hostname_recv_buf char array of length
+     128*comm_size() that will be filled in GPU ids for all processes.
+     Each hostname is in rank order, with 128 bytes for each.
+   */
+  void comm_gather_hostname(char *hostname_recv_buf);
+
+  /**
+     @brief Gather all GPU ids
+     @param[out] gpuid_recv_buf int array of length comm_size() that
+     will be filled in GPU ids for all processes (in rank order).
+   */
+  void comm_gather_gpuid(int *gpuid_recv_buf);
+
+  /**
      Enabled peer-to-peer communication.
      @param hostname_buf Array that holds all process hostnames
    */

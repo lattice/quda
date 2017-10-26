@@ -4,8 +4,8 @@
 namespace quda {
 
   template <typename FloatOut, typename FloatIn, int length, typename InOrder>
-  void copyGauge(const InOrder &inOrder, GaugeField &out, QudaFieldLocation location, 
-		 FloatOut *Out, FloatOut **outGhost, int type) {
+  void copyGauge(const InOrder &inOrder, const GaugeField &out, const GaugeField &in,
+		 QudaFieldLocation location, FloatOut *Out, FloatOut **outGhost, int type) {
     int faceVolumeCB[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
     if (out.isNative()) {
@@ -18,34 +18,34 @@ namespace quda {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  copyGauge<short,FloatIn,length>
 	    (FloatNOrder<short,length,2,19>(out, (short*)Out, (short**)outGhost, override), inOrder,
-	     out.Volume(), faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	     out.Volume(), faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 	} else {
 	  typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO>::type G;
 	  copyGauge<FloatOut,FloatIn,length>
 	    (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
-	     out.Ndim(), out.Geometry(), out, location, type);
+	     out.Ndim(), out.Geometry(), out, in, location, type);
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
 	copyGauge<FloatOut,FloatIn,length>
 	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
-	   out.Ndim(), out.Geometry(), out, location, type);
+	   out.Ndim(), out.Geometry(), out, in, location, type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
 	copyGauge<FloatOut,FloatIn,length> 
 	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
-	   out.Ndim(), out.Geometry(), out, location, type);
+	   out.Ndim(), out.Geometry(), out, in, location, type);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
         copyGauge<FloatOut,FloatIn,length>
 	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
-	   out.Ndim(),  out.Geometry(), out, location, type);
+	   out.Ndim(),  out.Geometry(), out, in, location, type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_9>::type G;
         copyGauge<FloatOut,FloatIn,length>
 	  (G(out, Out, outGhost, override), inOrder, out.Volume(), faceVolumeCB,
-	   out.Ndim(), out.Geometry(), out, location, type);
+	   out.Ndim(), out.Geometry(), out, in, location, type);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
@@ -55,7 +55,7 @@ namespace quda {
 #ifdef BUILD_QDP_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
 	(QDPOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), 
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -65,7 +65,7 @@ namespace quda {
 #ifdef BUILD_QDPJIT_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
 	(QDPJITOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
@@ -75,7 +75,7 @@ namespace quda {
 #ifdef BUILD_CPS_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
 	(CPSOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 #else
       errorQuda("CPS interface has not been built\n");
 #endif
@@ -85,7 +85,17 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
 	(MILCOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
+#else
+      errorQuda("MILC interface has not been built\n");
+#endif
+
+    } else if (out.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+
+#ifdef BUILD_MILC_INTERFACE
+      copyGauge<FloatOut,FloatIn,length>
+	(MILCSiteOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 #else
       errorQuda("MILC interface has not been built\n");
 #endif
@@ -95,7 +105,7 @@ namespace quda {
 #ifdef BUILD_BQCD_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
 	(BQCDOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 #else
       errorQuda("BQCD interface has not been built\n");
 #endif
@@ -105,7 +115,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
 	(TIFROrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -115,7 +125,7 @@ namespace quda {
 #ifdef BUILD_TIFR_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
 	(TIFRPaddedOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(),
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+	 faceVolumeCB, out.Ndim(), out.Geometry(), out, in, location, type);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -141,24 +151,24 @@ namespace quda {
 	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  copyGauge<FloatOut,short,length> (FloatNOrder<short,length,2,19>
 					    (in,(short*)In,(short**)inGhost,override),
-					    out, location, Out, outGhost, type);
+					    out, in, location, Out, outGhost, type);
 	} else {
 	  typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
-	  copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
+	  copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
 	}
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_9>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, location, Out, outGhost, type);
+	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
@@ -167,7 +177,7 @@ namespace quda {
 
 #ifdef BUILD_QDP_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In, inGhost),
-					 out, location, Out, outGhost, type);
+					 out, in, location, Out, outGhost, type);
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -176,7 +186,7 @@ namespace quda {
 
 #ifdef BUILD_QDPJIT_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(QDPJITOrder<FloatIn,length>(in, In, inGhost),
-					 out, location, Out, outGhost, type);
+					 out, in, location, Out, outGhost, type);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
@@ -185,7 +195,7 @@ namespace quda {
 
 #ifdef BUILD_CPS_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(CPSOrder<FloatIn,length>(in, In, inGhost),
-					 out, location, Out, outGhost, type);
+					 out, in, location, Out, outGhost, type);
 #else
       errorQuda("CPS interface has not been built\n");
 #endif
@@ -194,7 +204,16 @@ namespace quda {
 
 #ifdef BUILD_MILC_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(in, In, inGhost),
-					 out, location, Out, outGhost, type);
+					 out, in, location, Out, outGhost, type);
+#else
+      errorQuda("MILC interface has not been built\n");
+#endif
+
+    } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+
+#ifdef BUILD_MILC_INTERFACE
+      copyGauge<FloatOut,FloatIn,length>(MILCSiteOrder<FloatIn,length>(in, In, inGhost),
+					 out, in, location, Out, outGhost, type);
 #else
       errorQuda("MILC interface has not been built\n");
 #endif
@@ -203,7 +222,7 @@ namespace quda {
 
 #ifdef BUILD_BQCD_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(BQCDOrder<FloatIn,length>(in, In, inGhost),
-					 out, location, Out, outGhost, type);
+					 out, in, location, Out, outGhost, type);
 #else
       errorQuda("BQCD interface has not been built\n");
 #endif
@@ -212,7 +231,7 @@ namespace quda {
 
 #ifdef BUILD_TIFR_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(TIFROrder<FloatIn,length>(in, In, inGhost),
-					 out, location, Out, outGhost, type);
+					 out, in, location, Out, outGhost, type);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -221,7 +240,7 @@ namespace quda {
 
 #ifdef BUILD_TIFR_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(TIFRPaddedOrder<FloatIn,length>(in, In, inGhost),
-					 out, location, Out, outGhost, type);
+					 out, in, location, Out, outGhost, type);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -235,12 +254,12 @@ namespace quda {
   void checkMomOrder(const GaugeField &u);
 
   template <typename FloatOut, typename FloatIn, int length, typename Out, typename In, typename Arg>
-  void copyMom(Arg &arg, const GaugeField &meta, QudaFieldLocation location) {
+  void copyMom(Arg &arg, const GaugeField &out, const GaugeField &in, QudaFieldLocation location) {
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
       copyGauge<FloatOut,FloatIn,length>(arg);
     } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-      CopyGauge<FloatOut,FloatIn,length, Out, In, 0> momCopier(arg, meta);
+      CopyGauge<FloatOut,FloatIn,length, Out, In, 0> momCopier(arg, out, in);
       momCopier.apply(0);
     } else {
       errorQuda("Undefined field location %d for copyMom", location);
@@ -285,14 +304,24 @@ namespace quda {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef MILCOrder<FloatIn,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+#else
+	    errorQuda("MILC interface has not been built\n");
+#endif
+	  } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+#ifdef BUILD_MILC_INTERFACE
+	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	    typedef MILCSiteOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in.Volume(),
+				     faceVolumeCB, in.Ndim(), in.Geometry());
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 #else
 	    errorQuda("MILC interface has not been built\n");
 #endif
@@ -302,7 +331,7 @@ namespace quda {
 	    typedef TIFROrder<FloatIn,18> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,out,in,location);
 #else
 	    errorQuda("TIFR interface has not been built\n");
 #endif
@@ -312,7 +341,7 @@ namespace quda {
 	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,out,in,location);
 #else
 	    errorQuda("TIFR interface has not been built\n");
 #endif
@@ -326,12 +355,31 @@ namespace quda {
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	    typedef MILCOrder<FloatIn,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else {
+	    errorQuda("Gauge field orders %d not supported", in.Order());
+	  }
+#else
+	  errorQuda("MILC interface has not been built\n");
+#endif
+	} else if (out.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+	  typedef MILCSiteOrder<FloatOut,10> momOut;
+#ifdef BUILD_MILC_INTERFACE
+	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in.Volume(),
+				     faceVolumeCB, in.Ndim(), in.Geometry());
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+	    typedef MILCSiteOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
+				     faceVolumeCB, in.Ndim(), in.Geometry());
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 	  } else {
 	    errorQuda("Gauge field orders %d not supported", in.Order());
 	  }
@@ -346,12 +394,12 @@ namespace quda {
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 	    typedef TIFROrder<FloatIn,18> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,out,in,location);
 	  } else {
 	    errorQuda("Gauge field orders %d not supported", in.Order());
 	  }
@@ -366,12 +414,12 @@ namespace quda {
 	    typedef FloatNOrder<FloatIn,18,2,11> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	    typedef TIFRPaddedOrder<FloatIn,18> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in.Volume(),
 				     faceVolumeCB, in.Ndim(), in.Geometry());
-	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,in,location);
+	    copyMom<FloatOut,FloatIn,18,momOut,momIn>(arg,out,in,location);
 	  } else {
 	    errorQuda("Gauge field orders %d not supported", in.Order());
 	  }

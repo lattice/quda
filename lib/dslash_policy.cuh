@@ -253,7 +253,7 @@ struct DslashBasic : DslashPolicyImp {
 
 	// if peer-2-peer in a given direction then we need only wait on that copy event to finish
 	// else we post an event in the scatter stream and wait on that
-        if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+        if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  if (comm_peer2peer_enabled(0,i)) {
 	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
 		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -549,7 +549,7 @@ struct DslashGPUComms : DslashPolicyImp {
 
         } // dir=0,1
 
-        if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
@@ -950,7 +950,7 @@ struct DslashAsync : DslashPolicyImp {
 
 	// if peer-2-peer in a given direction then we need only wait on that copy event to finish
 	// else we post an event in the scatter stream and wait on that
-        if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  if (comm_peer2peer_enabled(0,i)) {
 	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
 		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -1260,7 +1260,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 
 	// if peer-2-peer in a given direction then we need only wait on that copy event to finish
 	// else we post an event in the scatter stream and wait on that
-        if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  if (comm_peer2peer_enabled(0,i)) {
 	    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], inputSpinor->getIPCRemoteCopyEvent(0,i), 0),
 		    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -1537,7 +1537,7 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	// FIXME - will not work with P2P until we can split where the halos originate
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-	if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
