@@ -96,23 +96,22 @@ namespace quda {
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
     for (int parity=0; parity<2; parity++) {
-
-      for (int d=0; d<arg.geometry; d++) {
-	int x = blockIdx.x * blockDim.x + threadIdx.x;
-	if (x >= arg.volume/2) return;
+      int x = blockIdx.x * blockDim.x + threadIdx.x;
+      int d = blockIdx.y * blockDim.y + threadIdx.y;
+      if (x >= arg.volume/2) return;
+      if (d >= arg.geometry) return;
 
 #ifdef FINE_GRAINED_ACCESS
-	for (int i=0; i<Ncolor(length); i++)
-	  for (int j=0; j<Ncolor(length); j++)
-	    arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+      for (int i=0; i<Ncolor(length); i++)
+	for (int j=0; j<Ncolor(length); j++)
+	  arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
 #else
-	RegTypeIn in[length];
-	RegTypeOut out[length];
-	arg.in.load(in, x, d, parity);
-	for (int i=0; i<length; i++) out[i] = in[i];
-	arg.out.save(out, x, d, parity);
+      RegTypeIn in[length];
+      RegTypeOut out[length];
+      arg.in.load(in, x, d, parity);
+      for (int i=0; i<length; i++) out[i] = in[i];
+      arg.out.save(out, x, d, parity);
 #endif
-      }
     }
   }
 
@@ -120,7 +119,7 @@ namespace quda {
      Generic CPU gauge ghost reordering and packing 
   */
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-    void copyGhost(CopyGaugeArg<OutOrder,InOrder> arg) {  
+    void copyGhost(CopyGaugeArg<OutOrder,InOrder> arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
@@ -150,7 +149,7 @@ namespace quda {
      the CPU version, using the same inlined functions.
   */
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-  __global__ void copyGhostKernel(CopyGaugeArg<OutOrder,InOrder> arg) {  
+  __global__ void copyGhostKernel(CopyGaugeArg<OutOrder,InOrder> arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
@@ -177,7 +176,7 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool isGhost>
-  class CopyGauge : Tunable {
+  class CopyGauge : TunableVectorY {
     CopyGaugeArg<OutOrder,InOrder> arg;
     int size;
     const GaugeField &meta;
@@ -190,7 +189,8 @@ namespace quda {
     unsigned int minThreads() const { return size; }
 
   public:
-    CopyGauge(CopyGaugeArg<OutOrder,InOrder> &arg, const GaugeField &meta) : arg(arg), meta(meta) { 
+    CopyGauge(CopyGaugeArg<OutOrder,InOrder> &arg, const GaugeField &out, const GaugeField &in)
+      : TunableVectorY(arg.in.geometry), arg(arg), meta(out) {
       int faceMax = 0;
       for (int d=0; d<arg.nDim; d++) {
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
@@ -201,9 +201,17 @@ namespace quda {
       }
 
 #ifndef FINE_GRAINED_ACCESS
-      writeAuxString("out_stride=%d,in_stride=%d,geometry=%d", arg.out.stride, arg.in.stride, arg.in.geometry);
+      int n = writeAuxString("out_stride=%d,in_stride=%d,geometry=%d",arg.out.stride, arg.in.stride, arg.in.geometry);
+      if (out.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+	n = snprintf(aux+n,TuneKey::aux_n,",in_siteoffset=%lu,out_sitesize=%lu",out.SiteOffset(),out.SiteSize());
+	if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+      }
+      if (in.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+	n = snprintf(aux+n,TuneKey::aux_n,",in_siteoffset=%lu,in_sitesize=%lu",in.SiteOffset(),in.SiteSize());
+	if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+      }
 #else
-      writeAuxString("fine-grained");
+      writeAuxString("fine-grained,geometry=%d", arg.in.geometry);
 #endif
     }
 
@@ -223,7 +231,7 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     long long flops() const { return 0; } 
-    long long bytes() const { 
+    long long bytes() const {
       int sites = 4*arg.volume/2;
       if (isGhost) {
 	sites = 0;
@@ -241,7 +249,8 @@ namespace quda {
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
     void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, int volume, const int *faceVolumeCB,
-		   int nDim, int geometry, const GaugeField &out, QudaFieldLocation location, int type) {
+		   int nDim, int geometry, const GaugeField &out, const GaugeField &in,
+		   QudaFieldLocation location, int type) {
 
     CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder, volume, faceVolumeCB, nDim, geometry);
 
@@ -269,14 +278,14 @@ namespace quda {
     } else if (location == QUDA_CUDA_FIELD_LOCATION) {
       // first copy body
       if (type == 0 || type == 2) {
-	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 0> gaugeCopier(arg, out);
+	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 0> gaugeCopier(arg, out, in);
 	gaugeCopier.apply(0);
       }
 #ifdef MULTI_GPU
       if (type == 0 || type == 1) {
 	if (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY) {
 	  // now copy ghost
-	  CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg, out);
+	  CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg, out, in);
 	  ghostCopier.apply(0);
 	} else {
 	  //warningQuda("Cannot copy for %d geometry gauge field", geometry);
@@ -287,7 +296,7 @@ namespace quda {
       if (type == 3) {
         if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
 	arg.offset = nDim;
-	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg, out);
+	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg, out, in);
 	ghostCopier.apply(0);
       }
 #endif

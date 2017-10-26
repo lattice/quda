@@ -376,7 +376,6 @@ namespace quda {
   template <typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order, bool native_ghost=true>
       struct FieldOrder {
 
-      protected:
 	/** An internal reference to the actual field we are accessing */
 	const int volumeCB;
 	const int nDim;
@@ -1070,7 +1069,7 @@ namespace quda {
 #pragma unroll
 	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
-	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
+	  vector_store(gauge + parity*offset, x + dir*stride*M + stride*i, vecTmp);
         }
         if(hasPhase){
           RegType phase = reconstruct.getPhase(v);
@@ -1147,8 +1146,7 @@ namespace quda {
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector*>
-	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
+	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
           }
 
 	  if (hasPhase) {
@@ -1225,9 +1223,8 @@ namespace quda {
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy to memory
-	    reinterpret_cast< Vector* >
-	      (ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase))
-	      [i*R[dim]*faceVolumeCB[dim]+buff_idx] = vecTmp;
+	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
+			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
 	  }
 	  if (hasPhase) {
 	    RegType phase = reconstruct.getPhase(v);
@@ -1574,6 +1571,74 @@ namespace quda {
       operator()(int dim, int x_cb, int parity) const {
       return gauge_wrapper<Float,MILCOrder<Float,length> >
 	(const_cast<MILCOrder<Float,length>&>(*this), dim, x_cb, parity);
+    }
+
+    size_t Bytes() const { return length * sizeof(Float); }
+  };
+
+  /**
+     @brief struct to define gauge fields packed into an opaque MILC site struct:
+
+     struct {
+       char padding[offset];
+       Float [dim][row][col];
+     } site;
+
+     site lattice [parity][volumecb];
+
+     We are just passed the size of the struct and the offset to the
+     required matrix elements.  Typically, it is expected that this
+     accessor will be used with zero-copy memory to the original
+     allocation in MILC.
+  */
+  template <typename Float, int length> struct MILCSiteOrder : public LegacyOrder<Float,length> {
+    typedef typename mapper<Float>::type RegType;
+    Float *gauge;
+    const int volumeCB;
+    const int geometry;
+    const size_t offset;
+    const size_t size;
+  MILCSiteOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) :
+    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
+      volumeCB(u.VolumeCB()), geometry(u.Geometry()),
+      offset(u.SiteOffset()), size(u.SiteSize()) { ; }
+  MILCSiteOrder(const MILCSiteOrder &order) : LegacyOrder<Float,length>(order),
+      gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry),
+      offset(order.offset), size(order.size)
+      { ; }
+    virtual ~MILCSiteOrder() { ; }
+
+    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+      // get base pointer
+      const Float *gauge0 = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset);
+
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge0);
+      structure v_ = gauge_[dir];
+      for (int i=0; i<length; i++) v[i] = (RegType)v_.v[i];
+#else
+      for (int i=0; i<length; i++) {
+	v[i] = (RegType)gauge0[dir*length + i];
+      }
+#endif
+    }
+
+    __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+      // get base pointer
+      Float *gauge0 = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset);
+
+#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+      typedef S<Float,length> structure;
+      trove::coalesced_ptr<structure> gauge_((structure*)gauge0);
+      structure v_;
+      for (int i=0; i<length; i++) v_.v[i] = (Float)v[i];
+      gauge_[dir] = v_;
+#else
+      for (int i=0; i<length; i++) {
+	gauge0[dir*length + i] = (Float)v[i];
+      }
+#endif
     }
 
     size_t Bytes() const { return length * sizeof(Float); }

@@ -186,13 +186,12 @@ namespace quda {
 
     char aux[TuneKey::aux_n];
 
-    void writeAuxString(const char *format, ...) {
+    int writeAuxString(const char *format, ...) {
       va_list arguments;
       va_start(arguments, format);
       int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
-      //int n = snprintf(aux, QUDA_TUNE_AUX_STR_LENGTH, "threads=%d,prec=%lu,stride=%d,geometery=%d",
-      //	       arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
       if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+      return n;
     }
 
   public:
