@@ -539,7 +539,8 @@ namespace quda {
 	if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
 	  // special case where we use zero-copy memory to read/write directly from MILC's data
 	  void *src_d;
-	  cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
+	  cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
+	  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site array");
 
 	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
@@ -606,8 +607,8 @@ namespace quda {
       if (cpu.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from MILC's data
 	void *cpu_d;
-	cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
-
+  cudaError_t error = cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
+  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site array");
 	if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
 	} else {
