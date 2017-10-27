@@ -1869,20 +1869,47 @@ struct DslashFactory {
        disableProfileCount();
 
        for (auto &i : policy) {
-	 // switch on kernel packing for the policies that need it
-	 bool kernel_pack_old = getKernelPackT();
-	 if (i == QUDA_GPU_COMMS_DSLASH || i == QUDA_FUSED_GPU_COMMS_DSLASH ||
-	     i == QUDA_ZERO_COPY_DSLASH_PACK || i == QUDA_FUSED_ZERO_COPY_DSLASH_PACK ||
-	     i == QUDA_ZERO_COPY_DSLASH || i == QUDA_FUSED_ZERO_COPY_DSLASH) {
+
+	 if (i == QUDA_DSLASH || i == QUDA_FUSED_DSLASH) {
+
+	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
+	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+	   delete dslashImp;
+
+	 } else if (i == QUDA_GPU_COMMS_DSLASH || i == QUDA_FUSED_GPU_COMMS_DSLASH ||
+		    i == QUDA_ZERO_COPY_DSLASH_PACK || i == QUDA_FUSED_ZERO_COPY_DSLASH_PACK ||
+		    i == QUDA_ZERO_COPY_DSLASH || i == QUDA_FUSED_ZERO_COPY_DSLASH) {
+	   // these dslash policies all must have kernel packing enabled
+
+	   bool kernel_pack_old = getKernelPackT();
+
+	   // if we are using GDR policies then we must tune the
+	   // non-GDR variants as well with and without kernel packing
+	   // enabled - this ensures that all GPUs will have the
+	   // required tune cache entries prior to potential process
+	   // divergence regardless of which GPUs are blacklisted
+	   if (i == QUDA_GPU_COMMS_DSLASH || i == QUDA_FUSED_GPU_COMMS_DSLASH) {
+	     QudaDslashPolicy policy = (i == QUDA_GPU_COMMS_DSLASH ? QUDA_DSLASH : QUDA_FUSED_DSLASH);
+	     DslashPolicyImp* dslashImp = DslashFactory::create(policy);
+	     setKernelPackT(false);
+	     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+	     setKernelPackT(true);
+	     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+	     delete dslashImp;
+	   }
+
 	   setKernelPackT(true);
+
+	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
+	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
+	   delete dslashImp;
+
+	   // restore default kernel packing
+	   setKernelPackT(kernel_pack_old);
+
+	 } else {
+	   errorQuda("Unsupported dslash policy %d\n", i);
 	 }
-
-	 DslashPolicyImp* dslashImp = DslashFactory::create(i);
-	 (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
-	 delete dslashImp;
-
-	 // restore default kernel packing
-	 setKernelPackT(kernel_pack_old);
        }
 
        enableProfileCount();
