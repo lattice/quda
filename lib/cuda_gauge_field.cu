@@ -1,8 +1,6 @@
 #include <string.h>
 #include <gauge_field.h>
-#include <face_quda.h>
 #include <typeinfo>
-#include <misc_helpers.h>
 #include <blas_quda.h>
 
 namespace quda {
@@ -88,28 +86,33 @@ namespace quda {
       if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
 
-      if(isPhase){
-        if(precision == QUDA_DOUBLE_PRECISION){
+      int texel_size = 1;
+      if (isPhase) {
+        if (precision == QUDA_DOUBLE_PRECISION) {
           desc.x = 8*sizeof(int);
           desc.y = 8*sizeof(int);
           desc.z = 0;
           desc.w = 0;
-        }else{
+          texel_size = 2*sizeof(int);
+        } else {
           desc.x = 8*precision;
           desc.y = desc.z = desc.w = 0;
+          texel_size = precision;
         }
-      }else{
+      } else {
         // always four components regardless of precision
         if (precision == QUDA_DOUBLE_PRECISION) {
           desc.x = 8*sizeof(int);
           desc.y = 8*sizeof(int);
           desc.z = 8*sizeof(int);
           desc.w = 8*sizeof(int);
+	  texel_size = 4*sizeof(int);
         } else {
           desc.x = 8*precision;
           desc.y = 8*precision;
           desc.z = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
           desc.w = (reconstruct == 18 || reconstruct == 10) ? 0 : 8*precision;
+          texel_size = (reconstruct == 18 || reconstruct == 10 ? 2 : 4) * precision;
         }
       }
 
@@ -119,6 +122,11 @@ namespace quda {
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/(!full ? 2 : 1) : (bytes-phase_bytes)/(!full ? 2 : 1);
+
+      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
+      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
+	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
+      }
 
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
@@ -148,6 +156,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     destroyTexObject();
 #endif
+
+    destroyComms();
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (gauge) pool_device_free(gauge);
@@ -251,139 +261,193 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
-    
-    void *send[QUDA_MAX_DIM];
-    void *recv[QUDA_MAX_DIM];
-    void *send_d[QUDA_MAX_DIM];
-    void *recv_d[QUDA_MAX_DIM];
-    size_t bytes[QUDA_MAX_DIM];
+  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill) const
+  {
+    createGhostZone(R, no_comms_fill);
+    LatticeField::allocateGhostBuffer(ghost_bytes);
+  }
 
-    for (int d=0; d<nDim; d++) {
-      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
-      // store both parities and directions in each
-      bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
-      send_d[d] = pool_device_malloc(2 * bytes[d]);
-      recv_d[d] = pool_device_malloc(2 * bytes[d]);
+  void cudaGaugeField::createComms(const int *R, bool no_comms_fill)
+  {
+    allocateGhostBuffer(R, no_comms_fill); // allocate the ghost buffer if not yet allocated
+
+    // ascertain if this instance needs it comms buffers to be updated
+    bool comms_reset = ghost_field_reset || // FIXME add send buffer check
+      (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]); // pinned buffers
+
+    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
+
+    if (ghost_field_reset) destroyIPCComms();
+    createIPCComms();
+  }
+
+  void cudaGaugeField::recvStart(int dim, int dir)
+  {
+    if (!comm_dim_partitioned(dim)) return;
+
+    if (dir==0) { // sending backwards
+      // receive from the processor in the +1 direction
+      if (comm_peer2peer_enabled(1,dim)) {
+	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
+      } else if (comm_gdr_enabled()) {
+        comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
+      } else {
+        comm_start(mh_recv_fwd[bufferIndex][dim]);
+      }
+    } else { //sending forwards
+      // receive from the processor in the -1 direction
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
+      } else if (comm_gdr_enabled()) {
+        comm_start(mh_recv_rdma_back[bufferIndex][dim]);
+      } else {
+        comm_start(mh_recv_back[bufferIndex][dim]);
+      }
     }
+  }
 
-#ifndef GPU_COMMS
-    void *send_h[QUDA_MAX_DIM];
-    void *recv_h[QUDA_MAX_DIM];
-    size_t total_bytes = 0;
-    for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-      total_bytes += 4*bytes[d]; // (2 from send/recv) x (2 from fwd/back)
+  void cudaGaugeField::sendStart(int dim, int dir, cudaStream_t* stream_p)
+  {
+    if (!comm_dim_partitioned(dim)) return;
+
+    if (!comm_peer2peer_enabled(dir,dim)) {
+      if (dir == 0)
+	if (comm_gdr_enabled()) {
+	  comm_start(mh_send_rdma_back[bufferIndex][dim]);
+	} else {
+	  comm_start(mh_send_back[bufferIndex][dim]);
+	}
+      else
+	if (comm_gdr_enabled()) {
+	  comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
+	} else {
+	  comm_start(mh_send_fwd[bufferIndex][dim]);
+	}
+    } else { // doing peer-to-peer
+
+      void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
+	+ precision*ghostOffset[dim][(dir+1)%2];
+
+      cudaMemcpyAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir],
+		      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice,
+		      stream_p ? *stream_p : 0);
+
+      if (dir == 0) {
+	// record the event
+	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream_p ? *stream_p : 0);
+	// send to the processor in the -1 direction
+	comm_start(mh_send_p2p_back[bufferIndex][dim]);
+      } else {
+	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream_p ? *stream_p : 0);
+	// send to the processor in the +1 direction
+	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
+      }
     }
-    void *buffer = total_bytes > 0 ? pool_pinned_malloc(total_bytes) : nullptr;
+  }
 
-    size_t offset = 0;
-    for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-      recv_h[d] = static_cast<char*>(buffer) + offset;
-      send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
-      offset += 4*bytes[d];
-    }
-#endif
+  void cudaGaugeField::commsComplete(int dim, int dir)
+  {
+    if (!comm_dim_partitioned(dim)) return;
 
-    // do the exchange
-    MsgHandle *mh_recv_back[QUDA_MAX_DIM];
-    MsgHandle *mh_recv_fwd[QUDA_MAX_DIM];
-    MsgHandle *mh_send_fwd[QUDA_MAX_DIM];
-    MsgHandle *mh_send_back[QUDA_MAX_DIM];
-
-    for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-#ifdef GPU_COMMS
-      recv[d] = recv_d[d];
-      send[d] = send_d[d];
-#else
-      recv[d] = recv_h[d];
-      send[d] = send_h[d];
-#endif
-
-      // look into storing these for later
-      mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-      mh_recv_fwd[d]  = comm_declare_receive_relative(static_cast<char*>(recv[d])+bytes[d], 
-						      d, +1, bytes[d]);
-      mh_send_back[d] = comm_declare_send_relative(send[d], d, -1, bytes[d]);
-      mh_send_fwd[d]  = comm_declare_send_relative(static_cast<char*>(send[d])+bytes[d], 
-						   d, +1, bytes[d]);
-    }
-
-    for (int d=0; d<nDim; d++) {
-      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
-
-      // FIXME why does this break if the order is switched?
-      // prepost the receives
-      if (commDimPartitioned(d)) {
-	comm_start(mh_recv_fwd[d]);
-	comm_start(mh_recv_back[d]);
+    if (dir==0) {
+      if (comm_peer2peer_enabled(1,dim)) {
+	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_recv_fwd[bufferIndex][dim]);
       }
 
-      //extract into a contiguous buffer
-      extractExtendedGaugeGhost(*this, d, R, send_d, true);
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_send_back[bufferIndex][dim]);
+      }
+    } else {
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_recv_back[bufferIndex][dim]);
+      }
 
-      if (commDimPartitioned(d)) {
-	
-	// pipeline the forwards and backwards sending
-#ifndef GPU_COMMS
-	cudaMemcpyAsync(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, streams[0]);
-	cudaMemcpyAsync(static_cast<char*>(send_h[d])+bytes[d], 
-			static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
-#endif      
-	
-#ifndef GPU_COMMS
-	cudaStreamSynchronize(streams[0]);
-#endif
-	comm_start(mh_send_back[d]);
-	
-#ifndef GPU_COMMS
-	cudaStreamSynchronize(streams[1]);
-#endif
-	comm_start(mh_send_fwd[d]);
-	
-	// forwards recv
-	comm_wait(mh_send_back[d]);
-	comm_wait(mh_recv_fwd[d]);
-#ifndef GPU_COMMS
-	cudaMemcpyAsync(static_cast<char*>(recv_d[d])+bytes[d], 
-			static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
-#endif      
-	
-	// backwards recv
-	comm_wait(mh_send_fwd[d]);
-	comm_wait(mh_recv_back[d]);
-#ifndef GPU_COMMS
-	cudaMemcpyAsync(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice, streams[1]);
-#endif      
+      if (comm_peer2peer_enabled(1,dim)) {
+	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
+	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
+      } else if (comm_gdr_enabled()) {
+	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_send_fwd[bufferIndex][dim]);
+      }
+    }
+  }
+
+  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill)
+  {
+    const int b = bufferIndex;
+    void *send_d[QUDA_MAX_DIM], *recv_d[QUDA_MAX_DIM];
+
+    createComms(R, no_comms_fill);
+
+    size_t offset = 0;
+    for (int dim=0; dim<nDim; dim++) {
+      if ( !(comm_dim_partitioned(dim) || (no_comms_fill && R[dim])) ) continue;
+      send_d[dim] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+      recv_d[dim] = static_cast<char*>(ghost_recv_buffer_d[b]) + offset;
+      offset += 2*ghost_face_bytes[dim]; // factor of two from fwd/back
+    }
+
+    for (int dim=0; dim<nDim; dim++) {
+      if ( !(comm_dim_partitioned(dim) || (no_comms_fill && R[dim])) ) continue;
+
+      //extract into a contiguous buffer
+      extractExtendedGaugeGhost(*this, dim, R, send_d, true);
+
+      if (comm_dim_partitioned(dim)) {
+	for (int dir=0; dir<2; dir++) recvStart(dim, dir);
+
+	for (int dir=0; dir<2; dir++) {
+	  // issue host-to-device copies if needed
+	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
+	    cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+			    ghost_face_bytes[dim], cudaMemcpyDeviceToHost, streams[dir]);
+	  }
+	}
+
+	// if neither direction is peer-to-peer then we need to synchronize
+	if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) cudaDeviceSynchronize();
+
+	// if we pass a stream to sendStart then we must ensure that stream is synchronized
+	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
+	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
+
+	for (int dir=0; dir<2; dir++) {
+	  // issue host-to-device copies if needed
+	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
+	    cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
+			    ghost_face_bytes[dim], cudaMemcpyHostToDevice, streams[dir]);
+	  }
+	}
+
       } else { // if just doing a local exchange to fill halo then need to swap faces
-	qudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], send_d[d], bytes[d], cudaMemcpyDeviceToDevice);
-	qudaMemcpy(recv_d[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0],
+		   ghost_face_bytes[dim], cudaMemcpyDeviceToDevice);
+	qudaMemcpy(from_face_dim_dir_d[b][dim][0], my_face_dim_dir_d[b][dim][1],
+		   ghost_face_bytes[dim], cudaMemcpyDeviceToDevice);
       }
 
       // inject back into the gauge field
-      extractExtendedGaugeGhost(*this, d, R, recv_d, false);
+      extractExtendedGaugeGhost(*this, dim, R, recv_d, false);
     }
 
-#ifndef GPU_COMMS
-    if (total_bytes > 0) pool_pinned_free(buffer);
-#endif
-
-    for (int d=0; d<nDim; d++) {
-      if ( !(commDimPartitioned(d) || (no_comms_fill && R[d])) ) continue;
-
-      if (commDimPartitioned(d)) {
-	comm_free(mh_send_fwd[d]);
-	comm_free(mh_send_back[d]);
-	comm_free(mh_recv_back[d]);
-	comm_free(mh_recv_fwd[d]);
-      }
-
-      pool_device_free(send_d[d]);
-      pool_device_free(recv_d[d]);
-    }
-
+    bufferIndex = 1-bufferIndex;
+    cudaDeviceSynchronize();
   }
 
   void cudaGaugeField::setGauge(void *gauge_)
@@ -471,33 +535,48 @@ namespace quda {
 	qudaMemcpy(gauge, buffer, bytes, cudaMemcpyHostToDevice);
 	pool_pinned_free(buffer);
       } else { // else on the GPU
-	void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
-	size_t ghost_bytes[8];
-	int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
-	for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
-	void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order(), geometry) : nullptr;
 
-	if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
-	  for (int d=0; d<geometry; d++) {
-	    qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyHostToDevice);
+	if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+	  // special case where we use zero-copy memory to read/write directly from MILC's data
+	  void *src_d;
+	  cudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
+	  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site array");
+
+	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
+	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
+	  } else {
+	    errorQuda("Ghost copy not supported here");
 	  }
-	} else {
-	  qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyHostToDevice);
-	}
 
-	if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	    src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	  for (int d=0; d<geometry; d++)
-	    qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
-
-	if (src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
-	  copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
-	  if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
 	} else {
-	  copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
+	  void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
+	  size_t ghost_bytes[8];
+	  int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
+	  for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
+	  void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order(), geometry) : nullptr;
+
+	  if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
+	    for (int d=0; d<geometry; d++) {
+	      qudaMemcpy(((void**)buffer)[d], ((void**)src.Gauge_p())[d], src.Bytes()/geometry, cudaMemcpyHostToDevice);
+	    }
+	  } else {
+	    qudaMemcpy(buffer, src.Gauge_p(), src.Bytes(), cudaMemcpyHostToDevice);
+	  }
+
+	  if (src.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
+	      src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+	    for (int d=0; d<geometry; d++)
+	      qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], cudaMemcpyHostToDevice);
+
+	  if (src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
+	    if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer, 3);
+	  } else {
+	    copyExtendedGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer);
+	  }
+	  free_gauge_buffer(buffer, src.Order(), src.Geometry());
+	  if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order(), geometry);
 	}
-	free_gauge_buffer(buffer, src.Order(), src.Geometry());
-	if (nFace > 0) free_ghost_buffer(ghost_buffer, src.Order(), geometry);
       } // reorder_location
     } else {
       errorQuda("Invalid gauge field type");
@@ -513,7 +592,11 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) { copy(cpu); }
+  void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
+    copy(cpu);
+    cudaDeviceSynchronize();
+    checkCudaError();
+  }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const
   {
@@ -521,35 +604,46 @@ namespace quda {
 
     if (reorder_location() == QUDA_CUDA_FIELD_LOCATION) {
 
-      void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
-
-      // Allocate space for ghost zone if required
-      size_t ghost_bytes[8];
-      int cpuNinternal = cpu.Reconstruct() != QUDA_RECONSTRUCT_NO ? cpu.Reconstruct() : 2*nColor*nColor;
-      for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * cpuNinternal * cpu.Precision();
-      void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, cpu.Order(), geometry) : nullptr;
-
-      if (cpu.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
-	copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge, ghost_buffer, 0);
-	if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge, ghost_buffer, 0, 3);
+      if (cpu.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
+	// special case where we use zero-copy memory to read/write directly from MILC's data
+	void *cpu_d;
+  cudaError_t error = cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
+  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site array");
+	if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
+	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
+	} else {
+	  errorQuda("Ghost copy not supported here");
+	}
       } else {
-	copyExtendedGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge);
+	void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
+
+	// Allocate space for ghost zone if required
+	size_t ghost_bytes[8];
+	int cpuNinternal = cpu.Reconstruct() != QUDA_RECONSTRUCT_NO ? cpu.Reconstruct() : 2*nColor*nColor;
+	for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * cpuNinternal * cpu.Precision();
+	void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, cpu.Order(), geometry) : nullptr;
+
+	if (cpu.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
+	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge, ghost_buffer, 0);
+	  if (geometry == QUDA_COARSE_GEOMETRY) copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge, ghost_buffer, 0, 3);
+	} else {
+	  copyExtendedGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, buffer, gauge);
+	}
+
+	if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
+	  for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDeviceToHost);
+	} else {
+	  qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDeviceToHost);
+	}
+
+	if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
+	    cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
+	  for (int d=0; d<geometry; d++)
+	    qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
+
+	free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
+	if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
       }
-
-      if (cpu.Order() == QUDA_QDP_GAUGE_ORDER) {
-	for (int d=0; d<geometry; d++) qudaMemcpy(((void**)cpu.gauge)[d], ((void**)buffer)[d], cpu.Bytes()/geometry, cudaMemcpyDeviceToHost);
-      } else {
-	qudaMemcpy(cpu.gauge, buffer, cpu.Bytes(), cudaMemcpyDeviceToHost);
-      }
-
-      if (cpu.Order() > 4 && GhostExchange() == QUDA_GHOST_EXCHANGE_PAD &&
-	  cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	for (int d=0; d<geometry; d++)
-	  qudaMemcpy(cpu.Ghost()[d], ghost_buffer[d], ghost_bytes[d], cudaMemcpyDeviceToHost);
-
-      free_gauge_buffer(buffer, cpu.Order(), cpu.Geometry());
-      if (nFace > 0) free_ghost_buffer(ghost_buffer, cpu.Order(), geometry);
-
     } else if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
 
       void *buffer = pool_pinned_malloc(bytes);
@@ -568,6 +662,9 @@ namespace quda {
 
     cpu.staggeredPhaseApplied = staggeredPhaseApplied;
     cpu.staggeredPhaseType = staggeredPhaseType;
+
+    cudaDeviceSynchronize();
+    checkCudaError();
   }
 
   void cudaGaugeField::backup() const {

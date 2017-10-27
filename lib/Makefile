@@ -20,7 +20,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
-	fat_force_quda.o llfat_quda.o					\
+	llfat_quda.o							\
 	gauge_force.o field_strength_tensor.o clover_quda.o		\
 	dslash_quda.o covDev.o dslash_wilson.o dslash_clover.o		\
 	dslash_clover_asym.o dslash_twisted_mass.o			\
@@ -28,8 +28,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
 	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
 	blas_quda.o multi_blas_quda.o copy_quda.o 			\
-	reduce_quda.o multi_reduce_quda.o face_buffer.o			\
-	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
+	reduce_quda.o multi_reduce_quda.o				\
+	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	copy_color_spinor.o copy_color_spinor_dd.o			\
 	copy_color_spinor_ds.o copy_color_spinor_dh.o			\
@@ -45,7 +45,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\
 	eig_lanczos_quda.o ritz_quda.o eig_solver.o 			\
 	blas_cublas.o blas_magma.o					\
-	misc_helpers.o inv_mpcg_quda.o inv_mpbicgstab_quda.o		\
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o				\
 	pgauge_exchange.o pgauge_init.o pgauge_heatbath.o random.o	\
 	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
 	pgauge_det_trace.o clover_outer_product.o			\
@@ -54,20 +54,20 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
 	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
 	quda_memcpy.o quda_arpack_interface.o deflation.o ${QIO_UTIL}   \
-	spinor_gauss.o gauge_random.o clover_rho.o
+	spinor_gauss.o gauge_random.o checksum.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	dirac_quda.h dslash_quda.h enum_quda.h gauge_force_quda.h	\
 	gauge_update_quda.h invert_quda.h llfat_quda.h quda.h		\
-	quda_internal.h util_quda.h face_quda.h tune_quda.h		\
+	quda_internal.h util_quda.h tune_quda.h				\
 	comm_quda.h lattice_field.h gauge_field.h double_single.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
 	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h	\
 	random_quda.h pgauge_monte.h unitarization_links.h		\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
-	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
+	numa_affinity.h texture.h object.h momentum.h			\
 	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
 	qio_util.h quda_arpack_interface.h deflation.h
 

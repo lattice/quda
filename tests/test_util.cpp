@@ -13,7 +13,6 @@
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
 
-#include <face_quda.h>
 #include <dslash_quda.h>
 #include "misc.h"
 

@@ -545,7 +545,7 @@ namespace quda {
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector* >(field + parity*offset)[x + stride*i] = vecTmp;
+	    vector_store(field + parity*offset, x + stride*i, vecTmp);
 	  }
 	}
 
@@ -600,8 +600,7 @@ namespace quda {
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast< RegVector* >(v)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector*>
-	      (ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N)[i*faceVolumeCB[dim]+x] = vecTmp;
+	    vector_store(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N, i*faceVolumeCB[dim]+x, vecTmp);
           }
 	}
 
@@ -1079,21 +1078,21 @@ namespace quda {
 	{ if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
 	virtual ~QDPJITDiracOrder() { ; }
 
-	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x, int parity=1) const {
+	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x, int parity=0) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		v[(s*Nc+c)*2+z] = field[(((z*Nc + c)*Ns + s)*2 + parity)*volumeCB + x];
+		v[(s*Nc+c)*2+z] = field[(((z*Nc + c)*Ns + s)*2 + (1-parity))*volumeCB + x];
 	      }
 	    }
 	  }
 	}
 
-	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x, int parity=1) {
+	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x, int parity=0) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		field[(((z*Nc + c)*Ns + s)*2 + parity)*volumeCB + x] = v[(s*Nc+c)*2+z];
+		field[(((z*Nc + c)*Ns + s)*2 + (1-parity))*volumeCB + x] = v[(s*Nc+c)*2+z];
 	      }
 	    }
 	  }

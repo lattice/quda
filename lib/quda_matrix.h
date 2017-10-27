@@ -112,7 +112,8 @@ namespace quda {
 
 	template<class U>
 	  __device__ __host__ inline void operator=(const Matrix<U,N> & b) {
-	  for(int i=0; i<N*N; i++) data[i] = b.data[i];
+#pragma unroll
+	  for (int i=0; i<N*N; i++) data[i] = b.data[i];
 	}
 
 	template<typename S>
@@ -126,6 +127,20 @@ namespace quda {
 
 	template<typename S>
 	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<typename RealType<T>::type, S> &s);
+
+	/**
+	   Return 64-bit XOR checksum computed from the
+	   elements of the matrix.  Compute the checksum on each
+	   64-bit word that constitutes the Matrix
+	 */
+	__device__ __host__ inline uint64_t checksum() const {
+	  // ensure length is rounded up to 64-bit multiple
+	  constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
+	  const uint64_t* base = reinterpret_cast<const uint64_t*>( static_cast< const void* >(data) );
+	  uint64_t checksum_ = base[0];
+	  for (int i=1; i<length; i++) checksum_ ^= base[i];
+	  return checksum_;
+        }
     };
 
   /**
@@ -382,9 +397,12 @@ namespace quda {
     __device__ __host__ inline Mat<T,N> operator*(const Mat<T,N> &a, const Mat<T,N> &b)
     {
       Mat<T,N> result;
+#pragma unroll
       for (int i=0; i<N; i++) {
+#pragma unroll
 	for (int k=0; k<N; k++) {
 	  result(i,k) = a(i,0) * b(0,k);
+#pragma unroll
 	  for (int j=1; j<N; j++) {
 	    result(i,k) += a(i,j) * b(j,k);
 	  }
@@ -435,9 +453,12 @@ namespace quda {
     Matrix<typename PromoteTypeId<T,U>::Type,N> operator*(const Matrix<T,N> &a, const Matrix<U,N> &b)
     {
       Matrix<typename PromoteTypeId<T,U>::Type,N> result;
+#pragma unroll
       for (int i=0; i<N; i++) {
+#pragma unroll
 	for (int k=0; k<N; k++) {
 	  result(i,k) = a(i,0) * b(0,k);
+#pragma unroll
 	  for (int j=1; j<N; j++) {
 	    result(i,k) += a(i,j) * b(j,k);
 	  }
@@ -464,8 +485,10 @@ namespace quda {
     __device__ __host__ inline
     Matrix<T,N> conj(const Matrix<T,N> & other){
       Matrix<T,N> result;
-      for(int i=0; i<N; ++i){
-        for(int j=0; j<N; ++j){
+#pragma unroll
+      for (int i=0; i<N; ++i){
+#pragma unroll
+        for (int j=0; j<N; ++j){
           result(i,j) = conj( other(j,i) );
         }
       }
@@ -519,9 +542,11 @@ namespace quda {
     __device__ __host__ inline
     void setIdentity(Matrix<T,N>* m){
 
-      for(int i=0; i<N; ++i){
+#pragma unroll
+      for (int i=0; i<N; ++i){
         (*m)(i,i) = 1;
-        for(int j=i+1; j<N; ++j){
+#pragma unroll
+        for (int j=i+1; j<N; ++j){
           (*m)(i,j) = (*m)(j,i) = 0;
         }
       }
@@ -533,9 +558,11 @@ namespace quda {
     __device__ __host__ inline
     void setIdentity(Matrix<float2,N>* m){
 
-      for(int i=0; i<N; ++i){
+#pragma unroll
+      for (int i=0; i<N; ++i){
         (*m)(i,i) = make_float2(1,0);
-        for(int j=i+1; j<N; ++j){
+#pragma unroll
+        for (int j=i+1; j<N; ++j){
           (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);    
         }
       }
@@ -547,9 +574,11 @@ namespace quda {
     __device__ __host__ inline
     void setIdentity(Matrix<double2,N>* m){
 
-      for(int i=0; i<N; ++i){
+#pragma unroll
+      for (int i=0; i<N; ++i){
         (*m)(i,i) = make_double2(1,0);
-        for(int j=i+1; j<N; ++j){
+#pragma unroll
+        for (int j=i+1; j<N; ++j){
           (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);    
         }
       }
@@ -562,8 +591,10 @@ namespace quda {
     __device__ __host__ inline
     void setZero(Matrix<T,N>* m){
 
-      for(int i=0; i<N; ++i){
-        for(int j=0; j<N; ++j){
+#pragma unroll
+      for (int i=0; i<N; ++i){
+#pragma unroll
+        for (int j=0; j<N; ++j){
           (*m)(i,j) = 0;
         }
       }
@@ -575,8 +606,10 @@ namespace quda {
     __device__ __host__ inline
     void setZero(Matrix<float2,N>* m){
 
-      for(int i=0; i<N; ++i){
-        for(int j=0; j<N; ++j){
+#pragma unroll
+      for (int i=0; i<N; ++i){
+#pragma unroll
+        for (int j=0; j<N; ++j){
           (*m)(i,j) = make_float2(0.,0.);
         }
       }
@@ -588,8 +621,10 @@ namespace quda {
     __device__ __host__ inline
     void setZero(Matrix<double2,N>* m){
 
-      for(int i=0; i<N; ++i){
-        for(int j=0; j<N; ++j){
+#pragma unroll
+      for (int i=0; i<N; ++i){
+#pragma unroll
+        for (int j=0; j<N; ++j){
           (*m)(i,j) = make_double2(0.,0.);
         }
       }
@@ -605,7 +640,9 @@ namespace quda {
 
     // second make it traceless
     real imag_trace = 0.0;
+#pragma unroll
     for (int i=0; i<N; i++) imag_trace += am(i,i).y;
+#pragma unroll
     for (int i=0; i<N; i++) {
       am(i,i).y -= imag_trace/N;
     }
@@ -645,7 +682,8 @@ namespace quda {
     __device__  __host__ inline
     void copyColumn(const Matrix<T,N>& m, int c, Array<T,N>* a)
     {
-      for(int i=0; i<N; ++i){
+#pragma unroll
+      for (int i=0; i<N; ++i){
         (*a)[i] = m(i,c); // c is the column index
       }
       return;
@@ -655,9 +693,10 @@ namespace quda {
   template<class T, int N>
     __device__ __host__ inline
     void outerProd(const Array<T,N>& a, const Array<T,N> & b, Matrix<T,N>* m){
-      for(int i=0; i<N; ++i){
+#pragma unroll
+      for (int i=0; i<N; ++i){
         const T conjb_i = conj(b[i]);
-        for(int j=0; j<N; ++j){
+        for (int j=0; j<N; ++j){
           (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
         }
       }
@@ -667,9 +706,11 @@ namespace quda {
   template<class T, int N>
     __device__ __host__ inline 
     void outerProd(const T (&a)[N], const T (&b)[N], Matrix<T,N>* m){
-      for(int i=0; i<N; ++i){
+#pragma unroll
+      for (int i=0; i<N; ++i){
         const T conjb_i = conj(b[i]);
-        for(int j=0; j<N; ++j){
+#pragma unroll
+        for (int j=0; j<N; ++j){
           (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
         }
       }
@@ -680,8 +721,10 @@ namespace quda {
   // Need some print utilities
   template<class T, int N>
     std::ostream & operator << (std::ostream & os, const Matrix<T,N> & m){
-      for(int i=0; i<N; ++i){
-        for(int j=0; j<N; ++j){
+#pragma unroll
+      for (int i=0; i<N; ++i){
+#pragma unroll
+        for (int j=0; j<N; ++j){
           os << m(i,j) << " ";
         }
         if(i<N-1) os << std::endl;
@@ -692,7 +735,7 @@ namespace quda {
 
   template<class T, int N>
     std::ostream & operator << (std::ostream & os, const Array<T,N> & a){
-      for(int i=0; i<N; ++i){
+      for (int i=0; i<N; ++i){
         os << a[i] << " ";
       }
       return os;
@@ -703,7 +746,8 @@ namespace quda {
     __device__ inline
     void loadLinkVariableFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<U,3> *link)
     {
-      for(int i=0; i<9; ++i){
+#pragma unroll
+      for (int i=0; i<9; ++i){
         link->data[i] = array[idx + (dir*9 + i)*stride];
       }
       return;
@@ -714,7 +758,8 @@ namespace quda {
     __device__ inline 
     void loadMatrixFromArray(const T* const array, const int idx, const int stride, Matrix<U,N> *mat)
     {
-      for(int i=0; i<(N*N); ++i){
+#pragma unroll
+      for (int i=0; i<(N*N); ++i){
         mat->data[i] = array[idx + i*stride];
       }
     }
@@ -724,7 +769,8 @@ namespace quda {
     void loadLinkVariableFromArray(const float2* const array, const int dir, const int idx, const int stride, Matrix<complex<double>,3> *link)
     { 
       float2 single_temp; 
-      for(int i=0; i<9; ++i){
+#pragma unroll
+      for (int i=0; i<9; ++i){
         single_temp = array[idx + (dir*9 + i)*stride];
         link->data[i].x = single_temp.x;
         link->data[i].y = single_temp.y;
@@ -738,7 +784,8 @@ namespace quda {
     __device__ inline 
     void writeMatrixToArray(const Matrix<T,N>& mat, const int idx, const int stride, U* const array)
     {
-      for(int i=0; i<(N*N); ++i){
+#pragma unroll
+      for (int i=0; i<(N*N); ++i){
         array[idx + i*stride] = mat.data[i];
       }
     }
@@ -746,7 +793,8 @@ namespace quda {
   __device__ inline 
     void appendMatrixToArray(const Matrix<complex<double>,3>& mat, const int idx, const int stride, double2* const array)
     {
-      for(int i=0; i<9; ++i){
+#pragma unroll
+      for (int i=0; i<9; ++i){
         array[idx + i*stride].x += mat.data[i].x;
         array[idx + i*stride].y += mat.data[i].y;
       }
@@ -755,7 +803,8 @@ namespace quda {
   __device__ inline 
     void appendMatrixToArray(const Matrix<complex<float>,3>& mat, const int idx, const int stride, float2* const array)
     {
-      for(int i=0; i<9; ++i){
+#pragma unroll
+      for (int i=0; i<9; ++i){
         array[idx + i*stride].x += mat.data[i].x;
         array[idx + i*stride].y += mat.data[i].y;
       }
@@ -766,7 +815,8 @@ namespace quda {
     __device__ inline
     void writeLinkVariableToArray(const Matrix<T,3> & link, const int dir, const int idx, const int stride, U* const array)
     {
-      for(int i=0; i<9; ++i){ 
+#pragma unroll
+      for (int i=0; i<9; ++i){ 
         array[idx + (dir*9 + i)*stride] = link.data[i];
       }
       return;
@@ -780,7 +830,8 @@ namespace quda {
     {
       float2 single_temp;
 
-      for(int i=0; i<9; ++i){ 
+#pragma unroll
+      for (int i=0; i<9; ++i){ 
         single_temp.x = link.data[i].x;
         single_temp.y = link.data[i].y;
         array[idx + (dir*9 + i)*stride] = single_temp;
@@ -898,8 +949,10 @@ namespace quda {
     } 
   // template this! 
   inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
-    for(int i=0; i<3; ++i){
-      for(int j=0; j<3; ++j){
+#pragma unroll
+    for (int i=0; i<3; ++i){
+#pragma unroll
+      for (int j=0; j<3; ++j){
         (*link)(i,j).x = array[(i*3+j)*2];
         (*link)(i,j).y = array[(i*3+j)*2 + 1];
       }
@@ -909,8 +962,10 @@ namespace quda {
 
   template<class Cmplx, class Real>
     inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
-      for(int i=0; i<3; ++i){
-        for(int j=0; j<3; ++j){
+#pragma unroll
+      for (int i=0; i<3; ++i){
+#pragma unroll
+        for (int j=0; j<3; ++j){
           (*link)(i,j).x = array[(i*3+j)*2];
           (*link)(i,j).y = array[(i*3+j)*2 + 1];
         }
@@ -921,8 +976,10 @@ namespace quda {
 
   // and this!
   inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
-    for(int i=0; i<3; ++i){
-      for(int j=0; j<3; ++j){
+#pragma unroll
+    for (int i=0; i<3; ++i){
+#pragma unroll
+      for (int j=0; j<3; ++j){
         array[(i*3+j)*2] = link(i,j).x;
         array[(i*3+j)*2 + 1] = link(i,j).y;
       }
@@ -933,8 +990,10 @@ namespace quda {
   // and this!
   template<class Cmplx, class Real>
     inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
-      for(int i=0; i<3; ++i){
-        for(int j=0; j<3; ++j){
+#pragma unroll
+      for (int i=0; i<3; ++i){
+#pragma unroll
+        for (int j=0; j<3; ++j){
           array[(i*3+j)*2] = link(i,j).x;
           array[(i*3+j)*2 + 1] = link(i,j).y;
         }
@@ -996,9 +1055,11 @@ namespace quda {
   {
     const Matrix<Cmplx,3> identity = conj(matrix)*matrix;
 
-    for(int i=0; i<3; ++i){
+#pragma unroll
+    for (int i=0; i<3; ++i){
       if( fabs(identity(i,i).x - 1.0) > max_error || fabs(identity(i,i).y) > max_error) return false;
-      for(int j=i+1; j<3; ++j){
+#pragma unroll
+      for (int j=i+1; j<3; ++j){
 	if( fabs(identity(i,j).x) > max_error || fabs(identity(i,j).y) > max_error
 	    ||  fabs(identity(j,i).x) > max_error || fabs(identity(j,i).y) > max_error ){
 	  return false;
@@ -1006,7 +1067,9 @@ namespace quda {
       }
     }
 
+#pragma unroll 
     for (int i=0; i<3; i++) {
+#pragma unroll
       for (int j=0; j<3; j++) {
 	if (isnan(matrix(i,j).x) || isnan(matrix(i,j).y)) return false;
       }
@@ -1026,8 +1089,10 @@ namespace quda {
       int j=0;
       
       //error = ||U^dagger U - I||_L2
-      for(i=0; i<3; ++i) 
-	for(j=0; j<3; ++j) 
+#pragma unroll
+      for (i=0; i<3; ++i) 
+#pragma unroll
+	for (j=0; j<3; ++j) 
 	  if(i==j) {
 	    temp = identity_comp(i,j);
 	    temp -= 1.0;

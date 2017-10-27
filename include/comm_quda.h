@@ -1,5 +1,5 @@
-#ifndef _COMM_QUDA_H
-#define _COMM_QUDA_H
+#pragma once
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -140,6 +140,21 @@ extern "C" {
   int comm_gpuid(void);
 
   /**
+     @brief Gather all hostnames
+     @param[out] hostname_recv_buf char array of length
+     128*comm_size() that will be filled in GPU ids for all processes.
+     Each hostname is in rank order, with 128 bytes for each.
+   */
+  void comm_gather_hostname(char *hostname_recv_buf);
+
+  /**
+     @brief Gather all GPU ids
+     @param[out] gpuid_recv_buf int array of length comm_size() that
+     will be filled in GPU ids for all processes (in rank order).
+   */
+  void comm_gather_gpuid(int *gpuid_recv_buf);
+
+  /**
      Enabled peer-to-peer communication.
      @param hostname_buf Array that holds all process hostnames
    */
@@ -212,12 +227,24 @@ extern "C" {
   void comm_allreduce_max(double* data);
   void comm_allreduce_array(double* data, size_t size);
   void comm_allreduce_int(int* data);
+  void comm_allreduce_xor(uint64_t *data);
   void comm_broadcast(void *data, size_t nbytes);
   void comm_barrier(void);
   void comm_abort(int status);
 
+  void reduceMaxDouble(double &);
+  void reduceDouble(double &);
+  void reduceDoubleArray(double *, const int len);
+  int commDim(int);
+  int commCoords(int);
+  int commDimPartitioned(int dir);
+  void commDimPartitionedSet(int dir);
+  bool commGlobalReduction();
+  void commGlobalReductionSet(bool global_reduce);
+
+  bool commAsyncReduction();
+  void commAsyncReductionSet(bool global_reduce);
+
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _COMM_QUDA_H */

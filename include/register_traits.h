@@ -11,6 +11,7 @@
 #include <quda_internal.h>
 #include <generics/ldg.h>
 #include <complex_quda.h>
+#include <inline_ptx.h>
 
 namespace quda {
 
@@ -271,12 +272,62 @@ namespace quda {
   template <> struct TexVectorType<short, 4>{typedef short4 type; };
 
   template <typename VectorType>
-    __device__ __host__ VectorType vector_load(void *ptr, int idx) {
+    __device__ __host__ inline VectorType vector_load(void *ptr, int idx) {
 #define USE_LDG
 #if defined(__CUDA_ARCH__) && defined(USE_LDG)
     return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
 #else
     return reinterpret_cast< VectorType* >(ptr)[idx];
+#endif
+  }
+
+  template <typename VectorType>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value) {
+    reinterpret_cast< __restrict__ VectorType* >(ptr)[idx] = value;
+  }
+
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const double2 &value) {
+#if defined(__CUDA_ARCH__)
+    store_streaming_double2(reinterpret_cast<double2*>(ptr)+idx, value.x, value.y);
+#else
+    reinterpret_cast<double2*>(ptr)[idx] = value;
+#endif
+  }
+
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const float4 &value) {
+#if defined(__CUDA_ARCH__)
+    store_streaming_float4(reinterpret_cast<float4*>(ptr)+idx, value.x, value.y, value.z, value.w);
+#else
+    reinterpret_cast<float4*>(ptr)[idx] = value;
+#endif
+  }
+
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const float2 &value) {
+#if defined(__CUDA_ARCH__)
+    store_streaming_float2(reinterpret_cast<float2*>(ptr)+idx, value.x, value.y);
+#else
+    reinterpret_cast<float2*>(ptr)[idx] = value;
+#endif
+  }
+
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const short4 &value) {
+#if defined(__CUDA_ARCH__)
+    store_streaming_short4(reinterpret_cast<short4*>(ptr)+idx, value.x, value.y, value.z, value.w);
+#else
+    reinterpret_cast<short4*>(ptr)[idx] = value;
+#endif
+  }
+
+  template <>
+    __device__ __host__ inline void vector_store(void *ptr, int idx, const short2 &value) {
+#if defined(__CUDA_ARCH__)
+    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, value.x, value.y);
+#else
+    reinterpret_cast<short2*>(ptr)[idx] = value;
 #endif
   }
 

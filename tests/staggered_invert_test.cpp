@@ -9,7 +9,6 @@
 #include <staggered_dslash_reference.h>
 #include <quda.h>
 #include <string.h>
-#include <face_quda.h>
 #include "misc.h"
 #include <gauge_field.h>
 #include <blas_quda.h>
@@ -18,10 +17,6 @@
 #include <qmp.h>
 #elif defined(MPI_COMMS)
 #include <mpi.h>
-#endif
-
-#ifdef MULTI_GPU
-#include <face_quda.h>
 #endif
 
 #define MAX(a,b) ((a)>(b)?(a):(b))

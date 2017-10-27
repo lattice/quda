@@ -1,6 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <limits>
+#include <memory>
+#include <iostream>
+
+#ifdef BLOCKSOLVER
+#include <Eigen/Dense>
+#endif
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,14 +15,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
-#include <limits>
-#include <cmath>
-
-#include <face_quda.h>
-
-#include <iostream>
-
 
 namespace quda {
 

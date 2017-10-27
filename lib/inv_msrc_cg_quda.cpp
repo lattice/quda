@@ -9,9 +9,6 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <sys/time.h>
-
-#include <face_quda.h>
-
 #include <iostream>
 
 namespace quda {

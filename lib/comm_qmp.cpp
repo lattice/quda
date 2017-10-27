@@ -15,9 +15,6 @@ struct MsgHandle_s {
 };
 
 static int gpuid = -1;
-static bool peer2peer_enabled[2][4] = { {false,false,false,false},
-                                        {false,false,false,false} };
-static bool peer2peer_init = false;
 
 static char partition_string[16];
 static char topology_string[16];
@@ -31,7 +28,10 @@ static char topology_string[16];
 #include <mpi.h>
 #endif
 
-void get_hostnames(char *hostname_recv_buf) {
+// There are more efficient ways to do the following,
+// but it doesn't really matter since this function should be
+// called just once.
+void comm_gather_hostname(char *hostname_recv_buf) {
   // determine which GPU this rank will use
   char *hostname = comm_hostname();
 
@@ -54,13 +54,16 @@ void get_hostnames(char *hostname_recv_buf) {
 }
 
 
-void get_gpuid(int *gpuid_recv_buf) {
+// There are more efficient ways to do the following,
+// but it doesn't really matter since this function should be
+// called just once.
+void comm_gather_gpuid(int *gpuid_recv_buf) {
 
 #ifdef USE_MPI_GATHER
   MPI_Allgather(&gpuid, 1, MPI_INT, gpuid_recv_buf, 1, MPI_INT, MPI_COMM_WORLD);
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
-  // local hostname to all other nodes
+  // local gpu to all other nodes
   for (int i=0; i<comm_size(); i++) {
     int data = (i == comm_rank()) ? gpuid : 0;
     QMP_sum_int(&data);
@@ -90,7 +93,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
   // determine which GPU this rank will use
   char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
-  get_hostnames(hostname_recv_buf);
+  comm_gather_hostname(hostname_recv_buf);
 
   gpuid = 0;
   for (int i = 0; i < comm_rank(); i++) {
@@ -121,75 +124,6 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
   snprintf(topology_string, 16, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
 }
-
-void comm_peer2peer_init(const char* hostname_recv_buf)
-{
-  if (peer2peer_init) return;
-
-  bool disable_peer_to_peer = false;
-  char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
-  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
-    if (getVerbosity() > QUDA_SILENT)
-      printfQuda("Disabling peer-to-peer access\n");
-    disable_peer_to_peer = true;
-  }
-
-  if (!peer2peer_init && !disable_peer_to_peer) {
-
-    // first check that the local GPU supports UVA
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop,gpuid);
-    if(!prop.unifiedAddressing) return;
-
-    comm_set_neighbor_ranks();
-
-    char *hostname = comm_hostname();
-    int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
-
-    get_gpuid(gpuid_recv_buf);
-
-    for(int dir=0; dir<2; ++dir){ // forward/backward directions
-      for(int dim=0; dim<4; ++dim){
-	int neighbor_rank = comm_neighbor_rank(dir,dim);
-	if(neighbor_rank == comm_rank()) continue;
-
-	// if the neighbors are on the same
-	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
-	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
-	  int canAccessPeer[2];
-	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
-	  if(canAccessPeer[0]*canAccessPeer[1]){
-	    peer2peer_enabled[dir][dim] = true;
-	    if (getVerbosity() > QUDA_SILENT)
-	      printf("Peer-to-peer enabled for rank %d gpu=%d with neighbor %d gpu=%d dir=%d, dim=%d\n",
-		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-	  }
-	} // on the same node
-      } // different dimensions - x, y, z, t
-    } // different directions - forward/backward
-
-    host_free(gpuid_recv_buf);
-  }
-
-  peer2peer_init = true;
-
-  // set gdr enablement
-  if (comm_gdr_enabled()) {
-    printfQuda("Enabling GPU-Direct RDMA access\n");
-  } else {
-    printfQuda("Disabling GPU-Direct RDMA access\n");
-  }
-
-  checkCudaErrorNoSync();
-  return;
-}
-
-
-bool comm_peer2peer_enabled(int dir, int dim){
-  return peer2peer_enabled[dir][dim];
-}
-
 
 int comm_rank(void)
 {
@@ -340,6 +274,11 @@ void comm_allreduce_int(int* data)
   QMP_CHECK( QMP_sum_int(data) );
 }
 
+void comm_allreduce_xor(uint64_t *data)
+{
+  if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
+  QMP_CHECK( QMP_xor_ulong(data); );
+}
 
 void comm_broadcast(void *data, size_t nbytes)
 {

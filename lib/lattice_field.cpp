@@ -4,18 +4,8 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
-#include <face_quda.h>
 
 namespace quda {
-
-  void* LatticeField::bufferPinned[] = {NULL};
-  bool LatticeField::bufferPinnedInit[] = {false};
-  size_t LatticeField::bufferPinnedBytes[] = {0};
-  size_t LatticeField::bufferPinnedResizeCount = 0;
-
-  void* LatticeField::bufferDevice = NULL;
-  bool LatticeField::bufferDeviceInit = false;
-  size_t LatticeField::bufferDeviceBytes = 0;
 
   bool LatticeField::initIPCComms = false;
 
@@ -45,11 +35,14 @@ namespace quda {
 
   void* LatticeField::ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
+  bool LatticeField::initGhostFaceBuffer = false;
+  size_t LatticeField::ghostFaceBytes = 0;
+
   int LatticeField::bufferIndex = 0;
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
     : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
-      siteSubset(field.SiteSubset()), mem_type(field.MemType()),  ghostExchange(field.GhostExchange())
+      siteSubset(field.SiteSubset()), mem_type(field.MemType()), ghostExchange(field.GhostExchange())
   {
     for(int dir=0; dir<nDim; ++dir) {
       x[dir] = field.X()[dir];
@@ -59,7 +52,8 @@ namespace quda {
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
-      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), initComms(false), mem_type(param.mem_type),
+      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), ghost_bytes(0),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
@@ -84,12 +78,22 @@ namespace quda {
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
 
+    switch (precision) {
+    case QUDA_DOUBLE_PRECISION:
+    case QUDA_SINGLE_PRECISION:
+    case QUDA_HALF_PRECISION:
+      break;
+    default:
+      errorQuda("Unknown precision %d", precision);
+    }
+
     setTuningString();
   }
 
   LatticeField::LatticeField(const LatticeField &field)
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
-      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), initComms(false), mem_type(field.mem_type),
+      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
@@ -118,6 +122,164 @@ namespace quda {
   }
 
   LatticeField::~LatticeField() { }
+
+  void LatticeField::allocateGhostBuffer(size_t ghost_bytes) const
+  {
+    // only allocate if not already allocated or buffer required is bigger than previously
+    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes) {
+
+      if (initGhostFaceBuffer) {
+	if (ghost_bytes) {
+	  for (int b=0; b<2; b++) {
+	    device_pinned_free(ghost_recv_buffer_d[b]);
+	    device_pinned_free(ghost_send_buffer_d[b]);
+	    host_free(ghost_pinned_buffer_h[b]);
+	  }
+	}
+      }
+
+      if (ghost_bytes > 0) {
+	for (int b=0; b<2; ++b) {
+	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+
+	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+
+	  // pinned buffer used for sending and receiving
+	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
+
+	  // set the matching device-mapper pointer
+	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
+	}
+
+	initGhostFaceBuffer = true;
+	ghostFaceBytes = ghost_bytes;
+      }
+
+      LatticeField::ghost_field_reset = true; // this signals that we must reset the IPC comms
+    }
+
+  }
+
+  void LatticeField::freeGhostBuffer(void)
+  {
+    destroyIPCComms();
+
+    if (!initGhostFaceBuffer) return;
+
+    for (int b=0; b<2; b++) {
+      // free receive buffer
+      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
+      ghost_recv_buffer_d[b] = nullptr;
+
+      // free send buffer
+      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
+      ghost_send_buffer_d[b] = nullptr;
+
+      // free pinned memory buffers
+      if (ghost_pinned_buffer_h[b]) host_free(ghost_pinned_buffer_h[b]);
+      ghost_pinned_buffer_h[b] = nullptr;
+      ghost_pinned_buffer_hd[b] = nullptr;
+    }
+    initGhostFaceBuffer = false;
+  }
+
+  void LatticeField::createComms(bool no_comms_fill)
+  {
+    destroyComms(); // if we are requesting a new number of faces destroy and start over
+
+    // initialize the ghost pinned buffers
+    for (int b=0; b<2; b++) {
+      my_face_h[b] = ghost_pinned_buffer_h[b];
+      my_face_hd[b] = ghost_pinned_buffer_hd[b];
+      from_face_h[b] = static_cast<char*>(my_face_h[b]) + ghost_bytes;
+      from_face_hd[b] = static_cast<char*>(my_face_hd[b]) + ghost_bytes;
+    }
+
+    // initialize ghost send pointers
+    size_t offset = 0;
+    for (int i=0; i<nDimComms; i++) {
+      if (!commDimPartitioned(i) && no_comms_fill==false) continue;
+
+      for (int b=0; b<2; ++b) {
+	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
+	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
+
+	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
+	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
+
+	my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
+      } // loop over b
+
+      offset += ghost_face_bytes[i];
+
+      for (int b=0; b<2; ++b) {
+	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
+	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
+
+	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
+	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
+
+	my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
+	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
+      } // loop over b
+      offset += ghost_face_bytes[i];
+
+    } // loop over dimension
+
+    bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled
+
+    // initialize the message handlers
+    for (int i=0; i<nDimComms; i++) {
+      if (!commDimPartitioned(i)) continue;
+
+      for (int b=0; b<2; ++b) {
+	mh_send_fwd[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
+	mh_send_back[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
+
+	mh_recv_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
+	mh_recv_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
+
+	mh_send_rdma_fwd[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	mh_send_rdma_back[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
+
+	mh_recv_rdma_fwd[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
+	mh_recv_rdma_back[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
+      } // loop over b
+
+    } // loop over dimension
+
+    initComms = true;
+    checkCudaError();
+  }
+
+  void LatticeField::destroyComms()
+  {
+    if (initComms) {
+
+      for (int b=0; b<2; ++b) {
+	for (int i=0; i<nDimComms; i++) {
+	  if (commDimPartitioned(i)) {
+	    if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
+	    if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
+	    if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
+	    if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
+
+	    if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
+	    if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
+	    if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
+	    if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
+	  }
+	}
+      } // loop over b
+
+      initComms = false;
+      checkCudaError();
+    }
+
+  }
 
   void LatticeField::createIPCComms() {
     if ( initIPCComms && !ghost_field_reset ) return;
@@ -166,7 +328,8 @@ namespace quda {
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
-	const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
+	// even if comm_dim(2) == 2, we not have p2p enabled in both directions, so check this
+	const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
@@ -269,7 +432,7 @@ namespace quda {
     for (int dim=0; dim<4; ++dim) {
 
       if (comm_dim(dim)==1) continue;
-      const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
+      const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
@@ -360,12 +523,11 @@ namespace quda {
 	       typeid(*this)==typeid(cpuColorSpinorField) ||
 	       typeid(*this)==typeid(cpuGaugeField)) {
       location = QUDA_CPU_FIELD_LOCATION;
-      location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
     }
     return location;
-}
+  }
 
   void LatticeField::read(char *filename) {
     errorQuda("Not implemented");
@@ -392,41 +554,6 @@ namespace quda {
 
     errorQuda("Unsupported field type");
     return -1;
-  }
-
-  void LatticeField::resizeBufferPinned(size_t bytes, const int idx) const {
-    if ((bytes > bufferPinnedBytes[idx] || bufferPinnedInit[idx] == 0) && bytes > 0) {
-      if (bufferPinnedInit[idx]) host_free(bufferPinned[idx]);
-      bufferPinned[idx] = pinned_malloc(bytes);
-      bufferPinnedBytes[idx] = bytes;
-      bufferPinnedInit[idx] = true;
-      bufferPinnedResizeCount++;
-      if (bufferPinnedResizeCount == 0) bufferPinnedResizeCount = 1; // keep 0 as initialization state
-    }
-  }
-
-  void LatticeField::resizeBufferDevice(size_t bytes) const {
-    if ((bytes > bufferDeviceBytes || bufferDeviceInit == 0) && bytes > 0) {
-      if (bufferDeviceInit) device_free(bufferDevice);
-      bufferDevice = device_malloc(bytes);
-      bufferDeviceBytes = bytes;
-      bufferDeviceInit = true;
-    }
-  }
-
-  void LatticeField::freeBuffer(int index) {
-    if (bufferPinnedInit[index]) {
-      host_free(bufferPinned[index]);
-      bufferPinned[index] = NULL;
-      bufferPinnedBytes[index] = 0;
-      bufferPinnedInit[index] = false;
-    }
-    if (bufferDeviceInit) {
-      device_free(bufferDevice);
-      bufferDevice = NULL;
-      bufferDeviceBytes = 0;
-      bufferDeviceInit = false;
-    }
   }
 
   // This doesn't really live here, but is fine for the moment
