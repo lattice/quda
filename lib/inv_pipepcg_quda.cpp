@@ -130,6 +130,10 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     ColorSpinorParam csParam(b);
+
+    ColorSpinorField *yp = nullptr;
+    ColorSpinorField *lp = nullptr;
+
     if (!init) {
       // high precision fields:
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -144,6 +148,9 @@ namespace quda {
       np = ColorSpinorField::Create(csParam);
       mp = ColorSpinorField::Create(csParam);
       up = ColorSpinorField::Create(csParam);
+
+      yp = ColorSpinorField::Create(csParam);
+      lp = ColorSpinorField::Create(csParam); 
 
       tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
 
@@ -170,6 +177,9 @@ namespace quda {
     ColorSpinorField &m = *mp;
     ColorSpinorField &z = *zp;
 
+    ColorSpinorField &y = *yp;
+    ColorSpinorField &l = *lp;
+
     ColorSpinorField &pPre = *p_pre;
     ColorSpinorField &rPre = *r_pre;
     ColorSpinorField &tmp  = *tmpp;
@@ -192,7 +202,7 @@ namespace quda {
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     double alpha, beta;
-    double gamma, gammajm1;
+    double gamma, gammajm1, gamma_aux;
     double delta;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -212,7 +222,7 @@ namespace quda {
       u = r;
     }
 
-    mat(w, u, tmp); // => w = A*u;
+    matSloppy(w, u, tmp); // => w = A*u;
 
     //Remark : no overlap here. 
     gamma = blas::reDotProduct(r,u); 
@@ -221,6 +231,17 @@ namespace quda {
 
     alpha = gamma / delta;
     beta  = 0.0;
+
+    double rNorm = sqrt(mNorm);
+    double r0Norm = rNorm;
+    double maxrx = rNorm;
+    double maxrr = rNorm;
+
+    const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
+
+    int resIncrease = 0;
+    int resIncreaseTotal = 0;
 
     blas::flops = 0;
 
@@ -252,74 +273,138 @@ namespace quda {
       m = w;
     }
 
-    mat(n, m, tmp);
+    matSloppy(n, m, tmp);
 
     PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
 
     while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
 
-      if(j > 0) {
-         beta  = gamma / gammajm1;
-         alpha = gamma / (delta - beta / alpha * gamma); 
-      } 
+      if(rNorm > maxrx) maxrx = mNorm;
+      if(rNorm > maxrr) maxrr = mNorm;
 
-      commGlobalReductionSet(false);//disable global reduction
-      buffer = pipePCGMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
-      commGlobalReductionSet(true);
+      int updateX = (rNorm < param.delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+      int updateR = ((rNorm < param.delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+
+      // force a reliable update if we are within target tolerance (only if doing reliable updates)
+      if( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
+
+      if( ! (updateR || updateX)  ) {
+
+        if(j > 0) {
+//         beta  = (gamma - gamma_aux) / gammajm1;
+           beta  = gamma / gammajm1;
+           alpha = gamma / (delta - beta / alpha * gamma); 
+        } 
+
+        commGlobalReductionSet(false);//disable global reduction
+        buffer = pipePCGMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
+        commGlobalReductionSet(true);
 #ifdef USE_WORKER
-      {
+        {
         //global_reduce.apply(0);
         //Warning! ordering is critical here: fisrt preconditioner and then matvec, since worker uses blocking MPI allreduce
         //in this approach all reduce is overlapped with matvec only.
         //more robust way just to call non-blocking allreduce and then synchronize 
-        if(K) {
-          rPre = w;
+          if(K) {
+            rPre = w;
 
-          commGlobalReductionSet(false);
-          (*K)(pPre, rPre);
-          commGlobalReductionSet(true);
+            commGlobalReductionSet(false);
+            (*K)(pPre, rPre);
+            commGlobalReductionSet(true);
 
-          m = pPre;
-        } else {
-          m = w;
-        }        
-        //
-        dslash::aux_worker = &global_reduce;
-        mat(n, m, tmp);
-        dslash::aux_worker = nullptr;
+            m = pPre;
+          } else {
+            m = w;
+          }        
+          //
+          dslash::aux_worker = &global_reduce;
+          matSloppy(n, m, tmp);
+          dslash::aux_worker = nullptr;
 
-        global_reduce.reset();
-      }
-#else
-      {
-#ifdef NONBLOCK_REDUCE
-        comm_allreduce_array_async(recvbuff, (double*)&buffer, 3, allreduceHandle);
-#else
-        reduceDoubleArray((double*)&buffer, 3);
-#endif
-        if(K) {
-          rPre = w;
-         
-          commGlobalReductionSet(false);
-          (*K)(pPre, rPre);
-          commGlobalReductionSet(true);
-
-          m = pPre;
-        } else {
-          m = w;
+          global_reduce.reset();
         }
-        //
-        mat(n, m, tmp);
-#ifdef NONBLOCK_REDUCE//sync point
-        comm_wait(allreduceHandle);
-        memcpy(&buffer, recvbuff, sizeof(double3));
+#else
+        {
+#ifdef NONBLOCK_REDUCE
+          comm_allreduce_array_async(recvbuff, (double*)&buffer, 3, allreduceHandle);
+#else
+          reduceDoubleArray((double*)&buffer, 3);
 #endif
-      }
+          if(K) {
+            rPre = w;
+         
+            commGlobalReductionSet(false);
+            (*K)(pPre, rPre);
+            commGlobalReductionSet(true);
+
+            m = pPre;
+          } else {
+            m = w;
+          }
+          //
+          mat(n, m, tmp);
+#ifdef NONBLOCK_REDUCE//sync point
+          comm_wait(allreduceHandle);
+          memcpy(&buffer, recvbuff, sizeof(double3));
+#endif
+        }
 #endif //end of USE_WORKER
-      gammajm1 = gamma;
-      gamma = buffer.x;
-      delta = buffer.y;
-      mNorm = buffer.z;
+        gammajm1 = gamma;
+        gamma = buffer.x;
+        delta = buffer.y;
+        mNorm = buffer.z;
+        //gamma_aux = buffer.w;
+     } else { //trigger reliable updates:
+        xpy(x,y);
+        zero(x);
+
+        mat(r, y, tmp);
+        xpay(b, -1.0, r);
+
+        mNorm = norm2(r);
+
+        // break-out check if we have reached the limit of the precision
+        if(sqrt(mNorm) > r0Norm && updateX) {
+          resIncrease++;
+          resIncreaseTotal++;
+          // reuse r0Norm for this
+          warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
+
+//        if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
+
+        } else {
+          resIncrease = 0;
+        }
+
+        rNorm = sqrt(mNorm);
+        maxrr = rNorm;
+        maxrx = rNorm;
+        r0Norm = rNorm;
+        ++rUpdate;
+
+        if(K) {
+          commGlobalReductionSet(false);
+          (*K)(u, r);
+          commGlobalReductionSet(true);
+        } else {
+          u = r;
+        }
+
+        matSloppy(w, u, tmp);
+        matSloppy(s, p, tmp);
+
+        zero(l);
+
+        if(K) {
+          commGlobalReductionSet(false);
+          (*K)(q, s);
+          commGlobalReductionSet(true);
+        } else {
+          q = s;
+        }
+
+        matSloppy(z, q, tmp);
+      }
 
       j += 1;
       PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
@@ -342,6 +427,7 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residual 
+    xpy(y, x);
     mat(r, x, tmp);
     double true_res = blas::xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
@@ -352,6 +438,9 @@ namespace quda {
     matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+    delete lp;
+    delete yp;
 
     return;
   }
