@@ -12,7 +12,6 @@
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
-#include <face_quda.h>
 
 #include <inline_ptx.h>
 
@@ -596,7 +595,7 @@ namespace quda
     DslashCuda *covdev = 0;
     size_t regSize = sizeof(float);
 
-        if (Location(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
+        if (checkLocation(*out, *in) != QUDA_CUDA_FIELD_LOCATION)
           errorQuda("Error: CPU fields not supported for covariant derivative");
 
         if(in->Precision() == QUDA_HALF_PRECISION)

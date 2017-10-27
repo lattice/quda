@@ -11,7 +11,6 @@
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
-#include <face_quda.h>
 
 #include <dslash_util.h>
 #include <string.h>

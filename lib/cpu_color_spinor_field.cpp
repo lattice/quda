@@ -122,8 +122,6 @@ namespace quda {
     // these need to be reset to ensure no ghost zones for the cpu
     // fields since we can't determine during the parent's constructor
     // whether the field is a cpu or cuda field
-    ghost_length = 0;
-    ghost_norm_length = 0;
 
     // set this again here.  this is a hack since we can determine we
     // have a cpu or cuda field in ColorSpinorField::create(), which
@@ -210,6 +208,33 @@ namespace quda {
     } else {
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION);
     }
+  }
+
+  void cpuColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Field already backed up");
+
+    backup_h = new char[bytes];
+    memcpy(backup_h, v, bytes);
+
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      memcpy(backup_norm_h, norm, norm_bytes);
+    }
+
+    backed_up = true;
+  }
+
+  void cpuColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+
+    memcpy(v, backup_h, bytes);
+    delete []backup_h;
+    if (norm_bytes) {
+      memcpy(norm, backup_norm_h, norm_bytes);
+      delete []backup_norm_h;
+    }
+
+    backed_up = false;
   }
 
   void cpuColorSpinorField::zero() {

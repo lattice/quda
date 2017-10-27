@@ -17,8 +17,6 @@
 #include <staggered_dslash_reference.h>
 #include <gauge_field.h>
 
-#include <face_quda.h>
-
 #include <assert.h>
 #include <gtest.h>
 
@@ -312,14 +310,32 @@ void end(void)
   endQuda();
 }
 
-double dslashCUDA(int niter) {
+struct DslashTime {
+  double event_time;
+  double cpu_time;
+  double cpu_min;
+  double cpu_max;
+
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
+};
+
+DslashTime dslashCUDA(int niter) {
+
+  DslashTime dslash_time;
+  timeval tstart, tstop;
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
   cudaEventSynchronize(start);
 
+  comm_barrier();
+  cudaEventRecord(start, 0);
+
   for (int i = 0; i < niter; i++) {
+
+    gettimeofday(&tstart, NULL);
+
     switch (test_type) {
       case 0:
         if (transfer){
@@ -343,6 +359,18 @@ double dslashCUDA(int niter) {
           dirac->M(*cudaSpinorOut, *cudaSpinor);
         }
     }
+
+    gettimeofday(&tstop, NULL);
+    long ds = tstop.tv_sec - tstart.tv_sec;
+    long dus = tstop.tv_usec - tstart.tv_usec;
+    double elapsed = ds + 0.000001*dus;
+
+    dslash_time.cpu_time += elapsed;
+    // skip first and last iterations since they may skew these metrics if comms are not synchronous
+    if (i>0 && i<niter) {
+      if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
+      if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+    }
   }
 
   cudaEventCreate(&end);
@@ -353,14 +381,14 @@ double dslashCUDA(int niter) {
   cudaEventDestroy(start);
   cudaEventDestroy(end);
 
-  double secs = runTime / 1000; //stopwatchReadSeconds();
+  dslash_time.event_time = runTime / 1000;
 
   // check for errors
   cudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
-  return secs;
+  return dslash_time;
 }
 
 void staggeredDslashRef()
@@ -424,17 +452,20 @@ static int dslashTest()
     // reset flop counter
     dirac->Flops();
 
-    double secs = dslashCUDA(niter);
+    DslashTime dslash_time = dslashCUDA(niter);
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
-    printfQuda("\n%fms per loop\n", 1000*secs);
+    printfQuda("%fus per kernel call\n", 1e6*dslash_time.event_time / niter);
     staggeredDslashRef();
 
     unsigned long long flops = dirac->Flops();
-    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("Effective halo bi-directional bandwidth = %f for aggregate message size %lu bytes\n",
-	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/secs, 2*cudaSpinor->GhostBytes());
+    printfQuda("GFLOPS = %f\n", 1.0e-9*flops/dslash_time.event_time);
+
+    printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate message size %lu bytes\n",
+	       1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.event_time, 1.0e-9*2*cudaSpinor->GhostBytes()*niter/dslash_time.cpu_time,
+	       1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_max, 1.0e-9*2*cudaSpinor->GhostBytes()/dslash_time.cpu_min,
+	       2*cudaSpinor->GhostBytes());
 
     double spinor_ref_norm2 = blas::norm2(*spinorRef);
     double spinor_out_norm2 =  blas::norm2(*spinorOut);

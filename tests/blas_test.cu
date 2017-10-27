@@ -6,7 +6,6 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
-#include <face_quda.h>
 
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
@@ -14,6 +13,8 @@
 // google test
 #include <gtest.h>
 
+extern int test_type;
+extern QudaPrecision prec;
 extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern int nvec;
@@ -71,6 +72,13 @@ display_test_info()
 int Nprec = 3;
 
 bool skip_kernel(int precision, int kernel) {
+  // if we've selected a given kernel then make sure we only run that
+  if (test_type != -1 && kernel != test_type) return true;
+
+  // if we've selected a given precision then make sure we only run that
+  QudaPrecision this_prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  if (prec != QUDA_INVALID_PRECISION && this_prec != prec) return true;
+
   if ( Nspin == 2 && precision == 0) {
     // avoid half precision tests if doing coarse fields
     return true;
@@ -949,6 +957,9 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
+  prec = QUDA_INVALID_PRECISION;
+  test_type = -1;
+
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;

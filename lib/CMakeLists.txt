@@ -17,7 +17,7 @@ set (QUDA_OBJS
   dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
-  dirac_twisted_mass.cpp tune.cpp fat_force_quda.cpp
+  dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   field_strength_tensor.cu clover_quda.cu dslash_quda.cu covDev.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
@@ -26,9 +26,9 @@ set (QUDA_OBJS
   dslash_domain_wall_4d.cu dslash_mobius.cu dslash_staggered.cu
   dslash_improved_staggered.cu dslash_pack.cu blas_quda.cu
   multi_blas_quda.cu copy_quda.cu reduce_quda.cu
-  multi_reduce_quda.cu face_buffer.cpp face_gauge.cpp
+  multi_reduce_quda.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
-  clover_deriv_quda.cu clover_invert.cu clover_rho.cu copy_gauge_extended.cu
+  clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cu spinor_gauss.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_ss.cu
@@ -42,13 +42,13 @@ set (QUDA_OBJS
   hisq_paths_force_quda.cu fermion_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
-  ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu misc_helpers.cu
+  ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
-  quda_memcpy.cpp quda_arpack_interface.cpp deflation.cpp version.cpp )
+  quda_memcpy.cpp quda_arpack_interface.cpp deflation.cpp checksum.cu version.cpp )
 
 ## split source into cu and cpp files
 FOREACH(item ${QUDA_OBJS})
@@ -99,11 +99,8 @@ endif()
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
-# add dependencies for linking
-# if CUDA_CUDA_LIBRARY (driver api) is not found look for stubs
-FIND_LIBRARY(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
 
-target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS} ${CUDA_CUDA_LIBRARY})
+target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
   target_link_libraries(quda ${QIO_LIB} ${LIME_LIB})
@@ -136,7 +133,7 @@ endif()
 
 # malloc.cpp uses both the driver and runtime api
 # So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
-find_library(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib/ ${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs)
+find_library(CUDA_CUDA_LIBRARY cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
 target_link_libraries(quda ${CUDA_CUDA_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first

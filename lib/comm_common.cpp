@@ -142,6 +142,101 @@ void comm_destroy_topology(Topology *topo)
 }
 
 
+static bool peer2peer_enabled[2][4] = { {false,false,false,false},
+                                        {false,false,false,false} };
+static bool peer2peer_init = false;
+void comm_peer2peer_init(const char* hostname_recv_buf)
+{
+  if (peer2peer_init) return;
+
+  bool disable_peer_to_peer = false;
+  char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "0") == 0) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling peer-to-peer access\n");
+    disable_peer_to_peer = true;
+  }
+
+  // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
+  // and comm_dim(dim) == 2 (used for perf benchmarking)
+  bool disable_peer_to_peer_bidir = false;
+  if (enable_peer_to_peer_env && strcmp(enable_peer_to_peer_env, "-1") == 0) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling bi-directional peer-to-peer access\n");
+    disable_peer_to_peer_bidir = true;
+  }
+
+  if (!peer2peer_init && !disable_peer_to_peer) {
+
+    // first check that the local GPU supports UVA
+    const int gpuid = comm_gpuid();
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, gpuid);
+    if(!prop.unifiedAddressing) return;
+
+    comm_set_neighbor_ranks();
+
+    char *hostname = comm_hostname();
+    int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int)*comm_size());
+
+    comm_gather_gpuid(gpuid_recv_buf);
+
+    for(int dir=0; dir<2; ++dir){ // forward/backward directions
+      for(int dim=0; dim<4; ++dim){
+	int neighbor_rank = comm_neighbor_rank(dir,dim);
+	if(neighbor_rank == comm_rank()) continue;
+
+	// disable peer-to-peer comms in one direction
+	if ( ((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1)) &&
+	     disable_peer_to_peer_bidir && comm_dim(dim) == 2 ) continue;
+
+	// if the neighbors are on the same
+	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
+	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
+	  int canAccessPeer[2];
+	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+
+	  int accessRank[2] = { };
+#if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
+	  if (canAccessPeer[0]*canAccessPeer[1]) {
+	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+	  }
+#endif
+
+	  // enable P2P if we can access the peer or if peer is self
+	  if (canAccessPeer[0]*canAccessPeer[1] || gpuid == neighbor_gpuid) {
+	    peer2peer_enabled[dir][dim] = true;
+	    if (getVerbosity() > QUDA_SILENT) {
+	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, performance rank = (%d, %d)\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+	    }
+	  }
+
+	} // on the same node
+      } // different dimensions - x, y, z, t
+    } // different directions - forward/backward
+
+    host_free(gpuid_recv_buf);
+  }
+
+  peer2peer_init = true;
+
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    printfQuda("Enabling GPU-Direct RDMA access\n");
+  } else {
+    printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
+
+  checkCudaErrorNoSync();
+  return;
+}
+
+bool comm_peer2peer_enabled(int dir, int dim){
+  return peer2peer_enabled[dir][dim];
+}
+
+
 int comm_ndim(const Topology *topo)
 {
   return topo->ndim;
@@ -477,3 +572,29 @@ bool comm_gdr_enabled() {
 #endif
   return gdr_enabled;
 }
+
+static bool globalReduce = true;
+static bool asyncReduce = false;
+
+void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
+
+void reduceDouble(double &sum) { if (globalReduce) comm_allreduce(&sum); }
+
+void reduceDoubleArray(double *sum, const int len)
+{ if (globalReduce) comm_allreduce_array(sum, len); }
+
+int commDim(int dir) { return comm_dim(dir); }
+
+int commCoords(int dir) { return comm_coord(dir); }
+
+int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
+
+void commDimPartitionedSet(int dir) { comm_dim_partitioned_set(dir);}
+
+bool commGlobalReduction() { return globalReduce; }
+
+void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduction; }
+
+bool commAsyncReduction() { return asyncReduce; }
+
+void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }

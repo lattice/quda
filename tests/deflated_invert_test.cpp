@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <algorithm>
 
 #include <util_quda.h>
 #include <test_util.h>
@@ -11,8 +12,6 @@
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
-
-#include "face_quda.h"
 
 #if defined(QMP_COMMS)
 #include <qmp.h>

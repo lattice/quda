@@ -53,9 +53,6 @@ BUILD_MAGMA_VARS = @BUILD_MAGMA_VARS@ # build magma using env vars MAGMA_INC and
 BUILD_ARPACK = @BUILD_ARPACK@     # build arpack interface
 BUILD_ARPACK_VARS = @BUILD_ARPACK_VARS@ # build arpack using env vars ARPACK_LIB
 
-# GPUdirect options
-GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
-
 # Profiling options
 MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
 INTERFACE_NVTX = @INTERFACE_NVTX@            # set to 'yes' to add nvtx markup to interface calls for the visual profiler
@@ -323,11 +320,6 @@ endif
 ifeq ($(strip $(FERMI_DBLE_TEX)), no)
   NVCCOPT += -DFERMI_NO_DBLE_TEX
   COPT += -DFERMI_NO_DBLE_TEX
-endif
-
-ifeq ($(strip $(GPU_DIRECT)), yes)
-  NVCCOPT += -DGPU_DIRECT
-  COPT += -DGPU_DIRECT
 endif
 
 ifeq ($(strip $(BUILD_QDP_INTERFACE)), yes)

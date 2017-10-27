@@ -75,6 +75,10 @@ extern "C" {
     int return_result_gauge; /**< Return the result gauge field */
     int return_result_mom;   /**< Return the result momentum field */
 
+    size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+
   } QudaGaugeParam;
 
 
@@ -732,15 +736,12 @@ extern "C" {
   void destroyMultigridQuda(void *mg_instance);
 
   /**
-<<<<<<< HEAD
    * @brief Updates the multigrid preconditioner for the new gauge / clover field
    * @param mg_instance Pointer to instance of multigrid_solver
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
-=======
->>>>>>> 5c038cb32c1ab09c9fcd09c41a001f1a1bd857a3
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field

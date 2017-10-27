@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <memory>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,14 +10,7 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
 #include <string.h>
-
-#include <face_quda.h>
-
-#include <memory>
-
-#include <iostream>
 
 #ifdef MAGMA_LIB 
 #include <blas_magma.h>
@@ -758,7 +753,9 @@ namespace quda {
        param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
        PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2);
 
-       if( !dcg_cycle &&  (eigcg_args->restarts > 1) && !defl.is_complete() ) defl.verify();
+       if( getVerbosity() >= QUDA_VERBOSE ) { 
+         if( !dcg_cycle &&  (eigcg_args->restarts > 1) && !defl.is_complete() ) defl.verify();
+       }
      } while ((r2 > stop) && mixed_prec);
 
      delete ep;

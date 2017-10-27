@@ -333,7 +333,7 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, __FILE__, __STRINGIFY__(__LINE__));
+#define qudaMemcpy(dst, src, count, kind) ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 namespace quda{
   /**
      * Check that the resident gauge field is compatible with the requested inv_param

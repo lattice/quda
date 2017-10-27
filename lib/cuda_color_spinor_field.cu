@@ -1,26 +1,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <typeinfo>
+#include <string.h>
+#include <iostream>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
-
-#include <string.h>
-#include <iostream>
-#include <misc_helpers.h>
-#include <face_quda.h>
 #include <dslash_quda.h>
 
 int zeroCopy = 0;
 
 namespace quda {
 
-  bool cudaColorSpinorField::initGhostFaceBuffer = false;
-  size_t cudaColorSpinorField::ghostFaceBytes = 0;
-
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -43,7 +37,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -53,7 +47,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false),
-    ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+    ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -101,7 +95,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false),
-      ghostTexInit(false), ghost_field_tex{nullptr,nullptr}, bufferMessageHandler(0)
+      ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -297,16 +291,19 @@ namespace quda {
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
       
       // staggered and coarse fields in half and single are always two component
+      int texel_size = 1;
       if ( (nSpin == 1 || nSpin == 2) && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
 	desc.x = 8*precision;
 	desc.y = 8*precision;
 	desc.z = 0;
 	desc.w = 0;
+	texel_size = 2*precision;
       } else { // all others are four component (double2 is spread across int4)
-	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+	texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
       }
       
       cudaResourceDesc resDesc;
@@ -320,7 +317,12 @@ namespace quda {
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
-      
+
+      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
+      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
+	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
+      }
+
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
       // create the texture for the norm components
@@ -483,10 +485,36 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if (!composite_descr.is_composite || composite_descr.is_component)
+    if (!composite_descr.is_composite || composite_descr.is_component) {
       destroyTexObject();
+      destroyGhostTexObject();
+    }
 #endif
 
+  }
+
+  void cudaColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Gauge field already backed up");
+    backup_h = new char[bytes];
+    cudaMemcpy(backup_h, v, bytes, cudaMemcpyDeviceToHost);
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+    checkCudaError();
+    backed_up = true;
+  }
+
+  void cudaColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+    cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
+    delete []backup_h;
+    if (norm_bytes) {
+      cudaMemcpy(v, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      delete []backup_norm_h;
+    }
+    checkCudaError();
+    backed_up = false;
   }
 
   // cuda's floating point format, IEEE-754, represents the floating point
@@ -553,24 +581,22 @@ namespace quda {
     } else {
       void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
-	resizeBufferDevice(src.Bytes()+src.NormBytes());
-	Src = bufferDevice;
-	srcNorm = (char*)bufferDevice + src.Bytes();
+	Src = pool_device_malloc(src.Bytes()+src.NormBytes());
+	srcNorm = static_cast<char*>(Src) + src.Bytes();
 	qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
 	qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
 	buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
 	memcpy(buffer, src.V(), src.Bytes());
 	memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
-
 	cudaHostGetDevicePointer(&Src, buffer, 0);
-	srcNorm = (void*)((char*)Src + src.Bytes());
+	srcNorm = static_cast<char*>(Src) + src.Bytes();
       }
 
       cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
 
-      if (zeroCopy) pool_pinned_free(buffer);
+      if (zeroCopy) { pool_pinned_free(buffer); } else { pool_device_free(Src); }
     }
 
     return;
@@ -591,13 +617,12 @@ namespace quda {
     } else {
       void *dst=nullptr, *dstNorm=nullptr, *buffer=nullptr;
       if (!zeroCopy) {
-	resizeBufferDevice(dest.Bytes()+dest.NormBytes());
-	dst = bufferDevice;
-	dstNorm = (char*)bufferDevice+dest.Bytes();
+	dst = pool_device_malloc(dest.Bytes()+dest.NormBytes());
+	dstNorm = static_cast<char*>(dst) + dest.Bytes();
       } else {
 	buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
 	cudaHostGetDevicePointer(&dst, buffer, 0);
-	dstNorm = (char*)dst+dest.Bytes();
+	dstNorm = static_cast<char*>(dst)+dest.Bytes();
       }
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
 
@@ -609,7 +634,7 @@ namespace quda {
 	memcpy(dest.Norm(), static_cast<char*>(buffer) + dest.Bytes(), dest.NormBytes());
       }
 
-      if (zeroCopy) pool_pinned_free(buffer);
+      if (zeroCopy) { pool_pinned_free(buffer); } else { pool_device_free(dst); }
     }
 
     return;
@@ -617,86 +642,14 @@ namespace quda {
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {
 
-    if (!comm_partitioned()) {
-      for (int i=0; i<4; i++) ghost_face_bytes[i] = 0;
-      return;
-    }
-
     createGhostZone(nFace, spin_project);
-
-    // temporary work around until the ghost buffer for fine and
-    // coarse grid are merged: this ensures we reset the fine ghost
-    // buffer if the coarse grid operator allocates a ghost buffer
-    // that is larger than the fine grid operator
-    static size_t ghostFaceBytes_ = 0;
-
-    // only allocate if not already allocated or buffer required is bigger than previously
-    if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes || ghost_bytes > ghostFaceBytes_) {
-
-      if (initGhostFaceBuffer) {
-#ifdef USE_TEXTURE_OBJECTS
-	destroyGhostTexObject();
-#endif
-	if (ghost_bytes) {
-	  for (int b=0; b<2; b++) {
-	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_pinned_free(ghost_send_buffer_d[b]);
-	    host_free(ghost_pinned_buffer_h[b]);
-	  }
-	}
-      }
-
-      if (ghost_bytes > 0) {
-	for (int b=0; b<2; ++b) {
-	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-
-	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
-
-	  // pinned buffer used for sending and receiving
-	  ghost_pinned_buffer_h[b] = mapped_malloc(2*ghost_bytes);
-
-	  // set the matching device-mapper pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_buffer_hd[b], ghost_pinned_buffer_h[b], 0);
-	}
-
-	initGhostFaceBuffer = true;
-	ghostFaceBytes = ghost_bytes;
-	ghostFaceBytes_ = ghost_bytes;
-      }
-
-      LatticeField::ghost_field_reset = true; // this signals that we must reset the IPC comms
-    }
+    LatticeField::allocateGhostBuffer(ghost_bytes);
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
     if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1]) destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
-  }
-
-  void cudaColorSpinorField::freeGhostBuffer(void)
-  {
-    destroyIPCComms();
-
-    if (!initGhostFaceBuffer) return;
-  
-    for (int b=0; b<2; b++) {
-      // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
-      ghost_recv_buffer_d[b] = nullptr;
-
-      // free send buffer
-      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
-      ghost_send_buffer_d[b] = nullptr;
-
-      // free pinned memory buffers
-      if (ghost_pinned_buffer_h[b]) host_free(ghost_pinned_buffer_h[b]);
-      ghost_pinned_buffer_h[b] = nullptr;
-      ghost_pinned_buffer_hd[b] = nullptr;
-    }
-    initGhostFaceBuffer = false;
   }
 
   // pack the ghost zone into a contiguous buffer for communications
@@ -949,25 +902,9 @@ namespace quda {
 
     if (!initComms || comms_reset) {
 
-      destroyComms(); // if we are requesting a new number of faces destroy and start over
+      LatticeField::createComms();
 
-      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
-
-      for (int i=0; i<nDimComms; i++) { // compute size of ghost buffers required
-	if (!commDimPartitioned(i)) { ghost_face_bytes[i] = 0; continue; }
-	ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*precision;
-	if (precision == QUDA_HALF_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
-      }
-
-      // initialize the ghost pinned buffers
-      for (int b=0; b<2; b++) {
-	my_face_h[b] = ghost_pinned_buffer_h[b];
-	my_face_hd[b] = ghost_pinned_buffer_hd[b];
-	from_face_h[b] = static_cast<char*>(my_face_h[b]) + ghost_bytes;
-	from_face_hd[b] = static_cast<char*>(my_face_hd[b]) + ghost_bytes;
-      }
-
-      // initialize the ghost receive pointers
+      // reinitialize the ghost receive pointers
       for (int i=0; i<nDimComms; ++i) {
 	if (commDimPartitioned(i)) {
 	  for (int b=0; b<2; b++) {
@@ -977,92 +914,10 @@ namespace quda {
 	  }
 	}
       }
-
-      // initialize ghost send pointers
-      size_t offset = 0;
-      for (int i=0; i<nDimComms; i++) {
-	if (!commDimPartitioned(i)) continue;
-
-	for (int b=0; b<2; ++b) {
-	  my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
-	  from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
-
-	  my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
-	  from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
-
-	  my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	  from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
-	} // loop over b
-	offset += ghost_face_bytes[i];
-
-	for (int b=0; b<2; ++b) {
-	  my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
-	  from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
-
-	  my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
-	  from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
-
-	  my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	  from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
-	} // loop over b
-	offset += ghost_face_bytes[i];
-
-      } // loop over dimension
-
-      bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled
-
-      // initialize the message handlers
-      for (int i=0; i<nDimComms; i++) {
-	if (!commDimPartitioned(i)) continue;
-
-	for (int b=0; b<2; ++b) {
-	  mh_send_fwd[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_send_back[b][i] = comm_declare_send_relative(my_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
-
-	  mh_recv_fwd[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][1], i, +1, ghost_face_bytes[i]);
-	  mh_recv_back[b][i] = comm_declare_receive_relative(from_face_dim_dir_h[b][i][0], i, -1, ghost_face_bytes[i]);
-
-	  mh_send_rdma_fwd[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
-	  mh_send_rdma_back[b][i] = gdr ? comm_declare_send_relative(my_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
-
-	  mh_recv_rdma_fwd[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][1], i, +1, ghost_face_bytes[i]) : nullptr;
-	  mh_recv_rdma_back[b][i] = gdr ? comm_declare_receive_relative(from_face_dim_dir_d[b][i][0], i, -1, ghost_face_bytes[i]) : nullptr;
-	} // loop over b
-
-      } // loop over dimension
-     
-      initComms = true;
-      checkCudaError();
     }
 
     if (LatticeField::ghost_field_reset) destroyIPCComms();
     createIPCComms();
-  }
-
-  void cudaColorSpinorField::destroyComms()
-  {
-    if (initComms) {
-
-      for (int b=0; b<2; ++b) {
-	for (int i=0; i<nDimComms; i++) {
-	  if (commDimPartitioned(i)) {
-	    if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
-	    if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
-	    if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
-	    if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
-
-	    if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
-	    if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
-	    if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
-	    if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
-	  }
-	}
-      } // loop over b
-
-      initComms = false;
-      checkCudaError();
-    }
-
   }
 
   void cudaColorSpinorField::streamInit(cudaStream_t *stream_p) {
@@ -1115,7 +970,7 @@ namespace quda {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (dir%2 == 0) { // sending backwards
       if (comm_peer2peer_enabled(1,dim)) {
@@ -1146,7 +1001,7 @@ namespace quda {
     int dim = d/2;
     int dir = d%2;
     if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
     int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
@@ -1261,7 +1116,7 @@ namespace quda {
       if (dir == 0) {
 	// record the event
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], *copy_stream);
-	// send to the propcessor in the -1 direction
+	// send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
@@ -1286,52 +1141,42 @@ namespace quda {
 
     int dim = dir/2;
     if (!commDimPartitioned(dim)) return 0;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (dir%2==0) {
 
-      if (comm_peer2peer_enabled(1,dim)) {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr) {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
-      }
-
       if (comm_peer2peer_enabled(0,dim)) {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
       } else if (gdr) {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_rdma_back[bufferIndex][dim]);
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][dim]);
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
       }
 
-      if (complete_recv_fwd[dim] && complete_send_back[dim]) {
-	complete_recv_fwd[dim] = false;
+      if (complete_recv_back[dim] && complete_send_back[dim]) {
+	complete_recv_back[dim] = false;
 	complete_send_back[dim] = false;
 	return 1;
       }
 
     } else { // dir%2 == 1
 
-      if (comm_peer2peer_enabled(0,dim)) {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr) {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
-      }
-
       if (comm_peer2peer_enabled(1,dim)) {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
       } else if (gdr) {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
 	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
+	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
       }
 
-      if (complete_recv_back[dim] && complete_send_fwd[dim]) {
-	complete_recv_back[dim] = false;
+      if (complete_recv_fwd[dim] && complete_send_fwd[dim]) {
+	complete_recv_fwd[dim] = false;
 	complete_send_fwd[dim] = false;
 	return 1;
       }
@@ -1344,45 +1189,38 @@ namespace quda {
   void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger, cudaStream_t *stream_p, bool gdr) {
     int dim = dir / 2;
     if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (dir%2==0) {
+
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+      } else if (gdr) {
+	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
+	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_recv_back[bufferIndex][dim]);
+	comm_wait(mh_send_back[bufferIndex][dim]);
+      }
+
+    } else {
 
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr) {
-	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_fwd[bufferIndex][dim]);
-      }
-
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr) {
-	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_send_back[bufferIndex][dim]);
-      }
-    } else {
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr) {
-	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_back[bufferIndex][dim]);
-      }
-
-      if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
       } else if (gdr) {
+	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
 	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
+	comm_wait(mh_recv_fwd[bufferIndex][dim]);
 	comm_wait(mh_send_fwd[bufferIndex][dim]);
       }
+
     }
 
     return;
@@ -1419,7 +1257,7 @@ namespace quda {
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv)  const {
-    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but not GDR is not enabled");
+    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
     // first set default values to device if needed
