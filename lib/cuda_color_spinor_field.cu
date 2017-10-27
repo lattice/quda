@@ -966,13 +966,14 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr) {
+  void cudaColorSpinorField::recvStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr) {
 
-    int dim = dir/2;
+    int dim = d/2;
+    int dir = d%2;
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir%2 == 0) { // sending backwards
+    if (dir == 0) { // sending backwards / receive from forwards
       if (comm_peer2peer_enabled(1,dim)) {
 	// receive from the processor in the +1 direction
 	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
@@ -983,7 +984,7 @@ namespace quda {
         // Prepost receive
         comm_start(mh_recv_fwd[bufferIndex][dim]);
       }
-    } else { //sending forwards
+    } else { //sending forwards / receive from backwards
       // Prepost receive
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
