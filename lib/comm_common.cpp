@@ -221,11 +221,14 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   peer2peer_init = true;
 
+  comm_barrier();
+
   // set gdr enablement
   if (comm_gdr_enabled()) {
-    printfQuda("Enabling GPU-Direct RDMA access\n");
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
+    comm_gdr_blacklist(); // set GDR blacklist
   } else {
-    printfQuda("Disabling GPU-Direct RDMA access\n");
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
   }
 
   checkCudaErrorNoSync();
@@ -596,8 +599,8 @@ bool comm_gdr_blacklist() {
 	if (blacklist_list.peek() == ',') blacklist_list.ignore();
 	if (excluded_device == comm_gpuid()) blacklist = true;
       }
-      if (blacklist) printf("GDR blacklisted for process %d GPU %d\n", comm_rank(), comm_gpuid());
-      else printf("GDR enabled for process %d GPU %d\n", comm_rank(), comm_gpuid());
+      comm_barrier();
+      if (getVerbosity() > QUDA_SILENT && blacklist) printf("Blacklisting GPU-Direct RDMA for rank %d (GPU %d)\n", comm_rank(), comm_gpuid());
     }
     blacklist_init = true;
 
