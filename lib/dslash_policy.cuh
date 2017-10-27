@@ -113,7 +113,7 @@ namespace {
         PROFILE(inSpinor->recvStart(param->nFace, 2*i+dir, param->dagger), (*(param->profile)), QUDA_PROFILE_COMMS_START);
       }
     }
-    return NULL;
+    return nullptr;
   }
 
   struct InteriorParam 
@@ -130,7 +130,7 @@ namespace {
     cudaSetDevice(param->current_device); // set device in the new thread
     PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
-    return NULL;
+    return nullptr;
   }
 
 } // anonymous namespace
@@ -462,9 +462,6 @@ struct DslashGPUComms : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-    bool kernel_pack_old = getKernelPackT();
-    setKernelPackT(true);
-
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
     dslashParam.parity = parity;
@@ -562,7 +559,6 @@ struct DslashGPUComms : DslashPolicyImp {
     }
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
-    setKernelPackT(kernel_pack_old);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 };
@@ -573,9 +569,6 @@ struct DslashFusedGPUComms : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-    bool kernel_pack_old = getKernelPackT();
-    setKernelPackT(true);
-
     profile.TPSTART(QUDA_PROFILE_TOTAL);
   
     dslashParam.parity = parity;
@@ -670,7 +663,6 @@ struct DslashFusedGPUComms : DslashPolicyImp {
 
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
-    setKernelPackT(kernel_pack_old);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 };
@@ -828,7 +820,7 @@ struct DslashFusedExterior : DslashPolicyImp {
   {									\
     CUresult cudaStatus = call;						\
     if ( CUDA_SUCCESS != cudaStatus ) {					\
-      const char *err_str = NULL;					\
+      const char *err_str = nullptr;					\
       cuGetErrorString(cudaStatus, &err_str);				\
       fprintf(stderr, "ERROR: CUDA call \"%s\" in line %d of file %s failed with %s (%d).\n", #call, __LINE__, __FILE__, err_str, cudaStatus); \
     }									\
@@ -1171,10 +1163,6 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-
-    bool kernel_pack_old = getKernelPackT();
-    setKernelPackT(true);
-
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1297,7 +1285,6 @@ struct DslashZeroCopyPack : DslashPolicyImp {
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
 
-    setKernelPackT(kernel_pack_old); // reset kernel packing
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 };
@@ -1313,10 +1300,6 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-
-    bool kernel_pack_old = getKernelPackT();
-    setKernelPackT(true);
-
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1436,7 +1419,6 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
 
-    setKernelPackT(kernel_pack_old); // reset kernel packing
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 };
@@ -1451,10 +1433,6 @@ struct DslashZeroCopy : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-
-    bool kernel_pack_old = getKernelPackT();
-    setKernelPackT(true);
-
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1570,7 +1548,6 @@ struct DslashZeroCopy : DslashPolicyImp {
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
 
-    setKernelPackT(kernel_pack_old); // reset kernel packing
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 };
@@ -1586,10 +1563,6 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
     using namespace dslash;
-
-    bool kernel_pack_old = getKernelPackT();
-    setKernelPackT(true);
-
     profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1703,7 +1676,6 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
 
-    setKernelPackT(kernel_pack_old); // reset kernel packing
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 };
@@ -1731,8 +1703,7 @@ struct DslashFactory {
 
   static DslashPolicyImp* create(const QudaDslashPolicy &dslashPolicy)
   {
-
-    DslashPolicyImp* result = NULL;    
+    DslashPolicyImp* result = nullptr;
 
     switch(dslashPolicy){
     case QUDA_DSLASH:
@@ -1751,10 +1722,12 @@ struct DslashFactory {
       result = new DslashFusedExteriorAsync;
       break;
     case QUDA_GPU_COMMS_DSLASH:
-      result = new DslashGPUComms;
+      if (!comm_gdr_blacklist()) result = new DslashGPUComms;
+      else result = new DslashBasic;
       break;
     case QUDA_FUSED_GPU_COMMS_DSLASH:
-      result = new DslashFusedGPUComms;
+      if (!comm_gdr_blacklist()) result = new DslashFusedGPUComms;
+      else result = new DslashFusedExterior;
       break;
     case QUDA_ZERO_COPY_DSLASH_PACK:
       result = new DslashZeroCopyPack;
@@ -1896,9 +1869,20 @@ struct DslashFactory {
        disableProfileCount();
 
        for (auto &i : policy) {
+	 // switch on kernel packing for the policies that need it
+	 bool kernel_pack_old = getKernelPackT();
+	 if (i == QUDA_GPU_COMMS_DSLASH || i == QUDA_FUSED_GPU_COMMS_DSLASH ||
+	     i == QUDA_ZERO_COPY_DSLASH_PACK || i == QUDA_FUSED_ZERO_COPY_DSLASH_PACK ||
+	     i == QUDA_ZERO_COPY_DSLASH || i == QUDA_FUSED_ZERO_COPY_DSLASH) {
+	   setKernelPackT(true);
+	 }
+
 	 DslashPolicyImp* dslashImp = DslashFactory::create(i);
 	 (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
 	 delete dslashImp;
+
+	 // restore default kernel packing
+	 setKernelPackT(kernel_pack_old);
        }
 
        enableProfileCount();
@@ -1920,9 +1904,20 @@ struct DslashFactory {
 
      if (tp.aux.x >= (int)policy.size()) errorQuda("Requested policy that is outside of range");
 
+     // switch on kernel packing for the policies that need it
+     bool kernel_pack_old = getKernelPackT();
+     if (policy[tp.aux.x] == QUDA_GPU_COMMS_DSLASH || policy[tp.aux.x] == QUDA_FUSED_GPU_COMMS_DSLASH ||
+	 policy[tp.aux.x] == QUDA_ZERO_COPY_DSLASH_PACK || policy[tp.aux.x] == QUDA_FUSED_ZERO_COPY_DSLASH_PACK ||
+	 policy[tp.aux.x] == QUDA_ZERO_COPY_DSLASH || policy[tp.aux.x] == QUDA_FUSED_ZERO_COPY_DSLASH) {
+       setKernelPackT(true);
+     }
+
      DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
      (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
      delete dslashImp;
+
+	 // restore default kernel packing
+     setKernelPackT(kernel_pack_old);
    }
 
    int tuningIter() const { return 10; }

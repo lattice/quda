@@ -573,6 +573,39 @@ bool comm_gdr_enabled() {
   return gdr_enabled;
 }
 
+bool comm_gdr_blacklist() {
+  static bool blacklist = false;
+  static bool blacklist_init = false;
+
+  if (!blacklist_init) {
+    char *blacklist_env = getenv("QUDA_ENABLE_GDR_BLACKLIST");
+
+    if (blacklist_env) { // set the policies to tune for explicitly
+      std::stringstream blacklist_list(blacklist_env);
+
+      int device_count;
+      cudaGetDeviceCount(&device_count);
+
+      int excluded_device;
+      while (blacklist_list >> excluded_device) {
+	// check this is a valid device
+	if ( excluded_device < 0 || excluded_device >= device_count ) {
+	  errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
+	}
+
+	if (blacklist_list.peek() == ',') blacklist_list.ignore();
+	if (excluded_device == comm_gpuid()) blacklist = true;
+      }
+      if (blacklist) printf("GDR blacklisted for process %d GPU %d\n", comm_rank(), comm_gpuid());
+      else printf("GDR enabled for process %d GPU %d\n", comm_rank(), comm_gpuid());
+    }
+    blacklist_init = true;
+
+  }
+
+  return blacklist;
+}
+
 static bool globalReduce = true;
 static bool asyncReduce = false;
 
