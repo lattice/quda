@@ -69,7 +69,7 @@ namespace quda {
 #pragma unroll
     for (int dir=0; dir<4; dir++) {
 
-      if(arg.aW[dir] < 1e-8) continue;  //-C.K: Skip this direction if aW[dir] is zero
+      if( fabs(arg.aW[dir]) < 1e-8 ) continue;  //-C.K: Skip this direction if aW[dir] is zero
       
       //Forward gather - compute fwd offset for vector fetch
       const int fwd_idx = linkIndexP1(coord, arg.dim, dir);
@@ -80,12 +80,12 @@ namespace quda {
         const Link U = arg.U(dir, x_cb, parity);
 	const Vector in = arg.in.Ghost(dir, 1, ghost_idx, their_spinor_parity);
 
-        out += U * in;
+        out += arg.aW[dir]*U * in;
       } else {
         const Link U = arg.U(dir, x_cb, parity);
 	const Vector in = arg.in(fwd_idx, their_spinor_parity);
 
-        out += U * in;
+        out += arg.aW[dir]*U * in;
       }
 
       //Backward gather - compute back offset for spinor and gauge fetch
@@ -98,15 +98,13 @@ namespace quda {
         const Link U = arg.U.Ghost(dir, ghost_idx, 1-parity);
 	const Vector in = arg.in.Ghost(dir, 0, ghost_idx, their_spinor_parity);
 
-        out += conj(U) * in;
+        out += arg.aW[dir]*conj(U) * in;
       } else {
         const Link U = arg.U(dir, gauge_idx, 1-parity);
 	const Vector in = arg.in(back_idx, their_spinor_parity);
 
-        out += conj(U) * in;
+        out += arg.aW[dir]*conj(U) * in;
       }
-
-      out = arg.aW[dir]*out; //-C.K.: Multiply here with the alpha-parameter
       
     }//-dir for-loop
     
@@ -124,7 +122,6 @@ namespace quda {
     Vector in;
     arg.in.load((Float*)in.data, x_cb, parity);
     out = arg.bW * in + out;
-    //    out = arg.A*in + arg.B*out;
     
     arg.out(x_cb, parity) = out;
   }
@@ -269,8 +266,8 @@ namespace quda {
      @param[in] in The in spinor field
      @param[in] U The gauge field
      @param[in] alpha_\mu The smearing parameter, can be different in each direction \mu
-     @param[in] bW A general factor. If bW = (1 + 2 sum_\mu \alpha_\mu) then this operation reduces to the standard Wuppertal smearing operation.
-     If bW = 1 then the hopping term operation generalizes to the full Laplacian operator
+     @param[in] bW A general factor that multiplies the local term. If bW -> (bW - 2 sum_\mu \alpha_\mu) then
+     the hopping term operation generalizes to the full Laplacian operator.
   */
   void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity,
 		     const GaugeField& U, const double *aW, const double bW)
@@ -298,9 +295,4 @@ namespace quda {
     return;
   }
 
-  /* void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, const double *aW, const double bW) */
-  /* { */
-    
-  /*   wuppertalStep(out, in, parity, U, aW, bW); */
-  /* } */
 } // namespace quda

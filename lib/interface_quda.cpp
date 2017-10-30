@@ -5519,12 +5519,12 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
 
 
   double nrmW = 1./(1. + 6*alpha);
-  double alphaW[4];
+  double alphaW[4] = {0.0,0.0,0.0,0.0};;
 
   // For standard Wuppertal smearing, alphaW and bW need to be
   // defined as below
-  for(int iw=0;iw<4;iw++) alphaW[iw] = alpha*nrmW;
-  double bW = 8.0*alpha * nrmW;
+  for(int iw=0;iw<3;iw++) alphaW[iw] = alpha*nrmW;
+  double bW = nrmW;
   
   for (unsigned int i=0; i<nSteps; i++) {
     if(i) in = out;
