@@ -825,6 +825,22 @@ get_test_type(int t)
     return ret;
 }
 
+int get_rank_order(char* s)
+{
+  int ret = -1;
+
+  if (strcmp(s, "col") == 0) {
+    ret = 0;
+  } else if (strcmp(s, "row") == 0) {
+    ret = 1;
+  } else {
+    fprintf(stderr, "Error: invalid rank order type\n");
+    exit(1);
+  }
+
+  return ret;
+}
+
 QudaDslashType
 get_dslash_type(char* s)
 {

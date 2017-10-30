@@ -140,6 +140,21 @@ extern "C" {
   int comm_gpuid(void);
 
   /**
+     @brief Gather all hostnames
+     @param[out] hostname_recv_buf char array of length
+     128*comm_size() that will be filled in GPU ids for all processes.
+     Each hostname is in rank order, with 128 bytes for each.
+   */
+  void comm_gather_hostname(char *hostname_recv_buf);
+
+  /**
+     @brief Gather all GPU ids
+     @param[out] gpuid_recv_buf int array of length comm_size() that
+     will be filled in GPU ids for all processes (in rank order).
+   */
+  void comm_gather_gpuid(int *gpuid_recv_buf);
+
+  /**
      Enabled peer-to-peer communication.
      @param hostname_buf Array that holds all process hostnames
    */
@@ -160,9 +175,14 @@ extern "C" {
   bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
-     Query if GPU Direct RDMA communication is enabled
+     @brief Query if GPU Direct RDMA communication is enabled (global setting)
   */
   bool comm_gdr_enabled();
+
+  /**
+     @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
+  */
+  bool comm_gdr_blacklist();
 
   /**
      Create a persistent message handler for a relative send

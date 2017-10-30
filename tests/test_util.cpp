@@ -44,6 +44,31 @@ int mySpinorSiteSize;
 
 extern float fat_link_max;
 
+/**
+ * For MPI, the default node mapping is lexicographical with t varying fastest.
+ */
+int gridsize_from_cmdline[4] = {1,1,1,1};
+
+static int lex_rank_from_coords_t(const int *coords, void *fdata)
+{
+  int rank = coords[0];
+  for (int i = 1; i < 4; i++) {
+    rank = gridsize_from_cmdline[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+static int lex_rank_from_coords_x(const int *coords, void *fdata)
+{
+  int rank = coords[3];
+  for (int i = 2; i >= 0; i--) {
+    rank = gridsize_from_cmdline[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+static int rank_order = 0;
+
 void initComms(int argc, char **argv, const int *commDims)
 {
 #if defined(QMP_COMMS)
@@ -62,8 +87,13 @@ void initComms(int argc, char **argv, const int *commDims)
 #endif
 
 #endif
-  initCommsGridQuda(4, commDims, NULL, NULL);
+  QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
+
+  initCommsGridQuda(4, commDims, func, NULL);
   initRand();
+
+  printfQuda("Rank order is %s major (%s running fastest)\n",
+	     rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
 }
 
 
@@ -1587,7 +1617,6 @@ int zdim = 24;
 int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
-int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 int Nsrc = 1;
@@ -1697,6 +1726,7 @@ void usage(char** argv )
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
+  printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
   printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
@@ -2205,26 +2235,36 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--rank-order") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    rank_order = get_rank_order(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--dslash-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
-    dslash_type =  get_dslash_type(argv[i+1]);
+    dslash_type = get_dslash_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--flavor") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
-    twist_flavor =  get_flavor_type(argv[i+1]);
+    twist_flavor = get_flavor_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--inv-type") == 0){
     if (i+1 >= argc){
       usage(argv);
