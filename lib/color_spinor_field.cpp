@@ -155,7 +155,7 @@ namespace quda {
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }
