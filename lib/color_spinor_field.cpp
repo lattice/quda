@@ -151,7 +151,7 @@ namespace quda {
     real_length = volume*nColor*nSpin*2; // physical length
 
     bytes = (size_t)length * precision; // includes pads and ghost zones
-    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
@@ -295,11 +295,11 @@ namespace quda {
     real_length = volume*nColor*nSpin*2;
 
     bytes = (size_t)length * precision; // includes pads
-    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }

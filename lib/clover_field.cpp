@@ -186,6 +186,11 @@ namespace quda {
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = bytes/(!full ? 2 : 1);
       
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+		  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+      }
+
       unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
       if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);

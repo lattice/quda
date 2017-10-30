@@ -319,6 +319,11 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
 
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+		  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+      }
+
       unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
       if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
@@ -340,6 +345,11 @@ namespace quda {
 	resDesc.res.linear.desc = desc;
 	resDesc.res.linear.sizeInBytes = norm_bytes;
 	
+	if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+	  errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+		    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+	}
+
 	cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
 	texDesc.readMode = cudaReadModeElementType;
