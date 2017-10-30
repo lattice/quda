@@ -479,6 +479,9 @@ extern "C" {
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
 
+    /** Location where the coarse-operator construction will be computedn */
+    QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
+
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
  

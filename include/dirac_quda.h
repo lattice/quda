@@ -783,7 +783,8 @@ namespace quda {
 
     void initializeCoarse();  /** Initialize the coarse gauge field */
 
-    bool enable_gpu; /** Whether to enable this operator for the GPU */
+    const bool enable_gpu; /** Whether to enable this operator for the GPU */
+    const bool gpu_setup; /** Where to do the coarse-operator construction*/
     bool init; /** Whether this instance did the allocation or not */
 
   public:
@@ -794,7 +795,7 @@ namespace quda {
        @param[in] param Parameters defining this operator
        @param[in] enable_gpu Whether to enable this operator for the GPU
      */
-    DiracCoarse(const DiracParam &param, bool enable_gpu=true);
+    DiracCoarse(const DiracParam &param, bool enable_gpu=true, bool gpu_setup=true);
 
     /**
        @param[in] param Parameters defining this operator
@@ -899,7 +900,7 @@ namespace quda {
   class DiracCoarsePC : public DiracCoarse {
 
   public:
-    DiracCoarsePC(const DiracParam &param, bool enable_gpu=true);
+    DiracCoarsePC(const DiracParam &param, bool enable_gpu=true, bool gpu_setup=true);
     DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarsePC();
 

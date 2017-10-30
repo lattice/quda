@@ -74,6 +74,9 @@ extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
+extern QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL];
+extern QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
+
 extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
 extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol[QUDA_MAX_MG_LEVEL];
@@ -295,7 +298,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.omega[i] = 0.85; // over/under relaxation factor
 
-    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
+    mg_param.location[i] = solver_location[i];
+    mg_param.setup_location[i] = setup_location[i];
   }
 
   // only coarsen the spin on the first restriction
@@ -462,6 +466,8 @@ int main(int argc, char **argv)
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
     coarse_solver_maxiter[i] = 10;
+    solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
+    setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
 
   for (int i = 1; i < argc; i++){

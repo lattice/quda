@@ -50,7 +50,7 @@ extern "C" {
 
   QudaExtLibType get_solve_ext_lib_type(char* s);
 
-  QudaFieldLocation get_df_location_ritz(char* s);
+  QudaFieldLocation get_location(char* s);
 
   QudaMemoryType get_df_mem_type_ritz(char* s);
 

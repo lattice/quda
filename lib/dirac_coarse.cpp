@@ -4,11 +4,11 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
+  DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu, bool gpu_setup)
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Yhat_h(nullptr),
       Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr), Yhat_d(nullptr),
-      enable_gpu(enable_gpu), init(true)
+      enable_gpu(enable_gpu), gpu_setup(gpu_setup), init(true)
   {
     initializeCoarse();
   }
@@ -19,7 +19,7 @@ namespace quda {
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(nullptr), dirac(nullptr),
       Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Yhat_h(Yhat_h),
       Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d), Yhat_d(Yhat_d),
-      enable_gpu(Y_d && X_d && Xinv_d), init(false)
+      enable_gpu(Y_d && X_d && Xinv_d), gpu_setup(true), init(false)
   {
 
   }
@@ -28,7 +28,7 @@ namespace quda {
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Yhat_h(dirac.Yhat_h),
       Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d), Yhat_d(dirac.Yhat_d),
-      enable_gpu(dirac.enable_gpu), init(false)
+      enable_gpu(dirac.enable_gpu), gpu_setup(dirac.gpu_setup), init(false)
   {
 
   }
@@ -49,6 +49,8 @@ namespace quda {
 
   void DiracCoarse::initializeCoarse()
   {
+    if (!init) errorQuda("Cannot call from this reference instance");
+
     QudaPrecision prec = transfer->Vectors().Precision();
     int ndim = transfer->Vectors().Ndim();
     int x[QUDA_MAX_DIM];
@@ -101,8 +103,6 @@ namespace quda {
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
       X_d = new cudaGaugeField(gParam);
     }
-
-    bool gpu_setup = true;
 
     if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
     else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
@@ -267,7 +267,7 @@ namespace quda {
     }
   }
 
-  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu) : DiracCoarse(param, enable_gpu)
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu, bool gpu_setup) : DiracCoarse(param, enable_gpu, gpu_setup)
   {
     /* do nothing */
   }

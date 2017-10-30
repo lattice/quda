@@ -1649,6 +1649,9 @@ QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
 
 int mg_levels = 2;
 
+QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL] = { };
+QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL] = { };
+
 int nu_pre = 2;
 int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
@@ -1759,6 +1762,8 @@ void usage(char** argv )
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-solve-type <level solve>             # The type of solve to do (direct, direct-pc) (default direct-pc) \n");
+  printf("    --mg-solve-location <level cpu/cuda>      # The location where the multigrid solver will run (default cuda)\n");
+  printf("    --mg-setup-location <level cpu/cuda>      # The location where the multigrid setup will be computed (default cuda)\n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
   printf("    --mg-setup-maxiter <level iter>           # The maximum number of solver iterations to use when relaxing on a null space vector (default 500)\n");
   printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
@@ -1793,7 +1798,7 @@ void usage(char** argv )
 
   printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
   printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
-  printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory loction)\n");
+  printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
   printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
@@ -2531,6 +2536,42 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-solver-location") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    solver_location[level] = get_location(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-location") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_location[level] = get_location(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-setup-inv") == 0){
     if (i+2 >= argc){
       usage(argv);
@@ -3049,7 +3090,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    location_ritz = get_df_location_ritz(argv[i+1]);
+    location_ritz = get_location(argv[i+1]);
     i++;
     ret = 0;
     goto out;

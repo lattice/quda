@@ -1298,16 +1298,16 @@ get_solve_ext_lib_type(char* s)
 }
 
 QudaFieldLocation
-get_df_location_ritz(char* s)
+get_location(char* s)
 {
   QudaFieldLocation ret = QUDA_INVALID_FIELD_LOCATION;
 
-  if (strcmp(s, "host") == 0) {
+  if (strcmp(s, "cpu") == 0 || strcmp(s, "host") == 0) {
     ret = QUDA_CPU_FIELD_LOCATION;
-  } else if (strcmp(s, "cuda") == 0) {
+  } else if (strcmp(s, "gpu") == 0 || strcmp(s, "cuda") == 0) {
     ret = QUDA_CUDA_FIELD_LOCATION;
   } else {
-    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    fprintf(stderr, "Error: invalid location %s\n", s);
     exit(1);
   }
 

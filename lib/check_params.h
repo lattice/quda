@@ -606,6 +606,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
     P(omega[i], INVALID_DOUBLE);
     P(location[i], QUDA_INVALID_FIELD_LOCATION);
+
+#ifdef INIT_PARAM
+    P(setup_location[i], QUDA_CUDA_FIELD_LOCATION);
+#else
+    P(setup_location[i], QUDA_INVALID_FIELD_LOCATION);
+#endif
   }
 
   P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
