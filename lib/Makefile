@@ -10,9 +10,9 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	gauge_ape.o gauge_stout.o gauge_plaq.o laplace.o gauge_laplace.o\
 	inv_gcr_quda.o inv_mr_quda.o inv_bicgstabl_quda.o     		\
 	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\
-	interface_quda.o util_quda.o color_spinor_field.o		\
-	color_spinor_util.o cpu_color_spinor_field.o			\
-	color_spinor_wuppertal.o					\
+	interface_quda.o interface_qlua.o util_quda.o			\
+	color_spinor_field.o color_spinor_util.o			\
+	cpu_color_spinor_field.o color_spinor_wuppertal.o		\
 	cuda_color_spinor_field.o dirac.o clover_field.o		\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
@@ -69,7 +69,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
 	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
 	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
-	qio_util.h quda_arpack_interface.h deflation.h
+	qio_util.h quda_arpack_interface.h deflation.h interface_qlua.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
@@ -198,6 +198,9 @@ version.o: version.cpp $(HDRS) $(QUDA_OBJS)
 
 
 interface_quda.o: interface_quda.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
+
+interface_qlua.o: interface_qlua.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
 
 tune.o: tune.cpp $(HDRS)
