@@ -418,8 +418,10 @@ namespace quda {
 	profile_path = resource_path + "/profile_" + std::to_string(count) + ".tsv";
 	async_profile_path = resource_path + "/profile_async_" + std::to_string(count) + ".tsv";
       } else {
-	profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + ".tsv";
-	async_profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + "_async.tsv";
+	//profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + ".tsv";
+	//async_profile_path = resource_path + "/" + profile_fname + "_" + std::to_string(count) + "_async.tsv";
+	profile_path =  profile_fname + std::to_string(count) + ".tsv";
+	async_profile_path =  profile_fname + std::to_string(count) + "_async.tsv";
       }
 
       count++;
