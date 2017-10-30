@@ -6,7 +6,7 @@
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
 #endif
-#include <int32_to_char.h>
+#include <uint_to_char.h>
 
 // splitting the dot-product between threads is buggy with CUDA 7.0
 #if __COMPUTE_CAPABILITY__ >= 300 && CUDA_VERSION >= 7050

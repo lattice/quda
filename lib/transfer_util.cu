@@ -4,7 +4,7 @@
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
 #include <cub_helper.cuh>
-#include <int32_to_char.h>
+#include <uint_to_char.h>
 #include <typeinfo>
 #include <vector>
 #include <assert.h>
