@@ -123,8 +123,10 @@ new_cudaGaugeField(QudaGaugeParam& gp, double *hbuf_u[])
   if (NULL == cuda_gf) return NULL;
 
   if (NULL != hbuf_u) {
-    cuda_gf->copy(*cpu_gf);
-    cuda_gf->exchangeGhost();
+    double t1 = MPI_Wtime();
+    cuda_gf->copy(*cpu_gf); // C.K. This does ghost exchange as well
+    double t2 = MPI_Wtime();
+    printfQuda("TIMING - laplacianQuda: cuda_gf copy & exchangeGhost in %.6f sec.\n", t2-t1);
   }
   
   return cuda_gf;
@@ -224,7 +226,6 @@ laplacianQuda(
     wuppertalStep(*cuda_v_out, *cuda_v_in, parity, *cuda_gf, alpha, beta);    
     cudaDeviceSynchronize();
     checkCudaError();
-    
     *cuda_v_in = *cuda_v_out;
   }
   double t2 = MPI_Wtime(); 
