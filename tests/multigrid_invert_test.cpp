@@ -12,8 +12,6 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#include "face_quda.h"
-
 #if defined(QMP_COMMS)
 #include <qmp.h>
 #elif defined(MPI_COMMS)
@@ -67,9 +65,13 @@ extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
+extern QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL];
+extern QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
+
 extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
 extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol[QUDA_MAX_MG_LEVEL];
+extern int setup_maxiter[QUDA_MAX_MG_LEVEL];
 extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
@@ -243,6 +245,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
+    mg_param.setup_maxiter[i] = setup_maxiter[i];
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
@@ -284,7 +287,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
-    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
+    mg_param.location[i] = solver_location[i];
+    mg_param.setup_location[i] = setup_location[i];
   }
 
   // only coarsen the spin on the first restriction
@@ -415,6 +419,7 @@ int main(int argc, char **argv)
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
     setup_tol[i] = 5e-6;
+    setup_maxiter[i] = 500;
     mu_factor[i] = 1.;
     mg_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
@@ -424,6 +429,8 @@ int main(int argc, char **argv)
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
     coarse_solver_maxiter[i] = 10;
+    solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
+    setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
 
   for (int i = 1; i < argc; i++){

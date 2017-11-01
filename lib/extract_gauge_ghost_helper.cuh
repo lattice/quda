@@ -228,7 +228,6 @@ namespace quda {
   template <typename Float, int length, typename Order>
   void extractGhost(Order order, const GaugeField &u, QudaFieldLocation location, bool extract, int offset) {
     const int *X = u.X();
-    const int nFace = u.Nface();
     const int nDim = 4;
     //loop variables: a, b, c with a the most signifcant and c the least significant
     //A, B, C the maximum value

@@ -609,7 +609,6 @@ BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
 INTERFACE_NVTX
 MPI_NVTX
-GPU_DIRECT
 POSIX_THREADS
 BUILD_MPI
 BUILD_QMP
@@ -730,7 +729,6 @@ enable_sstep
 enable_contract
 enable_dynamic_clover
 enable_multi_gpu
-enable_gpu_direct
 enable_mpi_nvtx
 enable_interface_nvtx
 with_mpi
@@ -1370,7 +1368,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-cpu-arch=arch  Set CPU arch: x86 or x86_64 (default: x86_64)
   --enable-gpu-arch=arch  Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50,
-                          sm_52, sm_60 (default: sm_35)
+                          sm_52, sm_60, sm_70 (default: sm_35)
   --enable-os=os          Set operating system: linux, osx (default: linux)
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
@@ -1418,8 +1416,6 @@ Optional Features:
   --enable-dynamic-clover Invert dynamically the clover term for
                           twisted-clover fermions (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
-  --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
-                          enabled)
   --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
                           the visual profiler (default: disabled)
   --enable-interface-nvtx Enable NVTX markup for profiling interface calls in
@@ -2308,15 +2304,6 @@ if test "${enable_multi_gpu+set}" = set; then :
   enableval=$enable_multi_gpu;  multi_gpu=${enableval}
 else
    multi_gpu="no"
-
-fi
-
-
-# Check whether --enable-gpu-direct was given.
-if test "${enable_gpu_direct+set}" = set; then :
-  enableval=$enable_gpu_direct;  gpu_direct=${enableval}
-else
-   gpu_direct="yes"
 
 fi
 
@@ -4044,9 +4031,9 @@ x86 | x86_64 ) ;;
 esac
 
 case ${gpu_arch} in
-sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60) ;;
+sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52 | sm_60 | sm_70) ;;
 *)
-  as_fn_error $? " GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60 " "$LINENO" 5
+  as_fn_error $? " GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52, sm_60, sm_70 " "$LINENO" 5
   ;;
 esac
 
@@ -4250,13 +4237,6 @@ case ${multi_gpu} in
 yes|no);;
 *)
   as_fn_error $? " invalid value for --enable-multi-gpu " "$LINENO" 5
-  ;;
-esac
-
-case ${gpu_direct} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-gpu-direct " "$LINENO" 5
   ;;
 esac
 
@@ -4491,11 +4471,6 @@ BUILD_MPI=${build_mpi}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting POSIX_THREADS = ${posix_threads}" >&5
 $as_echo "$as_me: Setting POSIX_THREADS = ${posix_threads}" >&6;}
 POSIX_THREADS=${posix_threads}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECT= ${gpu_direct}" >&5
-$as_echo "$as_me: Setting GPU_DIRECT= ${gpu_direct}" >&6;}
-GPU_DIRECT=${gpu_direct}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_NVTXS= ${mpi_nvtx}" >&5

@@ -160,33 +160,6 @@ namespace quda {
     /** Type of ghost exchange to perform */
     QudaGhostExchange ghostExchange;
 
-    /** Pinned-memory buffer that is used by all derived classes */
-    static void *bufferPinned[2]; 
-
-    /** Whether the pinned-memory buffer has already been initialized or not */
-    static bool bufferPinnedInit[2];
-
-    /** The size in bytes of pinned-memory buffer */
-    static size_t bufferPinnedBytes[2];
-
-    /** Resize the pinned-memory buffer */
-    void resizeBufferPinned(size_t bytes, const int index=0) const;
-
-    /** Keep track of resizes to the pinned memory buffers */
-    static size_t bufferPinnedResizeCount;
-
-    /** Device-memory buffer that is used by all derived classes */
-    static void *bufferDevice; 
-
-    /** Whether the device-memory buffer has already been initialized or not */
-    static bool bufferDeviceInit;
-
-    /** The size in bytes of device-memory buffer */
-    static size_t bufferDeviceBytes;
-
-    /** Resize the device-memory buffer */
-    void resizeBufferDevice(size_t bytes) const;
-
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
 
     /** The number of dimensions we partition for communication */
@@ -222,6 +195,36 @@ namespace quda {
        Remove ghost pointer for sending to
     */
     static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
+
+    /**
+       The current size of the static ghost allocation
+    */
+    static size_t ghostFaceBytes;
+
+    /**
+       Whether the ghost buffers have been initialized
+    */
+    static bool initGhostFaceBuffer;
+
+    /**
+       Size in bytes of this ghost field
+    */
+    mutable size_t ghost_bytes;
+
+    /**
+       Size in bytes of the ghost in each dimension
+    */
+    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
+
+    /**
+       Real-number offsets to each ghost zone
+    */
+    mutable int ghostOffset[QUDA_MAX_DIM][2];
+
+    /**
+       Real-number (in floats) offsets to each ghost zone for norm field
+    */
+    mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
     /** Pinned memory buffer used for sending all messages */
     void *my_face_h[2];
@@ -320,6 +323,21 @@ namespace quda {
     /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
 
+    void precisionCheck() {
+      switch(precision) {
+      case QUDA_HALF_PRECISION:
+      case QUDA_SINGLE_PRECISION:
+      case QUDA_DOUBLE_PRECISION:
+	break;
+      default:
+	errorQuda("Unknown precision %d\n", precision);
+      }
+    }
+
+    mutable char *backup_h;
+    mutable char *backup_norm_h;
+    mutable bool backed_up;
+
   public:
 
     /**
@@ -341,9 +359,27 @@ namespace quda {
     virtual ~LatticeField();
     
     /**
-       Free the pinned-memory buffer
+       @brief Allocate the static ghost buffers
+       @param[in] ghost_bytes Size of the ghost buffer to allocate
     */
-    static void freeBuffer(int index=0);
+    void allocateGhostBuffer(size_t ghost_bytes) const;
+
+    /**
+       @brief Free statically allocated ghost buffers
+    */
+    static void freeGhostBuffer(void);
+
+    /**
+       Create the communication handlers (both host and device)
+       @param[in] no_comms_fill Whether to allocate halo buffers for
+       dimensions that are not partitioned
+    */
+    void createComms(bool no_comms_fill=false);
+
+    /**
+       Destroy the communication handlers
+    */
+    void destroyComms();
 
     /**
        Create the inter-process communication handlers
@@ -509,6 +545,12 @@ namespace quda {
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
+
+    /** @brief Backs up the LatticeField */
+    virtual void backup() const { errorQuda("Not implemented"); }
+
+    /** @brief Restores the cpuGaugeField */
+    virtual void restore() { errorQuda("Not implemented"); }
   };
   
   /**

@@ -6,7 +6,6 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <dslash_quda.h>
-#include <face_quda.h>
 #include <blas_quda.h>
 
 #include <typeinfo>
@@ -69,6 +68,7 @@ namespace quda {
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i=0; i<Ls; i++) printfQuda("b_5[%d] = %e\t c_5[%d] = %e\n", i,b_5[i],i,c_5[i]);
     }
+
   };
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
@@ -108,7 +108,7 @@ namespace quda {
 
     QudaTune tune;
 
-    int commDim[QUDA_MAX_DIM]; // whether do comms or not
+    mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
     mutable TimeProfile profile;
 
@@ -117,6 +117,15 @@ namespace quda {
     Dirac(const Dirac &dirac);
     virtual ~Dirac();
     Dirac& operator=(const Dirac &dirac);
+
+    /**
+       @brief Enable / disable communications for the Dirac operator
+       @param[in] commDim_ Array of booleans which determines whether
+       communications are enabled
+     */
+    void setCommDim(const int commDim_[QUDA_MAX_DIM]) const {
+      for (int i=0; i<QUDA_MAX_DIM; i++) { commDim[i] = commDim_[i]; }
+    }
 
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     virtual void checkFullSpinor(const ColorSpinorField &, const ColorSpinorField &) const;
@@ -774,7 +783,8 @@ namespace quda {
 
     void initializeCoarse();  /** Initialize the coarse gauge field */
 
-    bool enable_gpu; /** Whether to enable this operator for the GPU */
+    const bool enable_gpu; /** Whether to enable this operator for the GPU */
+    const bool gpu_setup; /** Where to do the coarse-operator construction*/
     bool init; /** Whether this instance did the allocation or not */
 
   public:
@@ -785,7 +795,7 @@ namespace quda {
        @param[in] param Parameters defining this operator
        @param[in] enable_gpu Whether to enable this operator for the GPU
      */
-    DiracCoarse(const DiracParam &param, bool enable_gpu=true);
+    DiracCoarse(const DiracParam &param, bool enable_gpu=true, bool gpu_setup=true);
 
     /**
        @param[in] param Parameters defining this operator
@@ -890,7 +900,7 @@ namespace quda {
   class DiracCoarsePC : public DiracCoarse {
 
   public:
-    DiracCoarsePC(const DiracParam &param, bool enable_gpu=true);
+    DiracCoarsePC(const DiracParam &param, bool enable_gpu=true, bool gpu_setup=true);
     DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarsePC();
 

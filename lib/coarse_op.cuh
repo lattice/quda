@@ -65,6 +65,9 @@ namespace quda {
     int_fastdiv aggregates_per_block; // number of aggregates per thread block
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
 
+    Float max_h; // scalar that stores the maximum element of the dynamic clover inverse
+    Float *max_d; // array that stores the maximum element per lattice site of the dynamic clover inverse
+
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
 		  fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
@@ -76,7 +79,7 @@ namespace quda {
 	kappa(static_cast<Float>(kappa)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
         fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
         fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-      aggregates_per_block(1), swizzle(1), bidirectional(bidirectional)
+        bidirectional(bidirectional), aggregates_per_block(1), swizzle(1), max_d(nullptr)
     {
       if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
 	errorQuda("Gamma basis %d not supported", V.GammaBasis());
@@ -88,6 +91,8 @@ namespace quda {
 	comm_dim[i] = comm_dim_partitioned(i);
       }
     }
+
+    ~CalculateYArg() { }
   };
 
   /**
@@ -298,12 +303,12 @@ namespace quda {
   }
 
 #ifdef DYNAMIC_CLOVER
-  #ifdef UGLY_DYNCLOV
-    #include<dyninv_clover_mg.cuh>
-  #else
+#ifdef UGLY_DYNCLOV
+#include<dyninv_clover_mg.cuh>
+#else
 
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __device__ __host__ inline void applyInvClover(Arg &arg, int parity, int x_cb) {
+  __device__ __host__ inline void applyCloverInv(Arg &arg, const complex<Float> UV[fineSpin][fineColor][coarseColor], int parity, int x_cb) {
     /* Applies the inverse of the clover term squared plus mu2 to the spinor */
     /* Compute (T^2 + mu2) first, then invert */
     /* We proceed by chiral blocks */
@@ -313,8 +318,7 @@ namespace quda {
       complex<Float> tri[15];	/* Off-diagonal components of the inverse clover term */
 
       /*	This macro avoid the infinitely long expansion of the tri products	*/
-
-      #define Cl(s1,c1,s2,c2) (arg.C(0, parity, x_cb, s1+2*ch, s2+2*ch, c1, c2))
+#define Cl(s1,c1,s2,c2) (arg.C(0, parity, x_cb, s1+2*ch, s2+2*ch, c1, c2))
 
       tri[0]  = Cl(0,1,0,0)*Cl(0,0,0,0).real() + Cl(0,1,0,1)*Cl(0,1,0,0) + Cl(0,1,0,2)*Cl(0,2,0,0) + Cl(0,1,1,0)*Cl(1,0,0,0) + Cl(0,1,1,1)*Cl(1,1,0,0) + Cl(0,1,1,2)*Cl(1,2,0,0);
       tri[1]  = Cl(0,2,0,0)*Cl(0,0,0,0).real() + Cl(0,2,0,2)*Cl(0,2,0,0) + Cl(0,2,0,1)*Cl(0,1,0,0) + Cl(0,2,1,0)*Cl(1,0,0,0) + Cl(0,2,1,1)*Cl(1,1,0,0) + Cl(0,2,1,2)*Cl(1,2,0,0);
@@ -342,7 +346,7 @@ namespace quda {
       diag[4] = arg.mu*arg.mu + Cl(1,1,1,1).real()*Cl(1,1,1,1).real() + norm(Cl(0,0,1,1)) + norm(Cl(0,1,1,1)) + norm(Cl(0,2,1,1)) + norm(Cl(1,0,1,1)) + norm(Cl(1,2,1,1));
       diag[5] = arg.mu*arg.mu + Cl(1,2,1,2).real()*Cl(1,2,1,2).real() + norm(Cl(0,0,1,2)) + norm(Cl(0,1,1,2)) + norm(Cl(0,2,1,2)) + norm(Cl(1,0,1,2)) + norm(Cl(1,1,1,2));
 
-      #undef Cl
+#undef Cl
 
       /*	INVERSION STARTS	*/
 
@@ -410,27 +414,155 @@ namespace quda {
 	for (int j=0; j<(fineSpin/2)*fineColor; j++) {	// This won't work for anything different than fineColor = 3, fineSpin = 4
 	  int s = j / fineColor, ic = j % fineColor;
 
-	  arg.AV(parity, x_cb, s+2*ch, ic, ic_c) += diag[j] * arg.UV(parity, x_cb, s+2*ch, ic, ic_c);	// Diagonal clover
+	  arg.AV(parity, x_cb, s+2*ch, ic, ic_c) += diag[j] * UV[s+2*ch][ic][ic_c];	// Diagonal clover
 
 	  for (int k=0; k<j; k++) {
 	    const int jk = j*(j-1)/2 + k;
 	    const int s_col = k / fineColor, jc = k % fineColor;
 
-	    arg.AV(parity, x_cb, s+2*ch, ic, ic_c) += tri[jk] * arg.UV(parity, x_cb, s_col+2*ch, jc, ic_c); // Off-diagonal
+	    arg.AV(parity, x_cb, s+2*ch, ic, ic_c) += tri[jk] * UV[s_col+2*ch][jc][ic_c]; // Off-diagonal
 	  }
 
 	  for (int k=j+1; k<(fineSpin/2)*fineColor; k++) {
 	    int kj = k*(k-1)/2 + j;
 	    int s_col = k / fineColor, jc = k % fineColor;
 
-	    arg.AV(parity, x_cb, s+2*ch, ic, ic_c) += conj(tri[kj]) * arg.UV(parity, x_cb, s_col+2*ch, jc, ic_c); // Off-diagonal
+	    arg.AV(parity, x_cb, s+2*ch, ic, ic_c) += conj(tri[kj]) * UV[s_col+2*ch][jc][ic_c]; // Off-diagonal
 	  }
 	}
       }	// Coarse color
     } // Chirality
   }
 
-  #endif // UGLY_DYNCLOV
+#endif // UGLY_DYNCLOV
+
+  template<typename Float, typename Arg>
+  __device__ __host__ inline Float computeCloverInvMax(Arg &arg, int parity, int x_cb) {
+    /* Applies the inverse of the clover term squared plus mu2 to the spinor */
+    /* Compute (T^2 + mu2) first, then invert */
+    /* We proceed by chiral blocks */
+
+    Float max = 0.0;
+
+    for (int ch = 0; ch < 2; ch++) {	/* Loop over chiral blocks */
+      Float diag[6], tmp[6];
+      complex<Float> tri[15];	/* Off-diagonal components of the inverse clover term */
+
+      /*	This macro avoid the infinitely long expansion of the tri products	*/
+#define Cl(s1,c1,s2,c2) (arg.C(0, parity, x_cb, s1+2*ch, s2+2*ch, c1, c2))
+
+      tri[0]  = Cl(0,1,0,0)*Cl(0,0,0,0).real() + Cl(0,1,0,1)*Cl(0,1,0,0) + Cl(0,1,0,2)*Cl(0,2,0,0) + Cl(0,1,1,0)*Cl(1,0,0,0) + Cl(0,1,1,1)*Cl(1,1,0,0) + Cl(0,1,1,2)*Cl(1,2,0,0);
+      tri[1]  = Cl(0,2,0,0)*Cl(0,0,0,0).real() + Cl(0,2,0,2)*Cl(0,2,0,0) + Cl(0,2,0,1)*Cl(0,1,0,0) + Cl(0,2,1,0)*Cl(1,0,0,0) + Cl(0,2,1,1)*Cl(1,1,0,0) + Cl(0,2,1,2)*Cl(1,2,0,0);
+      tri[3]  = Cl(1,0,0,0)*Cl(0,0,0,0).real() + Cl(1,0,1,0)*Cl(1,0,0,0) + Cl(1,0,0,1)*Cl(0,1,0,0) + Cl(1,0,0,2)*Cl(0,2,0,0) + Cl(1,0,1,1)*Cl(1,1,0,0) + Cl(1,0,1,2)*Cl(1,2,0,0);
+      tri[6]  = Cl(1,1,0,0)*Cl(0,0,0,0).real() + Cl(1,1,1,1)*Cl(1,1,0,0) + Cl(1,1,0,1)*Cl(0,1,0,0) + Cl(1,1,0,2)*Cl(0,2,0,0) + Cl(1,1,1,0)*Cl(1,0,0,0) + Cl(1,1,1,2)*Cl(1,2,0,0);
+      tri[10] = Cl(1,2,0,0)*Cl(0,0,0,0).real() + Cl(1,2,1,2)*Cl(1,2,0,0) + Cl(1,2,0,1)*Cl(0,1,0,0) + Cl(1,2,0,2)*Cl(0,2,0,0) + Cl(1,2,1,0)*Cl(1,0,0,0) + Cl(1,2,1,1)*Cl(1,1,0,0);
+
+      tri[2]  = Cl(0,2,0,1)*Cl(0,1,0,1).real() + Cl(0,2,0,2)*Cl(0,2,0,1) + Cl(0,2,0,0)*Cl(0,0,0,1) + Cl(0,2,1,0)*Cl(1,0,0,1) + Cl(0,2,1,1)*Cl(1,1,0,1) + Cl(0,2,1,2)*Cl(1,2,0,1);
+      tri[4]  = Cl(1,0,0,1)*Cl(0,1,0,1).real() + Cl(1,0,1,0)*Cl(1,0,0,1) + Cl(1,0,0,0)*Cl(0,0,0,1) + Cl(1,0,0,2)*Cl(0,2,0,1) + Cl(1,0,1,1)*Cl(1,1,0,1) + Cl(1,0,1,2)*Cl(1,2,0,1);
+      tri[7]  = Cl(1,1,0,1)*Cl(0,1,0,1).real() + Cl(1,1,1,1)*Cl(1,1,0,1) + Cl(1,1,0,0)*Cl(0,0,0,1) + Cl(1,1,0,2)*Cl(0,2,0,1) + Cl(1,1,1,0)*Cl(1,0,0,1) + Cl(1,1,1,2)*Cl(1,2,0,1);
+      tri[11] = Cl(1,2,0,1)*Cl(0,1,0,1).real() + Cl(1,2,1,2)*Cl(1,2,0,1) + Cl(1,2,0,0)*Cl(0,0,0,1) + Cl(1,2,0,2)*Cl(0,2,0,1) + Cl(1,2,1,0)*Cl(1,0,0,1) + Cl(1,2,1,1)*Cl(1,1,0,1);
+
+      tri[5]  = Cl(1,0,0,2)*Cl(0,2,0,2).real() + Cl(1,0,1,0)*Cl(1,0,0,2) + Cl(1,0,0,0)*Cl(0,0,0,2) + Cl(1,0,0,1)*Cl(0,1,0,2) + Cl(1,0,1,1)*Cl(1,1,0,2) + Cl(1,0,1,2)*Cl(1,2,0,2);
+      tri[8]  = Cl(1,1,0,2)*Cl(0,2,0,2).real() + Cl(1,1,1,1)*Cl(1,1,0,2) + Cl(1,1,0,0)*Cl(0,0,0,2) + Cl(1,1,0,1)*Cl(0,1,0,2) + Cl(1,1,1,0)*Cl(1,0,0,2) + Cl(1,1,1,2)*Cl(1,2,0,2);
+      tri[12] = Cl(1,2,0,2)*Cl(0,2,0,2).real() + Cl(1,2,1,2)*Cl(1,2,0,2) + Cl(1,2,0,0)*Cl(0,0,0,2) + Cl(1,2,0,1)*Cl(0,1,0,2) + Cl(1,2,1,0)*Cl(1,0,0,2) + Cl(1,2,1,1)*Cl(1,1,0,2);
+
+      tri[9]  = Cl(1,1,1,0)*Cl(1,0,1,0).real() + Cl(1,1,1,1)*Cl(1,1,1,0) + Cl(1,1,0,0)*Cl(0,0,1,0) + Cl(1,1,0,1)*Cl(0,1,1,0) + Cl(1,1,0,2)*Cl(0,2,1,0) + Cl(1,1,1,2)*Cl(1,2,1,0);
+      tri[13] = Cl(1,2,1,0)*Cl(1,0,1,0).real() + Cl(1,2,1,2)*Cl(1,2,1,0) + Cl(1,2,0,0)*Cl(0,0,1,0) + Cl(1,2,0,1)*Cl(0,1,1,0) + Cl(1,2,0,2)*Cl(0,2,1,0) + Cl(1,2,1,1)*Cl(1,1,1,0);
+      tri[14] = Cl(1,2,1,1)*Cl(1,1,1,1).real() + Cl(1,2,1,2)*Cl(1,2,1,1) + Cl(1,2,0,0)*Cl(0,0,1,1) + Cl(1,2,0,1)*Cl(0,1,1,1) + Cl(1,2,0,2)*Cl(0,2,1,1) + Cl(1,2,1,0)*Cl(1,0,1,1);
+
+      diag[0] = arg.mu*arg.mu + Cl(0,0,0,0).real()*Cl(0,0,0,0).real() + norm(Cl(0,1,0,0)) + norm(Cl(0,2,0,0)) + norm(Cl(1,0,0,0)) + norm(Cl(1,1,0,0)) + norm(Cl(1,2,0,0));
+      diag[1] = arg.mu*arg.mu + Cl(0,1,0,1).real()*Cl(0,1,0,1).real() + norm(Cl(0,0,0,1)) + norm(Cl(0,2,0,1)) + norm(Cl(1,0,0,1)) + norm(Cl(1,1,0,1)) + norm(Cl(1,2,0,1));
+      diag[2] = arg.mu*arg.mu + Cl(0,2,0,2).real()*Cl(0,2,0,2).real() + norm(Cl(0,0,0,2)) + norm(Cl(0,1,0,2)) + norm(Cl(1,0,0,2)) + norm(Cl(1,1,0,2)) + norm(Cl(1,2,0,2));
+      diag[3] = arg.mu*arg.mu + Cl(1,0,1,0).real()*Cl(1,0,1,0).real() + norm(Cl(0,0,1,0)) + norm(Cl(0,1,1,0)) + norm(Cl(0,2,1,0)) + norm(Cl(1,1,1,0)) + norm(Cl(1,2,1,0));
+      diag[4] = arg.mu*arg.mu + Cl(1,1,1,1).real()*Cl(1,1,1,1).real() + norm(Cl(0,0,1,1)) + norm(Cl(0,1,1,1)) + norm(Cl(0,2,1,1)) + norm(Cl(1,0,1,1)) + norm(Cl(1,2,1,1));
+      diag[5] = arg.mu*arg.mu + Cl(1,2,1,2).real()*Cl(1,2,1,2).real() + norm(Cl(0,0,1,2)) + norm(Cl(0,1,1,2)) + norm(Cl(0,2,1,2)) + norm(Cl(1,0,1,2)) + norm(Cl(1,1,1,2));
+
+#undef Cl
+
+      /*	INVERSION STARTS	*/
+
+      for (int j=0; j<6; j++) {
+        diag[j] = sqrt(diag[j]);
+        tmp[j] = 1./diag[j];
+
+        for (int k=j+1; k<6; k++) {
+          int kj = k*(k-1)/2+j;
+          tri[kj] *= tmp[j];
+        }
+
+        for(int k=j+1;k<6;k++){
+          int kj=k*(k-1)/2+j;
+          diag[k] -= (tri[kj] * conj(tri[kj])).real();
+          for(int l=k+1;l<6;l++){
+            int lj=l*(l-1)/2+j;
+            int lk=l*(l-1)/2+k;
+            tri[lk] -= tri[lj] * conj(tri[kj]);
+          }
+        }
+      }
+
+      /* Now use forward and backward substitution to construct inverse */
+      complex<Float> v1[6];
+      for (int k=0;k<6;k++) {
+        for(int l=0;l<k;l++) v1[l] = complex<Float>(0.0, 0.0);
+
+        /* Forward substitute */
+        v1[k] = complex<Float>(tmp[k], 0.0);
+        for(int l=k+1;l<6;l++){
+          complex<Float> sum = complex<Float>(0.0, 0.0);
+          for(int j=k;j<l;j++){
+            int lj=l*(l-1)/2+j;
+            sum -= tri[lj] * v1[j];
+          }
+          v1[l] = sum * tmp[l];
+        }
+
+        /* Backward substitute */
+        v1[5] = v1[5] * tmp[5];
+        for(int l=4;l>=k;l--){
+          complex<Float> sum = v1[l];
+          for(int j=l+1;j<6;j++){
+            int jl=j*(j-1)/2+l;
+            sum -= conj(tri[jl]) * v1[j];
+          }
+          v1[l] = sum * tmp[l];
+        }
+
+        /* Overwrite column k */
+        diag[k] = v1[k].real();
+        for(int l=k+1;l<6;l++){
+          int lk=l*(l-1)/2+k;
+          tri[lk] = v1[l];
+        }
+      }
+
+      for (int i=0; i<6; i++) max = max > abs(diag[i]) ? max : abs(diag[i]);
+      for (int i=0; i<15; i++) max = max > abs(tri[i]) ? max : abs(tri[i]);
+    } // Chirality
+
+    return max;
+  }
+
+  template<typename Float, typename Arg>
+  void ComputeCloverInvMaxCPU(Arg &arg) {
+    Float max = 0.0;
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
+	Float max_x = computeCloverInvMax<Float,Arg>(arg, parity, x_cb);
+	max = max > max_x ? max : max_x;
+      } // c/b volume
+    }   // parity
+    arg.max_h = max;
+  }
+
+  template<typename Float, typename Arg>
+  __global__ void ComputeCloverInvMaxGPU(Arg arg) {
+    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
+    if (x_cb >= arg.fineVolumeCB) return;
+
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    arg.max_d[x_cb*2+parity] = computeCloverInvMax<Float,Arg>(arg, parity, x_cb);
+  }
 #endif // DYNAMIC_CLOVER
 
   /**
@@ -508,7 +640,7 @@ namespace quda {
       }
     } //Fine Spin
 #else
-    applyInvClover<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
+    applyCloverInv<Float,fineSpin,fineColor,coarseColor,Arg>(arg, UV, parity, x_cb);
 #endif
   } // computeTMCAV
 
@@ -1148,6 +1280,7 @@ namespace quda {
     COMPUTE_AV,
     COMPUTE_TMAV,
     COMPUTE_TMCAV,
+    COMPUTE_CLOVER_INV_MAX,
     COMPUTE_VUV,
     COMPUTE_COARSE_CLOVER,
     COMPUTE_REVERSE_Y,
@@ -1201,6 +1334,7 @@ namespace quda {
 	break;
       case COMPUTE_REVERSE_Y:
       case COMPUTE_CONVERT:
+      case COMPUTE_CLOVER_INV_MAX: // FIXME
 	// no floating point operations
 	flops_ = 0;
 	break;
@@ -1231,6 +1365,9 @@ namespace quda {
       case COMPUTE_TMCAV:
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.UV.Bytes() + 4*arg.C.Bytes(); // Two clover terms and more temporary storage
 	break;
+      case COMPUTE_CLOVER_INV_MAX: // FIXME
+	bytes_ = 2*arg.C.Bytes(); // read both parities of the clover field
+	break;
       case COMPUTE_VUV:
 	bytes_ = 2*arg.Y.Bytes() + (arg.bidirectional ? 1 : 2) * 2*arg.X.Bytes() + arg.UV.Bytes() + arg.V.Bytes();
 	break;
@@ -1259,6 +1396,7 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
+      case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_VUV:
       case COMPUTE_COARSE_CLOVER:
 	threads = arg.fineVolumeCB;
@@ -1322,6 +1460,15 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 	  ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+
+	} else if (type == COMPUTE_CLOVER_INV_MAX) {
+
+	  if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
+#ifdef DYNAMIC_CLOVER
+	  ComputeCloverInvMaxCPU<Float>(arg);
+#else
+	  errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
+#endif
 
 	} else if (type == COMPUTE_VUV) {
 
@@ -1394,6 +1541,19 @@ namespace quda {
 
 	  if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
 	  ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+
+	} else if (type == COMPUTE_CLOVER_INV_MAX) {
+
+	  if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
+#ifdef DYNAMIC_CLOVER
+	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB));
+	  ComputeCloverInvMaxGPU<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+	  thrust::device_ptr<Float> ptr(arg.max_d);
+	  arg.max_h = thrust::reduce(thrust::retag<my_tag>(ptr), thrust::retag<my_tag>(ptr+2*arg.fineVolumeCB), static_cast<Float>(0.0), thrust::maximum<Float>());
+	  pool_device_free(arg.max_d);
+#else
+	  errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
+#endif
 
 	} else if (type == COMPUTE_VUV) {
 #ifndef SHARED_ATOMIC
@@ -1563,16 +1723,17 @@ namespace quda {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
 
-      if      (type == COMPUTE_UV)            strcat(Aux,",computeUV");
-      else if (type == COMPUTE_AV)            strcat(Aux,",computeAV");
-      else if (type == COMPUTE_TMAV)          strcat(Aux,",computeTmAV");
-      else if (type == COMPUTE_TMCAV)         strcat(Aux,",computeTmcAV");
-      else if (type == COMPUTE_VUV)           strcat(Aux,",computeVUV");
-      else if (type == COMPUTE_COARSE_CLOVER) strcat(Aux,",computeCoarseClover");
-      else if (type == COMPUTE_REVERSE_Y)     strcat(Aux,",computeYreverse");
-      else if (type == COMPUTE_DIAGONAL)      strcat(Aux,",computeCoarseDiagonal");
-      else if (type == COMPUTE_TMDIAGONAL)    strcat(Aux,",computeCoarseTmDiagonal");
-      else if (type == COMPUTE_CONVERT)       strcat(Aux,",computeConvert");
+      if      (type == COMPUTE_UV)                 strcat(Aux,",computeUV");
+      else if (type == COMPUTE_AV)                 strcat(Aux,",computeAV");
+      else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
+      else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
+      else if (type == COMPUTE_CLOVER_INV_MAX) strcat(Aux,",computeCloverInverseMax");
+      else if (type == COMPUTE_VUV)                strcat(Aux,",computeVUV");
+      else if (type == COMPUTE_COARSE_CLOVER)      strcat(Aux,",computeCoarseClover");
+      else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
+      else if (type == COMPUTE_DIAGONAL)           strcat(Aux,",computeCoarseDiagonal");
+      else if (type == COMPUTE_TMDIAGONAL)         strcat(Aux,",computeCoarseTmDiagonal");
+      else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeConvert");
       else errorQuda("Unknown type=%d\n", type);
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
@@ -1612,6 +1773,7 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
+      case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_REVERSE_Y:
 	break;
       default:
@@ -1632,6 +1794,7 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
+      case COMPUTE_CLOVER_INV_MAX:
       case COMPUTE_REVERSE_Y:
 	break;
       default:
@@ -1688,15 +1851,15 @@ namespace quda {
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
 
-    int x_size[5];
+    int x_size[QUDA_MAX_DIM] = { };
     for (int i=0; i<4; i++) x_size[i] = v.X(i);
     x_size[4] = 1;
 
-    int xc_size[5];
+    int xc_size[QUDA_MAX_DIM] = { };
     for (int i=0; i<4; i++) xc_size[i] = X_.X()[i];
     xc_size[4] = 1;
 
-    int geo_bs[QUDA_MAX_DIM];
+    int geo_bs[QUDA_MAX_DIM] = { };
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 
@@ -1776,9 +1939,12 @@ namespace quda {
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 #ifdef DYNAMIC_CLOVER
-	errorQuda("Half precision not supported with dynamic clover");
-#endif
+	y.setComputeType(COMPUTE_CLOVER_INV_MAX);
+	y.apply(0);
+	double max = 6*sqrt(arg.max_h);
+#else
 	double max = 6*sqrt(arg.Cinv.abs_max(0));
+#endif
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("tmc max %e\n", max);
 	av.Scale(max);
 	arg.AV.resetScale(max);

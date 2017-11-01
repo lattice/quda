@@ -90,6 +90,9 @@ namespace quda {
     /** Where to compute this level of multigrid */
     QudaFieldLocation location;
 
+    /** Where to compute this level of the multigrid setup*/
+    QudaFieldLocation setup_location;
+
     /** Filename for where to load/store the null space */
     char filename[100];
 
@@ -120,7 +123,8 @@ namespace quda {
       smoother(param.smoother[level]),
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
-      location(param.location[level])
+      location(param.location[level]),
+      setup_location(param.setup_location[level])
       { 
 	// set the block size
 	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -155,7 +159,8 @@ namespace quda {
       smoother(param.mg_global.smoother[level]),
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
-      location(param.mg_global.location[level])
+      location(param.mg_global.location[level]),
+      setup_location(param.mg_global.setup_location[level])
       {
 	// set the block size
 	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];

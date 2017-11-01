@@ -9,9 +9,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-
-#include<face_quda.h>
-
 #include <color_spinor_field.h>
 
 #include <sys/time.h>
@@ -437,7 +434,7 @@ namespace quda {
 
     }
 
-    if (total_iter > 0) blas::copy(x, y);
+    blas::copy(x, y);
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);

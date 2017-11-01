@@ -75,6 +75,10 @@ extern "C" {
     int return_result_gauge; /**< Return the result gauge field */
     int return_result_mom;   /**< Return the result momentum field */
 
+    size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+    size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
+
   } QudaGaugeParam;
 
 
@@ -291,24 +295,18 @@ extern "C" {
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
     */
-    int max_search_dim;//for magma library this parameter must be multiple 16?
+    int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
     /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
     int deflation_grid;
-    /** eigCG: specifies whether to use reduced eigenvector set */
-    int use_reduced_vector_set;
     /** eigCG: selection criterion for the reduced eigenvector set */
     double eigenval_tol;
-    /** mixed precision eigCG tuning parameter:  whether to use cg refinement corrections in the incremental stage */
-    int use_cg_updates;
-    /** mixed precision eigCG tuning parameter:  tolerance for cg refinement corrections in the incremental stage */
-    double cg_iterref_tol;
     /** mixed precision eigCG tuning parameter:  minimum search vector space restarts */
     int eigcg_max_restarts;
     /** initCG tuning parameter:  maximum restarts */
     int max_restart_num;
-    /** initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle */
+    /** initCG tuning parameter:  tolerance for cg refinement corrections in the deflation stage */
     double inc_tol;
 
     /** Whether to make the solution vector(s) after the solve */
@@ -328,6 +326,9 @@ extern "C" {
 
     /** The index to indeicate which chrono history we are augmenting */
     int chrono_index;
+
+    /** Which external library to use in the linear solvers (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
 
   } QudaInvertParam;
 
@@ -362,6 +363,9 @@ extern "C" {
     /** The precision of the Ritz vectors */
     QudaPrecision cuda_prec_ritz;
 
+    /** The memory type used to keep the Ritz vectors */
+    QudaMemoryType mem_type_ritz;
+
     /** Location where deflation should be done */
     QudaFieldLocation location;
 
@@ -379,6 +383,9 @@ extern "C" {
 
     /**< The time taken by the multigrid solver setup */
     double secs;
+
+    /** Which external library to use in the deflation operations (MAGMA or Eigen) */
+    QudaExtLibType extlib_type;
 
   } QudaEigParam;
 
@@ -413,6 +420,9 @@ extern "C" {
 
     /** Tolerance to use in the setup phase */
     double setup_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum number of iterations for each setup solver */
+    int setup_maxiter[QUDA_MAX_MG_LEVEL];
 
     /** Null-space type to use in the setup phase */
     QudaSetupType setup_type;
@@ -468,6 +478,9 @@ extern "C" {
 
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
+
+    /** Location where the coarse-operator construction will be computedn */
+    QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
@@ -1030,18 +1043,6 @@ extern "C" {
     const void* const u_link,
     const QudaGaugeParam* param);
 
-
-
-  void computeHISQForceCompleteQuda(void* momentum,
-                      const double level2_coeff[6],
-                      const double fat7_coeff[6],
-                      void** quark_array,
-                      int num_terms,
-                      double** quark_coeff,
-                      const void* const w_link,
-                      const void* const v_link,
-                      const void* const u_link,
-                      const QudaGaugeParam* param);
 
   /**
    * Generate Gaussian distributed gauge field

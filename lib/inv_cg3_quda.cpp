@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
 
 #include <complex>
 
@@ -9,10 +10,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-
-#include <face_quda.h>
-
-#include <color_spinor_field.h>
 
 namespace quda {
 

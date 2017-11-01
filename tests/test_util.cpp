@@ -13,7 +13,6 @@
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
 
-#include <face_quda.h>
 #include <dslash_quda.h>
 #include "misc.h"
 
@@ -45,6 +44,31 @@ int mySpinorSiteSize;
 
 extern float fat_link_max;
 
+/**
+ * For MPI, the default node mapping is lexicographical with t varying fastest.
+ */
+int gridsize_from_cmdline[4] = {1,1,1,1};
+
+static int lex_rank_from_coords_t(const int *coords, void *fdata)
+{
+  int rank = coords[0];
+  for (int i = 1; i < 4; i++) {
+    rank = gridsize_from_cmdline[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+static int lex_rank_from_coords_x(const int *coords, void *fdata)
+{
+  int rank = coords[3];
+  for (int i = 2; i >= 0; i--) {
+    rank = gridsize_from_cmdline[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+static int rank_order = 0;
+
 void initComms(int argc, char **argv, const int *commDims)
 {
 #if defined(QMP_COMMS)
@@ -63,8 +87,13 @@ void initComms(int argc, char **argv, const int *commDims)
 #endif
 
 #endif
-  initCommsGridQuda(4, commDims, NULL, NULL);
+  QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
+
+  initCommsGridQuda(4, commDims, func, NULL);
   initRand();
+
+  printfQuda("Rank order is %s major (%s running fastest)\n",
+	     rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
 }
 
 
@@ -1106,7 +1135,21 @@ static void constructCloverField(Float *res, double norm, double diag) {
     for (int j = 0; j < 72; j++) {
       res[i*72 + j] = c*rand() - norm;
     }
-    for (int j = 0; j< 6; j++) {
+
+    //impose clover symmetry on each chiral block
+    for (int ch=0; ch<2; ch++) {
+      res[i*72 + 3 + 36*ch] = -res[i*72 + 0 + 36*ch];
+      res[i*72 + 4 + 36*ch] = -res[i*72 + 1 + 36*ch];
+      res[i*72 + 5 + 36*ch] = -res[i*72 + 2 + 36*ch];
+      res[i*72 + 30 + 36*ch] = -res[i*72 + 6 + 36*ch];
+      res[i*72 + 31 + 36*ch] = -res[i*72 + 7 + 36*ch];
+      res[i*72 + 32 + 36*ch] = -res[i*72 + 8 + 36*ch];
+      res[i*72 + 33 + 36*ch] = -res[i*72 + 9 + 36*ch];
+      res[i*72 + 34 + 36*ch] = -res[i*72 + 16 + 36*ch];
+      res[i*72 + 35 + 36*ch] = -res[i*72 + 17 + 36*ch];
+    }
+
+    for (int j = 0; j<6; j++) {
       res[i*72 + j] += diag;
       res[i*72 + j+36] += diag;
     }
@@ -1566,6 +1609,7 @@ QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
+QudaPrecision  prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
 int xdim = 24;
 int ydim = 24;
@@ -1573,7 +1617,6 @@ int zdim = 24;
 int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
-int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 int Nsrc = 1;
@@ -1606,6 +1649,9 @@ QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
 
 int mg_levels = 2;
 
+QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL] = { };
+QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL] = { };
+
 int nu_pre = 2;
 int nu_post = 2;
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
@@ -1614,6 +1660,7 @@ QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
 QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL] = { };
 int num_setup_iter[QUDA_MAX_MG_LEVEL] = { };
 double setup_tol[QUDA_MAX_MG_LEVEL] = { };
+int setup_maxiter[QUDA_MAX_MG_LEVEL] = { };
 QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
@@ -1629,6 +1676,20 @@ QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL] = { };
 int schwarz_cycle[QUDA_MAX_MG_LEVEL] = { };
 
 int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
+int nev = 8;
+int max_search_dim = 64;
+int deflation_grid = 16;
+double tol_restart = 5e+3*tol;
+
+int eigcg_max_restarts = 3;
+int max_restart_num = 3;
+double inc_tol = 1e-2;
+double eigenval_tol = 1e-1;
+
+QudaExtLibType solver_ext_lib     = QUDA_EIGEN_EXTLIB;
+QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
+QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
+QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1650,6 +1711,7 @@ void usage(char** argv )
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
   printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
+  printf("    --prec-ritz <double/single/half>  # Eigenvector precision in GPU\n");
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
   printf("    --recon-sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
   printf("    --recon-precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
@@ -1667,6 +1729,7 @@ void usage(char** argv )
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
+  printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
   printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
@@ -1699,7 +1762,10 @@ void usage(char** argv )
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-solve-type <level solve>             # The type of solve to do (direct, direct-pc) (default direct-pc) \n");
+  printf("    --mg-solve-location <level cpu/cuda>      # The location where the multigrid solver will run (default cuda)\n");
+  printf("    --mg-setup-location <level cpu/cuda>      # The location where the multigrid setup will be computed (default cuda)\n");
   printf("    --mg-setup-inv <level inv>                # The inverter to use for the setup of multigrid (default bicgstab)\n");
+  printf("    --mg-setup-maxiter <level iter>           # The maximum number of solver iterations to use when relaxing on a null space vector (default 500)\n");
   printf("    --mg-setup-iters <level iter>             # The number of setup iterations to use for the multigrid (default 1)\n");
   printf("    --mg-setup-tol <level tol>                # The tolerance to use for the setup of multigrid (default 5e-6)\n");
   printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
@@ -1720,7 +1786,23 @@ void usage(char** argv )
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --mg-vebosity <level verb>                # The verbosity to use on each level of the multigrid (default summarize)\n");
+  printf("    --df-nev <nev>                            # Set number of eigenvectors computed within a single solve cycle (default 8)\n");
+  printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
+  printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
+  printf("    --df-eigcg-max-restarts <n>               # Set how many iterative refinement cycles will be solved with eigCG within a single physical right hand site solve (default 4)\n");
+  printf("    --df-tol-restart <tol>                    # Set tolerance for the first restart in the initCG solver(default 5e-5)\n");
+  printf("    --df-tol-inc <tol>                        # Set tolerance for the subsequent restarts in the initCG solver  (default 1e-2)\n");
+  printf("    --df-max-restart-num <n>                  # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
+  printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
+
+
+  printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
+  printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
+  printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
+  printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
+
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
+
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --help                                    # Print out this message\n");
 
@@ -1829,6 +1911,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     prec_null =  get_prec(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--prec-ritz") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    prec_ritz =  get_prec(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2148,26 +2240,36 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--rank-order") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    rank_order = get_rank_order(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--dslash-type") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
-    dslash_type =  get_dslash_type(argv[i+1]);
+    dslash_type = get_dslash_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--flavor") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
-    twist_flavor =  get_flavor_type(argv[i+1]);
+    twist_flavor = get_flavor_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
-  
+
   if( strcmp(argv[i], "--inv-type") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -2434,6 +2536,42 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--mg-solver-location") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    solver_location[level] = get_location(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-location") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_location[level] = get_location(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-setup-inv") == 0){
     if (i+2 >= argc){
       usage(argv);
@@ -2480,6 +2618,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     setup_tol[level] = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-setup-maxiter") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    setup_maxiter[level] = atoi(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -2819,7 +2974,138 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
+
+  if( strcmp(argv[i], "--df-nev") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    nev = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-max-search-dim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    max_search_dim = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-deflation-grid") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    deflation_grid = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+  if( strcmp(argv[i], "--df-eigcg-max-restarts") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    eigcg_max_restarts = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+  if( strcmp(argv[i], "--df-max-restart-num") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    max_restart_num = atoi(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+
+  if( strcmp(argv[i], "--df-tol-restart") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    tol_restart = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+
+  if( strcmp(argv[i], "--df-tol-eigenval") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    eigenval_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+  if( strcmp(argv[i], "--df-tol-inc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    inc_tol = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  } 
+
+  if( strcmp(argv[i], "--solver-ext-lib-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    solver_ext_lib = get_solve_ext_lib_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-ext-lib-type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    deflation_ext_lib = get_solve_ext_lib_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-location-ritz") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    location_ritz = get_location(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--df-mem-type-ritz") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mem_type_ritz = get_df_mem_type_ritz(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);

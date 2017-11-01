@@ -20,7 +20,10 @@ namespace quda {
     compute_fat_link_max(false),
     staggeredPhaseType(u.StaggeredPhase()),
     staggeredPhaseApplied(u.StaggeredPhaseApplied()),
-    i_mu(u.iMu()) { }
+    i_mu(u.iMu()),
+    site_offset(u.SiteOffset()),
+    site_size(u.SiteSize())
+  { }
 
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
@@ -30,7 +33,8 @@ namespace quda {
     order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0),
     create(param.create),
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu),
+    site_offset(param.site_offset), site_size(param.site_size)
   {
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
       errorQuda("nColor must be 3, not %d for this link type", nColor);
@@ -81,6 +85,28 @@ namespace quda {
   GaugeField::~GaugeField() {
 
   }
+
+  void GaugeField::createGhostZone(const int *R, bool no_comms_fill) const
+  {
+    if (typeid(*this) == typeid(cpuGaugeField)) return;
+
+    // calculate size of ghost zone required
+    ghost_bytes = 0;
+    for (int i=0; i<nDim; i++) {
+      ghost_face_bytes[i] = 0;
+      if ( !(comm_dim_partitioned(i) || (no_comms_fill && R[i])) ) ghostFace[i] = 0;
+      else ghostFace[i] = surface[i] * R[i]; // includes the radius (unlike ColorSpinorField)
+
+      ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1]*geometry*nInternal;
+      ghostOffset[i][1] = ghostOffset[i][0] + ghostFace[i]*geometry*nInternal;
+
+      ghost_face_bytes[i] = ghostFace[i] * geometry * nInternal * precision;
+      ghost_bytes += 2*ghost_face_bytes[i]; // factor of two from direction
+    }
+
+    if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
+
+  } // createGhostZone
 
   void GaugeField::applyStaggeredPhase() {
     if (staggeredPhaseApplied) errorQuda("Staggered phases already applied");
@@ -289,5 +315,11 @@ namespace quda {
     delete b;
     return nrm1;
   }
+
+  uint64_t GaugeField::checksum(bool mini) const {
+    return Checksum(*this, mini);
+  }
+
+
 
 } // namespace quda

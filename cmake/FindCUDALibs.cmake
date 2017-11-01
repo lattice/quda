@@ -143,7 +143,7 @@ macro(cuda_find_library_local_first_with_path_ext _var _names _doc _path_ext )
     PATHS "${CUDA_TOOLKIT_TARGET_DIR}" "${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}"
     ENV CUDA_PATH
     ENV CUDA_LIB_PATH
-    PATH_SUFFIXES ${_cuda_64bit_lib_dir} "lib" "${_path_ext}lib/Win32" "${_path_ext}lib" "${_path_ext}libWin32"
+    PATH_SUFFIXES ${_cuda_64bit_lib_dir} "lib" "lib64" "${_path_ext}lib/Win32" "${_path_ext}lib" "${_path_ext}libWin32"
     DOC ${_doc}
     NO_DEFAULT_PATH
     )
@@ -185,6 +185,25 @@ if(NOT CUDA_TOOLKIT_ROOT_DIR AND NOT CMAKE_CROSSCOMPILING)
     DOC "CUDA Toolkit location."
     NO_DEFAULT_PATH
     )
+
+   if (CUDA_TOOLKIT_ROOT_DIR)
+    string(REGEX REPLACE "[/\\\\]?bin[64]*[/\\\\]?$" "" CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT_DIR})
+    # We need to force this back into the cache.
+    set(CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT_DIR} CACHE PATH "Toolkit location." FORCE)
+    set(CUDA_TOOLKIT_TARGET_DIR ${CUDA_TOOLKIT_ROOT_DIR})
+    set(CUDA_TOOLKIT_ROOT_DIR_INTERNAL "${CUDA_TOOLKIT_ROOT_DIR}" CACHE INTERNAL
+  "This is the value of the last time CUDA_TOOLKIT_ROOT_DIR was set successfully." FORCE)
+set(CUDA_TOOLKIT_TARGET_DIR_INTERNAL "${CUDA_TOOLKIT_TARGET_DIR}" CACHE INTERNAL
+  "This is the value of the last time CUDA_TOOLKIT_TARGET_DIR was set successfully." FORCE)
+  endif()
+
+  if (NOT EXISTS ${CUDA_TOOLKIT_ROOT_DIR})
+    if(CUDA_FIND_REQUIRED)
+      message(FATAL_ERROR "Specify CUDA_TOOLKIT_ROOT_DIR")
+    elseif(NOT CUDA_FIND_QUIETLY)
+      message("CUDA_TOOLKIT_ROOT_DIR not found or specified")
+    endif()
+  endif ()
 endif()
 
 if(CMAKE_CROSSCOMPILING)

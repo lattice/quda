@@ -6,7 +6,6 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
-#include <face_quda.h>
 #include <misc.h>
 
 // include because of nasty globals used in the tests
@@ -224,7 +223,7 @@ int main(int argc, char** argv)
   // Set some defaults that lets the benchmark fit in memory if you run it
   // with default parameters.
   xdim = ydim = zdim = tdim = 8;
-  
+
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -232,6 +231,7 @@ int main(int argc, char** argv)
     printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
