@@ -145,6 +145,10 @@ void comm_destroy_topology(Topology *topo)
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
+
+static bool intranode_enabled[2][4] = { {false,false,false,false},
+					{false,false,false,false} };
+
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
@@ -210,6 +214,12 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, performance rank = (%d, %d)\n",
 		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
 	    }
+	  } else {
+	    intranode_enabled[dir][dim] = true;
+	    if (getVerbosity() > QUDA_SILENT) {
+	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+	    }
 	  }
 
 	} // on the same node
@@ -262,6 +272,16 @@ bool comm_peer2peer_enabled_global() {
 
 void comm_enable_peer2peer(bool enable) {
   enable_p2p = enable;
+}
+
+static bool enable_intranode = true;
+
+bool comm_intranode_enabled(int dir, int dim){
+  return enable_intranode ? intranode_enabled[dir][dim] : false;
+}
+
+void comm_enable_intranode(bool enable) {
+  enable_intranode = enable;
 }
 
 int comm_ndim(const Topology *topo)
