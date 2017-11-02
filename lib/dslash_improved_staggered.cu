@@ -144,7 +144,7 @@ namespace quda {
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-    int Nface() { return 6; } 
+    int Nface() const { return 6; }
 
     /*
       per direction / dimension flops

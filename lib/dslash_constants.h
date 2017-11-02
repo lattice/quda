@@ -155,13 +155,6 @@ enum KernelType {
   static DslashParam dslashParam;
 
 
-
-#ifdef MULTI_GPU
-  static double twist_a = 0.0;
-  static double twist_b = 0.0;
-#endif
-
-
 #define MAX(a,b) ((a)>(b) ? (a):(b))
 
 typedef struct fat_force_stride_s {

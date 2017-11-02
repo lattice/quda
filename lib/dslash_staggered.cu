@@ -138,7 +138,7 @@ namespace quda {
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-    int Nface() { return 2; } 
+    int Nface() const { return 2; }
   };
 #endif // GPU_STAGGERED_DIRAC
 

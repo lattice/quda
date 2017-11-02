@@ -235,10 +235,34 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   return;
 }
 
+static bool enable_p2p = true;
+
 bool comm_peer2peer_enabled(int dir, int dim){
-  return peer2peer_enabled[dir][dim];
+  return enable_p2p ? peer2peer_enabled[dir][dim] : false;
 }
 
+bool comm_peer2peer_enabled_global() {
+  if (!enable_p2p) return false;
+
+  static bool init = false;
+  static bool p2p_global = false;
+
+  if (!init) {
+    int p2p = 0;
+    for (int dim=0; dim<4; dim++)
+      for (int dir=0; dir<2; dir++)
+	p2p += (int)comm_peer2peer_enabled(dir,dim);
+
+    comm_allreduce_int(&p2p);
+    init = true;
+    p2p_global = p2p > 0 ? true : false;
+  }
+  return p2p_global;
+}
+
+void comm_enable_peer2peer(bool enable) {
+  enable_p2p = enable;
+}
 
 int comm_ndim(const Topology *topo)
 {
@@ -541,23 +565,6 @@ int comm_partitioned()
     partitioned = partitioned || comm_dim_partitioned(i);
   }
   return partitioned;
-}
-
-bool comm_peer2peer_enabled_global() {
-  static bool init = false;
-  static bool p2p_global = false;
-
-  if (!init) {
-    int p2p = 0;
-    for (int dim=0; dim<4; dim++)
-      for (int dir=0; dir<2; dir++)
-	p2p += (int)comm_peer2peer_enabled(dir,dim);
-
-    comm_allreduce_int(&p2p);
-    init = true;
-    p2p_global = p2p > 0 ? true : false;
-  }
-  return p2p_global;
 }
 
 bool comm_gdr_enabled() {
