@@ -9,9 +9,9 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  color_spinor_wuppertal.cu
+  color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
-  clover_field.cpp covd.cpp lattice_field.cpp gauge_field.cpp
+  clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
@@ -19,7 +19,7 @@ set (QUDA_OBJS
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
-  field_strength_tensor.cu clover_quda.cu dslash_quda.cu covDev.cu
+  field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
   dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
   dslash_twisted_clover.cu dslash_domain_wall.cu
