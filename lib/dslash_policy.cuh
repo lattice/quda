@@ -877,7 +877,6 @@ struct DslashAsync : DslashPolicyImp {
         if (!dslashParam.commDim[i]) continue;
 
         for (int dir=1; dir>=0; dir--) {
-
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
@@ -890,8 +889,8 @@ struct DslashAsync : DslashPolicyImp {
 
 	      // schedule post comms work (scatter into the end zone)
 	      if (!comm_peer2peer_enabled(1-dir,i)) {
-		*((volatile cuuint32_t*)(commsEnd_h+2*i+dir)) = 0;
-		CUDA_CALL(cuStreamWaitValue32( streams[2*i+dir], commsEnd_d[2*i+dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
+		*((volatile cuuint32_t*)(commsEnd_h+2*i+1-dir)) = 0;
+		CUDA_CALL(cuStreamWaitValue32( streams[2*i+dir], commsEnd_d[2*i+1-dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
 		PROFILE(if (dslash_copy) inputSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir, &streams[2*i+dir]), profile, QUDA_PROFILE_SCATTER);
 	      }
 	    }
@@ -985,8 +984,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
-	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]),
-		    profile, QUDA_PROFILE_EVENT_QUERY);
+	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
@@ -995,9 +993,9 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 	      if (dslash_comms) inputSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
-	      if (!comm_peer2peer_enabled(1-dir,i)) {
-		*((volatile cuuint32_t*)(commsEnd_h+2*i+dir)) = 0;
-		CUDA_CALL(cuStreamWaitValue32( streams[scatterIndex], commsEnd_d[2*i+dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
+	      if (!comm_peer2peer_enabled(1-dir,i)) { // gather centric
+		*((volatile cuuint32_t*)(commsEnd_h+2*i+1-dir)) = 0;
+		CUDA_CALL(cuStreamWaitValue32( streams[scatterIndex], commsEnd_d[2*i+1-dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
 		PROFILE(if (dslash_copy) inputSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
 	      }
 	    }
@@ -1532,7 +1530,7 @@ struct DslashFactory {
 	 policy.push_back(QUDA_ZERO_COPY_DSLASH);
 	 policy.push_back(QUDA_FUSED_ZERO_COPY_DSLASH);
 
-	 // Async variants are only supported on CUDA 8.0 and are buggy  - so exclude for now
+	 // Async variants are only supported on CUDA 8.0 and up
 #if (CUDA_VERSION >= 8000) && 0
 	 policy.push_back(QUDA_DSLASH_ASYNC);
 	 policy.push_back(QUDA_FUSED_DSLASH_ASYNC);
@@ -1577,7 +1575,8 @@ struct DslashFactory {
 
        for (auto &i : policy) {
 
-	 if (i == QUDA_DSLASH || i == QUDA_FUSED_DSLASH) {
+	 if (i == QUDA_DSLASH || i == QUDA_FUSED_DSLASH ||
+	     i == QUDA_DSLASH_ASYNC || i == QUDA_FUSED_DSLASH_ASYNC) {
 
 	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
 	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
