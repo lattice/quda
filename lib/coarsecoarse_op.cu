@@ -105,6 +105,8 @@ namespace quda {
 
     if (coarseColor == 2) { 
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+    } else if (coarseColor == 6) {
+      calculateYcoarse<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 #if 0
     } else if (coarseColor == 8) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
@@ -139,6 +141,8 @@ namespace quda {
 			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
     if (g.Ncolor()/T.Vectors().Nspin() == 2) {
       calculateYcoarse<Float,vFloat,2>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+    } else if (g.Ncolor()/T.Vectors().Nspin() == 6) {
+      calculateYcoarse<Float,vFloat,6>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
 #if 0
     } else if (g.Ncolor()/T.Vectors().Nspin() == 8) {
       calculateYcoarse<Float,vFloat,8>(Y, X, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
