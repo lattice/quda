@@ -55,7 +55,6 @@ namespace quda {
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
    */
-  extern __shared__ float s[];
   template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
