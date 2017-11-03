@@ -178,7 +178,7 @@ namespace {
 
     if (pack) {
       PROFILE(if (dslash_pack_compute) input.pack(dslash.Nface()/2, parity, dslash.Dagger(), packIndex,
-						  pack_dest, dslash.twist_a, dslash.twist_b),
+						  pack_dest, dslashParam.twist_a, dslashParam.twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing

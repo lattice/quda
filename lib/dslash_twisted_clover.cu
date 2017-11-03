@@ -288,8 +288,8 @@ namespace quda {
     }
 
 #ifdef MULTI_GPU
-    twist_a	= 0.;
-    twist_b	= 0.;
+    dslashParam.twist_a	= 0.;
+    dslashParam.twist_b	= 0.;
 #endif
 
     void *gauge0, *gauge1;
