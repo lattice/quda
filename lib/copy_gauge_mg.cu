@@ -128,6 +128,9 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
     } else  if (in.Ncolor() == 8) {
       const int Nc = 8;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 12) { // Free field Wilson
+      const int Nc = 12;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else  if (in.Ncolor() == 16) {
       const int Nc = 16;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);

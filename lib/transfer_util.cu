@@ -122,6 +122,8 @@ namespace quda {
       FillV<Float,nSpin,nColor,2>(V,B);
     } else if (Nvec == 4) {
       FillV<Float,nSpin,nColor,4>(V,B);
+    } else if (Nvec == 6) {
+      FillV<Float,nSpin,nColor,6>(V,B);
     } else if (Nvec == 8) {
       FillV<Float,nSpin,nColor,8>(V,B);
     } else if (Nvec == 12) {
@@ -658,11 +660,15 @@ namespace quda {
       constexpr int nColor = 3;
       if (Nvec == 2) {
 	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,2>(V, fine_to_coarse, coarse_to_fine, geo_bs);
+      } else if (Nvec == 6) { // for Wilson free field
+  BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,6>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 24) {
 	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 32) {
 	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs);
-      } else {
+      } else if (Nvec == 48) {
+  BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,48>(V, fine_to_coarse, coarse_to_fine, geo_bs);
+      }else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
 

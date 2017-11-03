@@ -477,6 +477,8 @@ namespace quda {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,2>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 4) {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,4>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else if (nVec == 6) { // free field Wilson
+  Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 24) {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 32) {
@@ -492,6 +494,13 @@ namespace quda {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,4>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
+      }
+    } else if (in.Ncolor() == 6) { // Coarsen coarsened Wilson free field
+      const int fineColor = 6;
+      if (nVec == 6) { 
+  Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else {
+  errorQuda("Unsupported nVec %d", nVec);
       }
     } else if (in.Ncolor() == 24) { // to keep compilation under control coarse grids have same or more colors
       const int fineColor = 24;
