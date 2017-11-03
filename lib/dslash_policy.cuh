@@ -282,8 +282,12 @@ namespace {
 	if (!gdr && !zero_copy) { // Issue CPU->GPU copy if not GDR
 
 	  if (async) {
+#if (CUDA_VERSION >= 8000)
 	    // this will trigger the copy asynchronously
 	    *((volatile cuuint32_t*)(commsEnd_h+2*dim+dir2)) = 1;
+#else
+	    errorQuda("Async dslash policy variants require CUDA 8.0 and above");
+#endif
 	  } else {
 	    // note the ColorSpinorField::scatter transforms from
 	    // scatter centric to gather centric (e.g., flips
