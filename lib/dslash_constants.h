@@ -106,6 +106,9 @@ enum KernelType {
     void *cloverInv;
     float *cloverInvNorm;
 
+    double twist_a;
+    double twist_b;
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
