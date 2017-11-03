@@ -3,6 +3,7 @@
 #include <float_vector.h>
 #include <color_spinor_field_order.h>
 
+#define PIPEEIGCG
 //#define QUAD_SUM
 #ifdef QUAD_SUM
 #include <dbldbl.h>
@@ -794,6 +795,288 @@ namespace quda {
   (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
     }
 
+#endif
+
+
+#ifdef PIPEEIGCG
+
+    /**
+       Functor to perform the operation y += a * x  (real-valued)
+    */
+    __device__ void axpy_v2_(const double2 &a, const double2 &x, double2 &y) {
+      y.x = __fma_rn (a.x, x.x, y.x);
+      y.y = __fma_rn (a.x, x.y, y.y);
+    }
+    __device__ void axpy_v2_(const float2 &a, const float2 &x, float2 &y) {
+#if 0
+      y.x = __fmaf_rn (a.x, x.x, y.x);
+      y.y = __fmaf_rn (a.x, x.y, y.y);
+#else
+      double txx = static_cast<double> (x.x);
+      double txy = static_cast<double> (x.y);
+
+      double tyx = static_cast<double> (y.x);
+      double tyy = static_cast<double> (y.y);
+
+      double tax = static_cast<double> (a.x);
+
+      tyx = __fma_rn (tax, txx, tyx);
+      tyy = __fma_rn (tax, txy, tyy);
+
+      y.x = static_cast<float> (tyx);
+      y.y = static_cast<float> (tyy);
+#endif
+
+    }
+    __device__ void axpy_v2_(const float2 &a, const float4 &x, float4 &y) {
+#if 0
+      y.x = __fmaf_rn (a.x, x.x, y.x);
+      y.y = __fmaf_rn (a.x, x.y, y.y);
+      y.w = __fmaf_rn (a.x, x.w, y.w);
+      y.z = __fmaf_rn (a.x, x.z, y.z);
+#else
+
+      double txx = static_cast<double> (x.x);
+      double txy = static_cast<double> (x.y);
+
+      double tyx = static_cast<double> (y.x);
+      double tyy = static_cast<double> (y.y);
+
+      double tax = static_cast<double> (a.x);
+
+      tyx = __fma_rn (tax, txx, tyx);
+      tyy = __fma_rn (tax, txy, tyy);
+
+      y.x = static_cast<float> (tyx);
+      y.y = static_cast<float> (tyy);
+
+      txx = static_cast<double> (x.w);
+      txy = static_cast<double> (x.z);
+
+      tyx = static_cast<double> (y.w);
+      tyy = static_cast<double> (y.z);
+
+      tyx = __fma_rn (tax, txx, tyx);
+      tyy = __fma_rn (tax, txy, tyy);
+
+      y.w = static_cast<float> (tyx);
+      y.z = static_cast<float> (tyy);
+
+#endif
+    }
+
+    /**
+       Functor to perform the operation y = x + a*y  (real-valued)
+    */
+    __device__ void xpay_v2_(const double2 &x, const double2 &a, double2 &y) {
+      y.x = __fma_rn (a.x, y.x, x.x);
+      y.y = __fma_rn (a.x, y.y, x.y);
+    }
+    __device__ void xpay_v2_(const float2 &x, const float2 &a,  float2 &y) {
+#if 0
+      y.x = __fmaf_rn (a.x, y.x, x.x);
+      y.y = __fmaf_rn (a.x, y.y, x.y);
+#else
+
+      double txx = static_cast<double> (x.x);
+      double txy = static_cast<double> (x.y);
+
+      double tyx = static_cast<double> (y.x);
+      double tyy = static_cast<double> (y.y);
+
+      double tax = static_cast<double> (a.x);
+
+      tyx = __fma_rn (tax, tyx, txx);
+      tyy = __fma_rn (tax, tyy, txy);
+
+      y.x = static_cast<float> (tyx);
+      y.y = static_cast<float> (tyy);
+
+#endif
+    }
+    __device__ void xpay_v2_(const float4 &x, const float2 &a, float4 &y) {
+#if 0
+      y.x = __fmaf_rn (a.x, y.x, x.x);
+      y.y = __fmaf_rn (a.x, y.y, x.y);
+      y.w = __fmaf_rn (a.x, y.w, x.w);
+      y.z = __fmaf_rn (a.x, y.z, x.z);
+#else
+
+      double txx = static_cast<double> (x.x);
+      double txy = static_cast<double> (x.y);
+
+      double tyx = static_cast<double> (y.x);
+      double tyy = static_cast<double> (y.y);
+
+      double tax = static_cast<double> (a.x);
+
+      tyx = __fma_rn (tax, tyx, txx);
+      tyy = __fma_rn (tax, tyy, txy);
+
+      y.x = static_cast<float> (tyx);
+      y.y = static_cast<float> (tyy);
+
+      txx = static_cast<double> (x.w);
+      txy = static_cast<double> (x.z);
+
+      tyx = static_cast<double> (y.w);
+      tyy = static_cast<double> (y.z);
+
+      tyx = __fma_rn (tax, tyx, txx);
+      tyy = __fma_rn (tax, tyy, txy);
+
+      y.w = static_cast<float> (tyx);
+      y.z = static_cast<float> (tyy);
+
+#endif
+
+    }
+
+
+    /**
+       Return the real dot product of x and y
+    */
+    template<typename ReduceType> __device__ void dot_v2_(ReduceType &sum, const double2 &a, const double2 &b) {
+      //sum += (ReduceType)a.x*(ReduceType)b.x;
+      //sum += (ReduceType)a.y*(ReduceType)b.y;
+      double tmp1 = __dmul_rn (a.y, b.y);
+      double tmp2 = __fma_rn (a.y, b.y, -tmp1);
+      double tmp3 = __fma_rn (a.x, b.x, +tmp1);
+      tmp1 = __dadd_rn (tmp2, tmp3);
+      sum += static_cast<ReduceType>(tmp1);
+    }
+
+    template<typename ReduceType> __device__ void dot_v2_(ReduceType &sum, const float2 &a, const float2 &b) {
+      //sum += (ReduceType)a.x*(ReduceType)b.x;
+      //sum += (ReduceType)a.y*(ReduceType)b.y;
+#if 1
+      double dax = static_cast<double>(a.x);
+      double day = static_cast<double>(a.y);
+      double dbx = static_cast<double>(b.x);
+      double dby = static_cast<double>(b.y);
+
+      double tmp1 = __dmul_rn (day, dby);
+      double tmp2 = __fma_rn (day, dby, -tmp1);
+      double tmp3 = __fma_rn (dax, dbx, +tmp1);
+      tmp1 = __dadd_rn (tmp2, tmp3);
+#else
+      float tmp1 = __fmul_rn (a.y, b.y);
+      float tmp2 = __fmaf_rn (a.y, b.y, -tmp1);
+      float tmp3 = __fmaf_rn (a.x, b.x, +tmp1);
+      tmp1 = __fadd_rn (tmp2, tmp3);
+#endif
+      sum += static_cast<ReduceType>(tmp1);
+    }
+
+    template<typename ReduceType> __device__ void dot_v2_(ReduceType &sum, const float4 &a, const float4 &b) {
+      //sum += (ReduceType)a.x*(ReduceType)b.x;
+      //sum += (ReduceType)a.y*(ReduceType)b.y;
+      //sum += (ReduceType)a.z*(ReduceType)b.z;
+      //sum += (ReduceType)a.w*(ReduceType)b.w;
+#if 1
+      double dax = static_cast<double>(a.x);
+      double day = static_cast<double>(a.y);
+      double daz = static_cast<double>(a.z);
+      double daw = static_cast<double>(a.w);
+
+      double dbx = static_cast<double>(b.x);
+      double dby = static_cast<double>(b.y);
+      double dbz = static_cast<double>(b.z);
+      double dbw = static_cast<double>(b.w);
+
+      double tmp1 = __dmul_rn (day, dby);
+      double tmp2 = __fma_rn (day, dby, -tmp1);
+      double tmp3 = __fma_rn (dax, dbx, +tmp1);
+      tmp1 = __dadd_rn (tmp2, tmp3);
+
+      double tmp4 = __dmul_rn (daw, dbw);
+      tmp2 = __fma_rn (daw, dbw, -tmp4);
+      tmp3 = __fma_rn (daz, dbz, +tmp4);
+      tmp4 = __dadd_rn (tmp2, tmp3);
+      sum += static_cast<ReduceType>(__dadd_rn (tmp1, tmp4));
+#else
+      float tmp1 = __fmul_rn (a.y, b.y);
+      float tmp2 = __fmaf_rn (a.y, b.y, -tmp1);
+      float tmp3 = __fmaf_rn (a.x, b.x, +tmp1);
+      tmp1 = __fadd_rn (tmp2, tmp3);
+
+      float tmp4 = __fmul_rn (a.w, b.w);
+      tmp2 = __fmaf_rn (a.w, b.w, -tmp4);
+      tmp3 = __fmaf_rn (a.z, b.z, +tmp4);
+      tmp4 = __fadd_rn (tmp2, tmp3);
+      sum += static_cast<ReduceType>(__fadd_rn (tmp1, tmp4));
+#endif
+
+    }
+
+
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct PipeReduceFunctor {
+
+      //! pre-computation routine called before the "M-loop"
+      virtual __device__ void pre() { ; }
+
+      //! where the reduction is usually computed and any auxiliary operations
+      virtual __device__ void operator()(ReduceType &sum, FloatN &s, FloatN &p, FloatN &z,FloatN &r,
+						  FloatN &x, FloatN &w, FloatN &q) = 0;
+
+      //! post-computation routine called after the "M-loop"
+      virtual __device__ void post(ReduceType &sum) { ; }
+
+    };
+    /**
+       This convoluted kernel does the following:
+      //
+      xpay(w,beta,s);
+      xpay(r,beta,p);
+      xpay(q,beta,z);
+      //
+      axpy(-alpha,s,r);
+      axpy(+alpha,p,x);
+      axpy(-alpha,z,w);
+
+      gamma = norm2(r);
+      delta = reDotProduct(r, w);
+    */
+
+
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct pipeMergedReduceOp_ : public PipeReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      pipeMergedReduceOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      __device__ void operator()(ReduceType &sum, FloatN &s, FloatN &p, FloatN &z, FloatN &r, FloatN &x, FloatN &w, FloatN &q) { 
+	typedef typename ScalarType<ReduceType>::type scalar;
+//prefetch x?
+         //s = w + a.x*s;
+         xpay_v2_(w,a,s);
+         //p = r + a.x*p;
+         xpay_v2_(r,a,p);
+         //z = q + a.x*z;
+         xpay_v2_(q,a,z);
+
+         //r = r - b.x*s;
+         axpy_v2_(-b,s,r);
+         //x = x + b.x*p;
+         axpy_v2_(b,p,x);
+         //w = w - b.x*z;
+         axpy_v2_(-b,z,w);
+
+         dot_v2_<scalar> (sum.x, r, r);
+         dot_v2_<scalar> (sum.y, r, w);
+      }
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
+
+    double2 pipeMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z, 
+                               const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q) {
+      if (x.Precision() != p.Precision()) {
+         errorQuda("\nMixed blas is not implemented.\n");
+      } 
+      return reduce::mergedReduceCuda<double2, QudaSumFloat2,pipeMergedReduceOp_,1,1,1,1,1,1,0, false>
+	  (make_double2(a, 0.0), make_double2(b, 0.0), s, p, z, r, x, w, q);
+    }
 #endif
 
    } // namespace blas

@@ -94,7 +94,12 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    /**
+
+    double2 pipeMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z,
+                               const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q);
+ 
+
+   /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
 
