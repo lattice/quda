@@ -33,6 +33,7 @@ struct DslashCommsPattern {
     for (int i=0; i<Nstream-1; i++) gatherCompleted[i] = gdr_or_zero_copy_pack ? 1 : 0;
     gatherCompleted[Nstream-1] = 1;
     commsCompleted[Nstream-1] = 1;
+    dslashCompleted[Nstream-1] = 1;
 
     //   We need to know which was the previous direction in which
     //   communication was issued, since we only query a given event /
@@ -282,8 +283,12 @@ namespace {
 	if (!gdr && !zero_copy) { // Issue CPU->GPU copy if not GDR
 
 	  if (async) {
+#if (CUDA_VERSION >= 8000)
 	    // this will trigger the copy asynchronously
 	    *((volatile cuuint32_t*)(commsEnd_h+2*dim+dir2)) = 1;
+#else
+	    errorQuda("Async dslash policy variants require CUDA 8.0 and above");
+#endif
 	  } else {
 	    // note the ColorSpinorField::scatter transforms from
 	    // scatter centric to gather centric (e.g., flips
@@ -402,7 +407,7 @@ struct DslashBasic : DslashPolicyImp {
 
         } // dir=0,1
 
-        if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 
 	  for (int dir=1; dir>=0; dir--) {
 	    if (!comm_peer2peer_enabled(1-dir,i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
@@ -652,7 +657,7 @@ struct DslashGPUComms : DslashPolicyImp {
 
         } // dir=0,1
 
-	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
@@ -873,7 +878,6 @@ struct DslashAsync : DslashPolicyImp {
         if (!dslashParam.commDim[i]) continue;
 
         for (int dir=1; dir>=0; dir--) {
-
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
 	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
@@ -886,9 +890,10 @@ struct DslashAsync : DslashPolicyImp {
 
 	      // schedule post comms work (scatter into the end zone)
 	      if (!comm_peer2peer_enabled(1-dir,i)) {
-		*((volatile cuuint32_t*)(commsEnd_h+2*i+dir)) = 0;
-		CUDA_CALL(cuStreamWaitValue32( streams[2*i+dir], commsEnd_d[2*i+dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
+		*((volatile cuuint32_t*)(commsEnd_h+2*i+1-dir)) = 0;
+		CUDA_CALL(cuStreamWaitValue32( streams[2*i+dir], commsEnd_d[2*i+1-dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
 		PROFILE(if (dslash_copy) inputSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir, &streams[2*i+dir]), profile, QUDA_PROFILE_SCATTER);
+		printfQuda("dim = %d dir=%d scheduled \n", i, dir);
 	      }
 	    }
 	  }
@@ -903,7 +908,7 @@ struct DslashAsync : DslashPolicyImp {
 
         } // dir=0,1
 
-	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 
 	  for (int dir=1; dir>=0; dir--) {
 	    if (!comm_peer2peer_enabled(1-dir,i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
@@ -922,6 +927,7 @@ struct DslashAsync : DslashPolicyImp {
 
 	  pattern.dslashCompleted[2*i] = 1;
         }
+
       }
 
     }
@@ -981,8 +987,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 
 	  // Query if gather has completed
 	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) {
-	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]),
-		    profile, QUDA_PROFILE_EVENT_QUERY);
+	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      pattern.gatherCompleted[2*i+dir] = 1;
@@ -991,9 +996,9 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
 	      if (dslash_comms) inputSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger);  // do a comms query to ensure MPI has begun
 
 	      // schedule post comms work (scatter into the end zone)
-	      if (!comm_peer2peer_enabled(1-dir,i)) {
-		*((volatile cuuint32_t*)(commsEnd_h+2*i+dir)) = 0;
-		CUDA_CALL(cuStreamWaitValue32( streams[scatterIndex], commsEnd_d[2*i+dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
+	      if (!comm_peer2peer_enabled(1-dir,i)) { // gather centric
+		*((volatile cuuint32_t*)(commsEnd_h+2*i+1-dir)) = 0;
+		CUDA_CALL(cuStreamWaitValue32( streams[scatterIndex], commsEnd_d[2*i+1-dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
 		PROFILE(if (dslash_copy) inputSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
 	      }
 	    }
@@ -1105,8 +1110,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
 
 	}
 
-	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
-
+        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  for (int dir=1; dir>=0; dir--) {
 	    if (!comm_peer2peer_enabled(1-dir,i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
 	      // Record the end of the scattering
@@ -1285,7 +1289,7 @@ struct DslashZeroCopy : DslashPolicyImp {
 
 	// FIXME - will not work with P2P until we can split where the halos originate
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-	if ( (i==3 || pattern.dslashCompleted[2*(i+1)]) && !pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+        if ( !pattern.dslashCompleted[2*i] && pattern.dslashCompleted[pattern.previousDir[2*i+1]] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
@@ -1486,6 +1490,7 @@ struct DslashFactory {
      : dslash(dslash), in(in), regSize(regSize), parity(parity), dagger(dagger),
        volume(volume), ghostFace(ghostFace), profile(profile)
    {
+
      if (!dslash_init) {
        policy.reserve(10);
        static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_POLICY");
@@ -1528,10 +1533,20 @@ struct DslashFactory {
 	 policy.push_back(QUDA_ZERO_COPY_DSLASH);
 	 policy.push_back(QUDA_FUSED_ZERO_COPY_DSLASH);
 
-	 // Async variants are only supported on CUDA 8.0 and are buggy  - so exclude for now
+	 // Async variants are only supported on CUDA 8.0 and up
 #if (CUDA_VERSION >= 8000) && 0
-	 policy.push_back(QUDA_DSLASH_ASYNC);
-	 policy.push_back(QUDA_FUSED_DSLASH_ASYNC);
+#if (CUDA_VERSION >= 9000)
+	 CUdevice device;
+	 cuDeviceGet(&device, comm_gpuid());
+	 int can_use_stream_mem_ops;
+	 cuDeviceGetAttribute(&can_use_stream_mem_ops, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, device);
+#else
+	 int can_use_stream_mem_ops = 1;
+#endif
+	 if (can_use_stream_mem_ops) {
+	   policy.push_back(QUDA_DSLASH_ASYNC);
+	   policy.push_back(QUDA_FUSED_DSLASH_ASYNC);
+	 }
 #endif
        }
 
@@ -1573,7 +1588,8 @@ struct DslashFactory {
 
        for (auto &i : policy) {
 
-	 if (i == QUDA_DSLASH || i == QUDA_FUSED_DSLASH) {
+	 if (i == QUDA_DSLASH || i == QUDA_FUSED_DSLASH ||
+	     i == QUDA_DSLASH_ASYNC || i == QUDA_FUSED_DSLASH_ASYNC) {
 
 	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
 	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
