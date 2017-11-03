@@ -233,6 +233,8 @@ namespace {
       if (!comm_peer2peer_enabled(0,i)) index = 2*i+0;
       else if (!comm_peer2peer_enabled(1,i)) index = 2*i+1;
     }
+    // make sure we pick a valid index, in case we are fully p2p connected
+    if (index == -1) index = 0;
     return index;
   }
 
