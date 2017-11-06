@@ -38,9 +38,20 @@ typedef struct {
   QudaVerbosity verbosity;
 } wuppertalParam;
 
+typedef struct {
+  int nVec;
+} contractParam;
+
+typedef struct {
+  QudaVerbosity verbosity;
+  wuppertalParam wParam;
+  contractParam cParam;
+} qudaAPI_Param;
+
+
 EXTRN_C
 QudaVerbosity parseVerbosity(const char *v);
-  
+
 EXTRN_C int
 laplacianQuda(
 	      QUDA_REAL *quda_v_out,
@@ -48,7 +59,7 @@ laplacianQuda(
 	      QUDA_REAL *quda_u[],
 	      const qudaLattice *qS,
 	      int nColor, int nSpin,
-	      const wuppertalParam wParam);
+	      const qudaAPI_Param qAparam);
 
 
 EXTRN_C int
@@ -58,7 +69,7 @@ Qlua_invertQuda(
                 QUDA_REAL *h_gauge[],
                 const qudaLattice *qS,
                 int nColor, int nSpin,
-                wuppertalParam wParam);
+                qudaAPI_Param qAparam);
 
 
 #endif/*INTERFACE_QLUA_H__*/
