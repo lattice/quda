@@ -16,6 +16,27 @@
 
 using namespace quda;
 
+
+QudaVerbosity parseVerbosity(const char *v){
+
+  QudaVerbosity verbosity = QUDA_INVALID_VERBOSITY;
+  
+  if      (strcmp(v,"QUDA_SILENT")==0)        verbosity = QUDA_SILENT;
+  else if (strcmp(v,"QUDA_SUMMARIZE")==0)     verbosity = QUDA_SUMMARIZE;
+  else if (strcmp(v,"QUDA_VERBOSE")==0)       verbosity = QUDA_VERBOSE;
+  else if (strcmp(v,"QUDA_DEBUG_VERBOSE")==0) verbosity = QUDA_DEBUG_VERBOSE;
+  else if (strcmp(v,"INVALID_VERBOSITY")==0){
+    printfQuda("Verbosity not set! Will set to QUDA_SUMMARIZE\n");
+    verbosity = QUDA_SUMMARIZE;
+  }
+  else{
+    printfQuda("Verbosity not set correctly (got \"%s\")! Will set to QUDA_SUMMARIZE\n",v);
+    verbosity = QUDA_SUMMARIZE;
+  }
+
+  return verbosity;
+}
+
 /* topology in Quda is a global variable;
  * need to check for every lattice if the topology is the same */
 static int
@@ -38,7 +59,7 @@ check_quda_comms(const qudaLattice *qS)
 //-- fill out QudaInvertParam
 static void
 init_QudaInvertParam_generic(QudaInvertParam& ip,
-                             const QudaGaugeParam& gp, double *alpha)
+                             const QudaGaugeParam& gp, wuppertalParam wParam)
 {
 
   ip  = newQudaInvertParam();
@@ -65,13 +86,13 @@ init_QudaInvertParam_generic(QudaInvertParam& ip,
   ip.cl_pad                   = gp.ga_pad;
   ip.tune                     = QUDA_TUNE_YES;
   ip.use_init_guess           = QUDA_USE_INIT_GUESS_NO;
-  ip.verbosity                = QUDA_VERBOSE;
+  ip.verbosity                = wParam.verbosity;
 
   //-- FIXME: Need to change these
-  ip.kappa                    = alpha[0];
-  ip.clover_coeff             = alpha[1];
-  ip.tol                      = alpha[2];
-  ip.maxiter                  = int(alpha[3]);
+  ip.kappa                    = wParam.alpha[0];
+  ip.clover_coeff             = wParam.alpha[1];
+  ip.tol                      = wParam.alpha[2];
+  ip.maxiter                  = int(wParam.alpha[3]);
 }
 
 //-- fill out QudaGaugeParam
@@ -179,7 +200,7 @@ laplacianQuda(
 	      QUDA_REAL *h_gauge[],
 	      const qudaLattice *qS,
 	      int nColor, int nSpin,
-	      double *alpha, double beta, int Nstep)
+	      wuppertalParam wParam)
 {
   int status = 0;
 
@@ -188,21 +209,22 @@ laplacianQuda(
   if (QUDA_Nc != nColor)
     return 1;
 
-  printfQuda("laplacianQuda: Will apply the Laplacian for %d steps with the parameters:\n",Nstep);
-  for(int i=0; i< qS->rank; i++) printfQuda("  alpha[%d] = %.3f\n",i,alpha[i]);
-  printfQuda("  beta = %.3f\n",beta);
-
+  printfQuda("laplacianQuda: Will apply the Laplacian for %d steps with the parameters:\n", wParam.Nstep);
+  for(int i=0; i< qS->rank; i++) printfQuda("  alpha[%d] = %.3f\n", i, wParam.alpha[i]);
+  printfQuda("  beta = %.3f\n", wParam.beta);
+  
   //-- Initialize the quda-gauge parameters
   QudaGaugeParam gp;
   init_QudaGaugeParam_generic(gp, qS);
 
+  setVerbosity(wParam.verbosity);
+  if(getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(&gp);
+
   //-- Initialize the inverter parameters
   QudaInvertParam ip;
-  init_QudaInvertParam_generic(ip, gp, alpha);
+  init_QudaInvertParam_generic(ip, gp, wParam);
 
-  setVerbosity(ip.verbosity);
-  if(getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(&gp);
-  
+
   //-- Load the gauge field
   double t3 = MPI_Wtime();
   GaugeField *cuda_gf = NULL;
@@ -222,14 +244,14 @@ laplacianQuda(
   //-- Call the Wuppertal smearing Nstep times
   int parity = 0;  
   double t1 = MPI_Wtime();
-  for (int i = 0 ; i < Nstep ; i++){
-    wuppertalStep(*cuda_v_out, *cuda_v_in, parity, *cuda_gf, alpha, beta);    
+  for (int i = 0 ; i < wParam.Nstep ; i++){
+    wuppertalStep(*cuda_v_out, *cuda_v_in, parity, *cuda_gf, wParam.alpha, wParam.beta);    
     cudaDeviceSynchronize();
     checkCudaError();
     *cuda_v_in = *cuda_v_out;
   }
   double t2 = MPI_Wtime(); 
-  printfQuda("TIMING - laplacianQuda: Wuppertal smearing for Nstep = %d done in %.6f sec.\n", Nstep, t2-t1);
+  printfQuda("TIMING - laplacianQuda: Wuppertal smearing for Nstep = %d done in %.6f sec.\n", wParam.Nstep, t2-t1);
  
   //-- extract
   double t7 = MPI_Wtime();
@@ -246,6 +268,64 @@ laplacianQuda(
   saveTuneCache();
 
   printfQuda("laplacianQuda: Returning...\n");
+
+  return status;
+}
+
+
+//-- top level function, calls invertQuda
+//-- Here, wParam holds inverter parameters
+EXTRN_C int
+Qlua_invertQuda(
+		QUDA_REAL *hv_out,
+		QUDA_REAL *hv_in,
+		QUDA_REAL *h_gauge[],
+		const qudaLattice *qS,
+		int nColor, int nSpin,
+		wuppertalParam wParam)
+{
+  int status = 0;
+
+  if (check_quda_comms(qS))
+    return 1;
+  if (QUDA_Nc != nColor)
+    return 1;
+
+  printfQuda("Qlua_invertQuda: Will perform inversion with the parameters:\n");
+  printfQuda("kappa   = %lf\n", wParam.alpha[0]);
+  printfQuda("Csw     = %lf\n", wParam.alpha[1]);
+  printfQuda("tol     = %e\n",  wParam.alpha[2]);
+  printfQuda("Maxiter = %d\n",  int(wParam.alpha[3]));
+
+  //-- Initialize the quda-gauge parameters
+  QudaGaugeParam gp;
+  init_QudaGaugeParam_generic(gp, qS);
+
+  setVerbosity(wParam.verbosity);
+  if(getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(&gp);
+
+  //-- Initialize the inverter parameters
+  QudaInvertParam ip;
+  init_QudaInvertParam_generic(ip, gp, wParam);
+
+  //-- Inversion
+  double x1 = MPI_Wtime();
+  loadGaugeQuda(h_gauge, &gp);
+  loadCloverQuda(NULL, NULL, &ip);
+  double x2 = MPI_Wtime();
+  printfQuda("TIMING - Qlua_invertQuda: loadGaugeQuda-loadCloverQuda in %.6f sec.\n", x2-x1);
+
+  double x5 = MPI_Wtime();
+  invertQuda(hv_out, hv_in, &ip);
+  double x6 = MPI_Wtime();
+  printfQuda("TIMING - Qlua_invertQuda: invertQuda in %.6f sec.\n", x6-x5);
+
+  freeCloverQuda();
+  freeGaugeQuda();
+
+  saveTuneCache();
+
+  printfQuda("Qlua_invertQuda: Returning...\n");
 
   return status;
 }

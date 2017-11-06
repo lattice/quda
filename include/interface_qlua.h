@@ -31,6 +31,16 @@ typedef struct {
   LONG_T *ind_qdp2quda;
 } qudaLattice;
 
+typedef struct {
+  QUDA_REAL alpha[QUDA_MAX_RANK];
+  QUDA_REAL beta;
+  int Nstep;
+  QudaVerbosity verbosity;
+} wuppertalParam;
+
+EXTRN_C
+QudaVerbosity parseVerbosity(const char *v);
+  
 EXTRN_C int
 laplacianQuda(
 	      QUDA_REAL *quda_v_out,
@@ -38,7 +48,17 @@ laplacianQuda(
 	      QUDA_REAL *quda_u[],
 	      const qudaLattice *qS,
 	      int nColor, int nSpin,
-	      QUDA_REAL *alpha, QUDA_REAL beta, int Nstep);
+	      const wuppertalParam wParam);
+
+
+EXTRN_C int
+Qlua_invertQuda(
+                QUDA_REAL *hv_out,
+                QUDA_REAL *hv_in,
+                QUDA_REAL *h_gauge[],
+                const qudaLattice *qS,
+                int nColor, int nSpin,
+                wuppertalParam wParam);
 
 
 #endif/*INTERFACE_QLUA_H__*/
