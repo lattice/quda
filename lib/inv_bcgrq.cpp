@@ -13,8 +13,6 @@
 #include <limits>
 #include <cmath>
 
-#include <face_quda.h>
-
 #include <iostream>
 #include <Eigen/Dense>
 #include <cuda_profiler_api.h>

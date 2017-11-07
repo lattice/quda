@@ -445,16 +445,16 @@ namespace quda {
     ColorSpinorField &z = *zp;
 
     if( K ) {//apply preconditioner
-      if (param.precision_precondition == param.precision_sloppy) { r_pre = rp; p_pre = z; }
+      if (param.precision_precondition == param.precision_sloppy) { r_pre = rp; p_pre = zp; }
 
       ColorSpinorField &rPre = *r_pre;
       ColorSpinorField &pPre = *p_pre;
 
-      blas::copy(rPre, r);
+      rPre = r;
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
       commGlobalReductionSet(true);
-      blas::copy(z, pPre);
+      z = pPre;
     }
 
     p = z;
@@ -752,11 +752,22 @@ namespace quda {
      return;
   }
 
-  void IncEigCG::pipeEigCGsolve(ColorSpinorField &x, ColorSpinorField &b){
+  int IncEigCG::pipeEigCGsolve(ColorSpinorField &x, ColorSpinorField &b){
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     ColorSpinorParam csParam(b);
+
+    const double b2 = norm2(b);
+
+    if(b2 == 0){
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      printfQuda("Warning: inverting on zero-field source\n");
+      blas::copy(x, b);
+      param.true_res = 0.0;
+    } 
+
+    std::shared_ptr<ColorSpinorField> zp = nullptr;
 
     if (!init) {
       eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev);//need only deflation meta structure
@@ -767,8 +778,8 @@ namespace quda {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       pp = ColorSpinorField::CreateSmartPtr(csParam);
       zp = ColorSpinorField::CreateSmartPtr(csParam);
-      wp = ColorSpinorField::CreateSmartPtr(csParam);
-      sp = ColorSpinorField::CreateSmartPtr(csParam);
+      p_pre = ColorSpinorField::CreateSmartPtr(csParam); //wp
+      r_pre = ColorSpinorField::CreateSmartPtr(csParam); //sp
       yp = ColorSpinorField::CreateSmartPtr(csParam);
 
       Ap = ColorSpinorField::CreateSmartPtr(csParam);
@@ -788,6 +799,8 @@ namespace quda {
       init = true;
     }
 
+    EigCGArgs &args = *eigcg_args;
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &p = *pp;
     ColorSpinorField &s = *p_pre;
@@ -798,17 +811,6 @@ namespace quda {
 
     ColorSpinorField &tmp = *tmpp;
 
-    // Check to see that we're not trying to invert on a zero-field source
-    const double b2 = norm2(b);
-    if(b2 == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      printfQuda("Warning: inverting on zero-field source\n");
-      blas::copy(x, b);
-      param.true_res = 0.0;
-    } else {
-      y = x;
-    }
-
     matSloppy(r, x, tmp); 
     xpay(b,-1.0, r);
 
@@ -817,9 +819,12 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
-    double alpha, beta, alpha_inv, alpha_old_inv = 1.0;
+    double alpha, beta, alpha_inv, alpha_old_inv = 1.0, betajm1;
     double gamma, gammajm1;
+    double gamma_inv, gammajm1_inv;
     double delta;
+
+    double lanczos_diag, lanczos_offdiag;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -870,7 +875,7 @@ namespace quda {
 
     bool local_stop = false;
 
-    while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter || !local_stop){
+    while((!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j) < param.maxiter || !local_stop){
 
       rNorm = sqrt(mNorm);
       if(rNorm > maxrx) maxrx = rNorm;
@@ -904,14 +909,14 @@ namespace quda {
         axpy(-alpha, s, r);
         axpy(-alpha, z, w);
 #else
-        gamma_old_inv = gamma_inv;
+        gammajm1_inv  = gamma_inv;
         gamma         = norm2(r);
         delta         = reDotProduct(w, r);
         gamma_inv     = 1.0 / gamma;
 
-        alpha_old_div = alpha_div;
-        alpha_div     = delta * gamma_inv - beta * alpha_old_div;
-        alpha         = 1.0 / alpha_div;
+        alpha_old_inv = alpha_inv;
+        alpha_inv     = delta * gamma_inv - beta * alpha_old_inv;
+        alpha         = 1.0 / alpha_inv;
 
         betajm1       = beta; 
         beta          = gamma * gammajm1_inv;
@@ -988,7 +993,7 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    return;
+    return j;
   }
 
 } // namespace quda
