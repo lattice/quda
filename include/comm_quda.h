@@ -175,6 +175,30 @@ extern "C" {
   bool comm_peer2peer_enabled(int dir, int dim);
 
   /**
+     @brief Enable / disable peer-to-peer communication: used for dslash
+     policies that do not presently support peer-to-peer communication
+     @param[in] enable Boolean flag to enable / disable peer-to-peer communication
+  */
+  void comm_enable_peer2peer(bool enable);
+
+  /**
+     Query if intra-node (non-peer-to-peer) communication is enabled
+     in a given dimension and direction
+     @param dir Direction (0 - backwards, 1 forwards)
+     @param dim Dimension (0-3)
+     @return Whether intra-node communication is enabled
+  */
+  bool comm_intranode_enabled(int dir, int dim);
+
+  /**
+     @brief Enable / disable intra-node (non-peer-to-peer)
+     communication
+     @param[in] enable Boolean flag to enable / disable intra-node
+     (non peer-to-peer) communication
+  */
+  void comm_enable_intranode(bool enable);
+
+  /**
      @brief Query if GPU Direct RDMA communication is enabled (global setting)
   */
   bool comm_gdr_enabled();

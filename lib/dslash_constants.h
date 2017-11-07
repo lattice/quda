@@ -106,6 +106,9 @@ enum KernelType {
     void *cloverInv;
     float *cloverInvNorm;
 
+    double twist_a;
+    double twist_b;
+
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
@@ -153,13 +156,6 @@ enum KernelType {
   };
 
   static DslashParam dslashParam;
-
-
-
-#ifdef MULTI_GPU
-  static double twist_a = 0.0;
-  static double twist_b = 0.0;
-#endif
 
 
 #define MAX(a,b) ((a)>(b) ? (a):(b))
