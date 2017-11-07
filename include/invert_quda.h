@@ -878,10 +878,10 @@ namespace quda {
 
     std::shared_ptr<ColorSpinorField> rp;       //! residual vector
     std::shared_ptr<ColorSpinorField> yp;       //! high precision accumulator
-    std::shared_ptr<ColorSpinorField> p;  // conjugate vector
-    std::shared_ptr<ColorSpinorField> Ap; // mat * conjugate vector
+    std::shared_ptr<ColorSpinorField> pp;       // conjugate vector
+    std::shared_ptr<ColorSpinorField> Ap;       // mat * conjugate vector
     std::shared_ptr<ColorSpinorField> tmpp;     //! temporary for mat-vec
-    std::shared_ptr<ColorSpinorField> Az; // mat * conjugate vector from the previous iteration 
+    std::shared_ptr<ColorSpinorField> Az;       // mat * conjugate vector from the previous iteration 
     std::shared_ptr<ColorSpinorField> r_pre;    //! residual passed to preconditioner
     std::shared_ptr<ColorSpinorField> p_pre;    //! preconditioner result
 

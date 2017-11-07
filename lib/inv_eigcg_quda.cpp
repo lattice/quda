@@ -393,7 +393,7 @@ namespace quda {
       yp = ColorSpinorField::CreateSmartPtr(b, csParam);
 
       Ap = ColorSpinorField::CreateSmartPtr(csParam);
-      p  = ColorSpinorField::CreateSmartPtr(csParam);
+      pp = ColorSpinorField::CreateSmartPtr(csParam);
 
       tmpp = ColorSpinorField::CreateSmartPtr(csParam);
 
@@ -431,6 +431,7 @@ namespace quda {
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
+    ColorSpinorField &p = *pp;
     ColorSpinorField &tmp = *tmpp;
 
     csParam.setPrecision(param.precision_sloppy);
@@ -440,7 +441,8 @@ namespace quda {
     matSloppy(r, x, y);
     double r2 = blas::xmyNorm(b, r);
 
-    std::shared_ptr<ColorSpinorField> z  = (K != nullptr) ? ColorSpinorField::CreateSmartPtr(csParam) : rp;//
+    std::shared_ptr<ColorSpinorField> zp  = (K != nullptr) ? ColorSpinorField::CreateSmartPtr(csParam) : rp;//
+    ColorSpinorField &z = *zp;
 
     if( K ) {//apply preconditioner
       if (param.precision_precondition == param.precision_sloppy) { r_pre = rp; p_pre = z; }
@@ -452,10 +454,10 @@ namespace quda {
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
       commGlobalReductionSet(true);
-      blas::copy(*z, pPre);
+      blas::copy(z, pPre);
     }
 
-    *p = *z;
+    p = z;
     blas::zero(y);
 
     const bool use_heavy_quark_res =
@@ -477,7 +479,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     blas::flops = 0;
 
-    double rMinvr = blas::reDotProduct(r,*z);
+    double rMinvr = blas::reDotProduct(r,z);
     //Begin EigCG iterations:
     args.restarts = 0;
 
@@ -486,16 +488,16 @@ namespace quda {
     bool converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq);
 
     while ( !converged && k < param.maxiter ) {
-      matSloppy(*Ap, *p, tmp);  // tmp as tmp
+      matSloppy(*Ap, p, tmp);  // tmp as tmp
 
-      pAp    = blas::reDotProduct(*p, *Ap);
+      pAp    = blas::reDotProduct(p, *Ap);
       alpha_old_inv =  alpha_inv;
       alpha         = rMinvr / pAp;
       alpha_inv     = 1.0 / alpha;
 
       lanczos_diag  = (alpha_inv + beta*alpha_old_inv);
 
-      UpdateVm(*z, beta, sqrt(r2));
+      UpdateVm(z, beta, sqrt(r2));
 
       r2 = blas::axpyNorm(-alpha, *Ap, r);
       if( K ) {//apply preconditioner
@@ -506,13 +508,13 @@ namespace quda {
         commGlobalReductionSet(false);
         (*K)(pPre, rPre);
         commGlobalReductionSet(true);
-        blas::copy(*z, pPre);
+        blas::copy(z, pPre);
       }
       //
       double rMinvr_old   = rMinvr;
-      rMinvr = K ? blas::reDotProduct(r,*z) : r2;
+      rMinvr = K ? blas::reDotProduct(r,z) : r2;
       beta                = rMinvr / rMinvr_old;
-      blas::axpyZpbx(alpha, *p, y, *z, beta);
+      blas::axpyZpbx(alpha, p, y, z, beta);
 
       //
       lanczos_offdiag  = (-sqrt(beta)*alpha_inv);
@@ -748,6 +750,245 @@ namespace quda {
      }
 #endif
      return;
+  }
+
+  void IncEigCG::pipeEigCGsolve(ColorSpinorField &x, ColorSpinorField &b){
+
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+    ColorSpinorParam csParam(b);
+
+    if (!init) {
+      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev);//need only deflation meta structure
+
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      rp = ColorSpinorField::CreateSmartPtr(b, csParam);
+
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      pp = ColorSpinorField::CreateSmartPtr(csParam);
+      zp = ColorSpinorField::CreateSmartPtr(csParam);
+      wp = ColorSpinorField::CreateSmartPtr(csParam);
+      sp = ColorSpinorField::CreateSmartPtr(csParam);
+      yp = ColorSpinorField::CreateSmartPtr(csParam);
+
+      Ap = ColorSpinorField::CreateSmartPtr(csParam);
+      Az = ColorSpinorField::CreateSmartPtr(csParam);
+
+      tmpp = ColorSpinorField::CreateSmartPtr(csParam);
+
+      //Create a search vector set:
+      csParam.setPrecision(param.precision_ritz);//eigCG internal search space precision may not coincide with the solver precision!
+      csParam.is_composite  = true;
+      csParam.composite_dim = param.m;
+
+      Vm = ColorSpinorField::CreateSmartPtr(csParam); //search space for Ritz vectors
+
+      eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
+
+      init = true;
+    }
+
+    ColorSpinorField &r = *rp;
+    ColorSpinorField &p = *pp;
+    ColorSpinorField &s = *p_pre;
+    ColorSpinorField &w = *r_pre;
+    ColorSpinorField &q = *Ap;
+    ColorSpinorField &z = *Az;
+    ColorSpinorField &y = *yp;
+
+    ColorSpinorField &tmp = *tmpp;
+
+    // Check to see that we're not trying to invert on a zero-field source
+    const double b2 = norm2(b);
+    if(b2 == 0){
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      printfQuda("Warning: inverting on zero-field source\n");
+      blas::copy(x, b);
+      param.true_res = 0.0;
+    } else {
+      y = x;
+    }
+
+    matSloppy(r, x, tmp); 
+    xpay(b,-1.0, r);
+
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+
+    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+
+    double alpha, beta, alpha_inv, alpha_old_inv = 1.0;
+    double gamma, gammajm1;
+    double delta;
+
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+
+    blas::flops = 0;
+
+    double heavy_quark_res = 0.0;
+
+    matSloppy(w, r, tmp);
+
+    gamma = norm2(r);
+    delta = reDotProduct(w, r);
+    alpha = gamma /delta;
+    beta  = 0.0;
+
+    alpha_inv = 1.0 / alpha;
+
+    double mNorm  = gamma;
+
+    double rNorm  = sqrt(mNorm);
+    double r0Norm = rNorm;
+    double maxrx  = rNorm;
+    double maxrr  = rNorm;
+
+    const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
+
+    int rUpdate          = 0;
+    int resIncrease      = 0;
+    int resIncreaseTotal = 0;
+
+    matSloppy(q, w, tmp);
+
+    p = r;
+    s = w;
+    z = q;
+    //zero(y);
+
+//merge:
+    axpy( 1.0 / sqrt(gamma), r, Vm->Component(0));
+    axpy(+alpha, r, y);
+    axpy(-alpha, s, r);
+    axpy(-alpha, z, w);
+
+    int j = 0;
+    PrintStats( "PCG", j, norm2(r), b2, heavy_quark_res);
+    param.delta = 1e-8;
+
+    bool local_stop = false;
+
+    while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter || !local_stop){
+
+      rNorm = sqrt(mNorm);
+      if(rNorm > maxrx) maxrx = rNorm;
+      if(rNorm > maxrr) maxrr = rNorm;
+
+      int updateX = (rNorm < param.delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+      int updateR = ((rNorm < param.delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+
+
+      // force a reliable update if we are within target tolerance (only if doing reliable updates)
+      if( convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
+
+      if( ! (updateR || updateX)  ) {
+
+#if 0 // This works better
+        matSloppy(q, w, tmp);
+
+        gammajm1 = gamma;
+        gamma    = norm2(r);
+        beta     = gamma / gammajm1;
+
+        xpay(r, beta, p);
+
+        delta = reDotProduct(w, p);//inf prec relation!
+        alpha = gamma / delta;
+
+        xpay(w, beta, s);
+        xpay(q, beta, z);
+
+        axpy(+alpha, p, x);
+        axpy(-alpha, s, r);
+        axpy(-alpha, z, w);
+#else
+        gamma_old_inv = gamma_inv;
+        gamma         = norm2(r);
+        delta         = reDotProduct(w, r);
+        gamma_inv     = 1.0 / gamma;
+
+        alpha_old_div = alpha_div;
+        alpha_div     = delta * gamma_inv - beta * alpha_old_div;
+        alpha         = 1.0 / alpha_div;
+
+        betajm1       = beta; 
+        beta          = gamma * gammajm1_inv;
+
+        lanczos_diag     = (alpha_inv + betajm1*alpha_old_inv);
+        lanczos_offdiag  = (-sqrt(beta)*alpha_inv);
+
+        args.SetLanczos(lanczos_diag, lanczos_offdiag);
+
+        matSloppy(q, w, tmp);
+
+//update (or restart) search vectors:
+
+        if(j < (param.m-1)) {//merge in one operation
+          xpay(r,beta,p);
+          xpay(w,beta,s);
+          xpay(q,beta,z);
+
+          axpy(sqrt(gamma_inv), r, Vm->Component(args.id));
+
+          axpy(+alpha, p, x);
+          axpy(-alpha, s, r);
+          axpy(-alpha, z, w);
+          //
+        } else {
+          //UpdateVTv2(beta, sqrt(gamma_inv));
+
+          xpay(r,beta,p);
+          xpay(w,beta,s);
+          xpay(q,beta,z);
+
+          axpy(+alpha, p, x);
+          axpy(-alpha, s, r);
+          axpy(-alpha, z, w);
+          //
+        }
+
+#endif
+        mNorm = norm2(r);
+
+      } else {
+
+        warningQuda("Do restart\n");
+        local_stop = true;
+      }
+
+      j += 1;
+      PrintStats( "pipeEigCG", j, gamma, b2, heavy_quark_res);
+    }
+
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+
+    printfQuda("\nDone updates %d\n", rUpdate);
+
+    //param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    double gflops = (blas::flops + mat.flops() + matPrecon.flops())*1e-9;
+    param.gflops = gflops;
+    param.iter += j;
+
+    if (j==param.maxiter)
+      warningQuda("Exceeded maximum iterations %d", param.maxiter);
+
+    // compute the true residual
+    xpy(y, x);
+    mat(r, x, tmp);
+    double true_res = blas::xmyNorm(b, r);
+    param.true_res = sqrt(true_res / b2);
+
+    // reset the flops counters
+    blas::flops = 0;
+    mat.flops();
+    matPrecon.flops();
+
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+    return;
   }
 
 } // namespace quda
