@@ -270,6 +270,83 @@ laplacianQuda(
   return status;
 }
 
+
+//-- top level function, performs di-quark contractions
+EXTRN_C int
+doQQ_contract_Quda(
+	      QUDA_REAL *hprop_out,
+	      QUDA_REAL *hprop_in1,
+	      QUDA_REAL *hprop_in2,
+	      const qudaLattice *qS,
+	      int nColor, int nSpin,
+	      qudaAPI_Param paramAPI)
+{
+  int status = 0;
+
+  if (check_quda_comms(qS))
+    return 1;
+  if (QUDA_Nc != nColor)
+    return 1;
+
+  LONG_T fld_lgh = qS->locvol * nColor * nSpin * 2;
+  
+  //-- Initialize the quda-gauge parameters
+  QudaGaugeParam gp;
+  init_QudaGaugeParam_generic(gp, qS);
+
+  //-- Initialize the inverter parameters
+  QudaInvertParam ip;
+  init_QudaInvertParam_generic(ip, gp, paramAPI);
+
+  setVerbosity(paramAPI.verbosity);
+
+  //-- load the propagators
+  int nVec = paramAPI.cParam.nVec;
+  cudaColorSpinorField *cudaProp_in1[nVec];
+  cudaColorSpinorField *cudaProp_in2[nVec];
+  cudaColorSpinorField *cudaProp_out[nVec];
+
+  double t5 = MPI_Wtime();
+  for(int ivec=0;ivec<nVec;ivec++){
+    cudaProp_in1[ivec] = new_cudaColorSpinorField(gp, ip, nColor, nSpin, &(hprop_in1[ivec * fld_lgh]) );
+    cudaProp_in2[ivec] = new_cudaColorSpinorField(gp, ip, nColor, nSpin, &(hprop_in2[ivec * fld_lgh]) );
+    cudaProp_out[ivec] = new_cudaColorSpinorField(gp, ip, nColor, nSpin, NULL );
+    
+    if((cudaProp_in1[ivec] == NULL) || (cudaProp_in2[ivec] == NULL) || (cudaProp_out[ivec]==NULL))
+      errorQuda("doQQ_contract_Quda: Cannot allocate propagators. Exiting.\n");
+
+  }// -ivec
+  double t6 = MPI_Wtime();
+  printfQuda("TIMING - doQQ_contract_Quda: Propagators loaded in %.6f sec.\n", t6-t5);
+
+
+  //-- TODO: Call contractions routine here
+
+  
+  //-- extract
+  double t7 = MPI_Wtime();
+  for(int ivec=0;ivec<nVec;ivec++){
+    save_cudaColorSpinorField(&(hprop_out[ivec * fld_lgh]), gp, ip, nColor, nSpin, *cudaProp_out[ivec]);
+  }
+  double t8 = MPI_Wtime();
+  printfQuda("TIMING - doQQ_contract_Quda: Propagator extraction done in %.6f sec.\n", t8-t7);
+  
+  //-- cleanup & return
+  printfQuda("doQQ_contract_Quda: Finalizing...\n");
+  for(int ivec=0;ivec<nVec;ivec++){
+    delete_not_null(cudaProp_in1[ivec]);
+    delete_not_null(cudaProp_in2[ivec]);
+    delete_not_null(cudaProp_out[ivec]);
+  }
+  
+  saveTuneCache();
+
+  printfQuda("laplacianQuda: Returning...\n");
+
+  return status;
+}
+
+
 //-- top level function, calls invertQuda
 //-- Here, wParam holds inverter parameters
 EXTRN_C int

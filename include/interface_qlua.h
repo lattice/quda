@@ -48,9 +48,17 @@ typedef struct {
   contractParam cParam;
 } qudaAPI_Param;
 
-
 EXTRN_C
 QudaVerbosity parseVerbosity(const char *v);
+
+EXTRN_C int
+doQQ_contract_Quda(
+              QUDA_REAL *hprop_out,
+              QUDA_REAL *hprop_in1,
+              QUDA_REAL *hprop_in2,
+              const qudaLattice *qS,
+              int nColor, int nSpin,
+              const qudaAPI_Param qAparam);
 
 EXTRN_C int
 laplacianQuda(
