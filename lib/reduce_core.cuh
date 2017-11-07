@@ -321,8 +321,10 @@ template <typename ReduceType, typename Float, typename zFloat, int nSpin, QudaF
     value = genericReduce<ReduceType,Float,zFloat,nSpin,3,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 4) {
     value = genericReduce<ReduceType,Float,zFloat,nSpin,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
   } else if (x.Ncolor() == 6) {
     value = genericReduce<ReduceType,Float,zFloat,nSpin,6,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+#endif
   } else if (x.Ncolor() == 8) {
     value = genericReduce<ReduceType,Float,zFloat,nSpin,8,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 12) {

@@ -122,8 +122,10 @@ namespace quda {
       FillV<Float,nSpin,nColor,2>(V,B);
     } else if (Nvec == 4) {
       FillV<Float,nSpin,nColor,4>(V,B);
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if (Nvec == 6) {
       FillV<Float,nSpin,nColor,6>(V,B);
+#endif
     } else if (Nvec == 8) {
       FillV<Float,nSpin,nColor,8>(V,B);
     } else if (Nvec == 12) {
@@ -151,8 +153,10 @@ namespace quda {
       FillV<Float,nSpin,2>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 3) {
       FillV<Float,nSpin,3>(V,B,Nvec);
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if(B[0]->Ncolor() == 6) { // free field Wilson
       FillV<Float,nSpin,6>(V,B,Nvec);
+#endif
     } else if(B[0]->Ncolor() == 8) {
       FillV<Float,nSpin,8>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 16) {
@@ -662,8 +666,10 @@ namespace quda {
       constexpr int nColor = 3;
       if (Nvec == 2) {
 	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,2>(V, fine_to_coarse, coarse_to_fine, geo_bs);
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
       } else if (Nvec == 6) { // for Wilson free field
   BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,6>(V, fine_to_coarse, coarse_to_fine, geo_bs);
+#endif
       } else if (Nvec == 24) {
 	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 32) {
@@ -682,7 +688,7 @@ namespace quda {
       } else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
-
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if (V.Ncolor()/Nvec == 6) {
 
       constexpr int nColor = 6;
@@ -691,7 +697,7 @@ namespace quda {
       } else {
   errorQuda("Unsupported nVec %d\n", Nvec);
       }
-
+#endif
     
     } else if (V.Ncolor()/Nvec == 24) {
 

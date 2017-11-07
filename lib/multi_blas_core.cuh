@@ -389,8 +389,10 @@ template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
     genericMultiBlas<Float,yFloat,nSpin,3,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 4) {
     genericMultiBlas<Float,yFloat,nSpin,4,order,write,Functor>(x, y, z, w, f);
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
   } else if (x.Ncolor() == 6) { // free field Wilson
     genericMultiBlas<Float,yFloat,nSpin,6,order,write,Functor>(x, y, z, w, f);
+#endif
   } else if (x.Ncolor() == 8) {
     genericMultiBlas<Float,yFloat,nSpin,8,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 12) {

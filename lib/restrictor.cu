@@ -495,6 +495,7 @@ namespace quda {
       } else {
 	errorQuda("Unsupported nVec %d", nVec);
       }
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if (in.Ncolor() == 6) { // Coarsen coarsened Wilson free field
       const int fineColor = 6;
       if (nVec == 6) { 
@@ -502,6 +503,7 @@ namespace quda {
       } else {
   errorQuda("Unsupported nVec %d", nVec);
       }
+#endif
     } else if (in.Ncolor() == 24) { // to keep compilation under control coarse grids have same or more colors
       const int fineColor = 24;
       if (nVec == 24) {

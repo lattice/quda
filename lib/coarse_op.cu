@@ -113,8 +113,10 @@ namespace quda {
     } else if (coarseCoor == 4) {
       calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
 #endif
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if (coarseColor == 6) {
       calculateY<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+#endif 
 #if 0
     } else if (coarseColor == 8) {
       calculateY<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);

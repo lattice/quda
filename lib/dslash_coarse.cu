@@ -871,8 +871,10 @@ namespace quda {
     } else if (inA.Ncolor() == 4) {
       ApplyCoarse<Float,yFloat,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if (inA.Ncolor() == 6) { // free field Wilson
       ApplyCoarse<Float,yFloat,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+#endif
 #if 0
     } else if (inA.Ncolor() == 8) {
       ApplyCoarse<Float,yFloat,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);

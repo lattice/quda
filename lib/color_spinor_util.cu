@@ -127,8 +127,10 @@ namespace quda {
       genericSource<Float,nSpin,3,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 4) {
       genericSource<Float,nSpin,4,order>(a,sourceType, x, s, c);
+#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if (a.Ncolor() == 6) { // for Wilson free field
       genericSource<Float,nSpin,6,order>(a,sourceType, x, s, c);
+#endif
     } else if (a.Ncolor() == 8) {
       genericSource<Float,nSpin,8,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 12) {
