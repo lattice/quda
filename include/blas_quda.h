@@ -98,6 +98,8 @@ namespace quda {
     double2 pipeMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z,
                                const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q);
  
+    double2 pipeEigCGMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z,
+                               const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q, const double c, ColorSpinorField &v);
 
    /**
        @brief Compute the block "caxpy" with over the set of

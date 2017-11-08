@@ -1077,6 +1077,48 @@ namespace quda {
       return reduce::mergedReduceCuda<double2, QudaSumFloat2,pipeMergedReduceOp_,1,1,1,1,1,1,0, false>
 	  (make_double2(a, 0.0), make_double2(b, 0.0), s, p, z, r, x, w, q);
     }
+
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct pipeEigMergedReduceOp_ : public PipeEigReduceFunctor<ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      Float2 c;
+      pipeEigMergedReduceOp_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+      __device__ void operator()(ReduceType &sum, FloatN &s, FloatN &p, FloatN &z, FloatN &r, FloatN &x, FloatN &w, FloatN &q, FloatN &v) { 
+	typedef typename ScalarType<ReduceType>::type scalar;
+//prefetch x?
+         axpy_v2_(c,r,v);
+         //s = w + a.x*s;
+         xpay_v2_(w,a,s);
+         //p = r + a.x*p;
+         xpay_v2_(r,a,p);
+         //z = q + a.x*z;
+         xpay_v2_(q,a,z);
+
+         //r = r - b.x*s;
+         axpy_v2_(-b,s,r);
+         //x = x + b.x*p;
+         axpy_v2_(b,p,x);
+         //w = w - b.x*z;
+         axpy_v2_(-b,z,w);
+         //
+
+         dot_v2_<scalar> (sum.x, r, r);
+         dot_v2_<scalar> (sum.y, r, w);
+      }
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
+
+
+    double2 pipeEigMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z, 
+                               const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q, const double c, ColorSpinorField &v) {
+      if (x.Precision() != p.Precision()) {
+         errorQuda("\nMixed blas is not implemented.\n");
+      } 
+      return reduce::mergedReduceCuda<double2, QudaSumFloat2,pipeEigMergedReduceOp_,1,1,1,1,1,1,0,1, false>
+	  (make_double2(a, 0.0), make_double2(b, 0.0), s, p, z, r, x, w, q, make_double2(c, 0.0), v);
+    }
 #endif
 
    } // namespace blas
