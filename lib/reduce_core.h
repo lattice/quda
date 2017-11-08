@@ -116,10 +116,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 
 template <typename doubleN, typename ReduceType,
 	  template <typename ReducerType, typename Float, typename FloatN> class Reducer,
-  int writeS,int writeP,int writeZ,int writeR, int writeX, int writeW,int writeQ, bool siteUnroll>
-doubleN mergedReduceCuda(const double2 &a, const double2 &b, ColorSpinorField &s, 
+  int writeS,int writeP,int writeZ,int writeR, int writeX, int writeW,int writeQ, int writeV, bool siteUnroll>
+doubleN mergedReduceCuda(const double2 &a, const double2 &b, const double2 &c, ColorSpinorField &s, 
 		   ColorSpinorField &p, ColorSpinorField &z, ColorSpinorField &r,
-		   ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q) { 
+		   ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q, ColorSpinorField &v) { 
 
   doubleN value;
   if (checkLocation(x, s, r, p, z) == QUDA_CUDA_FIELD_LOCATION) {//must be 10 args.
@@ -135,8 +135,8 @@ doubleN mergedReduceCuda(const double2 &a, const double2 &b, ColorSpinorField &s
 	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
 	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 	value = reduceCudaExp<doubleN,ReduceType,double2,double2,double2,M,Reducer,
-	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ>
-	  (a, b, s, p, z, r, x, w, q, reduce_length/(2*M));
+	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ,writeV>
+	  (a, b, c, s, p, z, r, x, w, q, v, reduce_length/(2*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -144,8 +144,8 @@ doubleN mergedReduceCuda(const double2 &a, const double2 &b, ColorSpinorField &s
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	value = reduceCudaExp<doubleN,ReduceType,double2,double2,double2,M,Reducer,
-	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ>
-	  (a, b, s, p, z, r, x, w, q, reduce_length/(2*M));
+	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ,writeV>
+	  (a, b, c, s, p, z, r, x, w, q, v, reduce_length/(2*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -155,8 +155,8 @@ doubleN mergedReduceCuda(const double2 &a, const double2 &b, ColorSpinorField &s
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 	value = reduceCudaExp<doubleN,ReduceType,float4,float4,float4,M,Reducer,
-	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ>
-	  (a, b, s, p, z, r, x, w, q,reduce_length/(4*M));
+	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ,writeV>
+	  (a, b, c, s, p, z, r, x, w, q, v, reduce_length/(4*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -165,8 +165,8 @@ doubleN mergedReduceCuda(const double2 &a, const double2 &b, ColorSpinorField &s
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 	value = reduceCudaExp<doubleN,ReduceType,float2,float2,float2,M,Reducer,
-	  	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ>
-	  (a, b, s, p, z, r, x, w, q,reduce_length/(2*M));
+	  	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ,writeV>
+	  (a, b, c, s, p, z, r, x, w, q, v,reduce_length/(2*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -177,8 +177,8 @@ doubleN mergedReduceCuda(const double2 &a, const double2 &b, ColorSpinorField &s
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 6; // determines how much work per thread to do
 	value = reduceCudaExp<doubleN,ReduceType,float4,short4,short4,M,Reducer,
-	  	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
+	  	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ,writeV>
+	  (a, b, c, s, p, z, r, x, w, q, v,y.Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -186,8 +186,8 @@ doubleN mergedReduceCuda(const double2 &a, const double2 &b, ColorSpinorField &s
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = 3; // determines how much work per thread to do
 	value = reduceCudaExp<doubleN,ReduceType,float2,short2,short2,M,Reducer,
-	  	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
+	  	  writeS,writeP,writeZ,writeR,writeX,writeW,writeQ,writeV>
+	  (a, b, c, s, p, z, r, x, w, q, v, y.Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
