@@ -870,6 +870,49 @@ namespace quda {
       return reduce::reduceCudaExp<double3, QudaSumFloat3,pipePCGMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
 	  (make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
     }
+
+    template <typename ReduceType, typename Float2, typename FloatN>
+    struct pipePCGFletcherReevesMergedOp_ : public ReduceFunctorExp<ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      pipePCGFletcherReevesMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
+	typedef typename ScalarType<ReduceType>::type scalar;
+
+         z = n + b.x*z;
+         q = m + b.x*q;
+         s = w + b.x*s;
+         p = u + b.x*p;
+
+         x = x + a.x*p;
+         u = u - a.x*q;
+
+         dot_<scalar> (sum.w, r, u);
+
+         r = r - a.x*s;
+         w = w - a.x*z;
+
+         dot_<scalar> (sum.x, r, u);
+         dot_<scalar> (sum.y, w, u);
+
+         norm2_<scalar> (sum.z, u);
+      }
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
+
+
+    double4 pipePCGFletcherReevesMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+                                ColorSpinorField &r, ColorSpinorField &s,  
+                                ColorSpinorField &m, const double &b, ColorSpinorField &q,   
+			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
+      if (x.Precision() != p.Precision()) {
+         errorQuda("\nMixed blas is not implemented.\n");
+      } 
+      return reduce::reduceCudaExp<double4, QudaSumFloat4,pipePCGFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+	  (make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+    }
+
 ///END EXPERIMENTAL
 
    } // namespace blas

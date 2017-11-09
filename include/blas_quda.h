@@ -99,6 +99,11 @@ namespace quda {
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
 
+    double4 pipePCGFletcherReevesMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+                                ColorSpinorField &r, ColorSpinorField &s,  
+                                ColorSpinorField &m, const double &b, ColorSpinorField &q,   
+			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
+
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     /**
        @brief Compute the block "caxpy" with over the set of

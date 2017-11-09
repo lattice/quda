@@ -10,7 +10,6 @@
 #include <util_quda.h>
 #include <sys/time.h>
 
-#include <face_quda.h>
 #include <iostream>
 
 /***
@@ -202,7 +201,7 @@ namespace quda {
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     double alpha, beta;
-    double gamma, gammajm1, gamma_aux;
+    double gamma, gammajm1, gamma_aux = 0.0;
     double delta;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -229,7 +228,7 @@ namespace quda {
     delta = blas::reDotProduct(w,u);
     double mNorm = blas::norm2(u);
 
-    alpha = gamma / delta;
+    alpha = 1.0;
     beta  = 0.0;
 
     double rNorm = sqrt(mNorm);
@@ -245,7 +244,7 @@ namespace quda {
 
     blas::flops = 0;
 
-    double3 buffer;
+    double *local_buffer = nullptr;
 
     // now create the worker class for updating the gradient vectors
 #ifdef USE_WORKER
@@ -253,28 +252,13 @@ namespace quda {
     dslash::aux_worker = nullptr;//&global_reduce;
 #else
     MsgHandle* allreduceHandle = comm_handle();
-    double *recvbuff = new double[3];//mpi buffer for async global reduction
+    double *recvbuff           = new double[4];//mpi buffer for async global reduction
 #endif
 
     int j = 0;
 
     double heavy_quark_res = 0.0;
     //
-    //m = w;
-    if(K) {
-      rPre = w; 
-
-      commGlobalReductionSet(false);
-      (*K)(pPre, rPre);
-      commGlobalReductionSet(true);
-
-      m = pPre;
-    } else {
-      m = w;
-    }
-
-    matSloppy(n, m, tmp);
-
     PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
 
     while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
@@ -286,18 +270,23 @@ namespace quda {
       int updateR = ((rNorm < param.delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
+      if( convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
 
       if( ! (updateR || updateX)  ) {
 
-        if(j > 0) {
-//         beta  = (gamma - gamma_aux) / gammajm1;
-           beta  = gamma / gammajm1;
-           alpha = gamma / (delta - beta / alpha * gamma); 
-        } 
+        beta  = (gamma - gamma_aux) / gammajm1;
+        alpha = gamma / (delta - beta / alpha * gamma); 
 
         commGlobalReductionSet(false);//disable global reduction
-        buffer = pipePCGMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
+
+        if(K) {
+          double4 res = pipePCGFletcherReevesMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
+          local_buffer= reinterpret_cast<double*>(&res);
+        } else {
+          double3 res = pipePCGMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
+          local_buffer= reinterpret_cast<double*>(&res);
+        } 
+
         commGlobalReductionSet(true);
 #ifdef USE_WORKER
         {
@@ -326,9 +315,9 @@ namespace quda {
 #else
         {
 #ifdef NONBLOCK_REDUCE
-          comm_allreduce_array_async(recvbuff, (double*)&buffer, 3, allreduceHandle);
+          comm_allreduce_array_async(recvbuff, local_buffer, (K ? 4 : 3), allreduceHandle);
 #else
-          reduceDoubleArray((double*)&buffer, 3);
+          reduceDoubleArray(local_buffer, (K ? 4 : 3));
 #endif
           if(K) {
             rPre = w;
@@ -345,15 +334,15 @@ namespace quda {
           mat(n, m, tmp);
 #ifdef NONBLOCK_REDUCE//sync point
           comm_wait(allreduceHandle);
-          memcpy(&buffer, recvbuff, sizeof(double3));
+          memcpy(&local_buffer, recvbuff, (K ? 4 : 3)*sizeof(double));
 #endif
         }
 #endif //end of USE_WORKER
         gammajm1 = gamma;
-        gamma = buffer.x;
-        delta = buffer.y;
-        mNorm = buffer.z;
-        //gamma_aux = buffer.w;
+        gamma = local_buffer[0];
+        delta = local_buffer[1];
+        mNorm = local_buffer[2];
+        gamma_aux = K ? local_buffer[3] : 0.0;
      } else { //trigger reliable updates:
         xpy(x,y);
         zero(x);
@@ -368,7 +357,7 @@ namespace quda {
           resIncrease++;
           resIncreaseTotal++;
           // reuse r0Norm for this
-          warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
+          warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(mNorm), r0Norm, resIncreaseTotal);
 
 //        if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
 
@@ -380,7 +369,6 @@ namespace quda {
         maxrr = rNorm;
         maxrx = rNorm;
         r0Norm = rNorm;
-        ++rUpdate;
 
         if(K) {
           commGlobalReductionSet(false);
