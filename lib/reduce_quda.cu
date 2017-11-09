@@ -1018,7 +1018,7 @@ namespace quda {
 
       //! where the reduction is usually computed and any auxiliary operations
       virtual __device__ void operator()(ReduceType &sum, FloatN &s, FloatN &p, FloatN &z,FloatN &r,
-						  FloatN &x, FloatN &w, FloatN &q) = 0;
+						  FloatN &x, FloatN &w, FloatN &q, FloatN &v) = 0;
 
       //! post-computation routine called after the "M-loop"
       virtual __device__ void post(ReduceType &sum) { ; }
