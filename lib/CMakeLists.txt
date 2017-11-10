@@ -9,7 +9,7 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp interface_qlua.cpp  util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
+  color_spinor_wuppertal.cu cuda_qlua_contractQQ.cu covDev.cu gauge_covdev.cpp 
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu
