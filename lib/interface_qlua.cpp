@@ -283,6 +283,12 @@ doQQ_contract_Quda(
 {
   int status = 0;
 
+  //-- Check that the contract index is defined before proceeding
+  if (paramAPI.cParam.cntrID == cntr_INVALID)
+    errorQuda("doQQ_contract_Quda: Contract index not set!\n");
+  
+
+  
   if (check_quda_comms(qS))
     return 1;
   if (QUDA_Nc != nColor)
@@ -312,7 +318,7 @@ doQQ_contract_Quda(
     cudaProp_in2[ivec] = new_cudaColorSpinorField(gp, ip, nColor, nSpin, &(hprop_in2[ivec * fld_lgh]) );
     cudaProp_out[ivec] = new_cudaColorSpinorField(gp, ip, nColor, nSpin, NULL );
     
-    if((cudaProp_in1[ivec] == NULL) || (cudaProp_in2[ivec] == NULL) || (cudaProp_out[ivec]==NULL))
+    if((cudaProp_in1[ivec] == NULL) || (cudaProp_in2[ivec] == NULL) || (cudaProp_out[ivec] == NULL))
       errorQuda("doQQ_contract_Quda: Cannot allocate propagators. Exiting.\n");
 
   }// -ivec
@@ -320,8 +326,8 @@ doQQ_contract_Quda(
   printfQuda("TIMING - doQQ_contract_Quda: Propagators loaded in %.6f sec.\n", t6-t5);
 
 
-  //-- TODO: Call contractions routine here
-
+  //-- Call contractions kernel here
+  cudaContractQQ(**cudaProp_out, **cudaProp_in1, **cudaProp_in2, nColor, nSpin, paramAPI.cParam);
   
   //-- extract
   double t7 = MPI_Wtime();
