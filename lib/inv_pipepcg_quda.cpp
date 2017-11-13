@@ -134,15 +134,14 @@ namespace quda {
 
     ColorSpinorParam csParam(b);
 
-    ColorSpinorField *yp = nullptr;
-    ColorSpinorField *lp = nullptr;
-
     MergedLocalReducerType  MergedLocalReducer = K ? &pipePCGFletcherReevesMergedOp : &pipePCGMergedOp;
 
     if (!init) {
       // high precision fields:
       csParam.create = QUDA_COPY_FIELD_CREATE;
       rp = ColorSpinorField::Create(b, csParam);
+
+      csParam.setPrecision(param.precision_sloppy);
 
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       pp = ColorSpinorField::Create(csParam);
@@ -153,9 +152,6 @@ namespace quda {
       np = ColorSpinorField::Create(csParam);
       mp = ColorSpinorField::Create(csParam);
       up = ColorSpinorField::Create(csParam);
-
-      yp = ColorSpinorField::Create(csParam);
-      lp = ColorSpinorField::Create(csParam); 
 
       tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
 
@@ -171,6 +167,11 @@ namespace quda {
 
       init = true;
     }
+
+    csParam.setPrecision(param.precision_sloppy);
+
+    ColorSpinorField *yp = ColorSpinorField::Create(csParam);
+    ColorSpinorField *lp = ColorSpinorField::Create(csParam);
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &p = *pp;
@@ -263,6 +264,20 @@ namespace quda {
     double *recvbuff           = new double[4];//mpi buffer for async global reduction
 #endif
 
+    if(K) {
+      rPre = w;
+
+      commGlobalReductionSet(false);
+      (*K)(pPre, rPre);
+      commGlobalReductionSet(true);
+
+      m = pPre;
+    } else {
+      m = w;
+    }
+    //
+    matSloppy(n, m, tmp);
+
     int j = 0;
 
     double heavy_quark_res = 0.0;
@@ -282,11 +297,11 @@ namespace quda {
 
       if( ! (updateR || updateX)  ) {
 
-        alpha = gamma / (delta - beta / alpha * gamma); 
         beta  = (gamma - gamma_aux) / gammajm1;
+        alpha = gamma / (delta - beta / alpha * gamma); 
 
         commGlobalReductionSet(false);//disable global reduction
-        local_reduce = MergedLocalReducer(x,alpha,p,u,r,s,m,beta,q,w,n,z);
+        local_reduce = MergedLocalReducer(y,alpha,p,u,r,s,m,beta,q,w,n,z);
         commGlobalReductionSet(true);
 #ifdef USE_WORKER
         {
@@ -331,7 +346,7 @@ namespace quda {
             m = w;
           }
           //
-          mat(n, m, tmp);
+          matSloppy(n, m, tmp);
 #ifdef NONBLOCK_REDUCE//sync point
           comm_wait(allreduceHandle);
           memcpy(&local_reduce, recvbuff, (K ? 4 : 3)*sizeof(double));
@@ -344,10 +359,10 @@ namespace quda {
         mNorm     = local_reduce.z;
         gamma_aux = local_reduce.w;
      } else { //trigger reliable updates:
-        xpy(x,y);
-        zero(x);
+        xpy(y,x);
+        zero(y);
 
-        mat(r, y, tmp);
+        mat(r, x, tmp);
         xpay(b, -1.0, r);
 
         mNorm = norm2(r);
