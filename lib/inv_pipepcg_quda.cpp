@@ -29,6 +29,10 @@
 namespace quda {
 
   using namespace blas;
+
+  using MergedLocalReducerType = double4 (*) ( ColorSpinorField &, const double &, ColorSpinorField &, ColorSpinorField &,
+                                             ColorSpinorField &, ColorSpinorField &,  ColorSpinorField &, const double &,
+                                             ColorSpinorField &, ColorSpinorField&, ColorSpinorField&, ColorSpinorField& ) ;
   
   // set the required parameters for the inner solver
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
@@ -133,6 +137,8 @@ namespace quda {
     ColorSpinorField *yp = nullptr;
     ColorSpinorField *lp = nullptr;
 
+    MergedLocalReducerType  MergedLocalReducer = K ? &pipePCGFletcherReevesMergedOp : &pipePCGMergedOp;
+
     if (!init) {
       // high precision fields:
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -201,7 +207,7 @@ namespace quda {
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     double alpha, beta;
-    double gamma, gammajm1, gamma_aux = 0.0;
+    double gamma = 1.0, gammajm1 = 1.0, gamma_aux = 0.0;
     double delta;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -228,6 +234,8 @@ namespace quda {
     delta = blas::reDotProduct(w,u);
     double mNorm = blas::norm2(u);
 
+    gamma_aux = gamma;
+
     alpha = 1.0;
     beta  = 0.0;
 
@@ -244,11 +252,11 @@ namespace quda {
 
     blas::flops = 0;
 
-    double *local_buffer = nullptr;
+    double4 local_reduce;//to keep double3 or double4 registers
 
     // now create the worker class for updating the gradient vectors
 #ifdef USE_WORKER
-    GlobalMPIallreduce global_reduce((double*)&buffer, 3);
+    GlobalMPIallreduce global_reduce((double*)&local_reduce, K ? 4 : 3);
     dslash::aux_worker = nullptr;//&global_reduce;
 #else
     MsgHandle* allreduceHandle = comm_handle();
@@ -274,19 +282,11 @@ namespace quda {
 
       if( ! (updateR || updateX)  ) {
 
-        beta  = (gamma - gamma_aux) / gammajm1;
         alpha = gamma / (delta - beta / alpha * gamma); 
+        beta  = (gamma - gamma_aux) / gammajm1;
 
         commGlobalReductionSet(false);//disable global reduction
-
-        if(K) {
-          double4 res = pipePCGFletcherReevesMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
-          local_buffer= reinterpret_cast<double*>(&res);
-        } else {
-          double3 res = pipePCGMergedOp(x,alpha,p,u,r,s,m,beta,q,w,n,z);
-          local_buffer= reinterpret_cast<double*>(&res);
-        } 
-
+        local_reduce = MergedLocalReducer(x,alpha,p,u,r,s,m,beta,q,w,n,z);
         commGlobalReductionSet(true);
 #ifdef USE_WORKER
         {
@@ -315,9 +315,9 @@ namespace quda {
 #else
         {
 #ifdef NONBLOCK_REDUCE
-          comm_allreduce_array_async(recvbuff, local_buffer, (K ? 4 : 3), allreduceHandle);
+          comm_allreduce_array_async(recvbuff, (double*)&local_reduce, (K ? 4 : 3), allreduceHandle);
 #else
-          reduceDoubleArray(local_buffer, (K ? 4 : 3));
+          reduceDoubleArray((double*)&local_reduce, (K ? 4 : 3));
 #endif
           if(K) {
             rPre = w;
@@ -334,15 +334,15 @@ namespace quda {
           mat(n, m, tmp);
 #ifdef NONBLOCK_REDUCE//sync point
           comm_wait(allreduceHandle);
-          memcpy(&local_buffer, recvbuff, (K ? 4 : 3)*sizeof(double));
+          memcpy(&local_reduce, recvbuff, (K ? 4 : 3)*sizeof(double));
 #endif
         }
 #endif //end of USE_WORKER
         gammajm1 = gamma;
-        gamma = local_buffer[0];
-        delta = local_buffer[1];
-        mNorm = local_buffer[2];
-        gamma_aux = K ? local_buffer[3] : 0.0;
+        gamma     = local_reduce.x;
+        delta     = local_reduce.y;
+        mNorm     = local_reduce.z;
+        gamma_aux = local_reduce.w;
      } else { //trigger reliable updates:
         xpy(x,y);
         zero(x);

@@ -847,6 +847,8 @@ namespace quda {
          s = w + b.x*s;
          p = u + b.x*p;
 
+         sum.w = 0.0;
+
          x = x + a.x*p;
          r = r - a.x*s;
          u = u - a.x*q;
@@ -860,14 +862,14 @@ namespace quda {
       static int flops() { return (16+6); } //! flops per real element
     };
 
-    double3 pipePCGMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+    double4 pipePCGMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
                                 ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
       } 
-      return reduce::reduceCudaExp<double3, QudaSumFloat3,pipePCGMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+      return reduce::reduceCudaExp<double4, QudaSumFloat4,pipePCGMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
 	  (make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
     }
 

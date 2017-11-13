@@ -94,7 +94,7 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
-    double3 pipePCGMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+    double4 pipePCGMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
                                 ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
