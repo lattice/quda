@@ -207,9 +207,12 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
+    double4 local_reduce;//to keep double3 or double4 registers
+
     double alpha, beta;
-    double gamma = 1.0, gammajm1 = 1.0, gamma_aux = 0.0;
-    double delta;
+    double gammajm1 = 1.0, gamma_aux = 0.0;
+
+    double &gamma = local_reduce.x, &delta = local_reduce.y, &mNorm = local_reduce.z;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -233,7 +236,7 @@ namespace quda {
     //Remark : no overlap here. 
     gamma = blas::reDotProduct(r,u); 
     delta = blas::reDotProduct(w,u);
-    double mNorm = blas::norm2(u);
+    mNorm = blas::norm2(u);
 
     gamma_aux = gamma;
 
@@ -252,8 +255,6 @@ namespace quda {
     int resIncreaseTotal = 0;
 
     blas::flops = 0;
-
-    double4 local_reduce;//to keep double3 or double4 registers
 
     // now create the worker class for updating the gradient vectors
 #ifdef USE_WORKER
@@ -354,10 +355,7 @@ namespace quda {
         }
 #endif //end of USE_WORKER
         gammajm1 = gamma;
-        gamma     = local_reduce.x;
-        delta     = local_reduce.y;
-        mNorm     = local_reduce.z;
-        gamma_aux = local_reduce.w;
+        gamma_aux = local_reduce.w;//gamma, delta and mNorm are refs to local_reduce.[x|y|z]
      } else { //trigger reliable updates:
         xpy(y,x);
         zero(y);
