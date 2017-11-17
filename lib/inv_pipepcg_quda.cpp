@@ -300,6 +300,7 @@ namespace quda {
 
         beta  = (gamma - gamma_aux) / gammajm1;
         alpha = gamma / (delta - beta / alpha * gamma); 
+        gammajm1 = gamma;
 
         commGlobalReductionSet(false);//disable global reduction
         local_reduce = MergedLocalReducer(y,alpha,p,u,r,s,m,beta,q,w,n,z);
@@ -354,7 +355,6 @@ namespace quda {
 #endif
         }
 #endif //end of USE_WORKER
-        gammajm1 = gamma;
         gamma_aux = local_reduce.w;//gamma, delta and mNorm are refs to local_reduce.[x|y|z]
      } else { //trigger reliable updates:
         xpy(y,x);
