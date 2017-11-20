@@ -77,7 +77,7 @@ namespace quda {
 
     if (init) {
 
-      if (param.precision_precondition != param.precision_sloppy) {
+      if (K && (param.precision_precondition != param.precision_sloppy)) {
         delete p_pre;
         delete r_pre;
       }
@@ -140,10 +140,10 @@ namespace quda {
       // high precision fields:
       csParam.create = QUDA_COPY_FIELD_CREATE;
       rp = ColorSpinorField::Create(b, csParam);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
 
       csParam.setPrecision(param.precision_sloppy);
-
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
       pp = ColorSpinorField::Create(csParam);
       zp = ColorSpinorField::Create(csParam);
       wp = ColorSpinorField::Create(csParam);
@@ -153,10 +153,9 @@ namespace quda {
       mp = ColorSpinorField::Create(csParam);
       up = ColorSpinorField::Create(csParam);
 
-      tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
-
       // these low precision fields are used by the inner solver
-      if (param.precision_precondition != param.precision) {
+      if (K && (param.precision_precondition != param.precision_sloppy)) {
+        printfQuda("Allocated resources for the preconditioner.\n");
         csParam.setPrecision(param.precision_precondition);
 	p_pre = ColorSpinorField::Create(csParam);
 	r_pre = ColorSpinorField::Create(csParam);
@@ -169,9 +168,15 @@ namespace quda {
     }
 
     csParam.setPrecision(param.precision_sloppy);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
 
     ColorSpinorField *yp = ColorSpinorField::Create(csParam);
     ColorSpinorField *lp = ColorSpinorField::Create(csParam);
+
+    ColorSpinorField *rp_sloppy   = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : rp;
+    ColorSpinorField *tmpp_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : tmpp;
+    csParam.setPrecision(param.precision);
+    ColorSpinorField *xp_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : yp;
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &p = *pp;
@@ -186,9 +191,13 @@ namespace quda {
     ColorSpinorField &y = *yp;
     ColorSpinorField &l = *lp;
 
+    ColorSpinorField &r_sloppy = *rp_sloppy;
+    ColorSpinorField &x_sloppy = *xp_sloppy;
+
     ColorSpinorField &pPre = *p_pre;
     ColorSpinorField &rPre = *r_pre;
     ColorSpinorField &tmp  = *tmpp;
+    ColorSpinorField &tmp_sloppy  = *tmpp_sloppy;
 
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
@@ -201,6 +210,8 @@ namespace quda {
 
     mat(r, x, tmp); // => r = A*x;
     blas::xpay(b,-1.0, r);
+
+    r_sloppy = r;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
@@ -218,7 +229,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if(K) {
-      rPre = r;
+      rPre = r_sloppy;
 
       commGlobalReductionSet(false);
       (*K)(pPre, rPre);
@@ -228,13 +239,13 @@ namespace quda {
       blas::zero(m);
     } else {
       printfQuda("\nNo preconditioning...\n");
-      u = r;
+      u = r_sloppy;
     }
 
-    matSloppy(w, u, tmp); // => w = A*u;
+    matSloppy(w, u, tmp_sloppy); // => w = A*u;
 
     //Remark : no overlap here. 
-    gamma = blas::reDotProduct(r,u); 
+    gamma = blas::reDotProduct(r_sloppy,u); 
     delta = blas::reDotProduct(w,u);
     mNorm = blas::norm2(u);
 
@@ -277,7 +288,7 @@ namespace quda {
       m = w;
     }
     //
-    matSloppy(n, m, tmp);
+    matSloppy(n, m, tmp_sloppy);
 
     int j = 0;
 
@@ -303,7 +314,7 @@ namespace quda {
         gammajm1 = gamma;
 
         commGlobalReductionSet(false);//disable global reduction
-        local_reduce = MergedLocalReducer(y,alpha,p,u,r,s,m,beta,q,w,n,z);
+        local_reduce = MergedLocalReducer(y,alpha,p,u,r_sloppy,s,m,beta,q,w,n,z);
         commGlobalReductionSet(true);
 #ifdef USE_WORKER
         {
@@ -324,7 +335,7 @@ namespace quda {
           }        
           //
           dslash::aux_worker = &global_reduce;
-          matSloppy(n, m, tmp);
+          matSloppy(n, m, tmp_sloppy);
           dslash::aux_worker = nullptr;
 
           global_reduce.reset();
@@ -348,7 +359,7 @@ namespace quda {
             m = w;
           }
           //
-          matSloppy(n, m, tmp);
+          matSloppy(n, m, tmp_sloppy);
 #ifdef NONBLOCK_REDUCE//sync point
           comm_wait(allreduceHandle);
           memcpy(&local_reduce, recvbuff, (K ? 4 : 3)*sizeof(double));
@@ -357,11 +368,15 @@ namespace quda {
 #endif //end of USE_WORKER
         gamma_aux = local_reduce.w;//gamma, delta and mNorm are refs to local_reduce.[x|y|z]
      } else { //trigger reliable updates:
-        xpy(y,x);
+        printfQuda("Start relibale update..\n");
+        x_sloppy = y;
+        xpy(x_sloppy,x);
         zero(y);
 
         mat(r, x, tmp);
         xpay(b, -1.0, r);
+
+        r_sloppy = r;
 
         mNorm = norm2(r);
 
@@ -384,27 +399,34 @@ namespace quda {
         r0Norm = rNorm;
 
         if(K) {
+          rPre = r_sloppy;
+
           commGlobalReductionSet(false);
-          (*K)(u, r);
+          (*K)(pPre, rPre);
           commGlobalReductionSet(true);
+
+          u = pPre;
+          blas::zero(m);
         } else {
-          u = r;
+          u = r_sloppy;
         }
 
-        matSloppy(w, u, tmp);
-        matSloppy(s, p, tmp);
+        matSloppy(w, u, tmp_sloppy);
+        matSloppy(s, p, tmp_sloppy);
 
         zero(l);
 
         if(K) {
+          rPre = s;
           commGlobalReductionSet(false);
-          (*K)(q, s);
+          (*K)(pPre, rPre);
           commGlobalReductionSet(true);
+          q = pPre;
         } else {
           q = s;
         }
 
-        matSloppy(z, q, tmp);
+        matSloppy(z, q, tmp_sloppy);
       }
 
       j += 1;
@@ -428,7 +450,8 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residual 
-    xpy(y, x);
+    x_sloppy = y;
+    xpy(x_sloppy, x);
     mat(r, x, tmp);
     double true_res = blas::xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
@@ -442,6 +465,12 @@ namespace quda {
 
     delete lp;
     delete yp;
+
+    if (param.precision_sloppy != param.precision) {
+      delete rp_sloppy;
+      delete xp_sloppy;
+      delete tmpp_sloppy;
+    } 
 
     return;
   }

@@ -54,7 +54,7 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       if (x.Nspin() == 4) { //wilson
-#if 0//defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 	value = reduceCudaExp<doubleN,ReduceType,float4,float4,float4,M,Reducer,
 	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
