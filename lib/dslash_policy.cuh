@@ -1055,7 +1055,6 @@ struct DslashAsync : DslashPolicyImp {
 		*((volatile cuuint32_t*)(commsEnd_h+2*i+1-dir)) = 0;
 		CUDA_CALL(cuStreamWaitValue32( streams[2*i+dir], commsEnd_d[2*i+1-dir], 1, CU_STREAM_WAIT_VALUE_EQ ));
 		PROFILE(if (dslash_copy) inputSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir, &streams[2*i+dir]), profile, QUDA_PROFILE_SCATTER);
-		printfQuda("dim = %d dir=%d scheduled \n", i, dir);
 	      }
 	    }
 	  }
@@ -1411,7 +1410,7 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
 
     const int packIndex = getStreamIndex();
     PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*inputSpinor, dslash, 1-parity, Device, packIndex);
+    issuePack(*inputSpinor, dslash, 1-parity, Host, packIndex);
 
     PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     if (aux_worker) aux_worker->apply(streams[Nstream-1]);
@@ -1489,7 +1488,7 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
     inputSpinor->streamInit(streams);
     const int packIndex = getStreamIndex();
     PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-    issuePack(*inputSpinor, dslash, 1-parity, Device, packIndex);
+    issuePack(*inputSpinor, dslash, 1-parity, Host, packIndex);
 
     issueRecv(*inputSpinor, dslash, 0, true); // Prepost receives
 
