@@ -48,10 +48,7 @@ http://developer.nvidia.com/cuda-gpus
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
-appropriate value to QUDA's configure script.  For example, the Tesla
-C2075 is listed on the above website as having compute capability 2.0,
-and so to configure the library for this card, you'd run "configure
---enable-gpu-arch=sm_20 [other options]" before typing "make".
+appropriate value to the QUDA_GPU_ARCH variable in cmake. 
 
 As of QUDA 0.8.0, only devices of compute capability 2.0 or greater
 are supported.  See also "Known Issues" below.
@@ -117,11 +114,7 @@ should be set when configure is invoked, and "make fortran" must be
 run explicitly, since the Fortran interface modules are not built by
 default.
 
-As examples, the scripts "configure.milc.titan" and
-"configure.chroma.titan" are provided.  These configure QUDA for
-expected use with MILC and Chroma, respectively, on Titan (the Tesla
-K20X-powered Cray XK7 supercomputer at the Oak Ridge Leadership
-Computing Facility).
+
 
 Throughout the library, auto-tuning is used to select optimal launch
 parameters for most performance-critical kernels.  This tuning
