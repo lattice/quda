@@ -13,10 +13,6 @@ endif()
 set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in  ${DOXYGEN_OUT} @ONLY)
 
-find_package(Doxygen)
-
-message(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
-message(${DOXYGEN_OUT})
 add_custom_target(doc COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMENT "Generating doxygen documentation" VERBATIM)
 endif()
 endif()
