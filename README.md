@@ -71,37 +71,19 @@ You are most likely to want to specify the GPU architecture of the
 machine you are building for. Either configure QUDA_GPU_ARCH in step 3
 or specify e.g. -DQUDA_GPU_ARCH=sm_60 for a Pascal GPU in step 2.
 
+### Multi-GPU support
 
-## UPDATE OLD STUFF BELOW
+QUDA supports using multiple GPUs through MPI and QUDA.
+To enable multi-GPU support either set QUDA_MPI or QUDA_QMP to ON when configuring QUDA through cmake. 
 
-```
-Enabling multi-GPU support requires passing the --enable-multi-gpu flag
-to configure, as well as --with-mpi=<PATH> and optionally --with-
-qmp=<PATH>.  If the latter is given, QUDA will use QMP for
-communications; otherwise, MPI will be called directly.  By default, it
-is assumed that the MPI compiler wrappers are <MPI_PATH>/bin/mpicc and
-<MPI_PATH>/bin/mpicxx for C and C++, respectively.  These choices may be
-overriden by setting the CC and CXX variables on the command line as
-follows:
+Note that in any case cmake will automatically try to detect your MPI installation. If you need to specify a particular MPI please set MPI_C_COMPILER and MPI_CXX_COMPILER in cmake. 
+See also https://cmake.org/cmake/help/v3.9/module/FindMPI.html for more help.
 
-./configure --enable-multi-gpu --with-mpi=<MPI_PATH> \ [--with-
-qmp=<QMP_PATH>] [OTHER_OPTIONS] CC=my_mpicc CXX=my_mpicxx
+For QMP please set QUDA_QMP_HOME to the installation directory of QMP.
 
-Finally, with some MPI implementations, executables compiled against MPI
-will not run without "mpirun".  This has the side effect of causing the
-configure script to believe that the compiler is failing to produce a
-valid executable.  To skip these checks, one can trick configure into
-thinking that it's cross-compiling by setting the --build=none and
---host=<HOST> flags.  For the latter, "--host=x86_64-linux-gnu" should
-work on a 64-bit linux system.
+For more details see https://github.com/lattice/quda/wiki/Multi-GPU-Support
 
-By default only the QDP and MILC interfaces are enabled.  For
-interfacing support with QDPJIT, BQCD or CPS; this should be enabled at
-configure time with the appropriate flag, e.g., --enable-bqcd-interface.
-To keep compilation time to a minimum it is recommended to only enable
-those interfaces that are used by a given application.  The QDP and MILC
-interfaces can be disabled with the, e.g., --disable-milc-interface
-flag.
+### External dependencies
 
 The eigen-vector solvers (eigCG and incremental eigCG) require the
 installation of the MAGMA dense linear algebra package.  It is
@@ -114,17 +96,17 @@ Version 0.9.x of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
 CMake option -DQUDA_ARPACK=ON. Note that with a multi-gpu option, the
-build  system will automatically use PARPACK library. For GNU make build
-approach,  (P)ARPACK is enabled using the configure option --with-
-arpack=ARPACK_PATH.
+build  system will automatically use PARPACK library.
 
-If Fortran interface support is desired, the F90 environment variable
-should be set when configure is invoked, and "make fortran" must be run
-explicitly, since the Fortran interface modules are not built by
-default.
-```
+### Application Interfaces
 
+By default only the QDP and MILC interfaces are enabled.  For
+interfacing support with QDPJIT, BQCD or CPS; this should be enabled at
+by setting the corresponding QUDA_INTERFACE_<application> variable e.g., QUDA_INTERFACE_BQCD=ON.
+To keep compilation time to a minimum it is recommended to only enable
+those interfaces that are used by a given application.  
 
+## Tuning
 
 Throughout the library, auto-tuning is used to select optimal launch
 parameters for most performance-critical kernels.  This tuning process
