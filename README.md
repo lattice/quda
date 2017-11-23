@@ -1,0 +1,247 @@
+# QUDA 0.9.0                        
+
+## Overview
+
+QUDA is a library for performing calculations in lattice QCD on graphics
+processing units (GPUs), leveraging NVIDIA's CUDA platform. The current
+release includes optimized Dirac operators and solvers for the following
+fermion actions:
+
+* Wilson Clover-improved Wilson Twisted mass (including non-degenerate
+* pairs) Twisted mass with a clover term Staggered fermions Improved
+* staggered (asqtad or HISQ) Domain wall (4-d or 5-d preconditioned)
+* Mobius fermion
+
+Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
+GCR are provided, including robust mixed-precision variants supporting
+combinations of double, single, and half (16-bit "block floating point")
+precision.  The library also includes auxilliary routines necessary for
+Hybrid Monte Carlo, such as HISQ link fattening, force terms and clover-
+field construction.  Use of many GPUs in parallel is supported
+throughout, with communication handled by QMP or MPI.
+
+
+## Software Compatibility:
+
+The library has been tested under Linux (CentOS 5.8 and Ubuntu 14.04)
+using releases 7.5, 8.0 and 9.0 of the CUDA toolkit.  CUDA 7.0 and
+earlier are not supported (though they may continue to work fine). The
+library also works on recent 64-bit Intel-based Macs. 
+
+See also Known Issues below.
+
+
+## Hardware Compatibility:
+
+For a list of supported devices, see
+
+http://developer.nvidia.com/cuda-gpus
+
+Before building the library, you should determine the "compute
+capability" of your card, either from NVIDIA's documentation or by
+running the deviceQuery example in the CUDA SDK, and pass the
+appropriate value to the QUDA_GPU_ARCH variable in cmake.
+
+As of QUDA 0.8.0, only devices of compute capability 2.0 or greater are
+supported.  See also "Known Issues" below.
+
+
+## Installation:
+
+The recommended method for compiling QUDA is to use cmake, and build
+QUDA in a separate directory from the source directory.  For
+instructions on how to build QUDA using cmake see this page
+https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note that
+this requires cmake version 3.1 or later. You can obtain cmake from
+https://cmake.org/download/ On Linux the binary tar.gz archives unpack
+into a cmake directory and usually run fine from that directory.
+
+The basic steps for building cmake are: 
+
+1. Create a build dir, outside of the quda source directory. 
+2. In your build-dir run `cmake <path-to-quda-src>` 
+3. It is recommended to set options by calling `ccmake` in
+your build dir. Alternatively you can use the `-DVARIABLE=value`
+syntax in the previous step.
+4. run 'make -j <N>' to build with N
+parallel jobs. 
+5. Now is a good time to get a coffee.
+
+You are most likely to want to specify the GPU architecture of the
+machine you are building for. Either configure QUDA_GPU_ARCH in step 3
+or specify e.g. -DQUDA_GPU_ARCH=sm_60 for a Pascal GPU in step 2.
+
+
+## UPDATE OLD STUFF BELOW
+
+```
+Enabling multi-GPU support requires passing the --enable-multi-gpu flag
+to configure, as well as --with-mpi=<PATH> and optionally --with-
+qmp=<PATH>.  If the latter is given, QUDA will use QMP for
+communications; otherwise, MPI will be called directly.  By default, it
+is assumed that the MPI compiler wrappers are <MPI_PATH>/bin/mpicc and
+<MPI_PATH>/bin/mpicxx for C and C++, respectively.  These choices may be
+overriden by setting the CC and CXX variables on the command line as
+follows:
+
+./configure --enable-multi-gpu --with-mpi=<MPI_PATH> \ [--with-
+qmp=<QMP_PATH>] [OTHER_OPTIONS] CC=my_mpicc CXX=my_mpicxx
+
+Finally, with some MPI implementations, executables compiled against MPI
+will not run without "mpirun".  This has the side effect of causing the
+configure script to believe that the compiler is failing to produce a
+valid executable.  To skip these checks, one can trick configure into
+thinking that it's cross-compiling by setting the --build=none and
+--host=<HOST> flags.  For the latter, "--host=x86_64-linux-gnu" should
+work on a 64-bit linux system.
+
+By default only the QDP and MILC interfaces are enabled.  For
+interfacing support with QDPJIT, BQCD or CPS; this should be enabled at
+configure time with the appropriate flag, e.g., --enable-bqcd-interface.
+To keep compilation time to a minimum it is recommended to only enable
+those interfaces that are used by a given application.  The QDP and MILC
+interfaces can be disabled with the, e.g., --disable-milc-interface
+flag.
+
+The eigen-vector solvers (eigCG and incremental eigCG) require the
+installation of the MAGMA dense linear algebra package.  It is
+recommended that MAGMA 1.7.x is used, though versions are 1.5.x and
+1.6.x should work.  MAGMA is available from
+http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
+configure option --with-magma=MAGMA_PATH.
+
+Version 0.9.x of QUDA includes interface for the external (P)ARPACK
+library for eigenvector computing. (P)ARPACK is available, e.g., from
+https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
+CMake option -DQUDA_ARPACK=ON. Note that with a multi-gpu option, the
+build  system will automatically use PARPACK library. For GNU make build
+approach,  (P)ARPACK is enabled using the configure option --with-
+arpack=ARPACK_PATH.
+
+If Fortran interface support is desired, the F90 environment variable
+should be set when configure is invoked, and "make fortran" must be run
+explicitly, since the Fortran interface modules are not built by
+default.
+```
+
+
+
+Throughout the library, auto-tuning is used to select optimal launch
+parameters for most performance-critical kernels.  This tuning process
+takes some time and will generally slow things down the first time a
+given kernel is called during a run.  To avoid this one-time overhead in
+subsequent runs (using the same action, solver, lattice volume, etc.),
+the optimal parameters are cached to disk.  For this to work, the
+QUDA_RESOURCE_PATH environment variable must be set, pointing to a
+writable directory.  Note that since the tuned parameters are hardware-
+specific, this "resource directory" should not be shared between jobs
+running on different systems (e.g., two clusters with different GPUs
+installed).  Attempting to use parameters tuned for one card on a
+different card may lead to unexpected errors.
+
+This autotuning information can also be used to build up a first-order
+kernel profile: since the autotuner measures how long a kernel takes to
+run, if we simply keep track of the number of kernel calls, from the
+product of these two quantities we have a time profile of a given job
+run.  If QUDA_RESOURCE_PATH is set, then this profiling information is
+output to the file "profile.tsv" in this specified directory.
+Optionally, the output filename can be specified using the
+QUDA_PROFILE_OUTPUT environment variable, to avoid overwriting
+previously generated profile outputs.
+
+## Using the Library:
+
+Include the header file include/quda.h in your application, link against
+lib/libquda.a, and study tests/invert_test.cpp (for Wilson, clover,
+twisted-mass, or domain wall fermions) or
+tests/staggered_invert_test.cpp (for asqtad/HISQ fermions) for examples
+of the solver interface.  The various solver options are enumerated in
+include/enum_quda.h.
+
+
+## Known Issues:
+
+* For compatibility with CUDA, on 32-bit platforms the library is
+compiled with the GCC option -malign-double.  This differs from the
+GCC default and may affect the alignment of various structures,
+notably those of type QudaGaugeParam and QudaInvertParam, defined in
+quda.h.  Therefore, any code to be linked against QUDA should also   be
+compiled with this option.
+
+* When the auto-tuner is active in a multi-GPU run it may cause issues
+with binary reproducibility of this run. This is caused by the
+possibility of different launch configurations being used on   different
+GPUs in the tuning run. If binary reproducibility is   strictly required
+make sure that a run with active tuning has   completed. This will
+ensure that the same launch configurations for   a given Kernel is used
+on all GPUs and binary reproducibility.
+
+## Getting Help:
+
+Please visit http://lattice.github.com/quda for contact information. Bug
+reports are especially welcome.
+
+
+## Acknowledging QUDA:
+
+If you find this software useful in your work, please cite:
+
+M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
+Lattice QCD systems of equations using mixed precision solvers on GPUs,"
+Comput. Phys. Commun. 181, 1517 (2010) [arXiv:0911.3191 [hep-lat]].
+
+When taking advantage of multi-GPU support, please also cite:
+
+R. Babich, M. A. Clark, B. Joo, G. Shi, R. C. Brower, and S. Gottlieb,
+"Scaling lattice QCD beyond 100 GPUs," International Conference for High
+Performance Computing, Networking, Storage and Analysis (SC), 2011
+[arXiv:1109.2935 [hep-lat]].
+
+Several other papers that might be of interest are listed at
+http://lattice.github.com/quda .
+
+
+## Authors:
+
+*  Ronald Babich (NVIDIA)
+*  Simone Bacchio (Cyprus)
+*  Michael Baldhauf (Regensburg)
+*  Kipton Barros (Los Alamos National Laboratory)
+*  Richard Brower (Boston University) 
+*  Nuno Cardoso (NCSA) 
+*  Kate Clark (NVIDIA)
+*  Michael Cheng (Boston University)
+*  Carleton DeTar (Utah University)
+*  Justin Foley (NIH) 
+*  Joel Giedt (Rensselaer Polytechnic Institute) 
+*  Arjun Gambhir (William and Mary)
+*  Steven Gottlieb (Indiana University) 
+*  Kyriakos Hadjiyiannakou (Cyprus)
+*  Dean Howarth (Rensselaer Polytechnic Institute)
+*  Balint Joo (Jefferson Laboratory)
+*  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
+*  Bartek Kostrzewa (Bonn)
+*  Claudio Rebbi (Boston University) 
+*  Guochun Shi (NCSA) 
+*  Hauke Sandmeyer (Bielefeld)
+*  Mario Schröck (INFN)
+*  Alexei Strelchenko (Fermi National Accelerator Laboratory)
+*  Alejandro Vaquero (INFN Sezione Milano Bicocca) 
+*  Mathias Wagner (NVIDIA)
+*  Evan Weinberg (Boston University)
+*  Frank Winter (Jlab)
+
+
+Portions of this software were developed at the Innovative Systems Lab,
+National Center for Supercomputing Applications
+http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html
+
+Development was supported in part by the U.S. Department of Energy under
+grants DE-FC02-06ER41440, DE-FC02-06ER41449, and DE-AC05-06OR23177; the
+National Science Foundation under grants DGE-0221680, PHY-0427646,
+PHY-0835713, OCI-0946441, and OCI-1060067; as well as the PRACE project
+funded in part by the EUs 7th Framework Programme (FP7/2007-2013) under
+grants RI-211528 and FP7-261557.  Any opinions, findings, and
+conclusions or recommendations expressed in this material are those of
+the authors and do not necessarily reflect the views of the Department
+of Energy, the National Science Foundation, or the PRACE project.
