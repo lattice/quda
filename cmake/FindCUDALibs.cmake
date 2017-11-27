@@ -148,7 +148,7 @@ macro(cuda_find_library_local_first_with_path_ext _var _names _doc _path_ext )
     DOC ${_doc}
     NO_DEFAULT_PATH
     )
-  message(${${_var}})
+
   if (NOT CMAKE_CROSSCOMPILING)
     # Search default search paths, after we search our own set of paths.
     find_library(${_var}
