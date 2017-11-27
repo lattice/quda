@@ -23,8 +23,7 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>
-#include <thrust/device_ptr.h>
-#include <thrust/transform_reduce.h>
+#include <thrust_helper.cuh>
 
 namespace quda {
 
@@ -246,207 +245,14 @@ namespace quda {
     };
 
 
-    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat=Float>
-      class FieldOrderCB {
+    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,char>() { return true; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
+    template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
 
-    protected:
-      complex<Float> *v;
-      mutable complex<Float> *ghost[8];
-      mutable int x[QUDA_MAX_DIM];
-      const int volumeCB;
-      const int nDim;
-      const QudaGammaBasis gammaBasis;
-      const AccessorCB<Float,nSpin,nColor,nVec,order> accessor;
-      const GhostAccessorCB<Float,nSpin,nColor,nVec,order> ghostAccessor;
-      const int siteSubset;
-      const int nParity;
-      const QudaFieldLocation location;
-
-    public:
-      /** 
-       * Constructor for the FieldOrderCB class
-       * @param field The field that we are accessing
-       */
-    FieldOrderCB(const ColorSpinorField &field, int nFace=1, void *v_=0, void **ghost_=0)
-      : v(v_? static_cast<complex<Float>*>(const_cast<void*>(v_))
-	  : static_cast<complex<Float>*>(const_cast<void*>(field.V()))),
-        volumeCB(field.VolumeCB()),
-	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
-	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
-	location(field.Location()), accessor(field), ghostAccessor(field,nFace)
-      { 
-	for (int d=0; d<4; d++) {
-	  void * const *_ghost = ghost_ ? ghost_ : field.Ghost();
-	  ghost[2*d+0] = static_cast<complex<Float>*>(_ghost[2*d+0]);
-	  ghost[2*d+1] = static_cast<complex<Float>*>(_ghost[2*d+1]);
-	}
-
-	for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
-      }
-
-      /**
-       * Destructor for the FieldOrderCB class
-       */
-      virtual ~FieldOrderCB() { ; }
-
-      void resetGhost(void * const *ghost_) const
-      {
-	for (int d=0; d<4; d++) {
-	  ghost[2*d+0] = static_cast<complex<Float>*>(ghost_[2*d+0]);
-	  ghost[2*d+1] = static_cast<complex<Float>*>(ghost_[2*d+1]);
-	}
-      }
-
-      /**
-	 Dummy function for floating point field
-      */
-      void resetScale(double max) { }
-
-      /**
-       * Read-only complex-member accessor function.  The last
-       * parameter n is only used for indexed into the packed
-       * null-space vectors.
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param v vector number
-       */
-      __device__ __host__ inline const complex<Float>& operator()(int parity, int x_cb, int s, int c, int n=0) const
-      { return v[accessor.index(parity,x_cb,s,c,n)]; }
-
-      /**
-       * Writable complex-member accessor function.  The last
-       * parameter n is only used for indexed into the packed
-       * null-space vectors.
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param v vector number
-       */
-    __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c, int n=0)
-      { return v[accessor.index(parity,x_cb,s,c,n)]; }
-
-      /**
-       * Read-only complex-member accessor function for the ghost
-       * zone.  The last parameter n is only used for indexed into the
-       * packed null-space vectors.
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param v vector number
-       */
-      __device__ __host__ inline const complex<Float>& Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
-      {	return ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]; }
-
-      /**
-       * Writable complex-member accessor function for the ghost zone.
-       * The last parameter n is only used for indexed into the packed
-       * null-space vectors.
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param n vector number
-       */
-      __device__ __host__ inline complex<Float>& Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0)
-      { return ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]; }
-
-      /**
-	 Convert from 1-dimensional index to the n-dimensional spatial index.
-	 With full fields, we assume that the field is even-odd ordered.  The
-	 lattice coordinates that are computed here are full-field
-	 coordinates.
-      */
-      __device__ __host__ inline void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
-
-	for (int d=0; d<nDim; d++) {
-	  y[d] = i % x[d];
-	  i /= x[d];
-	}
-	int parity = i; // parity is the slowest running dimension
-
-	// convert into the full-field lattice coordinate
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	  for (int d=1; d<nDim; d++) parity += y[d];
-	  parity = parity & 1;
-	  x[0] *= 2; // restore x[0]
-	}
-	y[0] = 2*y[0] + parity;  // compute the full x coordinate
-      }
-
-      /**
-	 Convert from n-dimensional spatial index to the 1-dimensional index.
-	 With full fields, we assume that the field is even-odd ordered.  The
-	 input lattice coordinates are always full-field coordinates.
-      */
-      __device__ __host__ inline void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
-	int parity = 0;
-	int savey0 = y[0];
-
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	  for (int d=0; d<nDim; d++) parity += y[d];
-	  parity = parity & 1;
-	  y[0] /= 2;
-	  x[0] /= 2;
-	}
-
-	i = parity;
-	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
-
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	  //y[0] = 2*y[0] + parity;
-	  y[0] = savey0;
-	  x[0] *= 2; // restore x[0]
-	}
-      }
-
-      /** Return the length of dimension d */
-      __device__ __host__ inline int X(int d) const { return x[d]; }
-
-      /** Return the length of dimension d */
-      __device__ __host__ inline const int* X() const { return x; }
-
-      /** Returns the number of field colors */
-       __device__ __host__ inline int Ncolor() const { return nColor; }
-
-      /** Returns the number of field spins */
-      __device__ __host__ inline int Nspin() const { return nSpin; }
-
-      /** Returns the number of field parities (1 or 2) */
-      __device__ __host__ inline int Nparity() const { return nParity; }
-
-      /** Returns the field volume */
-      __device__ __host__ inline int VolumeCB() const { return volumeCB; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ inline int Ndim() const { return nDim; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
-
-      /** Returns the number of packed vectors (for mg prolongator) */
-      __device__ __host__ inline int Nvec() const { return nVec; }
-
-      /**
-       * Returns the L2 norm squared of the field in a given dimension
-       * @return L2 norm squared
-      */
-      __host__ double norm2() const {
-	double nrm2 = 0;
-	if (location == QUDA_CUDA_FIELD_LOCATION) {
-	  thrust::device_ptr<complex<Float> > ptr(v);
-	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,Float>(0.0), 0.0, thrust::plus<double>());
-	} else {
-	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,Float>(0.0), 0.0, thrust::plus<double>());
-	}
-	comm_allreduce(&nrm2);
-	return nrm2;
-      }
-
-      size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(Float); }
-    };
+    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
+    template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
+    template<> __host__ __device__ inline constexpr bool match<short,short>() { return true; }
 
     /**
        @brief fieldorder_wrapper is an internal class that is used to
@@ -461,6 +267,7 @@ namespace quda {
 	const int idx;
 	const Float scale;
 	const Float scale_inv;
+	static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
 	/**
 	   @brief fieldorder_wrapper constructor
@@ -469,38 +276,75 @@ namespace quda {
         __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
 	  : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
 
-	__device__ __host__ inline Float real() const { return scale_inv*static_cast<Float>(v[idx].real()); }
-	__device__ __host__ inline Float imag() const { return scale_inv*static_cast<Float>(v[idx].imag()); }
+	__device__ __host__ inline Float real() const {
+	  if (!fixed) {
+	    return v[idx].real();
+	  } else {
+	    return scale_inv*static_cast<Float>(v[idx].real());
+	  }
+	}
+
+	__device__ __host__ inline Float imag() const {
+	  if (!fixed) {
+	    return v[idx].imag();
+	  } else {
+	    return scale_inv*static_cast<Float>(v[idx].imag());
+	  }
+	}
+
+	__device__ __host__ inline void real(const Float &a) {
+	  if (!fixed) {
+	    v[idx].real(storeFloat(a));
+	  } else { // we need to scale and then round
+	    v[idx].real(storeFloat(round(scale * a)));
+	  }
+	}
+	__device__ __host__ inline void imag(const Float &a) {
+	  if (!fixed) {
+	    v[idx].imag(storeFloat(a));
+	  } else { // we need to scale and then round
+	    v[idx].imag(storeFloat(round(scale * a)));
+	  }
+	}
 
 	/**
 	   @brief Assignment operator with fieldorder_wrapper instance as input
 	   @param a fieldorder_wrapper we are copying from
 	*/
 	__device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a) {
-	  v[idx] = complex<storeFloat>(round(scale * a.real()), round(scale * a.imag()));
+	  v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
 	}
 
 	/**
 	   @brief Assignment operator with complex number instance as input
 	   @param a Complex number we want to store in this accessor
 	*/
-	__device__ __host__ inline void operator=(const complex<Float> &a) {
-	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
+        template<typename theirFloat>
+	__device__ __host__ inline void operator=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
 	    v[idx] = complex<storeFloat>(a.x, a.y);
-	  } else { // we need to scale and then round
-	    v[idx] = complex<storeFloat>(round(scale * a.x), round(scale * a.y));
+	  } else {
+	    v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
 	  }
 	}
+
+	/**
+	   @brief Assignment operator with real number instance as input
+	   @param a real number we want to store in this accessor
+	*/
+        template<typename theirFloat>
+	__device__ __host__ inline void operator=(const theirFloat &a) { *this = complex<theirFloat>(a,static_cast<theirFloat>(0.0)); }
 
 	/**
 	   @brief Operator+= with complex number instance as input
 	   @param a Complex number we want to add to this accessor
 	*/
-	__device__ __host__ inline void operator+=(const complex<Float> &a) {
-	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
+        template<typename theirFloat>
+	__device__ __host__ inline void operator+=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
 	    v[idx] += complex<storeFloat>(a.x, a.y);
-	  } else { // we need to scale and then round
-	    v[idx] += complex<storeFloat>(round(scale * a.x), round(scale * a.y));
+	  } else {
+	    v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
 	  }
 	}
 
@@ -508,26 +352,24 @@ namespace quda {
 	   @brief Operator-= with complex number instance as input
 	   @param a Complex number we want to subtract from this accessor
 	*/
-	__device__ __host__ inline void operator-=(const complex<Float> &a) {
-	  if (sizeof(storeFloat) == sizeof(Float)) { // store type matches input type
+	template<typename theirFloat>
+	__device__ __host__ inline void operator-=(const complex<theirFloat> &a) {
+	  if (match<storeFloat,theirFloat>()) {
 	    v[idx] -= complex<storeFloat>(a.x, a.y);
-	  } else { // we need to scale and then round
-	    v[idx] -= complex<storeFloat>(round(scale * a.x), round(scale * a.y));
+	  } else {
+	    v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
 	  }
 	}
+
       };
 
 
-    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
-      class FieldOrderCB<Float,nSpin,nColor,nVec,order,short> {
-
-      typedef short storeFloat;
+    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat=Float>
+      class FieldOrderCB {
 
     protected:
       complex<storeFloat> *v;
       mutable complex<storeFloat> *ghost[8];
-      Float scale;
-      Float scale_inv;
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
@@ -537,6 +379,9 @@ namespace quda {
       const int siteSubset;
       const int nParity;
       const QudaFieldLocation location;
+      Float scale;
+      Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
     public:
       /**
@@ -549,18 +394,12 @@ namespace quda {
         volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()),
 	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
-	location(field.Location()), accessor(field), ghostAccessor(field,nFace)
+        location(field.Location()), accessor(field), ghostAccessor(field,nFace),
+        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
-	for (int d=0; d<4; d++) {
-	  void * const *_ghost = ghost_ ? ghost_ : field.Ghost();
-	  ghost[2*d+0] = static_cast<complex<storeFloat>*>(_ghost[2*d+0]);
-	  ghost[2*d+1] = static_cast<complex<storeFloat>*>(_ghost[2*d+1]);
-	}
-
 	for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
-
-	scale = static_cast<Float>(MAX_SHORT / field.Scale());
-	scale_inv = static_cast<Float>(field.Scale() / MAX_SHORT);
+	resetGhost(ghost_ ? ghost_ : field.Ghost());
+	resetScale(field.Scale());
       }
 
       /**
@@ -576,9 +415,11 @@ namespace quda {
 	}
       }
 
-      void resetScale(double max) {
-	scale = static_cast<Float>(MAX_SHORT / max);
-	scale_inv = static_cast<Float>(max / MAX_SHORT);
+      void resetScale(Float max) {
+	if (fixed) {
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
       }
 
       /**
@@ -592,8 +433,12 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
       {
-	complex<short> tmp = v[accessor.index(parity,x_cb,s,c,n)];
-	return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	if (!fixed) {
+	  return complex<Float>(v[accessor.index(parity,x_cb,s,c,n)]);
+	} else {
+	  complex<storeFloat> tmp = v[accessor.index(parity,x_cb,s,c,n)];
+	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	}
       }
 
       /**
@@ -619,8 +464,12 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
       {
-	complex<short> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
-	return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	if (!fixed) {
+	  return complex<Float>(ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]);
+	} else {
+	  complex<storeFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
+	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	}
       }
 
       /**
@@ -1436,7 +1285,31 @@ namespace quda {
 
   } // namespace colorspinor
 
-    // Use traits to reduce the template explosion
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline void complex<double>::operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
+
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline void complex<float>::operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
+
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline complex<double>::complex(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
+
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline complex<float>::complex(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
+
+  // Use traits to reduce the template explosion
   template<typename T,int Ns, int Nc> struct colorspinor_mapper { };
   
   // double precision

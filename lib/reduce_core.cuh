@@ -259,11 +259,8 @@ doubleN reduceCuda(const double2 &a, const double2 &b,
 
 /**
    Generic reduce kernel with four loads and up to four stores.
-   FIXME - this is hacky due to the lack of std::complex support in
-   CUDA.  The functors are defined in terms of FloatN vectors, whereas
-   the operator() accessor returns std::complex<Float>
   */
-template <typename ReduceType, typename Float2, int writeX, int writeY, int writeZ,
+template <typename ReduceType, typename Float, int writeX, int writeY, int writeZ,
   int writeW, int writeV, typename SpinorX, typename SpinorY, typename SpinorZ,
   typename SpinorW, typename SpinorV, typename Reducer>
 ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer r) {
@@ -276,17 +273,17 @@ ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV
       r.pre();
       for (int s=0; s<X.Nspin(); s++) {
 	for (int c=0; c<X.Ncolor(); c++) {
-	  Float2 X2 = make_Float2<Float2>( X(parity, x, s, c) );
-	  Float2 Y2 = make_Float2<Float2>( Y(parity, x, s, c) );
-	  Float2 Z2 = make_Float2<Float2>( Z(parity, x, s, c) );
-	  Float2 W2 = make_Float2<Float2>( W(parity, x, s, c) );
-	  Float2 V2 = make_Float2<Float2>( V(parity, x, s, c) );
-	  r(sum, X2, Y2, Z2, W2, V2);
-	  if (writeX) X(parity, x, s, c) = make_Complex(X2);
-	  if (writeY) Y(parity, x, s, c) = make_Complex(Y2);
-	  if (writeZ) Z(parity, x, s, c) = make_Complex(Z2);
-	  if (writeW) W(parity, x, s, c) = make_Complex(W2);
-	  if (writeV) V(parity, x, s, c) = make_Complex(V2);
+	  complex<Float> X_ = X(parity, x, s, c);
+	  complex<Float> Y_ = Y(parity, x, s, c);
+	  complex<Float> Z_ = Z(parity, x, s, c);
+	  complex<Float> W_ = W(parity, x, s, c);
+	  complex<Float> V_ = V(parity, x, s, c);
+	  r(sum, X_, Y_, Z_, W_, V_);
+	  if (writeX) X(parity, x, s, c) = X_;
+	  if (writeY) Y(parity, x, s, c) = Y_;
+	  if (writeZ) Z(parity, x, s, c) = Z_;
+	  if (writeW) W(parity, x, s, c) = W_;
+	  if (writeV) V(parity, x, s, c) = V_;
 	}
       }
       r.post(sum);
@@ -306,8 +303,7 @@ template <typename ReduceType, typename Float, typename zFloat, int nSpin, int n
 			   ColorSpinorField &w, ColorSpinorField &v, R r) {
   colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Y(y), W(w), V(v);
   colorspinor::FieldOrderCB<zFloat,nSpin,nColor,1,order> Z(z);
-  typedef typename vector<zFloat,2>::type Float2;
-  return genericReduce<ReduceType,Float2,writeX,writeY,writeZ,writeW,writeV>(X, Y, Z, W, V, r);
+  return genericReduce<ReduceType,zFloat,writeX,writeY,writeZ,writeW,writeV>(X, Y, Z, W, V, r);
 }
 
 template <typename ReduceType, typename Float, typename zFloat, int nSpin, QudaFieldOrder order,
