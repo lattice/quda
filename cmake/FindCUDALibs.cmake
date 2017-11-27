@@ -99,7 +99,7 @@ endif()
 
 # Always set this convenience variable
 set(CUDA_VERSION_STRING "${CUDA_VERSION}")
-
+get_filename_component(cuda_dir "${CMAKE_CUDA_COMPILER}" DIRECTORY)
 
 macro(cuda_unset_include_and_libraries)
   unset(CUDA_cublas_LIBRARY CACHE)
@@ -117,17 +117,17 @@ macro(cuda_unset_include_and_libraries)
   unset(CUDA_nvcuvid_LIBRARY CACHE)
 endmacro()
 
-# Check to see if the CUDA_TOOLKIT_ROOT_DIR and CUDA_SDK_ROOT_DIR have changed,
-# if they have then clear the cache variables, so that will be detected again.
-if(NOT "${CUDA_TOOLKIT_ROOT_DIR}" STREQUAL "${CUDA_TOOLKIT_ROOT_DIR_INTERNAL}")
-  unset(CUDA_TOOLKIT_TARGET_DIR CACHE)
-  unset(CUDA_NVCC_EXECUTABLE CACHE)
-  cuda_unset_include_and_libraries()
-endif()
+# # Check to see if the CUDA_TOOLKIT_ROOT_DIR and CUDA_SDK_ROOT_DIR have changed,
+# # if they have then clear the cache variables, so that will be detected again.
+# if(NOT "${CUDA_TOOLKIT_ROOT_DIR}" STREQUAL "${CUDA_TOOLKIT_ROOT_DIR_INTERNAL}")
+#   unset(CUDA_TOOLKIT_TARGET_DIR CACHE)
+#   unset(CUDA_NVCC_EXECUTABLE CACHE)
+#   cuda_unset_include_and_libraries()
+# endif()
 
-if(NOT "${CUDA_TOOLKIT_TARGET_DIR}" STREQUAL "${CUDA_TOOLKIT_TARGET_DIR_INTERNAL}")
-  cuda_unset_include_and_libraries()
-endif()
+# if(NOT "${CUDA_TOOLKIT_TARGET_DIR}" STREQUAL "${CUDA_TOOLKIT_TARGET_DIR_INTERNAL}")
+#   cuda_unset_include_and_libraries()
+# endif()
 
 macro(cuda_find_library_local_first_with_path_ext _var _names _doc _path_ext )
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -140,13 +140,15 @@ macro(cuda_find_library_local_first_with_path_ext _var _names _doc _path_ext )
   # (lib/Win32) and the old path (lib).
   find_library(${_var}
     NAMES ${_names}
-    PATHS "${CUDA_TOOLKIT_TARGET_DIR}" "${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}"
-    ENV CUDA_PATH
-    ENV CUDA_LIB_PATH
-    PATH_SUFFIXES ${_cuda_64bit_lib_dir} "lib" "lib64" "${_path_ext}lib/Win32" "${_path_ext}lib" "${_path_ext}libWin32"
+    PATHS  ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} "${cuda_dir}/.."
+    # PATHS "${CUDA_TOOLKIT_TARGET_DIR}" "${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}"
+    #ENV CUDA_PATH
+    #ENV CUDA_LIB_PATH
+    PATH_SUFFIXES ${_cuda_64bit_lib_dir}  "lib" "lib64" "${_path_ext}lib/Win32" "${_path_ext}lib" "${_path_ext}libWin32"
     DOC ${_doc}
     NO_DEFAULT_PATH
     )
+  message(${${_var}})
   if (NOT CMAKE_CROSSCOMPILING)
     # Search default search paths, after we search our own set of paths.
     find_library(${_var}
@@ -168,67 +170,67 @@ macro(find_cuda_helper_libs _name)
   mark_as_advanced(CUDA_${_name}_LIBRARY)
 endmacro()
 
-# Search for the cuda distribution.
-if(NOT CUDA_TOOLKIT_ROOT_DIR AND NOT CMAKE_CROSSCOMPILING)
-  # Search in the CUDA_BIN_PATH first.
+# # Search for the cuda distribution.
+# if(NOT CUDA_TOOLKIT_ROOT_DIR AND NOT CMAKE_CROSSCOMPILING)
+#   # Search in the CUDA_BIN_PATH first.
 
-  get_filename_component(cuda_dir "${CMAKE_CUDA_COMPILER}" DIRECTORY)
+#   
 
 
-  find_path(CUDA_TOOLKIT_ROOT_DIR
-    NAMES nvcc nvcc.exe
-    PATHS "${cuda_dir}"
-      ENV CUDA_TOOLKIT_ROOT
-      ENV CUDA_PATH
-      ENV CUDA_BIN_PATH
-    PATH_SUFFIXES bin bin64
-    DOC "CUDA Toolkit location."
-    NO_DEFAULT_PATH
-    )
+#   find_path(CUDA_TOOLKIT_ROOT_DIR
+#     NAMES nvcc nvcc.exe
+#     PATHS "${cuda_dir}"
+#       ENV CUDA_TOOLKIT_ROOT
+#       ENV CUDA_PATH
+#       ENV CUDA_BIN_PATH
+#     PATH_SUFFIXES bin bin64
+#     DOC "CUDA Toolkit location."
+#     NO_DEFAULT_PATH
+#     )
 
-   if (CUDA_TOOLKIT_ROOT_DIR)
-    string(REGEX REPLACE "[/\\\\]?bin[64]*[/\\\\]?$" "" CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT_DIR})
-    # We need to force this back into the cache.
-    set(CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT_DIR} CACHE PATH "Toolkit location." FORCE)
-    set(CUDA_TOOLKIT_TARGET_DIR ${CUDA_TOOLKIT_ROOT_DIR})
-    set(CUDA_TOOLKIT_ROOT_DIR_INTERNAL "${CUDA_TOOLKIT_ROOT_DIR}" CACHE INTERNAL
-  "This is the value of the last time CUDA_TOOLKIT_ROOT_DIR was set successfully." FORCE)
-set(CUDA_TOOLKIT_TARGET_DIR_INTERNAL "${CUDA_TOOLKIT_TARGET_DIR}" CACHE INTERNAL
-  "This is the value of the last time CUDA_TOOLKIT_TARGET_DIR was set successfully." FORCE)
-  endif()
+#    if (CUDA_TOOLKIT_ROOT_DIR)
+#     string(REGEX REPLACE "[/\\\\]?bin[64]*[/\\\\]?$" "" CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT_DIR})
+#     # We need to force this back into the cache.
+#     set(CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT_DIR} CACHE PATH "Toolkit location." FORCE)
+#     set(CUDA_TOOLKIT_TARGET_DIR ${CUDA_TOOLKIT_ROOT_DIR})
+#     set(CUDA_TOOLKIT_ROOT_DIR_INTERNAL "${CUDA_TOOLKIT_ROOT_DIR}" CACHE INTERNAL
+#   "This is the value of the last time CUDA_TOOLKIT_ROOT_DIR was set successfully." FORCE)
+# set(CUDA_TOOLKIT_TARGET_DIR_INTERNAL "${CUDA_TOOLKIT_TARGET_DIR}" CACHE INTERNAL
+#   "This is the value of the last time CUDA_TOOLKIT_TARGET_DIR was set successfully." FORCE)
+#   endif()
 
-  if (NOT EXISTS ${CUDA_TOOLKIT_ROOT_DIR})
-    if(CUDA_FIND_REQUIRED)
-      message(FATAL_ERROR "Specify CUDA_TOOLKIT_ROOT_DIR")
-    elseif(NOT CUDA_FIND_QUIETLY)
-      message("CUDA_TOOLKIT_ROOT_DIR not found or specified")
-    endif()
-  endif ()
-endif()
+#   if (NOT EXISTS ${CUDA_TOOLKIT_ROOT_DIR})
+#     if(CUDA_FIND_REQUIRED)
+#       message(FATAL_ERROR "Specify CUDA_TOOLKIT_ROOT_DIR")
+#     elseif(NOT CUDA_FIND_QUIETLY)
+#       message("CUDA_TOOLKIT_ROOT_DIR not found or specified")
+#     endif()
+#   endif ()
+# endif()
 
-if(CMAKE_CROSSCOMPILING)
-  SET (CUDA_TOOLKIT_ROOT $ENV{CUDA_TOOLKIT_ROOT})
-  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "armv7-a")
-    # Support for NVPACK
-    set (CUDA_TOOLKIT_TARGET_NAME "armv7-linux-androideabi")
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
-    # Support for arm cross compilation
-    set(CUDA_TOOLKIT_TARGET_NAME "armv7-linux-gnueabihf")
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    # Support for aarch64 cross compilation
-    if (ANDROID_ARCH_NAME STREQUAL "arm64")
-      set(CUDA_TOOLKIT_TARGET_NAME "aarch64-linux-androideabi")
-    else()
-      set(CUDA_TOOLKIT_TARGET_NAME "aarch64-linux")
-    endif (ANDROID_ARCH_NAME STREQUAL "arm64")
-  endif()
+# if(CMAKE_CROSSCOMPILING)
+#   SET (CUDA_TOOLKIT_ROOT $ENV{CUDA_TOOLKIT_ROOT})
+#   if(CMAKE_SYSTEM_PROCESSOR STREQUAL "armv7-a")
+#     # Support for NVPACK
+#     set (CUDA_TOOLKIT_TARGET_NAME "armv7-linux-androideabi")
+#   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+#     # Support for arm cross compilation
+#     set(CUDA_TOOLKIT_TARGET_NAME "armv7-linux-gnueabihf")
+#   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+#     # Support for aarch64 cross compilation
+#     if (ANDROID_ARCH_NAME STREQUAL "arm64")
+#       set(CUDA_TOOLKIT_TARGET_NAME "aarch64-linux-androideabi")
+#     else()
+#       set(CUDA_TOOLKIT_TARGET_NAME "aarch64-linux")
+#     endif (ANDROID_ARCH_NAME STREQUAL "arm64")
+#   endif()
 
-  if (EXISTS "${CUDA_TOOLKIT_ROOT}/targets/${CUDA_TOOLKIT_TARGET_NAME}")
-    set(CUDA_TOOLKIT_TARGET_DIR "${CUDA_TOOLKIT_ROOT}/targets/${CUDA_TOOLKIT_TARGET_NAME}" CACHE PATH "CUDA Toolkit target location.")
-    SET (CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT})
-    mark_as_advanced(CUDA_TOOLKIT_TARGET_DIR)
-  endif()
-endif()
+#   if (EXISTS "${CUDA_TOOLKIT_ROOT}/targets/${CUDA_TOOLKIT_TARGET_NAME}")
+#     set(CUDA_TOOLKIT_TARGET_DIR "${CUDA_TOOLKIT_ROOT}/targets/${CUDA_TOOLKIT_TARGET_NAME}" CACHE PATH "CUDA Toolkit target location.")
+#     SET (CUDA_TOOLKIT_ROOT_DIR ${CUDA_TOOLKIT_ROOT})
+#     mark_as_advanced(CUDA_TOOLKIT_TARGET_DIR)
+#   endif()
+# endif()
 
 # CUPTI library showed up in cuda toolkit 4.0
 if(NOT CUDA_VERSION VERSION_LESS "4.0")
