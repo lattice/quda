@@ -101,7 +101,7 @@ endif()
 set(CUDA_VERSION_STRING "${CUDA_VERSION}")
 get_filename_component(cuda_dir "${CMAKE_CUDA_COMPILER}" DIRECTORY)
 
-macro(cuda_unset_include_and_libraries)
+macro(cuda_unset_libraries)
   unset(CUDA_cublas_LIBRARY CACHE)
   unset(CUDA_cublas_device_LIBRARY CACHE)
   unset(CUDA_cufft_LIBRARY CACHE)
@@ -116,6 +116,11 @@ macro(cuda_unset_include_and_libraries)
   unset(CUDA_nvcuvenc_LIBRARY CACHE)
   unset(CUDA_nvcuvid_LIBRARY CACHE)
 endmacro()
+
+if(NOT "${QUDA_CUDA_DIR_INTERNAL}" STREQUAL "${cuda_dir}")
+  cuda_unset_libraries()
+endif()
+
 
 # # Check to see if the CUDA_TOOLKIT_ROOT_DIR and CUDA_SDK_ROOT_DIR have changed,
 # # if they have then clear the cache variables, so that will be detected again.
@@ -263,3 +268,6 @@ if(NOT CUDA_VERSION VERSION_LESS "7.0")
   # cusolver showed up in version 7.0
   find_cuda_helper_libs(cusolver)
 endif()
+
+set(QUDA_CUDA_DIR_INTERNAL "${cuda_dir}" CACHE INTERNAL
+  "This is the value of the last time cuda_dir was set successfully." FORCE)
