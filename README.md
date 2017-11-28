@@ -14,12 +14,20 @@ fermion actions:
 
 Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
 GCR are provided, including robust mixed-precision variants supporting
-combinations of double, single, and half (16-bit "block floating point")
-precision.  The library also includes auxilliary routines necessary for
-Hybrid Monte Carlo, such as HISQ link fattening, force terms and clover-
-field construction.  Use of many GPUs in parallel is supported
-throughout, with communication handled by QMP or MPI.
+combinations of double, single, and half (16-bit "block floating
+point") precision.  The library also includes auxilliary routines
+necessary for Hybrid Monte Carlo, such as HISQ link fattening, force
+terms and clover- field construction.  Use of many GPUs in parallel is
+supported throughout, with communication handled by QMP or MPI.
+Support for eigen-vector deflation solvers is also included
+(https://github.com/lattice/quda/wiki/Deflated-Solvers).
 
+We note that while this release of QUDA includes an initial
+implementation of adaptive multigrid, this is considered experimental
+and is undergoing continued evolution and improvement.  We highly
+recommend that those users interested in using adaptive multigrid use
+the present multigrid development branch "feature/multigrid".  More
+details can be found at https://github.com/lattice/quda/wiki/Multigrid-Solver.
 
 ## Software Compatibility:
 
@@ -85,18 +93,18 @@ For more details see https://github.com/lattice/quda/wiki/Multi-GPU-Support
 
 ### External dependencies
 
-The eigen-vector solvers (eigCG and incremental eigCG) require the
-installation of the MAGMA dense linear algebra package.  It is
-recommended that MAGMA 1.7.x is used, though versions are 1.5.x and
-1.6.x should work.  MAGMA is available from
+The eigen-vector solvers (eigCG and incremental eigCG) by default will
+use Eigen, however, QUDA can be configured to use MAGMA if available
+(see https://github.com/lattice/quda/wiki/Deflated-Solvers for more
+details).  MAGMA is available from
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
-configure option --with-magma=MAGMA_PATH.
+cmake option -DQUDA_MAGMA=ON.
 
 Version 0.9.x of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
 CMake option -DQUDA_ARPACK=ON. Note that with a multi-gpu option, the
-build  system will automatically use PARPACK library.
+build system will automatically use PARPACK library.
 
 ### Application Interfaces
 
@@ -147,15 +155,15 @@ include/enum_quda.h.
 compiled with the GCC option -malign-double.  This differs from the
 GCC default and may affect the alignment of various structures,
 notably those of type QudaGaugeParam and QudaInvertParam, defined in
-quda.h.  Therefore, any code to be linked against QUDA should also   be
+quda.h.  Therefore, any code to be linked against QUDA should also be
 compiled with this option.
 
 * When the auto-tuner is active in a multi-GPU run it may cause issues
 with binary reproducibility of this run. This is caused by the
-possibility of different launch configurations being used on   different
-GPUs in the tuning run. If binary reproducibility is   strictly required
-make sure that a run with active tuning has   completed. This will
-ensure that the same launch configurations for   a given Kernel is used
+possibility of different launch configurations being used on different
+GPUs in the tuning run. If binary reproducibility is strictly required
+make sure that a run with active tuning has completed. This will
+ensure that the same launch configurations for a given Kernel is used
 on all GPUs and binary reproducibility.
 
 ## Getting Help:
