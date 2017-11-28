@@ -128,14 +128,6 @@ namespace quda {
 
   void Transfer::reset() {
 
-    ColorSpinorField *V_tmp = V_d;
-
-    if(V_d && V_d->Precision() != V_h->Precision()) {
-      ColorSpinorParam param(*V_d);
-      param.precision = V_h->Precision();
-      V_tmp = ColorSpinorField::Create(param);
-    }
-
 #if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
     bool gpu_setup = true;
 #else
@@ -143,6 +135,13 @@ namespace quda {
 #endif
 
     if (enable_gpu && gpu_setup) {
+
+      ColorSpinorField *V_tmp = V_d;
+      if (V_d && V_d->Precision() != V_h->Precision()) {
+	ColorSpinorParam param(*V_d);
+	param.precision = V_h->Precision();
+	V_tmp = ColorSpinorField::Create(param);
+      }
 
       printfQuda("Transfer: filling V field with null-space components\n");
       fillV(*V_tmp);  // copy the null space vectors into V
