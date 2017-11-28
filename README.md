@@ -7,9 +7,13 @@ processing units (GPUs), leveraging NVIDIA's CUDA platform. The current
 release includes optimized Dirac operators and solvers for the following
 fermion actions:
 
-* Wilson Clover-improved Wilson Twisted mass (including non-degenerate
-* pairs) Twisted mass with a clover term Staggered fermions Improved
-* staggered (asqtad or HISQ) Domain wall (4-d or 5-d preconditioned)
+* Wilson 
+* Clover-improved Wilson
+* Twisted mass (including non-degenerate pairs)
+* Twisted mass with a clover term 
+* Staggered fermions
+* Improved staggered (asqtad or HISQ) 
+* Domain wall (4-d or 5-d preconditioned)
 * Mobius fermion
 
 Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
