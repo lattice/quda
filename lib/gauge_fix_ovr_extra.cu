@@ -1,16 +1,7 @@
 #include <comm_quda.h>
-
-#include <thrust/device_vector.h>
-#include <thrust/remove.h>
-#include <thrust/unique.h>
-#include <thrust/binary_search.h>
-#include <thrust/sort.h>
-#include <thrust/device_ptr.h>
-#include <thrust/device_malloc.h>
-#include <thrust/device_free.h>
-#include <thrust/device_vector.h>
-
+#include <thrust_helper.cuh>
 #include <gauge_fix_ovr_extra.h>
+
 namespace quda {
 
 #if defined(GPU_GAUGE_ALG) && defined(MULTI_GPU)

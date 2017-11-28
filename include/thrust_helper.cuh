@@ -1,8 +1,18 @@
 #pragma once
 
+#include <malloc_quda.h>
+
+#undef device_malloc
+#undef device_free
+
 #include <thrust/device_ptr.h>
 #include <thrust/transform_reduce.h>
 #include <thrust/iterator/detail/retag.h>
+#include <thrust/device_vector.h>
+#include <thrust/sort.h>
+
+#define device_malloc(size) quda::device_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
+#define device_free(ptr) quda::device_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
 // create a tag derived from system::cuda::tag for distinguishing
 // our overloads of get_temporary_buffer and return_temporary_buffer
