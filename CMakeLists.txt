@@ -146,6 +146,8 @@ set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 
+option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
+
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_BLAS_TEX)
@@ -653,3 +655,4 @@ mark_as_advanced(CMAKE_F_FLAGS)
 ### add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(doc)
