@@ -17,14 +17,18 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, bool enable_gpu, TimeProfile &profile)
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, bool enable_gpu, bool gpu_setup, TimeProfile &profile)
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
       spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
-      enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
+      enable_gpu(enable_gpu), gpu_setup(gpu_setup), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
       flops_(0), profile(profile)
   {
+#if __COMPUTE_CAPABILITY__ < 300 // block orthogonalization only supported on Kepler onwards
+    gpu_setup = false;
+#endif
+
     int ndim = B[0]->Ndim();
 
     for (int d = 0; d < ndim; d++) {
@@ -127,12 +131,6 @@ namespace quda {
   }
 
   void Transfer::reset() {
-
-#if __COMPUTE_CAPABILITY__ >= 300 // only supported on Kepler onwards
-    bool gpu_setup = true;
-#else
-    bool gpu_setup = false;
-#endif
 
     if (enable_gpu && gpu_setup) {
 
@@ -239,23 +237,19 @@ namespace quda {
 
   void Transfer::fillV(ColorSpinorField &V) { 
     if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
-      std::vector<ColorSpinorField*> Bgpu;
-      Bgpu.reserve(Nvec);
       ColorSpinorParam param(*B[0]);
       param.location = QUDA_CUDA_FIELD_LOCATION;
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      for (int i=0; i<Nvec; i++) {
-	Bgpu.push_back(ColorSpinorField::Create(param));
-	*Bgpu[i] = *B[i];
-      }
-
-      FillV(V, Bgpu, Nvec);
+      ColorSpinorField *Bgpu = ColorSpinorField::Create(param);
 
       for (int i=0; i<Nvec; i++) {
-	delete Bgpu[i];
+	*Bgpu = *B[i];
+	FillV(V, *Bgpu, i, Nvec);
       }
+
+      delete Bgpu;
     } else {
-      FillV(V, B, Nvec);
+      for (int i=0; i<Nvec; i++) FillV(V, *B[i], i, Nvec);
     }
   }
 

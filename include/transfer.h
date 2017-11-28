@@ -98,6 +98,9 @@ namespace quda {
     /** Whether to enable transfer operator on the GPU */
     bool enable_gpu;
 
+    /** Whether to do the block-orthogonalization on the GPU */
+    bool gpu_setup;
+
     /** Whether to apply the transfer operaton the GPU (requires
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
@@ -170,9 +173,10 @@ namespace quda {
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
+     * @param gpu_setup Whether to do the block-orthogonalization on the GPU
      */
     Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
-	     QudaPrecision null_precision, bool enable_gpu, TimeProfile &profile);
+	     QudaPrecision null_precision, bool enable_gpu, bool gpu_setup, TimeProfile &profile);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
@@ -266,12 +270,13 @@ namespace quda {
   };
 
   /**
-     Helper method that takes a vector of ColorSpinorFields and packes them into a single matrix field.
+     Helper method that takes a ColorSpinorField and pack it into a single matrix field.
      @param[out] V The resulting packed matrix field
-     @param[in] B Vector of ColorSpinorFields to be packed
+     @param[in] B ColorSpinorFields to be inserted
+     @param[in] col Column in the matrix field where the field will be packed
      @param[in] Nvec Vector length
    */
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec);
+  void FillV(ColorSpinorField &V, const ColorSpinorField &B, int col, int Nvec);
 
   /**
      @brief Block orthogonnalize the matrix field, where the blocks are
