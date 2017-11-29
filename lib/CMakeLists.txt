@@ -135,9 +135,9 @@ endif()
 # So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
 # for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake 
 if(${CMAKE_VERSION} VERSION_LESS 3.8)
-  find_library(CUDA_CUDA_LIBRARY cuda HINTS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
+  find_library(CUDA_cuda_LIBRARY cuda HINTS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
 endif()
-target_link_libraries(quda ${CUDA_CUDA_LIBRARY})
+target_link_libraries(quda ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if (QUDA_DOWNLOAD_EIGEN)
