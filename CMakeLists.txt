@@ -145,7 +145,6 @@ set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
-set(QUDA_MULTIGRID_FREEFIELD_TEMPLATE OFF CACHE BOOL "template over Wilson free field Ncolor")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -162,7 +161,6 @@ mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_ALTRELIABLE)
-mark_as_advanced(QUDA_MULTIGRID_FREEFIELD_TEMPLATE)
 
 #######################################################################
 # options that are not exposed at all because only one option exists
@@ -347,10 +345,6 @@ if (QUDA_MULTIGRID)
   add_definitions(-DGPU_MULTIGRID)
   LIST(APPEND QUDA_LIBS ${CUDA_cublas_LIBRARY})
 endif(QUDA_MULTIGRID)
-
-if (QUDA_MULTIGRID_FREEFIELD_TEMPLATE)
-  add_definitions(-DQUDA_MULTIGRID_FREEFIELD_TEMPLATE)
-endif()
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)

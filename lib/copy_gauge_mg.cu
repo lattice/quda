@@ -134,17 +134,12 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
 
 #ifdef GPU_MULTIGRID
-    if (in.Ncolor() == 4) {
-      const int Nc = 4;
-      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else  if (in.Ncolor() == 8) {
+    if (in.Ncolor() == 8) {
       const int Nc = 8;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else  if (in.Ncolor() == 12) { // Free field Wilson
       const int Nc = 12;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-#endif
     } else  if (in.Ncolor() == 16) {
       const int Nc = 16;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);

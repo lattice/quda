@@ -59,12 +59,8 @@ namespace quda {
     if (u.LinkType() != QUDA_COARSE_LINKS)
       errorQuda("Link type %d not supported", u.LinkType());
 
-    if (u.Ncolor() == 4) {
-      extractGhostMG<Float, 4>(u, Ghost, extract, offset);
-#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
-    } else if (u.Ncolor() == 12) { // free field Wilson
+    if (u.Ncolor() == 12) { // free field Wilson
       extractGhostMG<Float, 12>(u, Ghost, extract, offset);
-#endif
     } else if (u.Ncolor() == 32) {
       extractGhostMG<Float, 32>(u, Ghost, extract, offset);
     } else if (u.Ncolor() == 48) {

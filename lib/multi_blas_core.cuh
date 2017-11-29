@@ -383,16 +383,12 @@ template <typename Float, typename yFloat, int nSpin, int nColor, QudaFieldOrder
 template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
 	  typename write, typename Functor>
   void genericMultiBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
-  if (x.Ncolor() == 2) {
-    genericMultiBlas<Float,yFloat,nSpin,2,order,write,Functor>(x, y, z, w, f);
-  } else if (x.Ncolor() == 3) {
+if (x.Ncolor() == 3) {
     genericMultiBlas<Float,yFloat,nSpin,3,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 4) {
     genericMultiBlas<Float,yFloat,nSpin,4,order,write,Functor>(x, y, z, w, f);
-#ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
   } else if (x.Ncolor() == 6) { // free field Wilson
     genericMultiBlas<Float,yFloat,nSpin,6,order,write,Functor>(x, y, z, w, f);
-#endif
   } else if (x.Ncolor() == 8) {
     genericMultiBlas<Float,yFloat,nSpin,8,order,write,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 12) {
