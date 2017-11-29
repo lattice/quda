@@ -145,8 +145,8 @@ namespace quda {
 
     if(B.Ncolor() == 3) {
       FillV<Float,nSpin,3>(V,B,v,Nvec);
-    } else if(B[0]->Ncolor() == 6) { // free field Wilson
-      FillV<Float,nSpin,6>(V,B,Nvec);
+    } else if(B->Ncolor() == 6) { // free field Wilson
+      FillV<Float,nSpin,6>(V,B,v,Nvec);
     } else if(B.Ncolor() == 8) {
       FillV<Float,nSpin,8>(V,B,v,Nvec);
     } else if(B.Ncolor() == 16) {
