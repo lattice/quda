@@ -494,6 +494,30 @@ namespace quda {
       (*param.matResidual)(*tmp2,*tmp1);
     }
 
+    // ESW HACK: BURNER TUNE UP 
+
+    zero(*tmp_coarse);
+    zero(*tmp1);
+    zero(*tmp2);
+
+    tmp_coarse->Source(QUDA_RANDOM_SOURCE);
+    transfer->P(*tmp1, *tmp_coarse);
+
+    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      double kappa = diracResidual->Kappa();
+      if (param.level==0) {
+  diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+  diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+      } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
+  diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+  diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+      }
+    } else {
+      (*param.matResidual)(*tmp2,*tmp1);
+    }
+
+    // END ESW HACK
+
     transfer->R(*x_coarse, *tmp2);
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
@@ -526,6 +550,10 @@ namespace quda {
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+      // ESW HACK: BURNER TUNE UP 
+      diracSmoother->MdagM(tmp2->Even(), tmp1->Odd());
+      zero(tmp2->Even());      
+      // END ESW HACK
       diracSmoother->MdagM(tmp2->Even(), tmp1->Odd());
       Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
@@ -541,6 +569,10 @@ namespace quda {
 		 real(dot), imag(dot), deviation);
       if (deviation > tol) errorQuda("failed");
     } else {
+      // ESW HACK: BURNER TUNE UP 
+      diracResidual->MdagM(*tmp2, *tmp1);
+      zero(*tmp2);
+      // END ESW HACK
       diracResidual->MdagM(*tmp2, *tmp1);
       Complex dot = cDotProduct(*tmp1,*tmp2);
 
@@ -1197,6 +1229,15 @@ namespace quda {
       else
       {
         errorQuda("\nError in MG::buildFreeVectors: Unexpected Nspin = %d for coarse fermions.\n", Nspin);
+      }
+    }
+
+    // global orthonormalization of the generated null-space vectors
+    if(param.mg_global.post_orthonormalize) {
+      for(int i=0; i<(int)B.size(); i++) {
+        double nrm2 = norm2(*B[i]);
+        if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B[i]);// i/<i,i>
+        else errorQuda("\nCannot normalize %u vector\n", i);
       }
     }
 
