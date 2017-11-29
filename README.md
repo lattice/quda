@@ -52,7 +52,7 @@ http://developer.nvidia.com/cuda-gpus
 Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
-appropriate value to the QUDA_GPU_ARCH variable in cmake.
+appropriate value to the `QUDA_GPU_ARCH` variable in cmake.
 
 As of QUDA 0.8.0, only devices of compute capability 2.0 or greater are
 supported.  See also "Known Issues" below.
@@ -65,7 +65,7 @@ QUDA in a separate directory from the source directory.  For
 instructions on how to build QUDA using cmake see this page
 https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note that
 this requires cmake version 3.1 or later. You can obtain cmake from
-https://cmake.org/download/ On Linux the binary tar.gz archives unpack
+https://cmake.org/download/. On Linux the binary tar.gz archives unpack
 into a cmake directory and usually run fine from that directory.
 
 The basic steps for building cmake are: 
@@ -86,12 +86,12 @@ or specify e.g. -DQUDA_GPU_ARCH=sm_60 for a Pascal GPU in step 2.
 ### Multi-GPU support
 
 QUDA supports using multiple GPUs through MPI and QUDA.
-To enable multi-GPU support either set QUDA_MPI or QUDA_QMP to ON when configuring QUDA through cmake. 
+To enable multi-GPU support either set `QUDA_MPI` or `QUDA_QMP` to ON when configuring QUDA through cmake. 
 
-Note that in any case cmake will automatically try to detect your MPI installation. If you need to specify a particular MPI please set MPI_C_COMPILER and MPI_CXX_COMPILER in cmake. 
+Note that in any case cmake will automatically try to detect your MPI installation. If you need to specify a particular MPI please set `MPI_C_COMPILER` and `MPI_CXX_COMPILER` in cmake. 
 See also https://cmake.org/cmake/help/v3.9/module/FindMPI.html for more help.
 
-For QMP please set QUDA_QMP_HOME to the installation directory of QMP.
+For QMP please set `QUDA_QMP_HOME` to the installation directory of QMP.
 
 For more details see https://github.com/lattice/quda/wiki/Multi-GPU-Support
 
@@ -102,19 +102,19 @@ use Eigen, however, QUDA can be configured to use MAGMA if available
 (see https://github.com/lattice/quda/wiki/Deflated-Solvers for more
 details).  MAGMA is available from
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
-cmake option -DQUDA_MAGMA=ON.
+cmake option `QUDA_MAGMA=ON`.
 
 Version 0.9.x of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
-CMake option -DQUDA_ARPACK=ON. Note that with a multi-gpu option, the
+CMake option `QUDA_ARPACK=ON`. Note that with a multi-gpu option, the
 build system will automatically use PARPACK library.
 
 ### Application Interfaces
 
 By default only the QDP and MILC interfaces are enabled.  For
 interfacing support with QDPJIT, BQCD or CPS; this should be enabled at
-by setting the corresponding QUDA_INTERFACE_<application> variable e.g., QUDA_INTERFACE_BQCD=ON.
+by setting the corresponding `QUDA_INTERFACE_<application>` variable e.g., `QUDA_INTERFACE_BQCD=ON`.
 To keep compilation time to a minimum it is recommended to only enable
 those interfaces that are used by a given application.  
 
@@ -126,7 +126,7 @@ takes some time and will generally slow things down the first time a
 given kernel is called during a run.  To avoid this one-time overhead in
 subsequent runs (using the same action, solver, lattice volume, etc.),
 the optimal parameters are cached to disk.  For this to work, the
-QUDA_RESOURCE_PATH environment variable must be set, pointing to a
+`QUDA_RESOURCE_PATH` environment variable must be set, pointing to a
 writable directory.  Note that since the tuned parameters are hardware-
 specific, this "resource directory" should not be shared between jobs
 running on different systems (e.g., two clusters with different GPUs
@@ -137,10 +137,10 @@ This autotuning information can also be used to build up a first-order
 kernel profile: since the autotuner measures how long a kernel takes to
 run, if we simply keep track of the number of kernel calls, from the
 product of these two quantities we have a time profile of a given job
-run.  If QUDA_RESOURCE_PATH is set, then this profiling information is
+run.  If `QUDA_RESOURCE_PATH` is set, then this profiling information is
 output to the file "profile.tsv" in this specified directory.
 Optionally, the output filename can be specified using the
-QUDA_PROFILE_OUTPUT environment variable, to avoid overwriting
+`QUDA_PROFILE_OUTPUT` environment variable, to avoid overwriting
 previously generated profile outputs.
 
 ## Using the Library:
