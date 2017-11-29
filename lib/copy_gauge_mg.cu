@@ -18,6 +18,18 @@ if (out.Reconstruct() != QUDA_RECONSTRUCT_NO)
 
     int faceVolumeCB[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
+
+#ifdef FINE_GRAINED_ACCESS
+    if (out.Precision() == QUDA_HALF_PRECISION) {
+      if (in.Precision() == QUDA_HALF_PRECISION) {
+	out.Scale(in.Scale());
+      } else {
+	InOrder in_(const_cast<GaugeField&>(in));
+	out.Scale(in_.abs_max());
+      }
+    }
+#endif
+
     if (out.isNative()) {
 
 #ifdef FINE_GRAINED_ACCESS

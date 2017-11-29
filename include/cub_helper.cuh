@@ -1,6 +1,10 @@
 #pragma once
+#include <quda_constants.h>
 #include <float_vector.h>
+#include <comm_quda.h>
+#include <blas_quda.h>
 
+#include <thrust_helper.cuh>
 using namespace quda;
 #include <cub/cub.cuh>
 

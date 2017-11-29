@@ -30,6 +30,10 @@ namespace quda {
   namespace gauge {
     template<typename Float, typename storeFloat> struct fieldorder_wrapper;
   }
+
+  namespace colorspinor {
+    template<typename Float, typename storeFloat> struct fieldorder_wrapper;
+  }
 }
 
 // We need this to make sure code inside quda:: that calls sqrt() using real numbers
@@ -557,10 +561,18 @@ public:
   inline operator std::complex<float>() const { return std::complex<float>(real(),imag()); }
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
-  // inline operator float() const { return real(); }
 
-  template<typename storeFloat>
-    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<float,storeFloat> &a);
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<float>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<float>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
 template<>
@@ -679,8 +691,18 @@ public:
   inline operator std::complex<double>() const { return std::complex<double>(real(),imag()); }
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
-  // inline operator double() { return real(); }
 
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<double>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<double>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
 
@@ -725,6 +747,9 @@ public:
 
   // cast operators
   inline operator std::complex<short>() const { return std::complex<short>(real(),imag()); }
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
+
 };
 
 template<>
@@ -768,6 +793,9 @@ public:
 
   // cast operators
   inline operator std::complex<int>() const { return std::complex<int>(real(),imag()); }
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
+
 };
 
   // Binary arithmetic operations

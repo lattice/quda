@@ -20,8 +20,8 @@ namespace quda {
     FieldOrderCB<real,nSpin,nColor,1,order> B;
     const int v;
 
-    FillVArg(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int v)
-      : V(V), B(*(B[v])), v(v) { }
+    FillVArg(ColorSpinorField &V, const ColorSpinorField &B, int v)
+      : V(V), B(B), v(v) { }
 
   };
 
@@ -61,13 +61,13 @@ namespace quda {
   class FillVLaunch : public TunableVectorY {
 
     ColorSpinorField &V;
-    const std::vector<ColorSpinorField*> &B;
+    const ColorSpinorField &B;
     const int v;
     unsigned int minThreads() const { return V.VolumeCB(); }
     bool tuneGridDim() const { return false; }
 
   public:
-    FillVLaunch(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, const int v)
+    FillVLaunch(ColorSpinorField &V, const ColorSpinorField &B, const int v)
       : TunableVectorY(2), V(V), B(B), v(v) {
       (V.Location() == QUDA_CPU_FIELD_LOCATION) ? strcpy(aux,"CPU") : strcpy(aux,"GPU");
     }
@@ -103,97 +103,95 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(V.VolString(), typeid(*this).name(), aux); }
 
     long long flops() const { return 0; }
-    long long bytes() const { return 2ll*B[0]->Bytes(); }
+    long long bytes() const { return 2ll*B.Bytes(); }
   };
 
 
   template <typename real, int nSpin, int nColor, int nVec>
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
-    for (int v=0; v<nVec; v++) {
-      FillVLaunch<real,nSpin,nColor,nVec> f(V,B,v);
-      f.apply(0);
-    }
+  void FillV(ColorSpinorField &V, const ColorSpinorField &B, int v) {
+    FillVLaunch<real,nSpin,nColor,nVec> f(V,B,v);
+    f.apply(0);
   }
 
   // For staggered this does not include factor 2 due to parity decomposition!
   template <typename Float, int nSpin, int nColor>
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+  void FillV(ColorSpinorField &V, const ColorSpinorField &B, int v, int Nvec) {
     if (Nvec == 2) {
-      FillV<Float,nSpin,nColor,2>(V,B);
+      FillV<Float,nSpin,nColor,2>(V,B,v);
     } else if (Nvec == 4) {
-      FillV<Float,nSpin,nColor,4>(V,B);
+      FillV<Float,nSpin,nColor,4>(V,B,v);
 #ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if (Nvec == 6) {
-      FillV<Float,nSpin,nColor,6>(V,B);
+      FillV<Float,nSpin,nColor,6>(V,B,v);
 #endif
     } else if (Nvec == 8) {
-      FillV<Float,nSpin,nColor,8>(V,B);
+      FillV<Float,nSpin,nColor,8>(V,B,v);
     } else if (Nvec == 12) {
-      FillV<Float,nSpin,nColor,12>(V,B);
+      FillV<Float,nSpin,nColor,12>(V,B,v);
     } else if (Nvec == 16) {
-      FillV<Float,nSpin,nColor,16>(V,B);
+      FillV<Float,nSpin,nColor,16>(V,B,v);
     } else if (Nvec == 20) {
-      FillV<Float,nSpin,nColor,20>(V,B);
+      FillV<Float,nSpin,nColor,20>(V,B,v);
     } else if (Nvec == 24) {
-      FillV<Float,nSpin,nColor,24>(V,B);
+      FillV<Float,nSpin,nColor,24>(V,B,v);
     } else if (Nvec == 32) {
-      FillV<Float,nSpin,nColor,32>(V,B);
+      FillV<Float,nSpin,nColor,32>(V,B,v);
     } else if (Nvec == 48) {
-      FillV<Float,nSpin,nColor,48>(V,B);
+      FillV<Float,nSpin,nColor,48>(V,B,v);
     } else {
       errorQuda("Unsupported Nvec %d", Nvec);
     }
   }
 
   template <typename Float, int nSpin>
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
-    if (B[0]->Ncolor()*Nvec != V.Ncolor()) errorQuda("Something wrong here");
+  void FillV(ColorSpinorField &V, const ColorSpinorField &B, int v, int Nvec) {
+    if (B.Ncolor()*Nvec != V.Ncolor()) errorQuda("Something wrong here");
 
-    if (B[0]->Ncolor() == 2) {
-      FillV<Float,nSpin,2>(V,B,Nvec);
-    } else if(B[0]->Ncolor() == 3) {
-      FillV<Float,nSpin,3>(V,B,Nvec);
+    if (B.Ncolor() == 2) {
+      FillV<Float,nSpin,2>(V,B,v,Nvec);
+    } else if(B.Ncolor() == 3) {
+      FillV<Float,nSpin,3>(V,B,v,Nvec);
 #ifdef QUDA_MULTIGRID_FREEFIELD_TEMPLATE
     } else if(B[0]->Ncolor() == 6) { // free field Wilson
       FillV<Float,nSpin,6>(V,B,Nvec);
 #endif
-    } else if(B[0]->Ncolor() == 8) {
-      FillV<Float,nSpin,8>(V,B,Nvec);
-    } else if(B[0]->Ncolor() == 16) {
-      FillV<Float,nSpin,16>(V,B,Nvec);
-    } else if(B[0]->Ncolor() == 24) {
-      FillV<Float,nSpin,24>(V,B,Nvec);
-    } else if(B[0]->Ncolor() == 32) {
-      FillV<Float,nSpin,32>(V,B,Nvec);
+    } else if(B.Ncolor() == 8) {
+      FillV<Float,nSpin,8>(V,B,v,Nvec);
+    } else if(B.Ncolor() == 16) {
+      FillV<Float,nSpin,16>(V,B,v,Nvec);
+    } else if(B.Ncolor() == 24) {
+      FillV<Float,nSpin,24>(V,B,v,Nvec);
+    } else if(B.Ncolor() == 32) {
+      FillV<Float,nSpin,32>(V,B,v,Nvec);
     } else {
-      errorQuda("Unsupported nColor %d", B[0]->Ncolor());
+      errorQuda("Unsupported nColor %d", B.Ncolor());
     }
   }
 
   template <typename Float>
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+  void FillV(ColorSpinorField &V, const ColorSpinorField &B, int v, int Nvec) {
     if (V.Nspin() == 4) {
-      FillV<Float,4>(V,B,Nvec);
+      FillV<Float,4>(V,B,v,Nvec);
     } else if (V.Nspin() == 2) {
-      FillV<Float,2>(V,B,Nvec);
+      FillV<Float,2>(V,B,v,Nvec);
 #ifdef GPU_STAGGERED_DIRAC
     } else if (V.Nspin() == 1) {
-      FillV<Float,1>(V,B,Nvec);
+      FillV<Float,1>(V,B,v,Nvec);
 #endif
     } else {
       errorQuda("Unsupported nSpin %d", V.Nspin());
     }
   }
 
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+  void FillV(ColorSpinorField &V, const ColorSpinorField &B, int v, int Nvec) {
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
-      FillV<double>(V,B,Nvec);
+      FillV<double>(V,B,v,Nvec);
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (V.Precision() == QUDA_SINGLE_PRECISION) {
-      FillV<float>(V,B,Nvec);
+      FillV<float>(V,B,v,Nvec);
     } else {
       errorQuda("Unsupported precision %d", V.Precision());
     }
@@ -336,7 +334,7 @@ namespace quda {
 	  }
 	}
 
-	for (int s=0; s<coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? 1.0/(sqrt(nrm[s])) : 0.0;
+	for (int s=0; s<coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? rsqrt(nrm[s]) : 0.0;
 
 	for (int parity=0; parity<arg.nParity; parity++) {
 	  parity = (arg.nParity == 2) ? parity : arg.parity;
@@ -447,7 +445,7 @@ namespace quda {
       nrm = *nrm_;
 
 #pragma unroll
-      for (int s=0; s<coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? 1.0/sqrt(nrm[s]) : 0.0;
+      for (int s=0; s<coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? rsqrt(nrm[s]) : 0.0;
 
 #pragma unroll
       for (int s=0; s<nSpin; s++) {

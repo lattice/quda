@@ -2587,8 +2587,26 @@ namespace quda {
 
   } // namespace gauge
 
-  template <typename storeFloat>
-  __device__ __host__ inline void complex<float>::operator=(const gauge::fieldorder_wrapper<float,storeFloat> &a) {
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline void complex<double>::operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
+
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline void complex<float>::operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
+
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline complex<double>::complex(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a) {
+    x = a.real();
+    y = a.imag();
+  }
+
+  template <typename otherFloat, typename storeFloat>
+    __device__ __host__ inline complex<float>::complex(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a) {
     x = a.real();
     y = a.imag();
   }

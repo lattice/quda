@@ -103,7 +103,8 @@ namespace quda {
         // create transfer operator
         if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating transfer operator\n");
         transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
-                                param.mg_global.precision_null[param.level], param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
+                                param.mg_global.precision_null[param.level], param.location == QUDA_CUDA_FIELD_LOCATION ? true : false,
+				param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse residual vector

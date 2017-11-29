@@ -460,8 +460,8 @@ namespace quda {
 	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }
     
-    
     for (int i=0; i<num_offset; i++) {
+      if (iter[i] == 0) iter[i] = k;
       blas::copy(*x[i], *x_sloppy[i]);
       if (reliable) blas::xpy(*y[i], *x[i]);
     }

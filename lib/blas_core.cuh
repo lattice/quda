@@ -181,12 +181,8 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 
 /**
    Generic blas kernel with four loads and up to four stores.
-
-   FIXME - this is hacky due to the lack of std::complex support in
-   CUDA.  The functors are defined in terms of FloatN vectors, whereas
-   the operator() accessor returns std::complex<Float>
   */
-template <typename Float2, int writeX, int writeY, int writeZ, int writeW,
+template <typename Float, int writeX, int writeY, int writeZ, int writeW,
   typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
   typename Functor>
 void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
@@ -195,15 +191,15 @@ void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
     for (int x=0; x<X.VolumeCB(); x++) {
       for (int s=0; s<X.Nspin(); s++) {
 	for (int c=0; c<X.Ncolor(); c++) {
-	  Float2 X2 = make_Float2<Float2>( X(parity, x, s, c) );
-	  Float2 Y2 = make_Float2<Float2>( Y(parity, x, s, c) );
-	  Float2 Z2 = make_Float2<Float2>( Z(parity, x, s, c) );
-	  Float2 W2 = make_Float2<Float2>( W(parity, x, s, c) );
-	  f(X2, Y2, Z2, W2);
-	  if (writeX) X(parity, x, s, c) = make_Complex(X2);
-	  if (writeY) Y(parity, x, s, c) = make_Complex(Y2);
-	  if (writeZ) Z(parity, x, s, c) = make_Complex(Z2);
-	  if (writeW) W(parity, x, s, c) = make_Complex(W2);
+	  complex<Float> X_(X(parity, x, s, c));
+	  complex<Float> Y_ = Y(parity, x, s, c);
+	  complex<Float> Z_ = Z(parity, x, s, c);
+	  complex<Float> W_ = W(parity, x, s, c);
+	  f(X_, Y_, Z_, W_);
+	  if (writeX) X(parity, x, s, c) = X_;
+	  if (writeY) Y(parity, x, s, c) = Y_;
+	  if (writeZ) Z(parity, x, s, c) = Z_;
+	  if (writeW) W(parity, x, s, c) = W_;
 	}
       }
     }
@@ -216,8 +212,7 @@ template <typename Float, typename yFloat, int nSpin, int nColor, QudaFieldOrder
 		   ColorSpinorField &w, Functor f) {
   colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Z(z), W(w);
   colorspinor::FieldOrderCB<yFloat,nSpin,nColor,1,order> Y(y);
-  typedef typename vector<yFloat,2>::type Float2;
-  genericBlas<Float2,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
+  genericBlas<yFloat,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
 }
 
 template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order,
