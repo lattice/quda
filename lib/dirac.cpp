@@ -208,6 +208,9 @@ namespace quda {
     } else if (param.type == QUDA_COARSEPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarsePC operator\n");
       return new DiracCoarsePC(param);
+    } else if (param.type == QUDA_GAUGE_COVDEV_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeCovDev operator\n");
+      return new GaugeCovDev(param);
     } else if (param.type == QUDA_GAUGE_LAPLACE_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a GaugeLaplace operator\n");
       return new GaugeLaplace(param);
@@ -229,6 +232,7 @@ namespace quda {
     {
       case QUDA_COARSE_DIRAC: // single fused operator
       case QUDA_GAUGE_LAPLACE_DIRAC:
+      case QUDA_GAUGE_COVDEV_DIRAC:
 	steps = 1;
 	break;
       case QUDA_WILSON_DIRAC:
