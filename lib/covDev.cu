@@ -38,7 +38,7 @@ namespace quda {
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB(in.VolumeCB())
     {
-      if (in.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || !U.isNative())
+      if (!U.isNative())
       errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
     }
   };
@@ -53,7 +53,7 @@ namespace quda {
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
    */
-  template <typename Float, int nDim, int nColor, typename Vector, typename Arg>
+  template <typename Float, int nDim, int nColor, int mu, typename Vector, typename Arg>
   __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
@@ -62,10 +62,9 @@ namespace quda {
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
-    const int d = arg.mu%4;
+    const int d = mu%4;
 
-    if (arg.mu < 4) {
-
+    if (mu < 4) {
       //Forward gather - compute fwd offset for vector fetch
       const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 
@@ -76,7 +75,7 @@ namespace quda {
 	const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
 
 	out += U * in;
-	} else {
+      } else {
 
 	const Link U = arg.U(d, x_cb, parity);
 	const Vector in = arg.in(fwd_idx, their_spinor_parity);
@@ -114,7 +113,16 @@ namespace quda {
     typedef ColorSpinor<Float,nColor,nSpin> Vector;
     Vector out;
 
-    applyCovDev<Float,nDim,nColor>(out, arg, x_cb, parity);
+    switch (arg.mu) {
+    case 0: applyCovDev<Float,nDim,nColor,0>(out, arg, x_cb, parity); break;
+    case 1: applyCovDev<Float,nDim,nColor,1>(out, arg, x_cb, parity); break;
+    case 2: applyCovDev<Float,nDim,nColor,2>(out, arg, x_cb, parity); break;
+    case 3: applyCovDev<Float,nDim,nColor,3>(out, arg, x_cb, parity); break;
+    case 4: applyCovDev<Float,nDim,nColor,4>(out, arg, x_cb, parity); break;
+    case 5: applyCovDev<Float,nDim,nColor,5>(out, arg, x_cb, parity); break;
+    case 6: applyCovDev<Float,nDim,nColor,6>(out, arg, x_cb, parity); break;
+    case 7: applyCovDev<Float,nDim,nColor,7>(out, arg, x_cb, parity); break;
+    }
     arg.out(x_cb, parity) = out;
   }
 
@@ -242,14 +250,14 @@ namespace quda {
     }
   }
 
-
+  // this is the Worker pointer that may have issue additional work
+  // while we're waiting on communication to finish
   namespace dslash {
     extern Worker* aux_worker;
   }
 
 #endif // GPU_CONTRACT
 
-  
   //Apply the covariant derivative operator
   //out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   //out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
