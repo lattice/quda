@@ -659,6 +659,12 @@ namespace quda {
       }
       param = tunecache[key]; // read this now for all processes
 
+      if (policyTuning()) {
+	tunable.preTune();
+	tunable.apply(0);
+	tunable.postTune();
+      }
+
     } else if (&tunable != active_tunable) {
       errorQuda("Unexpected call to tuneLaunch() in %s::apply()", typeid(tunable).name());
     }
