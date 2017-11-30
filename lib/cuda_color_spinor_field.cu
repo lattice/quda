@@ -494,7 +494,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::backup() const {
-    if (backed_up) errorQuda("Gauge field already backed up");
+    if (backed_up) errorQuda("ColorSpinorField already backed up");
     backup_h = new char[bytes];
     cudaMemcpy(backup_h, v, bytes, cudaMemcpyDeviceToHost);
     if (norm_bytes) {
