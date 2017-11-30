@@ -542,24 +542,14 @@ public:
   virtual void preTune()
   {
     if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
-      saveOut = new char[out->Bytes()];
-      cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
-      if (out->Precision() == QUDA_HALF_PRECISION) {
-	saveOutNorm = new char[out->NormBytes()];
-	cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
-      }
+      out->backup();
     }
   }
     
   virtual void postTune()
   {
     if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
-      cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-      if (out->Precision() == QUDA_HALF_PRECISION) {
-	cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
-	delete[] saveOutNorm;
-      }
+      out->restore();
     }
   }
 

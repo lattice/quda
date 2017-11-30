@@ -244,6 +244,8 @@ namespace quda {
 
     if (a.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       genericPackGhost<Float,QUDA_FLOAT2_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
+      genericPackGhost<Float,QUDA_FLOAT4_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       genericPackGhost<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
     } else {
