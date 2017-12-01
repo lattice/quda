@@ -11,7 +11,8 @@
 #include <comm_quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
-#include <interface_qlua.h>
+//#include <interface_qlua.h>
+#include <interface_qlua_internal.h>
 #include <mpi.h>
 
 using namespace quda;
@@ -36,6 +37,22 @@ QudaVerbosity parseVerbosity(const char *v){
 
   return verbosity;
 }
+
+qudaAPI_ContractId parseContractIdx(const char *v){
+  
+  qudaAPI_ContractId cId;
+  
+  if      (strcmp(v,"contract12")==0)  cId = cntr12;
+  else if (strcmp(v,"contract13")==0)  cId = cntr13;
+  else if (strcmp(v,"contract14")==0)  cId = cntr14;
+  else if (strcmp(v,"contract23")==0)  cId = cntr23;
+  else if (strcmp(v,"contract24")==0)  cId = cntr24;
+  else if (strcmp(v,"contract34")==0)  cId = cntr34;
+  else cId = cntr_INVALID;
+  
+  return cId;
+}
+  
 
 /* topology in Quda is a global variable;
  * need to check for every lattice if the topology is the same */
@@ -84,7 +101,7 @@ init_QudaInvertParam_generic(QudaInvertParam& ip,
   ip.solve_type               = QUDA_DIRECT_PC_SOLVE;
   ip.sp_pad                   = gp.ga_pad;
   ip.cl_pad                   = gp.ga_pad;
-  ip.tune                     = QUDA_TUNE_YES;
+  ip.tune                     = QUDA_TUNE_NO;
   ip.use_init_guess           = QUDA_USE_INIT_GUESS_NO;
   ip.verbosity                = paramAPI.verbosity;
 
@@ -161,7 +178,7 @@ new_cudaColorSpinorField(QudaGaugeParam& gp, QudaInvertParam& ip,
 {
   ColorSpinorParam cpuParam(hbuf_x, ip, gp.X, false, QUDA_CPU_FIELD_LOCATION); // false stands for the pc_solution
   ColorSpinorParam cudaParam(cpuParam, ip, QUDA_CUDA_FIELD_LOCATION);
-
+  
   cudaColorSpinorField *cuda_x = NULL;
   if (NULL != hbuf_x) {
     cudaParam.create = QUDA_COPY_FIELD_CREATE;
@@ -181,7 +198,7 @@ static void
 save_cudaColorSpinorField(QUDA_REAL *hbuf_x,
 			  QudaGaugeParam& gp, QudaInvertParam& ip,
 			  int nColor, int nSpin,
-			  cudaColorSpinorField& cuda_x)
+			  ColorSpinorField &cuda_x)
 {
   ColorSpinorParam cpuParam(hbuf_x, ip, gp.X, false); // false stands for the pc_solution
   cpuParam.nColor = nColor;  //
@@ -283,35 +300,36 @@ doQQ_contract_Quda(
 {
   int status = 0;
 
-  //-- Check that the contract index is defined before proceeding
-  if (paramAPI.cParam.cntrID == cntr_INVALID)
-    errorQuda("doQQ_contract_Quda: Contract index not set!\n");
-  
-
-  
   if (check_quda_comms(qS))
     return 1;
   if (QUDA_Nc != nColor)
     return 1;
 
-  LONG_T fld_lgh = qS->locvol * nColor * nSpin * 2;
+  //-- Check-print parameters
+  if (paramAPI.cParam.cntrID == cntr_INVALID)
+    errorQuda("doQQ_contract_Quda: Contract index not set correctly!\n");
+
+  int nVec = paramAPI.cParam.nVec;  
+  printfQuda("doQQ_contract_Quda: Got nVec = %d\n", nVec);
+  printfQuda("doQQ_contract_Quda: Got contractID = %d\n", (int)paramAPI.cParam.cntrID);
   
-  //-- Initialize the quda-gauge parameters
+  setVerbosity(paramAPI.verbosity);
+  
+  //-- Initialize the quda-gauge and invert parameters
   QudaGaugeParam gp;
   init_QudaGaugeParam_generic(gp, qS);
 
-  //-- Initialize the inverter parameters
   QudaInvertParam ip;
   init_QudaInvertParam_generic(ip, gp, paramAPI);
 
-  setVerbosity(paramAPI.verbosity);
-
   //-- load the propagators
-  int nVec = paramAPI.cParam.nVec;
-  cudaColorSpinorField *cudaProp_in1[nVec];
-  cudaColorSpinorField *cudaProp_in2[nVec];
-  cudaColorSpinorField *cudaProp_out[nVec];
+  LONG_T fld_lgh = qS->locvol * nColor * nSpin * 2;
+  size_t fld_bytes = sizeof(QUDA_REAL) * fld_lgh;
 
+  ColorSpinorField *cudaProp_in1[nVec];
+  ColorSpinorField *cudaProp_in2[nVec];
+  ColorSpinorField *cudaProp_out[nVec];
+  
   double t5 = MPI_Wtime();
   for(int ivec=0;ivec<nVec;ivec++){
     cudaProp_in1[ivec] = new_cudaColorSpinorField(gp, ip, nColor, nSpin, &(hprop_in1[ivec * fld_lgh]) );
@@ -320,14 +338,17 @@ doQQ_contract_Quda(
     
     if((cudaProp_in1[ivec] == NULL) || (cudaProp_in2[ivec] == NULL) || (cudaProp_out[ivec] == NULL))
       errorQuda("doQQ_contract_Quda: Cannot allocate propagators. Exiting.\n");
-
-  }// -ivec
+  }
   double t6 = MPI_Wtime();
   printfQuda("TIMING - doQQ_contract_Quda: Propagators loaded in %.6f sec.\n", t6-t5);
-
-
+  
   //-- Call contractions kernel here
-  cudaContractQQ(**cudaProp_out, **cudaProp_in1, **cudaProp_in2, nColor, nSpin, paramAPI.cParam);
+  int parity = 0;
+  double t1 = MPI_Wtime();
+  cudaContractQQ(cudaProp_out, cudaProp_in1, cudaProp_in2, parity, nColor, nSpin, paramAPI.cParam);
+  checkCudaError();
+  double t2 = MPI_Wtime();
+  printfQuda("TIMING - doQQ_contract_Quda: Contractions in %.6f sec.\n", t2-t1);
   
   //-- extract
   double t7 = MPI_Wtime();
@@ -347,7 +368,7 @@ doQQ_contract_Quda(
   
   saveTuneCache();
 
-  printfQuda("laplacianQuda: Returning...\n");
+  printfQuda("doQQ_contract_Quda: Returning...\n");
 
   return status;
 }

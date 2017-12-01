@@ -39,6 +39,18 @@ namespace quda {
 	}
       }
 
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator=(const complex<Float> *a) {
+#pragma unroll
+	for (int i=0; i<Nc*Ns; i++) {
+	  data[i] = a[i];
+	}
+	return *this;
+      }
+
+	__device__ __host__ inline void assign(complex<Float> a, int N1, int i1, int i2) {
+	  data[i1 + N1*i2] = a;
+	}
+
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator=(const ColorSpinor<Float, Nc, Ns> &a) {
 	if (this != &a) {
 #pragma unroll
@@ -111,6 +123,12 @@ namespace quda {
       return *this;
     }
 
+    __device__ __host__ inline void assign(complex<Float> a, int N1, int i1, int i2) {
+      data[i1 + N1*i2] = a;
+    }
+
+
+    
     /** 
 	Return this spinor spin projected
 	@param dim Which dimension projector are we using

@@ -431,10 +431,14 @@ namespace quda {
 	int stride;
 	Float *ghost[8];
 	int nParity;
+	
+	FloatNOrder() {}
+
+
       FloatNOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0)
       : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
-	norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
-	volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
+	  norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
+	  volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
 	{
 	  for (int i=0; i<4; i++) {
 	    ghost[2*i+0] = ghost_ ? ghost_[2*i+0] : static_cast<Float*>(a.Ghost()[2*i+0]);
@@ -442,6 +446,24 @@ namespace quda {
 	    faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
 	  }
 	}
+
+	void init(const ColorSpinorField &a, int nFace=1, Float *field_=0, float *norm_=0, Float **ghost_=0)
+	{
+	  field = field_ ? field_ : (Float*)a.V();
+	  offset = a.Bytes()/(2*sizeof(Float));
+	  norm = norm_ ? norm_ : (float*)a.Norm();
+	  norm_offset = a.NormBytes()/(2*sizeof(float));
+	  volumeCB = a.VolumeCB();
+	  stride = a.Stride();
+	  nParity = a.SiteSubset();
+	  
+	  for (int i=0; i<4; i++) {
+	    ghost[2*i+0] = ghost_ ? ghost_[2*i+0] : static_cast<Float*>(a.Ghost()[2*i+0]);
+	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : static_cast<Float*>(a.Ghost()[2*i+1]);
+	    faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
+	  }
+	}
+
 	virtual ~FloatNOrder() { ; }
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
