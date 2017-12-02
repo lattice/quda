@@ -96,6 +96,11 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
+#ifdef USE_TEXTURE_OBJECTS
+      dslashParam.ghostTex = in->GhostTex();
+      dslashParam.ghostTexNorm = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
+
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dslashParam.swizzle = tp.aux.x;
       IMPROVED_STAGGERED_DSLASH(tp.grid, tp.block, tp.shared_bytes, stream, dslashParam);

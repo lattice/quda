@@ -541,16 +541,12 @@ public:
 
   virtual void preTune()
   {
-    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
-      out->backup();
-    }
+    out->backup();
   }
     
   virtual void postTune()
   {
-    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
-      out->restore();
-    }
+    out->restore();
   }
 
   /*void launch_auxiliary(cudaStream_t &stream) {

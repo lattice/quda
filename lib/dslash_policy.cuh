@@ -315,17 +315,13 @@ namespace {
    */
   void setGhost(DslashCuda &dslash, cudaColorSpinorField &input, bool to_mapped) {
 
-    char aux_copy[TuneKey::aux_n];
+    static char aux_copy[TuneKey::aux_n];
     static bool set_mapped = false;
 
     if (to_mapped) {
       if (set_mapped) errorQuda("set_mapped already set");
       // in the below we switch to the mapped ghost buffer and update the tuneKey to reflect this
       input.bufferIndex += 2;
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = input.GhostTex();
-      dslashParam.ghostTexNorm = input.GhostTexNorm();
-#endif // USE_TEXTURE_OBJECTS
       strcpy(aux_copy,dslash.getAux(dslashParam.kernel_type));
       dslash.augmentAux(dslashParam.kernel_type, ",zero_copy");
       set_mapped = true;
@@ -334,10 +330,6 @@ namespace {
       // reset to default
       dslash.setAux(dslashParam.kernel_type, aux_copy);
       input.bufferIndex -= 2;
-#ifdef USE_TEXTURE_OBJECTS
-      dslashParam.ghostTex = input.GhostTex();
-      dslashParam.ghostTexNorm = input.GhostTexNorm();
-#endif // USE_TEXTURE_OBJECTS
       set_mapped = false;
     }
   }
@@ -662,9 +654,6 @@ struct DslashFusedExterior : DslashPolicyImp {
       } // i
     } // while(pattern.completeSum < commDimTotal)
 
-    // setup for exterior kernel
-    setFusedParam(dslashParam,dslash,faceVolumeCB);
-
     for (int i=3; i>=0; i--) {
       if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i))) { // if not peer-to-peer we post an event in the scatter stream and wait on that
 	PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -675,6 +664,7 @@ struct DslashFusedExterior : DslashPolicyImp {
 
     // Launch exterior kernel
     if (pattern.commDimTotal) {
+      setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
@@ -805,9 +795,6 @@ struct DslashFusedGDR : DslashPolicyImp {
       }
     } // p2p
 
-    // setup for exterior kernel
-    setFusedParam(dslashParam,dslash,faceVolumeCB);
-
     DslashCommsPattern pattern(dslashParam.commDim, true);
     while (pattern.completeSum < pattern.commDimTotal) {
       for (int i=3; i>=0; i--) {
@@ -828,6 +815,7 @@ struct DslashFusedGDR : DslashPolicyImp {
 
     // Launch exterior kernel
     if (pattern.commDimTotal) {
+      setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
@@ -973,11 +961,9 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
       } // i
     } // while(pattern.completeSum < commDimTotal)
 
-    // setup for exterior kernel
-    setFusedParam(dslashParam,dslash,faceVolumeCB);
-
     // Launch exterior kernel
     if (pattern.commDimTotal) {
+      setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
@@ -1181,8 +1167,6 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
       } // i
     } // while(pattern.completeSum < commDimTotal)
 
-    setFusedParam(dslashParam,dslash,faceVolumeCB);
-
     for (int i=3; i>=0; i--) {
       if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i))) {
 	// if not peer-to-peer we post an event in the scatter stream and wait on that
@@ -1193,6 +1177,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
     }
 
     if (pattern.commDimTotal) {
+      setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
@@ -1365,9 +1350,6 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
       } // i
     } // pattern.completeSum
 
-    // setup for exterior kernel
-    setFusedParam(dslashParam,dslash,faceVolumeCB);
-
     for (int i=3; i>=0; i--) {
       if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i))) {
 	// if not peer-to-peer we post an event in the scatter stream and wait on that
@@ -1379,6 +1361,7 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
 
     // Launch exterior kernel
     if (pattern.commDimTotal) {
+      setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
@@ -1529,11 +1512,9 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
       } // i
     } // while(pattern.completeSum < commDimTotal)
 
-    // setup for exterior kernel
-    setFusedParam(dslashParam,dslash,faceVolumeCB);
-
     // Launch exterior kernel
     if (pattern.commDimTotal) {
+      setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
@@ -1697,8 +1678,7 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
 
     // FIXME - will not work with P2P until we can split where the halos originate
     if (pattern.commDimTotal) {
-      // setup for exterior kernel
-      setFusedParam(dslashParam,dslash,faceVolumeCB);
+      setFusedParam(dslashParam,dslash,faceVolumeCB); // setup for exterior kernel
 
       setGhost(dslash, *inputSpinor, true);
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
@@ -2029,7 +2009,7 @@ struct DslashFactory {
      (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
      delete dslashImp;
 
-	 // restore default kernel packing
+     // restore default kernel packing
      setKernelPackT(kernel_pack_old);
    }
 
