@@ -791,12 +791,12 @@ namespace quda {
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
     /**
-       @brief Backs up the cudaColorSpinorField
+       @brief Backs up the cpuColorSpinorField
     */
     void backup() const;
 
     /**
-       @brief Restores the cudaColorSpinorField
+       @brief Restores the cpuColorSpinorField
     */
     void restore();
   };

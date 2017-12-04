@@ -608,23 +608,8 @@ namespace quda {
 
     char *saveOut, *saveOutNorm;
 
-    void preTune() {
-      saveOut = new char[V.Bytes()];
-      cudaMemcpy(saveOut, V.V(), V.Bytes(), cudaMemcpyDeviceToHost);
-      if (V.Precision() == QUDA_HALF_PRECISION && V.NormBytes()) {
-	saveOutNorm = new char[V.NormBytes()];
-	cudaMemcpy(saveOutNorm, V.Norm(), V.NormBytes(), cudaMemcpyDeviceToHost);
-      }
-    }
-
-    void postTune() {
-      cudaMemcpy((void*)V.V(), saveOut, V.Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-      if (V.Precision() == QUDA_HALF_PRECISION && V.NormBytes()) {
-	cudaMemcpy((void*)V.Norm(), saveOutNorm, V.NormBytes(), cudaMemcpyHostToDevice);
-	delete[] saveOutNorm;
-      }
-    }
+    void preTune() { V.backup(); }
+    void postTune() { V.restore(); }
 
   };
 
