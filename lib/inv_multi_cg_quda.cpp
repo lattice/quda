@@ -507,8 +507,8 @@ namespace quda {
 	}
       }
 
-      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && tmp5_p != y[1]) delete tmp5_p;
-      if (tmp4_p != &tmp1 && tmp4_p != y[0]) delete tmp4_p;
+      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && (reliable ? tmp5_p != y[1] : 1)) delete tmp5_p;
+      if (tmp4_p != &tmp1 && (reliable ? tmp4_p != y[0] : 1)) delete tmp4_p;
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
 	printfQuda("MultiShift CG: Converged after %d iterations\n", k);
