@@ -11,7 +11,6 @@
 #include <comm_quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
-//#include <interface_qlua.h>
 #include <interface_qlua_internal.h>
 #include <mpi.h>
 
@@ -324,7 +323,6 @@ doQQ_contract_Quda(
 
   //-- load the propagators
   LONG_T fld_lgh = qS->locvol * nColor * nSpin * 2;
-  size_t fld_bytes = sizeof(QUDA_REAL) * fld_lgh;
 
   ColorSpinorField *cudaProp_in1[nVec];
   ColorSpinorField *cudaProp_in2[nVec];

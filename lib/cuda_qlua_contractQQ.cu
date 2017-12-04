@@ -22,9 +22,9 @@ namespace quda {
     
     typedef typename colorspinor_mapper<QUDA_REAL,QUDA_Ns,QUDA_Nc>::type Propagator;        
 
-    Propagator pIn1[12];              // Input propagator 1
-    Propagator pIn2[12];              // Input propagator 2
-    Propagator pOut[12];              // Output propagator 
+    Propagator pIn1[QUDA_PROP_NVEC];  // Input propagator 1
+    Propagator pIn2[QUDA_PROP_NVEC];  // Input propagator 2
+    Propagator pOut[QUDA_PROP_NVEC];  // Output propagator 
     
     const int parity;                 // only use this for single parity fields
     const int nParity;                // number of parities we're working on
@@ -116,7 +116,7 @@ namespace quda {
   __device__ __host__ inline void computeContractQQ(ContractQQArg *arg, int x_cb, int pty){
     
     typedef ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> Vector;
-    Vector out[12];
+    Vector out[QUDA_PROP_NVEC];
     
     switch(arg->cntrID){
     case cntr12:
@@ -171,7 +171,6 @@ namespace quda {
     parity = (arg_dev->nParity == 2) ? parity : arg_dev->parity;
 
     computeContractQQ(arg_dev, x_cb, parity);
-
   }    
   
 
@@ -229,17 +228,16 @@ namespace quda {
     if(Nc != QUDA_Nc) errorQuda("cudaContractQQ: Supports only Ncolor = %d. Got Nc = %d\n", QUDA_Nc, Nc);
     if(Ns != QUDA_Ns) errorQuda("cudaContractQQ: Supports only Nspin = %d.  Got Ns = %d\n", QUDA_Ns, Ns);
     if(cParam.nVec != QUDA_PROP_NVEC) errorQuda("cudaContractQQ: Supports only nVec = %d.  Got nVec = %d\n", QUDA_PROP_NVEC, cParam.nVec);
-
+    
     ContractQQArg arg(propOut, propIn1, propIn2, parity, cParam);
-
+    
     ContractQQArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(ContractQQArg) );
     cudaMemcpy(arg_dev, &arg, sizeof(ContractQQArg), cudaMemcpyHostToDevice);
     
     ContractQQ contract(arg, arg_dev, *propIn1[0]);
     contract.apply(0);
-    
-    printfQuda("cudaContractQQ: Kernel applied successfully!\n");    
+
   }
 
   
