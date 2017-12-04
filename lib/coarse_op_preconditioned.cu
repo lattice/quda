@@ -74,6 +74,7 @@ namespace quda {
 
     for (int d=0; d<4; d++) {
       for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
 	for (int x_cb=0; x_cb<arg.Y.VolumeCB(); x_cb++) {
 	  for (int i=0; i<n; i++) computeYhat<Float,n>(arg, d, x_cb, parity, i);
 	} // x_cb
@@ -137,6 +138,7 @@ namespace quda {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
       strcat(Aux,meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(Aux, getOmpThreadStr());
       return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
     }
   };
