@@ -68,6 +68,7 @@ namespace quda {
 
     param.nSpin = B[0]->Nspin(); // spin has direct mapping
     param.nColor = B[0]->Ncolor()*Nvec; // nColor = number of colors * number of vectors
+    param.nVec = Nvec;
     param.create = QUDA_ZERO_FIELD_CREATE;
     // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
     if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {

@@ -280,7 +280,7 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
 
-    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
+    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 ) {
       if (texInit) errorQuda("Already bound textures");
       
       // create the texture for the field components
@@ -365,7 +365,7 @@ namespace quda {
 
   void cudaColorSpinorField::createGhostTexObject() const {
     // create the ghost texture object
-    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && ghost_bytes) {
+    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghost_bytes) {
       if (ghostTexInit) errorQuda("Already bound ghost texture");
 
       for (int b=0; b<2; b++) {
@@ -440,7 +440,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::destroyTexObject() {
-    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && texInit) {
+    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && texInit) {
       cudaDestroyTextureObject(tex);
       if (ghost_bytes) {
 	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
@@ -456,7 +456,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::destroyGhostTexObject() const {
-    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && ghostTexInit) {
+    if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
       if (precision == QUDA_HALF_PRECISION) {
 	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);

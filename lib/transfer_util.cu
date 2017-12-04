@@ -30,6 +30,7 @@ namespace quda {
   void FillVCPU(Arg &arg, int v) {
 
     for (int parity=0; parity<arg.V.Nparity(); parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.V.VolumeCB(); x_cb++) {
 	for (int s=0; s<nSpin; s++) {
 	  for (int c=0; c<nColor; c++) {
@@ -70,6 +71,7 @@ namespace quda {
     FillVLaunch(ColorSpinorField &V, const ColorSpinorField &B, const int v)
       : TunableVectorY(2), V(V), B(B), v(v) {
       (V.Location() == QUDA_CPU_FIELD_LOCATION) ? strcpy(aux,"CPU") : strcpy(aux,"GPU");
+      if (V.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
     virtual ~FillVLaunch() { }
 
@@ -260,6 +262,7 @@ namespace quda {
   void blockOrthoCPU(Arg &arg) {
 
     // loop over geometric blocks
+#pragma omp parallel for
     for (int x_coarse=0; x_coarse<arg.coarseVolume; x_coarse++) {
 
       for (int j=0; j<nVec; j++) {
@@ -480,6 +483,7 @@ namespace quda {
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       i32toa(size, geoBlockSize);
       strcat(aux,size);
+      if (V.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
 
       int chiralBlocks = (nSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
       nBlock = (V.Volume()/geoBlockSize) * chiralBlocks;
@@ -608,23 +612,8 @@ namespace quda {
 
     char *saveOut, *saveOutNorm;
 
-    void preTune() {
-      saveOut = new char[V.Bytes()];
-      cudaMemcpy(saveOut, V.V(), V.Bytes(), cudaMemcpyDeviceToHost);
-      if (V.Precision() == QUDA_HALF_PRECISION && V.NormBytes()) {
-	saveOutNorm = new char[V.NormBytes()];
-	cudaMemcpy(saveOutNorm, V.Norm(), V.NormBytes(), cudaMemcpyDeviceToHost);
-      }
-    }
-
-    void postTune() {
-      cudaMemcpy((void*)V.V(), saveOut, V.Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-      if (V.Precision() == QUDA_HALF_PRECISION && V.NormBytes()) {
-	cudaMemcpy((void*)V.Norm(), saveOutNorm, V.NormBytes(), cudaMemcpyHostToDevice);
-	delete[] saveOutNorm;
-      }
-    }
+    void preTune() { V.backup(); }
+    void postTune() { V.restore(); }
 
   };
 

@@ -371,9 +371,15 @@ namespace quda {
 #else
 	if (fixed) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col] += val_;
+#pragma omp atomic update
+	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += val_.x;
+#pragma omp atomic update
+	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].y += val_.y;
 	} else {
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col] += complex<storeFloat>(val.x,val.y);
+#pragma omp atomic update
+	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += static_cast<storeFloat>(val.x);
+#pragma omp atomic update
+	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].y += static_cast<storeFloat>(val.y);
 	}
 #endif
       }
@@ -503,9 +509,15 @@ namespace quda {
 #else
 	if (fixed) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col] += val_;
+#pragma omp atomic update
+	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += val_.x;
+#pragma omp atomic update
+	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].y += val_.y;
 	} else {
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col] += complex<storeFloat>(val.x,val.y);
+#pragma omp atomic update
+	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += static_cast<storeFloat>(val.x);
+#pragma omp atomic update
+	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].y += static_cast<storeFloat>(val.y);
 	}
 #endif
       }
@@ -651,9 +663,15 @@ namespace quda {
 #else
 	if (fixed) {
 	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb] += val_;
-	} else {
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb] += complex<storeFloat>(val.x,val.y);
+#pragma omp atomic update
+	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += val_.x;
+#pragma omp atomic update
+	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].y += val_.y;
+	  } else {
+#pragma omp atomic update
+	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += static_cast<storeFloat>(val.x);
+#pragma omp atomic update
+	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].y += static_cast<storeFloat>(val.y);
 	}
 #endif
       }

@@ -35,6 +35,14 @@ bool getRankVerbosity();
 
 char *getPrintBuffer();
 
+/**
+   @brief Returns a string of the form
+   ",omp_threads=$OMP_NUM_THREADS", which can be used for storing the
+   number of OMP threads for CPU functions recorded in the tune cache.
+   @return Returns the string
+*/
+char* getOmpThreadStr();
+
 namespace quda {
   // forward declaration
   void saveTuneCache(bool error);

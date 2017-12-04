@@ -173,6 +173,7 @@ namespace quda {
   void ComputeUVCPU(Arg &arg) {
 
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	for (int ic_c=0; ic_c < coarseColor; ic_c++) // coarse color
 	  if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV
@@ -238,6 +239,7 @@ namespace quda {
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   void ComputeAVCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	for (int ic_c=0; ic_c < coarseColor; ic_c++) // coarse color
 	  computeAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, ic_c);
@@ -283,6 +285,7 @@ namespace quda {
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   void ComputeTMAVCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	for (int v=0; v<coarseColor; v++) // coarse color
 	  computeTMAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb, v);
@@ -547,6 +550,7 @@ namespace quda {
   void ComputeCloverInvMaxCPU(Arg &arg) {
     Float max = 0.0;
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for reduction(max:max)
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	Float max_x = computeCloverInvMax<Float,Arg>(arg, parity, x_cb);
 	max = max > max_x ? max : max_x;
@@ -647,6 +651,7 @@ namespace quda {
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
   void ComputeTMCAVCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	computeTMCAV<Float,fineSpin,fineColor,coarseColor,Arg>(arg, parity, x_cb);
       } // c/b volume
@@ -952,6 +957,7 @@ namespace quda {
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg, typename Gamma>
   void ComputeVUVCPU(Arg arg, const Gamma &gamma) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) { // Loop over fine volume
 	for (int c_row=0; c_row<coarseColor; c_row++)
 	  for (int c_col=0; c_col<coarseColor; c_col++)
@@ -1032,6 +1038,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void ComputeYReverseCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
 	for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
 	  computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
@@ -1127,6 +1134,7 @@ namespace quda {
   template <bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
   void ComputeCoarseCloverCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
 	for (int ic_c=0; ic_c<coarseColor; ic_c++) {
 	  computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c);
@@ -1151,6 +1159,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void AddCoarseDiagonalCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
         for(int s = 0; s < nSpin; s++) { //Spin
          for(int c = 0; c < nColor; c++) { //Color
@@ -1183,6 +1192,7 @@ namespace quda {
     const complex<Float> mu(0., arg.mu*arg.mu_factor);
 
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
 	for(int s = 0; s < nSpin/2; s++) { //Spin
           for(int c = 0; c < nColor; c++) { //Color
@@ -1248,6 +1258,7 @@ namespace quda {
   template<typename Float, int nSpin, int nColor, typename Arg>
   void ConvertCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
+#pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
 	for(int c_row = 0; c_row < nColor; c_row++) { //Color row
 	  for(int c_col = 0; c_col < nColor; c_col++) { //Color column
@@ -1422,6 +1433,7 @@ namespace quda {
     {
       strcpy(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
     virtual ~CalculateY() { }
 

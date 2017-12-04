@@ -98,6 +98,10 @@ namespace quda {
       // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
       dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
       dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+#ifdef USE_TEXTURE_OBJECTS
+      dslashParam.ghostTex = in->GhostTex();
+      dslashParam.ghostTexNorm = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
 
 #ifdef SHARED_WILSON_DSLASH
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
