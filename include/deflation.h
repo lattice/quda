@@ -85,7 +85,7 @@ namespace quda {
     TimeProfile profile;
 
     /** Prefix label used for printf*/
-    char prefix[128];
+    // char prefix[128];
 
     /** High precision aux field */
     ColorSpinorField *r;

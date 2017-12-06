@@ -21,10 +21,10 @@ namespace quda {
   using namespace Eigen;
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
-#endif
 
   static auto pinned_allocator = [] (size_t bytes ) { return static_cast<Complex*>(pool_pinned_malloc(bytes)); };
   static auto pinned_deleter   = [] (Complex *hptr) { pool_pinned_free(hptr); };
+#endif
 
   //static bool debug = false;
 
