@@ -1022,9 +1022,8 @@ namespace quda {
 	    absmax = accessor.device_absmax();
 	  } else {
 	    // do simple norm on host memory
-	    absmax = 0.0;
 	    for (int parity=0; parity<2; parity++)
-	      for (int dim=0; dim<nDim; dim++) {
+	      for (int dim=0; dim<geometry; dim++) {
 		for (int x_cb=0; x_cb<volumeCB; x_cb++) {
 		  for (int row=0; row<nColor; row++)
 		    for (int col=0; col<nColor; col++)
@@ -1049,7 +1048,6 @@ namespace quda {
 	    absmax = accessor.device_absmax(dim);
 	  } else {
 	    // do simple norm on host memory
-	    absmax = 0.0;
 	    for (int parity=0; parity<2; parity++)
 	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
 		for (int row=0; row<nColor; row++)
@@ -1064,25 +1062,47 @@ namespace quda {
 
 	/**
 	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the Linfinity norm of
 	 * @return Minimum norm
 	 */
-	__host__ double abs_min(int dim) const {
-	  double absmin = 0;
+	__host__ double abs_min() const {
+	  double absmin = std::numeric_limits<double>::max();
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
 	    absmin = accessor.device_absmin();
 	  } else {
-	    // do simple norm on host memory
-	    absmin = 0.0;
+	    // do simple min reduction on host memory
 	    for (int parity=0; parity<2; parity++)
-	      for (int dim=0; dim<nDim; dim++) {
+	      for (int dim=0; dim<geometry; dim++) {
 		for (int x_cb=0; x_cb<volumeCB; x_cb++) {
 		  for (int row=0; row<nColor; row++)
 		    for (int col=0; col<nColor; col++)
 		      absmin = abs((*this)(dim,parity,x_cb,row,col)) < absmin
 			? abs((*this)(dim,parity,x_cb,row,col)) : absmin;
 		}
+	      }
+	  }
+	  comm_allreduce_min(&absmin);
+	  return absmin;
+	}
+
+	/**
+	 * @brief Returns the minimum absolute value of the field
+	 * @param[in] dim Which dimension we are taking the Linfinity norm of
+	 * @return Minimum norm
+	 */
+	__host__ double abs_min(int dim) const {
+	  double absmin = std::numeric_limits<double>::max();
+	  if (location == QUDA_CUDA_FIELD_LOCATION) {
+	    // call device version - specialized for ordering
+	    absmin = accessor.device_absmin();
+	  } else {
+	    // do simple min reduction on host memory
+	    for (int parity=0; parity<2; parity++)
+	      for (int x_cb=0; x_cb<volumeCB; x_cb++) {
+		for (int row=0; row<nColor; row++)
+		  for (int col=0; col<nColor; col++)
+		    absmin = abs((*this)(dim,parity,x_cb,row,col)) < absmin
+		      ? abs((*this)(dim,parity,x_cb,row,col)) : absmin;
 	      }
 	  }
 	  comm_allreduce_min(&absmin);
