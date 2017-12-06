@@ -428,7 +428,7 @@ int main(int argc, char **argv)
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
-    coarse_solver_maxiter[i] = 10;
+    coarse_solver_maxiter[i] = 100;
     solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
   }

@@ -33,15 +33,15 @@ namespace quda {
 
     for (int d = 0; d < ndim; d++) {
       while (geo_bs[d] > 0) {
-	if (d==0 && B[0]->X(0) == geo_bs[0])
-	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
-	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
-	  warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0]->X(d)/geo_bs[d]);
-	else if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
-	  warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0]->X(d), geo_bs[d]);
-	else
-	  break; // this is a valid block size so let's use it
-	geo_bs[d] /= 2;
+      	if (d==0 && B[0]->X(0) == geo_bs[0])
+      	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
+      	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
+      	  warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0]->X(d)/geo_bs[d]);
+      	else if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
+      	  warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0]->X(d), geo_bs[d]);
+      	else
+      	  break; // this is a valid block size so let's use it
+      	geo_bs[d] /= 2;
       }
       if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
     }
@@ -151,8 +151,8 @@ namespace quda {
 
       *V_h = *V_tmp;
       if (V_d != V_tmp) {
-	*V_d = *V_tmp;
-	delete V_tmp;
+      	*V_d = *V_tmp;
+      	delete V_tmp;
       }
       printfQuda("Transferred prolongator back to CPU\n");
 
@@ -166,8 +166,8 @@ namespace quda {
       BlockOrthogonalize(*V_h, Nvec, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
 
       if (enable_gpu) {
-	*V_d = *V_h;
-	printfQuda("Transferred prolongator to GPU\n");
+      	*V_d = *V_h;
+      	printfQuda("Transferred prolongator to GPU\n");
       }
     }
   }
@@ -333,11 +333,11 @@ namespace quda {
     if (use_gpu) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
       if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
-	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+        output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
       if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
-	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+        output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
     *input = in; // copy result to input field (aliasing handled automatically)
@@ -373,11 +373,11 @@ namespace quda {
     if (use_gpu) {
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
       if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
-	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+        input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
-	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+        input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
     *input = in;

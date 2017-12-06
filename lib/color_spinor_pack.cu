@@ -192,6 +192,8 @@ namespace quda {
       genericPackGhost<Float,order,Ns,12>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 16) {
       genericPackGhost<Float,order,Ns,16>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
+      genericPackGhost<Float,order,Ns,18>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 20) {
       genericPackGhost<Float,order,Ns,20>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) {
@@ -200,6 +202,8 @@ namespace quda {
       genericPackGhost<Float,order,Ns,28>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 32) {
       genericPackGhost<Float,order,Ns,32>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
+      genericPackGhost<Float,order,Ns,36>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 48) {
       genericPackGhost<Float,order,Ns,48>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 72) {
