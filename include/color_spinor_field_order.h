@@ -167,17 +167,29 @@ namespace quda {
 
   namespace colorspinor {
 
-    template<typename ReduceType, typename Float> struct square {
-      square(ReduceType scale) { }
+    template<typename ReduceType, typename Float> struct square_ {
+      square_(ReduceType scale) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
       { return static_cast<ReduceType>(norm(x)); }
     };
 
-    template<typename ReduceType> struct square<ReduceType,short> {
+    template<typename ReduceType> struct square_<ReduceType,short> {
       const ReduceType scale;
-      square(ReduceType scale) : scale(scale) { }
+      square_(ReduceType scale) : scale(scale) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<short> &x)
       { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
+
+    template<typename Float, typename storeFloat> struct abs_ {
+      abs_(const Float scale) { }
+      __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
+    };
+
+    template<typename Float> struct abs_<Float,short> {
+      Float scale;
+      abs_(const Float scale) : scale(scale) { }
+      __host__ __device__ Float operator()(const quda::complex<short> &x)
+      { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB { 
@@ -596,13 +608,31 @@ namespace quda {
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust::device_ptr<complex<storeFloat> > ptr(v);
 	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+					  square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	} else {
 	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+					  square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	}
 	comm_allreduce(&nrm2);
 	return nrm2;
+      }
+
+      /**
+       * Returns the Linfinity norm of the field
+       * @return Linfinity norm
+      */
+      __host__ double abs_max() const {
+	double absmax = 0;
+	if (location == QUDA_CUDA_FIELD_LOCATION) {
+	  thrust::device_ptr<complex<storeFloat> > ptr(v);
+	  absmax = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
+					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
+	} else {
+	  absmax = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
+					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
+	}
+	comm_allreduce_max(&absmax);
+	return absmax;
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }
