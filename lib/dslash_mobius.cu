@@ -318,7 +318,7 @@ namespace quda {
 
     DslashPolicyImp* dslashImp = NULL;
     if (DS_type != 0) {
-      dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
