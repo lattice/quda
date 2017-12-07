@@ -412,7 +412,7 @@ namespace quda {
       if (comm_peer2peer_enabled(0,dim)) {
 	for (int b=0; b<2; b++) {
 	  // send to processor in backward direction
-	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&buffer_recv_p2p_back[b][dim], dim, -1, sizeof(int));
+	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&buffer_send_p2p_back[b][dim], dim, -1, sizeof(int));
 	  // receive from processor in backward direction
 	  mh_recv_p2p_back[b][dim] = comm_declare_receive_relative(&buffer_recv_p2p_back[b][dim], dim, -1, sizeof(int));
 	}
