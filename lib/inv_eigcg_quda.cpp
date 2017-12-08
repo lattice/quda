@@ -17,9 +17,8 @@
 #include <blas_magma.h>
 #endif
 
-#ifdef DEFLATEDSOLVER
+
 #include <Eigen/Dense>
-#endif
 
 #include <deflation.h>
 
@@ -32,7 +31,6 @@ A. Stathopolous and K. Orginos, arXiv:0707.0131
 namespace quda {
 
    using namespace blas;
-#ifdef DEFLATEDSOLVER
    using namespace Eigen;
 
    using DynamicStride   = Stride<Dynamic, Dynamic>;
@@ -45,14 +43,13 @@ namespace quda {
    using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
-#endif
+
 
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
 
    class EigCGArgs{
 
      public:
-#ifdef DEFLATEDSOLVER
        //host Lanczos matrice, and its eigenvalue/vector arrays:
        DenseMatrix Tm;//VH A V,
        //eigenvectors:
@@ -139,9 +136,8 @@ namespace quda {
 
 	 return;
        }
-#endif
    };
-#ifdef DEFLATEDSOLVER
+
    //Rayleigh Ritz procedure:
    template<libtype which_lib> void ComputeRitz(EigCGArgs &args) {errorQuda("\nUnknown library type.\n");}
 
@@ -260,12 +256,11 @@ namespace quda {
 
     inner.use_sloppy_partial_accumulator= false;//outer.use_sloppy_partial_accumulator;
   }
-#endif
+
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
-#ifdef DEFLATEDSOLVER
     if( param.rhs_idx < param.deflation_grid )  printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
     else {  
       printfQuda("\nDeflation space is complete, running initCG solver.\n");
@@ -290,9 +285,6 @@ namespace quda {
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
-#else
-    errorQuda("Deflation solver was not enabled\n");
-#endif
     return;
   }
 
@@ -300,7 +292,6 @@ namespace quda {
 
  void IncEigCG::RestartVT(const double beta, const double rho)
   {
-#ifdef DEFLATEDSOLVER
     EigCGArgs &args = *eigcg_args;
 
     if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
@@ -334,14 +325,12 @@ namespace quda {
     //omega.push_back( Vm->Precision() != Az->Precision() ? &Vm->Component(args.m-1) : Az ); 
     omega.push_back( &Vm->Component(args.m-1) );
 
-    args.RestartLanczos(omega, v2k, 1.0 / rho);
-#endif
+    args.RestartLanczos(omega, Vm, 1.0 / rho);
     return;
   }
 
   void IncEigCG::UpdateVm(ColorSpinorField &res, double beta, double sqrtr2)
   {
-#ifdef DEFLATEDSOLVER
     EigCGArgs &args = *eigcg_args;
 
     if(args.run_residual_correction) return;
@@ -357,8 +346,7 @@ namespace quda {
     //load Lanczos basis vector:
     blas::copy(Vm->Component(args.id), res);//convert arrays
     //rescale the vector
-    blas::ax(1.0 / sqrtr2, Vm->Component(args.id));
-#endif    
+    blas::ax(1.0 / sqrtr2, Vm->Component(args.id)); 
     return;
   }
 
@@ -369,7 +357,6 @@ namespace quda {
 
     int k=0;
 
-#ifdef DEFLATEDSOLVER
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)  errorQuda("Not supported");
 
     profile.TPSTART(QUDA_PROFILE_INIT);
@@ -560,13 +547,11 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
-#endif
     return k;
   }
 
   int IncEigCG::initCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
     int k = 0;
-#ifdef DEFLATEDSOLVER
     //Start init CG iterations:
     deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
     Deflation &defl         = *(defl_p->defl);
@@ -634,13 +619,11 @@ namespace quda {
 
     k   += Kparam.iter;
 
-#endif
     return k;
   }
 
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
-#ifdef DEFLATEDSOLVER
      if(param.rhs_idx == 0) max_eigcg_cycles = param.eigcg_max_restarts;
 
      const bool mixed_prec = (param.precision != param.precision_sloppy);
@@ -751,61 +734,13 @@ namespace quda {
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);
        defl.reduce(param.eigenval_tol, max_nev);
      }
-#endif
      return;
   }
 
   template< int stage >
   bool IncEigCG::PipeRestartVT(const double beta, const double rho, ColorSpinorField &w2)
   {
-#ifdef DEFLATEDSOLVER
-    bool is_locked  = true;
-
-    EigCGArgs &args = *eigcg_args;
-
-    switch(stage) {
-      case 0 : {
-          start thread:  
-          ComputeRitz<libtype::eigen_lib>(args);
-          break;
-        }
-//Restart V:
-      case 1 : { 
-          stop thread;
-          initialize worker
-          blas::zero(*args.V2k);
-
-          RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
-          blas::caxpy( static_cast<Complex*>(Alpha.data()), Vm->Components(), args.V2k->Components());
-
-
-          std::vector<ColorSpinorField*> v2k( Vm->Components().begin(), Vm->Components().begin()+2*args.k );
-
-          for (int i = 0; i < 2*args.k; i++) blas::copy(*v2k[i], args.V2k->Component(i));
-          break;
-        }
-//Restart T:
-      case 2 : {
-          inititalize worker
-          Vm->Component(args.m-1) = w2;
-
-          std::vector<ColorSpinorField*> omega;
-          omega.push_back( &Vm->Component(args.m-1) );
-
-          args.RestartLanczos(omega, v2k, 1.0 / rho);//global (block) reduction!
-          break;
-        }
-//Updated vectors and Lanczos:
-      case 3 : {
-          is_locked = false;
-          break;
-        } 
-      default : {
-          break;  
-        }
-    }
-#endif
-    return is_locked;
+    return false;
   }
 
   int IncEigCG::pipeEigCGsolve(ColorSpinorField &x, ColorSpinorField &b){
