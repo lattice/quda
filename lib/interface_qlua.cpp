@@ -41,12 +41,16 @@ qudaAPI_ContractId parseContractIdx(const char *v){
   
   qudaAPI_ContractId cId;
   
-  if      (strcmp(v,"contract12")==0)  cId = cntr12;
-  else if (strcmp(v,"contract13")==0)  cId = cntr13;
-  else if (strcmp(v,"contract14")==0)  cId = cntr14;
-  else if (strcmp(v,"contract23")==0)  cId = cntr23;
-  else if (strcmp(v,"contract24")==0)  cId = cntr24;
-  else if (strcmp(v,"contract34")==0)  cId = cntr34;
+  if      (strcmp(v,"contract12")==0) cId = cntr12;
+  else if (strcmp(v,"contract13")==0) cId = cntr13;
+  else if (strcmp(v,"contract14")==0) cId = cntr14;
+  else if (strcmp(v,"contract23")==0) cId = cntr23;
+  else if (strcmp(v,"contract24")==0) cId = cntr24;
+  else if (strcmp(v,"contract34")==0) cId = cntr34;
+  else if (strcmp(v,"checkProp1")==0) cId = cntrP1;
+  else if (strcmp(v,"checkProp2")==0) cId = cntrP2;
+  else if (strcmp(v,"checkProp3")==0) cId = cntrP3;
+  else if (strcmp(v,"checkProp4")==0) cId = cntrP4;
   else cId = cntr_INVALID;
   
   return cId;
@@ -323,7 +327,7 @@ doQQ_contract_Quda(
 
   //-- load the propagators
   LONG_T fld_lgh = qS->locvol * nColor * nSpin * 2;
-
+  
   ColorSpinorField *cudaProp_in1[nVec];
   ColorSpinorField *cudaProp_in2[nVec];
   ColorSpinorField *cudaProp_out[nVec];
@@ -336,6 +340,7 @@ doQQ_contract_Quda(
     
     if((cudaProp_in1[ivec] == NULL) || (cudaProp_in2[ivec] == NULL) || (cudaProp_out[ivec] == NULL))
       errorQuda("doQQ_contract_Quda: Cannot allocate propagators. Exiting.\n");
+    checkCudaError();
   }
   double t6 = MPI_Wtime();
   printfQuda("TIMING - doQQ_contract_Quda: Propagators loaded in %.6f sec.\n", t6-t5);
@@ -352,6 +357,7 @@ doQQ_contract_Quda(
   double t7 = MPI_Wtime();
   for(int ivec=0;ivec<nVec;ivec++){
     save_cudaColorSpinorField(&(hprop_out[ivec * fld_lgh]), gp, ip, nColor, nSpin, *cudaProp_out[ivec]);
+    checkCudaError();
   }
   double t8 = MPI_Wtime();
   printfQuda("TIMING - doQQ_contract_Quda: Propagator extraction done in %.6f sec.\n", t8-t7);

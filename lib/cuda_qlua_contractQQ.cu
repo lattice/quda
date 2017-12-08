@@ -52,6 +52,54 @@ namespace quda {
     }    
   }; //-- Structure definition
 
+
+  __device__ __host__ inline void rotateBasis(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *prop, RotateType rType){
+
+    const int Ns = QUDA_Ns;
+    const int Nc = QUDA_Nc;
+
+    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
+    Vector res[QUDA_PROP_NVEC];
+    
+    complex<QUDA_REAL> zro = complex<QUDA_REAL>{0,0};
+    complex<QUDA_REAL> val = complex<QUDA_REAL>{sqrt(0.5),0};
+    complex<QUDA_REAL> M[Ns][Ns] = { { zro, -val,  zro, -val},
+				     { val,  zro,  val,  zro},
+				     { zro, -val,  zro,  val},
+				     { val,  zro, -val,  zro} };
+    
+    complex<QUDA_REAL> M_Trans[Ns][Ns];
+    for(int i=0;i<Ns;i++){
+      for(int j=0;j<Ns;j++){
+	M_Trans[i][j] = M[j][i];
+      }
+    }
+    
+    complex<QUDA_REAL> (*A)[Ns];
+    if      (rType == QLUA_quda2qdp) A = M;
+    else if (rType == QLUA_qdp2quda) A = M_Trans;
+    
+    for(int ic = 0; ic < Nc; ic++){
+      for(int jc = 0; jc < Nc; jc++){
+	for(int is = 0; is < Ns; is++){
+	  for(int js = 0; js < Ns; js++){	    
+	    int iv = js + Ns*jc;
+	    int id = ic + Nc*is;
+
+	    res[iv].data[id] = 0.0;
+	    for(int a=0;a<Ns;a++){
+	      int as = ic + Nc*a;
+	      
+	      res[iv].data[id] += A[is][a] * prop[iv].data[as];
+	    }
+	  }}}
+    }
+    
+    for(int v = 0; v<QUDA_PROP_NVEC; v++)
+      prop[v] = res[v];
+	  
+  }
+  
   
   //-- Main calculation kernel
 #define ContractQQ_macro(cntrIdx, A, B, C, D)				\
@@ -69,35 +117,40 @@ namespace quda {
     const int Nc = QUDA_Nc;						\
 									\
     typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;			\
-    Vector In11,In12;							\
-    Vector In21,In22;							\
-    									\
-    const int their_spinor_parity = (arg->nParity == 2) ? 1-pty : 0;	\
-  									\
-    complex<QUDA_REAL> accum;						\
-    for(int p_a = 0; p_a < QUDA_Nc; p_a++){				\
+    Vector In1[QUDA_PROP_NVEC];						\
+    Vector In2[QUDA_PROP_NVEC];						\
+									\
+    for(int i=0;i<12;i++){						\
+      In1[i] = arg->pIn1[i](x_cb, pty);					\
+      In2[i] = arg->pIn2[i](x_cb, pty);					\
+    }									\
+    rotateBasis(In1,QLUA_quda2qdp);					\
+    rotateBasis(In2,QLUA_quda2qdp);					\
+									\
+									\
+    for(int p_a = 0; p_a < Nc; p_a++){					\
       int i1 = eps[p_a][0];						\
       int j1 = eps[p_a][1];						\
       int k1 = eps[p_a][2];						\
-      for (int p_b = 0; p_b < QUDA_Nc; p_b++){				\
+      for (int p_b = 0; p_b < Nc; p_b++){				\
 	int i2 = eps[p_b][0];						\
     	int j2 = eps[p_b][1];						\
 	int k2 = eps[p_b][2];						\
-    	for (int a = 0; a < QUDA_Ns; a++){				\
-    	  for (int b = 0; b < QUDA_Ns; b++){				\
-	    accum = 0.0;						\
-	    for (int c = 0; c < QUDA_Ns; c++){				\
-	      In11 = arg->pIn1[(B)+Ns*i2](x_cb, their_spinor_parity);	\
-	      In12 = arg->pIn1[(B)+Ns*j2](x_cb, their_spinor_parity);	\
-	      In21 = arg->pIn2[(D)+Ns*i2](x_cb, their_spinor_parity);	\
-	      In22 = arg->pIn2[(D)+Ns*j2](x_cb, their_spinor_parity);	\
-									\
-  	      accum += In11.data[i1+Nc*(A)] * In22.data[j1+Nc*(C)];	\
-	      accum -= In12.data[i1+Nc*(A)] * In21.data[j1+Nc*(C)];	\
-	      accum -= In11.data[j1+Nc*(A)] * In22.data[i1+Nc*(C)];	\
-	      accum += In12.data[j1+Nc*(A)] * In21.data[i1+Nc*(C)];	\
+    	for (int a = 0; a < Ns; a++){					\
+    	  for (int b = 0; b < Ns; b++){					\
+	    complex<QUDA_REAL> accum = 0.0;				\
+	    for (int c = 0; c < Ns; c++){				\
+	      int idx11 = (B)+Ns*i2;					\
+	      int idx12 = (B)+Ns*j2;					\
+	      int idx21 = (D)+Ns*i2;					\
+	      int idx22 = (D)+Ns*j2;					\
+	      								\
+   	      accum += In1[idx11]((A),i1) * In2[idx22]((C),j1);		\
+	      accum -= In1[idx12]((A),i1) * In2[idx21]((C),j1);		\
+	      accum -= In1[idx11]((A),j1) * In2[idx22]((C),i1);		\
+	      accum += In1[idx12]((A),j1) * In2[idx21]((C),i1);		\
 	    }								\
-	    out[b+Ns*k1].assign(accum, Nc, k2, a);			\
+	    out[b+Ns*k1](a,k2) = accum;					\
 	  }								\
 	}								\
       }									\
@@ -111,8 +164,142 @@ namespace quda {
   ContractQQ_macro(24, a,c,b,c);
   ContractQQ_macro(34, a,b,c,c);
 #undef ContractQQ_macro
-  
 
+
+  __device__ __host__ inline void checkProp1(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
+					     ContractQQArg *arg,
+					     int x_cb,
+					     int pty)
+  {
+    const int Ns = QUDA_Ns;
+    const int Nc = QUDA_Nc;
+    
+    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
+
+    complex<QUDA_REAL> scMat[Ns] = { complex<QUDA_REAL>( .1, -.1),
+				     complex<QUDA_REAL>( .01, -.01),
+				     complex<QUDA_REAL>( .001, -.001),
+				     complex<QUDA_REAL>( .0001, -.0001) };
+    complex<QUDA_REAL> re1 = {1,0};
+
+    for(int jc = 0; jc < Nc; jc++){
+      for(int js = 0; js < Ns; js++){
+	int iv = js + Ns*jc;
+
+	complex<QUDA_REAL> z_jc = {(QUDA_REAL)jc,0};
+	complex<QUDA_REAL> z_js = {(QUDA_REAL)js,0};
+	
+	Vector vec;
+	for(int ic = 0; ic < Nc; ic++){
+	  for(int is = 0; is < Ns; is++){
+	    complex<QUDA_REAL> z_ic = {(QUDA_REAL)ic,0};
+	    complex<QUDA_REAL> z_is = {(QUDA_REAL)is,0};
+	    
+	    vec(is,ic) = ( z_ic*scMat[0] + z_is*scMat[1] + z_jc*scMat[2] + z_js*scMat[3] ) * re1;
+	  }
+	}
+	out[iv] = vec;
+      }
+    }
+  } //-- function closes
+
+
+  __device__ __host__ inline void checkProp2(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
+					     ContractQQArg *arg,
+					     int x_cb,
+					     int pty)
+  {
+    const int Ns = QUDA_Ns;
+    const int Nc = QUDA_Nc;
+    
+    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
+
+    complex<QUDA_REAL> re1 = {1,0};
+
+    for(int jc = 0; jc < Nc; jc++){
+      for(int js = 0; js < Ns; js++){
+	int iv = js + Ns*jc;	
+	for(int ic = 0; ic < Nc; ic++){
+	  for(int is = 0; is < Ns; is++){
+	    int id = ic + Nc*is;
+
+            if (0 == ic && 0 == jc && is == js)
+	      out[iv].data[id] = re1;
+	    else
+	      out[iv].data[id] = 0;
+	  }}}
+    }
+  } //-- function closes
+
+
+  __device__ __host__ inline void checkProp3(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
+					     ContractQQArg *arg,
+					     int x_cb,
+					     int pty)
+  {
+    const int Ns = QUDA_Ns;
+    const int Nc = QUDA_Nc;    
+
+    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
+    Vector In1[QUDA_PROP_NVEC];
+    Vector In2[QUDA_PROP_NVEC];
+
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      In1[i] = arg->pIn1[i](x_cb, pty);
+      In2[i] = arg->pIn2[i](x_cb, pty);
+    }
+
+    rotateBasis(In1,QLUA_quda2qdp);
+    rotateBasis(In2,QLUA_quda2qdp);
+    
+    for(int jc = 0; jc < Nc; jc++){
+      for(int js = 0; js < Ns; js++){
+    	int iv = js + Ns*jc;	
+    	for(int ic = 0; ic < Nc; ic++){
+    	  for(int is = 0; is < Ns; is++){
+    	    int id = ic + Nc*is;
+	    out[iv].data[id] = In1[iv].data[id];
+	  }}}
+    }
+  } //-- function closes
+
+  
+  __device__ __host__ inline void checkProp4(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
+					     ContractQQArg *arg,
+					     int x_cb,
+					     int pty)
+  {
+    const int Ns = QUDA_Ns;
+    const int Nc = QUDA_Nc;
+    
+    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
+    Vector In1[QUDA_PROP_NVEC];
+    Vector In2[QUDA_PROP_NVEC];
+    
+    for(int i=0;i<QUDA_PROP_NVEC;i++){
+      In1[i] = arg->pIn1[i](x_cb, pty);
+      In2[i] = arg->pIn2[i](x_cb, pty);
+    }
+
+    rotateBasis(In1,QLUA_quda2qdp);
+    rotateBasis(In2,QLUA_quda2qdp);
+
+    complex<QUDA_REAL> z1, z2;
+    z1 = {5.0,2.0};
+    z2 = {3.0,7.0};
+    for(int be=0;be<Ns;be++){
+      for(int b=0;b<Nc;b++){
+    	int vi = be + Ns*b;
+    	for(int al=0;al<Ns;al++){
+    	  for(int a=0;a<Nc;a++){
+    	    int di = a + Nc*al;
+
+    	    out[vi].data[di] = z1 * In1[vi].data[di] + z2 * In2[vi].data[di];
+    	  }}}
+    }
+  } //-- function closes
+
+  
   __device__ __host__ inline void computeContractQQ(ContractQQArg *arg, int x_cb, int pty){
     
     typedef ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> Vector;
@@ -137,15 +324,28 @@ namespace quda {
     case cntr34:
       performContractQQ34(out, arg, x_cb, pty);
       break;
+    case cntrP1:
+      checkProp1(out, arg, x_cb, pty);
+      break;
+    case cntrP2:
+      checkProp2(out, arg, x_cb, pty);
+      break;
+    case cntrP3:
+      checkProp3(out, arg, x_cb, pty);
+      break;
+    case cntrP4:
+      checkProp4(out, arg, x_cb, pty);
+      break;
     case cntr_INVALID: // Added it just to avoid the compilation warning, check has already been made
       break;
     }    
 
-    for(int ivec=0;ivec<arg->nVec;ivec++){
-      arg->pOut[ivec](x_cb,pty) = out[ivec];
-    }
+    rotateBasis(out, QLUA_qdp2quda);
+        
+    for(int ivec=0;ivec<arg->nVec;ivec++)
+      arg->pOut[ivec](x_cb, pty) = out[ivec];
     
-  }
+  } //-- function closes
   
   
   //-- CPU kernel for performing the contractions
@@ -169,7 +369,7 @@ namespace quda {
     if (x_cb >= arg_dev->volumeCB) return;
     if (parity >= arg_dev->nParity) return;
     parity = (arg_dev->nParity == 2) ? parity : arg_dev->parity;
-
+    
     computeContractQQ(arg_dev, x_cb, parity);
   }    
   
@@ -203,17 +403,11 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        double t1 = MPI_Wtime();
 	ContractQQ_CPU(arg);
-	double t2 = MPI_Wtime();
-	printfQuda("TIMING - ContractQQ_CPU: Done in %.6f sec\n", t2-t1);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        double t1 = MPI_Wtime();
 	ContractQQ_GPU <<<tp.grid,tp.block,tp.shared_bytes,stream>>> (arg_dev);
-        double t2 = MPI_Wtime();
-        printfQuda("TIMING - ContractQQ_GPU: Done in %.6f sec\n", t2-t1);
       }
     }
 
@@ -237,7 +431,6 @@ namespace quda {
     
     ContractQQ contract(arg, arg_dev, *propIn1[0]);
     contract.apply(0);
-
   }
 
   

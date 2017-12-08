@@ -33,6 +33,10 @@ typedef enum qudaAPI_ContractId_s{
   cntr23 = 23,
   cntr24 = 24,
   cntr34 = 34,
+  cntrP1 = 100,
+  cntrP2 = 200,
+  cntrP3 = 300,
+  cntrP4 = 400,
   cntr_INVALID = 0
 } qudaAPI_ContractId;
 
@@ -71,6 +75,11 @@ typedef struct{
   QUDA_REAL re;
   QUDA_REAL im;
 } QLUA_COMPLEX;
+
+typedef enum RotateType_s {
+  QLUA_qdp2quda = 1,
+  QLUA_quda2qdp = 2
+} RotateType;
 
 
 EXTRN_C
