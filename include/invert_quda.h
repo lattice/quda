@@ -863,6 +863,7 @@ namespace quda {
 
   //forward declaration
   class EigCGArgs;
+  class EigCGTasks;
 
   class IncEigCG : public Solver {
 
@@ -875,6 +876,7 @@ namespace quda {
     SolverParam Kparam; // parameters for preconditioner solve
 
     std::shared_ptr<ColorSpinorFieldSet> Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+//    std::shared_ptr<ColorSpinorFieldSet> Vp;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x pipeline length)
 
     std::shared_ptr<ColorSpinorField> rp;       //! residual vector
     std::shared_ptr<ColorSpinorField> yp;       //! high precision accumulator
@@ -885,7 +887,8 @@ namespace quda {
     std::shared_ptr<ColorSpinorField> r_pre;    //! residual passed to preconditioner
     std::shared_ptr<ColorSpinorField> p_pre;    //! preconditioner result
 
-    std::shared_ptr<EigCGArgs>  eigcg_args;
+    std::shared_ptr<EigCGArgs>   eigcg_args;
+    std::shared_ptr<EigCGTasks>  eigcg_tsks;     //pipelined eigCG
 
     TimeProfile &profile;    //time profile for initCG solver
 
@@ -901,12 +904,15 @@ namespace quda {
     void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2); 
     //EigCG solver:
     int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-    //pipeEigCG solver:
-    int pipeEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //InitCG solver:
     int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver (for eigcg and initcg calls)
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    //pipelined eigCG solver:
+    int pipeEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    //
+    bool PipelinedRestart(const int current_pipeline_idx);
+
   };
 
 //forward declaration
