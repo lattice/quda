@@ -17,10 +17,7 @@
 #include <blas_magma.h>
 #endif
 
-#ifdef DEFLATEDSOLVER
 #include <Eigen/Dense>
-#endif
-
 #include <deflation.h>
 
 
