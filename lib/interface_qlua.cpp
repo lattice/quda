@@ -47,10 +47,6 @@ qudaAPI_ContractId parseContractIdx(const char *v){
   else if (strcmp(v,"contract23")==0) cId = cntr23;
   else if (strcmp(v,"contract24")==0) cId = cntr24;
   else if (strcmp(v,"contract34")==0) cId = cntr34;
-  else if (strcmp(v,"checkProp1")==0) cId = cntrP1;
-  else if (strcmp(v,"checkProp2")==0) cId = cntrP2;
-  else if (strcmp(v,"checkProp3")==0) cId = cntrP3;
-  else if (strcmp(v,"checkProp4")==0) cId = cntrP4;
   else cId = cntr_INVALID;
   
   return cId;

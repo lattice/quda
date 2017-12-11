@@ -52,7 +52,19 @@ namespace quda {
     }    
   }; //-- Structure definition
 
+  /**
+     When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
+     This function is required in order to rotate the ColorSpinorFields between the Quda and the QDP bases.
+     The rotation matrix is ( with a factor sqrt(0.5) ):
+              ( 0 -1  0 -1)
+	  M = ( 1  0  1  0)
+              ( 0 -1  0  1)
+	      ( 1  0 -1  0)
 
+     Before the calculation the ColorSpinorFields must be rotated as F <- M F  (quda2qdp).
+     After the calculation the result must be rotated back to the Quda basis R <- M^T R (qdp2quda),
+     so that when Quda copies back to the CPU the result is again rotated to the QDP convention.
+   */
   __device__ __host__ inline void rotateBasis(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *prop, RotateType rType){
 
     const int Ns = QUDA_Ns;
@@ -75,7 +87,7 @@ namespace quda {
       }
     }
     
-    complex<QUDA_REAL> (*A)[Ns];
+    complex<QUDA_REAL> (*A)[Ns] = NULL;
     if      (rType == QLUA_quda2qdp) A = M;
     else if (rType == QLUA_qdp2quda) A = M_Trans;
     
@@ -165,140 +177,6 @@ namespace quda {
   ContractQQ_macro(34, a,b,c,c);
 #undef ContractQQ_macro
 
-
-  __device__ __host__ inline void checkProp1(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
-					     ContractQQArg *arg,
-					     int x_cb,
-					     int pty)
-  {
-    const int Ns = QUDA_Ns;
-    const int Nc = QUDA_Nc;
-    
-    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
-
-    complex<QUDA_REAL> scMat[Ns] = { complex<QUDA_REAL>( .1, -.1),
-				     complex<QUDA_REAL>( .01, -.01),
-				     complex<QUDA_REAL>( .001, -.001),
-				     complex<QUDA_REAL>( .0001, -.0001) };
-    complex<QUDA_REAL> re1 = {1,0};
-
-    for(int jc = 0; jc < Nc; jc++){
-      for(int js = 0; js < Ns; js++){
-	int iv = js + Ns*jc;
-
-	complex<QUDA_REAL> z_jc = {(QUDA_REAL)jc,0};
-	complex<QUDA_REAL> z_js = {(QUDA_REAL)js,0};
-	
-	Vector vec;
-	for(int ic = 0; ic < Nc; ic++){
-	  for(int is = 0; is < Ns; is++){
-	    complex<QUDA_REAL> z_ic = {(QUDA_REAL)ic,0};
-	    complex<QUDA_REAL> z_is = {(QUDA_REAL)is,0};
-	    
-	    vec(is,ic) = ( z_ic*scMat[0] + z_is*scMat[1] + z_jc*scMat[2] + z_js*scMat[3] ) * re1;
-	  }
-	}
-	out[iv] = vec;
-      }
-    }
-  } //-- function closes
-
-
-  __device__ __host__ inline void checkProp2(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
-					     ContractQQArg *arg,
-					     int x_cb,
-					     int pty)
-  {
-    const int Ns = QUDA_Ns;
-    const int Nc = QUDA_Nc;
-    
-    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
-
-    complex<QUDA_REAL> re1 = {1,0};
-
-    for(int jc = 0; jc < Nc; jc++){
-      for(int js = 0; js < Ns; js++){
-	int iv = js + Ns*jc;	
-	for(int ic = 0; ic < Nc; ic++){
-	  for(int is = 0; is < Ns; is++){
-	    int id = ic + Nc*is;
-
-            if (0 == ic && 0 == jc && is == js)
-	      out[iv].data[id] = re1;
-	    else
-	      out[iv].data[id] = 0;
-	  }}}
-    }
-  } //-- function closes
-
-
-  __device__ __host__ inline void checkProp3(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
-					     ContractQQArg *arg,
-					     int x_cb,
-					     int pty)
-  {
-    const int Ns = QUDA_Ns;
-    const int Nc = QUDA_Nc;    
-
-    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
-    Vector In1[QUDA_PROP_NVEC];
-    Vector In2[QUDA_PROP_NVEC];
-
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      In1[i] = arg->pIn1[i](x_cb, pty);
-      In2[i] = arg->pIn2[i](x_cb, pty);
-    }
-
-    rotateBasis(In1,QLUA_quda2qdp);
-    rotateBasis(In2,QLUA_quda2qdp);
-    
-    for(int jc = 0; jc < Nc; jc++){
-      for(int js = 0; js < Ns; js++){
-    	int iv = js + Ns*jc;	
-    	for(int ic = 0; ic < Nc; ic++){
-    	  for(int is = 0; is < Ns; is++){
-    	    int id = ic + Nc*is;
-	    out[iv].data[id] = In1[iv].data[id];
-	  }}}
-    }
-  } //-- function closes
-
-  
-  __device__ __host__ inline void checkProp4(ColorSpinor<QUDA_REAL,QUDA_Nc,QUDA_Ns> *out,
-					     ContractQQArg *arg,
-					     int x_cb,
-					     int pty)
-  {
-    const int Ns = QUDA_Ns;
-    const int Nc = QUDA_Nc;
-    
-    typedef ColorSpinor<QUDA_REAL,Nc,Ns> Vector;
-    Vector In1[QUDA_PROP_NVEC];
-    Vector In2[QUDA_PROP_NVEC];
-    
-    for(int i=0;i<QUDA_PROP_NVEC;i++){
-      In1[i] = arg->pIn1[i](x_cb, pty);
-      In2[i] = arg->pIn2[i](x_cb, pty);
-    }
-
-    rotateBasis(In1,QLUA_quda2qdp);
-    rotateBasis(In2,QLUA_quda2qdp);
-
-    complex<QUDA_REAL> z1, z2;
-    z1 = {5.0,2.0};
-    z2 = {3.0,7.0};
-    for(int be=0;be<Ns;be++){
-      for(int b=0;b<Nc;b++){
-    	int vi = be + Ns*b;
-    	for(int al=0;al<Ns;al++){
-    	  for(int a=0;a<Nc;a++){
-    	    int di = a + Nc*al;
-
-    	    out[vi].data[di] = z1 * In1[vi].data[di] + z2 * In2[vi].data[di];
-    	  }}}
-    }
-  } //-- function closes
-
   
   __device__ __host__ inline void computeContractQQ(ContractQQArg *arg, int x_cb, int pty){
     
@@ -323,18 +201,6 @@ namespace quda {
       break;
     case cntr34:
       performContractQQ34(out, arg, x_cb, pty);
-      break;
-    case cntrP1:
-      checkProp1(out, arg, x_cb, pty);
-      break;
-    case cntrP2:
-      checkProp2(out, arg, x_cb, pty);
-      break;
-    case cntrP3:
-      checkProp3(out, arg, x_cb, pty);
-      break;
-    case cntrP4:
-      checkProp4(out, arg, x_cb, pty);
       break;
     case cntr_INVALID: // Added it just to avoid the compilation warning, check has already been made
       break;

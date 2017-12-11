@@ -8,11 +8,6 @@
 #include <interface_qlua.h>
 #include <complex_quda.h>
 
-#define CMUL(x,y)  ( (QLUA_COMPLEX) {(x.re) * (y.re) - (x.im) * (y.im), (x.re) * (y.im) + (x.im) * (y.re) } )
-#define CADD(x,y)  ( (QLUA_COMPLEX) {(x.re)+(y.re), (x.im)+(y.im)})
-#define CSUB(x,y)  ( (QLUA_COMPLEX) {(x.re)-(y.re), (x.im)-(y.im)})
-#define FETCH(ptr,c,s) ( (QLUA_COMPLEX) { ptr[(c)+QUDA_Nc*(s)].x, ptr[(c)+QUDA_Nc*(s)].y } )
-
 namespace quda {
   
   void cudaContractQQ(

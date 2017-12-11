@@ -33,10 +33,6 @@ typedef enum qudaAPI_ContractId_s{
   cntr23 = 23,
   cntr24 = 24,
   cntr34 = 34,
-  cntrP1 = 100,
-  cntrP2 = 200,
-  cntrP3 = 300,
-  cntrP4 = 400,
   cntr_INVALID = 0
 } qudaAPI_ContractId;
 
