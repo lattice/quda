@@ -172,19 +172,20 @@ namespace quda {
 
   }
 
-  // This does the exchange of the gauge field ghost zone and places
-  // it into the ghost array.
+  // This does the exchange of the forwards boundary gauge field ghost zone and places
+  // it into the ghost array of the next node
   void cudaGaugeField::exchangeGhost(QudaLinkDirection link_direction) {
 
     if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD) errorQuda("Cannot call exchangeGhost with ghostExchange=%d", ghostExchange);
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY) errorQuda("Invalid geometry=%d", geometry);
     if ( (link_direction == QUDA_LINK_BIDIRECTIONAL || link_direction == QUDA_LINK_FORWARDS) && geometry != QUDA_COARSE_GEOMETRY)
       errorQuda("Cannot request exchange of forward links on non-coarse geometry");
+    if (nFace == 0) errorQuda("nFace = 0");
 
     const int dir = 1; // sending forwards only
     const int R[] = {nFace, nFace, nFace, nFace};
-    const bool no_comms_fill = true;
-    createComms(R, no_comms_fill);
+    const bool no_comms_fill = true; // dslash kernels presently require this
+    createComms(R, true); // always need to allocate space for non-partitioned dimension for copyGenericGauge
 
     // loop over backwards and forwards links
     const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
@@ -196,7 +197,6 @@ namespace quda {
 
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
-	if ( !(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
 	// receive from backwards is first half of each ghost_recv_buffer
 	recv_d[d] = static_cast<char*>(ghost_recv_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
 	// send forwards is second half of each ghost_send_buffer
@@ -264,11 +264,12 @@ namespace quda {
     if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD) errorQuda("Cannot call exchangeGhost with ghostExchange=%d", ghostExchange);
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY) errorQuda("Invalid geometry=%d", geometry);
     if (link_direction != QUDA_LINK_BACKWARDS) errorQuda("Invalid link_direction = %d", link_direction);
+    if (nFace == 0) errorQuda("nFace = 0");
 
     const int dir = 0; // sending backwards only
     const int R[] = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = false; // injection never does no_comms_fill
-    createComms(R, no_comms_fill);
+    createComms(R, true); // always need to allocate space for non-partitioned dimension for copyGenericGauge
 
     // loop over backwards and forwards links (forwards links never sent but leave here just in case)
     const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
@@ -280,7 +281,6 @@ namespace quda {
 
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
-	if ( !(comm_dim_partitioned(d) || (no_comms_fill && R[d])) ) continue;
 	// send backwards is first half of each ghost_send_buffer
 	send_d[d] = static_cast<char*>(ghost_send_buffer_d[bufferIndex]) + offset; offset += ghost_face_bytes[d];
 	// receive from forwards is the second half of each ghost_recv_buffer
