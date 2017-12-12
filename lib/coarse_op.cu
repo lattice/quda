@@ -107,11 +107,13 @@ namespace quda {
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
-    if (coarseColor == 2) {
-      calculateY<Float,vFloat,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
 #if 0
     } else if (coarseCoor == 4) {
       calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+#endif
+    if (coarseColor == 6) { // free field Wilson
+      calculateY<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+#if 0
     } else if (coarseColor == 8) {
       calculateY<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 12) {

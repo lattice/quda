@@ -1744,7 +1744,7 @@ void usage(char** argv )
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
-  printf("    --kappa                                   # Kappa of Dirac operator (default 0.1)\n");
+  printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
   printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
   printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
@@ -1781,8 +1781,8 @@ void usage(char** argv )
   printf("    --mg-schwarz-cycle <level cycle>          # The number of Schwarz cycles to apply per smoother application (default=1)\n");
   printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
-  printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
-  printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
+  printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't set, creates free-field null vectors)\n");
+  printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --mg-vebosity <level verb>                # The verbosity to use on each level of the multigrid (default summarize)\n");
@@ -2622,6 +2622,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
+
 
   if( strcmp(argv[i], "--mg-setup-maxiter") == 0){
     if (i+2 >= argc){

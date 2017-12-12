@@ -13,12 +13,12 @@ namespace quda {
   void random(T &t) {
     for (int parity=0; parity<t.Nparity(); parity++) {
       for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
-	for (int s=0; s<t.Nspin(); s++) {
-	  for (int c=0; c<t.Ncolor(); c++) {
-	    t(parity,x_cb,s,c).real(comm_drand());
-	    t(parity,x_cb,s,c).imag(comm_drand());
-	  }
-	}
+      	for (int s=0; s<t.Nspin(); s++) {
+      	  for (int c=0; c<t.Ncolor(); c++) {
+      	    t(parity,x_cb,s,c).real(comm_drand());
+      	    t(parity,x_cb,s,c).imag(comm_drand());
+      	  }
+      	}
       }
     }
   }
@@ -37,13 +37,13 @@ namespace quda {
   void constant(T &t, int k, int s, int c) {
     for (int parity=0; parity<t.Nparity(); parity++) {
       for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
-	// set all color-spin components to zero
-	for (int s2=0; s2<t.Nspin(); s2++) {
-	  for (int c2=0; c2<t.Ncolor(); c2++) {
-	    t(parity,x_cb,s2,c2) = 0.0;
-	  }
-	}
-	t(parity,x_cb,s,c) = k; // now set the one we want
+      	// set all color-spin components to zero
+      	for (int s2=0; s2<t.Nspin(); s2++) {
+      	  for (int c2=0; c2<t.Ncolor(); c2++) {
+      	    t(parity,x_cb,s2,c2) = 0.0;
+      	  }
+      	}
+        t(parity,x_cb,s,c) = k; // now set the one we want
       }
     }
   }
@@ -59,14 +59,50 @@ namespace quda {
 
     for (int parity=0; parity<p.Nparity(); parity++) {
       for (int x_cb=0; x_cb<p.VolumeCB(); x_cb++) {
-	getCoords(coord, x_cb, X, parity);
+        getCoords(coord, x_cb, X, parity);
 
-	double mode = n * (double)coord[d] / X[d];
-	double k = (double)offset + sin (M_PI * mode);
+        double mode = n * (double)coord[d] / X[d];
+        double k = (double)offset + sin (M_PI * mode);
 
-	for (int s=0; s<p.Nspin(); s++)
-	  for (int c=0; c<p.Ncolor(); c++)
-	    p(parity, x_cb, s, c) = k;
+        for (int s=0; s<p.Nspin(); s++)
+          for (int c=0; c<p.Ncolor(); c++)
+            p(parity, x_cb, s, c) = k;
+      }
+    }
+  }
+
+  /**
+     Create a corner source with value "v" on color "c"
+     on a single corner overloaded into "s". "s" is 
+     encoded via a bitmap: 1010 -> x = 0, y = 1, z = 0, t = 1
+     corner, for ex.
+  */
+  template <class T>
+  void corner(T &p, int v, int s, int c) {
+    if (p.Nspin() != 1)
+      errorQuda("ERROR: lib/color_spinor_util.cu, corner() is only defined for Nspin = 1 fields.\n");
+
+    int coord[4];
+    int X[4] = { p.X(0), p.X(1), p.X(2), p.X(3)};
+    X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
+
+    for (int parity=0; parity<p.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<p.VolumeCB(); x_cb++) {
+
+        
+        // get coords
+        getCoords(coord, x_cb, X, parity);
+
+        // Figure out corner of current site.
+        int corner = 8*(coord[3]%2)+4*(coord[2]%2)+2*(coord[1]%2)+(coord[0]%2);
+
+        // set all color components to zero
+        for (int c2=0; c2<p.Ncolor(); c2++) {
+          p(parity,x_cb,0,c2) = 0.0;
+          // except the corner and color we want
+          if (s == corner)
+            p(parity,x_cb,0,c) = (double)v;
+        }
       }
     }
   }
@@ -79,17 +115,18 @@ namespace quda {
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
     else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s, c);
+    else if (sourceType == QUDA_CORNER_SOURCE) corner(A, x, s, c);
     else errorQuda("Unsupported source type %d", sourceType);
   }
 
   template <typename Float, int nSpin, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
-    if (a.Ncolor() == 2) {
-      genericSource<Float,nSpin,2,order>(a,sourceType, x, s, c);
-    } else if (a.Ncolor() == 3) {
+    if (a.Ncolor() == 3) {
       genericSource<Float,nSpin,3,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 4) {
       genericSource<Float,nSpin,4,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 6) { // for Wilson free field
+      genericSource<Float,nSpin,6,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 8) {
       genericSource<Float,nSpin,8,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 12) {
