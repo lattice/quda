@@ -64,11 +64,11 @@ namespace quda {
 		  for (int i=0; i<gauge::Ncolor(length); i++) {
 		    for (int j=0; j<gauge::Ncolor(length); j++) {
 		      if (extract) {
-			arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, indexGhost, i, j)
+			arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, indexGhost, i, j)
 			  = arg.order(dim+arg.offset, parity, indexCB, i, j);
 		      } else { // injection
 			arg.order(dim+arg.offset, parity, indexCB, i, j)
-			  = arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, indexGhost, i, j);
+			  = arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, indexGhost, i, j);
 		      }
 		    }
 		  }
@@ -76,10 +76,10 @@ namespace quda {
 		  if (extract) {
 		    RegType u[length];
 		    arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
-		    arg.order.saveGhost(u, indexGhost, dim+arg.offset, (parity+arg.localParity[dim])&1);
+		    arg.order.saveGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
 		  } else { // injection
 		    RegType u[length];
-		    arg.order.loadGhost(u, indexGhost, dim+arg.offset, (parity+arg.localParity[dim])&1);
+		    arg.order.loadGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
 		    arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
 		  }
 #endif
@@ -134,11 +134,11 @@ namespace quda {
 	  for (int i=0; i<gauge::Ncolor(length); i++) {
 	    for (int j=0; j<gauge::Ncolor(length); j++) {
 	      if (extract) {
-		arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, X>>1, i, j)
+		arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j)
 		  = arg.order(dim+arg.offset, parity, indexCB, i, j);
 	      } else { // injection
 		arg.order(dim+arg.offset, parity, indexCB, i, j)
-		  = arg.order.Ghost(dim+arg.offset, (parity+arg.localParity[dim])&1, X>>1, i, j);
+		  = arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j);
 	      }
 	    }
 	  }
@@ -146,10 +146,10 @@ namespace quda {
 	  if (extract) {
 	    RegType u[length];
 	    arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
-	    arg.order.saveGhost(u, X>>1, dim+arg.offset, (parity+arg.localParity[dim])&1);
+	    arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
 	  } else {
 	    RegType u[length];
-	    arg.order.loadGhost(u, X>>1, dim+arg.offset, (parity+arg.localParity[dim])&1);
+	    arg.order.loadGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
 	    arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
 	  }
 #endif

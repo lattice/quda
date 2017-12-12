@@ -310,14 +310,10 @@ namespace quda {
 #undef PUSH_RANGE
 #undef POP_RANGE
 
-#ifdef MULTI_GPU
 #ifdef PTHREADS
   const int Nstream = 10;
 #else
   const int Nstream = 9;
-#endif
-#else
-  const int Nstream = 1;
 #endif
 
   /**
