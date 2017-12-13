@@ -1710,7 +1710,7 @@ struct DslashNC : DslashPolicyImp {
 
 };
 
-  enum QudaDslashPolicy {
+  enum class QudaDslashPolicy {
     QUDA_DSLASH,
     QUDA_FUSED_DSLASH,
     QUDA_GDR_DSLASH,
@@ -1726,8 +1726,13 @@ struct DslashNC : DslashPolicyImp {
     QUDA_DSLASH_ASYNC,
     QUDA_FUSED_DSLASH_ASYNC,
     QUDA_PTHREADS_DSLASH,
-    QUDA_DSLASH_NC
+    QUDA_DSLASH_NC,
+    QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
   };
+
+ static std::vector<QudaDslashPolicy> policies(static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED), QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+
+
 
 struct DslashFactory {
 
@@ -1736,62 +1741,62 @@ struct DslashFactory {
     DslashPolicyImp* result = nullptr;
 
     switch(dslashPolicy){
-    case QUDA_DSLASH:
+    case QudaDslashPolicy::QUDA_DSLASH:
       result = new DslashBasic;
       break;
-    case QUDA_DSLASH_ASYNC:
+    case QudaDslashPolicy::QUDA_DSLASH_ASYNC:
       result = new DslashAsync;
       break;
-    case QUDA_PTHREADS_DSLASH:
+    case QudaDslashPolicy::QUDA_PTHREADS_DSLASH:
       result = new DslashPthreads;
       break;
-    case QUDA_FUSED_DSLASH:
+    case QudaDslashPolicy::QUDA_FUSED_DSLASH:
       result = new DslashFusedExterior;
       break;
-    case QUDA_FUSED_DSLASH_ASYNC:
+    case QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC:
       result = new DslashFusedExteriorAsync;
       break;
-    case QUDA_GDR_DSLASH:
+    case QudaDslashPolicy::QUDA_GDR_DSLASH:
       if (!comm_gdr_blacklist()) result = new DslashGDR;
       else result = new DslashBasic;
       break;
-    case QUDA_FUSED_GDR_DSLASH:
+    case QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH:
       if (!comm_gdr_blacklist()) result = new DslashFusedGDR;
       else result = new DslashFusedExterior;
       break;
-    case QUDA_GDR_RECV_DSLASH:
+    case QudaDslashPolicy::QUDA_GDR_RECV_DSLASH:
       if (!comm_gdr_blacklist()) result = new DslashGDRRecv;
       else result = new DslashBasic;
       break;
-    case QUDA_FUSED_GDR_RECV_DSLASH:
+    case QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH:
       if (!comm_gdr_blacklist()) result = new DslashFusedGDRRecv;
       else result = new DslashFusedExterior;
       break;
-    case QUDA_ZERO_COPY_PACK_DSLASH:
+    case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH:
       result = new DslashZeroCopyPack;
       break;
-    case QUDA_FUSED_ZERO_COPY_PACK_DSLASH:
+    case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH:
       result = new DslashFusedZeroCopyPack;
       break;
-    case QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH:
+    case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH:
       if (!comm_gdr_blacklist()) result = new DslashZeroCopyPackGDRRecv;
       else result = new DslashZeroCopyPack;
       break;
-    case QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH:
+    case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH:
       if (!comm_gdr_blacklist()) result = new DslashFusedZeroCopyPackGDRRecv;
       else result = new DslashFusedZeroCopyPack;
       break;
-    case QUDA_ZERO_COPY_DSLASH:
+    case QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH:
       result = new DslashZeroCopy;
       break;
-    case QUDA_FUSED_ZERO_COPY_DSLASH:
+    case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH:
       result = new DslashFusedZeroCopy;
       break;
-    case QUDA_DSLASH_NC:
+    case QudaDslashPolicy::QUDA_DSLASH_NC:
       result = new DslashNC;
       break;
     default:
-      errorQuda("Dslash policy %d not recognized",dslashPolicy);
+      errorQuda("Dslash policy %d not recognized",static_cast<int>(dslashPolicy));
       break;
     }
     return result; // default 
@@ -1799,8 +1804,17 @@ struct DslashFactory {
 };
 
  static bool dslash_init = false;
- static std::vector<QudaDslashPolicy> policy;
+
  static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
+ static int first_active_policy=static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
+
+void enable_policy(QudaDslashPolicy p){
+  policies[static_cast<std::size_t>(p)] = p;
+}
+
+void disable_policy(QudaDslashPolicy p){
+  policies[static_cast<std::size_t>(p)] = QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED;
+}
 
  class DslashPolicyTune : public Tunable {
 
@@ -1826,7 +1840,6 @@ struct DslashFactory {
    {
 
      if (!dslash_init) {
-       policy.reserve(10);
        static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_POLICY");
        if (dslash_policy_env) { // set the policies to tune for explicitly
 	 std::stringstream policy_list(dslash_policy_env);
@@ -1835,35 +1848,41 @@ struct DslashFactory {
 	 while (policy_list >> policy_) {
 	   QudaDslashPolicy dslash_policy = static_cast<QudaDslashPolicy>(policy_);
 
-	   // check this is a valid policy choice
-	   if ( (dslash_policy == QUDA_GDR_DSLASH || dslash_policy == QUDA_FUSED_GDR_DSLASH ||
-		 dslash_policy == QUDA_GDR_RECV_DSLASH || dslash_policy == QUDA_FUSED_GDR_RECV_DSLASH)
-		&& !comm_gdr_enabled() ) {
-	     errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", dslash_policy);
+     // check this is a valid policy choice
+     if ( ( dslash_policy == QudaDslashPolicy::QUDA_GDR_DSLASH || 
+            dslash_policy == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+            dslash_policy == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH || 
+            dslash_policy == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH)
+	       	&& !comm_gdr_enabled() ) {
+	     errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", static_cast<int>(dslash_policy));
 	   }
 
-	   policy.push_back(static_cast<QudaDslashPolicy>(policy_));
+	   enable_policy(static_cast<QudaDslashPolicy>(policy_));
+     first_active_policy = policy_ < first_active_policy ? policy_ : first_active_policy; 
 	   if (policy_list.peek() == ',') policy_list.ignore();
 	 }
-       } else {
-	 policy.push_back(QUDA_DSLASH);
-	 policy.push_back(QUDA_FUSED_DSLASH);
+   if(first_active_policy == static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_POLICY");
+       } 
+       else {
+	 enable_policy(QudaDslashPolicy::QUDA_DSLASH);
+   first_active_policy = 0;
+	 enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH);
 
 	 // if we have gdr then enable tuning these policies
 	 if (comm_gdr_enabled()) {
-	   policy.push_back(QUDA_GDR_DSLASH);
-	   policy.push_back(QUDA_FUSED_GDR_DSLASH);
-	   policy.push_back(QUDA_GDR_RECV_DSLASH);
-	   policy.push_back(QUDA_FUSED_GDR_RECV_DSLASH);
+	   enable_policy(QudaDslashPolicy::QUDA_GDR_DSLASH);
+	   enable_policy(QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH);
+	   enable_policy(QudaDslashPolicy::QUDA_GDR_RECV_DSLASH);
+	   enable_policy(QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH);
 	   config+=2;
 	 }
 
-	 policy.push_back(QUDA_ZERO_COPY_PACK_DSLASH);
-	 policy.push_back(QUDA_FUSED_ZERO_COPY_PACK_DSLASH);
+	 enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH);
+	 enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH);
 
 	 if (comm_gdr_enabled()) {
-	   policy.push_back(QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH);
-	   policy.push_back(QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH);
+	   enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH);
+	   enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH);
 	 }
 
 	 // if we have p2p for now exclude zero-copy dslash halo reads
@@ -1873,8 +1892,8 @@ struct DslashFactory {
 	 config+=p2p;
 
 	 // note these policies do not presently use p2p
-	 policy.push_back(QUDA_ZERO_COPY_DSLASH);
-	 policy.push_back(QUDA_FUSED_ZERO_COPY_DSLASH);
+	 enable_policy(QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH);
+	 enable_policy(QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH);
 
 	 // Async variants are only supported on CUDA 8.0 and up
 #if (CUDA_VERSION >= 8000) && 0
@@ -1887,8 +1906,8 @@ struct DslashFactory {
 	 int can_use_stream_mem_ops = 1;
 #endif
 	 if (can_use_stream_mem_ops) {
-	   policy.push_back(QUDA_DSLASH_ASYNC);
-	   policy.push_back(QUDA_FUSED_DSLASH_ASYNC);
+	   enable_policy(QudaDslashPolicy::QUDA_DSLASH_ASYNC);
+	   enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC);
 	 }
 #endif
        }
@@ -1929,20 +1948,27 @@ struct DslashFactory {
      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
        disableProfileCount();
 
-       for (auto &i : policy) {
+       for (auto &i : policies) {
 
-	 if (i == QUDA_DSLASH || i == QUDA_FUSED_DSLASH ||
-	     i == QUDA_DSLASH_ASYNC || i == QUDA_FUSED_DSLASH_ASYNC) {
+	 if (i == QudaDslashPolicy::QUDA_DSLASH || 
+       i == QudaDslashPolicy::QUDA_FUSED_DSLASH ||
+	     i == QudaDslashPolicy::QUDA_DSLASH_ASYNC || 
+       i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) {
 
 	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
 	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
 	   delete dslashImp;
 
-	 } else if (i == QUDA_GDR_DSLASH || i == QUDA_FUSED_GDR_DSLASH ||
-		    i == QUDA_GDR_RECV_DSLASH || i == QUDA_FUSED_GDR_RECV_DSLASH ||
-		    i == QUDA_ZERO_COPY_PACK_DSLASH || i == QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
-		    i == QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH || i == QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
-		    i == QUDA_ZERO_COPY_DSLASH || i == QUDA_FUSED_ZERO_COPY_DSLASH) {
+	 } else if (i == QudaDslashPolicy::QUDA_GDR_DSLASH || 
+              i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+		          i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH || 
+              i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH ||
+		          i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
+              i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
+		          i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH || 
+              i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
+              i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || 
+              i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) {
 	   // these dslash policies all must have kernel packing enabled
 
 	   bool kernel_pack_old = getKernelPackT();
@@ -1952,9 +1978,11 @@ struct DslashFactory {
 	   // enabled - this ensures that all GPUs will have the
 	   // required tune cache entries prior to potential process
 	   // divergence regardless of which GPUs are blacklisted
-	   if (i == QUDA_GDR_DSLASH || i == QUDA_FUSED_GDR_DSLASH ||
-	       i == QUDA_GDR_RECV_DSLASH || i == QUDA_FUSED_GDR_RECV_DSLASH) {
-	     QudaDslashPolicy policy = (i==QUDA_GDR_DSLASH || i==QUDA_GDR_RECV_DSLASH) ? QUDA_DSLASH : QUDA_FUSED_DSLASH;
+	   if (i == QudaDslashPolicy::QUDA_GDR_DSLASH || 
+         i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+	       i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH || 
+         i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH) {
+	     QudaDslashPolicy policy = (i==QudaDslashPolicy::QUDA_GDR_DSLASH || i==QudaDslashPolicy::QUDA_GDR_RECV_DSLASH) ? QudaDslashPolicy::QUDA_DSLASH : QudaDslashPolicy::QUDA_FUSED_DSLASH;
 	     DslashPolicyImp* dslashImp = DslashFactory::create(policy);
 	     setKernelPackT(false);
 	     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
@@ -1972,8 +2000,8 @@ struct DslashFactory {
 	   // restore default kernel packing
 	   setKernelPackT(kernel_pack_old);
 
-	 } else {
-	   errorQuda("Unsupported dslash policy %d\n", i);
+	 } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED){
+	   errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
 	 }
        }
 
@@ -1994,18 +2022,24 @@ struct DslashFactory {
 		 config, tp.aux.y);
      }
 
-     if (tp.aux.x >= (int)policy.size()) errorQuda("Requested policy that is outside of range");
+     if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
+     if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
 
      // switch on kernel packing for the policies that need it
      bool kernel_pack_old = getKernelPackT();
-     if (policy[tp.aux.x] == QUDA_GDR_DSLASH || policy[tp.aux.x] == QUDA_FUSED_GDR_DSLASH ||
-	 policy[tp.aux.x] == QUDA_ZERO_COPY_PACK_DSLASH || policy[tp.aux.x] == QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
-	 policy[tp.aux.x] == QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH || policy[tp.aux.x] == QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
-	 policy[tp.aux.x] == QUDA_ZERO_COPY_DSLASH || policy[tp.aux.x] == QUDA_FUSED_ZERO_COPY_DSLASH) {
+     auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
+     if ( p == QudaDslashPolicy::QUDA_GDR_DSLASH ||
+          p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+	        p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
+          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
+          p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
+          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
+          p == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH ||
+          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) {
        setKernelPackT(true);
      }
 
-     DslashPolicyImp* dslashImp = DslashFactory::create(policy[tp.aux.x]);
+     DslashPolicyImp* dslashImp = DslashFactory::create(static_cast<QudaDslashPolicy>(tp.aux.x));
      (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
      delete dslashImp;
 
@@ -2018,25 +2052,24 @@ struct DslashFactory {
    // Find the best dslash policy
    bool advanceAux(TuneParam &param) const
    {
-     if ((unsigned)param.aux.x < policy.size()-1) {
+      while ((unsigned)param.aux.x < policies.size()-1) {
        param.aux.x++;
-       return true;
-     } else {
+       if(policies[param.aux.x] != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) return true;
+     }
        param.aux.x = 0;
        return false;
-     }
    }
 
    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
    void initTuneParam(TuneParam &param) const  {
      Tunable::initTuneParam(param);
-     param.aux.x = 0; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
      Tunable::defaultTuneParam(param);
-     param.aux.x = 0; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
    }
 
    TuneKey tuneKey() const {
