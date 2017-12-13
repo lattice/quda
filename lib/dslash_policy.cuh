@@ -1866,7 +1866,7 @@ void disable_policy(QudaDslashPolicy p){
        else {
 	 enable_policy(QudaDslashPolicy::QUDA_DSLASH);
    first_active_policy = 0;
-	 // policy.push_back(QUDA_FUSED_DSLASH);
+	 enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH);
 
 	 // if we have gdr then enable tuning these policies
 	 if (comm_gdr_enabled()) {
