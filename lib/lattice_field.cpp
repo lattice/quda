@@ -53,7 +53,8 @@ namespace quda {
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
       siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), ghost_bytes(0),
-      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(param.mem_type),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
@@ -93,7 +94,8 @@ namespace quda {
   LatticeField::LatticeField(const LatticeField &field)
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
       siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
-      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(field.mem_type),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
