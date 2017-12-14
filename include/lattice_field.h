@@ -385,6 +385,11 @@ namespace quda {
     inline bool ipcRemoteCopyComplete(int dir, int dim);
 
     /**
+       Handle to local copy event used for peer-to-peer synchronization
+    */
+    const cudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
+
+    /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
     const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;

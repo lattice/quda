@@ -470,6 +470,10 @@ namespace quda {
     return (cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
+  const cudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+    return ipcCopyEvent[bufferIndex][dir][dim];
+  }
+
   const cudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
     return ipcRemoteCopyEvent[bufferIndex][dir][dim];
   }

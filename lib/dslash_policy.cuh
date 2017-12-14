@@ -172,7 +172,7 @@ namespace {
         { pack = true; break; }
 
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
-    // always packing to local device for p2p directions or if requested, else pack to host (zero copy)
+    // always packing to local device for p2p directions, and if requested pack to host (zero copy)
     for (int dim=0; dim<4; dim++)
       for (int dir=0; dir<2; dir++)
 	pack_dest[2*dim+dir] = (location == Device || comm_peer2peer_enabled(dir,dim)) ? Device : Host;
@@ -302,8 +302,31 @@ namespace {
 	}
 
       }
+
     }
     return comms_test;
+  }
+
+  /**
+     @brief Ensure that the dslash is complete.  By construction, the
+     dslash will have completed (or is in flight) on this process,
+     however, we must also ensure that no local work begins until any
+     communication in flight from this process to another has
+     completed.  This prevents a race condition where we could start
+     updating the local buffers on a subsequent computation before we
+     have finished sending.
+  */
+  void completeDslash(const ColorSpinorField &in) {
+    // this ensures that the p2p sending is completed before any
+    // subsequent work is done on the compute stream
+    for (int dim=3; dim>=0; dim--) {
+      if (!dslashParam.commDim[dim]) continue;
+      for (int dir=0; dir<2; dir++) {
+	if (comm_peer2peer_enabled(dir,dim)) {
+	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	}
+      }
+    }
   }
 
   /**
@@ -423,6 +446,7 @@ struct DslashBasic : DslashPolicyImp {
       }
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -581,6 +605,8 @@ struct DslashPthreads : DslashPolicyImp {
       }
 
     }
+
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
 #endif // MULTI_GPU
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -664,6 +690,7 @@ struct DslashFusedExterior : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -741,6 +768,7 @@ struct DslashGDR : DslashPolicyImp {
       }
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -813,6 +841,7 @@ struct DslashFusedGDR : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -888,6 +917,7 @@ struct DslashGDRRecv : DslashPolicyImp {
       }
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -959,6 +989,7 @@ struct DslashFusedGDRRecv : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1069,6 +1100,8 @@ struct DslashAsync : DslashPolicyImp {
       }
 
     }
+
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1171,6 +1204,7 @@ struct DslashFusedExteriorAsync : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1269,6 +1303,7 @@ struct DslashZeroCopyPack : DslashPolicyImp {
       }
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1353,6 +1388,7 @@ struct DslashFusedZeroCopyPack : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1430,6 +1466,7 @@ struct DslashZeroCopyPackGDRRecv : DslashPolicyImp {
       }
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1504,6 +1541,7 @@ struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp {
       PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
@@ -1669,6 +1707,7 @@ struct DslashFusedZeroCopy : DslashPolicyImp {
       setGhost(dslash, *in, false);
     }
 
+    completeDslash(*in);
     in->bufferIndex = (1 - in->bufferIndex);
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
     comm_enable_peer2peer(true);
