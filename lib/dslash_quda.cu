@@ -66,13 +66,12 @@ namespace quda {
 #ifdef PTHREADS
     cudaEvent_t interiorDslashEnd;
 #endif
-    cudaEvent_t packEnd[Nstream];
+    cudaEvent_t packEnd[2];
     cudaEvent_t gatherStart[Nstream];
     cudaEvent_t gatherEnd[Nstream];
     cudaEvent_t scatterStart[Nstream];
     cudaEvent_t scatterEnd[Nstream];
-    cudaEvent_t dslashStart;
-    cudaEvent_t dslashEnd;
+    cudaEvent_t dslashStart[2];
 
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
@@ -89,14 +88,15 @@ namespace quda {
     using namespace dslash;
     // add cudaEventDisableTiming for lower sync overhead
     for (int i=0; i<Nstream; i++) {
-      cudaEventCreate(&packEnd[i], cudaEventDisableTiming);
       cudaEventCreate(&gatherStart[i], cudaEventDisableTiming);
       cudaEventCreate(&gatherEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
     }
-    cudaEventCreateWithFlags(&dslashStart, cudaEventDisableTiming);
-    cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
+    for (int i=0; i<2; i++) {
+      cudaEventCreate(&packEnd[i], cudaEventDisableTiming);
+      cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
+    }
 #ifdef PTHREADS
     cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
 #endif
@@ -125,15 +125,16 @@ namespace quda {
 #endif
 
     for (int i=0; i<Nstream; i++) {
-      cudaEventDestroy(packEnd[i]);
       cudaEventDestroy(gatherStart[i]);
       cudaEventDestroy(gatherEnd[i]);
       cudaEventDestroy(scatterStart[i]);
       cudaEventDestroy(scatterEnd[i]);
     }
 
-    cudaEventDestroy(dslashStart);
-    cudaEventDestroy(dslashEnd);
+    for (int i=0; i<2; i++) {
+      cudaEventDestroy(packEnd[i]);
+      cudaEventDestroy(dslashStart[i]);
+    }
 #ifdef PTHREADS
     cudaEventDestroy(interiorDslashEnd);
 #endif
