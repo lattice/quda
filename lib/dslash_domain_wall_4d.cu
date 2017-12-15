@@ -177,6 +177,10 @@ namespace quda {
       // factor of 2 (or 1) for T-dimensional spin projection (FIXME - unnecessary)
       dslashParam.tProjScale = getKernelPackT() ? 1.0 : 2.0;
       dslashParam.tProjScale_f = (float)(dslashParam.tProjScale);
+#ifdef USE_TEXTURE_OBJECTS
+      dslashParam.ghostTex = in->GhostTex();
+      dslashParam.ghostTexNorm = in->GhostTexNorm();
+#endif // USE_TEXTURE_OBJECTS
 
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
@@ -304,7 +308,7 @@ namespace quda {
 
     DslashPolicyImp* dslashImp = NULL;
     if (DS_type != 0) {
-      dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {
