@@ -88,13 +88,13 @@ namespace quda {
     using namespace dslash;
     // add cudaEventDisableTiming for lower sync overhead
     for (int i=0; i<Nstream; i++) {
-      cudaEventCreate(&gatherStart[i], cudaEventDisableTiming);
-      cudaEventCreate(&gatherEnd[i], cudaEventDisableTiming);
+      cudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
+      cudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
     }
     for (int i=0; i<2; i++) {
-      cudaEventCreate(&packEnd[i], cudaEventDisableTiming);
+      cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
     }
 #ifdef PTHREADS
