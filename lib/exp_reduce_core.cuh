@@ -130,7 +130,7 @@ public:
   ReduceCudaExp(doubleN &result, SpinorS &S, SpinorP &P, SpinorZ &Z,
 	     SpinorR &R, SpinorX &X, SpinorW &W, SpinorQ &Q, SpinorV &V, Reducer &r, int length, int nParity,
 	     const size_t *bytes, const size_t *norm_bytes) :
-    arg(S, P, Z, R, X, W, Q, r, length/nParity),
+    arg(S, P, Z, R, X, W, Q, V, r, length/nParity),
     result(result), nParity(nParity), S_h(0), P_h(0), Z_h(0), R_h(0), X_h(0), W_h(0), Q_h(0), V_h(0), 
     Snorm_h(0), Pnorm_h(0), Znorm_h(0), Rnorm_h(0), Xnorm_h(0), Wnorm_h(0), Qnorm_h(0), Vnorm_h(0),
     bytes_(bytes), norm_bytes_(norm_bytes) { }
@@ -223,8 +223,8 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, const double2 &c, Colo
     strcat(blasStrings.aux_tmp, z.AuxString());
   }
 
-  size_t bytes[] = {s.Bytes(), p.Bytes(), z.Bytes(), r.Bytes(), x.Bytes(), w.Bytes(), q.Bytes(), v.Bytes};
-  size_t norm_bytes[] = {s.NormBytes(), p.NormBytes(), z.NormBytes(), r.NormBytes(), x.NormBytes(), w.NormBytes(), q.NormBytes(), v.NormBytes};
+  size_t bytes[] = {s.Bytes(), p.Bytes(), z.Bytes(), r.Bytes(), x.Bytes(), w.Bytes(), q.Bytes(), v.Bytes()};
+  size_t norm_bytes[] = {s.NormBytes(), p.NormBytes(), z.NormBytes(), r.NormBytes(), x.NormBytes(), w.NormBytes(), q.NormBytes(), v.NormBytes()};
 
   Spinor<RegType,StoreType,M_,writeS,0> S(s);
   Spinor<RegType,StoreType,M_,writeP,1> P(p);
@@ -238,7 +238,7 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, const double2 &c, Colo
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
   typedef vector<Float,2> vec2;
-  Reducer<ReduceType, Float2, RegType> reducer_((Float2)vec2(a), (Float2)vec2(b)), (Float2)vec2(c));
+  Reducer<ReduceType, Float2, RegType> reducer_((Float2)vec2(a), (Float2)vec2(b), (Float2)vec2(c));
   doubleN value;
 
   int partitions = (x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset());
