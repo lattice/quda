@@ -13,7 +13,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	interface_quda.o interface_qlua.o util_quda.o			\
 	color_spinor_field.o color_spinor_util.o			\
 	cpu_color_spinor_field.o color_spinor_wuppertal.o		\
-	cuda_qlua_contractQQ.o cuda_color_spinor_field.o dirac.o        \
+	cuda_qlua_contractQQ.o phase_matrix_qlua.o                      \
+        cuda_color_spinor_field.o dirac.o                               \
         clover_field.o lattice_field.o gauge_field.o cpu_gauge_field.o	\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
 	gauge_update_quda.o dirac_clover.o dirac_wilson.o		\

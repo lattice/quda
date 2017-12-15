@@ -17,6 +17,12 @@ namespace quda {
   		      int parity, int Nc, int Ns,
   		      contractParam cParam);
 
+  
+  void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix,
+			     int *momMatrix,
+                             momProjParam param,
+                             int localL[], int totalL[]);
+    
 } //- namespace quda
   
 #endif/*INTERFACE_QLUA_INT_H__*/

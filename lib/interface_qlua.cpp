@@ -210,36 +210,50 @@ save_cudaColorSpinorField(QUDA_REAL *hbuf_x,
 
 static void createMomentaMatrix(int *momMatrix,
 				int *Nmoms,
-				int QsqMax)
+				int QsqMax,
+				int totalL[])
 {
-
+  
   int imom = 0;
-  for(int iQ=0; iQ<=QsqMax; iQ++){
-    for(int px=iQ; px>=-iQ; px--)
-      for(int py=iQ; py>=-iQ; py--)
-        for(int pz=iQ; pz>=-iQ; pz--){
-          if( px*px + py*py + pz*pz == iQ ){
-            momMatrix[0 + 3*imom] = px;
-            momMatrix[1 + 3*imom] = py;
-            momMatrix[2 + 3*imom] = pz;
-            imom++;
-          }
+  int p_temp[3];
+  for(int pz = 0; pz < totalL[2]; pz++){
+    for(int py = 0; py < totalL[1]; py++)
+      for(int px = 0; px < totalL[0]; px++){
+        if(px < totalL[0]/2)
+          p_temp[0] = px;
+        else
+          p_temp[0] = px - totalL[0];
+	
+        if(py < totalL[1]/2)
+          p_temp[1] = py;
+        else
+          p_temp[1] = py - totalL[1];
+	
+        if(pz < totalL[2]/2)
+          p_temp[2] = pz;
+        else
+          p_temp[2] = pz - totalL[2];
+	
+        if( (p_temp[0]*p_temp[0] + p_temp[1]*p_temp[1] + p_temp[2]*p_temp[2]) <= QsqMax ){
+          for(int i=0;i<3;i++) momMatrix[i + 3*imom] = p_temp[i];
+          imom++;
         }
+      }
   }
   *Nmoms = imom;
-    
+  
 }
 
 
 static void createPhaseMatrix_CPU(complex<QUDA_REAL> *phaseMatrix,
 				  int *momMatrix,
-				  LONG_T V3, int momDim, int Nmoms,
+				  momProjParam param,
 				  int localL[], int totalL[])
 {
   
-  int lcoord[momDim];
-  int gcoord[momDim];
-  for(int iv=0;iv<V3;iv++){
+  int lcoord[param.momDim];
+  int gcoord[param.momDim];
+  for(int iv=0;iv<param.V3;iv++){
     int a1 = iv / localL[0];
     int a2 = a1 / localL[1];
     lcoord[0] = iv - a1 * localL[0];
@@ -249,13 +263,14 @@ static void createPhaseMatrix_CPU(complex<QUDA_REAL> *phaseMatrix,
     gcoord[1] = lcoord[1] + comm_coord(1) * localL[1];
     gcoord[2] = lcoord[2] + comm_coord(2) * localL[2];
     
-    for(int im=0;im<Nmoms;im++){
+    QUDA_REAL f = (QUDA_REAL) param.expSgn;
+    for(int im=0;im<param.Nmoms;im++){
       QUDA_REAL phase = 0.0;
-      for(int id=0;id<momDim;id++)
-	phase += momMatrix[id + momDim*iv]*gcoord[id]/totalL[id];
+      for(int id=0;id<param.momDim;id++)
+	phase += momMatrix[id + param.momDim*im]*gcoord[id] / (QUDA_REAL)totalL[id];
 
-      phaseMatrix[iv+V3*im].x =  cos(2.0*PI*phase);
-      phaseMatrix[iv+V3*im].y = -sin(2.0*PI*phase);
+      phaseMatrix[iv + param.V3*im].x =   cos(2.0*PI*phase);
+      phaseMatrix[iv + param.V3*im].y = f*sin(2.0*PI*phase);
     }
   }//- iv
 
@@ -431,21 +446,37 @@ doQQ_contract_Quda(
 
 //-- top level function, performs momentum projection
 EXTRN_C int
-momentumProjection_Quda(
-			QUDA_REAL *corrOut,
-			QUDA_REAL *corrIn,
-			const qudaLattice *qS,
-			qudaAPI_Param paramAPI)
+momentumProjectionPropagator_Quda(
+				  QUDA_REAL *corrOut,
+				  QUDA_REAL *corrIn,
+				  const qudaLattice *qS,
+				  qudaAPI_Param paramAPI)
 {
   int status = 0;
 
   if (check_quda_comms(qS))
     return 1;
 
+  //-- This is needed to avoid segfaults, propagator must hold the full 3d-volume
+  if( comm_size() != comm_dim(3) )
+    errorQuda("momentumProjection_Quda: This function supports only T-direction partitioning!\n");
+
+  
+  int Nc = QUDA_Nc;
+  int Ns = QUDA_Ns;
+
   //-- Check-print parameters
-  int QsqMax = paramAPI.QsqMax;
-  int Ndata = paramAPI.Ndata;
+  int QsqMax = paramAPI.mpParam.QsqMax;
+  int Ndata  = paramAPI.mpParam.Ndata;
+  int expSgn = paramAPI.mpParam.expSgn;
+  bool GPU_phaseMatrix = (paramAPI.mpParam.GPU_phaseMatrix == 1 ? true : false);
+  if(expSgn != 1 && expSgn != -1)
+    errorQuda("momentumProjection_Quda: Got invalid exponential sign, expSgn = %d!\n",expSgn);
+
   printfQuda("momentumProjection_Quda: Got QsqMax = %d\n", QsqMax);
+  printfQuda("momentumProjection_Quda: Got Ndata  = %d\n", Ndata);
+  printfQuda("momentumProjection_Quda: Got exponential sign %s\n", expSgn == 1 ? "PLUS" : "MINUS");
+  printfQuda("momentumProjection_Quda: Will create phase matrix on %s\n", GPU_phaseMatrix == true ? "GPU" : "CPU");
   
   setVerbosity(paramAPI.verbosity);
   
@@ -466,34 +497,115 @@ momentumProjection_Quda(
     localL[mu] = qS->site_coord_hi[mu] - qS->site_coord_lo[mu];
     totalL[mu] = localL[mu] * comm_dim(mu);
   }
-  LONG_T V3 = qS->locvol / localL[3];
+
+  int Lt = localL[3];
+  int totT = totalL[3];
+  
+  LONG_T totV3 = 1;
+  LONG_T V3 = 1;
+  for(int i=0;i<momDim;i++){
+    totV3 *= totalL[i];
+    V3    *= localL[i];
+  }
+    
+  paramAPI.mpParam.momDim = momDim;
+  paramAPI.mpParam.V3     = V3;
+  printfQuda("momentumProjection_Quda: totV3 = %lld , V3 = %lld\n", totV3, V3);
+  //------------------------------------
 
   
   //-- Define the momenta matrix
-  int Nmoms;
+  int QsqMaxLat = 0;
+  for(int mu=0;mu<momDim;mu++)
+    QsqMaxLat += pow(0.5*totalL[mu],2);
+  if(QsqMax > QsqMaxLat)
+    errorQuda("momentumProjection_Quda: QsqMax = %d requested is greater than Maximum allowed for the lattice, QsqMaxLat = %d\n", QsqMax, QsqMaxLat);
+
+  
+  //-- Add this additional check, we want the full spectrum of momenta!
+  if(QsqMax != QsqMaxLat)
+    errorQuda("momentumProjection_Quda: This function supports only the maximum Qsq allowed, QsqMaxLat = %d\n", QsqMaxLat);
+
+  
+  int Nmoms = 0;
   int *momMatrix = NULL;
 
-  momMatrix = (int*) malloc(sizeof(int)*V3*momDim);
+  momMatrix = (int*) calloc(momDim*totV3, sizeof(int));
   if(momMatrix == NULL)
     errorQuda("momentumProjection_Quda: Cannot allocate momMatrix. Exiting.\n");
-  memset(momMatrix,V3*momDim,0);
   
-  createMomentaMatrix(momMatrix, &Nmoms, QsqMax);
+  /* When this function returns, momMatrix contains
+   * Nmoms pairs of momenta, giving Qsq <= QsqMax
+   * If QsqMax is less than maximum allowed by lattice size,
+   * the rest (totV3 - Nmoms) pair-entries of momMatrix contain zeros. 
+   */
+  createMomentaMatrix(momMatrix, &Nmoms, QsqMax, totalL);
   printfQuda("momentumProjection_Quda: Momenta matrix created, Nmoms = %d\n", Nmoms);
+  paramAPI.mpParam.Nmoms = Nmoms;
+
+  //  for(int i=0;i<totV3;i++)
+  //    printfQuda("Mom %d: %+d %+d %+d\n", i, momMatrix[0 + 3*i], momMatrix[1 + 3*i], momMatrix[2 + 3*i]);
+  //------------------------------------
 
   
   //-- Define the phase matrix
+  /* In defining the phase matrix, only the non-zero entries of momMatrix
+   * are used, hence the phase matrix has dimensions V3*Nmoms
+   */
   complex<QUDA_REAL> *phaseMatrix = NULL;
 
-  phaseMatrix = (complex<QUDA_REAL>*) malloc(sizeof(complex<QUDA_REAL>)*Nmoms*V3);
+  phaseMatrix = (complex<QUDA_REAL>*) calloc(V3*Nmoms, sizeof(complex<QUDA_REAL>));
   if(phaseMatrix == NULL)
     errorQuda("momentumProjection_Quda: Cannot allocate phaseMatrix. Exiting.\n");
-
-  createPhaseMatrix_CPU(phaseMatrix, momMatrix, V3, momDim, Nmoms, localL, totalL);
-  printfQuda("momentumProjection_Quda: Phase matrix created\n");
   
-  
+  double t1 = MPI_Wtime();
+  if(GPU_phaseMatrix){
+    createPhaseMatrix_GPU(phaseMatrix, momMatrix, paramAPI.mpParam, localL, totalL);
+    checkCudaError();
+  }
+  else{
+    createPhaseMatrix_CPU(phaseMatrix, momMatrix, paramAPI.mpParam, localL, totalL);
+  }
+  double t2 = MPI_Wtime();
+  printfQuda("momentumProjection_Quda: Phase matrix created in %f sec.\n", t2-t1);
+  //------------------------------------
+    
+    
   //-- Perform momentum projection
+
+  /* For testing purposes, I define a second pair
+   * of input/output buffers in which I copy the propagator
+   * data in a V3*Ndata*Lt format. This has to be column-major, i.e. the index
+   * corresponding to V3 should run fastest.
+   * For convenience, time should run the slowest
+   */
+
+  complex<QUDA_REAL> *corrIn_proj  = NULL;
+  complex<QUDA_REAL> *corrOut_proj = NULL;
+
+  corrIn_proj  = (complex<QUDA_REAL>*) calloc(V3*Ndata*Lt   , sizeof(complex<QUDA_REAL>));
+  corrOut_proj = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*Lt, sizeof(complex<QUDA_REAL>));
+  if(corrIn_proj == NULL || corrOut_proj == NULL)
+    errorQuda("Cannot allocate proj buffers for corrIn or corrOut\n");
+  
+  //-- Not the fastest way to do it, but for testing is fair enough...
+  for(int jc=0;jc<Nc;jc++){
+    for(int js=0;js<Ns;js++)
+      for(int ic=0;ic<Nc;ic++)
+	for(int is=0;is<Ns;is++)
+	  for(int it=0;it<Lt;it++)
+	    for(int iv=0;iv<V3;iv++){
+	      LONG_T ptr_f = 2*is + 2*Ns*ic + 2*Ns*Nc*iv + 2*Ns*Nc*V3*it + 2*Ns*Nc*V3*Lt*js + 2*Ns*Nc*V3*Lt*Ns*jc;
+	      LONG_T ptr_t = iv + V3*is + V3*Ns*ic + V3*Ns*Nc*js + V3*Ns*Nc*Ns*jc + V3*Ns*Nc*Ns*Nc*it;
+	      
+	      corrIn_proj[ptr_t].x = corrIn[0 + ptr_f];
+	      corrIn_proj[ptr_t].y = corrIn[1 + ptr_f];
+	    }
+  }  
+  printfQuda("momentumProjection_Quda: Input data transformed\n");
+
+  
+  //-- Define the device buffers
   complex<QUDA_REAL> *corrIn_dev = NULL;
   complex<QUDA_REAL> *corrOut_dev = NULL;
   complex<QUDA_REAL> *phaseMatrix_dev = NULL;
@@ -504,63 +616,110 @@ momentumProjection_Quda(
   cublasStatus_t stat;
   cublasHandle_t handle;
   
-  cudaMalloc( (void**)&corrIn_dev, sizeof(complex<QUDA_REAL>)*Ndata*V3 );
-  cudaMalloc( (void**)&corrOut_dev, sizeof(complex<QUDA_REAL>)*Ndata*Nmoms );
-  cudaMalloc( (void**)&phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*Nmoms*V3 );
-
+  cudaMalloc( (void**)&phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*V3*Nmoms );
+  cudaMalloc( (void**)&corrIn_dev,      sizeof(complex<QUDA_REAL>)*V3*Ndata*Lt );
+  cudaMalloc( (void**)&corrOut_dev,     sizeof(complex<QUDA_REAL>)*Nmoms*Ndata*Lt );
   checkCudaErrorNoSync();
-
-  cudaMemset(corrOut_dev, 0, sizeof(complex<QUDA_REAL>)*Ndata*Nmoms);
-  
 
   //-- Copy matrices from host to the device
   stat = cublasCreate(&handle);
-
-  stat = cublasSetMatrix(Ndata, V3   , sizeof(complex<QUDA_REAL>), corrIn, Ndata, corrIn_dev, Ndata);
+  
+  stat = cublasSetMatrix(V3, Nmoms, sizeof(complex<QUDA_REAL>), phaseMatrix, V3, phaseMatrix_dev, V3);
+  if(stat != CUBLAS_STATUS_SUCCESS)
+    errorQuda("momentumProjection_Quda: phaseMatrix data copy to GPU failed!\n");
+  
+  stat = cublasSetMatrix(V3, Ndata*Lt, sizeof(complex<QUDA_REAL>), corrIn_proj, V3, corrIn_dev, V3);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("momentumProjection_Quda: corrIn data copy to GPU failed!\n");
-
-  stat = cublasSetMatrix(Ndata, Nmoms, sizeof(complex<QUDA_REAL>), corrOut, Ndata, corrOut_dev, Ndata);
+  
+  stat = cublasSetMatrix(Nmoms, Ndata*Lt, sizeof(complex<QUDA_REAL>), corrOut_proj, Nmoms, corrOut_dev, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("momentumProjection_Quda: corrOut data copy to GPU failed!\n");
 
-  stat = cublasSetMatrix(V3   , Nmoms, sizeof(complex<QUDA_REAL>), phaseMatrix, V3, phaseMatrix_dev, V3);
-  if(stat != CUBLAS_STATUS_SUCCESS)
-    errorQuda("momentumProjection_Quda: phaseMatrix data copy to GPU failed!\n");
-
   
   //-- Perform projection
-  stat = cublasZgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, Ndata, Nmoms, V3,
-		     &al, corrIn_dev, Ndata,
-		     phaseMatrix_dev, V3, &be,
-		     corrOut_dev, Ndata);
-  
+  /* Matrix Multiplication Out = PH^T * In.
+   * phaseMatrix=(V3,Nmoms) is the phase matrix in column-major format, its transpose is used for multiplication
+   * corrIn=(V3,Ndata*Lt) is the input correlation matrix
+   * corrOut=(Nmoms,Ndata*Lt) is the output matrix in column-major format
+   */
+  double t3 = MPI_Wtime();
+  stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, Nmoms, Ndata*Lt, V3,
+		     &al, phaseMatrix_dev, V3,
+		     corrIn_dev , V3, &be,
+		     corrOut_dev, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("momentumProjection_Quda: Momentum projection failed!\n");
+  double t4 = MPI_Wtime();
+  printfQuda("momentumProjection_Quda: Projection completed in %f sec.\n",t4-t3);
 
   
   //-- extract the result from GPU to CPU
-  complex<QUDA_REAL> *corrOut_local = NULL;
-  corrOut_local = (complex<QUDA_REAL>*) malloc(sizeof(complex<QUDA_REAL>)*Ndata*Nmoms);
-  if(corrOut_local == NULL)
-    errorQuda("momentumProjection_Quda: Cannot allocate corrOut_local.\n");
-
-  memset(corrOut_local,0,sizeof(complex<QUDA_REAL>)*Ndata*Nmoms);
+  complex<QUDA_REAL> *corrOut_local  = NULL;
+  complex<QUDA_REAL> *corrOut_global = NULL;
+  corrOut_local  = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*Lt  , sizeof(complex<QUDA_REAL>));
+  corrOut_global = (complex<QUDA_REAL>*) calloc(Nmoms*Ndata*totT, sizeof(complex<QUDA_REAL>));
+  if(corrOut_local == NULL || corrOut_global == NULL)
+    errorQuda("momentumProjection_Quda: Cannot allocate output buffers\n");
   
-  stat = cublasGetMatrix(Ndata, Nmoms, sizeof(complex<QUDA_REAL>), corrOut_dev, Ndata, corrOut_local, Ndata);
-
+  stat = cublasGetMatrix(Nmoms, Ndata*Lt, sizeof(complex<QUDA_REAL>), corrOut_dev, Nmoms, corrOut_local, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("momentumProjection_Quda: corrOut data copy to CPU failed!\n");
+  
+  memcpy(corrOut_proj, corrOut_local, sizeof(complex<QUDA_REAL>)*Nmoms*Ndata*Lt);
 
   
   //-- Perform reduction over all processes
-  MPI_Allreduce(corrOut_local, corrOut, Ndata*Nmoms, MPI_DOUBLE_COMPLEX, MPI_SUM, MPI_COMM_WORLD);  
+  /* Create a separate communicator
+   * All processes with the same comm_coord(3) belong to COMM_TIME communicator.
+   * When performing the reduction over the COMM_TIME communicator, the global sum
+   * will be performed across all processes with the same time-coordinate,
+   * and the result will be placed at the "root" of each of the "time" groups.
+   * This means that the global result will exist only at the "time" processes, where each will
+   * hold the sum for its corresponing time slices.
+   * In the case where only the time-direction is partitioned,
+   * MPI_Reduce is essentially a memcpy.
+  */
+  /*
+  int time_rank, time_size;
+  MPI_Comm COMM_TIME;
+  MPI_Comm_split(MPI_COMM_WORLD, comm_coord(3), comm_rank(), &COMM_TIME);
+  MPI_Comm_rank(COMM_TIME,&time_rank);
+  MPI_Comm_size(COMM_TIME,&time_size);
 
+  MPI_Reduce(corrOut_local, corrOut_proj, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX, MPI_SUM, 0, COMM_TIME);  
+
+  MPI_Gather(corrOut_proj  , Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
+	     corrOut_global, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
+	     0, COMM_TIME);
+  */
+  
+  //-- Not the fastest way to do it, but for testing is fair enough...
+  // Works only when Nmoms = totV3 AND only the time direction is partitioned (such that V3 = totV3),
+  // so that all entries of the output propagator get (non-zero) entries
+  // and we don't go out of boundaries
+  for(int jc=0;jc<Nc;jc++){
+    for(int js=0;js<Ns;js++)
+      for(int ic=0;ic<Nc;ic++)
+	for(int is=0;is<Ns;is++)
+	  for(int it=0;it<Lt;it++)
+	    for(int im=0;im<Nmoms;im++){
+	      LONG_T ptr_f = im   + Nmoms*is + Nmoms*Ns*ic + Nmoms*Ns*Nc*js + Nmoms*Ns*Nc*Ns*jc + Nmoms*Ns*Nc*Ns*Nc*it;
+	      LONG_T ptr_t = 2*is + 2*Ns*ic  + 2*Ns*Nc*im  + 2*Ns*Nc*V3*it  + 2*Ns*Nc*V3*Lt*js  + 2*Ns*Nc*V3*Lt*Ns*jc;
+	      
+	      corrOut[0 + ptr_t] = corrOut_proj[ptr_f].real();
+	      corrOut[1 + ptr_t] = corrOut_proj[ptr_f].imag();
+	    }
+  }
+  printfQuda("momentumProjection_Quda: Output data transformed\n");
+  
   
   //-- cleanup & return  
   free(momMatrix);
   free(phaseMatrix);
   free(corrOut_local);
+  free(corrIn_proj);
+  free(corrOut_proj);
   
   cudaFree(corrIn_dev);
   cudaFree(corrOut_dev);

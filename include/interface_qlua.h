@@ -5,11 +5,13 @@
 #ifndef INTERFACE_QLUA_H__
 #define INTERFACE_QLUA_H__
 
+
 #ifdef __cplusplus
 
 #define EXTRN_C extern "C"
 
 #define delete_not_null(p) do { if (NULL != (p)) delete (p) ; } while(0)
+
 
 #else /*!defined(__cplusplus)*/
 #define EXTRN_C
@@ -21,11 +23,14 @@
 #define QUDA_MAX_RANK 6
 #define QUDA_PROP_NVEC 12
 
+#define PI 2*asin(1.0)
+#define THREADS_PER_BLOCK 64
+
 #ifndef LONG_T
 #define LONG_T long long
 #endif
 typedef double QUDA_REAL;
-  
+
 typedef enum qudaAPI_ContractId_s{
   cntr12 = 12,
   cntr13 = 13,
@@ -62,9 +67,23 @@ typedef struct {
 } contractParam;
 
 typedef struct {
+  // first four parameters are set within qudaAPI as user input
+  int Ndata;
+  int QsqMax;
+  int expSgn;
+  int GPU_phaseMatrix;
+  
+  // these are set in the qlua-interface function
+  int V3;
+  int momDim;
+  int Nmoms;
+} momProjParam;
+
+typedef struct {
   QudaVerbosity verbosity;
   wuppertalParam wParam;
   contractParam cParam;
+  momProjParam mpParam;
 } qudaAPI_Param;
 
 typedef struct{
@@ -92,6 +111,13 @@ doQQ_contract_Quda(
 		   const qudaLattice *qS,
 		   int nColor, int nSpin,
 		   const qudaAPI_Param qAparam);
+
+EXTRN_C int
+momentumProjectionPropagator_Quda(
+				  QUDA_REAL *corrOut,
+				  QUDA_REAL *corrIn,
+				  const qudaLattice *qS,
+				  qudaAPI_Param paramAPI);
 
 EXTRN_C int
 laplacianQuda(
