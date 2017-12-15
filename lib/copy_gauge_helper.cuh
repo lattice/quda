@@ -167,9 +167,9 @@ namespace quda {
 #else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d+arg.out_offset, parity); // assumes we are loading
+	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
 	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d+arg.in_offset, parity);
+	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
 #endif
 	}
       }
