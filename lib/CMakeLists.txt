@@ -119,15 +119,15 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda INTERFACE ${MAGMA})
+  target_link_libraries(quda PRIVATE ${MAGMA})
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda INTERFACE ${PARPACK_OR_ARPACK})
+  target_link_libraries(quda PRIVATE ${PARPACK_OR_ARPACK})
 endif()
 
 if(QUDA_NUMA_NVML)
-target_link_libraries(quda INTERFACE ${NVML_LIBRARY})
+target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
 
@@ -137,7 +137,7 @@ endif()
 if(${CMAKE_VERSION} VERSION_LESS 3.8)
   find_library(CUDA_cuda_LIBRARY cuda HINTS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
 endif()
-target_link_libraries(quda INTERFACE ${CUDA_cuda_LIBRARY})
+target_link_libraries(quda PRIVATE ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if (QUDA_DOWNLOAD_EIGEN)
