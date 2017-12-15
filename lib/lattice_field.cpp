@@ -54,8 +54,8 @@ namespace quda {
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
       scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
-      ghost_bytes(0), ghost_face_bytes{ }, ghostOffset(), ghostNormOffset( ), 
-      my_face_h{nullptr,nullptr}, my_face_hd{nullptr,nullptr}, initComms(false), mem_type(param.mem_type),
+      ghost_bytes(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     precisionCheck();
@@ -97,7 +97,7 @@ namespace quda {
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
       scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
-      my_face_h{nullptr,nullptr}, my_face_hd{nullptr,nullptr}, initComms(false), mem_type(field.mem_type),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     precisionCheck();
@@ -471,6 +471,10 @@ namespace quda {
   bool LatticeField::ipcRemoteCopyComplete(int dir, int dim)
   {
     return (cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
+  }
+
+  const cudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+    return ipcCopyEvent[bufferIndex][dir][dim];
   }
 
   const cudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
