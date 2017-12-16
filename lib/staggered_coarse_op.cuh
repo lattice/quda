@@ -24,7 +24,7 @@ namespace quda {
   template <typename Float, int coarseSpin,
 	    typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor,
 	    typename fineSpinorTmp, typename fineSpinorV>
-  struct CalculateYArg {
+  struct CalculateStaggeredYArg {
 
     coarseGauge Y;           /** Computed coarse link field */
     coarseGauge X;           /** Computed coarse clover field */
@@ -61,7 +61,7 @@ namespace quda {
     int_fastdiv aggregates_per_block; // number of aggregates per thread block
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
 
-    CalculateYArg(coarseGauge &Y, coarseGauge &X,
+    CalculateStaggeredYArg(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
 		  fineSpinorTmp &UV, const fineGauge &U, const fineSpinorV &V,
 		  double mass, const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
@@ -84,7 +84,7 @@ namespace quda {
       }
     }
 
-    ~CalculateYArg() { }
+    ~CalculateStaggeredYArg() { }
   };
 
   /**
@@ -94,7 +94,7 @@ namespace quda {
   */
   template<typename Float, int dim, QudaDirection dir, int fineColor,
 	   int coarseSpin, int coarseColor, typename Wtype, typename Arg>
-  __device__ __host__ inline void computeUV(Arg &arg, const Wtype &W, int parity, int x_cb, int ic_c) {
+  __device__ __host__ inline void computeStaggeredUV(Arg &arg, const Wtype &W, int parity, int x_cb, int ic_c) {
 
     int coord[5];
     coord[4] = 0;
@@ -134,30 +134,30 @@ namespace quda {
       arg.UV(parity,x_cb,0 /*?*/,c,ic_c) = UV[c];
     }
 
-  } // computeUV
+  } // computeStaggeredUV
 
   template<typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  void ComputeUVCPU(Arg &arg) {
+  void ComputeStaggeredUVCPU(Arg &arg) {
 
     for (int parity=0; parity<2; parity++) {
       #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) {
         for (int ic_c=0; ic_c < coarseColor; ic_c++) { // coarse color
-            computeUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_c);
+            computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_c);
         } // coarse color
       } // c/b volume
     }   // parity
   }
 
   template<typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __global__ void ComputeUVGPU(Arg arg) {
+  __global__ void ComputeStaggeredUVGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
     int ic_c = blockDim.z*blockIdx.z + threadIdx.z; // coarse color
     if (ic_c >= coarseColor) return;
-    computeUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_c);
+    computeStaggeredUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, arg.V, parity, x_cb, ic_c);
   }
 
   /**
@@ -170,7 +170,7 @@ namespace quda {
      @param[in] x_cb Checkboarded x dimension
    */
   template <typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __device__ __host__ inline void multiplyVUV(complex<Float>& vuv, const Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
+  __device__ __host__ inline void multiplyStaggeredVUV(complex<Float>& vuv, const Arg &arg, int parity, int x_cb, int ic_c, int jc_c) {
 
     // We can reduce this to computing just one value. All gauge links
     // couple even-to-odd, and chirality is also even-to-odd,
@@ -264,7 +264,7 @@ namespace quda {
 #endif
 
   template<typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __device__ __host__ void computeVUV(Arg &arg, int parity, int x_cb, int c_row, int c_col, int parity_coarse_, int coarse_x_cb_) {
+  __device__ __host__ void ComputeStaggeredVUV(Arg &arg, int parity, int x_cb, int c_row, int c_col, int parity_coarse_, int coarse_x_cb_) {
 
     constexpr int nDim = 4;
     int coord[QUDA_MAX_DIM];
@@ -293,7 +293,7 @@ namespace quda {
 #endif
 
     complex<Float> vuv = 0.0;
-    multiplyVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, gamma, parity, x_cb, c_row, c_col);
+    multiplyStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, gamma, parity, x_cb, c_row, c_col);
 
     constexpr int dim_index = (dir == QUDA_BACKWARDS) ? dim : dim + 4;
 #if defined(SHARED_ATOMIC) && __CUDA_ARCH__
@@ -371,13 +371,13 @@ namespace quda {
   }
 
   template<typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  void ComputeVUVCPU(Arg arg) {
+  void ComputeStaggeredVUVCPU(Arg arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) { // Loop over fine volume
         for (int c_row=0; c_row<coarseColor; c_row++) {
           for (int c_col=0; c_col<coarseColor; c_col++) {
-            computeVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, gamma, parity, x_cb, c_row, c_col, 0, 0);
+            ComputeStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, gamma, parity, x_cb, c_row, c_col, 0, 0);
           } // coarse color columns
         } // coarse color rows
       } // c/b volume
@@ -385,7 +385,7 @@ namespace quda {
   }
 
   template<typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __global__ void ComputeVUVGPU(Arg arg) {
+  __global__ void ComputeStaggeredVUVGPU(Arg arg) {
 
     int parity_c_col = blockDim.y*blockIdx.y + threadIdx.y;
     if (parity_c_col >= 2*coarseColor) return;
@@ -426,7 +426,7 @@ namespace quda {
     int c_row = blockDim.z*blockIdx.z + threadIdx.z; // coarse color row index
     if (c_row >= coarseColor) return;
 
-    computeVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, parity, x_cb, c_row, c_col, parity_coarse, x_coarse_cb);
+    ComputeStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, parity, x_cb, c_row, c_col, parity_coarse, x_coarse_cb);
   }
 
   /**
@@ -434,7 +434,7 @@ namespace quda {
    * sign of the spin projector
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __device__ __host__ void computeYreverse(Arg &arg, int parity, int x_cb, int ic_c) {
+  __device__ __host__ void computeStaggeredYreverse(Arg &arg, int parity, int x_cb, int ic_c) {
     auto &Y = arg.Y_atomic;
 
     for (int d=0; d<4; d++) {
@@ -454,19 +454,19 @@ namespace quda {
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
-  void ComputeYReverseCPU(Arg &arg) {
+  void ComputeStaggeredYReverseCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
         for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-          computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
+          computeStaggeredYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
         }
       } // c/b volume
     } // parity
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void ComputeYReverseGPU(Arg arg) {
+  __global__ void ComputeStaggeredYReverseGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
@@ -474,12 +474,12 @@ namespace quda {
     if (ic_c >= nColor) return;
 
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    computeYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
+    computeStaggeredYreverse<Float,nSpin,nColor,Arg>(arg, parity, x_cb, ic_c);
   }
 
   //Adds the mass to the coarse local term.
   template<typename Float, int nSpin, int nColor, typename Arg>
-  void AddCoarseMassCPU(Arg &arg) {
+  void AddCoarseStaggeredMassCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
@@ -495,7 +495,7 @@ namespace quda {
 
   // Adds the mass to the coarse local term.
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void AddCoarseMassGPU(Arg arg) {
+  __global__ void AddCoarseStaggeredMassGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
@@ -511,7 +511,7 @@ namespace quda {
    * Convert the field from the atomic format to the required computation format, e.g. fixed point to floating point
    */
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __device__ __host__ void convert(Arg &arg, int parity, int x_cb, int c_row, int c_col) {
+  __device__ __host__ void convertStaggered(Arg &arg, int parity, int x_cb, int c_row, int c_col) {
 
     const auto &Yin = arg.Y_atomic;
     const auto &Xin = arg.X_atomic;
@@ -534,13 +534,13 @@ namespace quda {
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
-  void ConvertCPU(Arg &arg) {
+  void ConvertStaggeredCPU(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
       for (int x_cb=0; x_cb<arg.coarseVolumeCB; x_cb++) {
         for(int c_row = 0; c_row < nColor; c_row++) { //Color row
           for(int c_col = 0; c_col < nColor; c_col++) { //Color column
-            convert<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+            convertStaggered<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
           }
         }
       } // c/b volume
@@ -548,7 +548,7 @@ namespace quda {
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void ConvertGPU(Arg arg) {
+  __global__ void ConvertStaggeredGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
@@ -561,7 +561,7 @@ namespace quda {
     int c_row = blockDim.z*blockIdx.z + threadIdx.z; // color row index
     if (c_row >= nColor) return;
 
-    convert<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
+    convertStaggered<Float,nSpin,nColor,Arg>(arg, parity, x_cb, c_row, c_col);
   }
 
   enum ComputeType {
@@ -575,7 +575,7 @@ namespace quda {
 
   template <typename Float,
 	    int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  class CalculateY : public TunableVectorYZ {
+  class CalculateStaggeredY : public TunableVectorYZ {
 
   protected:
     Arg &arg;
@@ -659,7 +659,7 @@ namespace quda {
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
-    CalculateY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X)
+    CalculateStaggeredY(Arg &arg, const ColorSpinorField &meta, GaugeField &Y, GaugeField &X)
       : TunableVectorYZ(2,1), arg(arg), type(COMPUTE_INVALID),
 	meta(meta), Y(Y), X(X), dim(0), dir(QUDA_BACKWARDS)
     {
@@ -667,7 +667,7 @@ namespace quda {
       strcat(aux,comm_dim_partitioned_string());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
-    virtual ~CalculateY() { }
+    virtual ~CalculateStaggeredY() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
@@ -677,15 +677,15 @@ namespace quda {
       	if (type == COMPUTE_UV) {
 
       	  if (dir == QUDA_BACKWARDS) {
-      	    if      (dim==0) ComputeUVCPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==1) ComputeUVCPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==2) ComputeUVCPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==3) ComputeUVCPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    if      (dim==0) ComputeStaggeredUVCPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==1) ComputeStaggeredUVCPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==2) ComputeStaggeredUVCPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==3) ComputeStaggeredUVCPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
       	  } else if (dir == QUDA_FORWARDS) {
-      	    if      (dim==0) ComputeUVCPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==1) ComputeUVCPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==2) ComputeUVCPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==3) ComputeUVCPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    if      (dim==0) ComputeStaggeredUVCPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==1) ComputeStaggeredUVCPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==2) ComputeStaggeredUVCPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==3) ComputeStaggeredUVCPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
       	  } else {
       	    errorQuda("Undefined direction %d", dir);
       	  }
@@ -694,30 +694,30 @@ namespace quda {
       	} else if (type == COMPUTE_VUV) {
 
       	  if (dir == QUDA_BACKWARDS) {
-      	    if      (dim==0) ComputeVUVCPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==1) ComputeVUVCPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==2) ComputeVUVCPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==3) ComputeVUVCPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    if      (dim==0) ComputeStaggeredVUVCPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==1) ComputeStaggeredVUVCPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==2) ComputeStaggeredVUVCPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==3) ComputeStaggeredVUVCPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor>(arg);
       	  } else if (dir == QUDA_FORWARDS) {
-      	    if      (dim==0) ComputeVUVCPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==1) ComputeVUVCPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==2) ComputeVUVCPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
-      	    else if (dim==3) ComputeVUVCPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    if      (dim==0) ComputeStaggeredVUVCPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==1) ComputeStaggeredVUVCPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==2) ComputeStaggeredVUVCPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
+      	    else if (dim==3) ComputeStaggeredVUVCPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor>(arg);
       	  } else {
       	    errorQuda("Undefined direction %d", dir);
       	  }
 
       	} else if (type == COMPUTE_REVERSE_Y) {
 
-      	  ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
+      	  ComputeStaggeredYReverseCPU<Float,coarseSpin,coarseColor>(arg);
 
       	} else if (type == COMPUTE_MASS) {
 
-      	  AddCoarseMassCPU<Float,coarseSpin,coarseColor>(arg);
+      	  AddCoarseStaggeredMassCPU<Float,coarseSpin,coarseColor>(arg);
 
       	} else if (type == COMPUTE_CONVERT) {
 
-      	  ConvertCPU<Float,coarseSpin,coarseColor>(arg);
+      	  ConvertStaggeredCPU<Float,coarseSpin,coarseColor>(arg);
 
       	} else {
       	  errorQuda("Undefined compute type %d", type);
@@ -727,15 +727,15 @@ namespace quda {
       	if (type == COMPUTE_UV) {
 
       	  if (dir == QUDA_BACKWARDS) {
-      	    if      (dim==0) ComputeUVGPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==1) ComputeUVGPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==2) ComputeUVGPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==3) ComputeUVGPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    if      (dim==0) ComputeStaggeredUVGPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==1) ComputeStaggeredUVGPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==2) ComputeStaggeredUVGPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==3) ComputeStaggeredUVGPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
       	  } else if (dir == QUDA_FORWARDS) {
-      	    if      (dim==0) ComputeUVGPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==1) ComputeUVGPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==2) ComputeUVGPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==3) ComputeUVGPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    if      (dim==0) ComputeStaggeredUVGPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==1) ComputeStaggeredUVGPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==2) ComputeStaggeredUVGPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==3) ComputeStaggeredUVGPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
       	  } else {
       	    errorQuda("Undefined direction %d", dir);
       	  }
@@ -754,15 +754,15 @@ namespace quda {
       	  tp.grid.x /= tp.aux.y;
 #endif
       	  if (dir == QUDA_BACKWARDS) {
-      	    if      (dim==0) ComputeVUVGPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==1) ComputeVUVGPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==2) ComputeVUVGPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==3) ComputeVUVGPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    if      (dim==0) ComputeStaggeredVUVGPU<Float,0,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==1) ComputeStaggeredVUVGPU<Float,1,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==2) ComputeStaggeredVUVGPU<Float,2,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==3) ComputeStaggeredVUVGPU<Float,3,QUDA_BACKWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
       	  } else if (dir == QUDA_FORWARDS) {
-      	    if      (dim==0) ComputeVUVGPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==1) ComputeVUVGPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==2) ComputeVUVGPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      	    else if (dim==3) ComputeVUVGPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    if      (dim==0) ComputeStaggeredVUVGPU<Float,0,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==1) ComputeStaggeredVUVGPU<Float,1,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==2) ComputeStaggeredVUVGPU<Float,2,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	    else if (dim==3) ComputeStaggeredVUVGPU<Float,3,QUDA_FORWARDS,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
       	  } else {
       	    errorQuda("Undefined direction %d", dir);
       	  }
@@ -774,16 +774,16 @@ namespace quda {
 
       	} else if (type == COMPUTE_REVERSE_Y) {
 
-      	  ComputeYReverseGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	  ComputeStaggeredYReverseGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 
       	} else if (type == COMPUTE_MASS) {
 
-      	  AddCoarseMassGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	  AddCoarseStaggeredMassGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 
       	} else if (type == COMPUTE_CONVERT) {
 
       	  tp.grid.y = 2*coarseColor;
-      	  ConvertGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      	  ConvertStaggeredGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 
       	} else {
       	  errorQuda("Undefined compute type %d", type);
@@ -896,11 +896,11 @@ namespace quda {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
 
-      if      (type == COMPUTE_UV)                 strcat(Aux,",computeUV");
-      else if (type == COMPUTE_VUV)                strcat(Aux,",computeVUV");
-      else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
-      else if (type == COMPUTE_MASS)               strcat(Aux,",computeMass");
-      else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeConvert");
+      if      (type == COMPUTE_UV)                 strcat(Aux,",computeStaggeredUV");
+      else if (type == COMPUTE_VUV)                strcat(Aux,",computeStaggeredVUV");
+      else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeStaggeredYreverse");
+      else if (type == COMPUTE_MASS)               strcat(Aux,",computeStaggeredMass");
+      else if (type == COMPUTE_CONVERT)            strcat(Aux,",computeStaggeredConvert");
       else errorQuda("Unknown type=%d\n", type);
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
@@ -913,7 +913,7 @@ namespace quda {
       	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
       }
 
-      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_MASS
+      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_MASS ||
 			     type == COMPUTE_CONVERT) ? X.VolString () : meta.VolString();
 
       if (type == COMPUTE_VUV) {
@@ -975,9 +975,9 @@ namespace quda {
      @param mass[in] Kappa parameter
      @param matpc[in] The type of preconditioning of the source fine-grid operator
    */
-  template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
+  template<typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
 	   typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge>
-  void calculateY(coarseGauge &Y, coarseGauge &X,
+  void calculateStaggeredY(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
 		  Ftmp &UV, Vt &V, fineGauge &G,
 		  GaugeField &Y_, GaugeField &X_, ColorSpinorField &uv,
@@ -1019,9 +1019,9 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    typedef CalculateYArg<Float,coarseSpin,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt> Arg;
+    typedef CalculateStaggeredYArg<Float,coarseSpin,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, G, V, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_);
+    CalculateStaggeredY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_);
 
     QudaFieldLocation location = checkLocation(Y_, X_, v);
     printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
