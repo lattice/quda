@@ -177,10 +177,8 @@ namespace quda {
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
-    if (in->Precision() != gauge.Precision()) {
-      errorQuda("Mixing precisions gauge=%d and spinor=%d not supported",
-		gauge.Precision(), in->Precision());
-    }
+    if (in->Precision() != gauge.Precision())
+      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
 
     if (gauge.Reconstruct() == QUDA_RECONSTRUCT_9 || gauge.Reconstruct() == QUDA_RECONSTRUCT_13) {
       errorQuda("Reconstruct %d not supported", gauge.Reconstruct());

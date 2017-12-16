@@ -295,7 +295,7 @@ namespace quda {
 
     if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
       errorQuda("Mixing gauge and spinor precision not supported"
-		"(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
+		"(spinor precision=%d, fatlinkGauge precision=%d, longGauge precision=%d",
 		in->Precision(), fatGauge.Precision(), longGauge.Precision());
     }
 
