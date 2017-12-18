@@ -24,7 +24,7 @@ template<typename T>
 thrust::pair<T*, std::ptrdiff_t> get_temporary_buffer(my_tag, std::ptrdiff_t n)
 {
   // ask the allocator for sizeof(T) * n bytes
-  T* result = reinterpret_cast<T*>(device_malloc(sizeof(T) * n));
+  T* result = reinterpret_cast<T*>(pool_device_malloc(sizeof(T) * n));
 
   // return the pointer and the number of elements allocated
   return thrust::make_pair(result,n);
@@ -39,5 +39,5 @@ template<typename Pointer>
 void return_temporary_buffer(my_tag, Pointer p)
 {
   // return the pointer to the allocator
-  device_free(thrust::raw_pointer_cast(p));
+  pool_device_free(thrust::raw_pointer_cast(p));
 }

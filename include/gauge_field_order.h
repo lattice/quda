@@ -1036,7 +1036,7 @@ namespace quda {
 	 * @brief Returns the L2 norm squared of the field
 	 * @return L2 norm squared
 	 */
-	__host__ double norm2() const {
+	__host__ double norm2(bool global=true) const {
 	  double nrm2 = 0;
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
@@ -1055,7 +1055,7 @@ namespace quda {
 	      }
 	    }
 	  }
-	  comm_allreduce(&nrm2);
+	  if (global) comm_allreduce(&nrm2);
 	  return nrm2;
 	}
 
@@ -1064,7 +1064,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of
 	 * @return L2 norm squared
 	 */
-	__host__ double norm2(int dim) const {
+	__host__ double norm2(int dim, bool global=true) const {
 	  double nrm2 = 0;
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
@@ -1078,7 +1078,7 @@ namespace quda {
 		    nrm2 += norm((*this)(dim,parity,x_cb,row,col));
 	      }
 	  }
-	  comm_allreduce(&nrm2);
+	  if (global) comm_allreduce(&nrm2);
 	  return nrm2;
 	}
 
@@ -1087,7 +1087,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of
 	 * @return Linfinity norm
 	 */
-	__host__ double abs_max() const {
+	__host__ double abs_max(bool global=true) const {
 	  double absmax = 0;
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
@@ -1104,7 +1104,7 @@ namespace quda {
 		}
 	      }
 	  }
-	  comm_allreduce_max(&absmax);
+	  if (global) comm_allreduce_max(&absmax);
 	  return absmax;
 	}
 
@@ -1113,7 +1113,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of
 	 * @return Linfinity norm
 	 */
-	__host__ double abs_max(int dim) const {
+	__host__ double abs_max(int dim, bool global=true) const {
 	  double absmax = 0;
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
@@ -1128,7 +1128,7 @@ namespace quda {
 		      ? abs((*this)(dim,parity,x_cb,row,col)) : absmax;
 	      }
 	  }
-	  comm_allreduce_max(&absmax);
+	  if (global) comm_allreduce_max(&absmax);
 	  return absmax;
 	}
 
@@ -1136,7 +1136,7 @@ namespace quda {
 	 * @brief Returns the minimum absolute value of the field
 	 * @return Minimum norm
 	 */
-	__host__ double abs_min() const {
+	__host__ double abs_min(bool global=true) const {
 	  double absmin = std::numeric_limits<double>::max();
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
@@ -1153,7 +1153,7 @@ namespace quda {
 		}
 	      }
 	  }
-	  comm_allreduce_min(&absmin);
+	  if (global) comm_allreduce_min(&absmin);
 	  return absmin;
 	}
 
@@ -1162,7 +1162,7 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of
 	 * @return Minimum norm
 	 */
-	__host__ double abs_min(int dim) const {
+	__host__ double abs_min(int dim, bool global=true) const {
 	  double absmin = std::numeric_limits<double>::max();
 	  if (location == QUDA_CUDA_FIELD_LOCATION) {
 	    // call device version - specialized for ordering
@@ -1177,7 +1177,7 @@ namespace quda {
 		      ? abs((*this)(dim,parity,x_cb,row,col)) : absmin;
 	      }
 	  }
-	  comm_allreduce_min(&absmin);
+	  if (global) comm_allreduce_min(&absmin);
 	  return absmin;
 	}
 
