@@ -1438,6 +1438,10 @@ namespace quda {
     diracParam.mu = inv_param->mu;
 
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
+
+    if (gaugePrecise->Precision() != inv_param->cuda_prec)
+      errorQuda("Gauge precision %d does not match requested precision %d\n", gaugePrecise->Precision(), inv_param->cuda_prec);
+
   }
 
 
@@ -1454,6 +1458,8 @@ namespace quda {
       diracParam.commDim[i] = 1;   // comms are always on
     }
 
+    if (gaugeSloppy->Precision() != inv_param->cuda_prec_sloppy)
+      errorQuda("Gauge precision %d does not match requested precision %d\n", gaugeSloppy->Precision(), inv_param->cuda_prec_sloppy);
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms
@@ -1482,6 +1488,10 @@ namespace quda {
        diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
        diracParam.gauge = gaugeFatPrecondition;
     }
+
+    if (gaugePrecondition->Precision() != inv_param->cuda_prec_precondition)
+      errorQuda("Gauge precision %d does not match requested precision %d\n",
+		gaugePrecondition->Precision(), inv_param->cuda_prec_precondition);
   }
 
 
