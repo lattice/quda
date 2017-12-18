@@ -2379,6 +2379,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
 
   QudaInvertParam *param = mg_param->invert_param;
   checkInvertParam(param);
+  // check the gauge fields have been created and set the precision as needed
+  checkGauge(param);
 
   // for reporting level 1 is the fine level but internally use level 0 for indexing
   // sprintf(mg->prefix,"MG level 1 (%s): ", param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
