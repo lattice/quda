@@ -90,13 +90,6 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(ga_pad, INVALID_INT);
   
 #if defined INIT_PARAM
-  P(gaugeGiB, 0.0);
-#else
-  P(gaugeGiB, INVALID_DOUBLE);
-#endif
-
-
-#if defined INIT_PARAM
   P(staggered_phase_type, QUDA_STAGGERED_PHASE_NO);
   P(staggered_phase_applied, 0);
   P(i_mu, 0.0);
@@ -414,16 +407,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #ifdef INIT_PARAM
   P(iter, 0);
-  P(spinorGiB, 0.0);
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)
-    P(cloverGiB, 0.0);
   P(gflops, 0.0);
   P(secs, 0.0);
 #elif defined(PRINT_PARAM)
   P(iter, INVALID_INT);
-  P(spinorGiB, INVALID_DOUBLE);
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH)
-    P(cloverGiB, INVALID_DOUBLE);
   P(gflops, INVALID_DOUBLE);
   P(secs, INVALID_DOUBLE);
 #endif

@@ -108,10 +108,6 @@ void end() {
 
 void packTest() {
 
-  float spinorGiB = (float)Vh*spinorSiteSize*param.cuda_prec / (1 << 30);
-  printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
-  printf("Gauge mem: %.3f GiB\n", param.gaugeGiB);
-
   printf("Sending fields to GPU...\n"); fflush(stdout);
   
 #ifdef BUILD_CPS_INTERFACE

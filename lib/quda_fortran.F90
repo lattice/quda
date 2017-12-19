@@ -48,7 +48,6 @@ module quda_fortran
      integer(4) :: staple_pad   ! Used by link fattening
      integer(4) :: llfat_ga_pad ! Used by link fattening
      integer(4) :: mom_ga_pad   ! Used by the gauge and fermion forces
-     real(8) :: gauge_gib
 
      ! Set the staggered phase type of the links
      QudaStaggeredPhase :: staggered_phase_type
@@ -186,8 +185,6 @@ module quda_fortran
      integer(4) :: cl_pad
 
      integer(4) :: iter
-     real(8) :: spinor_gib
-     real(8) :: clover_gib
      real(8) :: gflops
      real(8) :: secs
 
