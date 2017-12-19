@@ -1061,48 +1061,6 @@ void loadSloppyCloverQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondi
 
 }
 
-void freeGaugeQuda(void)
-{
-  if (!initialized) errorQuda("QUDA not initialized");
-  if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
-  if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
-  if (gaugePrecise) delete gaugePrecise;
-  if (gaugeExtended) delete gaugeExtended;
-
-  gaugePrecondition = NULL;
-  gaugeSloppy = NULL;
-  gaugePrecise = NULL;
-  gaugeExtended = NULL;
-
-  if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
-  if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
-  if (gaugeLongPrecise) delete gaugeLongPrecise;
-  if (gaugeLongExtended) delete gaugeLongExtended;
-
-  gaugeLongPrecondition = NULL;
-  gaugeLongSloppy = NULL;
-  gaugeLongPrecise = NULL;
-  gaugeLongExtended = NULL;
-
-  if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
-  if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
-  if (gaugeFatPrecise) delete gaugeFatPrecise;
-
-  gaugeFatPrecondition = NULL;
-  gaugeFatSloppy = NULL;
-  gaugeFatPrecise = NULL;
-  gaugeFatExtended = NULL;
-
-  if (gaugeSmeared) delete gaugeSmeared;
-
-  gaugeSmeared = NULL;
-  // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
-  if (extendedGaugeResident) {
-    delete extendedGaugeResident;
-    extendedGaugeResident = NULL;
-  }
-}
-
 // just free the sloppy fields used in mixed-precision solvers
 void freeSloppyGaugeQuda(void)
 {
@@ -1110,20 +1068,53 @@ void freeSloppyGaugeQuda(void)
   if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
   if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
 
-  gaugePrecondition = NULL;
-  gaugeSloppy = NULL;
+  gaugePrecondition = nullptr;
+  gaugeSloppy = nullptr;
 
   if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
   if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
 
-  gaugeLongPrecondition = NULL;
-  gaugeLongSloppy = NULL;
+  gaugeLongPrecondition =nullptr;
+  gaugeLongSloppy = nullptr;
 
   if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
   if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
 
-  gaugeFatPrecondition = NULL;
-  gaugeFatSloppy = NULL;
+  gaugeFatPrecondition = nullptr;
+  gaugeFatSloppy = nullptr;
+}
+
+void freeGaugeQuda(void)
+{
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  freeSloppyGaugeQuda();
+
+  if (gaugePrecise) delete gaugePrecise;
+  if (gaugeExtended) delete gaugeExtended;
+
+  gaugePrecise = nullptr;
+  gaugeExtended = nullptr;
+
+  if (gaugeLongPrecise) delete gaugeLongPrecise;
+  if (gaugeLongExtended) delete gaugeLongExtended;
+
+  gaugeLongPrecise = nullptr;
+  gaugeLongExtended = nullptr;
+
+  if (gaugeFatPrecise) delete gaugeFatPrecise;
+
+  gaugeFatPrecise = nullptr;
+  gaugeFatExtended = nullptr;
+
+  if (gaugeSmeared) delete gaugeSmeared;
+
+  gaugeSmeared = nullptr;
+  // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
+  if (extendedGaugeResident) {
+    delete extendedGaugeResident;
+    extendedGaugeResident = nullptr;
+  }
 }
 
 
