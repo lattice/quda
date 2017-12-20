@@ -167,17 +167,29 @@ namespace quda {
 
   namespace colorspinor {
 
-    template<typename ReduceType, typename Float> struct square {
-      square(ReduceType scale) { }
+    template<typename ReduceType, typename Float> struct square_ {
+      square_(ReduceType scale) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x)
       { return static_cast<ReduceType>(norm(x)); }
     };
 
-    template<typename ReduceType> struct square<ReduceType,short> {
+    template<typename ReduceType> struct square_<ReduceType,short> {
       const ReduceType scale;
-      square(ReduceType scale) : scale(scale) { }
+      square_(ReduceType scale) : scale(scale) { }
       __host__ __device__ inline ReduceType operator()(const quda::complex<short> &x)
       { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
+
+    template<typename Float, typename storeFloat> struct abs_ {
+      abs_(const Float scale) { }
+      __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
+    };
+
+    template<typename Float> struct abs_<Float,short> {
+      Float scale;
+      abs_(const Float scale) : scale(scale) { }
+      __host__ __device__ Float operator()(const quda::complex<short> &x)
+      { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB { 
@@ -387,18 +399,19 @@ namespace quda {
       };
 
 
-    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat=Float>
+    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order,
+      typename storeFloat=Float, typename ghostFloat=storeFloat>
       class FieldOrderCB {
 
     protected:
       complex<storeFloat> *v;
-      mutable complex<storeFloat> *ghost[8];
+      mutable complex<ghostFloat> *ghost[8];
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
       const QudaGammaBasis gammaBasis;
       const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
-      const GhostAccessorCB<storeFloat,nSpin,nColor,nVec,order> ghostAccessor;
+      const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
       const int siteSubset;
       const int nParity;
       const QudaFieldLocation location;
@@ -433,8 +446,8 @@ namespace quda {
       void resetGhost(void * const *ghost_) const
       {
 	for (int d=0; d<4; d++) {
-	  ghost[2*d+0] = static_cast<complex<storeFloat>*>(ghost_[2*d+0]);
-	  ghost[2*d+1] = static_cast<complex<storeFloat>*>(ghost_[2*d+1]);
+	  ghost[2*d+0] = static_cast<complex<ghostFloat>*>(ghost_[2*d+0]);
+	  ghost[2*d+1] = static_cast<complex<ghostFloat>*>(ghost_[2*d+1]);
 	}
       }
 
@@ -490,7 +503,7 @@ namespace quda {
 	if (!fixed) {
 	  return complex<Float>(ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]);
 	} else {
-	  complex<storeFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
+	  complex<ghostFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
 	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
 	}
       }
@@ -504,10 +517,10 @@ namespace quda {
        * @param c color index
        * @param n vector number
        */
-      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0)
+      __device__ __host__ inline fieldorder_wrapper<Float,ghostFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0)
       {
 	const int idx = ghostAccessor.index(dim,dir,parity,x_cb,s,c,n);
-	return fieldorder_wrapper<Float,storeFloat>(ghost[2*dim+dir], idx, scale, scale_inv);
+	return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx, scale, scale_inv);
       }
 
       /**
@@ -589,20 +602,42 @@ namespace quda {
 
       /**
        * Returns the L2 norm squared of the field in a given dimension
+       * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
       */
-      __host__ double norm2() const {
+      __host__ double norm2(bool global=true) const {
 	double nrm2 = 0;
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust::device_ptr<complex<storeFloat> > ptr(v);
-	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+	  nrm2 = thrust::transform_reduce(thrust::retag<my_tag>(ptr),
+					  thrust::retag<my_tag>(ptr+nParity*volumeCB*nSpin*nColor*nVec),
+					  square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	} else {
 	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-					  square<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
+					  square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
 	}
-	comm_allreduce(&nrm2);
+	if (global) comm_allreduce(&nrm2);
 	return nrm2;
+      }
+
+      /**
+       * Returns the Linfinity norm of the field
+       * @param[in] global Whether to do a global or process local Linfinity reduction
+       * @return Linfinity norm
+      */
+      __host__ double abs_max(bool global=true) const {
+	double absmax = 0;
+	if (location == QUDA_CUDA_FIELD_LOCATION) {
+	  thrust::device_ptr<complex<storeFloat> > ptr(v);
+	  absmax = thrust::transform_reduce(thrust::retag<my_tag>(ptr),
+					    thrust::retag<my_tag>(ptr+nParity*volumeCB*nSpin*nColor*nVec),
+					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
+	} else {
+	  absmax = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
+					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
+	}
+	if (global) comm_allreduce_max(&absmax);
+	return absmax;
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }

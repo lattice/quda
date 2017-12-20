@@ -284,7 +284,7 @@ namespace quda {
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
     if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
+      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
 
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);
@@ -308,7 +308,7 @@ namespace quda {
 
     DslashPolicyImp* dslashImp = NULL;
     if (DS_type != 0) {
-      dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+      dslashImp = DslashFactory::create(QudaDslashPolicy::QUDA_DSLASH_NC);
       (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
       delete dslashImp;
     } else {

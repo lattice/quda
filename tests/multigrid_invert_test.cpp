@@ -574,9 +574,6 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
     
-  printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
-	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
   //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
   //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 

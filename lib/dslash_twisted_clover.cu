@@ -302,11 +302,11 @@ namespace quda {
     void *cloverP=0, *cloverNormP=0, *cloverInvP=0, *cloverInvNormP=0;
     QudaPrecision clover_prec = bindTwistedCloverTex(*clover, *cloverInv, parity, &cloverP, &cloverNormP, &cloverInvP, &cloverInvNormP);
 
-    if (in->Precision() != clover_prec)
-      errorQuda("Mixing clover and spinor precision not supported");
-	
     if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
+      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
+
+    if (in->Precision() != clover_prec)
+      errorQuda("Mixing clover precision (%d) and spinor precision (%d) not supported", clover_prec, in->Precision());
 
 #ifndef DYNAMIC_CLOVER
     if (clover->stride != cloverInv->stride) 

@@ -51,10 +51,8 @@ enum KernelType {
     int long_gauge_stride;
     float fat_link_max;
 #endif 
-#ifdef MULTI_GPU
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
-#endif
 
     double a;
     float a_f;
@@ -163,12 +161,10 @@ enum KernelType {
       printfQuda("long_gauge_stride = %d\n", long_gauge_stride);
       printfQuda("fat_link_max = %e\n", fat_link_max);
 #endif
-#ifdef MULTI_GPU
       printfQuda("threadDimMapLower = {%d, %d, %d, %d}\n", threadDimMapLower[0], threadDimMapLower[1],
 		 threadDimMapLower[2], threadDimMapLower[3]);
       printfQuda("threadDimMapUpper = {%d, %d, %d, %d}\n", threadDimMapUpper[0], threadDimMapUpper[1],
 		 threadDimMapUpper[2], threadDimMapUpper[3]);
-#endif
       printfQuda("a = %e\n", a);
       printfQuda("b = %e\n", b);
       printfQuda("c = %e\n", c);
