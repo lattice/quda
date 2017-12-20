@@ -1,7 +1,7 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
-  coarse_op_preconditioned.cu
+  coarse_op_preconditioned.cu staggered_coarse_op.cu
   multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
