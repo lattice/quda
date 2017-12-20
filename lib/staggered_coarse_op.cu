@@ -27,7 +27,6 @@ namespace quda {
 
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
-      constexpr QudaCloverFieldOrder clOrder = QUDA_PACKED_CLOVER_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
 	errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
@@ -49,7 +48,7 @@ namespace quda {
       gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Y));
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(X));
 
-      calculateY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
 	 vAccessor, gAccessor, Y, X, uv, v, mass, dirac, matpc,
 	 T.fineToCoarse(location), T.coarseToFine(location));
@@ -97,25 +96,17 @@ namespace quda {
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
 #if 0
-    } else if (coarseCoor == 4) {
-      calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+    if (coarseCoor == 4) {
+      calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, uv, T, g, c, mass dirac, matpc);
 #endif
     if (coarseColor == 24) { // free field staggered
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#if 0
-    } else if (coarseColor == 8) {
-      calculateY<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 12) {
-      calculateY<Float,vFloat,fineColor,fineSpin,12,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 16) {
-      calculateY<Float,vFloat,fineColor,fineSpin,16,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 20) {
-      calculateY<Float,vFloat,fineColor,fineSpin,20,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#endif
+      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, mass, dirac, matpc);
+    } else if (coarseColor == 24) { // free field staggered
+      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, mass, dirac, matpc);
     } else if (coarseColor == 96) {
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, uv, T, g, mass, dirac, matpc);
     } else if (coarseColor == 128) {
-      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,128,coarseSpin>(Y, X, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+      calculateStaggeredY<Float,vFloat,fineColor,fineSpin,128,coarseSpin>(Y, X, uv, T, g, mass, dirac, matpc);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -123,7 +114,7 @@ namespace quda {
 
   // template on fine spin
   template <typename Float, typename vFloat, int fineColor>
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
+  void calculateStaggeredY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T,
 		  const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
     if (uv.Nspin() == 1) {
       calculateStaggeredY<Float,vFloat,fineColor,1>(Y, X, uv, T, g, mass, dirac, matpc);

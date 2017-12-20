@@ -22,7 +22,7 @@ namespace quda {
   static bool bidirectional_debug = false;
 
   template <typename Float, int coarseSpin,
-	    typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor,
+	    typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge,
 	    typename fineSpinorTmp, typename fineSpinorV>
   struct CalculateStaggeredYArg {
 
@@ -149,7 +149,7 @@ namespace quda {
     }   // parity
   }
 
-  template<typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template<typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __global__ void ComputeStaggeredUVGPU(Arg arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
@@ -177,36 +177,27 @@ namespace quda {
     // so once we know the parity we're working with we exactly
     // know the spins.
 
-#pragma unroll
-    for (int i=0; i<coarseSpin*coarseSpin; i++) vuv[i] = 0.0;
+    vuv = 0.0;
 
-#pragma unroll
     const int s = 0; // fine spin is always 0, since it's staggered.
-
-    //Spin part of the color matrix.  Will always consist
-    //of two terms - diagonal and off-diagonal part of
-    //P_mu = (1+/-\gamma_mu)
-
     const int s_c_row = arg.spin_map(s,parity); // Coarse spin row index
 
-    //Use Gamma to calculate off-diagonal coupling and
-    //column index.  Diagonal coupling is always 1.
     // If computing the backwards (forwards) direction link then
-    // we desire the positive (negative) projector
+    // we desire the positive (negative) hopping term.
 
-    int s_col;
+    int s_col = 0;
     const int s_c_col = arg.spin_map(s_col,parity); // Coarse spin col index
 
 #pragma unroll
     for (int ic = 0; ic < fineColor; ic++) { //Sum over fine color
       if (dir == QUDA_BACKWARDS) {
 
-        // off diagonal spin
+        // off diagonal contribution
         vuv += conj(arg.V(parity, x_cb, 0, ic, ic_c)) * arg.UV(parity, x_cb, 0, ic, jc_c);
 
       } else {
 
-        // off diagonal spin
+        // off diagonal contribution
         vuv -= conj(arg.V(parity, x_cb, 0, ic, ic_c)) * arg.UV(parity, x_cb, 0, ic, jc_c);
         
       }
@@ -293,7 +284,7 @@ namespace quda {
 #endif
 
     complex<Float> vuv = 0.0;
-    multiplyStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, gamma, parity, x_cb, c_row, c_col);
+    multiplyStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor,Arg>(vuv, arg, parity, x_cb, c_row, c_col);
 
     constexpr int dim_index = (dir == QUDA_BACKWARDS) ? dim : dim + 4;
 #if defined(SHARED_ATOMIC) && __CUDA_ARCH__
@@ -377,7 +368,7 @@ namespace quda {
       for (int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++) { // Loop over fine volume
         for (int c_row=0; c_row<coarseColor; c_row++) {
           for (int c_col=0; c_col<coarseColor; c_col++) {
-            ComputeStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, gamma, parity, x_cb, c_row, c_col, 0, 0);
+            ComputeStaggeredVUV<Float,dim,dir,fineColor,coarseSpin,coarseColor>(arg, parity, x_cb, c_row, c_col, 0, 0);
           } // coarse color columns
         } // coarse color rows
       } // c/b volume
@@ -975,7 +966,7 @@ namespace quda {
      @param mass[in] Kappa parameter
      @param matpc[in] The type of preconditioning of the source fine-grid operator
    */
-  template<typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
+  template<typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
 	   typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge>
   void calculateStaggeredY(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
@@ -1019,9 +1010,9 @@ namespace quda {
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    typedef CalculateStaggeredYArg<Float,coarseSpin,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt> Arg;
+    typedef CalculateStaggeredYArg<Float,coarseSpin,coarseGauge,coarseGaugeAtomic,fineGauge,Ftmp,Vt> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, G, V, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    CalculateStaggeredY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_);
+    CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_);
 
     QudaFieldLocation location = checkLocation(Y_, X_, v);
     printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -1049,7 +1040,7 @@ namespace quda {
       	printfQuda("Computing forward %d UV and VUV\n", d);
 
       	if (uv.Precision() == QUDA_HALF_PRECISION) {
-      	  double U_max = 3.0*arg.U.abs_max(from_coarse ? d+4 : d);
+      	  double U_max = 3.0*arg.U.abs_max(d);
       	  double uv_max = U_max * v.Scale();
       	  uv.Scale(uv_max);
       	  arg.UV.resetScale(uv_max);
@@ -1075,20 +1066,20 @@ namespace quda {
 
       if (uv.Precision() == QUDA_HALF_PRECISION) {
       	double U_max = 3.0*arg.U.abs_max(d);
-      	double uv_max = U_max * av.Scale();
+      	double uv_max = U_max * v.Scale();
       	uv.Scale(uv_max);
       	arg.UV.resetScale(uv_max);
 
-      	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e av_max = %e uv_max = %e\n", d, U_max, av.Scale(), uv_max);
+      	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", d, U_max, v.Scale(), uv_max);
       }
 
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
       y.apply(0);
-      printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
+      printfQuda("UV2[%d] = %e\n", d+4, arg.UV.norm2());
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(0);
-      printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(d));
+      printfQuda("Y2[%d] = %e\n", d+4, arg.Y_atomic.norm2(d));
 
     }
     printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));

@@ -386,7 +386,7 @@ namespace quda {
    */
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
     const cudaGaugeField &gauge,
-    double mass, QudaDiracType dirac, QudaMatPCType matpc) 
+    double mass, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
