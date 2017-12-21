@@ -84,6 +84,8 @@ extern QudaExtLibType   deflation_ext_lib;
 extern QudaFieldLocation location_ritz;
 extern QudaMemoryType    mem_type_ritz;
 
+extern int pipeline;
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -270,6 +272,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.omega = 1.0;
 
   inv_param.extlib_type = solver_ext_lib;
+
+  inv_param.pipeline = pipeline;
 }
 
 void setDeflationParam(QudaEigParam &df_param) {

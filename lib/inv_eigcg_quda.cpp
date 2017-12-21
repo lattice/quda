@@ -13,6 +13,9 @@
 #include <util_quda.h>
 #include <string.h>
 
+#include <functional>
+#include <limits>
+
 #ifdef MAGMA_LIB 
 #include <blas_magma.h>
 #endif
@@ -609,6 +612,8 @@ namespace quda {
         return;
      } 
 
+     //auto  genericEigCGsolve = param.pipeline ? pipeEigCGsolve : eigCGsolve ;
+
      ColorSpinorParam csParam(in);
 
      //Start (incremental) eigCG solver:
@@ -682,7 +687,8 @@ namespace quda {
          printfQuda("Running DCG correction cycle.\n");
        }
 
-       int iters = eigCGsolve(eSloppy, rSloppy);
+//       int iters = genericEigCGsolve(eSloppy, rSloppy);
+       int iters =  param.pipeline ? pipeEigCGsolve(eSloppy, rSloppy) : eigCGsolve(eSloppy, rSloppy) ;
 
        bool update_ritz = !dcg_cycle && (eigcg_args->restarts > 1) && !defl.is_complete(); 
 
