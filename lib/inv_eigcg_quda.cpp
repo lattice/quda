@@ -1025,6 +1025,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
     gamma = norm2(r);
     delta = reDotProduct(w, r);
     beta  = 0.0;
+    gamma_inv = 1.0 / gamma;
 
     alpha_inv     = delta * gamma_inv;
     alpha         = 1.0 / alpha_inv;
@@ -1078,7 +1079,7 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
       ColorSpinorField &t = *tp;
 
 #ifndef PIPEEIGCGDEBUG
-      local_reduce = pipeEigCGMergedReduceOp(alpha, s, p, z, beta, r, x, w, q, gamma_inv, t);
+      local_reduce = pipeEigCGMergedReduceOp(beta, s, p, z, aplha, r, x, w, q, gamma_inv, t);
 #else
       xpay(r,beta,p);
       xpay(w,beta,s);
@@ -1103,10 +1104,11 @@ recvbuff(new double[2], [](double *p) {delete[] p;}),  n_update( Vm->Nspin()==4 
 
       gamma_old_inv = gamma_inv;
       gamma_inv     = 1.0 / gamma;
+      beta          = gamma * gamma_old_inv;
+
       alpha_old_inv = alpha_inv;
       alpha_inv     = delta * gamma_inv - beta * alpha_old_inv;
       alpha         = 1.0 / alpha_inv;
-      beta          = gamma * gamma_old_inv;
 
       lanczos_offdiag = (-sqrt(beta)*alpha_inv);
 
