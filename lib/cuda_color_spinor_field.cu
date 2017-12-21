@@ -322,6 +322,11 @@ namespace quda {
 
       unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
       if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
+//We cannot (and currently don't need to) create a texture object for large composite fields  
+        if(composite_descr.is_composite && composite_descr.dim > 16) {
+ 	  warningQuda("Cannot bind too large a texture for the composite field %lu > %d", texels, deviceProp.maxTexture1DLinear);
+          return;
+        }
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
       }
 
