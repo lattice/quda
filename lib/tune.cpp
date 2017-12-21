@@ -658,7 +658,7 @@ namespace quda {
 	tunecache[key] = best_param;
 
       }
-      if (commGlobalReduction()) broadcastTuneCache();
+      if (commGlobalReduction() || policyTuning()) broadcastTuneCache();
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {

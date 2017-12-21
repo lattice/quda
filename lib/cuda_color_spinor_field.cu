@@ -496,7 +496,7 @@ namespace quda {
   }
 
   void cudaColorSpinorField::backup() const {
-    if (backed_up) errorQuda("Gauge field already backed up");
+    if (backed_up) errorQuda("ColorSpinorField already backed up");
     backup_h = new char[bytes];
     cudaMemcpy(backup_h, v, bytes, cudaMemcpyDeviceToHost);
     if (norm_bytes) {
@@ -962,25 +962,27 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr) {
+  void cudaColorSpinorField::recvStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr) {
 
-    int dim = dir/2;
+    // note this is scatter centric, so dir=0 (1) is send backwards
+    // (forwards) and receive from forwards (backwards)
+
+    int dim = d/2;
+    int dir = d%2;
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir%2 == 0) { // sending backwards
+    if (dir == 0) { // receive from forwards
+      // receive from the processor in the +1 direction
       if (comm_peer2peer_enabled(1,dim)) {
-	// receive from the processor in the +1 direction
 	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
       } else if (gdr) {
-        // Prepost receive
         comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
-        // Prepost receive
         comm_start(mh_recv_fwd[bufferIndex][dim]);
       }
-    } else { //sending forwards
-      // Prepost receive
+    } else { // receive from backwards
+      // receive from the processor in the -1 direction
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
       } else if (gdr) {
@@ -993,6 +995,9 @@ namespace quda {
 
 
   void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr) {
+
+    // note this is scatter centric, so dir=0 (1) is send backwards
+    // (forwards) and receive from forwards (backwards)
 
     int dim = d/2;
     int dir = d%2;
@@ -1081,7 +1086,7 @@ namespace quda {
 	if (upper) {
 	  flavor1_offset = (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
 	  flavor2_offset = (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
-	}else{
+	} else {
 	  flavor1_offset = lower_spin_offset + (dir == 0 ? 0 : flavor1_Nt_minus1_offset);
 	  flavor2_offset = lower_spin_offset + (dir == 0 ? flavorVolume : flavor2_Nt_minus1_offset);
 	}
@@ -1122,9 +1127,9 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr) {
-    recvStart(nFace, dir, dagger, stream_p, gdr);
-    sendStart(nFace, dir, dagger, stream_p, gdr);
+  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr_send, bool gdr_recv) {
+    recvStart(nFace, dir, dagger, stream_p, gdr_recv);
+    sendStart(nFace, dir, dagger, stream_p, gdr_send);
   }
 
 
@@ -1133,47 +1138,66 @@ namespace quda {
   static bool complete_send_fwd[QUDA_MAX_DIM] = { };
   static bool complete_send_back[QUDA_MAX_DIM] = { };
 
-  int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p, bool gdr) {
+  int cudaColorSpinorField::commsQuery(int nFace, int d, int dagger, cudaStream_t *stream_p, bool gdr_send, bool gdr_recv) {
 
-    int dim = dir/2;
+    // note this is scatter centric, so dir=0 (1) is send backwards
+    // (forwards) and receive from forwards (backwards)
+
+    int dim = d/2;
+    int dir = d%2;
+
     if (!commDimPartitioned(dim)) return 0;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
+    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir%2==0) {
+    if (dir==0) {
 
+      // first query send to backwards
       if (comm_peer2peer_enabled(0,dim)) {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr) {
+      } else if (gdr_send) {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_rdma_back[bufferIndex][dim]);
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
 	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][dim]);
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
       }
 
-      if (complete_recv_back[dim] && complete_send_back[dim]) {
-	complete_recv_back[dim] = false;
-	complete_send_back[dim] = false;
-	return 1;
-      }
-
-    } else { // dir%2 == 1
-
+      // second query receive from forwards
       if (comm_peer2peer_enabled(1,dim)) {
-	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr) {
-	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
+      } else if (gdr_recv) {
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
-	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
 	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
       }
 
-      if (complete_recv_fwd[dim] && complete_send_fwd[dim]) {
+      if (complete_recv_fwd[dim] && complete_send_back[dim]) {
+	complete_send_back[dim] = false;
 	complete_recv_fwd[dim] = false;
+	return 1;
+      }
+
+    } else { // dir == 1
+
+      // first query send to forwards
+      if (comm_peer2peer_enabled(1,dim)) {
+	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
+      } else if (gdr_send) {
+	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
+      } else {
+	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
+      }
+
+      // second query receive from backwards
+      if (comm_peer2peer_enabled(0,dim)) {
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
+      } else if (gdr_recv) {
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
+      } else {
+	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
+      }
+
+      if (complete_recv_back[dim] && complete_send_fwd[dim]) {
 	complete_send_fwd[dim] = false;
+	complete_recv_back[dim] = false;
 	return 1;
       }
 
@@ -1182,39 +1206,59 @@ namespace quda {
     return 0;
   }
 
-  void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger, cudaStream_t *stream_p, bool gdr) {
-    int dim = dir / 2;
+  void cudaColorSpinorField::commsWait(int nFace, int d, int dagger, cudaStream_t *stream_p, bool gdr_send, bool gdr_recv) {
+
+    // note this is scatter centric, so dir=0 (1) is send backwards
+    // (forwards) and receive from forwards (backwards)
+
+    int dim = d/2;
+    int dir = d%2;
+
     if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
+    if ( (gdr_send && gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir%2==0) {
+    if (dir==0) {
 
+      // first wait on send to backwards
       if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
 	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
 	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr) {
-	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
+      } else if (gdr_send) {
 	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
       } else {
-	comm_wait(mh_recv_back[bufferIndex][dim]);
 	comm_wait(mh_send_back[bufferIndex][dim]);
+      }
+
+      // second wait on receive from forwards
+      if (comm_peer2peer_enabled(1,dim)) {
+	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
+      } else if (gdr_recv) {
+	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
+      } else {
+	comm_wait(mh_recv_fwd[bufferIndex][dim]);
       }
 
     } else {
 
+      // first wait on send to forwards
       if (comm_peer2peer_enabled(1,dim)) {
-	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
-	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
+	comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr) {
-	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
-	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
+      } else if (gdr_send) {
+	comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
-	comm_wait(mh_recv_fwd[bufferIndex][dim]);
-	comm_wait(mh_send_fwd[bufferIndex][dim]);
+	comm_query(mh_send_fwd[bufferIndex][dim]);
+      }
+
+      // second wait on receive from backwards
+      if (comm_peer2peer_enabled(0,dim)) {
+	comm_query(mh_recv_p2p_back[bufferIndex][dim]);
+	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+      } else if (gdr_recv) {
+	comm_query(mh_recv_rdma_back[bufferIndex][dim]);
+      } else {
+	comm_query(mh_recv_back[bufferIndex][dim]);
       }
 
     }
@@ -1224,6 +1268,9 @@ namespace quda {
 
   void cudaColorSpinorField::scatter(int nFace, int dagger, int dim_dir, cudaStream_t* stream_p)
   {
+    // note this is scatter centric, so input expects dir=0 (1) is send backwards
+    // (forwards) and receive from forwards (backwards), so here we need flip to receive centric
+
     int dim = dim_dir/2;
     int dir = (dim_dir+1)%2; // dir = 1 - receive from forwards, dir == 0 recive from backwards
     if (!commDimPartitioned(dim)) return;
@@ -1234,6 +1281,9 @@ namespace quda {
 
   void cudaColorSpinorField::scatter(int nFace, int dagger, int dim_dir)
   {
+    // note this is scatter centric, so dir=0 (1) is send backwards
+    // (forwards) and receive from forwards (backwards), so here we need flip to receive centric
+
     int dim = dim_dir/2;
     int dir = (dim_dir+1)%2; // dir = 1 - receive from forwards, dir == 0 receive from backwards
     if (!commDimPartitioned(dim)) return;

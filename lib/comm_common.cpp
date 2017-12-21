@@ -145,6 +145,10 @@ void comm_destroy_topology(Topology *topo)
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
+
+static bool intranode_enabled[2][4] = { {false,false,false,false},
+					{false,false,false,false} };
+
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
@@ -210,6 +214,12 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	      printf("Peer-to-peer enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d, performance rank = (%d, %d)\n",
 		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
 	    }
+	  } else {
+	    intranode_enabled[dir][dim] = true;
+	    if (getVerbosity() > QUDA_SILENT) {
+	      printf("Intra-node (non peer-to-peer) enabled for rank %d (gpu=%d) with neighbor %d (gpu=%d) dir=%d, dim=%d\n",
+		     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+	    }
 	  }
 
 	} // on the same node
@@ -221,21 +231,58 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   peer2peer_init = true;
 
+  comm_barrier();
+
   // set gdr enablement
   if (comm_gdr_enabled()) {
-    printfQuda("Enabling GPU-Direct RDMA access\n");
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
+    comm_gdr_blacklist(); // set GDR blacklist
   } else {
-    printfQuda("Disabling GPU-Direct RDMA access\n");
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
   }
 
   checkCudaErrorNoSync();
   return;
 }
 
+static bool enable_p2p = true;
+
 bool comm_peer2peer_enabled(int dir, int dim){
-  return peer2peer_enabled[dir][dim];
+  return enable_p2p ? peer2peer_enabled[dir][dim] : false;
 }
 
+bool comm_peer2peer_enabled_global() {
+  if (!enable_p2p) return false;
+
+  static bool init = false;
+  static bool p2p_global = false;
+
+  if (!init) {
+    int p2p = 0;
+    for (int dim=0; dim<4; dim++)
+      for (int dir=0; dir<2; dir++)
+	p2p += (int)comm_peer2peer_enabled(dir,dim);
+
+    comm_allreduce_int(&p2p);
+    init = true;
+    p2p_global = p2p > 0 ? true : false;
+  }
+  return p2p_global;
+}
+
+void comm_enable_peer2peer(bool enable) {
+  enable_p2p = enable;
+}
+
+static bool enable_intranode = true;
+
+bool comm_intranode_enabled(int dir, int dim){
+  return enable_intranode ? intranode_enabled[dir][dim] : false;
+}
+
+void comm_enable_intranode(bool enable) {
+  enable_intranode = enable;
+}
 
 int comm_ndim(const Topology *topo)
 {
@@ -540,23 +587,6 @@ int comm_partitioned()
   return partitioned;
 }
 
-bool comm_peer2peer_enabled_global() {
-  static bool init = false;
-  static bool p2p_global = false;
-
-  if (!init) {
-    int p2p = 0;
-    for (int dim=0; dim<4; dim++)
-      for (int dir=0; dir<2; dir++)
-	p2p += (int)comm_peer2peer_enabled(dir,dim);
-
-    comm_allreduce_int(&p2p);
-    init = true;
-    p2p_global = p2p > 0 ? true : false;
-  }
-  return p2p_global;
-}
-
 bool comm_gdr_enabled() {
   static bool gdr_enabled = false;
 #ifdef MULTI_GPU
@@ -571,6 +601,39 @@ bool comm_gdr_enabled() {
   }
 #endif
   return gdr_enabled;
+}
+
+bool comm_gdr_blacklist() {
+  static bool blacklist = false;
+  static bool blacklist_init = false;
+
+  if (!blacklist_init) {
+    char *blacklist_env = getenv("QUDA_ENABLE_GDR_BLACKLIST");
+
+    if (blacklist_env) { // set the policies to tune for explicitly
+      std::stringstream blacklist_list(blacklist_env);
+
+      int device_count;
+      cudaGetDeviceCount(&device_count);
+
+      int excluded_device;
+      while (blacklist_list >> excluded_device) {
+	// check this is a valid device
+	if ( excluded_device < 0 || excluded_device >= device_count ) {
+	  errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
+	}
+
+	if (blacklist_list.peek() == ',') blacklist_list.ignore();
+	if (excluded_device == comm_gpuid()) blacklist = true;
+      }
+      comm_barrier();
+      if (getVerbosity() > QUDA_SILENT && blacklist) printf("Blacklisting GPU-Direct RDMA for rank %d (GPU %d)\n", comm_rank(), comm_gpuid());
+    }
+    blacklist_init = true;
+
+  }
+
+  return blacklist;
 }
 
 static bool globalReduce = true;

@@ -637,11 +637,63 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
-    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
+    /**
+       @brief Initiate halo communication receive
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr Whether we are using GDR on the receive side
+    */
+    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+
+    /**
+       @brief Initiate halo communication sending
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr Whether we are using GDR on the send side
+    */
+    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+
+    /**
+       @brief Initiate halo communication
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    void commsStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+
+    /**
+       @brief Non-blocking query if the halo communication has completed
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    int commsQuery(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+
+    /**
+       @brief Wait on halo communication to complete
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    void commsWait(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
 
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
