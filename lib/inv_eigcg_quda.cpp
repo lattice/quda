@@ -614,10 +614,10 @@ namespace quda {
      //Start (incremental) eigCG solver:
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     std::shared_ptr<ColorSpinorField> ep = ColorSpinorField::CreateSmartPtr(csParam);//full precision accumulator
-     ColorSpinorField &e = *ep;
-     std::shared_ptr<ColorSpinorField> rp = ColorSpinorField::CreateSmartPtr(csParam);//full precision residual
-     ColorSpinorField &r = *rp;
+     std::shared_ptr<ColorSpinorField> ep2 = ColorSpinorField::CreateSmartPtr(csParam);//full precision accumulator
+     ColorSpinorField &e = *ep2;
+     std::shared_ptr<ColorSpinorField> rp2 = ColorSpinorField::CreateSmartPtr(csParam);//full precision residual
+     ColorSpinorField &r = *rp2;
 
      //deflate initial guess ('out'-field):
      mat(r, out, e);
@@ -626,10 +626,10 @@ namespace quda {
 
      csParam.setPrecision(param.precision_sloppy);
 
-     std::shared_ptr<ColorSpinorField> ep_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : ep;
-     ColorSpinorField &eSloppy = *ep_sloppy;
-     std::shared_ptr<ColorSpinorField> rp_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : rp;
-     ColorSpinorField &rSloppy = *rp_sloppy;
+     std::shared_ptr<ColorSpinorField> ep2_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : ep2;
+     ColorSpinorField &eSloppy = *ep2_sloppy;
+     std::shared_ptr<ColorSpinorField> rp2_sloppy = ( mixed_prec ) ? ColorSpinorField::CreateSmartPtr(csParam) : rp2;
+     ColorSpinorField &rSloppy = *rp2_sloppy;
 
      //now create eigCG internal fields:  
      if (!init) {

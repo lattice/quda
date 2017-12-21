@@ -1113,7 +1113,7 @@ namespace quda {
     };
 
 
-    double2 pipeEigMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z, 
+    double2 pipeEigCGMergedReduceOp(const double &a, ColorSpinorField &s, ColorSpinorField &p, ColorSpinorField &z, 
                                const double &b, ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &w, ColorSpinorField &q, const double c, ColorSpinorField &v) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
