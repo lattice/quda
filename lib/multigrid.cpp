@@ -75,13 +75,12 @@ namespace quda {
     }
 
     // in case of iterative setup with MG the coarse level may be already built
-    if(!transfer)
-      reset();
+    if (!transfer) reset();
 
     setOutputPrefix("");
   }
 
-  void MG::reset() {
+  void MG::reset(bool refresh) {
 
     setVerbosity(param.mg_global.verbosity[param.level]);
     setOutputPrefix(prefix);
@@ -89,13 +88,18 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d of %d levels\n", transfer ? "Resetting":"Creating", param.level+1, param.Nlevel);
     createSmoother();
 
+    // Refresh the null-space vectors if we need to
+    if (refresh && param.level < param.Nlevel-1) {
+      if (param.mg_global.setup_maxiter_refresh[param.level]) generateNullVectors(param.B, refresh);
+    }
+
     // if not on the coarsest level, update next
     if (param.level < param.Nlevel-1) {
 
       if (transfer) {
         // restoring FULL parity in Transfer changed at the end of this procedure
         transfer->setSiteSubset(QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY);
-        if (resetTransfer) {
+        if (resetTransfer || refresh) {
           transfer->reset();
           resetTransfer = false;
         }
@@ -144,7 +148,7 @@ namespace quda {
         coarse->param.matResidual = matCoarseResidual;
         coarse->param.matSmooth = matCoarseSmoother;
         coarse->param.matSmoothSloppy = matCoarseSmootherSloppy;
-        coarse->reset();
+        coarse->reset(refresh);
       } else {
         // create the next multigrid level
         param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy, param.level+1);
@@ -830,12 +834,12 @@ namespace quda {
 #endif
   }
 
-  void MG::generateNullVectors(std::vector<ColorSpinorField*> &B) {
+  void MG::generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh) {
     setOutputPrefix(prefix);
 
     SolverParam solverParam(param);  // Set solver field parameters:
     // set null-space generation options - need to expose these
-    solverParam.maxiter = param.mg_global.setup_maxiter[param.level];
+    solverParam.maxiter = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
     solverParam.tol = param.mg_global.setup_tol[param.level];
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-1;
@@ -955,7 +959,7 @@ namespace quda {
             caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
           }
           double nrm2 = norm2(*B_gpu[i]);
-          if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B_gpu[i]);// i/<i,i>
+          if (sqrt(nrm2) > 1e-16) ax(1.0 /sqrt(nrm2), *B_gpu[i]);// i/<i,i>
           else errorQuda("\nCannot normalize %u vector\n", i);
         }
       }
@@ -970,7 +974,7 @@ namespace quda {
           reset();
           if ( param.level < param.Nlevel-2 ) {
             if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES ) {
-              coarse->generateNullVectors(*B_coarse);
+              coarse->generateNullVectors(*B_coarse, refresh);
             } else {
               printfQuda("Restricting null space vectors\n");
               for (int i=0; i<param.Nvec; i++) {

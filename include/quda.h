@@ -421,6 +421,9 @@ extern "C" {
     /** Maximum number of iterations for each setup solver */
     int setup_maxiter[QUDA_MAX_MG_LEVEL];
 
+    /** Maximum number of iterations for refreshing the null-space vectors */
+    int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
+
     /** Null-space type to use in the setup phase */
     QudaSetupType setup_type;
 
