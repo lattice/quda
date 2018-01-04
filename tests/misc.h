@@ -36,6 +36,8 @@ extern "C" {
 
   QudaTwistFlavorType get_flavor_type(char* s);
 
+  int get_rank_order(char* s);
+
   QudaDslashType get_dslash_type(char* s);
   const char* get_dslash_str(QudaDslashType type);
 

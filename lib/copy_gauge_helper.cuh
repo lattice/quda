@@ -15,10 +15,12 @@ namespace quda {
     int faceVolumeCB[QUDA_MAX_DIM];
     int nDim;
     int geometry;
-    int offset;
+    int out_offset;
+    int in_offset;
     CopyGaugeArg(const OutOrder &out, const InOrder &in, int volume, 
 		 const int *faceVolumeCB, int nDim, int geometry) 
-      : out(out), in(in), volume(volume), nDim(nDim), geometry(geometry), offset(0) {
+      : out(out), in(in), volume(volume), nDim(nDim), geometry(geometry),
+	out_offset(0), in_offset(0) {
       for (int d=0; d<nDim; d++) this->faceVolumeCB[d] = faceVolumeCB[d];
     }
   };
@@ -130,13 +132,13 @@ namespace quda {
 #ifdef FINE_GRAINED_ACCESS
 	  for (int i=0; i<Ncolor(length); i++)
 	    for (int j=0; j<Ncolor(length); j++)
-	      arg.out.Ghost(d+arg.offset, parity, x, i, j) = arg.in.Ghost(d+arg.offset, parity, x, i, j);
+	      arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d+arg.offset, parity); // assumes we are loading
+	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
 	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d+arg.offset, parity);
+	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
 #endif
 	}
       }
@@ -161,13 +163,13 @@ namespace quda {
 #ifdef FINE_GRAINED_ACCESS
 	  for (int i=0; i<Ncolor(length); i++)
 	    for (int j=0; j<Ncolor(length); j++)
-	      arg.out.Ghost(d+arg.offset, parity, x, i, j) = arg.in.Ghost(d+arg.offset, parity, x, i, j);
+	      arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
-	  arg.in.loadGhost(in, x, d+arg.offset, parity); // assumes we are loading
+	  arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
 	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.saveGhost(out, x, d+arg.offset, parity);
+	  arg.out.saveGhost(out, x, d+arg.out_offset, parity);
 #endif
 	}
       }
@@ -271,7 +273,7 @@ namespace quda {
       // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
       if (type == 3) {
         if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
-	arg.offset = nDim;
+	arg.out_offset = nDim;
 	copyGhost<FloatOut, FloatIn, length>(arg);
       }
 #endif
@@ -295,7 +297,7 @@ namespace quda {
       // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
       if (type == 3) {
         if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
-	arg.offset = nDim;
+	arg.out_offset = nDim;
 	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg, out, in);
 	ghostCopier.apply(0);
       }

@@ -355,6 +355,10 @@
 // allow a simple interface.
 class DslashCuda : public Tunable {
 
+public:
+  double twist_a;
+  double twist_b;
+
 protected:
   cudaColorSpinorField *out;
   const cudaColorSpinorField *in;
@@ -413,7 +417,7 @@ public:
 	     const cudaColorSpinorField *x, const QudaReconstructType reconstruct,
 	     const int dagger) 
     : out(out), in(in), x(x), reconstruct(reconstruct), 
-      dagger(dagger), saveOut(0), saveOutNorm(0) { 
+      dagger(dagger), saveOut(0), saveOutNorm(0), twist_a(0.0), twist_b(0.0)  {
 
     dslashParam.out = (void*)out->V();
     dslashParam.outNorm = (float*)out->Norm();
@@ -464,7 +468,6 @@ public:
       dslashParam.face_XYZ[dim] = dslashParam.face_XY[dim] * face[2];
       dslashParam.face_XYZT[dim] = dslashParam.face_XYZ[dim] * face[3];
     }
-
   }
 
   virtual ~DslashCuda() { }
@@ -483,7 +486,9 @@ public:
     strcat(aux[type], extra);
   }
 
-  virtual int Nface() { return 2; }
+  virtual int Nface() const { return 2; }
+
+  int Dagger() const { return dagger; }
 
 #if defined(DSLASH_TUNE_TILE)
   // Experimental autotuning of the thread ordering
@@ -536,26 +541,12 @@ public:
 
   virtual void preTune()
   {
-    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
-      saveOut = new char[out->Bytes()];
-      cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
-      if (out->Precision() == QUDA_HALF_PRECISION) {
-	saveOutNorm = new char[out->NormBytes()];
-	cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
-      }
-    }
+    out->backup();
   }
     
   virtual void postTune()
   {
-    if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel or policy tuning
-      cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
-      delete[] saveOut;
-      if (out->Precision() == QUDA_HALF_PRECISION) {
-	cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
-	delete[] saveOutNorm;
-      }
-    }
+    out->restore();
   }
 
   /*void launch_auxiliary(cudaStream_t &stream) {

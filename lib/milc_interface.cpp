@@ -51,9 +51,7 @@ static bool create_quda_gauge = false;
 
 static bool invalidate_quda_mom = true;
 
-#ifdef DEFLATEDSOLVER
 static void *df_preconditioner = NULL;
-#endif
 
 // set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
 #define MOM_PIPE 0
@@ -135,10 +133,6 @@ void qudaSetLayout(QudaLayout_t input)
   }
 
   for(int dir=0; dir<4; ++dir) localDim[dir] = local_dim[dir];
-
-#ifdef GPU_COMMS
-  setKernelPackT(true);
-#endif
 
 #ifdef MULTI_GPU
   for(int dir=0; dir<4; ++dir)  gridDim[dir] = input.machsize[dir];
@@ -1224,7 +1218,7 @@ void qudaEigCGInvert(int external_precision,
     double* const final_fermilab_residual,
     int *num_iters)
 {
-#ifdef DEFLATEDSOLVER
+
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -1329,9 +1323,6 @@ void qudaEigCGInvert(int external_precision,
 
   qudamilc_called<false>(__func__, verbosity);
 
-#else
-  errorQuda("Deflation solver was not built.");
-#endif
   return;
 } // qudaEigCGInvert
 
@@ -1644,7 +1635,6 @@ void qudaEigCGCloverInvert(int external_precision,
     double* const final_fermilab_residual,
     int *num_iters)
 {
-#ifdef DEFLATEDSOLVER
   qudamilc_called<true>(__func__);
   if(target_fermilab_residual == 0 && target_residual == 0){
     errorQuda("qudaCloverInvert: requesting zero residual\n");
@@ -1713,9 +1703,6 @@ void qudaEigCGCloverInvert(int external_precision,
   if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
-#else
-  errorQuda("Deflation solver was not built.");
-#endif
   return;
 } // qudaEigCGCloverInvert
 

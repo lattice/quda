@@ -53,7 +53,8 @@ namespace quda {
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
       siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), ghost_bytes(0),
-      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(param.mem_type),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
@@ -93,7 +94,8 @@ namespace quda {
   LatticeField::LatticeField(const LatticeField &field)
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
       siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
-      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ), initComms(false), mem_type(field.mem_type),
+      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
     for (int i=0; i<nDim; i++) {
@@ -412,7 +414,7 @@ namespace quda {
       if (comm_peer2peer_enabled(0,dim)) {
 	for (int b=0; b<2; b++) {
 	  // send to processor in backward direction
-	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&buffer_recv_p2p_back[b][dim], dim, -1, sizeof(int));
+	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&buffer_send_p2p_back[b][dim], dim, -1, sizeof(int));
 	  // receive from processor in backward direction
 	  mh_recv_p2p_back[b][dim] = comm_declare_receive_relative(&buffer_recv_p2p_back[b][dim], dim, -1, sizeof(int));
 	}
@@ -466,6 +468,10 @@ namespace quda {
   bool LatticeField::ipcRemoteCopyComplete(int dir, int dim)
   {
     return (cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
+  }
+
+  const cudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+    return ipcCopyEvent[bufferIndex][dir][dim];
   }
 
   const cudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
