@@ -253,6 +253,10 @@ namespace quda {
     case 32: calculateYhat<storeFloat,Float,32>(Yhat, Xinv, Y, X); break;
     case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X); break;
     case 64: calculateYhat<storeFloat,Float,64>(Yhat, Xinv, Y, X); break;
+    case 96: calculateYhat<storeFloat,Float,96>(Yhat, Xinv, Y, X); break;
+    case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
+    case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
+    case 256: calculateYhat<storeFloat,Float,256>(Yhat, Xinv, Y, X); break;
     default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
     }
   }
