@@ -902,7 +902,7 @@ namespace quda {
 
 #endif // GPU_MULTIGRID
 
-  enum DslashCoarsePolicy {
+  enum class DslashCoarsePolicy {
     DSLASH_COARSE_BASIC,          // stage both sends and recvs in host memory using memcpys
     DSLASH_COARSE_ZERO_COPY_PACK, // zero copy write pack buffers
     DSLASH_COARSE_ZERO_COPY_READ, // zero copy read halos in dslash kernel
@@ -911,7 +911,8 @@ namespace quda {
     DSLASH_COARSE_GDR_RECV,       // GDR recv
     DSLASH_COARSE_GDR,             // full GDR
     DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV, // zero copy write and GDR recv
-    DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ // GDR send and zero copy read
+    DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ, // GDR send and zero copy read
+    DSLASH_COARSE_POLICY_DISABLED
   };
 
   struct DslashCoarseLaunch {
@@ -955,15 +956,15 @@ namespace quda {
       MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
       MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from
       for (int i=0; i<2*QUDA_MAX_DIM; i++) {
-	pack_destination[i] = (policy == DSLASH_COARSE_ZERO_COPY_PACK || policy == DSLASH_COARSE_ZERO_COPY ||
-			       policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? Host : Device;
-	halo_location[i] = (policy == DSLASH_COARSE_ZERO_COPY_READ || policy == DSLASH_COARSE_ZERO_COPY ||
-			    policy == DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? Host : Device;
+	pack_destination[i] = (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY ||
+			       policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? Host : Device;
+	halo_location[i] = (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY ||
+			    policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? Host : Device;
       }
-      bool gdr_send = (policy == DSLASH_COARSE_GDR_SEND || policy == DSLASH_COARSE_GDR ||
-		       policy == DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? true : false;
-      bool gdr_recv = (policy == DSLASH_COARSE_GDR_RECV || policy == DSLASH_COARSE_GDR ||
-		       policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
+      bool gdr_send = (policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR ||
+		       policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? true : false;
+      bool gdr_recv = (policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR ||
+		       policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
 
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
@@ -1013,8 +1014,18 @@ namespace quda {
   void setPolicyTuning(bool);
 
   static bool dslash_init = false;
-  static std::vector<DslashCoarsePolicy> policy;
   static int config = 0; // 2-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
+  static std::vector<DslashCoarsePolicy> policies(static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
+  static int first_active_policy=static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
+
+  void enable_policy(DslashCoarsePolicy p){
+    policies[static_cast<std::size_t>(p)] = p;
+  }
+  
+  void disable_policy(DslashCoarsePolicy p){
+    policies[static_cast<std::size_t>(p)] = DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED;
+  }
+
 
  class DslashCoarsePolicyTune : public Tunable {
 
@@ -1044,7 +1055,7 @@ namespace quda {
       strcat(aux, comm_sum ? ",full" : ",interior");
 
       if (!dslash_init) {
-	policy.reserve(9);
+
 	static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_COARSE_POLICY");
 
 	if (dslash_policy_env) { // set the policies to tune for explicitly
@@ -1055,26 +1066,31 @@ namespace quda {
 	    DslashCoarsePolicy dslash_policy = static_cast<DslashCoarsePolicy>(policy_);
 
 	    // check this is a valid policy choice
-	    if ( (dslash_policy == DSLASH_COARSE_GDR_SEND || dslash_policy == DSLASH_COARSE_GDR_RECV ||
-		  dslash_policy == DSLASH_COARSE_GDR || dslash_policy == DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV ||
-		  dslash_policy == DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) && !comm_gdr_enabled() ) {
-	      errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", dslash_policy);
+	    if ( (dslash_policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND ||
+            dslash_policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV ||
+		        dslash_policy == DslashCoarsePolicy::DSLASH_COARSE_GDR || 
+            dslash_policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV ||
+		        dslash_policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) && !comm_gdr_enabled() ) {
+	      errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", static_cast<int>(dslash_policy));
 	    }
 
-	    policy.push_back(static_cast<DslashCoarsePolicy>(policy_));
+	    enable_policy(dslash_policy);
+      first_active_policy = policy_ < first_active_policy ? policy_ : first_active_policy;
 	    if (policy_list.peek() == ',') policy_list.ignore();
 	  }
+    if(first_active_policy == static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_COARSE_POLICY");
 	} else {
-	  policy.push_back(DSLASH_COARSE_BASIC);
-	  policy.push_back(DSLASH_COARSE_ZERO_COPY_PACK);
-	  policy.push_back(DSLASH_COARSE_ZERO_COPY_READ);
-	  policy.push_back(DSLASH_COARSE_ZERO_COPY);
+    first_active_policy = 0;
+	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
+	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
+	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
+	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
 	  if (comm_gdr_enabled()) {
-	    policy.push_back(DSLASH_COARSE_GDR_SEND);
-	    policy.push_back(DSLASH_COARSE_GDR_RECV);
-	    policy.push_back(DSLASH_COARSE_GDR);
-	    policy.push_back(DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
-	    policy.push_back(DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
+	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
+	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
+	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR);
+	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
+	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
 	  }
 	}
 
@@ -1087,7 +1103,7 @@ namespace quda {
       // constituents have been tuned since we can't do nested tuning
       if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
 	disableProfileCount();
-	for (auto &i : policy) dslash(i);
+	for (auto &i : policies) if(i!= DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED) dslash(i);
 	enableProfileCount();
 	setPolicyTuning(true);
       }
@@ -1104,33 +1120,33 @@ namespace quda {
 		 config, tp.aux.y);
      }
 
-     if (tp.aux.x >= (int)policy.size()) errorQuda("Requested policy that is outside of range");
-     dslash(policy[tp.aux.x]);
+     if (tp.aux.x >= (int)policies.size()) errorQuda("Requested policy that is outside of range");
+     if (policies[tp.aux.x] == DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED ) errorQuda("Requested policy is disabled");
+     dslash(policies[tp.aux.x]);
    }
 
    int tuningIter() const { return 10; }
 
    bool advanceAux(TuneParam &param) const
    {
-     if ((unsigned)param.aux.x < policy.size()-1) {
-       param.aux.x++;
-       return true;
-     } else {
-       param.aux.x = 0;
-       return false;
-     }
+    while ((unsigned)param.aux.x < policies.size()-1) {
+      param.aux.x++;
+      if(policies[param.aux.x] != DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED) return true;
+    }
+    param.aux.x = 0;
+    return false;
    }
 
    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
    void initTuneParam(TuneParam &param) const  {
      Tunable::initTuneParam(param);
-     param.aux.x = 0; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
      Tunable::defaultTuneParam(param);
-     param.aux.x = 0; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
    }
 
    TuneKey tuneKey() const {

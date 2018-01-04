@@ -81,6 +81,7 @@ extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
 extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
 extern double setup_tol[QUDA_MAX_MG_LEVEL];
 extern int setup_maxiter[QUDA_MAX_MG_LEVEL];
+extern int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
 extern QudaSetupType setup_type;
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
@@ -258,6 +259,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
+    mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
     mg_param.nu_pre[i] = nu_pre;
@@ -399,7 +401,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.pipeline = pipeline;
-  inv_param.gcrNkrylov = 20;
+  inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine convergence
@@ -457,6 +459,7 @@ int main(int argc, char **argv)
     num_setup_iter[i] = 1;
     setup_tol[i] = 5e-6;
     setup_maxiter[i] = 500;
+    setup_maxiter_refresh[i] = 100;
     mu_factor[i] = 1.;
     mg_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
@@ -603,7 +606,7 @@ int main(int argc, char **argv)
     RNG *randstates = new RNG(halfvolume, 1234, gauge_param.X);
     randstates->Init();
 
-    int nsteps = 100;
+    int nsteps = 10;
     int nhbsteps = 1;
     int novrsteps = 1;
     bool  coldstart = false;
@@ -628,10 +631,9 @@ int main(int argc, char **argv)
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-
-    // setup the multigrid solver
-    void *mg_preconditioner = newMultigridQuda(&mg_param);
-    inv_param.preconditioner = mg_preconditioner;
+    double3 plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
+    double charge = qChargeCuda();
+    printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, charge);
 
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
@@ -644,6 +646,20 @@ int main(int argc, char **argv)
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
+    // do reference BiCGStab solve
+    QudaInvertParam inv_param2 = inv_param;
+    inv_param2.inv_type = QUDA_BICGSTABL_INVERTER;
+    inv_param2.gcrNkrylov = 4;
+    inv_param2.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inv_param2.reliable_delta = 0.1;
+    inv_param2.maxiter = 10000;
+    inv_param2.verbosity = QUDA_SUMMARIZE;
+    invertQuda(spinorOut, spinorIn, &inv_param2);
+
+    // setup the multigrid solver
+    void *mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+
     invertQuda(spinorOut, spinorIn, &inv_param);
 
     freeGaugeQuda();
@@ -653,16 +669,25 @@ int main(int argc, char **argv)
 
       //Reunitarize gauge links...
       CallUnitarizeLinks(gaugeEx);
-      double3 plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
-      printfQuda("step=%d plaquette = %e\n", step, plaq.x);
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-      
-      updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for and new gauge and clover fields
+      plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
+      charge = qChargeCuda();
+      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
 
+      // reference BiCGStab for comparison
+      invertQuda(spinorOut, spinorIn, &inv_param2);
+
+      if (1) {
+	updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new gauge and clover fields
+      } else {
+	destroyMultigridQuda(mg_preconditioner);
+	mg_preconditioner = newMultigridQuda(&mg_param);
+	inv_param.preconditioner = mg_preconditioner;
+      }
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       freeGaugeQuda();

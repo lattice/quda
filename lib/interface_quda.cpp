@@ -2359,6 +2359,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   pushVerbosity(mg_param->invert_param->verbosity);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
+
   multigrid_solver *mg = static_cast<multigrid_solver*>(mg_);
   checkMultigridParam(mg_param);
 
@@ -2416,12 +2418,15 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param) {
   if(mg->mgParam->mg_global.invert_param != param)
     mg->mgParam->mg_global.invert_param = param;
 
-  mg->mg->reset();
+  bool refresh = true;
+  mg->mg->reset(refresh);
 
   setOutputPrefix("");
 
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
+
+  profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   popVerbosity();

@@ -286,8 +286,9 @@ namespace quda {
 
     /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
+       @param Whether we are refreshing the null-space components or just updating the operators
      */
-    void reset();
+    void reset(bool refresh=false);
 
     /**
        @brief Create the smoothers
@@ -334,8 +335,9 @@ namespace quda {
     /**
        @brief Generate the null-space vectors
        @param B Generated null-space vectors
+       @param refresh Whether we refreshing pre-exising vectors or starting afresh
      */
-    void generateNullVectors(std::vector<ColorSpinorField*> &B);
+    void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
 
     /**
        @brief Build free-field null-space vectors
