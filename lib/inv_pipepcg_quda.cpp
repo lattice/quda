@@ -12,6 +12,10 @@
 
 #include <iostream>
 
+#include <functional>
+#include <limits>
+
+
 /***
 * Experimental PipePCG algorithm
 * Source P. Ghysels and W. Vanroose "Hiding global synchronization latency in the preconditioned Conjugate Gradient algorithm" 
@@ -30,10 +34,6 @@ namespace quda {
 
   using namespace blas;
 
-  using MergedLocalReducerType = double4 (*) ( ColorSpinorField &, const double &, ColorSpinorField &, ColorSpinorField &,
-                                             ColorSpinorField &, ColorSpinorField &,  ColorSpinorField &, const double &,
-                                             ColorSpinorField &, ColorSpinorField&, ColorSpinorField&, ColorSpinorField& ) ;
-  
   // set the required parameters for the inner solver
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
@@ -105,20 +105,23 @@ namespace quda {
   class GlobalMPIallreduce : public Worker {
      double *buffer;
      int     size;
-     int     elem;
-     bool    stop; 
+     int     vals_to_update;
+     int     stages; 
     public:
-    GlobalMPIallreduce(double *buffer, int size) : buffer(buffer), size(size), elem(0), stop(false) { }
+    GlobalMPIallreduce(double *buffer, int size, int stages=4) : buffer(buffer), size(size), vals_to_update(size/4), stages(stages) { }
 
     virtual ~GlobalMPIallreduce() { }
 
-    void reset() { elem = 0; stop = false; }
-
     void apply(const cudaStream_t &stream) {  //this has nothing to do with GPU streaming but should work as well, we may need non-blocked MPI allreduce, see cooments below
-      if(stop) return;
-      reduceDoubleArray(&buffer[elem], 1);
-      elem +=1;
-      if(elem == size) stop = true;  
+      static int count = 0;
+      if (count < (stages -1) ) {
+        reduceDoubleArray( &buffer[count*vals_to_update] , vals_to_update );
+        count += 1;
+      } else {
+        reduceDoubleArray( &buffer[count*vals_to_update] , (size-vals_to_update) );
+        count = 0; 
+      } 
+
       return;
     }
   };
@@ -128,13 +131,13 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
-  void PipePCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
-  {
+  void PipePCG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     ColorSpinorParam csParam(b);
 
-    MergedLocalReducerType  MergedLocalReducer = K ? &pipePCGFletcherReevesMergedOp : &pipePCGMergedOp;
+    auto  MergedLocalReducer = K ? pipePCGRRFletcherReevesMergedOp : pipePCGRRMergedOp;
 
     if (!init) {
       // high precision fields:
@@ -201,12 +204,41 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
+    const double bnorm = sqrt(b2);
+
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       blas::copy(x, b);
       param.true_res = 0.0;
     }
+
+    //Estimate A-norm:
+//TEST:
+    csParam.setPrecision(param.precision);
+    ColorSpinorField *Ax_cuda = ColorSpinorField::Create(csParam);
+    
+
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam.location   = QUDA_CPU_FIELD_LOCATION;
+    ColorSpinorField *Ax = ColorSpinorField::Create(csParam);
+    Ax->Source(QUDA_RANDOM_SOURCE);
+    *Ax_cuda = *Ax;
+
+    const double Axnorm2 = sqrt(blas::norm2(*Ax_cuda));
+    printfQuda("(Debug info) x-norm estimate: %1.15le\n", Axnorm2);
+    blas::ax(1.0 / Axnorm2, *Ax_cuda);
+
+    mat(r, *Ax_cuda, tmp);
+    delete Ax;
+    delete Ax_cuda;
+
+    const double mu    = K ? 1000.0 : 100.0; 
+    const double blen  = b.RealLength();
+    const double Anorm = sqrt(blas::norm2(r));
+    const double msqrn = mu*sqrt(blen); 
+    const double msqrnA= msqrn*Anorm;
+    printfQuda("(Debug info) A-norm estimate: %1.15le\n", Anorm);
 
     mat(r, x, tmp); // => r = A*x;
     blas::xpay(b,-1.0, r);
@@ -218,12 +250,18 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
-    double4 local_reduce;//to keep double3 or double4 registers
+    double4 *local_reduce = new double4[3];//to keep double3 or double4 registers
 
-    double alpha, beta;
+    double alpha, beta, alpha_old, beta_old, mNorm_old, mNorm_old2;
     double gammajm1 = 1.0, gamma_aux = 0.0;
 
-    double &gamma = local_reduce.x, &delta = local_reduce.y, &mNorm = local_reduce.z;
+    double &gamma = local_reduce[0].x, &delta = local_reduce[0].y, &mNorm = local_reduce[0].z;
+    double &pi    = local_reduce[1].x, &sigma = local_reduce[1].y, &phi   = local_reduce[1].z, &psi = local_reduce[1].w;
+    double &chi   = local_reduce[2].x, &ksi   = local_reduce[2].y, &omega = local_reduce[2].z, &nu  = local_reduce[2].w;
+
+    double pi_old  = 0.0, sigma_old  = 0.0,  phi_old  = 0.0,  psi_old  = 0.0;
+    double chi_old = 0.0, omega_old  = 0.0,  ksi_old  = 0.0,  nu_old   = 0.0;
+    double pi_old2 = 0.0, sigma_old2 = 0.0,  phi_old2 = 0.0,  psi_old2 = 0.0;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -245,10 +283,11 @@ namespace quda {
     matSloppy(w, u, tmp_sloppy); // => w = A*u;
 
     //Remark : no overlap here. 
-    gamma = blas::reDotProduct(r_sloppy,u); 
+    double2 gammamNorm = reDotProductNormA(r_sloppy, u);
+    gamma = gammamNorm.y; 
+    mNorm = gammamNorm.x;
     delta = blas::reDotProduct(w,u);
-    mNorm = blas::norm2(u);
-
+        
     gamma_aux = gamma;
 
     alpha = 1.0;
@@ -262,6 +301,20 @@ namespace quda {
     const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
+    double ef = 0.0, eh = 0.0, eg = 0.0, ek = 0.0;
+    double f = 0.0, g = 0.0, h = 0.0, k = 0.0, f_old = 0.0;
+
+    const double uroe   = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
+/*
+tau = sqrt(uroe) will destroy convergence!
+tau = 100000 * sqrt(uroe) works! (212 iters)
+tau = 10000 * sqrt(uroe) works! (212 iters)
+tau = 1000 * sqrt(uroe) works! (212 iters)
+tau = 100 * sqrt(uroe) works! (214 iters)
+tau = 10 * sqrt(uroe) fails!
+*/
+    const double tau = 100*sqrt(uroe);
+
     int resIncrease = 0;
     int resIncreaseTotal = 0;
 
@@ -269,11 +322,11 @@ namespace quda {
 
     // now create the worker class for updating the gradient vectors
 #ifdef USE_WORKER
-    GlobalMPIallreduce global_reduce((double*)&local_reduce, K ? 4 : 3);
+    GlobalMPIallreduce global_reduce((double*)&local_reduce, 12);
     dslash::aux_worker = nullptr;//&global_reduce;
 #else
     MsgHandle* allreduceHandle = comm_handle();
-    double *recvbuff           = new double[4];//mpi buffer for async global reduction
+    double *recvbuff           = new double[12];//mpi buffer for async global reduction
 #endif
 
     if(K) {
@@ -294,109 +347,98 @@ namespace quda {
 
     double heavy_quark_res = 0.0;
     //
-    PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
+    PrintStats( "PipePCG (before main loop)", j, mNorm, b2, heavy_quark_res);
+
+    int updateR = 0;
 
     while(!convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && j < param.maxiter){
 
-      if(rNorm > maxrx) maxrx = mNorm;
-      if(rNorm > maxrr) maxrr = mNorm;
+      double ajm1, bjm1;
 
-      int updateX = (rNorm < param.delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-      int updateR = ((rNorm < param.delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+      beta_old  = beta;
+      beta  = (gamma - gamma_aux) / gammajm1;
+      double scal = (delta / gamma - beta / alpha);
+      alpha_old = alpha;
+      alpha = 1.0 / scal; 
+      gammajm1 = gamma;
 
-      // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if( convergence(mNorm, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
+//start a cascade of updates:
+      mNorm_old2 = mNorm_old;//sic! 
+      mNorm_old  = mNorm;
 
-      if( ! (updateR || updateX)  ) {
+      chi_old   = sqrt(chi);
+      omega_old = sqrt(omega);
+      ksi_old   = sqrt(ksi);
+      nu_old    = sqrt(nu);
 
-        beta  = (gamma - gamma_aux) / gammajm1;
-        alpha = gamma / (delta - beta / alpha * gamma); 
-        gammajm1 = gamma;
+      pi_old2    = pi_old;
+      sigma_old2 = sigma_old;
+      phi_old2   = phi_old;
+      psi_old2   = psi_old; 
 
-        commGlobalReductionSet(false);//disable global reduction
-        local_reduce = MergedLocalReducer(y,alpha,p,u,r_sloppy,s,m,beta,q,w,n,z);
-        commGlobalReductionSet(true);
-#ifdef USE_WORKER
-        {
-        //global_reduce.apply(0);
-        //Warning! ordering is critical here: fisrt preconditioner and then matvec, since worker uses blocking MPI allreduce
-        //in this approach all reduce is overlapped with matvec only.
-        //more robust way just to call non-blocking allreduce and then synchronize 
-          if(K) {
-            rPre = w;
+      pi_old    = sqrt(pi);
+      sigma_old = sqrt(sigma);
+      phi_old   = sqrt(phi);
+      psi_old   = sqrt(psi);
 
-            commGlobalReductionSet(false);
-            (*K)(pPre, rPre);
-            commGlobalReductionSet(true);
+      commGlobalReductionSet(false);//disable global reduction
+      MergedLocalReducer(local_reduce,y,alpha,p,u,r_sloppy,s,m,beta,q,w,n,z);
+      commGlobalReductionSet(true);
+//finish updates
 
-            m = pPre;
-          } else {
-            m = w;
-          }        
-          //
-          dslash::aux_worker = &global_reduce;
-          matSloppy(n, m, tmp_sloppy);
-          dslash::aux_worker = nullptr;
+      ajm1 = fabs(alpha_old);
+      bjm1 = fabs(beta_old);
 
-          global_reduce.reset();
+      if(j > 0) {
+        PrintStats( "PipePCG", j, mNorm_old, b2, heavy_quark_res);
+
+        ef = Anorm*(chi+2*ajm1*pi_old ) + sqrt(mNorm_old2) + 2*ajm1*sigma_old;
+        eh = Anorm*(ksi+2*ajm1*phi_old) + omega_old + 2*ajm1*psi_old;
+
+        if(j > 1) {
+          eg = Anorm*(ksi+2*bjm1*pi_old2) + omega_old + 2*bjm1*sigma_old2;
+          ek = Anorm*((msqrn+2)*nu_old+2*bjm1*phi_old2) + 2*bjm1*psi_old2;
         }
-#else
-        {
-#ifdef NONBLOCK_REDUCE
-          comm_allreduce_array_async(recvbuff, (double*)&local_reduce, (K ? 4 : 3), allreduceHandle);
-#else
-          reduceDoubleArray((double*)&local_reduce, (K ? 4 : 3));
-#endif
-          if(K) {
-            rPre = w;
-         
-            commGlobalReductionSet(false);
-            (*K)(pPre, rPre);
-            commGlobalReductionSet(true);
 
-            m = pPre;
-          } else {
-            m = w;
-          }
-          //
-          matSloppy(n, m, tmp_sloppy);
-#ifdef NONBLOCK_REDUCE//sync point
-          comm_wait(allreduceHandle);
-          memcpy(&local_reduce, recvbuff, (K ? 4 : 3)*sizeof(double));
-#endif
+        if(j == 1 or updateR) {
+
+          printfQuda("Do %s..\n", j == 1 ? "initialization" : "replace");
+
+          f = uroe * sqrt( (msqrnA + Anorm) * chi_old + bnorm ) + uroe * sqrt( ajm1*msqrnA*pi_old  ) + sqrt(ef)*uroe;
+          g = uroe * sqrt( msqrnA * pi_old );
+          h = uroe * sqrt( msqrnA * ksi_old ) + uroe * sqrt( ajm1*msqrnA*phi_old ) + sqrt(eh)*uroe;
+          k = uroe * sqrt( msqrnA * phi_old);
+
+        } else { 
+          f = f + ajm1*bjm1*g + ajm1*h + sqrt(ef)*uroe + ajm1*sqrt(eg)*uroe; 
+          g = bjm1*g + h + sqrt(eg)*uroe;
+          h = h + ajm1*bjm1*k + sqrt(eh)*uroe + ajm1*sqrt(ek)*uroe;
+          k = bjm1*k + sqrt(ek)*uroe;
         }
-#endif //end of USE_WORKER
-        gamma_aux = local_reduce.w;//gamma, delta and mNorm are refs to local_reduce.[x|y|z]
-     } else { //trigger reliable updates:
-        printfQuda("Start relibale update..\n");
+
+      }
+
+      updateR = ( j > 1 and f_old <= tau*sqrt(mNorm_old2) and f > tau*sqrt(mNorm_old) ) ? 1 : 0;
+      f_old   = f;
+//updateR = 0;
+
+      if( updateR ) { //trigger reliable updates:
+
+        printfQuda("Start relibale update.. (f_old = %le , tau*mNorm_old = %le , f = %le, tau*mNorm = %le )\n",f_old, tau*sqrt(mNorm_old2) , f , tau*sqrt(mNorm_old));
+
         x_sloppy = y;
         xpy(x_sloppy,x);
         zero(y);
 
         mat(r, x, tmp);
         xpay(b, -1.0, r);
+//Debug
+        mNorm_old2 = norm2(r_sloppy);
 
         r_sloppy = r;
+        mNorm = norm2(r_sloppy);
 
-        mNorm = norm2(r);
-
-        // break-out check if we have reached the limit of the precision
-        if(sqrt(mNorm) > r0Norm && updateX) {
-          resIncrease++;
-          resIncreaseTotal++;
-          // reuse r0Norm for this
-          warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(mNorm), r0Norm, resIncreaseTotal);
-
-//        if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
-
-        } else {
-          resIncrease = 0;
-        }
-
-        rNorm = sqrt(mNorm);
-        maxrr = rNorm;
-        maxrx = rNorm;
-        r0Norm = rNorm;
+        printfQuda("Old residual: %1.15le vs new residual %1.15le\n", mNorm_old2, mNorm);
 
         if(K) {
           rPre = r_sloppy;
@@ -427,10 +469,67 @@ namespace quda {
         }
 
         matSloppy(z, q, tmp_sloppy);
+
+        mNorm_old2 = mNorm_old;
+        mNorm_old  = mNorm;
+        gamma = blas::reDotProduct(r_sloppy,u); 
+        delta = blas::reDotProduct(w,u);
+        mNorm = blas::norm2(r_sloppy);
       }
 
+#ifdef USE_WORKER
+      {
+//global_reduce.apply(0);
+//Warning! ordering is critical here: fisrt preconditioner and then matvec, since worker uses blocking MPI allreduce
+//in this approach all reduce is overlapped with matvec only.
+//more robust way just to call non-blocking allreduce and then synchronize 
+        if(K) {
+          rPre = w;
+
+          commGlobalReductionSet(false);
+          (*K)(pPre, rPre);
+          commGlobalReductionSet(true);
+
+          m = pPre;
+        } else {
+          m = w;
+        }        
+          //
+        dslash::aux_worker = &global_reduce;
+        matSloppy(n, m, tmp_sloppy);
+        dslash::aux_worker = nullptr;
+
+      }
+#else
+      {
+#ifdef NONBLOCK_REDUCE
+        comm_allreduce_array_async(recvbuff, (double*)&local_reduce, 12, allreduceHandle);
+#else
+        reduceDoubleArray((double*)&local_reduce, 12);
+#endif
+        if(K) {
+          rPre = w;
+         
+          commGlobalReductionSet(false);
+          (*K)(pPre, rPre);
+          commGlobalReductionSet(true);
+
+          m = pPre;
+        } else {
+          m = w;
+        }
+        //
+        matSloppy(n, m, tmp_sloppy);
+#ifdef NONBLOCK_REDUCE//sync point
+        comm_wait(allreduceHandle);
+        memcpy(&local_reduce, recvbuff, 12*sizeof(double));
+#endif
+      }
+#endif //end of USE_WORKER
+      gamma_aux = local_reduce[0].w;//gamma, delta and mNorm are refs to local_reduce.[x|y|z]
+
       j += 1;
-      PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
+      //PrintStats( "PipePCG", j, mNorm, b2, heavy_quark_res);
     }
 
 #ifdef NONBLOCK_REDUCE
@@ -466,6 +565,8 @@ namespace quda {
     delete lp;
     delete yp;
 
+    delete[] local_reduce;
+
     if (param.precision_sloppy != param.precision) {
       delete rp_sloppy;
       delete xp_sloppy;
@@ -474,6 +575,5 @@ namespace quda {
 
     return;
   }
-
 
 } // namespace quda

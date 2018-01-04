@@ -83,7 +83,7 @@ namespace quda {
            single vector type (max length 4 presently), with possibly
            parity dimension, and a grid-stride loop with max number of
            blocks = 2 x SM count
-
+A.S. edit: extended to 16 for CA solvers 
 	 - multi-reductions where we are reducing to a matrix of size
 	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
 	   possible parity dimension, and a grid-stride loop with
@@ -97,7 +97,8 @@ namespace quda {
 
       const int max_reduce_blocks = 2*deviceProp.multiProcessorCount; // FIXME - should set this according to what's used in tune_quda.h
 
-      const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
+      //const int max_reduce = 2 * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
+      const int max_reduce = 2 * max_reduce_blocks * 16 * sizeof(QudaSumFloat);//A.S. extended to 16 for CA solvers
       const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * 4 * sizeof(QudaSumFloat);
 
       const int max_generic_blocks = 65336; // FIXME - this isn't quite right
@@ -802,18 +803,19 @@ namespace quda {
 
 
 ///EXPERIMENTAL:
-    template <typename ReduceType, typename Float2, typename FloatN>
+
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
     struct ReduceFunctorExp {
 
       //! pre-computation routine called before the "M-loop"
       virtual __device__ __host__ void pre() { ; }
 
       //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &p, FloatN &u,FloatN &r,
+      virtual __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u,FloatN &r,
 						  FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) = 0;
 
       //! post-computation routine called after the "M-loop"
-      virtual __device__ __host__ void post(ReduceType &sum) { ; }
+      virtual __device__ __host__ void post(ReduceType sum[Nreduce]) { ; }
 
     };
     /**
@@ -834,12 +836,12 @@ namespace quda {
        rdot = (w,u),
        rdot = (r,u),
     */
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct pipePCGMergedOp_ : public ReduceFunctorExp<ReduceType, Float2, FloatN> {
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
+    struct pipePCGRRMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
       Float2 a;
       Float2 b;
-      pipePCGMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
+      pipePCGRRMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
 	typedef typename ScalarType<ReduceType>::type scalar;
 
          z = n + b.x*z;
@@ -847,72 +849,95 @@ namespace quda {
          s = w + b.x*s;
          p = u + b.x*p;
 
-         sum.w = 0.0;
+         norm2_<scalar> (sum[1].x, p);
+         norm2_<scalar> (sum[1].y, s);
+         norm2_<scalar> (sum[1].z, q);
+         norm2_<scalar> (sum[1].w, z);
+
+         norm2_<scalar> (sum[2].x, x);
+         norm2_<scalar> (sum[2].y, u);
+         norm2_<scalar> (sum[2].z, w);
+         norm2_<scalar> (sum[2].w, m);
 
          x = x + a.x*p;
-         r = r - a.x*s;
          u = u - a.x*q;
+
+         sum[0].w = 0.0;
+
+         r = r - a.x*s;
          w = w - a.x*z;
 
-         dot_<scalar> (sum.x, r, u);
-         dot_<scalar> (sum.y, w, u);
-         norm2_<scalar> (sum.z, u);
+         dot_<scalar>   (sum[0].x, r, u);
+         dot_<scalar>   (sum[0].y, w, u);
+         norm2_<scalar> (sum[0].z, r);
       }
       static int streams() { return 18; } //! total number of input and output streams
       static int flops() { return (16+6); } //! flops per real element
     };
 
-    double4 pipePCGMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+    void pipePCGRRMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
                                 ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
       } 
-      return reduce::reduceCudaExp<double4, QudaSumFloat4,pipePCGMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
-	  (make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+      reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+      return;
     }
 
-    template <typename ReduceType, typename Float2, typename FloatN>
-    struct pipePCGFletcherReevesMergedOp_ : public ReduceFunctorExp<ReduceType, Float2, FloatN> {
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
+    struct pipePCGRRFletcherReevesMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
       Float2 a;
       Float2 b;
-      pipePCGFletcherReevesMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
-	typedef typename ScalarType<ReduceType>::type scalar;
+      pipePCGRRFletcherReevesMergedOp_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u, FloatN &r, FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) { 
+	 typedef typename ScalarType<ReduceType>::type scalar;
 
          z = n + b.x*z;
          q = m + b.x*q;
          s = w + b.x*s;
          p = u + b.x*p;
 
+         norm2_<scalar> (sum[1].x, p);
+         norm2_<scalar> (sum[1].y, s);
+         norm2_<scalar> (sum[1].z, q);
+         norm2_<scalar> (sum[1].w, z);
+
+         norm2_<scalar> (sum[2].x, x);
+         norm2_<scalar> (sum[2].y, u);
+         norm2_<scalar> (sum[2].z, w);
+         norm2_<scalar> (sum[2].w, m);
+
          x = x + a.x*p;
          u = u - a.x*q;
 
-         dot_<scalar> (sum.w, r, u);
+         dot_<scalar> (sum[0].w, r, u);
 
          r = r - a.x*s;
          w = w - a.x*z;
 
-         dot_<scalar> (sum.x, r, u);
-         dot_<scalar> (sum.y, w, u);
+         dot_<scalar> (sum[0].x, r, u);
+         dot_<scalar> (sum[0].y, w, u);
 
-         norm2_<scalar> (sum.z, u);
+         norm2_<scalar> (sum[0].z, r);
       }
       static int streams() { return 18; } //! total number of input and output streams
       static int flops() { return (16+6); } //! flops per real element
     };
 
 
-    double4 pipePCGFletcherReevesMergedOp(ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
+    void pipePCGRRFletcherReevesMergedOp(double4 *buffer, ColorSpinorField &x, const double &a, ColorSpinorField &p, ColorSpinorField &u, 
                                 ColorSpinorField &r, ColorSpinorField &s,  
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
       if (x.Precision() != p.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
       } 
-      return reduce::reduceCudaExp<double4, QudaSumFloat4,pipePCGFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
-	  (make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+      reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
+	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
+      return;
     }
 
 ///END EXPERIMENTAL

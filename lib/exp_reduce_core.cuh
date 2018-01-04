@@ -24,7 +24,7 @@ struct ReductionArgExp : public ReduceArg<ReduceType> {//defined in cub
 /**
    Generic reduction kernel with up to four loads and three saves.
  */
-template <int block_size, typename ReduceType, typename FloatN, int M_, typename SpinorX,
+template <int block_size, typename ReduceType, typename FloatN, int Nreduce, int M_, typename SpinorX,
 	  typename SpinorP, typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM, typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
 __global__ void reduceKernelExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,SpinorU,SpinorR,SpinorS,SpinorM,SpinorQ,SpinorW,SpinorN,SpinorZ,Reducer> arg) {
 
@@ -32,8 +32,9 @@ __global__ void reduceKernelExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,Spino
   unsigned int parity = blockIdx.y;
   unsigned int gridSize = gridDim.x*blockDim.x;
 
-  ReduceType sum;
-  ::quda::zero(sum);
+  ReduceType sum[Nreduce];
+#pragma unroll
+  for (int j=0; j<Nreduce;j++) ::quda::zero(sum[j]);
 
   while (i < arg.length) {
     FloatN x[M_], p[M_], u[M_], r[M_], s[M_],m[M_], q[M_], w[M_], n[M_], z[M_];
@@ -72,22 +73,23 @@ __global__ void reduceKernelExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,Spino
     i += gridSize;
   }
 
-  ::quda::reduce<block_size, ReduceType>(arg, sum, parity);
+  ::quda::array_reduce<Nreduce, block_size, ReduceType>(arg, sum, parity);
 }
 
 
 /**
    Generic reduction kernel launcher
 */
-template <typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX,
+template <int Nreduce, typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX,
 	  typename SpinorP, typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM, 
           typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
-doubleN reduceLaunchExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,SpinorU,SpinorR,SpinorS,SpinorM,SpinorQ,SpinorW,SpinorN,SpinorZ, Reducer> &arg,
+void reduceLaunchExp(doubleN cpu_sum[Nreduce], ReductionArgExp<ReduceType,SpinorX,SpinorP,SpinorU,SpinorR,SpinorS,SpinorM,SpinorQ,SpinorW,SpinorN,SpinorZ, Reducer> &arg,
 		     const TuneParam &tp, const cudaStream_t &stream) {
+  if (Nreduce < 0 or Nreduce > 8) errorQuda("Incorrect size of the reduce array: %d.\n", Nreduce);
   if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
      errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
-  LAUNCH_KERNEL(reduceKernelExp,tp,stream,arg,ReduceType,FloatN,M_);
+  LAUNCH_KERNEL(reduceKernelExp,tp,stream,arg,ReduceType,FloatN,Nreduce,M_);
 
   if (!commAsyncReduction()) {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
@@ -96,21 +98,26 @@ doubleN reduceLaunchExp(ReductionArgExp<ReduceType,SpinorX,SpinorP,SpinorU,Spino
       while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
     } else
 #endif
-      { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
+    { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType)*Nreduce, cudaMemcpyDeviceToHost); }
   }
-  doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
-  if (tp.grid.y==2) sum(cpu_sum, ((ReduceType*)h_reduce)[1]); // add other parity if needed
-  return cpu_sum;
+
+#pragma unroll
+  for (int j=0; j<Nreduce;j++) cpu_sum[j] = set(((ReduceType*)h_reduce)[0+j*tp.grid.y]);
+  if (tp.grid.y==2) {
+#pragma unroll 
+    for (int j=0; j<Nreduce;j++) sum(cpu_sum[j], ((ReduceType*)h_reduce)[1+j*tp.grid.y]); // add other parity if needed
+  }
+  return;
 }
 
 
-template <typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX,
+template <int Nreduce, typename doubleN, typename ReduceType, typename FloatN, int M_, typename SpinorX,
 	  typename SpinorP, typename SpinorU, typename SpinorR, typename SpinorS, typename SpinorM, typename SpinorQ, typename SpinorW, typename SpinorN, typename SpinorZ, typename Reducer>
 class ReduceCudaExp : public Tunable {
 
 private:
   mutable ReductionArgExp<ReduceType,SpinorX,SpinorP,SpinorU,SpinorR,SpinorS,SpinorM,SpinorQ,SpinorW,SpinorN,SpinorZ, Reducer> arg;
-  doubleN &result;
+  doubleN *result;
   const int nParity;
 
   // host pointers used for backing up fields when tuning
@@ -134,7 +141,7 @@ private:
   }
 
 public:
-  ReduceCudaExp(doubleN &result, SpinorX &X, SpinorP &P, SpinorU &U,
+  ReduceCudaExp(doubleN result[Nreduce], SpinorX &X, SpinorP &P, SpinorU &U,
 	     SpinorR &R, SpinorS &S, SpinorM &M, SpinorQ &Q, SpinorW &W, SpinorN &N, SpinorZ &Z, Reducer &r, int length, int nParity,
 	     const size_t *bytes, const size_t *norm_bytes) :
     arg(X, P, U, R, S, M, Q, W, N, Z, r, length/nParity),
@@ -149,7 +156,7 @@ public:
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-    result = reduceLaunchExp<doubleN,ReduceType,FloatN,M_>(arg, tp, stream);
+    reduceLaunchExp<Nreduce,doubleN,ReduceType,FloatN,M_>(result, arg, tp, stream);
   }
 
   void preTune() {
@@ -209,10 +216,10 @@ public:
 };
 
 
-template <typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
-	  int M_, template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+template <int Nreduce, typename doubleN, typename ReduceType, typename RegType, typename StoreType, typename zType,
+	  int M_, template <int Nreduce_, typename ReducerType, typename Float, typename FloatN> class Reducer,
 	  int writeX,int writeP,int writeU,int writeR, int writeS, int writeM,int writeQ,int writeW,int writeN, int writeZ>
-doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x, 
+void reduceCudaExp(doubleN reduce_buffer[Nreduce], const double2 &a, const double2 &b, ColorSpinorField &x, 
 		   ColorSpinorField &p, ColorSpinorField &u, ColorSpinorField &r,
                    ColorSpinorField &s, ColorSpinorField &m, ColorSpinorField &q, 
                    ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z,
@@ -224,9 +231,8 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
 
   if (!x.isNative()) {
     warningQuda("Device reductions on non-native fields is not supported\n");
-    doubleN value;
-    ::quda::zero(value);
-    return value;
+    for(int j = 0; j < Nreduce; j++) ::quda::zero(reduce_buffer[j]);
+    return;
   }
 
   blasStrings.vol_str = x.VolString();
@@ -253,12 +259,11 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
   typedef vector<Float,2> vec2;
-  Reducer<ReduceType, Float2, RegType> reducer_((Float2)vec2(a), (Float2)vec2(b));
-  doubleN value;
+  Reducer<Nreduce, ReduceType, Float2, RegType> reducer_((Float2)vec2(a), (Float2)vec2(b));
 
   int partitions = (x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset());
 
-  ReduceCudaExp<doubleN,ReduceType,RegType,M_,
+  ReduceCudaExp<Nreduce,doubleN,ReduceType,RegType,M_,
   Spinor<RegType,StoreType,M_,writeX,0>,
   Spinor<RegType,StoreType,M_,writeP,1>,
   Spinor<RegType,StoreType,M_,writeU,2>,
@@ -269,8 +274,8 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
   Spinor<RegType,StoreType,M_,writeW,7>,
   Spinor<RegType,StoreType,M_,writeN,8>,
   Spinor<RegType,    zType,M_,writeZ,9>,
-    Reducer<ReduceType, Float2, RegType> >
-    reduce(value, X, P, U, R, S, M, Q, W, N, Z, reducer_, length, partitions, bytes, norm_bytes);
+    Reducer<Nreduce, ReduceType, Float2, RegType> >
+    reduce(reduce_buffer, X, P, U, R, S, M, Q, W, N, Z, reducer_, length, partitions, bytes, norm_bytes);
   reduce.apply(*(blas::getStream()));
 
   blas::bytes += reduce.bytes();
@@ -278,7 +283,7 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
 
   checkCudaError();
 
-  return value;
+  return;
 }
 
 

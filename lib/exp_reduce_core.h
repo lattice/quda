@@ -15,15 +15,14 @@
    @param ReduceType 
    @param siteUnroll - if this is true, then one site corresponds to exactly one thread
  */
-template <typename doubleN, typename ReduceType,
-	  template <typename ReducerType, typename Float, typename FloatN> class Reducer,
+template <int Nreduce, typename doubleN, typename ReduceType,
+	  template <int Nreduce_, typename ReducerType, typename Float, typename FloatN> class Reducer,
   int writeX,int writeP,int writeU,int writeR, int writeS, int writeM,int writeQ,int writeW,int writeN, int writeZ, bool siteUnroll>
-doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x, 
+void reduceCudaExp(doubleN *reduce_buffer, const double2 &a, const double2 &b, ColorSpinorField &x, 
 		   ColorSpinorField &p, ColorSpinorField &u, ColorSpinorField &r,
 		   ColorSpinorField &s, ColorSpinorField &m, ColorSpinorField &q, 
                    ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z) {
 
-  doubleN value;
   if (checkLocation(x, u, r, p, z) == QUDA_CUDA_FIELD_LOCATION) {//must be 10 args.
 
     // cannot do site unrolling for arbitrary color (needs JIT)
@@ -36,18 +35,18 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
 	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
-	value = reduceCudaExp<doubleN,ReduceType,double2,double2,double2,M,Reducer,
+	reduceCudaExp<Nreduce,doubleN,ReduceType,double2,double2,double2,M,Reducer,
 	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ >
-	  (a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(2*M));
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(2*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else if (x.Nspin() == 1) { //staggered
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-	value = reduceCudaExp<doubleN,ReduceType,double2,double2,double2,M,Reducer,
+	reduceCudaExp<Nreduce,doubleN,ReduceType,double2,double2,double2,M,Reducer,
 	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(2*M));
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(2*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -56,9 +55,9 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
       if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-	value = reduceCudaExp<doubleN,ReduceType,float4,float4,float4,M,Reducer,
+	reduceCudaExp<Nreduce,doubleN,ReduceType,float4,float4,float4,M,Reducer,
 	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(4*M));
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(4*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -66,9 +65,9 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
 #if 0 //defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
-	value = reduceCudaExp<doubleN,ReduceType,float2,float2,float2,M,Reducer,
+	reduceCudaExp<Nreduce,doubleN,ReduceType,float2,float2,float2,M,Reducer,
 	  	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(2*M));
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, reduce_length/(2*M));
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -78,18 +77,18 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
       if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 6; // determines how much work per thread to do
-	value = reduceCudaExp<doubleN,ReduceType,float4,short4,short4,M,Reducer,
+	reduceCudaExp<Nreduce,doubleN,ReduceType,float4,short4,short4,M,Reducer,
 	  	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else if (x.Nspin() == 1) {//staggered
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = 3; // determines how much work per thread to do
-	value = reduceCudaExp<doubleN,ReduceType,float2,short2,short2,M,Reducer,
+	reduceCudaExp<Nreduce,doubleN,ReduceType,float2,short2,short2,M,Reducer,
 	  	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -99,24 +98,11 @@ doubleN reduceCudaExp(const double2 &a, const double2 &b, ColorSpinorField &x,
       errorQuda("precision=%d is not supported\n", x.Precision());
     }
   } else { // fields are on the CPU
-#if 0
-    // we don't have quad precision support on the GPU so use doubleN instead of ReduceType
-    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      Reducer<doubleN, double2, double2> r(a, b);
-      value = genericReduce<doubleN,doubleN,double,double,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,double2,double2> >(x,y,z,w,v,r);
-    } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      Reducer<doubleN, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      value = genericReduce<doubleN,doubleN,float,float,writeX,writeY,writeZ,writeW,writeV,Reducer<doubleN,float2,float2> >(x,y,z,w,v,r);
-    } else {
-      errorQuda("Precision %d not implemented", x.Precision());
-    }
-#else
     errorQuda("\nCPU version is not implemented..\n"); 
-#endif
   }
 
-  //const int Nreduce = sizeof(doubleN) / sizeof(double);
-  //reduceDoubleArray((double*)&value, Nreduce);
+  const int Nreglen = sizeof(doubleN) / sizeof(double);
+  reduceDoubleArray(reinterpret_cast<double*>(reduce_buffer), Nreduce*Nreglen);
 
-  return value;
+  return;
 }
