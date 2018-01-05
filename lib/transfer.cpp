@@ -31,9 +31,9 @@ namespace quda {
 
     int ndim = B[0]->Ndim();
 
-    warningQuda("ndim = %d", ndim);
-
-    for (int d = 0; d < ndim; d++) {
+    // Only loop over four dimensions for now, we don't have
+    // to worry about the fifth dimension until we hit chiral fermions.
+    for (int d = 0; d < 4; d++) {
       while (geo_bs[d] > 0) {
       	if (d==0 && B[0]->X(0) == geo_bs[0])
       	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
@@ -46,6 +46,15 @@ namespace quda {
       	geo_bs[d] /= 2;
       }
       if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
+    }
+
+    if (ndim > 4)
+    {
+      if (geo_bs[4] != 1)
+      {
+        geo_bs[4] = 1;
+        warningQuda("5th dimension block size is being set to 1. This is a benign side effect of staggered fermions.\n");
+      }
     }
 
     this->geo_bs = new int[ndim];
