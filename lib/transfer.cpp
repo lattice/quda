@@ -31,6 +31,8 @@ namespace quda {
 
     int ndim = B[0]->Ndim();
 
+    warningQuda("ndim = %d", ndim);
+
     for (int d = 0; d < ndim; d++) {
       while (geo_bs[d] > 0) {
       	if (d==0 && B[0]->X(0) == geo_bs[0])

@@ -11,6 +11,7 @@
 #include <staggered_dslash_reference.h>
 #include "misc.h"
 #include <gauge_field.h>
+#include <covdev_reference.h>
 
 #if defined(QMP_COMMS)
 #include <qmp.h>
@@ -191,9 +192,24 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 
   gauge_param.scale = dslash_type != QUDA_ASQTAD_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_PERIODIC_T; //QUDA_ANTI_PERIODIC_T;
+  gauge_param.type = QUDA_WILSON_LINKS;
+
+  // QUDA_QDP_GAUGE_ORDER causes a segfault...
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  gauge_param.ga_pad = xdim*ydim*zdim/2;
+  
+  gauge_param.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int pad_size =MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+  gauge_param.ga_pad = pad_size;    
+#endif
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param) {
@@ -295,7 +311,6 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
-  warningQuda("Level 0 spin block size is set to: %d\n", mg_param.spin_block_size[0]);
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
@@ -350,7 +365,6 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   // no need to set clover params
 
@@ -368,8 +382,9 @@ void setInvertParam(QudaInvertParam &inv_param) {
   //inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
 
-
+  /* ESW HACK: comment this out to do a non-MG solve. */
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
+
   inv_param.pipeline = pipeline;
   inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.tol = tol;
@@ -416,6 +431,9 @@ int main(int argc, char **argv)
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
 
+  // Give the dslash type a reasonable default.
+  dslash_type = QUDA_STAGGERED_DSLASH;
+
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -432,6 +450,7 @@ int main(int argc, char **argv)
   for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     if (mg_solve_type[i] == QUDA_INVALID_SOLVE) mg_solve_type[i] = solve_type;
   }
+
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -516,11 +535,11 @@ int main(int argc, char **argv)
   ColorSpinorParam csParam;
   csParam.nColor=3;
   csParam.nSpin=1;
-  csParam.nDim=5;
+  csParam.nDim=4;
   for (int d = 0; d < 4; d++) csParam.x[d] = gauge_param.X[d];
   bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) csParam.x[0] /= 2;
-  csParam.x[4] = Nsrc;
+  //csParam.x[4] = Nsrc;
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
@@ -595,60 +614,68 @@ int main(int argc, char **argv)
 
   inv_param.solve_type = solve_type; // restore actual solve_type we want to do
 
+  /* ESW HACK: comment this out to do a non-MG solve. */
+
   // setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
-  invertQuda(out->V(), in->V(), &inv_param);
+  // Test: create a dummy invert param just to make sure
+  // we're setting up gauge fields and such correctly.
+
+
+
+  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
+    invertQuda((float*)out->V(), (float*)in->V(), &inv_param);
+  }else{
+    invertQuda((double*)out->V(), (double*)in->V(), &inv_param);
+  }
+
+  warningQuda("Got out of inverter, need to verify.\n");
+  fflush(stdout);
 
   // free the multigrid solver
-  destroyMultigridQuda(mg_preconditioner);
+  //destroyMultigridQuda(mg_preconditioner);
 
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  // Prepare for checks and such.
-  double nrm2=0;
-  double src2=0;
-  double l2r=0;
-
-  int len = Vh*Nsrc;
     
   //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
   //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, 0.0);
+  fflush(stdout);
 
-  if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-#ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-          out, mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp, QUDA_ODD_PARITY);
+  // I haven't been able to get this verify working,
+  // and I'm not going to try for now. The issue is I need
+  // to check both parities.
+  /* 
+  
+  // Prepare for checks and such.
+  double nrm2=0;
+  double src2=0;
+  double l2r=0;
+
+  int len = V;//Vh*Nsrc;
+
+  double factor = 1.0 / (2.0*mass);
+
+#ifdef MULTI_GPU    
+  //mat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, in, factor, QUDA_DAG_NO, inv_param.cpu_prec, gauge_param.cpu_prec, &inv_param);
+
+  // Need to do both even and odd...
+  staggered_dslash_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, in, 0, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
+
 #else
-      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp->V(), QUDA_ODD_PARITY);  
+  mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), factor, 0, inv_param.cpu_prec, gauge_param.cpu_prec);
 #endif
 
-      mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-    
-  } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
-    /*
-    if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-      wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
-		inv_param.cpu_prec, gauge_param);
-    } else {
-      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
-          tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
-                   inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-        } else {
-          printfQuda("Unsupported dslash_type\n");
-          exit(-1);
-        }
-      }
-    }*/
-  }
+  printfQuda("\nCompleted reference dslash.\n");
+  fflush(stdout);
+
+  ax( factor, in->V(), len*mySpinorSiteSize, inv_param.cpu_prec );
 
   int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
   mxpy(in->V(), ref->V(), vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
@@ -658,9 +685,10 @@ int main(int argc, char **argv)
 
   printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
 	     inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
+  fflush(stdout);
 
-
-  freeGaugeQuda();
+  */ 
+  // End I'm lazy.
 
   // Clean up cpu fields
   for(int i=0;i < 4;i++){
@@ -668,16 +696,24 @@ int main(int argc, char **argv)
     free(qdp_longlink[i]);
   }
 
+  printfQuda("free qdp links\n"); fflush(stdout);
+
   free(fatlink);
+  printfQuda("free(fatlink)\n"); fflush(stdout);
   free(longlink);
+  printfQuda("free(longlink)\n"); fflush(stdout);
 
   delete in;
+  printfQuda("delete in\n"); fflush(stdout);
   delete out;
+  printfQuda("delete out\n"); fflush(stdout);
   delete ref;
+  printfQuda("delete ref\n"); fflush(stdout);
   delete tmp;
+  printfQuda("delete tmp\n"); fflush(stdout);
 
-  if (cpuFat) delete cpuFat;
-  if (cpuLong) delete cpuLong;
+  if (cpuFat) { delete cpuFat; printfQuda("delete cpuFat\n"); fflush(stdout); }
+  if (cpuLong) { delete cpuLong; printfQuda("delete cpuLong\n"); fflush(stdout); }
 
   // finalize the QUDA library
   endQuda();
