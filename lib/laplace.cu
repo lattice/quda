@@ -283,6 +283,8 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
+
+    in.bufferIndex = (1 - in.bufferIndex);
   }
 
 

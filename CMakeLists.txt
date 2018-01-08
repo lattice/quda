@@ -142,7 +142,6 @@ set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for t
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
-set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
@@ -225,7 +224,7 @@ else()
     message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
   endif()
 endif()
-include_directories(${EIGEN_INCLUDE_DIRS})
+include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Now we hopefully found some way to get eigen to work
 
 # We need threads
@@ -353,10 +352,6 @@ endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
-endif()
-
-if(QUDA_DEFLATEDSOLVER)
-  add_definitions(-DDEFLATEDSOLVER)
 endif()
 
 if(QUDA_ALTRELIABLE)
@@ -493,7 +488,7 @@ if(QUDA_NUMA_NVML)
   add_definitions(-DNUMA_NVML)
   set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
   find_package(NVML REQUIRED)
-  include_directories(NVML_INCLUDE_DIR)
+  include_directories(SYSTEM NVML_INCLUDE_DIR)
 endif(QUDA_NUMA_NVML)
 
 
