@@ -1247,22 +1247,22 @@ namespace quda {
 
       // first wait on send to forwards
       if (comm_peer2peer_enabled(1,dim)) {
-	comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
+	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
 	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
       } else if (gdr_send) {
-	comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
+	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
-	comm_query(mh_send_fwd[bufferIndex][dim]);
+	comm_wait(mh_send_fwd[bufferIndex][dim]);
       }
 
       // second wait on receive from backwards
       if (comm_peer2peer_enabled(0,dim)) {
-	comm_query(mh_recv_p2p_back[bufferIndex][dim]);
+	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
 	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
       } else if (gdr_recv) {
-	comm_query(mh_recv_rdma_back[bufferIndex][dim]);
+	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
-	comm_query(mh_recv_back[bufferIndex][dim]);
+	comm_wait(mh_recv_back[bufferIndex][dim]);
       }
 
     }
