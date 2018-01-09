@@ -62,7 +62,7 @@ void reduceCudaExp(doubleN *reduce_buffer, const double2 &a, const double2 &b, C
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else if (x.Nspin() == 1 || x.Nspin() == 2) {
-#if 0 //defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 	reduceCudaExp<Nreduce,doubleN,ReduceType,float2,float2,float2,M,Reducer,
@@ -72,14 +72,13 @@ void reduceCudaExp(doubleN *reduce_buffer, const double2 &a, const double2 &b, C
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-#if 0 //Disable HALF precision
     } else if (x.Precision() == QUDA_HALF_PRECISION) { // half precision
       if (x.Nspin() == 4) { //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = 6; // determines how much work per thread to do
 	reduceCudaExp<Nreduce,doubleN,ReduceType,float4,short4,short4,M,Reducer,
 	  	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, x.Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -88,12 +87,11 @@ void reduceCudaExp(doubleN *reduce_buffer, const double2 &a, const double2 &b, C
 	const int M = 3; // determines how much work per thread to do
 	reduceCudaExp<Nreduce,doubleN,ReduceType,float2,short2,short2,M,Reducer,
 	  	  writeX,writeP,writeU,writeR,writeS,writeM,writeQ,writeW,writeN,writeZ>
-	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, y.Volume());
+	  (reduce_buffer, a, b, x, p, u, r, s, m, q, w, n, z, x.Volume());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
-#endif //Disable HALF precision
     } else {
       errorQuda("precision=%d is not supported\n", x.Precision());
     }

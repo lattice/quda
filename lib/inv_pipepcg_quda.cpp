@@ -18,7 +18,10 @@
 
 /***
 * Experimental PipePCG algorithm
-* Source P. Ghysels and W. Vanroose "Hiding global synchronization latency in the preconditioned Conjugate Gradient algorithm" 
+* Sources: 
+* P. Ghysels and W. Vanroose "Hiding global synchronization latency in the preconditioned Conjugate Gradient algorithm"
+* S. Cools et al, "Analyzing the effect of local rounding error propagation on the maximal attainable accuracy of the
+*                   pipelined Conjugate Gredient method ",  arXiv:1601.07068  
 ***/
 
 //#define USE_WORKER
@@ -283,40 +286,39 @@ namespace quda {
     matSloppy(w, u, tmp_sloppy); // => w = A*u;
 
     //Remark : no overlap here. 
-    double2 gammamNorm = reDotProductNormA(r_sloppy, u);
-    gamma = gammamNorm.y; 
-    mNorm = gammamNorm.x;
+    //double2 gammamNorm = reDotProductNormA(r_sloppy, u);
+    //gamma = gammamNorm.y; 
+    //mNorm = gammamNorm.x;
+
+    gamma = blas::reDotProduct(r_sloppy,u); 
+    mNorm = blas::norm2(r_sloppy);
     delta = blas::reDotProduct(w,u);
-        
+
+    mNorm_old = mNorm;
     gamma_aux = gamma;
 
     alpha = 1.0;
     beta  = 0.0;
 
-    double rNorm = sqrt(mNorm);
-    double r0Norm = rNorm;
-    double maxrx = rNorm;
-    double maxrr = rNorm;
-
-    const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
-    const int maxResIncreaseTotal = param.max_res_increase_total;
+    //const int maxResIncrease      = param.max_res_increase; // check if we reached the limit of our tolerance
+    //const int maxResIncreaseTotal = param.max_res_increase_total;
 
     double ef = 0.0, eh = 0.0, eg = 0.0, ek = 0.0;
     double f = 0.0, g = 0.0, h = 0.0, k = 0.0, f_old = 0.0;
 
-    const double uroe   = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
+    const double uro   = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
 /*
-tau = sqrt(uroe) will destroy convergence!
-tau = 100000 * sqrt(uroe) works! (212 iters)
-tau = 10000 * sqrt(uroe) works! (212 iters)
-tau = 1000 * sqrt(uroe) works! (212 iters)
-tau = 100 * sqrt(uroe) works! (214 iters)
-tau = 10 * sqrt(uroe) fails!
+tau = sqrt(uro) will destroy convergence!
+tau = 100000 * sqrt(uro) works! (212 iters)
+tau = 10000 * sqrt(uro) works! (212 iters)
+tau = 1000 * sqrt(uro) works! (212 iters)
+tau = 100 * sqrt(uro) works! (214 iters)
+tau = 10 * sqrt(uro) fails!
 */
-    const double tau = 100*sqrt(uroe);
+    const double tau = 100.0*sqrt(uro);
 
-    int resIncrease = 0;
-    int resIncreaseTotal = 0;
+    //int resIncrease = 0;
+    //int resIncreaseTotal = 0;
 
     blas::flops = 0;
 
@@ -404,23 +406,22 @@ tau = 10 * sqrt(uroe) fails!
 
           printfQuda("Do %s..\n", j == 1 ? "initialization" : "replace");
 
-          f = uroe * sqrt( (msqrnA + Anorm) * chi_old + bnorm ) + uroe * sqrt( ajm1*msqrnA*pi_old  ) + sqrt(ef)*uroe;
-          g = uroe * sqrt( msqrnA * pi_old );
-          h = uroe * sqrt( msqrnA * ksi_old ) + uroe * sqrt( ajm1*msqrnA*phi_old ) + sqrt(eh)*uroe;
-          k = uroe * sqrt( msqrnA * phi_old);
+          f = uro * sqrt( (msqrnA + Anorm) * chi_old + bnorm ) + uro * sqrt( ajm1*msqrnA*pi_old  ) + sqrt(ef)*uro;
+          g = uro * sqrt( msqrnA * pi_old );
+          h = uro * sqrt( msqrnA * ksi_old ) + uro * sqrt( ajm1*msqrnA*phi_old ) + sqrt(eh)*uro;
+          k = uro * sqrt( msqrnA * phi_old);
 
         } else { 
-          f = f + ajm1*bjm1*g + ajm1*h + sqrt(ef)*uroe + ajm1*sqrt(eg)*uroe; 
-          g = bjm1*g + h + sqrt(eg)*uroe;
-          h = h + ajm1*bjm1*k + sqrt(eh)*uroe + ajm1*sqrt(ek)*uroe;
-          k = bjm1*k + sqrt(ek)*uroe;
+          f = f + ajm1*bjm1*g + ajm1*h + sqrt(ef)*uro + ajm1*sqrt(eg)*uro; 
+          g = bjm1*g + h + sqrt(eg)*uro;
+          h = h + ajm1*bjm1*k + sqrt(eh)*uro + ajm1*sqrt(ek)*uro;
+          k = bjm1*k + sqrt(ek)*uro;
         }
 
       }
 
       updateR = ( j > 1 and f_old <= tau*sqrt(mNorm_old2) and f > tau*sqrt(mNorm_old) ) ? 1 : 0;
       f_old   = f;
-//updateR = 0;
 
       if( updateR ) { //trigger reliable updates:
 

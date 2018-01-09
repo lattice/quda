@@ -163,6 +163,67 @@ namespace quda {
   __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T>(arg, in, idx); }
 
 
+  template <int nreduce, int block_size_x, int block_size_y, typename T>
+  __device__ inline void array_reduce2d(ReduceArg<T> arg, const T in[nreduce], const int idx=0) {
+
+    typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+    __shared__ typename BlockReduce::TempStorage cub_tmp;
+
+    T aggregate[nreduce];
+#pragma unroll 
+    for(int j=0; j<nreduce; j++) {
+      aggregate[j] = BlockReduce(cub_tmp).Sum(in[j]);
+      __syncthreads();
+    }
+
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+#pragma unroll
+      for(int j=0; j<nreduce; j++) arg.partial[j*gridDim.x*gridDim.y+idx*gridDim.x + blockIdx.x] = aggregate[j];
+      __threadfence(); // flush result
+
+      // increment global block counter
+      unsigned int value = atomicInc(&count[idx], gridDim.x);
+
+      // determine if last block
+      isLastBlockDone = (value == (gridDim.x-1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      unsigned int i = threadIdx.y*block_size_x + threadIdx.x;
+      T sum[nreduce];
+#pragma unroll
+      for(int j=0; j<nreduce; j++) zero(sum[j]);
+      while (i<gridDim.x) {
+#pragma unroll //??
+        for(int j=0; j<nreduce; j++) 
+	  sum[j] += arg.partial[j*gridDim.x*gridDim.y + idx*gridDim.x + i];
+	i += block_size_x*block_size_y;
+      }
+#pragma unroll 
+      for(int j=0; j<nreduce; j++) {
+        sum[j] = BlockReduce(cub_tmp).Sum(sum[j]);
+        __syncthreads();
+      }
+
+      // write out the final reduced value
+      if (threadIdx.y*block_size_x + threadIdx.x == 0) {
+#pragma unroll
+        for(int j=0; j<nreduce; j++) arg.result_d[idx+j*gridDim.y] = sum[j];
+	count[idx] = 0; // set to zero for next time
+      }
+    }
+
+    return;
+  }
+
+
+  template <int nreduce, int block_size, typename T>
+  __device__ inline void array_reduce(ReduceArg<T> arg, const T in[nreduce], const int idx=0) { array_reduce2d<nreduce, block_size, 1, T>(arg, in, idx); }
+
+
   __shared__ volatile bool isLastWarpDone[16];
 
 #if __COMPUTE_CAPABILITY__ >= 300
