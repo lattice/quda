@@ -260,10 +260,6 @@ extern "C" {
   void comm_broadcast(void *data, size_t nbytes);
   void comm_barrier(void);
   void comm_abort(int status);
-  /*just allocates handle*/
-  MsgHandle *comm_handle(void);
-  /*async allreduce*/
-  void comm_allreduce_array_async(double *recvfbuff, double* data, size_t size, MsgHandle *mh);
   void reduceMaxDouble(double &);
   void reduceDouble(double &);
   void reduceDoubleArray(double *, const int len);

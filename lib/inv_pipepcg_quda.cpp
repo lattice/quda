@@ -28,8 +28,19 @@
 
 #ifndef USE_WORKER
 
+#include <mpi.h>
+
 #define NONBLOCK_REDUCE
-#include <comm_quda.h>
+#define MPI_CHECK_(mpi_call) do {                    \
+  int status = mpi_call;                            \
+  if (status != MPI_SUCCESS) {                      \
+    char err_string[128];                           \
+    int err_len;                                    \
+    MPI_Error_string(status, err_string, &err_len); \
+    err_string[127] = '\0';                         \
+    errorQuda("(MPI) %s", err_string);              \
+  }                                                 \
+} while (0)
 
 #endif
 
@@ -327,7 +338,8 @@ tau = 10 * sqrt(uro) fails!
     GlobalMPIallreduce global_reduce((double*)&local_reduce, 12);
     dslash::aux_worker = nullptr;//&global_reduce;
 #else
-    MsgHandle* allreduceHandle = comm_handle();
+    //MsgHandle* allreduceHandle = comm_handle();
+    MPI_Request request_handle;
     double *recvbuff           = new double[12];//mpi buffer for async global reduction
 #endif
 
@@ -504,7 +516,7 @@ tau = 10 * sqrt(uro) fails!
 #else
       {
 #ifdef NONBLOCK_REDUCE
-        comm_allreduce_array_async(recvbuff, (double*)&local_reduce, 12, allreduceHandle);
+        MPI_CHECK_(MPI_Iallreduce((double*)&local_reduce, recvbuff, 12, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 #else
         reduceDoubleArray((double*)&local_reduce, 12);
 #endif
@@ -522,7 +534,7 @@ tau = 10 * sqrt(uro) fails!
         //
         matSloppy(n, m, tmp_sloppy);
 #ifdef NONBLOCK_REDUCE//sync point
-        comm_wait(allreduceHandle);
+        MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
         memcpy(&local_reduce, recvbuff, 12*sizeof(double));
 #endif
       }
@@ -534,7 +546,7 @@ tau = 10 * sqrt(uro) fails!
     }
 
 #ifdef NONBLOCK_REDUCE
-    host_free(allreduceHandle);
+    //host_free(allreduceHandle);
     delete [] recvbuff;
 #endif
 
