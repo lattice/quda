@@ -966,6 +966,13 @@ namespace quda {
       bool gdr_recv = (policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR ||
 		       policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
 
+      // disable peer-to-peer if doing a zero-copy policy (temporary)
+      if ( policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK ||
+	   policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ ||
+	   policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY ||
+	   policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV ||
+	   policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) comm_enable_peer2peer(false);
+
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
 	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv);
@@ -998,6 +1005,7 @@ namespace quda {
       }
 
       if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
+      comm_enable_peer2peer(true);
 #else
       errorQuda("Multigrid has not been built");
 #endif
@@ -1075,12 +1083,12 @@ namespace quda {
 	    }
 
 	    enable_policy(dslash_policy);
-      first_active_policy = policy_ < first_active_policy ? policy_ : first_active_policy;
+	    first_active_policy = policy_ < first_active_policy ? policy_ : first_active_policy;
 	    if (policy_list.peek() == ',') policy_list.ignore();
 	  }
-    if(first_active_policy == static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_COARSE_POLICY");
+	  if(first_active_policy == static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_COARSE_POLICY");
 	} else {
-    first_active_policy = 0;
+	  first_active_policy = 0;
 	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
 	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
 	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
