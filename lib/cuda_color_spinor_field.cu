@@ -1165,7 +1165,7 @@ namespace quda {
     int dim = d/2;
     int dir = d%2;
 
-    if (!commDimPartitioned(dim)) return 0;
+    if (!commDimPartitioned(dim)) return 1;
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (dir==0) {
@@ -1405,17 +1405,22 @@ namespace quda {
 	for (int dir=0; dir<2; dir++) {
 	  if ( (comm_peer2peer_enabled(dir,dim) + p2p) % 2 == 0 ) { // issue non-p2p transfers first
 	    const_cast<cudaColorSpinorField*>(this)->sendStart(nFace, 2*dim+dir, dagger, 0, gdr_send);
-	    const_cast<cudaColorSpinorField*>(this)->commsQuery(nFace, 2*dim+dir, dagger, 0, gdr_send); //query to encourage progress
 	  }
 	}
       }
     }
 
-    for (int p2p=0; p2p<2; p2p++) {
+    bool comms_complete[2*QUDA_MAX_DIM] = { };
+    int comms_done = 0;
+    while (comms_done < 2*nDimComms) { // non-blocking query of each exchange and exit once all have completed
       for (int dim=0; dim<nDimComms; dim++) {
 	for (int dir=0; dir<2; dir++) {
-	  if ( (comm_peer2peer_enabled(dir,dim) + p2p) % 2 == 1 ) { // wait on p2p transfers first
-	    for (int i=0; i<2*nDimComms; i++) const_cast<cudaColorSpinorField*>(this)->commsWait(nFace, i, dagger, 0, gdr_send, gdr_recv);
+	  if (!comms_complete[dim*2+dir]) {
+	    comms_complete[2*dim+dir] = const_cast<cudaColorSpinorField*>(this)->commsQuery(nFace, 2*dim+dir, dagger, 0, gdr_send, gdr_recv);
+	    if (comms_complete[2*dim+dir]) {
+	      comms_done++;
+	      if (comm_peer2peer_enabled(1-dir,dim)) cudaStreamWaitEvent(0, ipcRemoteCopyEvent[bufferIndex][1-dir][dim], 0);
+	    }
 	  }
 	}
       }
