@@ -1379,10 +1379,15 @@ namespace quda {
       if (!fused_pack_memcpy) {
 	for (int i=0; i<nDimComms; i++) {
 	  if (comm_dim_partitioned(i)) {
-	    if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
-	      qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyDeviceToHost);
-	    if (pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
-	      qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	    if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
+		pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
+	      qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	    } else {
+	      if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+		qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	      if (pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
+		qudaMemcpy(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyDeviceToHost);
+	    }
 	  }
 	}
       } else if (total_bytes && !pack_host) {
@@ -1395,18 +1400,41 @@ namespace quda {
 
     if (gdr_send || pack_host) cudaDeviceSynchronize(); // need to make sure packing has finished before kicking off MPI
 
-    for (int i=0; i<2*nDimComms; i++) const_cast<cudaColorSpinorField*>(this)->sendStart(nFace, i, dagger, 0, gdr_send);
+    for (int p2p=0; p2p<2; p2p++) {
+      for (int dim=0; dim<nDimComms; dim++) {
+	for (int dir=0; dir<2; dir++) {
+	  if ( (comm_peer2peer_enabled(dir,dim) + p2p) % 2 == 0 ) { // issue non-p2p transfers first
+	    const_cast<cudaColorSpinorField*>(this)->sendStart(nFace, 2*dim+dir, dagger, 0, gdr_send);
+	    const_cast<cudaColorSpinorField*>(this)->commsQuery(nFace, 2*dim+dir, dagger, 0, gdr_send); //query to encourage progress
+	  }
+	}
+      }
+    }
 
-    for (int i=0; i<2*nDimComms; i++) const_cast<cudaColorSpinorField*>(this)->commsWait(nFace, i, dagger, 0, gdr_send, gdr_recv);
+    for (int p2p=0; p2p<2; p2p++) {
+      for (int dim=0; dim<nDimComms; dim++) {
+	for (int dir=0; dir<2; dir++) {
+	  if ( (comm_peer2peer_enabled(dir,dim) + p2p) % 2 == 1 ) { // wait on p2p transfers first
+	    for (int i=0; i<2*nDimComms; i++) const_cast<cudaColorSpinorField*>(this)->commsWait(nFace, i, dagger, 0, gdr_send, gdr_recv);
+	  }
+	}
+      }
+    }
 
     if (!gdr_recv) {
       if (!fused_halo_memcpy) {
 	for (int i=0; i<nDimComms; i++) {
-	  if (!comm_dim_partitioned(i)) continue;
-	  if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
-	    qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyHostToDevice);
-	  if (halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
-	    qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyHostToDevice);
+	  if (comm_dim_partitioned(i)) {
+	    if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
+		halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
+	      qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], 2*ghost_face_bytes[i], cudaMemcpyHostToDevice);
+	    } else {
+	      if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+		qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0], ghost_face_bytes[i], cudaMemcpyHostToDevice);
+	      if (halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
+		qudaMemcpy(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1], ghost_face_bytes[i], cudaMemcpyHostToDevice);
+	    }
+	  }
 	}
       } else if (total_bytes && !halo_host) {
 	qudaMemcpy(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice);
