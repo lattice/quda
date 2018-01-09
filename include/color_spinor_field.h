@@ -108,7 +108,7 @@ namespace quda {
 
   ColorSpinorParam()
     : LatticeFieldParam(), location(QUDA_INVALID_FIELD_LOCATION), nColor(0),
-      nSpin(0), nVec(0), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
+      nSpin(0), nVec(1), twistFlavor(QUDA_TWIST_INVALID), siteOrder(QUDA_INVALID_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
       create(QUDA_INVALID_FIELD_CREATE), PCtype(QUDA_PC_INVALID),
       is_composite(false), composite_dim(0), is_component(false), component_id(0) { ; }
