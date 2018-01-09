@@ -53,6 +53,8 @@ namespace quda {
 
     QudaPrecision prec = transfer->Vectors().Precision();
     int ndim = transfer->Vectors().Ndim();
+    if (ndim == 5 && transfer->Vectors().Nspin() == 1)
+      ndim = 4; // forced case for staggered
     int x[QUDA_MAX_DIM];
     //Number of coarse sites.
     const int *geo_bs = transfer->Geo_bs();
@@ -62,7 +64,7 @@ namespace quda {
     int Nc_c = transfer->nvec();
 
     //Coarse Spin
-    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs();
+    int Ns_c = (transfer->Spin_bs() == 0) ? 2 : transfer->Vectors().Nspin()/transfer->Spin_bs();
 
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
