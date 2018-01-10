@@ -636,7 +636,7 @@ namespace quda {
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
     constexpr int coarseSpin = (nSpin == 4 || nSpin == 2 || spinBlockSize == 0) ? 2 : 1;
 
-    printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
     BlockOrtho<double,Float,nSpin,spinBlockSize,nColor,coarseSpin,nVec> ortho(V, fine_to_coarse, coarse_to_fine, geo_bs);
     ortho.apply(0);
@@ -650,13 +650,13 @@ namespace quda {
 
       constexpr int nColor = 3;
       if (Nvec == 6) { // for Wilson free field
-  BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,6>(V, fine_to_coarse, coarse_to_fine, geo_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,6>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 24) {
 	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,24>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 32) {
 	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,32>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else if (Nvec == 48) {
-  BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,48>(V, fine_to_coarse, coarse_to_fine, geo_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,48>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       }else {
 	errorQuda("Unsupported nVec %d\n", Nvec);
       }
@@ -665,9 +665,9 @@ namespace quda {
 
       constexpr int nColor = 6;
       if (Nvec == 6) {
-  BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,6>(V, fine_to_coarse, coarse_to_fine, geo_bs);
+	BlockOrthogonalize<Float,nSpin,spinBlockSize,nColor,6>(V, fine_to_coarse, coarse_to_fine, geo_bs);
       } else {
-  errorQuda("Unsupported nVec %d\n", Nvec);
+	errorQuda("Unsupported nVec %d\n", Nvec);
       }
     
     } else if (V.Ncolor()/Nvec == 24) {

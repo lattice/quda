@@ -161,7 +161,7 @@ namespace quda {
     checkPrecision(X, Y, clover, cloverInv);
     checkPrecision(g, uv, T.Vectors(X.Location()));
 
-    printfQuda("Computing Y field......\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
@@ -183,7 +183,7 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
-    printfQuda("....done computing Y field\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
   }
 
   //Calculates the coarse color matrix and puts the result in Y.

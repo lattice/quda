@@ -2316,7 +2316,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
   mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
-  if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
   ColorSpinorParam cpuParam(0, *param, cudaGauge->X(), pc_solution, QUDA_CPU_FIELD_LOCATION);
   cpuParam.create = QUDA_ZERO_FIELD_CREATE;

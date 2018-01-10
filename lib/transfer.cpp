@@ -58,7 +58,7 @@ namespace quda {
     char block_str[128];
     sprintf(block_str, "%d", geo_bs[0]);
     for (int d=1; d<ndim; d++) sprintf(block_str, "%s x %d", block_str, geo_bs[d]);
-    printfQuda("Transfer: using block size %s\n", block_str);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str);
 
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
@@ -76,8 +76,6 @@ namespace quda {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: creating V field with location %d\n", param.location);
 
     // for cpu transfer this is the V field, for gpu it's just a temporary until we port the block orthogonalization
     V_h = ColorSpinorField::Create(param);
@@ -142,11 +140,11 @@ namespace quda {
 	V_tmp = ColorSpinorField::Create(param);
       }
 
-      printfQuda("Transfer: filling V field with null-space components\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: filling V field with null-space components\n");
       fillV(*V_tmp);  // copy the null space vectors into V
 
       // orthogonalize the blocks
-      printfQuda("Transfer: block orthogonalizing\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
       BlockOrthogonalize(*V_tmp, Nvec, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
 
       *V_h = *V_tmp;
@@ -154,20 +152,20 @@ namespace quda {
       	*V_d = *V_tmp;
       	delete V_tmp;
       }
-      printfQuda("Transferred prolongator back to CPU\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
 
     } else {
 
-      printfQuda("Transfer: filling V field with null-space components\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: filling V field with null-space components\n");
       fillV(*V_h); // copy the null space vectors into V
 
       // orthogonalize the blocks
-      printfQuda("Transfer: block orthogonalizing\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
       BlockOrthogonalize(*V_h, Nvec, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
 
       if (enable_gpu) {
       	*V_d = *V_h;
-      	printfQuda("Transferred prolongator to GPU\n");
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
       }
     }
   }
