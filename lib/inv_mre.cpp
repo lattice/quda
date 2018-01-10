@@ -7,8 +7,8 @@
 
 namespace quda {
 
-  MinResExt::MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, TimeProfile &profile)
-    : mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), profile(profile){
+  MinResExt::MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile)
+    : mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), hermitian(hermitian), profile(profile){
 
   }
 
@@ -26,6 +26,7 @@ namespace quda {
      @param p[in] Search direction vectors
      @param q[in] Search direction vectors with the operator applied
   */
+  template<bool hermitian>
   void solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b) {
 
     using namespace Eigen;
@@ -38,11 +39,18 @@ namespace quda {
     for (unsigned int i=0; i<p.size(); i++) phi(i) = blas::cDotProduct(*p[i], b);
 
     // Construct the matrix
+    //MW us block blas here 
     for (unsigned int j=0; j<p.size(); j++) {
-      A(j,j) = blas::cDotProduct(*q[j], *p[j]);
-      for (unsigned int k=j+1; k<p.size(); k++) {
-	A(j,k) = blas::cDotProduct(*p[j], *q[k]);
-	A(k,j) = conj(A(j,k));
+      if(hermitian){
+        A(j,j) = blas::cDotProduct(*q[j], *p[j]);
+        for (unsigned int k=j+1; k<p.size(); k++) {
+          A(j,k) = blas::cDotProduct(*p[j], *q[k]);
+          A(k,j) = conj(A(j,k));
+        }
+      } else {
+        for (unsigned int k=0; k<p.size(); k++) {
+          A(j,k) = blas::cDotProduct(*p[j], *q[k]);
+        } 
       }
     }
     JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
@@ -176,7 +184,11 @@ namespace quda {
     // if operator hasn't already been applied then apply
     if (apply_mat) for (int i=0; i<N; i++) mat(*q[i], *p[i]);
 
-    solve(alpha, p, q, b);
+    if (hermitian) {
+      solve<true>(alpha, p, q, b);
+    } else {
+      solve<false>(alpha, p, q, b);
+    }
 
     for (int i=0; i<N; i++) minus_alpha[i] = -alpha[i];
 

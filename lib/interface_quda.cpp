@@ -2726,7 +2726,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       bool orthogonal = true;
       bool apply_mat = false;
-      MinResExt mre(m, orthogonal, apply_mat, profileInvert);
+      bool hermitian = true;
+      MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
       blas::copy(tmp, *in);
 
       mre(*out, tmp, basis);
@@ -3432,7 +3433,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 	  bool orthogonal = true;
 	  bool apply_mat = true;
-	  MinResExt mre(m, orthogonal, apply_mat, profileMulti);
+    bool hermitian = true;
+	  MinResExt mre(m, orthogonal, apply_mat, hermitian, profileMulti);
 	  blas::copy(tmp, *b);
 	  mre(*x[i], tmp, z, q);
 
