@@ -536,6 +536,12 @@ namespace quda {
 	  } else if (arg.geoBlockSizeCB == 64) {  // for 2x4x4x4 aggregates
 	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,64>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 81) {  // for 3x3x3x6 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,81>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  } else if (arg.geoBlockSizeCB == 96) {  // for 4x4x4x3 aggregates
+	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,96>
+	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	  } else if (arg.geoBlockSizeCB == 100) {  // for 5x5x2x4 aggregates
 	    blockOrthoGPU<sumType,real,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg,100>
 	      <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
