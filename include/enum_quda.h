@@ -56,6 +56,7 @@ extern "C" {
   } QudaTboundary;
 
   typedef enum QudaPrecision_s {
+    QUDA_QUARTER_PRECISION = 1,
     QUDA_HALF_PRECISION = 2,
     QUDA_SINGLE_PRECISION = 4,
     QUDA_DOUBLE_PRECISION = 8,
