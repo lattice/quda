@@ -35,10 +35,10 @@ namespace quda {
       unsigned int gridSize = gridDim.x*blockDim.x;
 
       while (i < length) {
-	FloatN x[N];
-	X.load(x, i, parity);
-	Y.save(x, i, parity);
-	i += gridSize;
+        FloatN x[N];
+        X.load(x, i, parity);
+        Y.save(x, i, parity);
+        i += gridSize;
       }
     }
       
