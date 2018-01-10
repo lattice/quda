@@ -150,6 +150,13 @@ namespace quda {
       { return static_cast<ReduceType>(norm(x)); }
     };
 
+    template<typename ReduceType> struct square_<ReduceType,char> {
+      const ReduceType scale;
+      square_(const ReduceType scale) : scale(scale) { }
+      __host__ __device__ inline ReduceType operator()(const quda::complex<char> &x)
+      { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    };
+
     template<typename ReduceType> struct square_<ReduceType,short> {
       const ReduceType scale;
       square_(const ReduceType scale) : scale(scale) { }
@@ -167,6 +174,13 @@ namespace quda {
     template<typename Float, typename storeFloat> struct abs_ {
       abs_(const Float scale) { }
       __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) { return abs(x); }
+    };
+
+    template<typename Float> struct abs_<Float,char> {
+      Float scale;
+      abs_(const Float scale) : scale(scale) { }
+      __host__ __device__ Float operator()(const quda::complex<char> &x)
+      { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
     template<typename Float> struct abs_<Float,short> {
@@ -2744,6 +2758,14 @@ namespace quda {
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 12, stag, huge_alloc> type; };
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc> type; };
   template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N,stag,huge_alloc> { typedef gauge::FloatNOrder<short, N, 4, 8, stag, huge_alloc> type; };
+
+  // quarter precision
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_NO,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 2, N, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_13,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 13, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_12,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 12, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_9,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 9, stag, huge_alloc> type; };
+  template<int N,QudaStaggeredPhase stag,bool huge_alloc> struct gauge_mapper<char,QUDA_RECONSTRUCT_8,N,stag,huge_alloc> { typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc> type; };
+
 
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };

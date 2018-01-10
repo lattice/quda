@@ -300,6 +300,7 @@ namespace quda {
     template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
+    template<> __host__ __device__ inline constexpr bool match<char,char>() { return true; }
     template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
     template<> __host__ __device__ inline constexpr bool match<short,short>() { return true; }
 
@@ -533,8 +534,8 @@ namespace quda {
        */
       __device__ __host__ inline fieldorder_wrapper<Float,ghostFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0)
       {
-  const int idx = ghostAccessor.index(dim,dir,parity,x_cb,s,c,n);
-  return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx, scale, scale_inv);
+        const int idx = ghostAccessor.index(dim,dir,parity,x_cb,s,c,n);
+        return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx, scale, scale_inv);
       }
 
       /**
@@ -544,21 +545,21 @@ namespace quda {
    coordinates.
       */
       __device__ __host__ inline void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
-  if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
+        if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
 
-  for (int d=0; d<nDim; d++) {
-    y[d] = i % x[d];
-    i /= x[d];
-  }
-  int parity = i; // parity is the slowest running dimension
+        for (int d=0; d<nDim; d++) {
+          y[d] = i % x[d];
+          i /= x[d];
+        }
+        int parity = i; // parity is the slowest running dimension
 
-  // convert into the full-field lattice coordinate
-  if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-    for (int d=1; d<nDim; d++) parity += y[d];
-    parity = parity & 1;
-    x[0] *= 2; // restore x[0]
-  }
-  y[0] = 2*y[0] + parity;  // compute the full x coordinate
+        // convert into the full-field lattice coordinate
+        if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+          for (int d=1; d<nDim; d++) parity += y[d];
+          parity = parity & 1;
+          x[0] *= 2; // restore x[0]
+        }
+        y[0] = 2*y[0] + parity;  // compute the full x coordinate
       }
 
       /**
@@ -711,7 +712,7 @@ namespace quda {
       tex = static_cast<const cudaColorSpinorField&>(a).Tex();
       texNorm = static_cast<const cudaColorSpinorField&>(a).TexNorm();
     }
-    if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) ) && !override) {
+    if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) || (a.Precision() == QUDA_QUARTER_PRECISION && this->norm != a.Norm())) && !override) {
       errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
     }
 #endif
@@ -734,7 +735,7 @@ namespace quda {
       }
     }
 
-    if (sizeof(Float)==sizeof(short)) {
+    if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       // use textures unless we have a large alloc
       RegType nrm = !huge_alloc ? tex1Dfetch<float>(texNorm,x+parity*norm_offset) : norm[x+parity*norm_offset];
@@ -750,13 +751,13 @@ namespace quda {
     RegType scale = 0.0;
     RegType tmp[length];
 
-    if (sizeof(Float)==sizeof(short)) {
+    if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
 #pragma unroll
       for (int i=0; i<length; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
       norm[x+parity*norm_offset] = scale;
     }
 
-    if (sizeof(Float)==sizeof(short)) {
+    if (sizeof(Float)==sizeof(short) || sizeof(Float)==sizeof(char)) {
       RegType scale_inv = static_cast<RegType>(1.0) / scale;
 #pragma unroll
       for (int i=0; i<length; i++) tmp[i] = v[i] * scale_inv;
@@ -947,7 +948,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v_.v[(c*Ns + s)*2 + z] = (Float)v[(s*Nc+c)*2+z];
+          v_.v[(c*Ns + s)*2 + z] = (Float)v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -956,7 +957,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    field[parity*offset + ((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
+          field[parity*offset + ((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -996,7 +997,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Nc + c)*Ns + s)*2 + z];
+          v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Nc + c)*Ns + s)*2 + z];
         }
       }
     }
@@ -1006,7 +1007,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
+          ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1047,7 +1048,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = (RegType)v_.v[(s*Nc + c)*2 + z];
+          v[(s*Nc+c)*2+z] = (RegType)v_.v[(s*Nc + c)*2 + z];
         }
       }
     }
@@ -1055,7 +1056,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = field[parity*offset + ((x*Ns + s)*Nc + c)*2 + z];
+          v[(s*Nc+c)*2+z] = field[parity*offset + ((x*Ns + s)*Nc + c)*2 + z];
         }
       }
     }
@@ -1070,7 +1071,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v_.v[(s*Nc + c)*2 + z] = (Float)v[(s*Nc+c)*2+z];
+          v_.v[(s*Nc + c)*2 + z] = (Float)v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1079,7 +1080,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    field[parity*offset + ((x*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+          field[parity*offset + ((x*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1119,7 +1120,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z];
+          v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z];
         }
       }
     }
@@ -1129,7 +1130,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+          ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1197,7 +1198,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = (RegType)v_.v[(s*Nc + c)*2 + z];
+          v[(s*Nc+c)*2+z] = (RegType)v_.v[(s*Nc + c)*2 + z];
         }
       }
     }
@@ -1205,7 +1206,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = field[parity*offset + ((y*Ns + s)*Nc + c)*2 + z];
+          v[(s*Nc+c)*2+z] = field[parity*offset + ((y*Ns + s)*Nc + c)*2 + z];
         }
       }
     }
@@ -1222,7 +1223,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v_.v[(s*Nc + c)*2 + z] = (Float)v[(s*Nc+c)*2+z];
+          v_.v[(s*Nc + c)*2 + z] = (Float)v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1231,7 +1232,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    field[parity*offset + ((y*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+          field[parity*offset + ((y*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1271,7 +1272,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z];
+          v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z];
         }
       }
     }
@@ -1281,7 +1282,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+          ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1307,7 +1308,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    v[(s*Nc+c)*2+z] = field[(((z*Nc + c)*Ns + s)*2 + (1-parity))*volumeCB + x];
+          v[(s*Nc+c)*2+z] = field[(((z*Nc + c)*Ns + s)*2 + (1-parity))*volumeCB + x];
         }
       }
     }
@@ -1317,7 +1318,7 @@ namespace quda {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         for (int z=0; z<2; z++) {
-    field[(((z*Nc + c)*Ns + s)*2 + (1-parity))*volumeCB + x] = v[(s*Nc+c)*2+z];
+          field[(((z*Nc + c)*Ns + s)*2 + (1-parity))*volumeCB + x] = v[(s*Nc+c)*2+z];
         }
       }
     }
@@ -1398,6 +1399,11 @@ namespace quda {
   template<int Nc> struct colorspinor_mapper<short,4,Nc> { typedef colorspinor::FloatNOrder<short, 4, Nc, 4> type; };
   template<int Nc> struct colorspinor_mapper<short,2,Nc> { typedef colorspinor::FloatNOrder<short, 2, Nc, 2> type; };
   template<int Nc> struct colorspinor_mapper<short,1,Nc> { typedef colorspinor::FloatNOrder<short, 1, Nc, 2> type; };
+    
+  // quarter precision
+  template<int Nc> struct colorspinor_mapper<char,4,Nc> { typedef colorspinor::FloatNOrder<char, 4, Nc, 4> type; };
+  template<int Nc> struct colorspinor_mapper<char,2,Nc> { typedef colorspinor::FloatNOrder<char, 2, Nc, 2> type; };
+  template<int Nc> struct colorspinor_mapper<char,1,Nc> { typedef colorspinor::FloatNOrder<char, 1, Nc, 2> type; };
     
 
   template<typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper { };
