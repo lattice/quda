@@ -1,9 +1,7 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 
-#ifdef EIGEN
 #include <Eigen/Dense>
-#endif
 
 namespace quda {
 
@@ -16,7 +14,7 @@ namespace quda {
 
   }
 
-#ifdef EIGEN
+#if 1
 
   /**
      @brief Solve the equation A p_k psi_k = b by minimizing the
@@ -59,7 +57,7 @@ namespace quda {
     for (unsigned int i=0; i<p.size(); i++) psi_[i] = psi(i);
   }
 
-#else
+#else //old stuff
 
   /**
      @brief Solve the equation A p_k psi_k = b by minimizing the
@@ -124,7 +122,7 @@ namespace quda {
     delete [] phi;
   }
 
-#endif // EIGEN
+#endif // old stuff
 
 
   /*
