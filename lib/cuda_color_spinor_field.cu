@@ -152,12 +152,12 @@ namespace quda {
       switch(mem_type) {
       case QUDA_MEMORY_DEVICE:
 	v = pool_device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION) norm = pool_device_malloc(norm_bytes);
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) norm = pool_device_malloc(norm_bytes);
 	break;
       case QUDA_MEMORY_MAPPED:
 	v_h = mapped_malloc(bytes);
 	cudaHostGetDevicePointer(&v, v_h, 0); // set the matching device pointer
-	if (precision == QUDA_HALF_PRECISION) {
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  norm_h = mapped_malloc(norm_bytes);
 	  cudaHostGetDevicePointer(&norm, norm_h, 0); // set the matching device pointer
 	}
@@ -210,7 +210,7 @@ namespace quda {
 
         // need this hackery for the moment (need to locate the odd pointers half way into the full field)
         (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
-        if (precision == QUDA_HALF_PRECISION) 
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) 
 	  (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -332,7 +332,7 @@ namespace quda {
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
       // create the texture for the norm components
-      if (precision == QUDA_HALF_PRECISION) {
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	cudaChannelFormatDesc desc;
 	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
 	desc.f = cudaChannelFormatKindFloat;
@@ -396,7 +396,7 @@ namespace quda {
 
 	cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
-	if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
 	else texDesc.readMode = cudaReadModeElementType;
 
 	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
@@ -405,7 +405,7 @@ namespace quda {
 	resDesc.res.linear.devPtr = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
 	cudaCreateTextureObject(&ghostTex[2+b], &resDesc, &texDesc, NULL);
 
-	if (precision == QUDA_HALF_PRECISION) {
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  cudaChannelFormatDesc desc;
 	  memset(&desc, 0, sizeof(cudaChannelFormatDesc));
 	  desc.f = cudaChannelFormatKindFloat;
@@ -445,7 +445,7 @@ namespace quda {
       if (ghost_bytes) {
 	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
       }
-      if (precision == QUDA_HALF_PRECISION) {
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
         cudaDestroyTextureObject(texNorm);
         if (ghost_bytes) {
 	  for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
@@ -458,7 +458,7 @@ namespace quda {
   void cudaColorSpinorField::destroyGhostTexObject() const {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
-      if (precision == QUDA_HALF_PRECISION) {
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
       }
       ghostTexInit = false;
@@ -472,11 +472,11 @@ namespace quda {
       switch(mem_type) {
       case QUDA_MEMORY_DEVICE:
 	pool_device_free(v);
-	if (precision == QUDA_HALF_PRECISION) pool_device_free(norm);
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) pool_device_free(norm);
 	break;
       case QUDA_MEMORY_MAPPED:
 	host_free(v_h);
-	if (precision == QUDA_HALF_PRECISION) host_free(norm_h);
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) host_free(norm_h);
 	break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
@@ -532,7 +532,7 @@ namespace quda {
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
     cudaMemsetAsync(v, 0, bytes, streams[Nstream-1]);
-    if (precision == QUDA_HALF_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, streams[Nstream-1]);
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, streams[Nstream-1]);
   }
 
   void cudaColorSpinorField::zeroPad() {
@@ -709,7 +709,7 @@ namespace quda {
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
 
-      if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
 
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
 
@@ -746,7 +746,7 @@ namespace quda {
 	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
 	cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
-	if (precision == QUDA_HALF_PRECISION) {
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
 	  int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
 	  void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision + s*len;
@@ -789,7 +789,7 @@ namespace quda {
       src = (char*)v + flavor2_offset*Nvec*precision;
       cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
-      if (precision == QUDA_HALF_PRECISION) {
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
         int Nt_minus1_offset = (flavorVolume - flavorTFace);
         int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
 	void *dst = (char*)ghost_spinor + Nint*ghostFace[3]*precision;
@@ -818,7 +818,7 @@ namespace quda {
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
     void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + precision*ghost_offset;
 
-    if (precision == QUDA_HALF_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
 
     cudaMemcpyAsync(ghost_dst, src, len, cudaMemcpyHostToDevice, *stream);
   }
@@ -924,7 +924,7 @@ namespace quda {
 	if (commDimPartitioned(i)) {
 	  for (int b=0; b<2; b++) {
 	    ghost[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
-	    if (precision == QUDA_HALF_PRECISION)
+	    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
 	      ghostNorm[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
 	  }
 	}
@@ -1082,7 +1082,7 @@ namespace quda {
 	  // start the copy
 	  cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	  if (precision == QUDA_HALF_PRECISION) {
+	  if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	    size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
 	    int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
 	    void *dst = (char*)ghost_norm_dst + s*len;
@@ -1124,7 +1124,7 @@ namespace quda {
 	src = static_cast<char*>(v) + flavor2_offset*Nvec*precision;
 	cudaMemcpy2DAsync(static_cast<char*>(ghost_dst)+len, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	if (precision == QUDA_HALF_PRECISION) {
+	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  int norm_offset = (dir == 0) ? 0 : flavor1_Nt_minus1_offset*sizeof(float);
 	  void *src = static_cast<char*>(norm) + norm_offset;
 	  size_t dpitch = flavorTFace*sizeof(float);

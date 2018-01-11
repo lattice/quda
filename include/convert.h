@@ -8,7 +8,7 @@
  * arbitrary field and register ordering.
  */
 
-#include <quda_internal.h> // for MAX_SHORT
+#include <quda_internal.h> // for MAX_SHORT, MAX_CHAR
 
 template <typename type> inline int vecLength() { return 0; }
 

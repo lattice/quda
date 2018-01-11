@@ -95,8 +95,8 @@ namespace quda {
 	long long bytes() const { 
 	  const int Ninternal = (sizeof(FloatN)/sizeof(((FloatN*)0)->x))*N;
 	  size_t bytes = (X.Precision() + Y.Precision())*Ninternal;
-	  if (X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
-	  if (Y.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
+	  if (X.Precision() == QUDA_HALF_PRECISION || X.Precision() == QUDA_QUARTER_PRECISION) bytes += sizeof(float);
+	  if (Y.Precision() == QUDA_HALF_PRECISION || Y.Precision() == QUDA_QUARTER_PRECISION) bytes += sizeof(float);
 	  return bytes*length*nParity;
 	}
 	int tuningIter() const { return 3; }
@@ -131,7 +131,7 @@ namespace quda {
 	if (dst.Precision() == src.Precision()) {
 	  if (src.Bytes() != dst.Bytes()) errorQuda("Precisions match, but bytes do not");
 	  qudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
-	  if (dst.Precision() == QUDA_HALF_PRECISION) {
+	  if (dst.Precision() == QUDA_HALF_PRECISION || dst.Precision() == QUDA_QUARTER_PRECISION) {
 	    qudaMemcpy(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice);
 	    blas::bytes += 2*(unsigned long long)dst.RealLength()*sizeof(float);
 	  }

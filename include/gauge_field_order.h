@@ -2663,7 +2663,7 @@ namespace quda {
 	  for (int j=0; j<Nc; j++)
 	    for (int z=0; z<2; z++)
 	      v_.v[(j*Nc+i)*2+z] = (Float)(v[(i*Nc+j)*2+z]) * scale;
-	gauge_[(dir*2+parity)*exVolumeCB + y] = v_;
+  gauge_[(dir*2+parity)*exVolumeCB + y] = v_;
 #else
 	for (int i=0; i<Nc; i++) {
 	  for (int j=0; j<Nc; j++) {
