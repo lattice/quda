@@ -139,6 +139,7 @@ namespace quda {
   void MinResExt::operator()(ColorSpinorField &x, ColorSpinorField &b, 
 			     std::vector<ColorSpinorField*> p, std::vector<ColorSpinorField*> q) {
 
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     const int N = p.size();
@@ -148,13 +149,15 @@ namespace quda {
     // if no guess is required, then set initial guess = 0
     if (N == 0) {
       blas::zero(x);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       return;
     }
 
-    // if (N == 1) {
-    //   blas::copy(x, p[0]);
-    //   return;
-    // }
+    if (N == 1) {
+      blas::copy(x, *p[0]);
+      profile.TPSTOP(QUDA_PROFILE_INIT);    
+      return;
+    }
 
     // Solution coefficient vectors
     Complex *alpha = new Complex[N];
