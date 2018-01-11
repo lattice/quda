@@ -250,13 +250,16 @@ module quda_fortran
      integer(4)::use_resident_solution  ! Whether to use the resident solution vector(s)
 
      ! Whether to use the solution vector to augment the chronological forecast
-     integer(4)::make_resident_chrono
+     integer(4)::chrono_make_resident
+
+     !Whether the solution should replace the last entry in the chronology */
+     integer(4)::chrono_replace_last
 
      ! Whether to use the resident chronological basis
-     integer(4)::use_resident_chrono
+     integer(4)::chrono_use_resident
 
      ! The maximum length of the chronological history to store
-     integer(4)::max_chrono_dim
+     integer(4)::chrono_max_dim
 
      ! The index to indeicate which chrono history we are augmenting */
      integer(4)::chrono_index
