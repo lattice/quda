@@ -151,6 +151,11 @@ namespace quda {
       return;
     }
 
+    // if (N == 1) {
+    //   blas::copy(x, p[0]);
+    //   return;
+    // }
+
     // Solution coefficient vectors
     Complex *alpha = new Complex[N];
     Complex *minus_alpha = new Complex[N];
@@ -163,15 +168,15 @@ namespace quda {
     // Orthonormalise the vector basis
     if (orthogonal) {
       for (int i=0; i<N; i++) {
-	double p2 = blas::norm2(*p[i]);
-	blas::ax(1 / sqrt(p2), *p[i]);
-	if (!apply_mat) blas::ax(1 / sqrt(p2), *q[i]);
-	for (int j=i+1; j<N; j++) {
-	  Complex xp = blas::cDotProduct(*p[i], *p[j]);
-	  blas::caxpy(-xp, *p[i], *p[j]);
-	  // if not applying the matrix below then orthongonalize q
-	  if (!apply_mat) blas::caxpy(-xp, *q[i], *q[j]);
-	}
+        double p2 = blas::norm2(*p[i]);
+        blas::ax(1 / sqrt(p2), *p[i]);
+        if (!apply_mat) blas::ax(1 / sqrt(p2), *q[i]);
+        for (int j=i+1; j<N; j++) {
+          Complex xp = blas::cDotProduct(*p[i], *p[j]);
+          blas::caxpy(-xp, *p[i], *p[j]);
+          // if not applying the matrix below then orthongonalize q
+          if (!apply_mat) blas::caxpy(-xp, *q[i], *q[j]);
+        }
       }
     }
 
