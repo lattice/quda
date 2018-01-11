@@ -268,6 +268,55 @@ namespace quda {
 #undef SPINORTEX
 #undef WRITE_HALF_SPINOR
 
+  // quarter precision
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
+#define READ_SPINOR READ_SPINOR_QUARTER
+#define READ_SPINOR_UP READ_SPINOR_QUARTER_UP
+#define READ_SPINOR_DOWN READ_SPINOR_QUARTER_DOWN
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_QUARTER_TEX
+#define READ_SPINOR_UP READ_SPINOR_QUARTER_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_QUARTER_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
+#define SPINORTEX spinorTexHalf
+#endif
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_CHAR4
+  template <int dim, int dagger, int face_num>
+    static inline __device__ void packFaceWilsonCore(char4 *out, float *outNorm, const char4 *in, const float *inNorm,
+                 const int &idx, const int &face_idx, 
+                 const int &face_volume, 
+                 const PackParam<char4> &param)
+  {
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
+#include "wilson_pack_face_core.h"
+    }
+  }
+
+  template <int dim, int dagger, int face_num>
+    static inline __device__ void unpackFaceWilsonCore(char4 *out, float *outNorm, const char4 *in, const float *inNorm,
+                   const int &idx, const int &face_idx, 
+                   const int &face_volume, 
+                   const PackParam<char4> &param)
+  {
+    if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+    } else {
+#include "wilson_pack_face_core.h"
+    }
+  }
+#undef READ_SPINOR
+#undef READ_SPINOR_UP
+#undef READ_SPINOR_DOWN
+#undef SPINORTEX
+#undef WRITE_HALF_SPINOR
+
+
   template <int dagger, typename FloatN>
     __global__ void packFaceWilsonKernel(PackParam<FloatN> param)
   {
@@ -606,6 +655,41 @@ namespace quda {
 #undef SPINORTEX
 #undef WRITE_HALF_SPINOR
 
+  // quarter precision
+#ifdef DIRECT_ACCESS_WILSON_PACK_SPINOR
+#define READ_SPINOR READ_SPINOR_QUARTER
+#define READ_SPINOR_UP READ_SPINOR_QUARTER_UP
+#define READ_SPINOR_DOWN READ_SPINOR_QUARTER_DOWN
+#define SPINORTEX in
+#else
+#define READ_SPINOR READ_SPINOR_QUARTER_TEX
+#define READ_SPINOR_UP READ_SPINOR_QUARTER_UP_TEX
+#define READ_SPINOR_DOWN READ_SPINOR_QUARTER_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
+#define SPINORTEX spinorTexHalf
+#endif
+#endif
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_QUARTER4
+  template <int dim, int dagger, int face_num>
+    static inline __device__ void packTwistedFaceWilsonCore(char4 *out, float *outNorm, const char4 *in, const float *inNorm, float a, float b,
+                  const int &idx, const int &face_idx, 
+                  const int &face_volume, 
+                  const PackParam<char4> &param)
+  {
+    if (dagger) {
+#include "wilson_pack_twisted_face_dagger_core.h"
+    } else {
+#include "wilson_pack_twisted_face_core.h"
+    }
+  }
+#undef READ_SPINOR
+#undef READ_SPINOR_UP
+#undef READ_SPINOR_DOWN
+#undef SPINORTEX
+#undef WRITE_HALF_SPINOR
+
   template <int dagger, typename FloatN, typename Float>
     __global__ void packTwistedFaceWilsonKernel(Float a, Float b, PackParam<FloatN> param)
   {
@@ -739,8 +823,8 @@ namespace quda {
 	param.out[2*i+0] = static_cast<FloatN*>(faces[2*i+0]);
 	param.out[2*i+1] = static_cast<FloatN*>(faces[2*i+1]);
 
-	param.outNorm[2*i+0] = reinterpret_cast<float*>(static_cast<char*>(faces[2*i+0]) + nFace*outputPerSite()*in->GhostFace()[i]*QUDA_HALF_PRECISION);
-	param.outNorm[2*i+1] = reinterpret_cast<float*>(static_cast<char*>(faces[2*i+1]) + nFace*outputPerSite()*in->GhostFace()[i]*QUDA_HALF_PRECISION);
+	param.outNorm[2*i+0] = reinterpret_cast<float*>(static_cast<char*>(faces[2*i+0]) + nFace*outputPerSite()*in->GhostFace()[i]*in->Precision());
+	param.outNorm[2*i+1] = reinterpret_cast<float*>(static_cast<char*>(faces[2*i+1]) + nFace*outputPerSite()*in->GhostFace()[i]*in->Precision());
 
         prev=i;
       }
@@ -941,6 +1025,12 @@ namespace quda {
         pack.apply(stream);
       }
       break;
+    case QUDA_QUARTER_PRECISION:
+      {
+        PackFaceWilson<char4, float> pack(ghost_buf, &in, location, dagger, parity);
+        pack.apply(stream);
+      }
+      break;
     default:
       errorQuda("Precision %d not supported", in.Precision());
     }
@@ -1004,6 +1094,12 @@ namespace quda {
         pack.apply(stream);
       }
       break;
+    case QUDA_QUARTER_PRECISION:
+      {
+        PackFaceTwisted<char4, float> pack(ghost_buf, &in, location, dagger, parity, (float)a, (float)b);
+        pack.apply(stream);
+      }
+      break;
     default:
       errorQuda("Precision %d not supported", in.Precision());
     }
@@ -1016,11 +1112,15 @@ namespace quda {
 #define SPINORTEXSINGLE param.inTex
 #define SPINORTEXHALF param.inTex
 #define SPINORTEXHALFNORM param.inTexNorm
+#define SPINORTEXQUARTER param.inTex
+#define SPINORTEXQUARTERNORM param.inTexNorm
 #else
 #define SPINORTEXDOUBLE spinorTexDouble
 #define SPINORTEXSINGLE spinorTexSingle2
 #define SPINORTEXHALF spinorTexHalf2
 #define SPINORTEXHALFNORM spinorTexHalf2Norm
+#define SPINORTEXQUARTER spinorTexQuarter2
+#define SPINORTEXQUARTERNORM spinorTexQuarter2Norm
 #endif
 
   template <typename Float2>
@@ -1040,6 +1140,15 @@ namespace quda {
     out[out_idx + 2*out_stride] = in[in_idx + 2*in_stride];
     outNorm[out_idx] = inNorm[in_idx];
   }
+  template<> 
+    __device__ void packFaceStaggeredCore(char2 *out, float *outNorm, const int out_idx, 
+            const int out_stride, const char2 *in, const float *inNorm, 
+            const int in_idx, const int in_stride) {
+    out[out_idx + 0*out_stride] = in[in_idx + 0*in_stride];
+    out[out_idx + 1*out_stride] = in[in_idx + 1*in_stride];
+    out[out_idx + 2*out_stride] = in[in_idx + 2*in_stride];
+    outNorm[out_idx] = inNorm[in_idx];
+  }
 
 #if (defined DIRECT_ACCESS_PACK) || (defined FERMI_NO_DBLE_TEX)
   template <typename Float2>
@@ -1054,6 +1163,15 @@ namespace quda {
     __device__ void packFaceStaggeredCore(short2 *out, float *outNorm, const int out_idx, 
 					  const int out_stride, const short2 *in, const float *inNorm, 
 					  const int in_idx, const PackParam<double2> &param) {
+    out[out_idx + 0*out_stride] = in[in_idx + 0*param.sp_stride];
+    out[out_idx + 1*out_stride] = in[in_idx + 1*param.sp_stride];
+    out[out_idx + 2*out_stride] = in[in_idx + 2*param.sp_stride];
+    outNorm[out_idx] = inNorm[in_idx];
+  }
+  template<> 
+    __device__ void packFaceStaggeredCore(char2 *out, float *outNorm, const int out_idx, 
+            const int out_stride, const char2 *in, const float *inNorm, 
+            const int in_idx, const PackParam<double2> &param) {
     out[out_idx + 0*out_stride] = in[in_idx + 0*param.sp_stride];
     out[out_idx + 1*out_stride] = in[in_idx + 1*param.sp_stride];
     out[out_idx + 2*out_stride] = in[in_idx + 2*param.sp_stride];
@@ -1084,6 +1202,9 @@ namespace quda {
   static inline __device__ short2 float22short2(float c, float2 a) {
     return make_short2((short)(a.x*c*MAX_SHORT), (short)(a.y*c*MAX_SHORT));
   }
+  static inline __device__ char2 float22short2(float c, float2 a) {
+    return make_char2((short)(a.x*c*MAX_CHAR), (short)(a.y*c*MAX_CHAR));
+  }
 
   __device__ void packFaceStaggeredCore(short2 *out, float *outNorm, const int out_idx, 
 					const int out_stride, const short2 *in, 
@@ -1093,6 +1214,16 @@ namespace quda {
     out[out_idx + 1*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+1*param.sp_stride));
     out[out_idx + 2*out_stride] = float22short2(1.0f,TEX1DFETCH(float2,SPINORTEXHALF,in_idx+2*param.sp_stride));
     outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXHALFNORM, in_idx);
+  }
+
+  __device__ void packFaceStaggeredCore(char2 *out, float *outNorm, const int out_idx, 
+          const int out_stride, const char2 *in, 
+          const float *inNorm, const int in_idx, 
+          const PackParam<char2> &param) {
+    out[out_idx + 0*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+0*param.sp_stride));
+    out[out_idx + 1*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+1*param.sp_stride));
+    out[out_idx + 2*out_stride] = float22char2(1.0f,TEX1DFETCH(float2,SPINORTEXQUARTER,in_idx+2*param.sp_stride));
+    outNorm[out_idx] = TEX1DFETCH(float, SPINORTEXQUARTERNORM, in_idx);
   }
 #endif
 
@@ -1304,6 +1435,7 @@ namespace quda {
 #undef SPINORTEXDOUBLE
 #undef SPINORTEXSINGLE
 #undef SPINORTEXHALF
+#undef SPINORTEXQUARTER
 
 #endif // GPU_STAGGERED_DIRAC
 
@@ -1419,6 +1551,12 @@ namespace quda {
         pack.apply(stream);
       }
       break;
+    case QUDA_QUARTER_PRECISION:
+      {
+        PackFaceStaggered<char2, float> pack(ghost_buf, &in, location, nFace, dagger, parity, dim, face_num);
+        pack.apply(stream);
+      }
+      break;
     default:
       errorQuda("Precision %d not supported", in.Precision());
     }
@@ -1443,6 +1581,12 @@ namespace quda {
     case QUDA_HALF_PRECISION:
       {
         PackFaceStaggered<short2,float> pack(buffer, &field, location, nFace, dagger, parity, dim, face_num, R, unpack);
+        pack.apply(stream);  
+      }
+      break;
+    case QUDA_QUARTER_PRECISION:
+      {
+        PackFaceStaggered<char2,float> pack(buffer, &field, location, nFace, dagger, parity, dim, face_num, R, unpack);
         pack.apply(stream);  
       }
       break;
@@ -1684,6 +1828,12 @@ namespace quda {
 	    pack.apply(stream);
 	  }
 	  break;
+  case QUDA_QUARTER_PRECISION:
+    {
+      PackFaceDW4D<char4, float> pack(ghost_buf, &in, location, dagger, parity);
+      pack.apply(stream);
+    }
+    break;
 	default:
 	  errorQuda("Precision %d not supported", in.Precision());
 	}
@@ -1709,6 +1859,12 @@ namespace quda {
 	    pack.apply(stream);
 	  }
 	  break;
+  case QUDA_QUARTER_PRECISION:
+    {
+      PackFaceDW<char4, float> pack(ghost_buf, &in, location, dagger, parity);
+      pack.apply(stream);
+    }
+    break;
 	default:
 	  errorQuda("Precision %d not supported", in.Precision());
 	}
@@ -1838,6 +1994,12 @@ namespace quda {
     case QUDA_HALF_PRECISION:
       {
         PackFaceNdegTM<short4, float> pack(ghost_buf, &in, location, dagger, parity);
+        pack.apply(stream);
+      }
+      break;
+    case QUDA_QUARTER_PRECISION:
+      {
+        PackFaceNdegTM<char4, float> pack(ghost_buf, &in, location, dagger, parity);
         pack.apply(stream);
       }
       break;

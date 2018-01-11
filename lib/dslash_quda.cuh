@@ -613,9 +613,9 @@ public:
 
   virtual long long bytes() const {
     int gauge_bytes = reconstruct * in->Precision();
-    bool isHalf = in->Precision() == sizeof(short) ? true : false;
-    int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
-    int proj_spinor_bytes = (in->Nspin()==4 ? 1 : 2) * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+    bool isFixed = (in->Precision() == sizeof(short) || in->Precision() == sizeof(char)) ? true : false;
+    int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
+    int proj_spinor_bytes = (in->Nspin()==4 ? 1 : 2) * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
     int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + spinor_bytes;
     int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
 

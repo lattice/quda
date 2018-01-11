@@ -1409,7 +1409,7 @@ namespace quda {
 
 	// Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
 	Complex A(cos_sin[0], cos_sin[1]);
 
 	Out[6] *= A;
@@ -1457,8 +1457,8 @@ namespace quda {
       isLastTimeSlice(recon.isLastTimeSlice), ghostExchange(recon.ghostExchange) { }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
-      out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
-      out[1] = Trig<isHalf<Float>::value,RegType>::Atan2(in[13], in[12]);
+      out[0] = Trig<isFixed<Float>::value,RegType>::Atan2(in[1], in[0]);
+      out[1] = Trig<isFixed<Float>::value,RegType>::Atan2(in[13], in[12]);
 #pragma unroll
       for (int i=2; i<8; i++) out[i] = in[i];
     }
@@ -1481,7 +1481,7 @@ namespace quda {
       RegType diff = static_cast<RegType>(1.0)/(u0*u0) - row_sum;
       RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      Out[0] = U00_mag * Complex(Trig<isHalf<Float>::value,RegType>::Cos(in[0]), Trig<isHalf<Float>::value,RegType>::Sin(in[0]));
+      Out[0] = U00_mag * Complex(Trig<isFixed<Float>::value,RegType>::Cos(in[0]), Trig<isFixed<Float>::value,RegType>::Sin(in[0]));
 
       // Now reconstruct first column
       Out[3] = In[3];
@@ -1490,7 +1490,7 @@ namespace quda {
       diff = static_cast<RegType>(1.0)/(u0*u0) - column_sum;
       RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      Out[6] = U20_mag * Complex( Trig<isHalf<Float>::value,RegType>::Cos(in[1]), Trig<isHalf<Float>::value,RegType>::Sin(in[1]));
+      Out[6] = U20_mag * Complex( Trig<isFixed<Float>::value,RegType>::Cos(in[1]), Trig<isFixed<Float>::value,RegType>::Sin(in[1]));
       // First column now restored
 
       // finally reconstruct last elements from SU(2) rotation
@@ -1542,7 +1542,7 @@ namespace quda {
       __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
 	RegType phase = getPhase(in);
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(-phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
 	Complex su3[9];
 #pragma unroll
@@ -1555,7 +1555,7 @@ namespace quda {
 					     const RegType phase, const I *X, const int *R) const {
 	reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, scale);
 	RegType cos_sin[2];
-	Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
+	Trig<isFixed<RegType>::value,RegType>::SinCos(static_cast<RegType>(phase), &cos_sin[1], &cos_sin[0]);
 	Complex z(cos_sin[0], cos_sin[1]);
 #pragma unroll
 	for (int i=0; i<9; i++) reinterpret_cast<Complex*>(out)[i] *= z;

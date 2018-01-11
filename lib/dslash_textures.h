@@ -202,10 +202,16 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaBindTexture(0, gauge0TexSingle2, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexSingle2, *gauge1, gauge.Bytes()/2);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaBindTexture(0, gauge0TexHalf2, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexHalf2, *gauge1, gauge.Bytes()/2);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaBindTexture(0, gauge0TexQuarter2, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, gauge1TexQuarter2, *gauge1, gauge.Bytes()/2);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
+
   } else {
     if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
       cudaBindTexture(0, gauge0TexDouble2, *gauge0, gauge.Bytes()/2); 
@@ -213,9 +219,14 @@ void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, 
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaBindTexture(0, gauge0TexSingle4, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexSingle4, *gauge1, gauge.Bytes()/2);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaBindTexture(0, gauge0TexHalf4, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, gauge1TexHalf4, *gauge1, gauge.Bytes()/2);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaBindTexture(0, gauge0TexQuarter4, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, gauge1TexQuarter4, *gauge1, gauge.Bytes()/2);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
   }
 #endif // USE_TEXTURE_OBJECTS
@@ -232,9 +243,14 @@ void unbindGaugeTex(const cudaGaugeField &gauge)
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaUnbindTexture(gauge0TexSingle2);
       cudaUnbindTexture(gauge1TexSingle2);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaUnbindTexture(gauge0TexHalf2); 
       cudaUnbindTexture(gauge1TexHalf2);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaUnbindTexture(gauge0TexQuarter2); 
+      cudaUnbindTexture(gauge1TexQuarter2);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
   } else {
     if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -243,9 +259,14 @@ void unbindGaugeTex(const cudaGaugeField &gauge)
     } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
       cudaUnbindTexture(gauge0TexSingle4); 
       cudaUnbindTexture(gauge1TexSingle4);
-    } else {
+    } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
       cudaUnbindTexture(gauge0TexHalf4); 
       cudaUnbindTexture(gauge1TexHalf4);
+    } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+      cudaUnbindTexture(gauge0TexQuarter4); 
+      cudaUnbindTexture(gauge1TexQuarter4);
+    } else {
+      errorQuda("gauge precision is not supported");
     }
   }
 #endif
@@ -271,9 +292,14 @@ void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge
   } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
     cudaBindTexture(0, fatGauge0TexSingle, *gauge0, gauge.Bytes()/2); 
     cudaBindTexture(0, fatGauge1TexSingle, *gauge1, gauge.Bytes()/2);
-  } else {
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
     cudaBindTexture(0, fatGauge0TexHalf, *gauge0, gauge.Bytes()/2); 
     cudaBindTexture(0, fatGauge1TexHalf, *gauge1, gauge.Bytes()/2);
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+    cudaBindTexture(0, fatGauge0TexQuarter, *gauge0, gauge.Bytes()/2); 
+    cudaBindTexture(0, fatGauge1TexQuarter, *gauge1, gauge.Bytes()/2);
+  } else {
+    errorQuda("gauge precision is not supported");
   }
 #endif // USE_TEXTURE_OBJECTS
 
@@ -288,9 +314,14 @@ void unbindFatGaugeTex(const cudaGaugeField &gauge)
   } else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
     cudaUnbindTexture(fatGauge0TexSingle);
     cudaUnbindTexture(fatGauge1TexSingle);
-  } else {
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
     cudaUnbindTexture(fatGauge0TexHalf);
     cudaUnbindTexture(fatGauge1TexHalf);
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+    cudaUnbindTexture(fatGauge0TexQuarter);
+    cudaUnbindTexture(fatGauge1TexQuarter);
+  } else {
+    errorQuda("gauge precision is not supported");
   }
 #endif
 }
@@ -333,7 +364,7 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
         cudaBindTexture(0, longPhase1TexSingle, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
       }
     }
-  } else {
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) {
     if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
       cudaBindTexture(0, longGauge0TexHalf_norecon, *gauge0, gauge.Bytes()/2); 
       cudaBindTexture(0, longGauge1TexHalf_norecon, *gauge1, gauge.Bytes()/2);	
@@ -345,6 +376,20 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
 	cudaBindTexture(0, longPhase1TexHalf, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
       }
     }
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) {
+    if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
+      cudaBindTexture(0, longGauge0TexQuarter_norecon, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, longGauge1TexQuarter_norecon, *gauge1, gauge.Bytes()/2);  
+    } else {
+      cudaBindTexture(0, longGauge0TexQuarter, *gauge0, gauge.Bytes()/2); 
+      cudaBindTexture(0, longGauge1TexQuarter, *gauge1, gauge.Bytes()/2);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
+        cudaBindTexture(0, longPhase0TexQuarter, (char*)(*gauge0) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+  cudaBindTexture(0, longPhase1TexQuarter, (char*)(*gauge1) + gauge.PhaseOffset(), gauge.PhaseBytes()/2);
+      }
+    }
+  } else {
+    errorQuda("gauge precision not supported");
   }
 #endif // USE_TEXTURE_OBJECTS
 }
@@ -371,7 +416,7 @@ void unbindLongGaugeTex(const cudaGaugeField &gauge)
         cudaUnbindTexture(longPhase1TexSingle);
       }
     }
-  } else { // half precision
+  } else if (gauge.Precision() == QUDA_HALF_PRECISION) { // half precision
     if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
       cudaUnbindTexture(longGauge0TexHalf_norecon);
       cudaUnbindTexture(longGauge1TexHalf_norecon);
@@ -383,6 +428,20 @@ void unbindLongGaugeTex(const cudaGaugeField &gauge)
         cudaUnbindTexture(longPhase1TexHalf);
       }
     }
+  } else if (gauge.Precision() == QUDA_QUARTER_PRECISION) { 
+    if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) { //18 reconstruct
+      cudaUnbindTexture(longGauge0TexQuarter_norecon);
+      cudaUnbindTexture(longGauge1TexQuarter_norecon);
+    } else {
+      cudaUnbindTexture(longGauge0TexQuarter);
+      cudaUnbindTexture(longGauge1TexQuarter);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() ==  QUDA_RECONSTRUCT_9){
+        cudaUnbindTexture(longPhase0TexQuarter);
+        cudaUnbindTexture(longPhase1TexQuarter);
+      }
+    }
+  } else {
+    errorQuda("gauge precision not supported");
   }
 #endif
 }
