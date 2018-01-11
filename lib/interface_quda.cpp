@@ -141,7 +141,7 @@ cudaGaugeField *extendedGaugeResident = NULL;
 std::vector<cudaColorSpinorField*> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
-#define QUDA_MAX_CHRONO 2
+#define QUDA_MAX_CHRONO 12
 // each entry is a pair for both p and Ap storage
 std::vector< std::vector< std::pair<ColorSpinorField*,ColorSpinorField*> > > chronoResident(QUDA_MAX_CHRONO);
 
