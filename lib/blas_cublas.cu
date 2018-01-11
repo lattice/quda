@@ -117,8 +117,8 @@ namespace quda {
       long dus = stop.tv_usec - start.tv_usec;
       double time = ds + 0.000001*dus;
 
-      printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n",
-		 time, 1e-9 * flops / time);
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 #endif // CUBLAS_LIB
 
       return flops;

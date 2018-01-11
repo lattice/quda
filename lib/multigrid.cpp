@@ -105,7 +105,7 @@ namespace quda {
         }
       } else {
         // create transfer operator
-        if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating transfer operator\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
         transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
                                 param.mg_global.precision_null[param.level], param.location == QUDA_CUDA_FIELD_LOCATION ? true : false,
 				param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
@@ -129,13 +129,13 @@ namespace quda {
 
         // if we're not generating on all levels then we need to propagate the vectors down
         if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO) {
-          printfQuda("Restricting null space vectors\n");
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
           for (int i=0; i<param.Nvec; i++) {
             zero(*(*B_coarse)[i]);
             transfer->R(*(*B_coarse)[i], *(param.B[i]));
           }
         }
-        if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Transfer operator done\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer operator done\n");
       }
 
       createCoarseDirac();
@@ -175,17 +175,17 @@ namespace quda {
       }
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Level %d of %d done\n", param.level+1, param.Nlevel);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Setup of level %d of %d done\n", param.level+1, param.Nlevel);
 
     // print out profiling information for the adaptive setup
-    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
+    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
     // Reset the profile for accurate solver timing
     profile.TPRESET();
   }
 
   void MG::createSmoother() {
     // create the smoother for this level
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating smoother\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating smoother\n");
     diracResidual = param.matResidual->Expose();
     diracSmoother = param.matSmooth->Expose();
     diracSmootherSloppy = param.matSmoothSloppy->Expose();
@@ -237,11 +237,11 @@ namespace quda {
       postsmoother = (param_postsmooth->inv_type != QUDA_INVALID_INVERTER) ?
 	Solver::create(*param_postsmooth, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile) : nullptr;
     }
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Smoother done\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
   }
 
   void MG::createCoarseDirac() {
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating coarse Dirac operator\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating coarse Dirac operator\n");
     // check if we are coarsening the preconditioned system then
     bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
     QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
@@ -295,15 +295,15 @@ namespace quda {
     matCoarseSmoother = new DiracM(*diracCoarseSmoother);
     matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Coarse Dirac operator done\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse Dirac operator done\n");
   }
 
   void MG::createCoarseSolver() {
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating coarse solver wrapper\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating coarse solver wrapper\n");
     if (param.cycle_type == QUDA_MG_CYCLE_VCYCLE && param.level < param.Nlevel-2) {
       // if coarse solver is not a bottom solver and on the second to bottom level then we can just use the coarse solver as is
       coarse_solver = coarse;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Assigned coarse solver to coarse MG operator\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to coarse MG operator\n");
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
       if (coarse_solver) delete coarse_solver;
       if (param_coarse_solver) delete param_coarse_solver;
@@ -341,11 +341,11 @@ namespace quda {
 	coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
       }
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
     } else {
       errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
     }
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Coarse solver wrapper done\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse solver wrapper done\n");
   }
 
   MG::~MG() {
@@ -383,7 +383,7 @@ namespace quda {
 
     if (param_coarse) delete param_coarse;
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
+    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
   }
 
   // FIXME need to make this more robust (implement Solver::flops() for all solvers)
@@ -431,8 +431,7 @@ namespace quda {
       ? param.mg_global.precision_null[param.level]  : csParam.precision;
     double tol = prec == QUDA_HALF_PRECISION ? 5e-3 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
 
-    printfQuda("\n");
-    printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("\nChecking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
       // as well as copying to the correct location this also changes basis if necessary
@@ -441,17 +440,19 @@ namespace quda {
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
 
-      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
-		 i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
+		   i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2));
 
       deviation = sqrt( xmyNorm(*tmp1, *tmp2) / norm2(*tmp1) );
-      printfQuda("L2 relative deviation = %e\n", deviation);
-      if (deviation > tol) errorQuda("failed");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
+      if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
     }
 
 #if 0
-    printfQuda("Checking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", 
-	       param.Nvec);
+    if (getVerbosity() >= QUDA_SUMMARIZE)
+      printfQuda("Checking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n",
+		 param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *(param.B[i]));
@@ -460,24 +461,24 @@ namespace quda {
       transfer->P(*tmp2, *x_coarse);
       param.matResidual(*tmp1,*tmp2);
       *tmp2 = *(param.B[i]);
-      printfQuda("Vector %d: norms %e %e ", i, norm2(*param.B[i]), norm2(*tmp1));
-      printfQuda("relative residual = %e\n", sqrt(xmyNorm(*tmp2, *tmp1) / norm2(*param.B[i])) );
+      if (getVerbosity() >= QUDA_VERBOSE) {
+	printfQuda("Vector %d: norms %e %e ", i, norm2(*param.B[i]), norm2(*tmp1));
+	printfQuda("relative residual = %e\n", sqrt(xmyNorm(*tmp2, *tmp1) / norm2(*param.B[i])) );
+      }
     }
 #endif
 
-    printfQuda("\n");
-    printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c\n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
-    printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(*tmp2));
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-    printfQuda("L2 relative deviation = %e\n", deviation);
-    if (deviation > tol ) errorQuda("failed");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
+    if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("\nComparing native coarse operator to emulated operator\n");
 
-    printfQuda("\n");
-    printfQuda("Comparing native coarse operator to emulated operator\n");
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     zero(*tmp_coarse);
     zero(*r_coarse);
@@ -502,14 +503,14 @@ namespace quda {
     (*param_coarse->matResidual)(*r_coarse, *tmp_coarse);
 
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
-    printfQuda("emulated\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
     for (int x=0; x<x_coarse->Volume(); x++) tmp1->PrintVector(x);
 
-    printfQuda("actual\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("actual\n");
     for (int x=0; x<r_coarse->Volume(); x++) tmp2->PrintVector(x);
 #endif
 
-    printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Vector norms Emulated=%e Native=%e ", norm2(*x_coarse), norm2(*r_coarse));
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
 
@@ -524,8 +525,8 @@ namespace quda {
 	deviation = fabs(deviation);
       }
     }
-    printfQuda("L2 relative deviation = %e\n\n", deviation);
-    if (deviation > tol) errorQuda("failed");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n\n", deviation);
+    if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     
     // here we check that the Hermitian conjugate operator is working
     // as expected for both the smoother and residual Dirac operators
@@ -533,30 +534,29 @@ namespace quda {
       diracSmoother->MdagM(tmp2->Even(), tmp1->Odd());
       Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-      printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-		 real(dot), imag(dot), deviation);
-      if (deviation > tol) errorQuda("failed");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+						     real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
 
       diracResidual->MdagM(*tmp2, *tmp1);
       dot = cDotProduct(*tmp2,*tmp1);
 
       deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-      printfQuda("Residual normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-		 real(dot), imag(dot), deviation);
-      if (deviation > tol) errorQuda("failed");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Residual normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+						     real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     } else {
       diracResidual->MdagM(*tmp2, *tmp1);
       Complex dot = cDotProduct(*tmp1,*tmp2);
 
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-      printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-		 real(dot), imag(dot), deviation);
-      if (deviation > tol) errorQuda("failed");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+						     real(dot), imag(dot), deviation);
+      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
 #ifdef ARPACK_LIB
-    printfQuda("\n");
-    printfQuda("Check eigenvector overlap for level %d\n", param.level );
+    printfQuda("\nCheck eigenvector overlap for level %d\n", param.level);
 
     int nmodes = 128;
     int ncv    = 256;
@@ -747,7 +747,7 @@ namespace quda {
     vec_infile += std::to_string(param.level);
 
     const int Nvec = B.size();
-    printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile.c_str());
 
     void **V = new void*[Nvec];
     for (int i=0; i<Nvec; i++) { 
@@ -765,7 +765,7 @@ namespace quda {
       errorQuda("\nQIO library was not built.\n");      
 #endif
     } else {
-      printfQuda("Using %d constant nullvectors\n", Nvec);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using %d constant nullvectors\n", Nvec);
       //errorQuda("No nullspace file defined");
 
       for (int i = 0; i < (Nvec < 2 ? Nvec : 2); i++) {
@@ -783,7 +783,7 @@ namespace quda {
 	}
 	delete tmp;
 #else
-	printfQuda("Using random source for nullvector = %d\n",i);
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using random source for nullvector = %d\n",i);
 	B[i]->Source(QUDA_RANDOM_SOURCE);
 #endif
 	//printfQuda("B[%d]\n",i);
@@ -793,7 +793,7 @@ namespace quda {
       for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
     }
 
-    printfQuda("Done loading vectors\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done loading vectors\n");
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
@@ -808,7 +808,7 @@ namespace quda {
 
     if (strcmp(param.mg_global.vec_outfile,"")!=0) {
       const int Nvec = B.size();
-      printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
 
       void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
       for (int i=0; i<Nvec; i++) {
@@ -822,7 +822,7 @@ namespace quda {
 			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);
-      printfQuda("Done saving vectors\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done saving vectors\n");
     }
 
     profile_global.TPSTOP(QUDA_PROFILE_IO);
@@ -915,7 +915,7 @@ namespace quda {
     }
 
     for(int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
-      printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level+1, si+1, param.mg_global.num_setup_iter[param.level]);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level+1, si+1, param.mg_global.num_setup_iter[param.level]);
 
       // global orthonormalization of the initial null-space vectors
       if(param.mg_global.pre_orthonormalize) {
@@ -976,7 +976,7 @@ namespace quda {
             if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES ) {
               coarse->generateNullVectors(*B_coarse, refresh);
             } else {
-              printfQuda("Restricting null space vectors\n");
+              if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
               for (int i=0; i<param.Nvec; i++) {
                 zero(*(*B_coarse)[i]);
                 transfer->R(*(*B_coarse)[i], *(param.B[i]));
@@ -1037,9 +1037,9 @@ namespace quda {
       {
         // There needs to be 6 null vectors -> 12 after chirality.
         if (Nvec != 6)
-          errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6.\n");
+          errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6");
         
-        printfQuda("Building 6 free field vectors for Wilson-type fermions.\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Wilson-type fermions\n", Nvec);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec ;i++)
@@ -1069,9 +1069,9 @@ namespace quda {
       {
         // There needs to be 24 null vectors -> 48 after chirality.
         if (Nvec != 24)
-          errorQuda("\nError in MG::buildFreeVectors: Staggered-type fermions require Nvec = 24.\n");
+          errorQuda("\nError in MG::buildFreeVectors: Staggered-type fermions require Nvec = 24\n");
         
-        printfQuda("Building 24 free field vectors for Staggered-type fermions.\n");
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Staggered-type fermions\n", Nvec);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec ;i++)
@@ -1141,7 +1141,7 @@ namespace quda {
       }
       else
       {
-        errorQuda("\nError in MG::buildFreeVectors: Unsupported combo of Nc %d, Nspin %d.\n", Ncolor, Nspin);
+        errorQuda("\nError in MG::buildFreeVectors: Unsupported combo of Nc %d, Nspin %d", Ncolor, Nspin);
       }
     }
     else // coarse level
@@ -1150,9 +1150,9 @@ namespace quda {
       {
         // There needs to be Ncolor null vectors.
         if (Nvec != Ncolor)
-          errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor.\n");
+          errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
         
-        printfQuda("Building %d free field vectors for Coarse fermions.\n", Ncolor);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec; i++)
@@ -1177,9 +1177,9 @@ namespace quda {
       {
         // There needs to be Ncolor null vectors.
         if (Nvec != Ncolor)
-          errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor.\n");
+          errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
         
-        printfQuda("Building %d free field vectors for Coarse fermions.\n", Ncolor);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Building %d free field vectors for Coarse fermions\n", Ncolor);
 
         // Zero the null vectors.
         for (int i = 0; i < Nvec; i++)
@@ -1200,7 +1200,7 @@ namespace quda {
       }
       else
       {
-        errorQuda("\nError in MG::buildFreeVectors: Unexpected Nspin = %d for coarse fermions.\n", Nspin);
+        errorQuda("\nError in MG::buildFreeVectors: Unexpected Nspin = %d for coarse fermions", Nspin);
       }
     }
 
@@ -1213,7 +1213,7 @@ namespace quda {
       }
     }
 
-    printfQuda("Done building free vectors\n");
-}
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done building free vectors\n");
+  }
 
 }

@@ -1879,8 +1879,11 @@ namespace quda {
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
     bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug ||
 				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC);
-    if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
-    else printfQuda("Doing uni-directional link coarsening\n");
+
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
+      else printfQuda("Doing uni-directional link coarsening\n");
+    }
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
@@ -1890,7 +1893,7 @@ namespace quda {
     CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_);
 
     QudaFieldLocation location = checkLocation(Y_, X_, av, v);
-    printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     // do exchange of null-space vectors
     const int nFace = 1;
@@ -1899,13 +1902,13 @@ namespace quda {
     if (&v == &av) arg.AV.resetGhost(av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
-    printfQuda("V2 = %e\n", arg.V.norm2());
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("V2 = %e\n", arg.V.norm2());
 
     // If doing preconditioned clover then we first multiply the
     // null-space vectors by the clover inverse matrix, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      printfQuda("Computing AV\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing AV\n");
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 	double max = 6*arg.Cinv.abs_max(0);
@@ -1917,14 +1920,14 @@ namespace quda {
       y.setComputeType(COMPUTE_AV);
       y.apply(0);
 
-      printfQuda("AV2 = %e\n", arg.AV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
     // If doing preconditioned twisted-mass then we first multiply the
     // null-space vectors by the inverse twist, since this is
     // needed for the coarse link computation
     if ( dirac == QUDA_TWISTED_MASSPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      printfQuda("Computing TMAV\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing TMAV\n");
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 	// this is just a trivial rescaling kernel, find the maximum
@@ -1939,7 +1942,7 @@ namespace quda {
       y.setComputeType(COMPUTE_TMAV);
       y.apply(0);
 
-      printfQuda("AV2 = %e\n", arg.AV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
     // If doing preconditioned twisted-clover then we first multiply the
@@ -1947,7 +1950,7 @@ namespace quda {
     // mu^2, and then we multiply the result by the clover matrix. This is
     // needed for the coarse link computation
     if ( dirac == QUDA_TWISTED_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
-      printfQuda("Computing TMCAV\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing TMCAV\n");
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
 #ifdef DYNAMIC_CLOVER
@@ -1965,7 +1968,7 @@ namespace quda {
       y.setComputeType(COMPUTE_TMCAV);
       y.apply(0);
 
-      printfQuda("AV2 = %e\n", arg.AV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
     // work out what to set the scales to
@@ -1980,7 +1983,7 @@ namespace quda {
       for (int d = 0; d < nDim; d++) {
 	y.setDimension(d);
 	y.setDirection(QUDA_FORWARDS);
-	printfQuda("Computing forward %d UV and VUV\n", d);
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
 
 	if (uv.Precision() == QUDA_HALF_PRECISION) {
 	  double U_max = 3.0*arg.U.abs_max(from_coarse ? d+4 : d);
@@ -1993,11 +1996,11 @@ namespace quda {
 
 	y.setComputeType(COMPUTE_UV);  // compute U*V product
 	y.apply(0);
-	printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
 	y.setComputeType(COMPUTE_VUV); // compute Y += VUV
 	y.apply(0);
-	printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(4+d));
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(4+d));
       }
     }
 
@@ -2012,7 +2015,7 @@ namespace quda {
     for (int d = 0; d < nDim; d++) {
       y.setDimension(d);
       y.setDirection(QUDA_BACKWARDS);
-      printfQuda("Computing backward %d UV and VUV\n", d);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing backward %d UV and VUV\n", d);
 
       if (uv.Precision() == QUDA_HALF_PRECISION) {
 	double U_max = 3.0*arg.U.abs_max(d);
@@ -2025,30 +2028,30 @@ namespace quda {
 
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
       y.apply(0);
-      printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(0);
-      printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(d));
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, arg.Y_atomic.norm2(d));
 
     }
-    printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
 
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
     if ( !bidirectional_links ) {
-      printfQuda("Reversing links\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Reversing links\n");
       y.setComputeType(COMPUTE_REVERSE_Y);  // reverse the links for the forwards direction
       y.apply(0);
     }
 
     // Check if we have a clover term that needs to be coarsened
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_COARSE_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
-      printfQuda("Computing fine->coarse clover term\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
       y.apply(0);
     } else {  //Otherwise, we just have to add the identity matrix
-      printfQuda("Summing diagonal contribution to coarse clover\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
       y.apply(0);
     }
@@ -2056,12 +2059,12 @@ namespace quda {
     if (arg.mu*arg.mu_factor!=0 || dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC)
 	arg.mu_factor += 1.;
-      printfQuda("Adding mu = %e\n",arg.mu*arg.mu_factor);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding mu = %e\n",arg.mu*arg.mu_factor);
       y.setComputeType(COMPUTE_TMDIAGONAL);
       y.apply(0);
     }
 
-    printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
 
     // now convert from atomic to application computation format if necesaary
     if (coarseGaugeAtomic::fixedPoint()) {
