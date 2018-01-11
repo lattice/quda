@@ -83,9 +83,9 @@ namespace quda {
     param.location = QUDA_CUDA_FIELD_LOCATION;
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//ok for staggered
 
-    param.precision = null_precision;
+    param.setPrecision(null_precision);
     V_d = enable_gpu ? ColorSpinorField::Create(param) : nullptr;
-    param.precision = V_h->Precision();
+    param.setPrecision(V_h->Precision());
 
     // used for cpu<->gpu transfers
     param = ColorSpinorParam(*B[0]);
@@ -136,7 +136,7 @@ namespace quda {
       ColorSpinorField *V_tmp = V_d;
       if (V_d && V_d->Precision() != V_h->Precision()) {
 	ColorSpinorParam param(*V_d);
-	param.precision = V_h->Precision();
+	param.setPrecision(V_h->Precision());
 	V_tmp = ColorSpinorField::Create(param);
       }
 
@@ -210,7 +210,7 @@ namespace quda {
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
       param.x[0] /= 2;
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      param.precision = V_d->Precision();
+      param.setPrecision(V_d->Precision());
 
       delete V_d;
       V_d = ColorSpinorField::Create(param);
@@ -222,7 +222,7 @@ namespace quda {
       ColorSpinorParam param(*V_h);
       param.location = QUDA_CUDA_FIELD_LOCATION;
       param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      param.precision = V_d->Precision();
+      param.setPrecision(V_d->Precision());
 
       delete V_d;
       V_d = ColorSpinorField::Create(param);
