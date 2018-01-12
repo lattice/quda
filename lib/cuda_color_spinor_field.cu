@@ -1310,7 +1310,7 @@ namespace quda {
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
     bool pack_t = getKernelPackT();
     setKernelPackT(true); // ensure kernel packing is enabled for all dimensions
-    const_cast<cudaColorSpinorField*>(this)->streamInit(streams); // ensures streams are set (needed for p2p)
+    const_cast<cudaColorSpinorField&>(*this).streamInit(streams); // ensures streams are set (needed for p2p)
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
     // first set default values to device if needed
