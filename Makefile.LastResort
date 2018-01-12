@@ -2,8 +2,7 @@ all:
 	@echo 'Please use cmake to build quda, see the README file.'
 	@exit 1
 
-old:
-	make.inc lib tests
+old:	make.inc lib tests
 
 make.inc:
 	@echo 'Please run autoconf and ./configure to create make.inc before building.'
