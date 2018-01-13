@@ -141,9 +141,9 @@ cudaGaugeField *extendedGaugeResident = NULL;
 std::vector<cudaColorSpinorField*> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
-#define QUDA_MAX_CHRONO 2
-// each entry is a pair for both p and Ap storage
-std::vector< std::vector< std::pair<ColorSpinorField*,ColorSpinorField*> > > chronoResident(QUDA_MAX_CHRONO);
+#define QUDA_MAX_CHRONO 12
+// each entry is one p 
+std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 
 // Mapped memory buffer used to hold unitarization failures
 static int *num_failures_h = NULL;
@@ -1239,9 +1239,8 @@ void flushChronoQuda(int i)
 
   auto &basis = chronoResident[i];
 
-  for (unsigned int j=0; j<basis.size(); j++) {
-    if (basis[j].first)  delete basis[j].first;
-    if (basis[j].second) delete basis[j].second;
+  for (auto v : basis) {
+    if (v)  delete v;
   }
   basis.clear();
 }
@@ -2551,13 +2550,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
     (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
+  Timer t_predict;
+  Timer t_register;
+
   param->secs = 0;
   param->gflops = 0;
   param->iter = 0;
 
-  Dirac *d = NULL;
-  Dirac *dSloppy = NULL;
-  Dirac *dPre = NULL;
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
 
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *param, pc_solve);
@@ -2568,10 +2570,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_H2D);
 
-  ColorSpinorField *b = NULL;
-  ColorSpinorField *x = NULL;
-  ColorSpinorField *in = NULL;
-  ColorSpinorField *out = NULL;
+  ColorSpinorField *b = nullptr;
+  ColorSpinorField *x = nullptr;
+  ColorSpinorField *in = nullptr;
+  ColorSpinorField *out = nullptr;
 
   const int *X = cudaGauge->X();
 
@@ -2688,7 +2690,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Multigrid preconditioning only supported for direct solves");
   }
 
-  if (param->use_resident_chrono && (direct_solve || norm_error_solve) ){
+  if (param->chrono_use_resident && ( norm_error_solve) ){
     errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
   }
 
@@ -2708,6 +2710,34 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
+        // chronological forecasting
+    if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
+      t_predict.Start(__func__,__FILE__,__LINE__);
+      auto &basis = chronoResident[param->chrono_index];
+      cudaColorSpinorField tmp(*in), tmp2(*in);
+      std::vector<ColorSpinorField*> Ap;
+      ColorSpinorParam cs_param(*basis[0]);
+      for(unsigned int k=0; k < basis.size(); k++){
+        Ap.emplace_back((ColorSpinorField::Create(cs_param)));
+      }
+
+      for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], tmp, tmp2);
+
+      bool orthogonal = true;
+      bool apply_mat = false;
+      bool hermitian = false;
+      MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
+      blas::copy(tmp, *in);
+
+      mre(*out, tmp, basis, Ap);
+      
+      for(auto ap: Ap){
+        if (ap) delete(ap);
+      }
+      t_predict.Stop(__func__,__FILE__,__LINE__);
+
+    }
+
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
@@ -2717,19 +2747,30 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     SolverParam solverParam(*param);
 
     // chronological forecasting
-    if (param->use_resident_chrono && chronoResident[param->chrono_index].size() > 0) {
+    if (param->chrono_use_resident && chronoResident[param->chrono_index].size() > 0) {
+      t_predict.Start(__func__,__FILE__,__LINE__);
       auto &basis = chronoResident[param->chrono_index];
 
+      std::vector<ColorSpinorField*> Ap;
       cudaColorSpinorField tmp(*in), tmp2(*in);
+      ColorSpinorParam cs_param(*basis[0]);
+      for(unsigned int k=0; k < basis.size(); k++){
+        Ap.emplace_back((ColorSpinorField::Create(cs_param)));
+      }
 
-      for (unsigned int j=0; j<basis.size(); j++) m(*basis[j].second, *basis[j].first, tmp, tmp2);
+      for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], tmp, tmp2);
 
       bool orthogonal = true;
       bool apply_mat = false;
-      MinResExt mre(m, orthogonal, apply_mat, profileInvert);
+      bool hermitian = true;
+      MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
       blas::copy(tmp, *in);
 
-      mre(*out, tmp, basis);
+      mre(*out, tmp, basis, Ap);
+      for(auto ap: Ap){
+        if (ap) delete(ap);
+      }
+      t_predict.Stop(__func__,__FILE__,__LINE__);
     }
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
@@ -2753,6 +2794,37 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
+  if (param->chrono_make_resident) {
+    t_register.Start(__func__,__FILE__,__LINE__);
+    if(param->chrono_max_dim < 1){
+      errorQuda("Cannot chrono_make_resident with chrono_max_dim %i",param->chrono_max_dim);
+    }
+
+    const int i = param->chrono_index;
+    if (i >= QUDA_MAX_CHRONO)
+      errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
+
+    auto &basis = chronoResident[i];
+
+    if(param->chrono_max_dim < (int)basis.size()){
+      errorQuda("Requested chrono_max_dim %i is smaller than already existing chroology %i",param->chrono_max_dim,(int)basis.size());
+    }
+
+    if(not param->chrono_replace_last){
+    // if we have not filled the space yet just augment
+      if ((int)basis.size() < param->chrono_max_dim) {
+        ColorSpinorParam cs_param(*out);
+        basis.emplace_back(ColorSpinorField::Create(cs_param));
+      }
+
+    // shuffle every entry down one and bring the last to the front
+      ColorSpinorField *tmp = basis[basis.size()-1];
+      for (unsigned int j=basis.size()-1; j>0; j--) basis[j] = basis[j-1];
+        basis[0] = tmp;
+    }
+    *(basis[0]) = *out; // set first entry to new solution
+    t_register.Stop(__func__,__FILE__,__LINE__);
+  }
   dirac.reconstruct(*x, *b, param->solution_type);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
@@ -2769,25 +2841,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-  if (param->make_resident_chrono) {
-    int i = param->chrono_index;
-    if (i >= QUDA_MAX_CHRONO)
-      errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
 
-    auto &basis = chronoResident[i];
-
-    // if we have filled the space yet just augment
-    if ((int)basis.size() < param->max_chrono_dim) {
-      ColorSpinorParam cs_param(*x);
-      basis.push_back(std::pair<ColorSpinorField*,ColorSpinorField*>(ColorSpinorField::Create(cs_param),ColorSpinorField::Create(cs_param)));
-    }
-
-    // shuffle every entry down one and bring the last to the front
-    ColorSpinorField *tmp = basis[basis.size()-1].first;
-    for (unsigned int j=basis.size()-1; j>0; j--) basis[j].first = basis[j-1].first;
-    basis[0].first = tmp;
-    *(basis[0]).first = *x; // set first entry to new solution
-  }
 
   if (param->compute_action) {
     Complex action = blas::cDotProduct(*b, *x);
@@ -2799,6 +2853,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nx = blas::norm2(*x);
     double nh_x = blas::norm2(*h_x);
     printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+  }
+  if(param->chrono_use_resident){
+    printfQuda("QUDA-Chrono-Predict Index %i time %f\n",param->chrono_index,t_predict.Last());
+  }
+  if(param->chrono_make_resident){
+    printfQuda("QUDA-Chrono-Register Index %i time %f\n",param->chrono_index,t_register.Last());  
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
@@ -3432,7 +3492,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 	  bool orthogonal = true;
 	  bool apply_mat = true;
-	  MinResExt mre(m, orthogonal, apply_mat, profileMulti);
+    bool hermitian = true;
+	  MinResExt mre(m, orthogonal, apply_mat, hermitian, profileMulti);
 	  blas::copy(tmp, *b);
 	  mre(*x[i], tmp, z, q);
 

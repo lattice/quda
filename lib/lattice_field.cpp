@@ -441,20 +441,22 @@ namespace quda {
 
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
-	  comm_free(mh_send_p2p_fwd[b][dim]);
-	  comm_free(mh_recv_p2p_fwd[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
-
-	  // only close this handle if it doesn't alias the back ghost
-	  if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
+	  if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
+	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
+	    // only close this handle if it doesn't alias the back ghost
+	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  }
 	}
 
 	if (comm_peer2peer_enabled(0,dim)) {
-	  comm_free(mh_send_p2p_back[b][dim]);
-	  comm_free(mh_recv_p2p_back[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-
-	  cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
+	  if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
+	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
+	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  }
 	}
       } // buffer
     } // iterate over dim

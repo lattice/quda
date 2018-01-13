@@ -653,7 +653,13 @@ int main(int argc, char **argv)
     inv_param2.inv_type_precondition = QUDA_INVALID_INVERTER;
     inv_param2.reliable_delta = 0.1;
     inv_param2.maxiter = 10000;
-    inv_param2.verbosity = QUDA_SUMMARIZE;
+    inv_param2.verbosity = QUDA_VERBOSE;
+    inv_param2.chrono_use_resident = true;
+    inv_param2.chrono_make_resident = true;
+    inv_param2.chrono_index = 0 ;
+    inv_param2.chrono_max_dim = 7;
+    inv_param2.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+
     invertQuda(spinorOut, spinorIn, &inv_param2);
 
     // setup the multigrid solver

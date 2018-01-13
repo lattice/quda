@@ -1,14 +1,12 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 
-#ifdef EIGEN
 #include <Eigen/Dense>
-#endif
 
 namespace quda {
 
-  MinResExt::MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, TimeProfile &profile)
-    : mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), profile(profile){
+  MinResExt::MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile)
+    : mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), hermitian(hermitian), profile(profile){
 
   }
 
@@ -16,7 +14,7 @@ namespace quda {
 
   }
 
-#ifdef EIGEN
+#if 1
 
   /**
      @brief Solve the equation A p_k psi_k = b by minimizing the
@@ -26,6 +24,7 @@ namespace quda {
      @param p[in] Search direction vectors
      @param q[in] Search direction vectors with the operator applied
   */
+  template<bool hermitian>
   void solve(Complex *psi_, std::vector<ColorSpinorField*> &p, std::vector<ColorSpinorField*> &q, ColorSpinorField &b) {
 
     using namespace Eigen;
@@ -38,11 +37,18 @@ namespace quda {
     for (unsigned int i=0; i<p.size(); i++) phi(i) = blas::cDotProduct(*p[i], b);
 
     // Construct the matrix
+    //MW us block blas here 
     for (unsigned int j=0; j<p.size(); j++) {
-      A(j,j) = blas::cDotProduct(*q[j], *p[j]);
-      for (unsigned int k=j+1; k<p.size(); k++) {
-	A(j,k) = blas::cDotProduct(*p[j], *q[k]);
-	A(k,j) = conj(A(j,k));
+      if(hermitian){
+        A(j,j) = blas::cDotProduct(*q[j], *p[j]);
+        for (unsigned int k=j+1; k<p.size(); k++) {
+          A(j,k) = blas::cDotProduct(*p[j], *q[k]);
+          A(k,j) = conj(A(j,k));
+        }
+      } else {
+        for (unsigned int k=0; k<p.size(); k++) {
+          A(j,k) = blas::cDotProduct(*p[j], *q[k]);
+        } 
       }
     }
     JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
@@ -51,7 +57,7 @@ namespace quda {
     for (unsigned int i=0; i<p.size(); i++) psi_[i] = psi(i);
   }
 
-#else
+#else //old stuff
 
   /**
      @brief Solve the equation A p_k psi_k = b by minimizing the
@@ -116,7 +122,7 @@ namespace quda {
     delete [] phi;
   }
 
-#endif // EIGEN
+#endif // old stuff
 
 
   /*
@@ -133,6 +139,7 @@ namespace quda {
   void MinResExt::operator()(ColorSpinorField &x, ColorSpinorField &b, 
 			     std::vector<ColorSpinorField*> p, std::vector<ColorSpinorField*> q) {
 
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     const int N = p.size();
@@ -142,6 +149,13 @@ namespace quda {
     // if no guess is required, then set initial guess = 0
     if (N == 0) {
       blas::zero(x);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      return;
+    }
+
+    if (N == 1) {
+      blas::copy(x, *p[0]);
+      profile.TPSTOP(QUDA_PROFILE_INIT);    
       return;
     }
 
@@ -157,15 +171,15 @@ namespace quda {
     // Orthonormalise the vector basis
     if (orthogonal) {
       for (int i=0; i<N; i++) {
-	double p2 = blas::norm2(*p[i]);
-	blas::ax(1 / sqrt(p2), *p[i]);
-	if (!apply_mat) blas::ax(1 / sqrt(p2), *q[i]);
-	for (int j=i+1; j<N; j++) {
-	  Complex xp = blas::cDotProduct(*p[i], *p[j]);
-	  blas::caxpy(-xp, *p[i], *p[j]);
-	  // if not applying the matrix below then orthongonalize q
-	  if (!apply_mat) blas::caxpy(-xp, *q[i], *q[j]);
-	}
+        double p2 = blas::norm2(*p[i]);
+        blas::ax(1 / sqrt(p2), *p[i]);
+        if (!apply_mat) blas::ax(1 / sqrt(p2), *q[i]);
+        for (int j=i+1; j<N; j++) {
+          Complex xp = blas::cDotProduct(*p[i], *p[j]);
+          blas::caxpy(-xp, *p[i], *p[j]);
+          // if not applying the matrix below then orthongonalize q
+          if (!apply_mat) blas::caxpy(-xp, *q[i], *q[j]);
+        }
       }
     }
 
@@ -176,7 +190,11 @@ namespace quda {
     // if operator hasn't already been applied then apply
     if (apply_mat) for (int i=0; i<N; i++) mat(*q[i], *p[i]);
 
-    solve(alpha, p, q, b);
+    if (hermitian) {
+      solve<true>(alpha, p, q, b);
+    } else {
+      solve<false>(alpha, p, q, b);
+    }
 
     for (int i=0; i<N; i++) minus_alpha[i] = -alpha[i];
 
