@@ -106,63 +106,61 @@ namespace quda {
   __global__ void extractGhostKernel(ExtractGhostArg<Order,nDim> arg) {  
     typedef typename mapper<Float>::type RegType;
 
-    for (int parity=0; parity<2; parity++) {
-      for (int dim=0; dim<nDim; dim++) {
+    int parity_dim = blockIdx.z * blockDim.z + threadIdx.z; //parity_dim = parity*nDim + dim
+    int parity = parity_dim / nDim;
+    int dim = parity_dim % nDim;
+    if (parity_dim >= 2 * nDim) return;
 
-	// for now we never inject unless we have partitioned in that dimension
-	if (!arg.commDim[dim] && !extract) continue;
+    // for now we never inject unless we have partitioned in that dimension
+    if (!arg.commDim[dim] && !extract) return;
 
-	// linear index used for writing into ghost buffer
-	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
-	//if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
-	if (X >= 2*arg.faceVolumeCB[dim]) continue;
-	// X = ((d * A + a)*B + b)*C + c
-	int dab = X/arg.C[dim];
-	int c = X - dab*arg.C[dim];
-	int da = dab/arg.B[dim];
-	int b = dab - da*arg.B[dim];
-	int d = da / arg.A[dim];
-	int a = da - d * arg.A[dim];
-	d += arg.X[dim]-arg.nFace;
+    // linear index used for writing into ghost buffer
+    int X = blockIdx.x * blockDim.x + threadIdx.x;
+    //if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
+    if (X >= 2*arg.faceVolumeCB[dim]) return;
+    // X = ((d * A + a)*B + b)*C + c
+    int dab = X/arg.C[dim];
+    int c = X - dab*arg.C[dim];
+    int da = dab/arg.B[dim];
+    int b = dab - da*arg.B[dim];
+    int d = da / arg.A[dim];
+    int a = da - d * arg.A[dim];
+    d += arg.X[dim]-arg.nFace;
 
-	// index is a checkboarded spacetime coordinate
-	int indexCB = (a*arg.f[dim][0] + b*arg.f[dim][1] + c*arg.f[dim][2] + d*arg.f[dim][3]) >> 1;
-	// we only do the extraction for parity we are currently working on
-	int oddness = (a+b+c+d)&1;
-	if (oddness == parity) {
+    // index is a checkboarded spacetime coordinate
+    int indexCB = (a*arg.f[dim][0] + b*arg.f[dim][1] + c*arg.f[dim][2] + d*arg.f[dim][3]) >> 1;
+    // we only do the extraction for parity we are currently working on
+    int oddness = (a+b+c+d)&1;
+    if (oddness == parity) {
 #ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<gauge::Ncolor(length); i++) {
-	    for (int j=0; j<gauge::Ncolor(length); j++) {
-	      if (extract) {
-		arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j)
-		  = arg.order(dim+arg.offset, parity, indexCB, i, j);
-	      } else { // injection
-		arg.order(dim+arg.offset, parity, indexCB, i, j)
-		  = arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j);
-	      }
-	    }
-	  }
+      int i = blockIdx.y * blockDim.y + threadIdx.y;
+      if (i >= Ncolor(length)) return;
+      for (int j=0; j<gauge::Ncolor(length); j++) {
+	if (extract) {
+	  arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j)
+	    = arg.order(dim+arg.offset, parity, indexCB, i, j);
+	} else { // injection
+	  arg.order(dim+arg.offset, parity, indexCB, i, j)
+	    = arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j);
+	}
+      }
 #else
-	  if (extract) {
-	    RegType u[length];
-	    arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
-	    arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
-	  } else {
-	    RegType u[length];
-	    arg.order.loadGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
-	    arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
-	  }
+      if (extract) {
+	RegType u[length];
+	arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
+	arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
+      } else {
+	RegType u[length];
+	arg.order.loadGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
+	arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
+      }
 #endif
-	} // oddness == parity
-
-      } // dim
-
-    } // parity
+    } // oddness == parity
 
   }
 
   template <typename Float, int length, int nDim, typename Order>
-  class ExtractGhost : Tunable {
+  class ExtractGhost : TunableVectorYZ {
     ExtractGhostArg<Order,nDim> arg;
     int size;
     const GaugeField &meta;
@@ -179,7 +177,11 @@ namespace quda {
   public:
     ExtractGhost(ExtractGhostArg<Order,nDim> &arg, const GaugeField &meta,
 		 QudaFieldLocation location, bool extract)
-      : arg(arg), meta(meta), location(location), extract(extract) {
+#ifndef FINE_GRAINED_ACCESS
+      : TunableVectorYZ(1, 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
+#else
+      : TunableVectorYZ(gauge::Ncolor(length), 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
+#endif
       int faceMax = 0;
       for (int d=0; d<nDim; d++) 
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
