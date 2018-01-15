@@ -305,7 +305,7 @@ namespace quda {
     }
     track_free(DEVICE, ptr);
 #else
-    device_pinned_free_(func, char, line, ptr);
+    device_pinned_free_(func, file, line, ptr);
 #endif
   }
 
