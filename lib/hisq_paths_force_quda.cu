@@ -9,7 +9,6 @@
 #include <force_common.h>
 #include <tune_quda.h>
 #include <color_spinor_field.h>
-#include <face_quda.h>
 #include <index_helper.cuh>
 
 #ifdef GPU_HISQ_FORCE

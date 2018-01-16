@@ -50,7 +50,7 @@ endif()
 project("QUDA" VERSION 0.9.0)
 
 if(NOT GITVERSION)
-  set(GITVERSION ${CMAKE_VERSION})
+  set(GITVERSION ${PROJECT_VERSION})
 endif()
 
 
@@ -67,8 +67,8 @@ if(NOT QUDA_GPU_ARCH)
   message ("-- Building QUDA for arch " "${QUDA_DEFAULT_GPU_ARCH}")
 endif()
 
-set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60)
+set(QUDA_GPU_ARCH ${QUDA_DEFAULT_GPU_ARCH} CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
@@ -137,17 +137,15 @@ set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
 
-# GPUdirect options
-set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
-
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
-set(QUDA_DEFLATEDSOLVER OFF CACHE BOOL "build deflated solvers")
 set(QUDA_ALTRELIABLE OFF CACHE BOOL "use alternative reliable updates in CG")
 set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
+
+option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_SHAREDLIB)
@@ -159,8 +157,6 @@ mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
-
-mark_as_advanced(QUDA_GPU_DIRECT)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
@@ -225,7 +221,7 @@ else()
     message(FATAL_ERROR "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components.")
   endif()
 endif()
-include_directories(${EIGEN_INCLUDE_DIRS})
+include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 ## Now we hopefully found some way to get eigen to work
 
 # We need threads
@@ -355,12 +351,6 @@ if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
 endif()
 
-if(QUDA_DEFLATEDSOLVER)
-  add_definitions(-DDEFLATEDSOLVER)
-  find_package(Eigen REQUIRED)
-  include_directories(${EIGEN_INCLUDE_DIRS})
-endif()
-
 if(QUDA_ALTRELIABLE)
   add_definitions(-DALTRELIABE)
 endif()
@@ -447,7 +437,7 @@ if(QUDA_INTERFACE_NVTX)
 endif(QUDA_INTERFACE_NVTX)
 
 if(QUDA_NVTX)
-  FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
+  FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64/)
   LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
 endif(QUDA_NVTX)
 
@@ -458,10 +448,6 @@ endif(NOT QUDA_BLAS_TEX)
 if(NOT QUDA_FERMI_DBLE_TEX)
   add_definitions(-DFERMI_NO_DBLE_TEX)
 endif(NOT QUDA_FERMI_DBLE_TEX)
-
-if(GPU_DIRECT)
-  add_definitions(-DGPU_DIRECT)
-endif(GPU_DIRECT)
 
 if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
@@ -499,7 +485,7 @@ if(QUDA_NUMA_NVML)
   add_definitions(-DNUMA_NVML)
   set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
   find_package(NVML REQUIRED)
-  include_directories(NVML_INCLUDE_DIR)
+  include_directories(SYSTEM NVML_INCLUDE_DIR)
 endif(QUDA_NUMA_NVML)
 
 
@@ -664,3 +650,4 @@ mark_as_advanced(CMAKE_F_FLAGS)
 ### add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(doc)

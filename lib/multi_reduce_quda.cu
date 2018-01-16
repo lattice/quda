@@ -2,7 +2,7 @@
 #include <tune_quda.h>
 #include <float_vector.h>
 #include <color_spinor_field_order.h>
-#include <int32_to_char.h>
+#include <uint_to_char.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -477,10 +477,10 @@ namespace quda {
         if (Anorm) strcat(aux, ",Anorm");
 	strcat(aux,",n=");
 	char size[8];
-	i32toa(size, (int32_t)x.size());
+	u64toa(size, x.size());
 	strcat(aux,size);
 	strcat(aux,",m=");
-	i32toa(size, (int32_t)y.size());
+	u64toa(size, y.size());
 	strcat(aux,size);
 
       	// before we do policy tuning we must ensure the kernel

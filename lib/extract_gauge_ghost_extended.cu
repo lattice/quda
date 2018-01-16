@@ -320,10 +320,7 @@ namespace quda {
       errorQuda("Invalid dim=%d", dim);
     }
 
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      cudaDeviceSynchronize(); // need to sync before we commence any communication
-      checkCudaError();
-    }
+    checkCudaError();
   }
 
   /** This is the template driver for extractGhost */

@@ -9,11 +9,6 @@
 #include <vector>
 #include <algorithm>
 
-#if (defined (QMP_COMMS) || defined (MPI_COMMS))
-//#include <qmp.h>
-#include <mpi.h>
-#endif
-
 //#ifdef PRIMME_LIB
 //#include "primme.h"
 //#endif

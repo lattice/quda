@@ -230,14 +230,24 @@
 // double-precision clover field
 #if (defined DIRECT_ACCESS_CLOVER) || (defined FERMI_NO_DBLE_TEX)
 #define CLOVERTEX param.clover
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_DOUBLE_STR
+#else
 #define READ_CLOVER READ_CLOVER_DOUBLE_STR
+#endif
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define CLOVERTEX (param.cloverTex)
 #else
 #define CLOVERTEX cloverTexDouble
 #endif
+
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_DOUBLE_TEX
+#else
 #define READ_CLOVER READ_CLOVER_DOUBLE_TEX
+#endif
+
 #endif
 #define CLOVER_DOUBLE
 
@@ -315,14 +325,23 @@
 // single-precision clover field
 #ifdef DIRECT_ACCESS_CLOVER
 #define CLOVERTEX param.clover
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_SINGLE
+#else
 #define READ_CLOVER READ_CLOVER_SINGLE
+#endif
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define CLOVERTEX (param.cloverTex)
 #else
 #define CLOVERTEX cloverTexSingle
 #endif
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_SINGLE_TEX
+#else
 #define READ_CLOVER READ_CLOVER_SINGLE_TEX
+#endif
+
 #endif
 
 #else             // half-precision fields
@@ -399,7 +418,11 @@
 // half-precision clover field
 #ifdef DIRECT_ACCESS_CLOVER
 #define CLOVERTEX param.clover
+#ifdef (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_HALF
+#else
 #define READ_CLOVER READ_CLOVER_HALF
+#endif
 #define CLOVERTEXNORM (param.cloverNorm)
 #else
 #ifdef USE_TEXTURE_OBJECTS
@@ -409,7 +432,11 @@
 #define CLOVERTEX cloverTexHalf
 #define CLOVERTEXNORM cloverTexNorm
 #endif
+#if (DD_CLOVER==2)
+#define READ_CLOVER READ_CLOVER2_HALF_TEX
+#else
 #define READ_CLOVER READ_CLOVER_HALF_TEX
+#endif
 #endif
 
 #endif

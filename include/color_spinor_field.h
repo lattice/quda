@@ -277,18 +277,11 @@ namespace quda {
     void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
     mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
-    mutable int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
-    mutable int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
-
-    mutable size_t ghost_length; // length of ghost zone
-    mutable size_t ghost_norm_length; // length of ghost zone for norm
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-    mutable size_t ghost_bytes; // size in bytes of the ghost field
-    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -304,6 +297,11 @@ namespace quda {
     //
     CompositeColorSpinorField components;
 
+    /**
+       Compute the required extended ghost zone sizes and offsets
+       @param[in] nFace The depth of the halo
+       @param[in] spin_project Whether we are spin projecting
+    */
     void createGhostZone(int nFace, bool spin_project=true) const;
 
     // resets the above attributes based on contents of param
@@ -403,7 +401,6 @@ namespace quda {
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-    size_t GhostLength() const { return ghost_length; }
     const int *GhostFace() const { return ghostFace; }
     int GhostOffset(const int i) const { return ghostOffset[i][0]; }
     int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
@@ -486,9 +483,6 @@ namespace quda {
 
     bool reference; // whether the field is a reference or not
 
-    static size_t ghostFaceBytes;
-    static bool initGhostFaceBuffer;
-
     mutable void *ghost_field_tex[4]; // instance pointer to GPU halo buffer (used to check if static allocation has changed)
 
     void create(const QudaFieldCreate);
@@ -532,21 +526,11 @@ namespace quda {
     void createComms(int nFace, bool spin_project=true);
 
     /**
-       @brief Destroy the communication handlers and buffers
-    */
-    void destroyComms();
-
-    /**
        @brief Allocate the ghost buffers
        @param[in] nFace Depth of each halo
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
     void allocateGhostBuffer(int nFace, bool spin_project=true) const;
-
-    /**
-       @brief Free statically allocated ghost buffers
-    */
-    static void freeGhostBuffer(void);
 
     /**
        @brief Packs the cudaColorSpinorField's ghost zone
@@ -622,11 +606,63 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
-    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
-    void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr=false);
+    /**
+       @brief Initiate halo communication receive
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr Whether we are using GDR on the receive side
+    */
+    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+
+    /**
+       @brief Initiate halo communication sending
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr Whether we are using GDR on the send side
+    */
+    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+
+    /**
+       @brief Initiate halo communication
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    void commsStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+
+    /**
+       @brief Non-blocking query if the halo communication has completed
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    int commsQuery(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+
+    /**
+       @brief Wait on halo communication to complete
+       @param[in] Depth of face exchange
+       @param[in] d d=[2*dim+dir], where dim is dimension and dir is
+       the scatter-centric direction (0=backwards,1=forwards)
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream CUDA stream to be used (unused)
+       @param[in] gdr_send Whether we are using GDR on the send side
+       @param[in] gdr_recv Whether we are using GDR on the receive side
+    */
+    void commsWait(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
 
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
@@ -671,6 +707,16 @@ namespace quda {
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 
     void PrintVector(unsigned int x);
+
+    /**
+       @brief Backs up the cudaColorSpinorField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cudaColorSpinorField
+    */
+    void restore();
   };
 
   // CPU implementation
@@ -726,7 +772,7 @@ namespace quda {
     void zero();
 
     /**
-       @brieff This is a unified ghost exchange function for doing a complete
+       @brief This is a unified ghost exchange function for doing a complete
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
@@ -741,6 +787,15 @@ namespace quda {
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
 		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
 
+    /**
+       @brief Backs up the cudaColorSpinorField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the cudaColorSpinorField
+    */
+    void restore();
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
