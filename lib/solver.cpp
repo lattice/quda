@@ -107,6 +107,10 @@ namespace quda {
       report("PipePCG");
       solver = new PipePCG(mat, matSloppy, matPrecon, param, profile);
       break;
+    case QUDA_PIPEPCG3_INVERTER:
+      report("PipePCG3");
+      solver = new PipePCG3(mat, matSloppy, matPrecon, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }

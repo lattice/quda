@@ -45,6 +45,7 @@ namespace quda {
     double xmyNorm(ColorSpinorField &x, ColorSpinorField &y);
 
     void axpby(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y);
+    void axpbypcz(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y, const double &c, ColorSpinorField &z);
     void axpy(const double &a, ColorSpinorField &x, ColorSpinorField &y);
     void ax(const double &a, ColorSpinorField &x);
     void xpy(ColorSpinorField &x, ColorSpinorField &y);

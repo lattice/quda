@@ -9,6 +9,8 @@
 
 namespace quda {
 
+  using ColorSpinorFieldSet = ColorSpinorField;
+
   /**
      SolverParam is the meta data used to define linear solvers.
    */
@@ -516,6 +518,44 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
+  class PipePCG3 : public Solver {
+    private:
+      const DiracMatrix &mat;
+      const DiracMatrix &matSloppy;
+      const DiracMatrix &matPrecon;
+
+      Solver *K;
+      SolverParam Kparam; // parameters for preconditioner solve
+
+      bool init;
+
+      ColorSpinorField *rp;       //! residual vector
+
+      ColorSpinorFieldSet *yp;       
+      ColorSpinorFieldSet *zp;
+      ColorSpinorFieldSet *wp;
+
+      ColorSpinorFieldSet *rp_sloppy;       
+      ColorSpinorFieldSet *xp_sloppy;       
+
+      ColorSpinorField *pp;        
+      ColorSpinorField *qp;
+      ColorSpinorField *tmpp;
+      ColorSpinorField *r_pre;    //! residual passed to preconditioner
+      ColorSpinorField *p_pre;    //! preconditioner result
+
+    public:
+      PipePCG3(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      /**
+        @param K Preconditioner
+      */
+      PipePCG3(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+
+      virtual ~PipePCG3();
+
+      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
 
   class BiCGstab : public Solver {
 
@@ -838,8 +878,6 @@ namespace quda {
 		    std::vector<ColorSpinorField*> p,
 		    std::vector<ColorSpinorField*> q);
   };
-
-  using ColorSpinorFieldSet = ColorSpinorField;
 
   //forward declaration
   class EigCGArgs;
