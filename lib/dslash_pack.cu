@@ -671,7 +671,7 @@ namespace quda {
 #define SPINORTEX spinorTexHalf
 #endif
 #endif
-#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_QUARTER4
+#define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_CHAR4
   template <int dim, int dagger, int face_num>
     static inline __device__ void packTwistedFaceWilsonCore(char4 *out, float *outNorm, const char4 *in, const float *inNorm, float a, float b,
                   const int &idx, const int &face_idx, 
@@ -1202,7 +1202,7 @@ namespace quda {
   static inline __device__ short2 float22short2(float c, float2 a) {
     return make_short2((short)(a.x*c*MAX_SHORT), (short)(a.y*c*MAX_SHORT));
   }
-  static inline __device__ char2 float22short2(float c, float2 a) {
+  static inline __device__ char2 float22char2(float c, float2 a) {
     return make_char2((short)(a.x*c*MAX_CHAR), (short)(a.y*c*MAX_CHAR));
   }
 

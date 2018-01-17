@@ -105,7 +105,7 @@ union uint32_char2 { unsigned short i; char2 s; };
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
-static inline __device__ short2 atomicAdd(short2 *addr, short2 val){
+static inline __device__ char2 atomicAdd(char2 *addr, char2 val){
   uint32_char2 old, assumed, incremented;
   old.s = *addr;
   do {

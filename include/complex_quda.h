@@ -719,7 +719,7 @@ public:
       imag(im);
     }
 
-  __host__ __device__ inline complex<char>(const complex<char> & z) : short2(z){}
+  __host__ __device__ inline complex<char>(const complex<char> & z) : char2(z){}
 
   __host__ __device__ inline complex<char>& operator+=(const complex<char> z)
     {

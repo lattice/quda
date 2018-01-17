@@ -325,6 +325,7 @@ namespace quda {
 
     void precisionCheck() {
       switch(precision) {
+      case QUDA_QUARTER_PRECISION:
       case QUDA_HALF_PRECISION:
       case QUDA_SINGLE_PRECISION:
       case QUDA_DOUBLE_PRECISION:

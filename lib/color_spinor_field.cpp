@@ -154,7 +154,7 @@ namespace quda {
     bytes = (size_t)length * precision; // includes pads and ghost zones
     if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
-    if (precision == QUDA_HALF_PRECISION) {
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
       if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
@@ -299,7 +299,7 @@ namespace quda {
     bytes = (size_t)length * precision; // includes pads
     if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
-    if (precision == QUDA_HALF_PRECISION) {
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
       if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
@@ -512,7 +512,8 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION ||
-	       (precision == QUDA_HALF_PRECISION && nColor == 3)) {
+	       (precision == QUDA_HALF_PRECISION && nColor == 3) ||
+         (precision == QUDA_QUARTER_PRECISION && nColor == 3)) {
       if (nSpin == 4) {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 2) {

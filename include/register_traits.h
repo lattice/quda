@@ -406,7 +406,7 @@ namespace quda {
     __device__ __host__ inline void vector_store(void *ptr, int idx, const char4 &value) {
 #if defined(__CUDA_ARCH__)
 
-    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, reinterpret_cast<short2*>(&value)->x, reinterpret_cast<short2*>(&value)->y);
+    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, reinterpret_cast<const short2*>(&value)->x, reinterpret_cast<const short2*>(&value)->y);
 #else
     reinterpret_cast<char4*>(ptr)[idx] = value;
 #endif

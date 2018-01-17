@@ -55,6 +55,11 @@ __device__ inline void copyFloatN(short4 &a, const float4 &b) { a = make_short4(
 __device__ inline void copyFloatN(short2 &a, const double2 &b) { a = make_short2(d2i(b.x), d2i(b.y)); }
 __device__ inline void copyFloatN(short4 &a, const double4 &b) { a = make_short4(d2i(b.x), d2i(b.y), d2i(b.z), d2i(b.w)); }
 
+__device__ inline void copyFloatN(char2 &a, const float2 &b) { a = make_char2(f2i(b.x), f2i(b.y)); }
+__device__ inline void copyFloatN(char4 &a, const float4 &b) { a = make_char4(f2i(b.x), f2i(b.y), f2i(b.z), f2i(b.w)); }
+__device__ inline void copyFloatN(char2 &a, const double2 &b) { a = make_char2(d2i(b.x), d2i(b.y)); }
+__device__ inline void copyFloatN(char4 &a, const double4 &b) { a = make_char4(d2i(b.x), d2i(b.y), d2i(b.z), d2i(b.w)); }
+
 
 /**
  Convert a vector of type InputType to type OutputType.

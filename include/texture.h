@@ -306,8 +306,8 @@ template<typename OutputType, typename InputType, int tex_id>
 
   }
 
-  template <int M>
-  __device__ inline float store_norm_half(float *norm, FloatN x[M], int i) {
+  template <int M, typename FloatN>
+  __device__ inline float store_norm(float *norm, FloatN x[M], int i) {
     float c[M];
 #pragma unroll
     for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
@@ -317,8 +317,32 @@ template<typename OutputType, typename InputType, int tex_id>
     return __fdividef(MAX_SHORT, c[0]);
   }
 
+  // Specializations for chars.
+
   template <int M>
-  __device__ inline float store_norm_quarter(float *norm, FloatN x[M], int i) {
+  __device__ inline float store_norm(float *norm, char x[M], int i) {
+    float c[M];
+#pragma unroll
+    for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
+#pragma unroll
+    for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
+    norm[i] = c[0];
+    return __fdividef(MAX_CHAR, c[0]);
+  }
+
+  template <int M>
+  __device__ inline float store_norm(float *norm, char2 x[M], int i) {
+    float c[M];
+#pragma unroll
+    for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
+#pragma unroll
+    for (int j=1; j<M; j++) c[0] = fmaxf(c[j],c[0]);
+    norm[i] = c[0];
+    return __fdividef(MAX_CHAR, c[0]);
+  }
+
+  template <int M>
+  __device__ inline float store_norm(float *norm, char4 x[M], int i) {
     float c[M];
 #pragma unroll
     for (int j=0; j<M; j++) c[j] = max_fabs(x[j]);
@@ -608,21 +632,14 @@ template <typename RegType, typename StoreType, int N, int write, int tex_id=-1>
 	InterType y[M];
 	convert<InterType, RegType>(y, x, M);
 	
-	if ( isHalf<StoreType>::value ) {
-          float C = store_norm_half<M>(ST::norm, y, ST::cb_norm_offset*parity + i);
+	if ( isFixed<StoreType>::value ) {
+          float C = store_norm<M, InterType>(ST::norm, y, ST::cb_norm_offset*parity + i);
 #pragma unroll
           for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], C*y[j]);
 	} else {
 #pragma unroll
           for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], y[j]);
-	} else if ( isQuarter<StoreType>::value ) {
-          float C = store_norm_quarter<M>(ST::norm, y, ST::cb_norm_offset*parity + i);
-#pragma unroll
-          for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], C*y[j]);
-  } else {
-#pragma unroll
-          for (int j=0; j<M; j++) copyFloatN(SPINOR[ST::cb_offset*parity + i + j*ST::stride], y[j]);
-  }
+	}
       }
     }
 

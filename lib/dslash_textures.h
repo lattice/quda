@@ -679,10 +679,10 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
 
 #ifdef USE_TEXTURE_OBJECTS
 	dslashParam.cloverTex   = oddBit ? clover.OddTex() : clover.EvenTex();
-	if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
+	if (clover.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
 #ifndef DYNAMIC_CLOVER
 	dslashParam.cloverInvTex = oddBit ? cloverInv.OddTex() : cloverInv.EvenTex();
-	if (cloverInv.precision == QUDA_HALF_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
+	if (cloverInv.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
 #endif
 #else
 	if (clover.precision == QUDA_DOUBLE_PRECISION)    //I assume that the clover and cloverInv fields have the same precision

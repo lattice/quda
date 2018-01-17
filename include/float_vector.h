@@ -215,6 +215,47 @@ namespace quda {
     return fmax(fabs(b.x), fabs(b.y));
   };
 
+  // abuse of naming
+  __forceinline__ __host__ __device__ short max_fabs(const short4 &c) {
+    const short abs_x = c.x > 0 ? c.x : (c.x == -32768 ? 32767 : -c.x);
+    const short abs_y = c.y > 0 ? c.y : (c.x == -32768 ? 32767 : -c.y);
+    const short abs_z = c.z > 0 ? c.z : (c.z == -32768 ? 32767 : -c.z);
+    const short abs_w = c.w > 0 ? c.w : (c.w == -32768 ? 32767 : -c.w);
+    short a = max(abs_x,abs_y);
+    short b = max(abs_z,abs_w);
+    return max(a,b);
+  };
+
+  __forceinline__ __host__ __device__ short max_fabs(const short2 &b) {
+    const short abs_x = b.x > 0 ? b.x : (b.x == -32768 ? 32767 : -b.x);
+    const short abs_y = b.y > 0 ? b.y : (b.y == -32768 ? 32767 : -b.y);
+    return max(abs_x, abs_y);
+  };
+
+  __forceinline__ __host__ __device__ short max_fabs(const short &a) {
+    return a > 0 ? a : (a == -32768 ? 32767 : -a);
+  };
+
+  __forceinline__ __host__ __device__ char max_fabs(const char4 &c) {
+    const char abs_x = c.x > 0 ? c.x : (c.x == -256 ? 255 : -c.x);
+    const char abs_y = c.y > 0 ? c.y : (c.y == -256 ? 255 : -c.y);
+    const char abs_z = c.z > 0 ? c.z : (c.z == -256 ? 255 : -c.z);
+    const char abs_w = c.w > 0 ? c.w : (c.w == -256 ? 255 : -c.w);
+    short a = max(abs_x,abs_y);
+    short b = max(abs_z,abs_w);
+    return max(a, b);
+  };
+
+  __forceinline__ __host__ __device__ char max_fabs(const char2 &b) {
+    const char abs_x = b.x > 0 ? b.x : (b.x == -256 ? 255 : -b.x);
+    const char abs_y = b.y > 0 ? b.y : (b.y == -256 ? 255 : -b.y);
+    return max(abs_x, abs_y);
+  };
+
+  __forceinline__ __host__ __device__ char max_fabs(const char &a) {
+    return a > 0 ? a : (a == -256 ? 255 : -a);
+  };
+
   /*
     Precision conversion routines for vector types
   */
@@ -263,7 +304,7 @@ namespace quda {
     return make_char4(a.x, a.y, a.z, a.w);
   }
 
-  __forceinline__ __host__ __device__ char4 make_charN(const short2 &a) {
+  __forceinline__ __host__ __device__ char2 make_charN(const short2 &a) {
     return make_char2(a.x, a.y);
   }
 
@@ -271,7 +312,7 @@ namespace quda {
     return make_char4(a.x, a.y, a.z, a.w);
   }
 
-  __forceinline__ __host__ __device__ char4 make_charN(const float2 &a) {
+  __forceinline__ __host__ __device__ char2 make_charN(const float2 &a) {
     return make_char2(a.x, a.y);
   }
 
@@ -279,7 +320,7 @@ namespace quda {
     return make_char4(a.x, a.y, a.z, a.w);
   }
 
-  __forceinline__ __host__ __device__ char4 make_charN(const double2 &a) {
+  __forceinline__ __host__ __device__ char2 make_charN(const double2 &a) {
     return make_char2(a.x, a.y);
   }
   /* Helper functions for converting between float2/double2 and complex */

@@ -288,23 +288,23 @@ namespace quda {
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
       if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+      else desc.f = cudaChannelFormatKindSigned; // quarter is char, half is short, double is int2
       
       // staggered and coarse fields in half and single are always two component
       int texel_size = 1;
       // all FLOAT2-ordred fields that are not double precision
       if (precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
-	desc.x = 8*precision;
-	desc.y = 8*precision;
-	desc.z = 0;
-	desc.w = 0;
-	texel_size = 2*precision;
+        desc.x = 8*precision;
+        desc.y = 8*precision;
+        desc.z = 0;
+        desc.w = 0;
+        texel_size = 2*precision;
       } else { // all others are four component (double2 is spread across int4)
-	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-	texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
+        desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+        desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+        desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+        desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+        texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
       }
       
       cudaResourceDesc resDesc;
@@ -316,45 +316,49 @@ namespace quda {
       
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
-      if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
 
       if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
-	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-		  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+        errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+          resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
       }
 
       unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
       if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
-	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
+        errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
       }
 
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
+      checkCudaError();
+
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-	cudaChannelFormatDesc desc;
-	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	desc.f = cudaChannelFormatKindFloat;
-	desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
-	
-	cudaResourceDesc resDesc;
-	memset(&resDesc, 0, sizeof(resDesc));
-	resDesc.resType = cudaResourceTypeLinear;
-	resDesc.res.linear.devPtr = norm;
-	resDesc.res.linear.desc = desc;
-	resDesc.res.linear.sizeInBytes = norm_bytes;
-	
-	if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
-	  errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-		    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
-	}
+        cudaChannelFormatDesc desc;
+        memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+        desc.f = cudaChannelFormatKindFloat;
+        desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
 
-	cudaTextureDesc texDesc;
-	memset(&texDesc, 0, sizeof(texDesc));
-	texDesc.readMode = cudaReadModeElementType;
-	
-	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+        cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypeLinear;
+        resDesc.res.linear.devPtr = norm;
+        resDesc.res.linear.desc = desc;
+        resDesc.res.linear.sizeInBytes = norm_bytes;
+
+        if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+          errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+        	    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+        }
+
+        cudaTextureDesc texDesc;
+        memset(&texDesc, 0, sizeof(texDesc));
+        texDesc.readMode = cudaReadModeElementType;
+
+        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+
+        checkCudaError();
       }
       
       texInit = true;
@@ -459,7 +463,7 @@ namespace quda {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
+        for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
       }
       ghostTexInit = false;
     }
@@ -471,15 +475,15 @@ namespace quda {
     if (alloc) {
       switch(mem_type) {
       case QUDA_MEMORY_DEVICE:
-	pool_device_free(v);
-	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) pool_device_free(norm);
-	break;
+        pool_device_free(v);
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) pool_device_free(norm);
+        break;
       case QUDA_MEMORY_MAPPED:
-	host_free(v_h);
-	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) host_free(norm_h);
-	break;
+        host_free(v_h);
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) host_free(norm_h);
+        break;
       default:
-	errorQuda("Unsupported memory type %d", mem_type);
+        errorQuda("Unsupported memory type %d", mem_type);
       }
     }
 

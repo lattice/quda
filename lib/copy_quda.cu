@@ -279,7 +279,7 @@ namespace quda {
         copy(dst_spinor, src_tex, src.Volume(), partitions);
       copy.apply(*blas::getStream());
     } else if (src.Nspin() == 1) {
-      Spinor<float2, float2, 3, 0, 0> src_tex(src);
+      Spinor<float2, char2, 3, 0, 0> src_tex(src);
       Spinor<float2, short2, 3, 1> dst_spinor(dst);
       CopyCuda<float2, 3, Spinor<float2, short2, 3, 1>, Spinor<float2, char2, 3, 0, 0> >
         copy(dst_spinor, src_tex, src.Volume(), partitions);
