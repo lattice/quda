@@ -41,7 +41,8 @@ namespace quda {
   int LatticeField::bufferIndex = 0;
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
-    : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
+    : precision(field.Precision()), ghost_precision(field.Precision()),
+      nDim(field.Ndim()), pad(field.Pad()),
       siteSubset(field.SiteSubset()), mem_type(field.MemType()),
       ghostExchange(field.GhostExchange()), scale(field.Scale())
   {
@@ -52,7 +53,8 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
-    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
+    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim),
+      precision(param.Precision()), ghost_precision(param.GhostPrecision()),
       scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
       ghost_bytes(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
@@ -94,7 +96,8 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeField &field)
-    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
+    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim),
+      precision(field.precision), ghost_precision(field.ghost_precision),
       scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
@@ -215,7 +218,7 @@ namespace quda {
 	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
 
 	my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
+	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
       } // loop over b
 
       offset += ghost_face_bytes[i];
@@ -228,7 +231,7 @@ namespace quda {
 	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
 
 	my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*precision;
+	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*ghost_precision;
       } // loop over b
       offset += ghost_face_bytes[i];
 
@@ -575,7 +578,8 @@ namespace quda {
       output << "x[" << i << "] = " << param.x[i] << std::endl;    
     }
     output << "pad = " << param.pad << std::endl;
-    output << "precision = " << param.precision << std::endl;
+    output << "precision = " << param.Precision() << std::endl;
+    output << "ghost_precision = " << param.GhostPrecision() << std::endl;
     output << "scale = " << param.scale << std::endl;
 
     output << "ghostExchange = " << param.ghostExchange << std::endl;

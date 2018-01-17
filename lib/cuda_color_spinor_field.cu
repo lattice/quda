@@ -371,20 +371,20 @@ namespace quda {
       for (int b=0; b<2; b++) {
 	cudaChannelFormatDesc desc;
 	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
+	if (ghost_precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
 	else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
 
 	// all FLOAT2-ordred fields that are not double precision
-	if (precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
-	  desc.x = 8*precision;
-	  desc.y = 8*precision;
+	if (ghost_precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
+	  desc.x = 8*ghost_precision;
+	  desc.y = 8*ghost_precision;
 	  desc.z = 0;
 	  desc.w = 0;
 	} else { // all others are four component (double2 is spread across int4)
-	  desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	  desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	  desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-	  desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+	  desc.x = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
+	  desc.y = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
+	  desc.z = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
+	  desc.w = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	}
 
 	cudaResourceDesc resDesc;
@@ -396,7 +396,7 @@ namespace quda {
 
 	cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
-	if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+	if (ghost_precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
 	else texDesc.readMode = cudaReadModeElementType;
 
 	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
@@ -405,7 +405,7 @@ namespace quda {
 	resDesc.res.linear.devPtr = static_cast<char*>(ghost_pinned_buffer_hd[b])+ghost_bytes;
 	cudaCreateTextureObject(&ghostTex[2+b], &resDesc, &texDesc, NULL);
 
-	if (precision == QUDA_HALF_PRECISION) {
+	if (ghost_precision == QUDA_HALF_PRECISION) {
 	  cudaChannelFormatDesc desc;
 	  memset(&desc, 0, sizeof(cudaChannelFormatDesc));
 	  desc.f = cudaChannelFormatKindFloat;
@@ -655,6 +655,8 @@ namespace quda {
     return;
   }
 
+  static bool ghost_precision_reset = false;
+
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {
 
     createGhostZone(nFace, spin_project);
@@ -662,7 +664,8 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
     // ghost texture is per object
-    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1]) destroyGhostTexObject();
+    if (ghost_field_tex[0] != ghost_recv_buffer_d[0] || ghost_field_tex[1] != ghost_recv_buffer_d[1] || ghost_precision_reset)
+      destroyGhostTexObject();
     if (!ghostTexInit) createGhostTexObject();
 #endif
   }
@@ -913,7 +916,8 @@ namespace quda {
     // ascertain if this instance needs its comms buffers to be updated
     bool comms_reset = ghost_field_reset || // FIXME add send buffer check
       (my_face_h[0] != ghost_pinned_buffer_h[0]) || (my_face_h[1] != ghost_pinned_buffer_h[1]) || // pinned buffers
-      (ghost_field_tex[0] != ghost_recv_buffer_d[0]) || (ghost_field_tex[1] != ghost_recv_buffer_d[1]); // receive buffers
+      (ghost_field_tex[0] != ghost_recv_buffer_d[0]) || (ghost_field_tex[1] != ghost_recv_buffer_d[1]) || // receive buffers
+      ghost_precision_reset; // ghost_precision has changed
 
     if (!initComms || comms_reset) {
 
@@ -923,15 +927,17 @@ namespace quda {
       for (int i=0; i<nDimComms; ++i) {
 	if (commDimPartitioned(i)) {
 	  for (int b=0; b<2; b++) {
-	    ghost[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*precision;
-	    if (precision == QUDA_HALF_PRECISION)
+	    ghost[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
+	    if (ghost_precision == QUDA_HALF_PRECISION)
 	      ghostNorm[b][i] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostNormOffset[i][0]*QUDA_SINGLE_PRECISION;
 	  }
 	}
       }
+
+      ghost_precision_reset = false;
     }
 
-    if (LatticeField::ghost_field_reset) destroyIPCComms();
+    if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
   }
 
@@ -1045,6 +1051,8 @@ namespace quda {
 
       if (dim != 3 || getKernelPackT()) {
 
+	void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
+	  + ghost_precision*ghostOffset[dim][(dir+1)%2];
 	cudaMemcpyAsync(ghost_dst,
 			my_face_dim_dir_d[bufferIndex][dim][dir],
 			ghost_face_bytes[dim],
@@ -1321,7 +1329,20 @@ namespace quda {
   }
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
-					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv)  const {
+					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
+					   QudaPrecision ghost_precision_)  const {
+
+    if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
+      ghost_precision_reset = true;
+      ghost_precision = ghost_precision_;
+    }
+
+    // not overriding the ghost precision, but we did previously so need to update
+    if (ghost_precision == QUDA_INVALID_PRECISION && ghost_precision != precision) {
+      ghost_precision_reset = true;
+      ghost_precision = precision;
+    }
+
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
     bool pack_t = getKernelPackT();
     setKernelPackT(true); // ensure kernel packing is enabled for all dimensions
@@ -1348,10 +1369,10 @@ namespace quda {
 
     void *send[2*QUDA_MAX_DIM];
     for (int d=0; d<nDimComms; d++) {
-      send[2*d+0] = pack_destination[2*d+0] == Host ? my_face_dim_dir_hd[bufferIndex][d][0] : my_face_dim_dir_d[bufferIndex][d][0];
-      send[2*d+1] = pack_destination[2*d+1] == Host ? my_face_dim_dir_hd[bufferIndex][d][1] : my_face_dim_dir_d[bufferIndex][d][1];
-      ghost_buf[2*d+0] = halo_location[2*d+0] == Host ? from_face_dim_dir_hd[bufferIndex][d][0] : from_face_dim_dir_d[bufferIndex][d][0];
-      ghost_buf[2*d+1] = halo_location[2*d+1] == Host ? from_face_dim_dir_hd[bufferIndex][d][1] : from_face_dim_dir_d[bufferIndex][d][1];
+      for (int dir=0; dir<2; dir++) {
+	send[2*d+dir] = pack_destination[2*d+dir] == Host ? my_face_dim_dir_hd[bufferIndex][d][dir] : my_face_dim_dir_d[bufferIndex][d][dir];
+	ghost_buf[2*d+dir] = halo_location[2*d+dir] == Host ? from_face_dim_dir_hd[bufferIndex][d][dir] : from_face_dim_dir_d[bufferIndex][d][dir];
+      }
 
       // if doing p2p, then we must pack to and load the halo from device memory
       for (int dir=0; dir<2; dir++) {

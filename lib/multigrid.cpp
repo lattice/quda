@@ -40,9 +40,9 @@ namespace quda {
       csParam.location = param.location;
       if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
         // all coarse GPU vectors use FLOAT2 ordering
-        csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION || param.level > 0 || param.B[0]->Nspin() == 1) ? 
+        csParam.fieldOrder = (csParam.Precision() == QUDA_DOUBLE_PRECISION || param.level > 0 || param.B[0]->Nspin() == 1) ?
           QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-        csParam.setPrecision(csParam.precision);
+        csParam.setPrecision(csParam.Precision());
         csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
       }
       if (param.B[0]->Nspin() == 1) { // New: we need this hack for staggered to avoid unnecessary basis checks
@@ -427,11 +427,11 @@ namespace quda {
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
 
-    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.precision)
-      ? param.mg_global.precision_null[param.level]  : csParam.precision;
+    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
+      ? param.mg_global.precision_null[param.level]  : csParam.Precision();
     double tol = prec == QUDA_HALF_PRECISION ? 5e-3 : prec == QUDA_SINGLE_PRECISION ? 1e-4 : 1e-10;
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("\nChecking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
       // as well as copying to the correct location this also changes basis if necessary
@@ -468,7 +468,7 @@ namespace quda {
     }
 #endif
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c\n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
@@ -477,7 +477,7 @@ namespace quda {
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("L2 relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("\nComparing native coarse operator to emulated operator\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
 
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     zero(*tmp_coarse);
@@ -861,7 +861,7 @@ namespace quda {
     // to force setting the field to be native first set to double-precision native order
     // then use the setPrecision method to set to native order
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    csParam.precision = QUDA_DOUBLE_PRECISION;
+    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
     csParam.setPrecision(B[0]->Precision());
 
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
@@ -959,8 +959,8 @@ namespace quda {
             caxpy(-alpha, *B_gpu[j], *B_gpu[i]); // i-<j,i>j
           }
           double nrm2 = norm2(*B_gpu[i]);
-          if (sqrt(nrm2) > 1e-16) ax(1.0 /sqrt(nrm2), *B_gpu[i]);// i/<i,i>
-          else errorQuda("\nCannot normalize %u vector\n", i);
+          if (sqrt(nrm2) > 1e-16) ax(1.0/sqrt(nrm2), *B_gpu[i]);// i/<i,i>
+          else errorQuda("\nCannot normalize %u vector (nrm=%e)\n", i, sqrt(nrm2));
         }
       }
 

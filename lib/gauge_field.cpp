@@ -36,6 +36,8 @@ namespace quda {
     staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu),
     site_offset(param.site_offset), site_size(param.site_size)
   {
+    if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
+
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
       errorQuda("nColor must be 3, not %d for this link type", nColor);
     if (nDim != 4)
@@ -100,7 +102,7 @@ namespace quda {
       ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1]*geometry*nInternal;
       ghostOffset[i][1] = ghostOffset[i][0] + ghostFace[i]*geometry*nInternal;
 
-      ghost_face_bytes[i] = ghostFace[i] * geometry * nInternal * precision;
+      ghost_face_bytes[i] = ghostFace[i] * geometry * nInternal * ghost_precision;
       ghost_bytes += 2*ghost_face_bytes[i]; // factor of two from direction
     }
 
@@ -287,7 +289,7 @@ namespace quda {
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
-    spinor_param.precision = a.Precision();
+    spinor_param.setPrecision(a.Precision());
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;

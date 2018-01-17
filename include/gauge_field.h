@@ -109,9 +109,30 @@ namespace quda {
        @param precision The precision to use 
      */
     void setPrecision(QudaPrecision precision) {
+      // is the current status in native field order?
+      bool native = false;
+      if (precision == QUDA_DOUBLE_PRECISION) {
+	if (order  == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+      } else if (precision == QUDA_SINGLE_PRECISION ||
+		 precision == QUDA_HALF_PRECISION) {
+	if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	  if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
+	  if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+	  if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
+	} else if (reconstruct == QUDA_RECONSTRUCT_10) {
+	  if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
+	}
+      }
+
       this->precision = precision;
-      order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
-	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
+      this->ghost_precision = precision;
+
+      if (native) {
+	order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ?
+	  QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+      }
     }
 
   };

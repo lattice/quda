@@ -75,7 +75,7 @@ namespace quda {
     if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
       ColorSpinorParam param(in);
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
 	(param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
       param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       In = ColorSpinorField::Create(param);
@@ -86,7 +86,7 @@ namespace quda {
     if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
       ColorSpinorParam param(out);
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
+      param.fieldOrder =  param.Precision() == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
 	(param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
       param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       Out = ColorSpinorField::Create(param);

@@ -221,7 +221,8 @@ namespace quda {
       //Create a copy of the gauge field with no reconstruction, required for fine-grained access
       GaugeFieldParam gf_param(gauge);
       gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-      gf_param.setPrecision(gf_param.precision);
+      gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+      gf_param.setPrecision(gf_param.Precision());
       U = new cudaGaugeField(gf_param);
 
       U->copy(gauge);
@@ -230,7 +231,7 @@ namespace quda {
     CloverFieldParam cf_param;
     cf_param.nDim = 4;
     cf_param.pad = 0;
-    cf_param.precision = clover ? clover->Precision() : QUDA_SINGLE_PRECISION;
+    cf_param.setPrecision(clover ? clover->Precision() : QUDA_SINGLE_PRECISION);
 
     // if we have no clover term then create an empty clover field
     for(int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
@@ -259,7 +260,7 @@ namespace quda {
     ColorSpinorParam UVparam(T.Vectors(location));
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
-    UVparam.precision = T.Vectors(location).Precision();
+    UVparam.setPrecision(T.Vectors(location).Precision());
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 

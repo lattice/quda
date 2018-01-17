@@ -43,6 +43,20 @@ namespace quda {
 
   struct LatticeFieldParam {
 
+  protected:
+    /** Field precision */
+    QudaPrecision precision;
+
+    /** Ghost precision */
+    QudaPrecision ghost_precision;
+
+  public:
+    /** Field precision */
+    QudaPrecision Precision() const { return precision; }
+
+    /** Ghost precision */
+    QudaPrecision GhostPrecision() const { return ghost_precision; }
+
     /** Number of field dimensions */
     int nDim;
 
@@ -51,7 +65,6 @@ namespace quda {
 
     int pad;
 
-    QudaPrecision precision;
     QudaSiteSubset siteSubset;
 
     QudaMemoryType mem_type; 
@@ -69,7 +82,8 @@ namespace quda {
        @brief Default constructor for LatticeFieldParam
     */
     LatticeFieldParam()
-    : nDim(4), pad(0), precision(QUDA_INVALID_PRECISION), siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
+    : precision(QUDA_INVALID_PRECISION), ghost_precision(QUDA_INVALID_PRECISION), nDim(4), pad(0),
+      siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD), scale(1.0)
     {
       for (int i=0; i<nDim; i++) {
@@ -88,7 +102,8 @@ namespace quda {
     */
     LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision,
 		      QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD)
-    : nDim(nDim), pad(pad), precision(precision), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
+    : precision(precision), ghost_precision(precision), nDim(nDim), pad(pad),
+      siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(ghostExchange), scale(1.0)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -105,7 +120,8 @@ namespace quda {
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) 
-    : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
+    :  precision(param.cpu_prec), ghost_precision(param.cpu_prec), nDim(4), pad(0),
+      siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_NO), scale(param.scale)
     {
       for (int i=0; i<nDim; i++) {
@@ -151,6 +167,9 @@ namespace quda {
     /** Precision of the field */
     QudaPrecision precision;
     
+    /** Precision of the ghost */
+    mutable QudaPrecision ghost_precision;
+
     /** For fixed-point fields that need a global scaling factor */
     double scale;
 
@@ -477,6 +496,11 @@ namespace quda {
        @return The field precision
     */
     QudaPrecision Precision() const { return precision; }
+
+    /**
+       @return The ghost precision
+    */
+    QudaPrecision GhostPrecision() const { return ghost_precision; }
 
     /**
        @return The global scaling factor for a fixed-point field
