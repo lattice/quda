@@ -213,10 +213,12 @@ namespace quda {
 
     template<typename Float, int nSpin, int nColor, int nVec>
       struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
+      int faceVolumeCB[4];
       int ghostOffset[4];
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
 	for (int d=0; d<4; d++) {
-	  ghostOffset[d] = nFace*a.SurfaceCB(d)*nColor*nSpin*nVec;
+	  faceVolumeCB[d] = nFace*a.SurfaceCB(d);
+	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
 	}
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
@@ -406,6 +408,7 @@ namespace quda {
     protected:
       complex<storeFloat> *v;
       mutable complex<ghostFloat> *ghost[8];
+      mutable float *ghost_norm[8];
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
@@ -417,7 +420,11 @@ namespace quda {
       const QudaFieldLocation location;
       Float scale;
       Float scale_inv;
+      Float ghost_scale;
+      Float ghost_scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
+      static constexpr bool ghost_fixed = fixed_point<Float,ghostFloat>();
+      static constexpr bool block_float_ghost = !fixed && ghost_fixed;
 
     public:
       /**
@@ -431,10 +438,11 @@ namespace quda {
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()),
 	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
         location(field.Location()), accessor(field), ghostAccessor(field,nFace),
-        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0)),
+        ghost_scale(static_cast<Float>(1.0)), ghost_scale_inv(static_cast<Float>(1.0))
       {
 	for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
-	resetGhost(ghost_ ? ghost_ : field.Ghost());
+	resetGhost(field, ghost_ ? ghost_ : field.Ghost());
 	resetScale(field.Scale());
       }
 
@@ -443,11 +451,15 @@ namespace quda {
        */
       virtual ~FieldOrderCB() { ; }
 
-      void resetGhost(void * const *ghost_) const
+    void resetGhost(const ColorSpinorField &a, void * const *ghost_) const
       {
-	for (int d=0; d<4; d++) {
-	  ghost[2*d+0] = static_cast<complex<ghostFloat>*>(ghost_[2*d+0]);
-	  ghost[2*d+1] = static_cast<complex<ghostFloat>*>(ghost_[2*d+1]);
+	for (int dim=0; dim<4; dim++) {
+	  for (int dir=0; dir<2; dir++) {
+	    ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
+	    ghost_norm[2*dim+dir] =
+	      reinterpret_cast<float*>(static_cast<char*>(ghost_[2*dim+dir]) +
+				       a.GhostNormOffset(dim,dir)*QUDA_SINGLE_PRECISION - a.GhostOffset(dim,dir)*sizeof(ghostFloat));
+	  }
 	}
       }
 
@@ -455,6 +467,12 @@ namespace quda {
 	if (fixed) {
 	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
 	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	}
+	if (ghost_fixed) {
+	  if (block_float_ghost && max != static_cast<Float>(1.0))
+	      errorQuda("Block-float accessor requires max=1.0 not max=%e\n", max);
+	  ghost_scale = static_cast<Float>(std::numeric_limits<ghostFloat>::max() / max);
+	  ghost_scale_inv = static_cast<Float>(max / std::numeric_limits<ghostFloat>::max());
 	}
       }
 
@@ -500,11 +518,13 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
       {
-	if (!fixed) {
+	if (!ghost_fixed) {
 	  return complex<Float>(ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]);
 	} else {
+	  Float scale = ghost_scale_inv;
+	  if (block_float_ghost) scale *= ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb];
 	  complex<ghostFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)];
-	  return scale_inv*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+	  return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
 	}
       }
 
@@ -516,11 +536,15 @@ namespace quda {
        * @param s spin index
        * @param c color index
        * @param n vector number
+       * @param max site-element max (only when using block-float format)
        */
-      __device__ __host__ inline fieldorder_wrapper<Float,ghostFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0)
+	__device__ __host__ inline fieldorder_wrapper<Float,ghostFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0, Float max=0)
       {
+	if (block_float_ghost && s==0 && c==0 && n==0) ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb] = max;
 	const int idx = ghostAccessor.index(dim,dir,parity,x_cb,s,c,n);
-	return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx, scale, scale_inv);
+	return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx,
+						    block_float_ghost ? ghost_scale/max : ghost_scale,
+						    block_float_ghost ? ghost_scale_inv*max : ghost_scale_inv);
       }
 
       /**
