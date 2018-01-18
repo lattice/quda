@@ -7,6 +7,8 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   using namespace quda::colorspinor;
 
   template<typename real, int nSpin, int nColor, int nVec, QudaFieldOrder order>
@@ -165,7 +167,11 @@ namespace quda {
     }
   }
 
+#endif // GPU_MULTIGRID
+
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+
+#ifdef GPU_MULTIGRID
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       FillV<double>(V,B,Nvec);
@@ -177,7 +183,12 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d", V.Precision());
     }
+#else
+    errorQuda("Multigrid has not been built");
+#endif
   }
+
+#ifdef GPU_MULTIGRID
 
   // Creates a block-ordered version of a ColorSpinorField
   // N.B.: Only works for the V field, as we need to block spin.
@@ -648,8 +659,11 @@ namespace quda {
     }
   }
 
+#endif // GPU_MULTIGRID
+
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
+#ifdef GPU_MULTIGRID
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       BlockOrthogonalize<double>(V, Nvec, geo_bs, geo_map, spin_bs);
@@ -661,6 +675,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", V.Precision());
     }
+#else
+    errorQuda("Multigrid has not been built");
+#endif // GPU_MULTIGRID
   }
 
 } // namespace quda
