@@ -25,7 +25,7 @@ namespace quda {
 
   template <typename Float, typename yFloat, int coarseSpin, int coarseColor, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   struct DslashCoarseArg {
-    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder> F;
+    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder,Float,yFloat> F;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,yFloat> GY;
 
@@ -975,7 +975,7 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
-	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv);
+	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, Y.Precision());
       }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
