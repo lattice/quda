@@ -531,18 +531,19 @@ namespace quda {
 
       ColorSpinorField *rp;       //! residual vector
 
-      ColorSpinorFieldSet *yp;       
-      ColorSpinorFieldSet *zp;
-      ColorSpinorFieldSet *wp;
-
-      ColorSpinorFieldSet *rp_sloppy;       
       ColorSpinorFieldSet *xp_sloppy;       
+      ColorSpinorFieldSet *rp_sloppy;       
 
-      ColorSpinorField *pp;        
+//      ColorSpinorFieldSet *yp;
+      ColorSpinorFieldSet *wp;       
+      ColorSpinorFieldSet *zp;
+
+      ColorSpinorFieldSet *w_pre;    //! object passed to preconditioner
+      ColorSpinorFieldSet *p_pre;    //! preconditioner result
+      ColorSpinorFieldSet *pp;        
+
       ColorSpinorField *qp;
       ColorSpinorField *tmpp;
-      ColorSpinorField *r_pre;    //! residual passed to preconditioner
-      ColorSpinorField *p_pre;    //! preconditioner result
 
     public:
       PipePCG3(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
@@ -552,6 +553,53 @@ namespace quda {
       PipePCG3(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
       virtual ~PipePCG3();
+
+      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
+
+  class Pipe2PCG : public Solver {
+    private:
+      const DiracMatrix &mat;
+      const DiracMatrix &matSloppy;
+      const DiracMatrix &matPrecon;
+
+      Solver *K;
+      SolverParam Kparam; // parameters for preconditioner solve
+
+      bool init;
+
+      ColorSpinorField *rp;       //! residual vector
+
+      ColorSpinorFieldSet *xp_sloppy; 
+      ColorSpinorFieldSet *rp_sloppy;       
+
+      ColorSpinorFieldSet *wp;
+      ColorSpinorFieldSet *qp;
+      ColorSpinorFieldSet *dp;
+      ColorSpinorFieldSet *zp;
+      ColorSpinorFieldSet *pp;       
+      ColorSpinorFieldSet *cp;
+
+      ColorSpinorField *gp;
+      ColorSpinorField *hp;
+
+      ColorSpinorField *tmpp;
+
+      ColorSpinorField *q_pre;    //! object passed to preconditioner
+      ColorSpinorField *c_pre;    //! preconditioner result
+
+      ColorSpinorField *d_pre;    //! object passed to preconditioner
+      ColorSpinorField *g_pre;    //! preconditioner result
+
+
+    public:
+      Pipe2PCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+      /**
+        @param K Preconditioner
+      */
+      Pipe2PCG(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+
+      virtual ~Pipe2PCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };

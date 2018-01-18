@@ -17,9 +17,9 @@
 
 
 /***
-* Experimental PipePCG3 algorithm
+* Experimental Pipe2PCG algorithm
 * Sources: 
-* P. Eller and W. Gropp "Scalable non-blocking Preconditioned Conjugate Gradient Methods", SC2016
+* P. Eller and W. Gropp "Scalable non-blocking Preconditioned Conjugate Gradient Methods", SC2016  
 ***/
 
 //#define USE_WORKER
@@ -62,13 +62,13 @@ namespace quda {
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
-    if(outer.inv_type == QUDA_PIPEPCG3_INVERTER && outer.precision_sloppy != outer.precision_precondition)
+    if(outer.inv_type == QUDA_PIPE2PCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
     else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
 
-  PipePCG3::PipePCG3(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+  Pipe2PCG::Pipe2PCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param), init(false)
   {
     fillInnerSolverParam(Kparam, param);
@@ -84,7 +84,7 @@ namespace quda {
     }
   }
   
-  PipePCG3::~PipePCG3(){
+  Pipe2PCG::~Pipe2PCG(){
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     if (init) {
@@ -92,25 +92,31 @@ namespace quda {
       if (K) {
 
         if (param.precision_precondition != param.precision_sloppy) {
-          delete w_pre;
-          delete p_pre;
+          delete q_pre;
+          delete c_pre;
+          delete d_pre;
+          delete g_pre;
         }
 
         delete zp;
+        delete cp;
         delete pp;
+        delete gp;
 
         delete K;
       }
 
+      delete pp;
+
       delete tmpp;
       delete rp;
- //     delete yp;
+      //delete yp;
 
       delete qp;
       delete wp;
     }
 
-    if(K) 
+    if(K) delete K;
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -143,7 +149,7 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
-  void PipePCG3::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+  void Pipe2PCG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     ColorSpinorParam csParam(b);
@@ -157,7 +163,7 @@ namespace quda {
 
       csParam.setPrecision(param.precision_sloppy);
 
-      qp   = ColorSpinorField::Create(csParam);
+      hp   = ColorSpinorField::Create(csParam);
 
       csParam.is_composite  = true;
       csParam.composite_dim = 2;
@@ -165,19 +171,34 @@ namespace quda {
       xp_sloppy = ColorSpinorField::Create(csParam);
       rp_sloppy = ColorSpinorField::Create(csParam);
       wp = ColorSpinorField::Create(csParam);
+      qp = ColorSpinorField::Create(csParam);
+      dp = ColorSpinorField::Create(csParam);
+
       zp = K ? ColorSpinorField::Create(csParam) : rp_sloppy;
       pp = K ? ColorSpinorField::Create(csParam) : wp;
+      cp = K ? ColorSpinorField::Create(csParam) : qp;
+
+      csParam.is_composite  = false;
+      csParam.composite_dim = 1;
+
+      gp = K ? ColorSpinorField::Create(csParam) : &dp->Component(1);
+
 
       // these low precision fields are used by the inner solver
       if ( K ) {
         printfQuda("Allocated resources for the preconditioner.\n");
         csParam.setPrecision(param.precision_precondition);
-	w_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : wp;
-	p_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : pp;
+	q_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &qp->Component(1);
+	c_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &cp->Component(1);
+
+	d_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &dp->Component(1);
+	g_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : gp;
       } else { //no preconditioner
         printfQuda("\nNo preconditioning...\n");
-        w_pre = nullptr;
-        p_pre = pp;
+        q_pre = nullptr;
+        c_pre = &cp->Component(1);//qp
+        d_pre = nullptr;
+        g_pre = gp;//dp
       }
 
       init = true;
@@ -189,18 +210,27 @@ namespace quda {
 
     ColorSpinorField *tmpp_sloppy = (param.precision_sloppy != param.precision) ? ColorSpinorField::Create(csParam) : tmpp;
 
-    ColorSpinorField &wPre = *w_pre;
-    ColorSpinorField &pPre = *p_pre;
+    ColorSpinorField &qPre = *q_pre;
+    ColorSpinorField &cPre = *c_pre;
+
+    ColorSpinorField &dPre = *d_pre;
+    ColorSpinorField &gPre = *g_pre;
+
     ColorSpinorField &tmp  = *tmpp;
     ColorSpinorField &tmp_sloppy  = *tmpp_sloppy;
+
+    ColorSpinorField &x_sloppy = *xp_sloppy;
+    ColorSpinorField &r_sloppy = *rp_sloppy;
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &z = *zp;
     ColorSpinorField &w = *wp;
     ColorSpinorField &q = *qp;
     ColorSpinorField &p = *pp;
-    ColorSpinorField &x_sloppy = *xp_sloppy;
-    ColorSpinorField &r_sloppy = *rp_sloppy;
+    ColorSpinorField &c = *cp;
+    ColorSpinorField &g = *gp;
+    ColorSpinorField &d = *dp;
+    ColorSpinorField &h = *hp;
 
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
@@ -245,127 +275,165 @@ namespace quda {
     blas::xpay(b,-1.0, r);
 
     r_sloppy.Component(0) = r;
-    x_sloppy.Component(0) = x;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+
+    // now create the worker class for updating the gradient vectors
+#ifdef USE_WORKER
+    GlobalMPIallreduce global_reduce((double*)&local_reduce, 10);
+    dslash::aux_worker = nullptr;//&global_reduce;
+#else
+    //MsgHandle* allreduceHandle = comm_handle();
+    MPI_Request request_handle;
+    double *recvbuff           = new double[10];//mpi buffer for async global reduction
+#endif
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     double4 local_reduce;//to keep double3 or double4 registers
 
-    double beta, gamma, delta, delta_old, rho = 1.0;
+    double lambda[10], beta[3], gamma[3], delta[3];
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if(K) {
-      wPre.Component(0) = r_sloppy.Component(0);
+      qPre = r_sloppy.Component(0);
       commGlobalReductionSet(false);
-      (*K)(pPre.Component(0), wPre.Component(0));
+      (*K)(cPre, qPre);
       commGlobalReductionSet(true);
-      z.Component(0) = pPre.Component(0);
+      z.Component(0) = cPre;
     } 
 
     matSloppy(w.Component(0), z.Component(0), tmp_sloppy); // => w = A*u;
 
-    delta   = blas::reDotProduct(z.Component(0),w.Component(0)); 
-    beta    = blas::reDotProduct(z.Component(0),r.Component(0)); 
+    delta[0]   = blas::reDotProduct(z.Component(0),w.Component(0)); 
+    beta[0]    = blas::reDotProduct(z.Component(0),r.Component(0)); 
     double mNorm   = blas::norm2(z.Component(0));
 
-    gamma  = beta / delta; 
+    gamma[0]  = beta[0] / delta[0];
 
     const double uro   = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double tau = 100.0*sqrt(uro);
 
     blas::flops = 0;
 
-    // now create the worker class for updating the gradient vectors
-#ifdef USE_WORKER
-    GlobalMPIallreduce global_reduce((double*)&local_reduce, 3);
-    dslash::aux_worker = nullptr;//&global_reduce;
-#else
-    //MsgHandle* allreduceHandle = comm_handle();
-    MPI_Request request_handle;
-    double *recvbuff           = new double[3];//mpi buffer for async global reduction
-#endif
-
     if(K) {
-      wPre.Component(0) = w.Component(0);
+      dPre = w.Component(0);
       commGlobalReductionSet(false);
-      (*K)(pPre.Component(0), wPre.Component(0));
+      (*K)(gPre, dPre);
       commGlobalReductionSet(true);
-      p.Component(0) = pPre.Component(0);
+      p.Component(0) = gPre;
     } 
     //
-    matSloppy(q, p.Component(0), tmp_sloppy);
+    matSloppy(q.Component(0), p.Component(0), tmp_sloppy);
+
+    lambda[1] = blas::reDotProduct(p.Component(0),q.Component(0));
+    lambda[0] = delta[0];
+    lambda[6] = beta[0];
+
+    if(K) {
+      qPre = q.Component(0);
+      commGlobalReductionSet(false);
+      (*K)(cPre, qPre);
+      commGlobalReductionSet(true);
+      c.Component(0) = cPre;
+    } 
+    //
+    matSloppy(d.Component(0), c.Component(0), tmp_sloppy);
+
+    delta[1] = lambda[0] - 2.0*gamma[0]*lambda[1] + gamma[0]*gamma[0]*lambda[3]; 
+    beta [1] = lambda[6] - 2.0*gamma[0]*lambda[0] + gamma[0]*gamma[0]*lambda[1];
 
     int j = 1;
 
-    PrintStats( "PipePCG3 (before main loop)", j, mNorm, b2, 0.0);
+    PrintStats( "Pipe2PCG (before main loop)", j, mNorm, b2, 0.0);
 
     int updateR = 0;
 
+    gamma[1] = beta[1] / delta[1]; 
+
+    double rhoj   = 1.0;
+    double rhojp1 = 1.0 / (1-gamma[1]*beta[1] / (gamma[0]*beta[0]) ) ;
+
+
     while(!convergence(mNorm, 0.0, stop, param.tol_hq) && j < param.maxiter){
 
-      double mu = 1 - rho;
-      double nu = rho*gamma;
+      double muj   = 1 - rhoj;
+      double mujp1 = 1 - rhojp1;
+      int currentj = j;
  
-      int jm2   = j % 2;
-      int jm1   = 1 - jm2;
-
-      axpbypcz(rho, x_sloppy.Component(jm1), nu, z.Component(jm1), mu, x_sloppy.Component(jm2));
-      axpbypcz(rho, r_sloppy.Component(jm1), nu, w.Component(jm1), mu, r_sloppy.Component(jm2));
-      axpbypcz(rho, w.Component(jm1), nu, q, mu, w.Component(jm2));
-      if (K) axpbypcz(rho, z.Component(jm1), nu, *pp, mu, z.Component(jm2));
-
-      int &currentj   = jm2;
-
-      delta   = blas::reDotProduct(z.Component(currentj),w.Component(currentj)); 
-      beta    = blas::reDotProduct(z.Component(currentj),r.Component(currentj)); 
-      mNorm   = blas::norm2(z.Component(currentj));
-
 #ifdef USE_WORKER
       {
         if(K) {
-          wPre.Component(currentj) = w.Component(currentj);
+          qPre = q.Component(1);
+
           commGlobalReductionSet(false);
-          (*K)(pPre.Component(currentj), wPre.Component(currentj));
+          (*K)(cPre, qPre);
           commGlobalReductionSet(true);
-          p.Component(currentj) = pPre.Component(currentj);
+
+          c.Component(1) = cPre;
         }      
-          //
+        //
         dslash::aux_worker = &global_reduce;
-        matSloppy(q, p.Component(currentj), tmp_sloppy);
+        matSloppy(d.Component(1), c.Component(1), tmp_sloppy);
+        dslash::aux_worker = nullptr;
+
+        if(K) {
+          dPre = d.Component(1);
+
+          commGlobalReductionSet(false);
+          (*K)(gPre, dPre);
+          commGlobalReductionSet(true);
+
+          g = gPre;
+        }      
+        //
+        dslash::aux_worker = &global_reduce;
+        matSloppy(h, g, tmp_sloppy);
         dslash::aux_worker = nullptr;
 
       }
 #else
       {
 #ifdef NONBLOCK_REDUCE
-        MPI_CHECK_(MPI_Iallreduce((double*)&local_reduce, recvbuff, 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+        MPI_CHECK_(MPI_Iallreduce((double*)&local_reduce, recvbuff, 10, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
 #else
-        reduceDoubleArray((double*)&local_reduce, 3);
+        reduceDoubleArray((double*)&local_reduce, 10);
 #endif
         if(K) {
-          wPre.Component(currentj) = w.Component(currentj);
+          qPre = q.Component(1);
 
           commGlobalReductionSet(false);
-          (*K)(pPre.Component(currentj), wPre.Component(currentj));
+          (*K)(cPre, qPre);
           commGlobalReductionSet(true);
 
-          p.Component(currentj) = pPre.Component(currentj);
-        } 
+          c.Component(1) = cPre;
+        }      
         //
-        matSloppy(q, p.Component(currentj), tmp_sloppy);
+        matSloppy(d.Component(1), c.Component(1), tmp_sloppy);
+
+        if(K) {
+          dPre = d.Component(1);
+
+          commGlobalReductionSet(false);
+          (*K)(gPre, dPre);
+          commGlobalReductionSet(true);
+
+          g = gPre;
+        }      
+        //
+        matSloppy(h, g, tmp_sloppy);
+
 #ifdef NONBLOCK_REDUCE//sync point
         MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
-        memcpy(&local_reduce, recvbuff, 3*sizeof(double));
+        memcpy(&local_reduce, recvbuff, 10*sizeof(double));
 #endif
       }
 #endif //end of USE_WORKER
 
-      j += 1;
+      j += 2;
     }
 
 #ifdef NONBLOCK_REDUCE

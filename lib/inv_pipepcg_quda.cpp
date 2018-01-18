@@ -592,4 +592,8 @@ tau = 10 * sqrt(uro) fails!
 #undef USE_WORKER
 #endif
 
+#ifdef NONBLOCK_REDUCE
+#undef MPI_CHECK_
+#endif 
+
 } // namespace quda
