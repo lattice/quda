@@ -23,8 +23,7 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>
-#include <thrust/device_ptr.h>
-#include <thrust/transform_reduce.h>
+#include <thrust_helper.cuh>
 
 namespace quda {
 
@@ -436,19 +435,21 @@ namespace quda {
 
       /**
        * Returns the L2 norm squared of the field in a given dimension
+       * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
       */
-      __host__ double norm2() const {
+      __host__ double norm2(bool global=true) const {
 	double nrm2 = 0;
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
+	  thrust_allocator alloc;
 	  thrust::device_ptr<complex<Float> > ptr(v);
-	  nrm2 = thrust::transform_reduce(ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
+	  nrm2 = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
 					  square<double,Float>(), 0.0, thrust::plus<double>());
 	} else {
 	  nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
 					  square<double,Float>(), 0.0, thrust::plus<double>());
 	}
-	comm_allreduce(&nrm2);
+	if (global) comm_allreduce(&nrm2);
 	return nrm2;
       }
 
