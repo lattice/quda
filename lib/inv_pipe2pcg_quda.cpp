@@ -154,6 +154,8 @@ namespace quda {
 
     ColorSpinorParam csParam(b);
 
+    auto  MergedLocalReducer = K ? pipe2PCGMergedOp : pipe2CGMergedOp;
+
     if (!init) {
       // high precision fields:
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -219,18 +221,28 @@ namespace quda {
     ColorSpinorField &tmp  = *tmpp;
     ColorSpinorField &tmp_sloppy  = *tmpp_sloppy;
 
-    ColorSpinorField &x_sloppy = *xp_sloppy;
-    ColorSpinorField &r_sloppy = *rp_sloppy;
+    ColorSpinorField &x0_sloppy = xp_sloppy->Component(0);
+    ColorSpinorField &x1_sloppy = xp_sloppy->Component(1);
+    ColorSpinorField &r0_sloppy = rp_sloppy->Component(0);
+    ColorSpinorField &r1_sloppy = rp_sloppy->Component(1);
 
     ColorSpinorField &r = *rp;
-    ColorSpinorField &z = *zp;
-    ColorSpinorField &w = *wp;
-    ColorSpinorField &q = *qp;
-    ColorSpinorField &p = *pp;
-    ColorSpinorField &c = *cp;
+    ColorSpinorField &z0 = zp->Component(0);
+    ColorSpinorField &w0 = wp->Component(0);
+    ColorSpinorField &q0 = qp->Component(0);
+    ColorSpinorField &p0 = pp->Component(0);
+    ColorSpinorField &c0 = cp->Component(0);
     ColorSpinorField &g = *gp;
-    ColorSpinorField &d = *dp;
+    ColorSpinorField &d0 = dp->Component(0);
     ColorSpinorField &h = *hp;
+
+    ColorSpinorField &z1 = zp->Component(1);
+    ColorSpinorField &w1 = wp->Component(1);
+    ColorSpinorField &q1 = qp->Component(1);
+    ColorSpinorField &p1 = pp->Component(1);
+    ColorSpinorField &c1 = cp->Component(1);
+    ColorSpinorField &g1 = gp->Component(1);
+    ColorSpinorField &d1 = dp->Component(1);
 
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
@@ -274,7 +286,7 @@ namespace quda {
     mat(r, x, tmp); // => r = A*x;
     blas::xpay(b,-1.0, r);
 
-    r_sloppy.Component(0) = r;
+    r0_sloppy = r;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
@@ -291,28 +303,28 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
-    double4 local_reduce;//to keep double3 or double4 registers
+    double4 *local_reduce = new double4[3];//to keep double3 or double4 registers
 
-    double lambda[10], beta[3], gamma[3], delta[3];
+    double lambda[10], beta, betajp1, gamma, gammajp1, delta, deltajp1;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if(K) {
-      qPre = r_sloppy.Component(0);
+      qPre = r0_sloppy;
       commGlobalReductionSet(false);
       (*K)(cPre, qPre);
       commGlobalReductionSet(true);
-      z.Component(0) = cPre;
+      z0 = cPre;
     } 
 
-    matSloppy(w.Component(0), z.Component(0), tmp_sloppy); // => w = A*u;
+    matSloppy(w0, z0, tmp_sloppy); // => w = A*u;
 
-    delta[0]   = blas::reDotProduct(z.Component(0),w.Component(0)); 
-    beta[0]    = blas::reDotProduct(z.Component(0),r.Component(0)); 
-    double mNorm   = blas::norm2(z.Component(0));
+    delta   = blas::reDotProduct(z0,w0); 
+    beta    = blas::reDotProduct(z0,r0_sloppy); 
+    double mNorm   = blas::norm2(z0);
 
-    gamma[0]  = beta[0] / delta[0];
+    gamma  = beta / delta;
 
     const double uro   = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double tau = 100.0*sqrt(uro);
@@ -320,31 +332,31 @@ namespace quda {
     blas::flops = 0;
 
     if(K) {
-      dPre = w.Component(0);
+      dPre = w0;
       commGlobalReductionSet(false);
       (*K)(gPre, dPre);
       commGlobalReductionSet(true);
-      p.Component(0) = gPre;
+      p0 = gPre;
     } 
     //
-    matSloppy(q.Component(0), p.Component(0), tmp_sloppy);
+    matSloppy(q0, p0, tmp_sloppy);
 
-    lambda[1] = blas::reDotProduct(p.Component(0),q.Component(0));
-    lambda[0] = delta[0];
-    lambda[6] = beta[0];
+    lambda[1] = blas::reDotProduct(p0,q0);
+    lambda[0] = delta;
+    lambda[6] = beta;
 
     if(K) {
-      qPre = q.Component(0);
+      qPre = q0;
       commGlobalReductionSet(false);
       (*K)(cPre, qPre);
       commGlobalReductionSet(true);
-      c.Component(0) = cPre;
+      c0 = cPre;
     } 
     //
-    matSloppy(d.Component(0), c.Component(0), tmp_sloppy);
+    matSloppy(d0, c0, tmp_sloppy);
 
-    delta[1] = lambda[0] - 2.0*gamma[0]*lambda[1] + gamma[0]*gamma[0]*lambda[3]; 
-    beta [1] = lambda[6] - 2.0*gamma[0]*lambda[0] + gamma[0]*gamma[0]*lambda[1];
+    deltajp1 = lambda[0] - 2.0*gamma*lambda[1] + gamma*gamma*lambda[3]; 
+    betajp1  = lambda[6] - 2.0*gamma*lambda[0] + gamma*gamma*lambda[1];
 
     int j = 1;
 
@@ -352,36 +364,39 @@ namespace quda {
 
     int updateR = 0;
 
-    gamma[1] = beta[1] / delta[1]; 
+    gammajp1 = betajp1 / deltajp1; 
 
     double rhoj   = 1.0;
-    double rhojp1 = 1.0 / (1-gamma[1]*beta[1] / (gamma[0]*beta[0]) ) ;
+    double rhojp1 = 1.0 / (1-gammajp1*betajp1 / (gamma*beta) ) ;
 
 
     while(!convergence(mNorm, 0.0, stop, param.tol_hq) && j < param.maxiter){
 
       double muj   = 1 - rhoj;
       double mujp1 = 1 - rhojp1;
-      int currentj = j;
+
+      commGlobalReductionSet(false);//disable global reduction
+      MergedLocalReducer( local_reduce, rhoj, (rhoj*gamma), muj, rhojp1, (rhojp1*gammajp1), mujp1, x0_sloppy, r0_sloppy, w0, q0, d0, h, z0, p0, c0, g, x1_sloppy, r1_sloppy, w1, q1, d1, h, z1, p1, c1, g );
+      commGlobalReductionSet(true);
  
 #ifdef USE_WORKER
       {
         if(K) {
-          qPre = q.Component(1);
+          qPre = q1;
 
           commGlobalReductionSet(false);
           (*K)(cPre, qPre);
           commGlobalReductionSet(true);
 
-          c.Component(1) = cPre;
+          c1 = cPre;
         }      
         //
         dslash::aux_worker = &global_reduce;
-        matSloppy(d.Component(1), c.Component(1), tmp_sloppy);
+        matSloppy(d1, c1, tmp_sloppy);
         dslash::aux_worker = nullptr;
 
         if(K) {
-          dPre = d.Component(1);
+          dPre = d1;
 
           commGlobalReductionSet(false);
           (*K)(gPre, dPre);
@@ -403,19 +418,19 @@ namespace quda {
         reduceDoubleArray((double*)&local_reduce, 10);
 #endif
         if(K) {
-          qPre = q.Component(1);
+          qPre = q1;
 
           commGlobalReductionSet(false);
           (*K)(cPre, qPre);
           commGlobalReductionSet(true);
 
-          c.Component(1) = cPre;
+          c1 = cPre;
         }      
         //
-        matSloppy(d.Component(1), c.Component(1), tmp_sloppy);
+        matSloppy(d1, c1, tmp_sloppy);
 
         if(K) {
-          dPre = d.Component(1);
+          dPre = d1;
 
           commGlobalReductionSet(false);
           (*K)(gPre, dPre);
@@ -433,8 +448,28 @@ namespace quda {
       }
 #endif //end of USE_WORKER
 
+      delta = lambda[0]; 
+      beta  = lambda[6]; 
+
+      gamma = beta / delta; 
+
+      rhoj = 1.0 / (1-gamma*beta / (gamma*betajp1*rhojp1) );
+
+      double phi0 = rhojp1;
+      double phi1 = - rhojp1*gammajp1;
+      double phi2 = 1.0 - rhojp1;
+
+      deltajp1 = phi0*phi0*lambda[0]+2*phi0*phi1*lambda[1]+2*phi0*phi2*lambda[2]+phi1*phi1*lambda[3]+2*phi1*phi2*lambda[4]+phi2*phi2*lambda[5]; 
+      betajp1  = phi0*phi0*lambda[6]+2*phi0*phi1*lambda[0]+2*phi0*phi2*lambda[7]+phi1*phi1*lambda[1]+2*phi1*phi2*lambda[2]+phi2*phi2*lambda[8]; 
+
+      gammajp1 = betajp1 / deltajp1; 
+
+      rhojp1 = 1.0 / (1-gammajp1*betajp1 / (gamma*beta*rhoj) );
+
       j += 2;
     }
+
+    delete[] local_reduce;
 
 #ifdef NONBLOCK_REDUCE
     delete [] recvbuff;
@@ -452,7 +487,7 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residual 
-    xpy(x_sloppy.Component(j%3), x);
+    xpy(x1_sloppy, x);
     mat(r, x, tmp);
     double true_res = blas::xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);

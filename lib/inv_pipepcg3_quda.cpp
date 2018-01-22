@@ -254,7 +254,7 @@ namespace quda {
 
     double4 local_reduce;//to keep double3 or double4 registers
 
-    double beta, gamma, delta, delta_old, rho = 1.0;
+    double beta, beta_old, gamma, gamma_old, delta, delta_old, rho, rho_old;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -274,6 +274,8 @@ namespace quda {
     double mNorm   = blas::norm2(z.Component(0));
 
     gamma  = beta / delta; 
+
+    rho = 1.0;
 
     const double uro   = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double tau = 100.0*sqrt(uro);
@@ -311,32 +313,29 @@ namespace quda {
       double mu = 1 - rho;
       double nu = rho*gamma;
  
-      int jm2   = j % 2;
-      int jm1   = 1 - jm2;
+      axpbypcz(rho, x_sloppy.Component(0), nu, z.Component(0), mu, x_sloppy.Component(1));
+      axpbypcz(rho, r_sloppy.Component(0), -nu, w.Component(0), mu, r_sloppy.Component(1));
+      axpbypcz(rho, w.Component(0), -nu, q, mu, w.Component(1));
+      if (K) axpbypcz(rho, z.Component(0), -nu, *pp, mu, z.Component(1));
 
-      axpbypcz(rho, x_sloppy.Component(jm1), nu, z.Component(jm1), mu, x_sloppy.Component(jm2));
-      axpbypcz(rho, r_sloppy.Component(jm1), nu, w.Component(jm1), mu, r_sloppy.Component(jm2));
-      axpbypcz(rho, w.Component(jm1), nu, q, mu, w.Component(jm2));
-      if (K) axpbypcz(rho, z.Component(jm1), nu, *pp, mu, z.Component(jm2));
+      delta_old = delta;
+      beta_old  = beta;
 
-      int &currentj   = jm2;
-
-      delta   = blas::reDotProduct(z.Component(currentj),w.Component(currentj)); 
-      beta    = blas::reDotProduct(z.Component(currentj),r.Component(currentj)); 
-      mNorm   = blas::norm2(z.Component(currentj));
+      delta   = blas::reDotProduct(z.Component(1),w.Component(1)); 
+      beta    = blas::reDotProduct(z.Component(1),r.Component(1)); 
 
 #ifdef USE_WORKER
       {
         if(K) {
-          wPre.Component(currentj) = w.Component(currentj);
+          wPre.Component(1) = w.Component(1);
           commGlobalReductionSet(false);
-          (*K)(pPre.Component(currentj), wPre.Component(currentj));
+          (*K)(pPre.Component(1), wPre.Component(1));
           commGlobalReductionSet(true);
-          p.Component(currentj) = pPre.Component(currentj);
+          p.Component(1) = pPre.Component(1);
         }      
           //
         dslash::aux_worker = &global_reduce;
-        matSloppy(q, p.Component(currentj), tmp_sloppy);
+        matSloppy(q, p.Component(1), tmp_sloppy);
         dslash::aux_worker = nullptr;
 
       }
@@ -348,16 +347,16 @@ namespace quda {
         reduceDoubleArray((double*)&local_reduce, 3);
 #endif
         if(K) {
-          wPre.Component(currentj) = w.Component(currentj);
+          wPre.Component(1) = w.Component(1);
 
           commGlobalReductionSet(false);
-          (*K)(pPre.Component(currentj), wPre.Component(currentj));
+          (*K)(pPre.Component(1), wPre.Component(1));
           commGlobalReductionSet(true);
 
-          p.Component(currentj) = pPre.Component(currentj);
+          p.Component(1) = pPre.Component(1);
         } 
         //
-        matSloppy(q, p.Component(currentj), tmp_sloppy);
+        matSloppy(q, p.Component(1), tmp_sloppy);
 #ifdef NONBLOCK_REDUCE//sync point
         MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
         memcpy(&local_reduce, recvbuff, 3*sizeof(double));
@@ -365,7 +364,75 @@ namespace quda {
       }
 #endif //end of USE_WORKER
 
-      j += 1;
+      gamma_old = gamma;
+      gamma     = beta / delta;
+
+      rho_old = rho;
+      rho     = 1.0 / (1-(gamma * beta) / (gamma_old*beta_old*rho_old));
+
+      mu = 1 - rho;
+      nu = rho*gamma;
+ 
+
+      axpbypcz(rho, x_sloppy.Component(1), nu, z.Component(1), mu, x_sloppy.Component(0));
+      axpbypcz(rho, r_sloppy.Component(1), -nu, w.Component(1), mu, r_sloppy.Component(0));
+      axpbypcz(rho, w.Component(1), -nu, q, mu, w.Component(0));
+      if (K) axpbypcz(rho, z.Component(1), -nu, *pp, mu, z.Component(0));
+
+      delta_old = delta;
+      beta_old  = beta;
+
+      delta   = blas::reDotProduct(z.Component(0),w.Component(0)); 
+      beta    = blas::reDotProduct(z.Component(0),r.Component(0)); 
+      mNorm   = blas::norm2(z.Component(0));
+
+#ifdef USE_WORKER
+      {
+        if(K) {
+          wPre.Component(0) = w.Component(0);
+          commGlobalReductionSet(false);
+          (*K)(pPre.Component(0), wPre.Component(0));
+          commGlobalReductionSet(true);
+          p.Component(0) = pPre.Component(0);
+        }      
+          //
+        dslash::aux_worker = &global_reduce;
+        matSloppy(q, p.Component(0), tmp_sloppy);
+        dslash::aux_worker = nullptr;
+
+      }
+#else
+      {
+#ifdef NONBLOCK_REDUCE
+        MPI_CHECK_(MPI_Iallreduce((double*)&local_reduce, recvbuff, 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &request_handle));
+#else
+        reduceDoubleArray((double*)&local_reduce, 3);
+#endif
+        if(K) {
+          wPre.Component(0) = w.Component(0);
+
+          commGlobalReductionSet(false);
+          (*K)(pPre.Component(0), wPre.Component(0));
+          commGlobalReductionSet(true);
+
+          p.Component(0) = pPre.Component(0);
+        } 
+        //
+        matSloppy(q, p.Component(0), tmp_sloppy);
+#ifdef NONBLOCK_REDUCE//sync point
+        MPI_CHECK_(MPI_Wait(&request_handle, MPI_STATUS_IGNORE));
+        memcpy(&local_reduce, recvbuff, 3*sizeof(double));
+#endif
+      }
+#endif //end of USE_WORKER
+
+      gamma_old = gamma;
+      gamma     = beta / delta;
+
+      rho_old = rho;
+      rho     = 1.0 / (1-(gamma * beta) / (gamma_old*beta_old*rho_old));
+
+      j += 2;
     }
 
 #ifdef NONBLOCK_REDUCE

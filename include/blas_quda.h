@@ -105,6 +105,23 @@ namespace quda {
                                 ColorSpinorField &m, const double &b, ColorSpinorField &q,   
 			        ColorSpinorField &w, ColorSpinorField &n, ColorSpinorField &z);
 
+    void pipe2PCGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2, 
+                                ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1, 
+                                ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,   
+                                ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
+                                ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2, 
+                                ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,   
+			        ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2);
+
+    void pipe2CGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2, 
+                                ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1, 
+                                ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,   
+                                ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
+                                ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2, 
+                                ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,   
+			        ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2);
+
+
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     /**
        @brief Compute the block "caxpy" with over the set of

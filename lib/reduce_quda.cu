@@ -814,6 +814,12 @@ A.S. edit: extended to 16 for CA solvers
       virtual __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u,FloatN &r,
 						  FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) = 0;
 
+      //! where the reduction is usually computed and any auxiliary operations
+      virtual __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
+						  FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
+                                                  FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2, 
+                                                  FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) = 0;
+
       //! post-computation routine called after the "M-loop"
       virtual __device__ __host__ void post(ReduceType sum[Nreduce]) { ; }
 
@@ -871,6 +877,12 @@ A.S. edit: extended to 16 for CA solvers
          dot_<scalar>   (sum[0].y, w, u);
          norm2_<scalar> (sum[0].z, r);
       }
+
+     __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
+						  FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
+                                                  FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2, 
+                                                  FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) {}
+
       static int streams() { return 18; } //! total number of input and output streams
       static int flops() { return (16+6); } //! flops per real element
     };
@@ -923,6 +935,11 @@ A.S. edit: extended to 16 for CA solvers
 
          norm2_<scalar> (sum[0].z, r);
       }
+
+      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,
+						  FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
+                                                  FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2, 
+                                                  FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) {}
       static int streams() { return 18; } //! total number of input and output streams
       static int flops() { return (16+6); } //! flops per real element
     };
@@ -938,6 +955,146 @@ A.S. edit: extended to 16 for CA solvers
       reduce::reduceCudaExp<3, double4, QudaSumFloat4,pipePCGRRFletcherReevesMergedOp_,1,1,1,1,1,0,1,1,0,1,false>
 	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), x, p, u, r, s, m, q, w, n, z);
       return;
+    }
+
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
+    struct pipe2PCGMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      Float2 c;
+
+      Float2 a2;
+      Float2 b2;
+      Float2 c2;
+
+      pipe2PCGMergedOp_(const Float2 &a, const Float2 &b, const Float2 &c, const Float2 &a2, const Float2 &b2, const Float2 &c2) : a(a), b(b), c(c), a2(a2), b2(b2), c2(c2) { ; }
+      __device__ __host__ void operator()(ReduceType sum[Nreduce],FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
+                                          FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2,FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) { 
+	 typedef typename ScalarType<ReduceType>::type scalar;
+
+         x2 = a.x*x1 + b.x*z1 + c.x*x2;
+         r2 = a.x*r1 - b.x*w1 + c.x*r2;
+         w2 = a.x*w1 - b.x*q1 + c.x*w2;
+         q2 = a.x*q1 - b.x*d1 + c.x*q2;
+         d2 = a.x*d1 - b.x*h1 + c.x*d2;
+         z2 = a.x*z1 - b.x*p1 + c.x*z2;
+         p2 = a.x*p1 - b.x*u1 + c.x*p2;
+         u2 = a.x*u1 - b.x*g1 + c.x*u2;
+
+         x1 = a2.x*x2 + b2.x*z2 + c2.x*x1;
+         r1 = a2.x*r2 - b2.x*w2 + c2.x*r1;
+         w1 = a2.x*w2 - b2.x*q2 + c2.x*w1;
+         q1 = a2.x*q2 - b2.x*d2 + c2.x*q1;
+         z1 = a2.x*z2 - b2.x*p2 + c2.x*z1;
+         p1 = a2.x*p2 - b2.x*d2 + c2.x*p1;
+
+         dot_<scalar> (sum[0].x, z1, w1);//l0
+         dot_<scalar> (sum[0].y, z1, q1);//l1
+         dot_<scalar> (sum[0].w, z1, w2);//l2
+         dot_<scalar> (sum[0].z, p1, q1);//l3
+
+         dot_<scalar> (sum[1].x, p1, w2);//l4
+         dot_<scalar> (sum[1].y, z2, w2);//l5
+         dot_<scalar> (sum[1].w, z1, r1);//l6
+         dot_<scalar> (sum[1].z, z1, r2);//l7
+
+         dot_<scalar>   (sum[2].x, z2, r2);//l8
+         norm2_<scalar> (sum[2].y, z1);//l9
+
+         sum[2].z = 0.0;
+         sum[2].w = 0.0;
+
+      }
+
+      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u,FloatN &r,
+						  FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) {}
+
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
+
+    void pipe2PCGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2, 
+                                ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1, 
+                                ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,   
+                                ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
+                                ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2, 
+                                ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,   
+			        ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2) {
+
+      if (x1.Precision() != p1.Precision()) {
+         errorQuda("\nMixed blas is not implemented.\n");
+      } 
+      reduce::reduceComponentwiseCudaExp<3, double4, QudaSumFloat4,pipe2PCGMergedOp_,1,1,1,1,1,0,1,1,1,0,false>
+	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), make_double2(c, 0.0), make_double2(a2, 0.0), make_double2(b2, 0.0), make_double2(c2, 0.0),  x1, r1, w1, q1, d1, h1, z1, p1, u1, g1, x2, r2, w2, q2, d2, h2, z2, p2, u2, g2);
+
+       return;
+    }
+
+    template <int Nreduce, typename ReduceType, typename Float2, typename FloatN>
+    struct pipe2CGMergedOp_ : public ReduceFunctorExp<Nreduce, ReduceType, Float2, FloatN> {
+      Float2 a;
+      Float2 b;
+      Float2 c;
+
+      Float2 a2;
+      Float2 b2;
+      Float2 c2;
+
+      pipe2CGMergedOp_(const Float2 &a, const Float2 &b, const Float2 &c, const Float2 &a2, const Float2 &b2, const Float2 &c2) : a(a), b(b), c(c), a2(a2), b2(b2), c2(c2) { ; }
+      __device__ __host__ void operator()(ReduceType sum[Nreduce],FloatN &x1, FloatN &r1, FloatN &w1,FloatN &q1,FloatN &d1, FloatN &h1, FloatN &z1, FloatN &p1, FloatN &u1, FloatN &g1,
+                                          FloatN &x2, FloatN &r2, FloatN &w2,FloatN &q2, FloatN &d2, FloatN &h2,FloatN &z2, FloatN &p2, FloatN &u2, FloatN &g2) { 
+	 typedef typename ScalarType<ReduceType>::type scalar;
+
+         x2 = a.x*x1 + b.x*r1 + c.x*x2;
+         r2 = a.x*r1 - b.x*w1 + c.x*r2;
+         w2 = a.x*w1 - b.x*q1 + c.x*w2;
+         q2 = a.x*q1 - b.x*d1 + c.x*q2;
+         d2 = a.x*d1 - b.x*h1 + c.x*d2;
+
+         x1 = a2.x*x2 + b2.x*r2 + c2.x*x1;
+         r1 = a2.x*r2 - b2.x*w2 + c2.x*r1;
+         w1 = a2.x*w2 - b2.x*q2 + c2.x*w1;
+         q1 = a2.x*q2 - b2.x*d2 + c2.x*q1;
+
+         dot_<scalar> (sum[0].x, r1, w1);//l0
+         dot_<scalar> (sum[0].y, r1, q1);//l1
+         dot_<scalar> (sum[0].w, r1, w2);//l2
+         dot_<scalar> (sum[0].z, w1, q1);//l3
+
+         dot_<scalar> (sum[1].x, w1, w2);//l4
+         dot_<scalar> (sum[1].y, r2, w2);//l5
+         dot_<scalar> (sum[1].w, r1, r1);//l6
+         dot_<scalar> (sum[1].z, r1, r2);//l7
+
+         dot_<scalar>   (sum[2].x, r2, r2);//l8
+         norm2_<scalar> (sum[2].y, r1);//l9
+
+         sum[2].z = 0.0;
+         sum[2].w = 0.0;
+      }
+
+      __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u,FloatN &r,
+						  FloatN &s, FloatN &m, FloatN &q, FloatN &w, FloatN &n, FloatN &z) {}
+
+      static int streams() { return 18; } //! total number of input and output streams
+      static int flops() { return (16+6); } //! flops per real element
+    };
+
+    void pipe2CGMergedOp(double4 *buffer, const double &a, const double &b, const double &c, const double &a2, const double &b2, const double &c2, 
+                                ColorSpinorField &x1, ColorSpinorField &r1, ColorSpinorField &w1, 
+                                ColorSpinorField &q1, ColorSpinorField &d1, ColorSpinorField &h1, ColorSpinorField &z1,   
+                                ColorSpinorField &p1, ColorSpinorField &u1, ColorSpinorField &g1,
+                                ColorSpinorField &x2, ColorSpinorField &r2, ColorSpinorField &w2, 
+                                ColorSpinorField &q2, ColorSpinorField &d2, ColorSpinorField &h2, ColorSpinorField &z2,   
+			        ColorSpinorField &p2, ColorSpinorField &u2, ColorSpinorField &g2) {
+
+      if (x1.Precision() != p1.Precision()) {
+         errorQuda("\nMixed blas is not implemented.\n");
+      } 
+      reduce::reduceComponentwiseCudaExp<3, double4, QudaSumFloat4,pipe2CGMergedOp_,1,1,1,1,1,0,1,1,1,0,false>
+	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), make_double2(c, 0.0), make_double2(a2, 0.0), make_double2(b2, 0.0), make_double2(c2, 0.0),  x1, r1, w1, q1, d1, h1, z1, p1, u1, g1, x2, r2, w2, q2, d2, h2, z2, p2, u2, g2);
+
+       return;
     }
 
 ///END EXPERIMENTAL
