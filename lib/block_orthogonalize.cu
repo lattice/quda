@@ -17,8 +17,6 @@ namespace quda {
 
 #ifdef GPU_MULTIGRID
 
-#ifdef GPU_MULTIGRID
-
   using namespace quda::colorspinor;
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
