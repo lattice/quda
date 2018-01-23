@@ -215,10 +215,9 @@ namespace quda {
       struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
       int ghostOffset[4];
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
-	for (int d=0; d<4; d++) {
-	  ghostOffset[d] = nFace*a.SurfaceCB(d)*nColor*nSpin*nVec;
-	}
+	for (int d=0; d<4; d++) ghostOffset[d] = nFace*a.SurfaceCB(d)*nColor*nSpin*nVec;
       }
+      GhostAccessorCB() : ghostOffset{ } { }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
     };
@@ -405,13 +404,17 @@ namespace quda {
 
     protected:
       complex<storeFloat> *v;
+#ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
+#endif
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
       const QudaGammaBasis gammaBasis;
       const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
+#ifndef DISABLE_GHOST
       const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
+#endif
       const int siteSubset;
       const int nParity;
       const QudaFieldLocation location;
@@ -430,11 +433,16 @@ namespace quda {
         volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()),
 	siteSubset(field.SiteSubset()), nParity(field.SiteSubset()),
-        location(field.Location()), accessor(field), ghostAccessor(field,nFace),
+        location(field.Location()), accessor(field),
+#ifndef DISABLE_GHOST
+        ghostAccessor(field,nFace),
+#endif
         scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
 	for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d);
+#ifndef DISABLE_GHOST
 	resetGhost(ghost_ ? ghost_ : field.Ghost());
+#endif
 	resetScale(field.Scale());
       }
 
@@ -443,13 +451,15 @@ namespace quda {
        */
       virtual ~FieldOrderCB() { ; }
 
-      void resetGhost(void * const *ghost_) const
+#ifndef DISABLE_GHOST
+      void resetGhost(void * const * ghost_) const
       {
 	for (int d=0; d<4; d++) {
 	  ghost[2*d+0] = static_cast<complex<ghostFloat>*>(ghost_[2*d+0]);
 	  ghost[2*d+1] = static_cast<complex<ghostFloat>*>(ghost_[2*d+1]);
 	}
       }
+#endif
 
       void resetScale(Float max) {
 	if (fixed) {
@@ -489,6 +499,7 @@ namespace quda {
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int parity, int x_cb, int s, int c, int n=0)
 	{ return fieldorder_wrapper<Float,storeFloat>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv); }
 
+#ifndef DISABLE_GHOST
       /**
        * Read-only complex-member accessor function for the ghost
        * zone.  The last parameter n is only used for indexed into the
@@ -522,6 +533,7 @@ namespace quda {
 	const int idx = ghostAccessor.index(dim,dir,parity,x_cb,s,c,n);
 	return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx, scale, scale_inv);
       }
+#endif
 
       /**
 	 Convert from 1-dimensional index to the n-dimensional spatial index.
