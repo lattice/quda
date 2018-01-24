@@ -9,6 +9,14 @@
 #include <assert.h>
 
 #define DISABLE_GHOST // this removes ghost accessor reducing the parameter space needed
+
+#if CUDA_VERSION < 8000 && defined(__CUDA_ARCH__)
+// CUDA 7.x can't deal with array initialization from a parameter
+// pack.  This macro exposes a default constructor for the GPU
+// compiler while leaving the array initialization intact for the CPU compiler
+#define CUDA_CXX_ARRAY_WAR
+#endif
+
 #include <color_spinor_field_order.h>
 
 #include <integer_sequence.hpp> // C++11 version of this C++14 feature
@@ -28,7 +36,6 @@ namespace quda {
   template <typename Rotator, typename Vector, int fineSpin, int spinBlockSize, int coarseSpin, int nVec>
   struct BlockOrthoArg {
     Rotator V;
-    const Vector B[nVec];
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const spin_mapper<fineSpin,coarseSpin> spin_map;
@@ -39,14 +46,18 @@ namespace quda {
     int geoBlockSizeCB; // number of geometric elements in each checkerboarded block
     int nBlock; // number of blocks we are orthogonalizing
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
+    const Vector B[nVec];
 
     template <typename... T>
     BlockOrthoArg(ColorSpinorField &V,
                   const int *fine_to_coarse, const int *coarse_to_fine,
 		  int parity, const int *geo_bs, const ColorSpinorField &meta,
 		  T... B) :
-      V(V), B{*B...}, fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+      V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       spin_map(), parity(parity), nParity(meta.SiteSubset()), swizzle(1)
+#ifndef CUDA_CXX_ARRAY_WAR
+      , B{*B...}
+#endif
     {
       geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
@@ -347,6 +358,7 @@ namespace quda {
      */
     template <typename Rotator, typename Vector, int block_size, std::size_t... S>
     void GPU(const TuneParam &tp, const cudaStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
+      typedef typename mapper<real>::type RegType; // need to redeclare typedef (WAR for CUDA 7 and 8)
       typedef BlockOrthoArg<Rotator,Vector,nSpin,spinBlockSize,coarseSpin,nVec> Arg;
       Arg arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, V, B[S]...);
       arg.swizzle = tp.aux.x;

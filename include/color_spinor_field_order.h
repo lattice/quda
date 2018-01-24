@@ -194,11 +194,13 @@ namespace quda {
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB { 
       AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
+      AccessorCB() { errorQuda("Not implemented"); }
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const { return 0; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct GhostAccessorCB {
       GhostAccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
+      GhostAccessorCB() { errorQuda("Not implemented"); }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return 0; }
     };
@@ -207,6 +209,7 @@ namespace quda {
       struct AccessorCB<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> { 
       const int offset_cb;
     AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
+    AccessorCB() : offset_cb(0) { }
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const 
       { return parity*offset_cb + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
     };
@@ -236,6 +239,7 @@ namespace quda {
       const int offset_cb;
     AccessorCB(const ColorSpinorField &field): stride(field.Stride()), 
 	offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
+    AccessorCB(): stride(0), offset_cb(0) { }
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const 
       { return parity*offset_cb + ((s*nColor+c)*nVec+v)*stride+x_cb; }
     };
@@ -250,6 +254,7 @@ namespace quda {
 	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
 	}
       }
+      GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((s*nColor+c)*nVec+v)*faceVolumeCB[dim] + x_cb; }
     };
@@ -260,6 +265,7 @@ namespace quda {
       const int offset_cb;
     AccessorCB(const ColorSpinorField &field): stride(field.Stride()), 
 	offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
+    AccessorCB() : stride(0), offset_cb(0) { }
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const 
       { return parity*offset_cb + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, stride); }
     };
@@ -274,6 +280,7 @@ namespace quda {
 	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
 	}
       }
+    GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]); }
     };
@@ -445,6 +452,21 @@ namespace quda {
 #endif
 	resetScale(field.Scale());
       }
+
+#ifdef CUDA_CXX_ARRAY_WAR
+    /**
+     * Default constructor for the FieldOrderCB class.  This is only
+     * exposed for CUDA 7 which cannot handle C++ array initialization
+     * from a parameter pack, so with this enabled we enable the GPU
+     * compiler to see the default constructor.  Enabled
+     * block_orthogonalize.cu.
+     */
+    FieldOrderCB()
+    : v(nullptr), volumeCB(0), nDim(0), gammaBasis(QUDA_INVALID_GAMMA_BASIS),
+      siteSubset(QUDA_INVALID_SITE_SUBSET), nParity(0), location(QUDA_INVALID_FIELD_LOCATION),
+      scale(static_cast<Float>(0.0)), scale_inv(static_cast<Float>(0.0))
+      {  }
+#endif
 
       /**
        * Destructor for the FieldOrderCB class
