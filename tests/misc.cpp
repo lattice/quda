@@ -1156,6 +1156,10 @@ get_solver_type(char* s)
     ret = QUDA_CGNR_INVERTER;
   } else if (strcmp(s, "pipepcg") == 0){
     ret = QUDA_PIPEPCG_INVERTER;
+  } else if (strcmp(s, "pipepcg3") == 0){
+    ret = QUDA_PIPEPCG3_INVERTER;
+  } else if (strcmp(s, "pipe2pcg") == 0){
+    ret = QUDA_PIPE2PCG_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);
@@ -1220,6 +1224,12 @@ get_solver_str(QudaInverterType type)
     break;
   case QUDA_PIPEPCG_INVERTER:
     ret = "pipepcg";
+    break;
+  case QUDA_PIPEPCG3_INVERTER:
+    ret = "pipepcg3";
+    break;
+  case QUDA_PIPE2PCG_INVERTER:
+    ret = "pipe2pcg";
     break;
   default:
     ret = "unknown";

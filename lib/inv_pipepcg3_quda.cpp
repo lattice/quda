@@ -270,7 +270,7 @@ namespace quda {
     matSloppy(w.Component(0), z.Component(0), tmp_sloppy); // => w = A*u;
 
     delta   = blas::reDotProduct(z.Component(0),w.Component(0)); 
-    beta    = blas::reDotProduct(z.Component(0),r.Component(0)); 
+    beta    = blas::reDotProduct(z.Component(0),r_sloppy.Component(0)); 
     double mNorm   = blas::norm2(z.Component(0));
 
     gamma  = beta / delta; 
@@ -322,7 +322,7 @@ namespace quda {
       beta_old  = beta;
 
       delta   = blas::reDotProduct(z.Component(1),w.Component(1)); 
-      beta    = blas::reDotProduct(z.Component(1),r.Component(1)); 
+      beta    = blas::reDotProduct(z.Component(1),r_sloppy.Component(1)); 
 
 #ifdef USE_WORKER
       {
@@ -383,7 +383,7 @@ namespace quda {
       beta_old  = beta;
 
       delta   = blas::reDotProduct(z.Component(0),w.Component(0)); 
-      beta    = blas::reDotProduct(z.Component(0),r.Component(0)); 
+      beta    = blas::reDotProduct(z.Component(0),r_sloppy.Component(0)); 
       mNorm   = blas::norm2(z.Component(0));
 
 #ifdef USE_WORKER
@@ -431,6 +431,8 @@ namespace quda {
 
       rho_old = rho;
       rho     = 1.0 / (1-(gamma * beta) / (gamma_old*beta_old*rho_old));
+
+      PrintStats( "PipePCG3", j, mNorm, b2, 0.0);
 
       j += 2;
     }
