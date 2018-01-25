@@ -178,7 +178,7 @@ namespace quda {
 	r_pre = ColorSpinorField::Create(csParam);
       } else {
 	p_pre = mp;
-	r_pre = wp;
+	r_pre = np;//wp->np
       }
 
       init = true;
@@ -247,7 +247,7 @@ namespace quda {
     delete Ax;
     delete Ax_cuda;
 
-    const double mu    = K ? 1000.0 : 100.0; 
+    const double mu    = K ? 1000.0 : 1000.0; 
     const double blen  = b.RealLength();
     const double Anorm = sqrt(blas::norm2(r));
     const double msqrn = mu*sqrt(blen); 
@@ -403,15 +403,17 @@ tau = 10 * sqrt(uro) fails!
       ajm1 = fabs(alpha_old);
       bjm1 = fabs(beta_old);
 
+      constexpr double fma_factor = 1.0;//1.0 for FMA instructions and 2.0 for separate fp operations leading to classical relations
+
       if(j > 0) {
         PrintStats( "PipePCG", j, mNorm_old, b2, heavy_quark_res);
 
-        ef = Anorm*(chi+2*ajm1*pi_old ) + sqrt(mNorm_old2) + 2*ajm1*sigma_old;
-        eh = Anorm*(ksi+2*ajm1*phi_old) + omega_old + 2*ajm1*psi_old;
+        ef = Anorm*(chi+2*ajm1*pi_old ) + sqrt(mNorm_old2) + fma_factor*ajm1*sigma_old;
+        eh = Anorm*(ksi+2*ajm1*phi_old) + omega_old + fma_factor*ajm1*psi_old;
 
         if(j > 1) {
-          eg = Anorm*(ksi+2*bjm1*pi_old2) + omega_old + 2*bjm1*sigma_old2;
-          ek = Anorm*((msqrn+2)*nu_old+2*bjm1*phi_old2) + 2*bjm1*psi_old2;
+          eg = Anorm*(ksi+2*bjm1*pi_old2) + omega_old + fma_factor*bjm1*sigma_old2;
+          ek = Anorm*((msqrn+2)*nu_old+2*bjm1*phi_old2) + fma_factor*bjm1*psi_old2;
         }
 
         if(j == 1 or updateR) {
@@ -497,13 +499,16 @@ tau = 10 * sqrt(uro) fails!
 //in this approach all reduce is overlapped with matvec only.
 //more robust way just to call non-blocking allreduce and then synchronize 
         if(K) {
-          rPre = w;
+          n = r_sloppy;
+          xpay(w, -1.0, n);
+          rPre = n;
 
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
 
           m = pPre;
+          xpy(u, m);
         } else {
           m = w;
         }        
@@ -521,13 +526,16 @@ tau = 10 * sqrt(uro) fails!
         reduceDoubleArray((double*)&local_reduce, 12);
 #endif
         if(K) {
-          rPre = w;
+          n = r_sloppy;
+          xpay(w, -1.0, n);
+          rPre = n;
          
           commGlobalReductionSet(false);
           (*K)(pPre, rPre);
           commGlobalReductionSet(true);
 
           m = pPre;
+          xpy(u, m);
         } else {
           m = w;
         }
