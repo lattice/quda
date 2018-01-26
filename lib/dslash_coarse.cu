@@ -464,6 +464,7 @@ namespace quda {
     const int nParity;
     const int nSrc;
 
+#define EIGHT_WAY_WARP_SPLIT
 #ifdef EIGHT_WAY_WARP_SPLIT
     const int max_color_col_stride = 8;
 #else
