@@ -4,7 +4,7 @@ QUDA = libquda.a
 
 QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	coarsecoarse_op.o coarse_op_preconditioned.o 			\
-	multigrid.o transfer.o transfer_util.o				\
+	multigrid.o transfer.o block_orthogonalize.o			\
 	prolongator.o restrictor.o gauge_phase.o timer.o malloc.o	\
 	solver.o inv_bicgstab_quda.o inv_cg_quda.o inv_cg3_quda.o	\
 	inv_cg3ne_quda.o						\

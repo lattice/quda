@@ -1,6 +1,6 @@
 #include <comm_quda.h>
-#include <thrust_helper.cuh>
 #include <gauge_fix_ovr_extra.h>
+#include <thrust_helper.cuh>
 
 namespace quda {
 
@@ -79,7 +79,7 @@ namespace quda {
     thrust::device_ptr<int> array_faceT[2];
     thrust::device_ptr<int> array_interiorT[2];
     for ( int i = 0; i < 2; i++ ) { //even and odd ids
-      cudaMalloc(&borderpoints[i], nlinksfaces * sizeof(int) );
+      borderpoints[i] = static_cast<int*>(pool_device_malloc(nlinksfaces * sizeof(int) ));
       cudaMemset(borderpoints[i], 0, nlinksfaces * sizeof(int) );
       array_faceT[i] = thrust::device_pointer_cast(borderpoints[i]);
     }
@@ -96,7 +96,8 @@ namespace quda {
     int size[2];
     for ( int i = 0; i < 2; i++ ) {
       //sort and remove duplicated lattice indices
-      thrust::sort(array_faceT[i], array_faceT[i] + nlinksfaces);
+      thrust_allocator alloc;
+      thrust::sort(thrust::cuda::par(alloc), array_faceT[i], array_faceT[i] + nlinksfaces);
       thrust::device_ptr<int> new_end = thrust::unique(array_faceT[i], array_faceT[i] + nlinksfaces);
       size[i] = thrust::raw_pointer_cast(new_end) - thrust::raw_pointer_cast(array_faceT[i]);
     }
