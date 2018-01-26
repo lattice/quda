@@ -259,6 +259,7 @@ namespace quda {
     if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
 
     if (param.Precision() != QUDA_INVALID_PRECISION) precision = param.Precision();
+    if (param.GhostPrecision() != QUDA_INVALID_PRECISION) ghost_precision = param.GhostPrecision();
     if (param.nDim != 0) nDim = param.nDim;
 
     composite_descr.is_composite     = param.is_composite;
