@@ -206,8 +206,10 @@ namespace quda {
        @param[in] R Radius of the ghost zone
        @param[in] no_comms_fill If true we create a full halo
        regardless of partitioning
+       @param[in] bidir Is this a bi-directional exchange - if not
+       then we alias the fowards and backwards offsetss
     */
-    void createGhostZone(const int *R, bool no_comms_fill) const;
+    void createGhostZone(const int *R, bool no_comms_fill, bool bidir=true) const;
 
   public:
     GaugeField(const GaugeFieldParam &param);
@@ -356,19 +358,24 @@ namespace quda {
 
     /**
        @brief Create the communication handlers and buffers
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
+       @param[in] bidir Whether to allocate communication buffers to
+       allow for simultaneous bi-directional exchange.  If false, then
+       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(const int *R, bool no_comms_fill);
+    void createComms(const int *R, bool no_comms_fill, bool bidir=true);
 
     /**
        @brief Allocate the ghost buffers
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
+       @param[in] bidir Is this a bi-directional exchange - if not
+       then we alias the fowards and backwards offsetss
        region in non-partitioned dimensions
     */
-    void allocateGhostBuffer(const int *R, bool no_comms_fill) const;
+    void allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir=true) const;
 
     /**
        @brief Start the receive communicators

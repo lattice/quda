@@ -56,7 +56,7 @@ namespace quda {
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim),
       precision(param.Precision()), ghost_precision(param.GhostPrecision()),
       scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
-      ghost_bytes(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      ghost_bytes(0), ghost_bytes_old(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
@@ -98,7 +98,8 @@ namespace quda {
   LatticeField::LatticeField(const LatticeField &field)
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim),
       precision(field.precision), ghost_precision(field.ghost_precision),
-      scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
+      scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange),
+      ghost_bytes(0), ghost_bytes_old(0),
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
@@ -193,7 +194,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms(bool no_comms_fill)
+  void LatticeField::createComms(bool no_comms_fill, bool bidir)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -221,7 +222,8 @@ namespace quda {
 	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
       } // loop over b
 
-      offset += ghost_face_bytes[i];
+      // if not bidir then forwards and backwards will alias
+      if (bidir) offset += ghost_face_bytes[i];
 
       for (int b=0; b<2; ++b) {
 	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;

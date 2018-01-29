@@ -231,6 +231,11 @@ namespace quda {
     mutable size_t ghost_bytes;
 
     /**
+       Size in bytes of prior ghost allocation
+    */
+    mutable size_t ghost_bytes_old;
+
+    /**
        Size in bytes of the ghost in each dimension
     */
     mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
@@ -392,8 +397,11 @@ namespace quda {
        Create the communication handlers (both host and device)
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
+       @param[in] bidir Whether to allocate communication buffers to
+       allow for simultaneous bi-directional exchange.  If false, then
+       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(bool no_comms_fill=false);
+    void createComms(bool no_comms_fill=false, bool bidir=true);
 
     /**
        Destroy the communication handlers
