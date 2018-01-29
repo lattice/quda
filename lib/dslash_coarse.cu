@@ -1047,6 +1047,7 @@ namespace quda {
       i32toa(prec_str,dslash.Y.Precision());
       strcat(aux,prec_str);
       strcat(aux,comm_dim_partitioned_string());
+      strcat(aux,comm_dim_topology_string());
 
       int comm_sum = 4;
       if (dslash.commDim) for (int i=0; i<4; i++) comm_sum -= (1-dslash.commDim[i]);
