@@ -186,6 +186,8 @@ namespace quda {
    */
   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
+    if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
+
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -308,6 +310,11 @@ namespace quda {
    */
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
+    if (!comm_peer2peer_present()) {
+      device_free_(func, file, line, ptr);
+      return;
+    }
+
     if (!ptr) {
       printfQuda("ERROR: Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
