@@ -5,16 +5,23 @@
 #ifndef INTERFACE_QLUA_H__
 #define INTERFACE_QLUA_H__
 
+#ifndef LONG_T
+#define LONG_T long long
+#endif
+typedef double QUDA_REAL;
 
 #ifdef __cplusplus
+
+#define XTRN_CPLX std::complex<QUDA_REAL>
 
 #define EXTRN_C extern "C"
 
 #define delete_not_null(p) do { if (NULL != (p)) delete (p) ; } while(0)
 
-
 #else /*!defined(__cplusplus)*/
+#include <complex.h>
 #define EXTRN_C
+#define XTRN_CPLX double complex
 #endif/*__cplusplus*/
 
 #define QUDA_Nc 3
@@ -22,14 +29,15 @@
 #define QUDA_DIM 4
 #define QUDA_MAX_RANK 6
 #define QUDA_PROP_NVEC 12
+#define QUDA_TIME_AXIS 3
+#define QUDA_LEN_G (QUDA_Ns*QUDA_Ns)
 
 #define PI 2*asin(1.0)
 #define THREADS_PER_BLOCK 64
 
-#ifndef LONG_T
-#define LONG_T long long
-#endif
-typedef double QUDA_REAL;
+
+//#include <complex_quda.h>
+
 
 typedef enum qudaAPI_ContractId_s{
   cntr12 = 12,
@@ -67,16 +75,19 @@ typedef struct {
 } contractParam;
 
 typedef struct {
-  // first four parameters are set within qudaAPI as user input
-  int Ndata;
   int QsqMax;
+  int Nmoms;
+  int Ndata;
   int expSgn;
   int GPU_phaseMatrix;
-  
-  // these are set in the qlua-interface function
-  int V3;
   int momDim;
-  int Nmoms;
+  int V3;
+  int tAxis;
+  int Tdim;
+  double bc_t;
+  int csrc[QUDA_DIM];
+  LONG_T locvol;
+  int push_res;
 } momProjParam;
 
 typedef struct {
@@ -138,5 +149,10 @@ Qlua_invertQuda(
 		int nColor, int nSpin,
 		qudaAPI_Param qAparam);
 
+EXTRN_C int
+baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const qudaLattice *qS, const int *momlist,
+                                             QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3,
+                                             XTRN_CPLX *S2, XTRN_CPLX *S1,
+                                             int Nc, int Ns, qudaAPI_Param paramAPI);
 
 #endif/*INTERFACE_QLUA_H__*/

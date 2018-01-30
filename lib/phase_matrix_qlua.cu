@@ -64,24 +64,16 @@ namespace quda {
   }//--kernel
   
 
-  void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix,
-			     int *momMatrix,
+  void createPhaseMatrix_GPU(complex<QUDA_REAL> *phaseMatrix_dev,
+			     const int *momMatrix,
 			     momProjParam param,
 			     int localL[], int totalL[])
   {
     printfQuda("createPhaseMatrix_GPU:\n");
-    printfQuda("  Got Nmoms  = %d\n",param.Nmoms);
-    printfQuda("  Got V3     = %d\n",param.V3);
-    printfQuda("  Got momDim = %d\n",param.momDim);
-    printfQuda("  Got expSgn = %d\n",param.expSgn);
-
-    dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
-    dim3 gridDim((param.V3 + blockDim.x -1)/blockDim.x, 1, 1); // spawn threads only for the spatial volume
-
-    complex<QUDA_REAL> *phaseMatrix_dev;    
-    cudaMalloc((void**)&phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*param.V3*param.Nmoms );
-    checkCudaErrorNoSync();
-    cudaMemset(phaseMatrix_dev, 0, sizeof(complex<QUDA_REAL>)*param.V3*param.Nmoms);
+    printfQuda("  Got Nmoms  = %d\n", param.Nmoms);
+    printfQuda("  Got V3     = %d\n", param.V3);
+    printfQuda("  Got momDim = %d\n", param.momDim);
+    printfQuda("  Got expSgn = %d\n", param.expSgn);
 
     int *momMatrix_dev;
     cudaMalloc((void**)&momMatrix_dev, sizeof(int)*param.momDim*param.Nmoms );
@@ -91,14 +83,16 @@ namespace quda {
     MomProjArg arg(param, localL, totalL);
     MomProjArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(MomProjArg) );
+    checkCudaErrorNoSync();
     cudaMemcpy(arg_dev, &arg, sizeof(MomProjArg), cudaMemcpyHostToDevice);
     
     //-Call the kernel
-    phaseMatrix_kernel<<<gridDim,blockDim>>>(phaseMatrix_dev, momMatrix_dev, arg_dev);
+    dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
+    dim3 gridDim((param.V3 + blockDim.x -1)/blockDim.x, 1, 1); // spawn threads only for the spatial volume
 
-    cudaMemcpy(phaseMatrix, phaseMatrix_dev, sizeof(complex<QUDA_REAL>)*param.Nmoms*param.V3, cudaMemcpyDeviceToHost);
+    phaseMatrix_kernel<<<gridDim,blockDim>>>(phaseMatrix_dev, momMatrix_dev, arg_dev);
+    checkCudaError();
     
-    cudaFree(phaseMatrix_dev);
     cudaFree(momMatrix_dev);
     cudaFree(arg_dev);
   }
