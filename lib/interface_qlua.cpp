@@ -260,9 +260,9 @@ static void createPhaseMatrix_CPU(complex<QUDA_REAL> *phaseMatrix,
     lcoord[0] = iv - a1 * localL[0];
     lcoord[1] = a1 - a2 * localL[1];
     lcoord[2] = a2;
-    gcoord[0] = lcoord[0] + comm_coord(0) * localL[0];
-    gcoord[1] = lcoord[1] + comm_coord(1) * localL[1];
-    gcoord[2] = lcoord[2] + comm_coord(2) * localL[2];
+    gcoord[0] = lcoord[0] + comm_coord(0) * localL[0] - param.csrc[0];
+    gcoord[1] = lcoord[1] + comm_coord(1) * localL[1] - param.csrc[1];
+    gcoord[2] = lcoord[2] + comm_coord(2) * localL[2] - param.csrc[2];
     
     QUDA_REAL f = (QUDA_REAL) param.expSgn;
     for(int im=0;im<param.Nmoms;im++){
