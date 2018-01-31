@@ -17,12 +17,14 @@ namespace quda {
     const int momDim;
     const int Nmoms;
     const int expSgn;
+    const int csrc[QUDA_DIM];
     const int localL[QUDA_DIM];
     const int totalL[QUDA_DIM];
     const int commCoord[QUDA_DIM];
     
   MomProjArg(momProjParam param, int localL[], int totalL[])
   :   V3(param.V3), momDim(param.momDim), Nmoms(param.Nmoms), expSgn(param.expSgn),
+      csrc{param.csrc[0],param.csrc[1],param.csrc[2],param.csrc[3]},
       localL{localL[0],localL[1],localL[2],localL[3]},
       totalL{totalL[0],totalL[1],totalL[2],totalL[3]},
       commCoord{comm_coord(0),comm_coord(1),comm_coord(2),comm_coord(3)}
@@ -45,9 +47,9 @@ namespace quda {
       lcoord[1] = a1  - a2 * arg->localL[1];
       lcoord[2] = a2;
       
-      gcoord[0] = lcoord[0] + arg->commCoord[0] * arg->localL[0];
-      gcoord[1] = lcoord[1] + arg->commCoord[1] * arg->localL[1];
-      gcoord[2] = lcoord[2] + arg->commCoord[2] * arg->localL[2];
+      gcoord[0] = lcoord[0] + arg->commCoord[0] * arg->localL[0] - arg->csrc[0];
+      gcoord[1] = lcoord[1] + arg->commCoord[1] * arg->localL[1] - arg->csrc[1];
+      gcoord[2] = lcoord[2] + arg->commCoord[2] * arg->localL[2] - arg->csrc[2];
       
       QUDA_REAL f = (QUDA_REAL) arg->expSgn;
       for(int im=0;im<arg->Nmoms;im++){
