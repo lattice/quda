@@ -84,6 +84,8 @@ static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
+#include <blas_cublas.h>
+
 //for MAGMA lib:
 #include <blas_magma.h>
 
@@ -500,6 +502,10 @@ void initQudaMemory()
   checkCudaError();
   createDslashEvents();
   blas::init();
+
+#ifdef CUBLAS_LIB
+  cublas::init();
+#endif
 
   // initalize the memory pool allocators
   pool::init();
@@ -1263,6 +1269,10 @@ void endQuda(void)
 
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
+
+#ifdef CUBLAS_LIB
+  cublas::destroy();
+#endif
 
   blas::end();
 
