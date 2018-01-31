@@ -104,7 +104,7 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   
-  __global__ void QluaCoordCheck_kernel(QluaUtilArg *utilArg){
+  __global__ void QluaSiteOrderCheck_kernel(QluaUtilArg *utilArg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;    
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
@@ -130,7 +130,7 @@ namespace quda {
   }//-- function
 
   
-  int QluaCoordCheck(QluaUtilArg utilArg){
+  int QluaSiteOrderCheck(QluaUtilArg utilArg){
     int crdChkVal;
 
     QluaUtilArg *utilArg_dev;
@@ -141,7 +141,7 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, utilArg.nParity, 1);
     dim3 gridDim((utilArg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
     
-    QluaCoordCheck_kernel<<<gridDim,blockDim>>>(utilArg_dev);
+    QluaSiteOrderCheck_kernel<<<gridDim,blockDim>>>(utilArg_dev);
     checkCudaError();
     cudaMemcpyFromSymbol(&crdChkVal, d_crdChkVal, sizeof(crdChkVal), 0, cudaMemcpyDeviceToHost);
     checkCudaErrorNoSync();
@@ -153,7 +153,7 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   
-  __global__ void conv_siteOrder_QudaQdp_to_momproj_kernel(void *dst, const void *src, QluaUtilArg *arg){
+  __global__ void convertSiteOrder_QudaQDP_to_momProj_kernel(void *dst, const void *src, QluaUtilArg *arg){
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int pty  = blockIdx.y*blockDim.y + threadIdx.y;
@@ -180,7 +180,7 @@ namespace quda {
     
   }//-- function
   
-  void conv_siteOrder_QudaQdp_to_momproj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg){
+  void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg){
 
     QluaUtilArg *utilArg_dev;
     cudaMalloc((void**)&(utilArg_dev), sizeof(QluaUtilArg));
@@ -190,7 +190,7 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, utilArg.nParity, 1);
     dim3 gridDim((utilArg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    conv_siteOrder_QudaQdp_to_momproj_kernel<<<gridDim,blockDim>>>(corrInp_dev, corrQuda_dev, utilArg_dev);
+    convertSiteOrder_QudaQDP_to_momProj_kernel<<<gridDim,blockDim>>>(corrInp_dev, corrQuda_dev, utilArg_dev);
     checkCudaError();
     
     cudaFree(utilArg_dev);

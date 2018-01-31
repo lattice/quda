@@ -46,10 +46,10 @@ namespace quda {
 
   
   __device__ int d_crdChkVal = 0;
-  int QluaCoordCheck(QluaUtilArg utilArg);
+  int QluaSiteOrderCheck(QluaUtilArg utilArg);
 
   
-  void conv_siteOrder_QudaQdp_to_momproj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg);
+  void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg);
 
   
   void cudaContractQQ(

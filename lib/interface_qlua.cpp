@@ -900,7 +900,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   /* --------------------------------------------------------------------------------------- */
 
   
-  //-- Define output correlation buffers
+  //-- Prepare momentum projection buffers
   complex<QUDA_REAL> *corrOut_proj = NULL; //-- Final result (global summed, gathered) of momentum projection
   complex<QUDA_REAL> *corrOut_glob = NULL; //-- Globally summed momentum projection buffer
   complex<QUDA_REAL> *corrOut_host = NULL; //-- Host (local) output of cuBlas momentum projection
@@ -912,10 +912,9 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
      (corrOut_glob == NULL) ||
      (corrOut_host == NULL))
     errorQuda("%s: Cannot allocate Output correlation function buffers\n", func_name);
-  /* --------------------------------------------------------------------------------------- */
+  //----------------
 
   
-  /*---------- Perform momentum projection ----------*/
   cublasHandle_t handle;
   cublasStatus_t stat = cublasCreate(&handle);
 
@@ -928,10 +927,12 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   cudaMalloc( (void**)&corrInp_dev, sizeof(complex<QUDA_REAL>)*V3*Ndata*Lt );
   cudaMalloc( (void**)&corrOut_dev, sizeof(complex<QUDA_REAL>)*Nmoms*Ndata*Lt );
   checkCudaErrorNoSync();
-  
-  //-- Change volume site order from Quda-QDP to Qlua-QDP
-  conv_siteOrder_QudaQdp_to_momproj(corrInp_dev, corrQuda_dev, utilArg);  
 
+  //-- Change volume site order from Quda-QDP to Qlua-QDP  
+  convertSiteOrder_QudaQDP_to_momProj(corrInp_dev, corrQuda_dev, utilArg);  
+
+  //-- Copy the output correlator to device
+  //-- If not using GPU for creating the phase matrix copy it to device, otherwise it's already on device
   stat = cublasSetMatrix(Nmoms, Ndata*Lt, sizeof(complex<QUDA_REAL>), corrOut_host, Nmoms, corrOut_dev, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: corrOut data copy to GPU failed!\n", func_name);
@@ -942,7 +943,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
       errorQuda("%s: phaseMatrix data copy to GPU failed!\n", func_name);
   }
   
-  //-- Perform projection
+  //-- Perform momentum projection
   /* Matrix Multiplication Out = PH^T * In.
    * phaseMatrix_dev=(V3,Nmoms) is the phase matrix in column-major format, its transpose is used for multiplication
    * corrInp_dev=(V3,Ndata*Lt) is the input correlation matrix
@@ -963,6 +964,8 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   stat = cublasGetMatrix(Nmoms, Ndata*Lt, sizeof(complex<QUDA_REAL>), corrOut_dev, Nmoms, corrOut_host, Nmoms);
   if(stat != CUBLAS_STATUS_SUCCESS)
     errorQuda("%s: corrOut data copy to CPU failed!\n", func_name);
+  /* --------------------------------------------------------------------------------------- */
+
 
 
   //-- Perform reduction over all processes
@@ -995,7 +998,8 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   /*
    * Now a transpose of the corrOut_proj is required such that it follows the Qlua-C
    * convention, T-inside-Nmoms-inside-Ndata. A shift of the source-time to zero is also required,
-   * together with boundary condition application
+   * together with boundary condition application.
+   * All processes can perform this, because corrOut_proj is significant to all of them, due to MPI_Allgather 
    */
   for(int it=0;it<totT;it++){
     int itShf = (it + csrc[3]) % totT;
@@ -1093,8 +1097,8 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
   //-- Create a utility structure (required in momentum projection as well)
   QluaUtilArg utilArg(cudaProp1, paramAPI.mpParam.Ndata, paramAPI.mpParam.Ndata, paramAPI.mpParam.tAxis, sizeof(complex<QUDA_REAL>));
 
-  //-- Check coordinate conventions
-  int crdChkVal = QluaCoordCheck(utilArg);  
+  //-- Check Site order conventions
+  int crdChkVal = QluaSiteOrderCheck(utilArg);  
   if(crdChkVal == -1)
     errorQuda("Site mismatch! Exiting.\n");
   else if (crdChkVal == 0)
