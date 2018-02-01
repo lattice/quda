@@ -220,7 +220,7 @@ namespace quda {
 			 momProjParam mpParam){
 
     char *func_name;
-    asprintf(&func_name,"contractGPU_baryon_sigma_twopt_asymsrc_gvec");
+    asprintf(&func_name,"QuarkContract_GPU");
 
     LONG_T locvol = mpParam.locvol;
     int parity = 0; //-- not functional for full-site fields, just set it to zero
