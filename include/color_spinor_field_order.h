@@ -406,7 +406,7 @@ namespace quda {
 
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order,
-      typename storeFloat=Float, typename ghostFloat=storeFloat>
+      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false>
       class FieldOrderCB {
 
     protected:
@@ -451,6 +451,10 @@ namespace quda {
 	resetGhost(ghost_ ? ghost_ : field.Ghost());
 #endif
 	resetScale(field.Scale());
+
+#ifdef DISABLE_GHOST
+	if (!disable_ghost) errorQuda("DISABLE_GHOST macro set but corresponding disable_ghost template not set");
+#endif
       }
 
 #ifdef CUDA_CXX_ARRAY_WAR
