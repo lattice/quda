@@ -212,17 +212,18 @@ namespace quda {
 
   
   //-Top-level function in GPU contractions
-  void contractGPU_baryon_sigma_twopt_asymsrc_gvec(complex<QC_REAL> *corrQuda_dev,
-						   ColorSpinorField **cudaProp1,
-						   ColorSpinorField **cudaProp2,
-						   ColorSpinorField **cudaProp3,
-						   complex<QC_REAL> *S2, complex<QC_REAL> *S1,
-						   momProjParam mpParam){
+  void QuarkContract_GPU(complex<QC_REAL> *corrQuda_dev,
+			 ColorSpinorField **cudaProp1,
+			 ColorSpinorField **cudaProp2,
+			 ColorSpinorField **cudaProp3,
+			 complex<QC_REAL> *S2, complex<QC_REAL> *S1,
+			 momProjParam mpParam){
 
     char *func_name;
     asprintf(&func_name,"contractGPU_baryon_sigma_twopt_asymsrc_gvec");
 
     LONG_T locvol = mpParam.locvol;
+    int parity = 0; //-- not functional for full-site fields, just set it to zero
     
     //-- Transform the propagators
     size_t propSizeCplx = sizeof(complex<QC_REAL>) * locvol * QUDA_Nc*QUDA_Nc * QUDA_Ns*QUDA_Ns;
@@ -234,16 +235,21 @@ namespace quda {
     
     cudaMalloc((void**)&prop1_dev, propSizeCplx );
     cudaMalloc((void**)&prop2_dev, propSizeCplx );
-    cudaMalloc((void**)&prop3_dev, propSizeCplx );
     checkCudaErrorNoSync();
     cudaMemset(prop1_dev, 0, propSizeCplx);
     cudaMemset(prop2_dev, 0, propSizeCplx);
-    cudaMemset(prop3_dev, 0, propSizeCplx);
     
-    int parity = 0; //-- not functional for full-site fields, just set it to zero
     propagatorTransform(prop1_dev, cudaProp1, parity);
     propagatorTransform(prop2_dev, cudaProp2, parity);
-    propagatorTransform(prop3_dev, cudaProp3, parity);
+
+    if(mpParam.cntrType == what_baryon_sigma_UUS){
+      cudaMalloc((void**)&prop3_dev, propSizeCplx );
+      checkCudaErrorNoSync();
+      cudaMemset(prop3_dev, 0, propSizeCplx);
+      
+      propagatorTransform(prop3_dev, cudaProp3, parity);
+    }
+    
     printfQuda("%s: Propagators transformed\n", func_name);
     //-------------------------------------------------------------
     
@@ -255,83 +261,69 @@ namespace quda {
 
     //-- allocate S-matrices on device
     size_t SmatSize = sizeof(complex<QC_REAL>)*QUDA_LEN_G;
-    complex<QC_REAL> *S2_dev, *S1_dev;
-    cudaMalloc((void**)&S2_dev, SmatSize);
-    cudaMalloc((void**)&S1_dev, SmatSize);
-    checkCudaErrorNoSync();    
-    cudaMemcpy(S2_dev, S2, SmatSize, cudaMemcpyHostToDevice);
-    cudaMemcpy(S1_dev, S1, SmatSize, cudaMemcpyHostToDevice);
+    complex<QC_REAL> *S2_dev;
+    complex<QC_REAL> *S1_dev;
 
+    if(mpParam.cntrType == what_baryon_sigma_UUS){
+      cudaMalloc((void**)&S2_dev, SmatSize);
+      cudaMalloc((void**)&S1_dev, SmatSize);
+      checkCudaErrorNoSync();
+      cudaMemcpy(S2_dev, S2, SmatSize, cudaMemcpyHostToDevice);
+      cudaMemcpy(S1_dev, S1, SmatSize, cudaMemcpyHostToDevice);
+    }
     
     //-- Call the kernel wrapper to perform contractions
     dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
     dim3 gridDim((locvol + blockDim.x - 1)/blockDim.x, 1, 1);
 
-    baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev,
-    								 prop1_dev, prop2_dev, prop3_dev,
-    								 S2_dev, S1_dev);
-    checkCudaError();
+    
+    switch(mpParam.cntrType){
+    case what_baryon_sigma_UUS: {
+      baryon_sigma_twopt_asymsrc_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev,
+								   prop1_dev, prop2_dev, prop3_dev,
+								   S2_dev, S1_dev);
+      checkCudaError();
+    } break;
+    case what_qbarq_g_F_B: {
+      qbarq_g_P_P_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      checkCudaError();
+    } break;
+    case what_qbarq_g_F_aB: {
+      qbarq_g_P_aP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      checkCudaError();
+    } break;
+    case what_qbarq_g_F_hB: {
+      qbarq_g_P_hP_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      checkCudaError();
+    } break;
+    case what_meson_F_B: {
+      meson_F_B_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      checkCudaError();
+    } break;
+    case what_meson_F_aB: {
+      meson_F_aB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      checkCudaError();
+    } break;
+    case what_meson_F_hB: {
+      meson_F_hB_gvec_kernel<<<gridDim,blockDim>>>(corrQuda_dev, locvol_dev, prop1_dev, prop2_dev);
+      checkCudaError();
+    } break;
+    case what_qpdf_g_F_B:
+    case what_tmd_g_F_B:
+    default: errorQuda("%s: cntrType = %d not supported!\n", func_name, (int)mpParam.cntrType);
+    }//-- switch
 
     
     //-- Clean-up
     cudaFree(prop1_dev);
     cudaFree(prop2_dev);
-    cudaFree(prop3_dev);
-    cudaFree(S2_dev);
-    cudaFree(S1_dev);
     cudaFree(locvol_dev);
+    if(mpParam.cntrType == what_baryon_sigma_UUS){
+      cudaFree(prop3_dev);
+      cudaFree(S2_dev);
+      cudaFree(S1_dev);
+    }
 
   }//-- function
   
 } //-namespace quda
-
-
-
-    
-    /* int i_rlex = crd[0] + arg->lL[0]*( */
-    /* 	         crd[1] + arg->lL[1]*( */
-    /* 	         crd[2] + arg->lL[2]*( */
-    /* 	         crd[3])));  //-- Full lattice site index */
-    /* int i_par = (crd[0] + crd[1] + crd[2] + crd[3]) & 1; */
-
-    /* if (i_rlex / 2 != x_cb || pty != i_par) */
-    /*   printf("x_cb = %d, pty = %d: site order mismatch\n", x_cb, pty); */
-
-
-
-    /* cudaMemcpy(prop1_dev, hprop1, propSizeCplx, cudaMemcpyHostToDevice); */
-    /* cudaMemcpy(prop2_dev, hprop2, propSizeCplx, cudaMemcpyHostToDevice); */
-    /* cudaMemcpy(prop3_dev, hprop3, propSizeCplx, cudaMemcpyHostToDevice); */
-
-
-//int pIdx = is + Ns*ic + Ns*Nc*iv + Ns*Nc*lV*js + Ns*Nc*lV*Ns*jc;  //-- QDP propagator index order (spin-inside-color-inside-volume, spin-inside-color for each vector)
-
-
-//	    printf("(x_cb,pty) = %d , %d , (jc,js,ic,is,iv) = %d , %d , %d , %d , %d , devProp[%d] = %+lf  %+lf * i\n",
-//		   x_cb, pty, jc, js, ic, is, iv, pIdx3, devProp[pIdx3].real(), devProp[pIdx3].imag());
-
-
-
-    /* printfQuda("propagatorTransform:\n"); */
-    /* printfQuda("  arg.parity   = %d\n", arg.parity); */
-    /* printfQuda("  arg.nParity  = %d\n", arg.nParity); */
-    /* printfQuda("  arg.nFace    = %d\n", arg.nFace); */
-    /* printfQuda("  arg.volumeCB = %d\n", arg.volumeCB); */
-    /* printfQuda("  arg.volume   = %d\n", arg.volume); */
-    /* printfQuda("  arg.dim      = [%d,%d,%d,%d]\n", arg.dim[0], arg.dim[1], arg.dim[2], arg.dim[3]); */
-    /* printfQuda("  arg.commDim  = [%d,%d,%d,%d]\n", arg.commDim[0], arg.commDim[1], arg.commDim[2], arg.commDim[3]); */
-    /* printfQuda("  arg.lL   = [%d,%d,%d,%d]\n", arg.lL[0], arg.lL[1], arg.lL[2], arg.lL[3]); */
-
-
-
-    /* int r1 = crd / arg->lL[0]; */
-    /* int r2 = r1  / arg->lL[1]; */
-    /* int locx = crd - r1 * arg->lL[0]; */
-    /* int locy = r1  - r2 * arg->lL[1]; */
-    /* int loct = r2 / arg->lL[2]; */
-    /* int locz = r2 - loct * arg->lL[2]; */
-
-    /* int evenSiteBit = (locx + locy + locz + loct) & 1; */
-    /* int oddSiteBit  = evenSiteBit ^ 1; */
-    
-    /* int sBit = (pty == 0) ? evenSiteBit : oddSiteBit; //-- TODO: Need to verify/check this */

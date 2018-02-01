@@ -66,11 +66,11 @@ namespace quda {
                              int localL[], int totalL[]);
 
 
-  void contractGPU_baryon_sigma_twopt_asymsrc_gvec(complex<QUDA_REAL> *corrQuda_dev,
-						   ColorSpinorField **cudaProp1,
-						   ColorSpinorField **cudaProp2,
-						   ColorSpinorField **cudaProp3,
-						   complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1, momProjParam mpParam);
+  void QuarkContract_GPU(complex<QUDA_REAL> *corrQuda_dev,
+			 ColorSpinorField **cudaProp1,
+			 ColorSpinorField **cudaProp2,
+			 ColorSpinorField **cudaProp3,
+			 complex<QUDA_REAL> *S2, complex<QUDA_REAL> *S1, momProjParam mpParam);
 
   
 } //- namespace quda

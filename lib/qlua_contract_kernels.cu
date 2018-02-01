@@ -765,6 +765,9 @@ namespace quda {
     QC(gvec_eq_trace_gamma_dot_G)(r,r_stride, tmpG,1);
   }
 
+  //--------------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------------  
+  //-- Kernel wrappers  
 
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
 							 LONG_T *locvol_dev,
@@ -787,7 +790,109 @@ namespace quda {
                                             S2_dev, S1_dev);
   }
   //------------------------------------------------------------------------------------------
-  
+
+  __global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					  LONG_T *locvol_dev,
+					  complex<QC_REAL> *prop1_dev,
+					  complex<QC_REAL> *prop2_dev){
+
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    LONG_T lV = locvol_dev[0];
+    
+    if(tid >= lV) return;
+
+    qc_quda_contract_tr_g_P_P(Corr_dev  + tid, (int)lV,
+			      prop1_dev + tid, (int)lV,
+			      prop2_dev + tid, (int)lV);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					   LONG_T *locvol_dev,
+					   complex<QC_REAL> *prop1_dev,
+					   complex<QC_REAL> *prop2_dev){
+
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    LONG_T lV = locvol_dev[0];
+    
+    if(tid >= lV) return;
+
+    qc_quda_contract_tr_g_P_aP(Corr_dev  + tid, (int)lV,
+			       prop1_dev + tid, (int)lV,
+			       prop2_dev + tid, (int)lV);
+  }
+  //------------------------------------------------------------------------------------------
+
+    __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					     LONG_T *locvol_dev,
+					     complex<QC_REAL> *prop1_dev,
+					     complex<QC_REAL> *prop2_dev){
+
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    LONG_T lV = locvol_dev[0];
+    
+    if(tid >= lV) return;
+
+    qc_quda_contract_tr_g_P_hP(Corr_dev  + tid, (int)lV,
+			       prop1_dev + tid, (int)lV,
+			       prop2_dev + tid, (int)lV);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					LONG_T *locvol_dev,
+					complex<QC_REAL> *prop1_dev,
+					complex<QC_REAL> *prop2_dev){
+
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    LONG_T lV = locvol_dev[0];
+    
+    if(tid >= lV) return;
+
+    qc_quda_contract_tr_g_P_mgbar_P(Corr_dev  + tid, (int)lV,
+				    prop1_dev + tid, (int)lV,
+				    prop2_dev + tid, (int)lV);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					 LONG_T *locvol_dev,
+					 complex<QC_REAL> *prop1_dev,
+					 complex<QC_REAL> *prop2_dev){
+    
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    LONG_T lV = locvol_dev[0];
+    
+    if(tid >= lV) return;
+
+    qc_quda_contract_tr_g_P_mgbar_aP(Corr_dev  + tid, (int)lV,
+				     prop1_dev + tid, (int)lV,
+				     prop2_dev + tid, (int)lV);
+  }
+  //------------------------------------------------------------------------------------------
+
+  __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					 LONG_T *locvol_dev,
+					 complex<QC_REAL> *prop1_dev,
+					 complex<QC_REAL> *prop2_dev){
+
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    
+    LONG_T lV = locvol_dev[0];
+    
+    if(tid >= lV) return;
+
+    qc_quda_contract_tr_g_P_mgbar_hP(Corr_dev  + tid, (int)lV,
+				     prop1_dev + tid, (int)lV,
+				     prop2_dev + tid, (int)lV);
+  }
+  //------------------------------------------------------------------------------------------
+
   
 } //- namespace quda
  
@@ -798,18 +903,3 @@ namespace quda {
    P,P,P -> C*16 : sigmab ; also momproj(C*16)
    vD,vD -> C*16 : contraction
 */
-
-
-  //C.K. #define qc_gamma_adj_parity(n) (qc_gamma_adj_parity_[n])
-  /*  G(n)^* = (-1)**gamma_conj_parity[n] * G(n) */
-  //#define gamma_conj_parity(n) (( (((n) & 1) ? 1 : 0) + (((n) & 4) ? 1 : 0) ) % 2)
-  //C.K. #define qc_gamma_conj_parity(n) (qc_gamma_conj_parity_[n])
-  /*  G(n)^T = (-1)**gamma_transp_parity[n] * G(n) */
-  //#define gamma_transp_parity(n) (gamma_conj_parity(n) ^ gamma_adj_parity(n))
-  //C.K. #define qc_gamma_transp_parity(n) (qc_gamma_transp_parity_[n])
-  
-  /* G(n)^\dag . G(m) . G(n) = (-1)**gamma_uni_parity(m,n) * G(m) */
-  //C.K. #define qc_gamma_uni_parity(m,n) (((qc_bitcount16)[m] * (qc_bitcount16)[n] - (qc_bitcount16)[(m)&(n)])%2)
-  /* G(n)^T . G(m) . G(n)    = (-1)**gamma_sim_parity(m,n) * G(m) */
-  //C.K. #define qc_gamma_sim_parity(m,n) ((qc_gamma_uni_parity(m,n) + qc_gamma_conj_parity(n))%2)
-  

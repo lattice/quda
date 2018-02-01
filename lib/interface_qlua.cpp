@@ -1057,15 +1057,15 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
 
 
 EXTRN_C int
-baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qudaLattice *qS, const int *momlist,
-					     QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3,
-					     XTRN_CPLX *S2, XTRN_CPLX *S1,
-                                             int Nc, int Ns, qudaAPI_Param paramAPI){
-
+QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qudaLattice *qS, const int *momlist,
+			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3,
+			   XTRN_CPLX *S2, XTRN_CPLX *S1,
+			   int Nc, int Ns, qudaAPI_Param paramAPI){
+  
   int status = 0;
 
   char *func_name;
-  asprintf(&func_name,"baryon_sigma_twopt_asymsrc_gvec_momProj_Quda");
+  asprintf(&func_name,"QuarkContract_momProj_Quda");
   
   if (check_quda_comms(qS))
     return 1;
@@ -1073,6 +1073,9 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
   if((Nc != QUDA_Nc) || (Ns != QUDA_Ns))
     return 1;
 
+  if( (paramAPI.mpParam.cntrType == what_baryon_sigma_UUS) && (hprop3==NULL) )
+    errorQuda("%s: Got hprop3 = NULL for cntrType = what_baryon_sigma_UUS\n", func_name);
+  
   //-- Load the parameters required for the CSFs
   QudaGaugeParam gp;
   init_QudaGaugeParam_generic(gp, qS);
@@ -1092,14 +1095,20 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
   for(int ivec=0;ivec<nVec;ivec++){
     cudaProp1[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop1[ivec * fieldLgh]) );
     cudaProp2[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop2[ivec * fieldLgh]) );
-    cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]) );
-
-    if((cudaProp1[ivec] == NULL) ||
-       (cudaProp2[ivec] == NULL) ||
-       (cudaProp3[ivec] == NULL))
+    if( (cudaProp1[ivec] == NULL) || (cudaProp2[ivec] == NULL) )
       errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
-
+    
     checkCudaError();
+  }
+
+  if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
+    for(int ivec=0;ivec<nVec;ivec++){
+      cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]) );
+      if(cudaProp3[ivec] == NULL)
+	errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
+
+      checkCudaError();
+    }
   }
   printfQuda("%s: Color-spinor fields created.\n", func_name);
   /* --------------------------------------------------------------------------------------- */
@@ -1109,10 +1118,8 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
 
   //-- Check Site order conventions
   int crdChkVal = QluaSiteOrderCheck(utilArg);  
-  if(crdChkVal == -1)
-    errorQuda("%s: Site mismatch! Exiting.\n", func_name);
-  else if (crdChkVal == 0)
-    printfQuda("%s: Site order check PASSED.\n", func_name);
+  if(crdChkVal == -1) errorQuda("%s: Site mismatch! Exiting.\n", func_name);
+  else if (crdChkVal == 0) printfQuda("%s: Site order check PASSED.\n", func_name);
   /* --------------------------------------------------------------------------------------- */
 
   
@@ -1125,10 +1132,9 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
   cudaMemset(corrQuda_dev, 0, corrSize);
 
   double t1 = MPI_Wtime();
-  contractGPU_baryon_sigma_twopt_asymsrc_gvec(corrQuda_dev,
-					      cudaProp1, cudaProp2, cudaProp3,
-					      (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
-					      paramAPI.mpParam);
+  QuarkContract_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
+		    (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
+		    paramAPI.mpParam);
   double t2 = MPI_Wtime();
   printfQuda("%s: GPU Contractions completed in %f sec.\n", func_name, t2-t1);
   /* --------------------------------------------------------------------------------------- */
@@ -1150,11 +1156,18 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
   for(int ivec=0;ivec<nVec;ivec++){
     delete_not_null(cudaProp1[ivec]);
     delete_not_null(cudaProp2[ivec]);
-    delete_not_null(cudaProp3[ivec]);
   }
+  
+  if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
+    for(int ivec=0;ivec<nVec;ivec++)
+      delete_not_null(cudaProp3[ivec]);
+  }
+  
   cudaFree(corrQuda_dev);
   
   saveTuneCache();
+
+  printfQuda("%s: Returning...\n", func_name);
   
   return status;
 }

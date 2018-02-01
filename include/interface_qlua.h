@@ -49,6 +49,22 @@ typedef enum qudaAPI_ContractId_s{
   cntr_INVALID = 0
 } qudaAPI_ContractId;
 
+typedef enum {
+  what_none           = 0,
+  what_qbarq_g_F_B    = 1,
+  what_qbarq_g_F_aB   ,   /*  2 */
+  what_qbarq_g_F_hB   ,   /*  3 */
+  what_qbarq_g_vD_vD  ,   /*  4 */
+  what_qbarq_g_vD_avD ,   /*  5 */
+  what_qbarq_g_vD_hvD ,   /*  6 */
+  what_meson_F_B      ,   /*  7 */
+  what_meson_F_aB     ,   /*  8 */
+  what_meson_F_hB     ,   /*  9 */
+  what_baryon_sigma_UUS,  /* 10 */
+  what_qpdf_g_F_B     ,   /* 11 */
+  what_tmd_g_F_B          /* 12 */
+} qluaCntr_Type;
+
 struct qudaLattice_s { 
   int node;
   int rank;
@@ -88,6 +104,7 @@ typedef struct {
   int csrc[QUDA_DIM];
   LONG_T locvol;
   int push_res;
+  qluaCntr_Type cntrType;  
 } momProjParam;
 
 typedef struct {
@@ -150,9 +167,9 @@ Qlua_invertQuda(
 		qudaAPI_Param qAparam);
 
 EXTRN_C int
-baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const qudaLattice *qS, const int *momlist,
-                                             QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3,
-                                             XTRN_CPLX *S2, XTRN_CPLX *S1,
-                                             int Nc, int Ns, qudaAPI_Param paramAPI);
+QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const qudaLattice *qS, const int *momlist,
+			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3,
+			   XTRN_CPLX *S2, XTRN_CPLX *S1,
+			   int Nc, int Ns, qudaAPI_Param paramAPI);
 
 #endif/*INTERFACE_QLUA_H__*/

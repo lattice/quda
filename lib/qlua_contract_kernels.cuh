@@ -311,8 +311,8 @@ namespace quda {
 						    const QC_CPLX *S2_gvec, const QC_CPLX *S1_gvec);
 
   /* ----------------------------------------------------------------------------------------------- */
-
-  //-- Forward declarations for contraction wrappers from there after
+  /* ----------------------------------------------------------------------------------------------- */
+  //-- Forward declarations for contraction wrappers
 
   __global__ void baryon_sigma_twopt_asymsrc_gvec_kernel(complex<QC_REAL> *Corr_dev,
 							 LONG_T *locvol_dev,
@@ -321,7 +321,37 @@ namespace quda {
 							 complex<QC_REAL> *prop3_dev,
                                                          complex<QC_REAL> *S2_dev,
 							 complex<QC_REAL> *S1_dev);
-  
+
+__global__ void qbarq_g_P_P_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					LONG_T *locvol_dev,
+					complex<QC_REAL> *prop1_dev,
+					complex<QC_REAL> *prop2_dev);
+
+ __global__ void qbarq_g_P_aP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					  LONG_T *locvol_dev,
+					  complex<QC_REAL> *prop1_dev,
+					  complex<QC_REAL> *prop2_dev);
+
+ __global__ void qbarq_g_P_hP_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					  LONG_T *locvol_dev,
+					  complex<QC_REAL> *prop1_dev,
+					  complex<QC_REAL> *prop2_dev);
+
+ __global__ void meson_F_B_gvec_kernel(complex<QC_REAL> *Corr_dev,
+				       LONG_T *locvol_dev,
+				       complex<QC_REAL> *prop1_dev,
+				       complex<QC_REAL> *prop2_dev);
+
+ __global__ void meson_F_aB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					LONG_T *locvol_dev,
+					complex<QC_REAL> *prop1_dev,
+					complex<QC_REAL> *prop2_dev);
+
+ __global__ void meson_F_hB_gvec_kernel(complex<QC_REAL> *Corr_dev,
+					LONG_T *locvol_dev,
+					complex<QC_REAL> *prop1_dev,
+					complex<QC_REAL> *prop2_dev);
+ 
 } //- namespace quda
 
 #endif/*QLUA_CONTRACT_KERNELS_H__*/
