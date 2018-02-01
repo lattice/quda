@@ -8,7 +8,8 @@
 #include <vector>
 #include <assert.h>
 
-#define DISABLE_GHOST // this removes ghost accessor reducing the parameter space needed
+// this removes ghost accessor reducing the parameter space needed
+#define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
 
 #if CUDA_VERSION < 8000 && defined(__CUDA_ARCH__)
 // CUDA 7.x can't deal with array initialization from a parameter
@@ -370,8 +371,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	  typedef FieldOrderCB<RegType,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,real> Rotator;
-	  typedef FieldOrderCB<RegType,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> Vector;
+	  typedef FieldOrderCB<RegType,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,real,real,DISABLE_GHOST> Rotator;
+	  typedef FieldOrderCB<RegType,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,RegType,RegType,DISABLE_GHOST> Vector;
 	  CPU<Rotator,Vector>(B, std::make_index_sequence<nVec>());
 	} else {
 	  errorQuda("Unsupported field order %d\n", V.FieldOrder());
@@ -379,8 +380,8 @@ namespace quda {
       } else {
 #if __COMPUTE_CAPABILITY__ >= 300
 	if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-	  typedef FieldOrderCB<RegType,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,real> Rotator;
-	  typedef FieldOrderCB<RegType,nSpin,nColor,1,QUDA_FLOAT2_FIELD_ORDER> Vector;
+	  typedef FieldOrderCB<RegType,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,real,real,DISABLE_GHOST> Rotator;
+	  typedef FieldOrderCB<RegType,nSpin,nColor,1,QUDA_FLOAT2_FIELD_ORDER,RegType,RegType,DISABLE_GHOST> Vector;
 
 	  switch (geoBlockSize/2) {
 	  case   4: GPU<Rotator,Vector,  4>(tp,stream,B,std::make_index_sequence<nVec>()); break; // for 2x2x2x1 aggregates
