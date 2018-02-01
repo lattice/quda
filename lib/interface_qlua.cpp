@@ -969,9 +969,9 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
 
 
   //-- Perform reduction over all processes
-  /* Create a separate communicator
-   * All processes with the same comm_coord(3) belong to COMM_TIME communicator.
-   * When performing the reduction over the COMM_TIME communicator, the global sum
+  /* Create separate communicators
+   * All processes with the same comm_coord(3) belong to COMM_SPACE communicator.
+   * When performing the reduction over the COMM_SPACE communicator, the global sum
    * will be performed across all processes with the same time-coordinate,
    * and the result will be placed at the "root" of each of the "time" groups.
    * This means that the global result will exist only at the "time" processes, where each will
@@ -979,27 +979,48 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
    * (In the case where only the time-direction is partitioned, MPI_Reduce is essentially a memcpy).
    *
    * Then a Gathering is required, in order to put the global result from each of the "time" processes
-   * into the final buffer (corrOut_proj).
-   * MPI_Allgather takes care to put the result from each process to the corresponding location of the final buffer.
-   * The final buffer is accesible from all ranks.
-  */
+   * into the final buffer (corrOut_proj). This gathering must take place only across the "time" processes,
+   * therefore another communicator involving only these processes must be created (COMM_TIME).
+   * Finally, we need to Broadcast the final result to ALL processes, such that it is accessible to all of them.
+   */
+
+  //-- Create space-communicator
+  int space_rank, space_size;
+  MPI_Comm COMM_SPACE;
+  MPI_Comm_split(MPI_COMM_WORLD, comm_coord(3), comm_rank(), &COMM_SPACE);
+  MPI_Comm_rank(COMM_SPACE,&space_rank);
+  MPI_Comm_size(COMM_SPACE,&space_size);
+
+  //-- Create time communicator
   int time_rank, time_size;
   MPI_Comm COMM_TIME;
-  MPI_Comm_split(MPI_COMM_WORLD, comm_coord(3), comm_rank(), &COMM_TIME);
+  int time_color = comm_rank();   //-- Determine the "color" which distinguishes the "time" processes from the rest
+  if( (comm_coord(0) == 0) &&
+      (comm_coord(1) == 0) &&
+      (comm_coord(2) == 0) ) time_color = -1;
+
+  MPI_Comm_split(MPI_COMM_WORLD, time_color, comm_coord(3), &COMM_TIME);
   MPI_Comm_rank(COMM_TIME,&time_rank);
   MPI_Comm_size(COMM_TIME,&time_size);
+  
+  printf("##### rank %d / %d: (x,y,z,t) = (%d,%d,%d,%d) , time_color = %d , space_rank = %d / %d , time_rank = %d / %d \n", comm_rank(), comm_size(),
+	 comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3), time_color,
+	 space_rank, space_size,
+	 time_rank , time_size);
+    
+  MPI_Reduce(corrOut_host, corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX, MPI_SUM, 0, COMM_SPACE);  
 
-  MPI_Reduce(corrOut_host, corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX, MPI_SUM, 0, COMM_TIME);  
-
-  MPI_Allgather(corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
-		corrOut_proj, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
-		COMM_TIME);
+  MPI_Gather(corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
+	     corrOut_proj, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
+	     0, COMM_TIME);
+  
+  MPI_Bcast(corrOut_proj, Nmoms*Ndata*totT, MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD);
   
   /*
    * Now a transpose of the corrOut_proj is required such that it follows the Qlua-C
    * convention, T-inside-Nmoms-inside-Ndata. A shift of the source-time to zero is also required,
    * together with boundary condition application.
-   * All processes can perform this, because corrOut_proj is significant to all of them, due to MPI_Allgather 
+   * All processes can perform this, because corrOut_proj is significant to all of them, due to MPI_Bcast 
    */
   for(int it=0;it<totT;it++){
     int itShf = (it + csrc[3]) % totT;
@@ -1015,16 +1036,24 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   }
 
 
-  for(int i=0;i<20;i++)
-    printfQuda("corrOut[%d] , h, g, p, f: = %+.6lf %+.6f  ,  %+.6lf %+.6f  ,  %+.6lf %+.6f,  %+.6lf %+.6f \n",i,
-	       corrOut_host[i].real(), corrOut_host[i].imag(),
-	       corrOut_glob[i].real(), corrOut_glob[i].imag(),
-	       corrOut_proj[i].real(), corrOut_proj[i].imag(),
-	       corrOut[i].real()     , corrOut[i].imag());
+  for(int i=0;i<Lt*Ndata*Nmoms;i++)
+    printf("^^^^^ rank = %d , %d: corrOut[%d] , host, global: = %+.6lf %+.6f  ,  %+.6lf %+.6f\n", comm_rank(), space_rank, i,
+	   corrOut_host[i].real(), corrOut_host[i].imag(),
+	   corrOut_glob[i].real(), corrOut_glob[i].imag());
+
+  printf("\n\n");
+  
+  for(int i=0;i<totT*Ndata*Nmoms;i++)
+    printf("***** rank = %d , %d: corrOut[%d] , proj, final: = %+.6lf %+.6f,  %+.6lf %+.6f\n", comm_rank(), space_rank, i,
+	   corrOut_proj[i].real(), corrOut_proj[i].imag(),
+	   corrOut[i].real()     , corrOut[i].imag());
 
   
   
   //-- cleanup & return  
+  MPI_Comm_free(&COMM_SPACE);
+  MPI_Comm_free(&COMM_TIME);
+
   free(corrOut_proj);
   free(corrOut_glob);
   free(corrOut_host);
