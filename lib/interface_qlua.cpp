@@ -1002,12 +1002,8 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   MPI_Comm_split(MPI_COMM_WORLD, time_color, comm_coord(3), &COMM_TIME);
   MPI_Comm_rank(COMM_TIME,&time_rank);
   MPI_Comm_size(COMM_TIME,&time_size);
+
   
-  printf("##### rank %d / %d: (x,y,z,t) = (%d,%d,%d,%d) , time_color = %d , space_rank = %d / %d , time_rank = %d / %d \n", comm_rank(), comm_size(),
-	 comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3), time_color,
-	 space_rank, space_size,
-	 time_rank , time_size);
-    
   MPI_Reduce(corrOut_host, corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX, MPI_SUM, 0, COMM_SPACE);  
 
   MPI_Gather(corrOut_glob, Nmoms*Ndata*Lt, MPI_DOUBLE_COMPLEX,
@@ -1035,21 +1031,6 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
     }
   }
 
-
-  for(int i=0;i<Lt*Ndata*Nmoms;i++)
-    printf("^^^^^ rank = %d , %d: corrOut[%d] , host, global: = %+.6lf %+.6f  ,  %+.6lf %+.6f\n", comm_rank(), space_rank, i,
-	   corrOut_host[i].real(), corrOut_host[i].imag(),
-	   corrOut_glob[i].real(), corrOut_glob[i].imag());
-
-  printf("\n\n");
-  
-  for(int i=0;i<totT*Ndata*Nmoms;i++)
-    printf("***** rank = %d , %d: corrOut[%d] , proj, final: = %+.6lf %+.6f,  %+.6lf %+.6f\n", comm_rank(), space_rank, i,
-	   corrOut_proj[i].real(), corrOut_proj[i].imag(),
-	   corrOut[i].real()     , corrOut[i].imag());
-
-  
-  
   //-- cleanup & return  
   MPI_Comm_free(&COMM_SPACE);
   MPI_Comm_free(&COMM_TIME);
@@ -1129,9 +1110,9 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
   //-- Check Site order conventions
   int crdChkVal = QluaSiteOrderCheck(utilArg);  
   if(crdChkVal == -1)
-    errorQuda("Site mismatch! Exiting.\n");
+    errorQuda("%s: Site mismatch! Exiting.\n", func_name);
   else if (crdChkVal == 0)
-    printfQuda("Site order check PASSED.\n");
+    printfQuda("%s: Site order check PASSED.\n", func_name);
   /* --------------------------------------------------------------------------------------- */
 
   
@@ -1177,41 +1158,3 @@ baryon_sigma_twopt_asymsrc_gvec_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *
   
   return status;
 }
-
-
-  // int lV = paramAPI.mpParam.locvol;
-  // int Ndata = paramAPI.mpParam.Ndata;
-
-  // complex<QUDA_REAL> *corrQuda = NULL;
-  // size_t corrSize = sizeof(complex<QUDA_REAL>) * lV * Ndata;
-  // printfQuda("%s: corrSize = %lld bytes\n", func_name, (LONG_T)corrSize);
-  
-  // corrQuda = (complex<QUDA_REAL>*) malloc(corrSize);
-  // if(corrQuda == NULL)
-  //   errorQuda("%s: Cannot allocate correlator buffer. Exiting.\n", func_name);
-  // memset(corrQuda, 0, corrSize);
-
-
-
-  // int lL[4];
-  // for(int mu=0; mu<4; mu++)
-  //   lL[mu] = qS->site_coord_hi[mu] - qS->site_coord_lo[mu];
-
-
-  // for(int id=0;id<paramAPI.mpParam.Ndata;id++){
-  //   for(int iv=0;iv<paramAPI.mpParam.locvol;iv++){
-  //     int idx = iv + qS->locvol * id;
-  //     printf("corrPosSpc[%d] - (iv,id) = (%d,%d) : = %+lf  %+lf\n", idx, iv, id, corrPosSpc[idx].real(), corrPosSpc[idx].imag());
-  //   }
-  // } 
-  
-  //-- convert the volume index to QDP order
-  // for(int id=0;id<Ndata;id++){
-  //   for(int iv=0;iv<lV;iv++){
-  //     int idx_from = qS->ind_qdp2quda[iv] + lV*id;
-  //     int idx_to = iv + lV*id;
-  //     printf("***** corrQuda[%d] - (iv,id) = (%d,%d) : = %+lf  %+lf\n", idx_to, iv, id, corrQuda[idx_from].real(), corrQuda[idx_from].imag());
-  //   }
-  // }
-  // memcpy(corrPosSpc, corrQuda, corrSize);
-  
