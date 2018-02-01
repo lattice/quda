@@ -7,6 +7,7 @@
 #include <color_spinor_field_order.h>
 #include <mpi.h>
 #include <interface_qlua_internal.h>
+#include <qlua_contract.h>
 #include <qlua_contract_kernels.cuh>
 
 namespace quda {
@@ -42,67 +43,6 @@ namespace quda {
   };//-- Structure definition
   //---------------------------------------------------------------------------
   
-  /**
-     When copying ColorSpinorFields to GPU, Quda rotates the fields to another basis using a rotation matrix.
-     This function is required in order to rotate the ColorSpinorFields between the Quda and the QDP bases.
-     The rotation matrix is ( with a factor sqrt(0.5) ):
-              ( 0 -1  0 -1)
-          M = ( 1  0  1  0)
-              ( 0 -1  0  1)
-              ( 1  0 -1  0)
-
-     Before the calculation the ColorSpinorFields must be rotated as F <- M F  (quda2qdp).
-     After the calculation the result must be rotated back to the Quda basis R <- M^T R (qdp2quda),
-     so that when Quda copies back to the CPU the result is again rotated to the QDP convention.
-   */
-  __device__ __host__ inline void rotatePropBasis(ColorSpinor<QC_REAL,QC_Nc,QC_Ns> *prop, RotateType rType){
-
-    const int Ns = QC_Ns;
-    const int Nc = QC_Nc;
-
-    typedef ColorSpinor<QC_REAL,Nc,Ns> Vector;
-    Vector res[QUDA_PROP_NVEC];
-
-    complex<QC_REAL> zro = complex<QC_REAL>{0,0};
-    complex<QC_REAL> val = complex<QC_REAL>{sqrt(0.5),0};
-    complex<QC_REAL> M[Ns][Ns] = { { zro, -val,  zro, -val},
-				   { val,  zro,  val,  zro},
-				   { zro, -val,  zro,  val},
-				   { val,  zro, -val,  zro} };
-
-    complex<QC_REAL> M_Trans[Ns][Ns];
-    for(int i=0;i<Ns;i++){
-      for(int j=0;j<Ns;j++){
-        M_Trans[i][j] = M[j][i];
-      }
-    }
-
-    complex<QC_REAL> (*A)[Ns] = NULL;
-    if      (rType == QLUA_quda2qdp) A = M;
-    else if (rType == QLUA_qdp2quda) A = M_Trans;
-
-    for(int ic = 0; ic < Nc; ic++){
-      for(int jc = 0; jc < Nc; jc++){
-        for(int is = 0; is < Ns; is++){
-          for(int js = 0; js < Ns; js++){
-            int iv = js + Ns*jc;
-            int id = ic + Nc*is;
-
-            res[iv].data[id] = 0.0;
-            for(int a=0;a<Ns;a++){
-              int as = ic + Nc*a;
-
-              res[iv].data[id] += A[is][a] * prop[iv].data[as];
-            }
-          }}}
-    }
-
-    for(int v = 0; v<QUDA_PROP_NVEC; v++)
-      prop[v] = res[v];
-
-  }
-  //---------------------------------------------------------------------------
-
   
   __global__ void QluaSiteOrderCheck_kernel(QluaUtilArg *utilArg){
 

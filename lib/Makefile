@@ -71,7 +71,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
 	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
 	qio_util.h quda_arpack_interface.h deflation.h                  \
-	interface_qlua_internal.h
+	interface_qlua_internal.h qlua_contract.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
