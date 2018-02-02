@@ -2001,7 +2001,9 @@ void disable_policy(QudaDslashPolicy p){
               i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) {
 	   // these dslash policies all must have kernel packing enabled
 
-	   bool kernel_pack_old = getKernelPackT();
+     // clumsy, but we call setKernelPackT a handful of times before 
+     // we restore the the current state, so this will "just work"
+     pushKernelPackT(getKernelPackT());
 
 	   // if we are using GDR policies then we must tune the
 	   // non-GDR variants as well with and without kernel packing
@@ -2028,7 +2030,7 @@ void disable_policy(QudaDslashPolicy p){
 	   delete dslashImp;
 
 	   // restore default kernel packing
-	   setKernelPackT(kernel_pack_old);
+     popKernelPackT();
 
 	 } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED){
 	   errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
@@ -2055,8 +2057,8 @@ void disable_policy(QudaDslashPolicy p){
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
      if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
 
-     // switch on kernel packing for the policies that need it
-     bool kernel_pack_old = getKernelPackT();
+     // switch on kernel packing for the policies that need it, save default kernel packing
+     pushKernelPackT(getKernelPackT());
      auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
      if ( p == QudaDslashPolicy::QUDA_GDR_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
@@ -2074,7 +2076,7 @@ void disable_policy(QudaDslashPolicy p){
      delete dslashImp;
 
      // restore default kernel packing
-     setKernelPackT(kernel_pack_old);
+     popKernelPackT();
    }
 
    int tuningIter() const { return 10; }

@@ -19,6 +19,9 @@ namespace quda {
     */
   bool getKernelPackT();
 
+  void pushKernelPackT(bool pack);
+  void popKernelPackT();
+
   /**
      Sets commDim array used in dslash_pack.cu
    */
