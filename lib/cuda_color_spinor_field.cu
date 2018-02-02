@@ -1054,7 +1054,7 @@ namespace quda {
       void *ghost_norm_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
 	+ QUDA_SINGLE_PRECISION*ghostNormOffset[dim][(d+1)%2];
 
-    if (ghost_precision != precision) pushKernelPackT(true);
+      if (ghost_precision != precision) pushKernelPackT(true);
 
       if (dim != 3 || getKernelPackT()) {
 

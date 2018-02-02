@@ -1980,41 +1980,42 @@ void disable_policy(QudaDslashPolicy p){
 
        for (auto &i : policies) {
 
-	 if (i == QudaDslashPolicy::QUDA_DSLASH || 
-       i == QudaDslashPolicy::QUDA_FUSED_DSLASH ||
-	     i == QudaDslashPolicy::QUDA_DSLASH_ASYNC || 
-       i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) {
+	 if (i == QudaDslashPolicy::QUDA_DSLASH ||
+	     i == QudaDslashPolicy::QUDA_FUSED_DSLASH ||
+	     i == QudaDslashPolicy::QUDA_DSLASH_ASYNC ||
+	     i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC) {
 
 	   DslashPolicyImp* dslashImp = DslashFactory::create(i);
 	   (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
 	   delete dslashImp;
 
-	 } else if (i == QudaDslashPolicy::QUDA_GDR_DSLASH || 
-              i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-		          i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH || 
-              i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH ||
-		          i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
-              i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
-		          i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH || 
-              i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
-              i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || 
-              i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) {
+	 } else if (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH ||
+		    i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH) {
 	   // these dslash policies all must have kernel packing enabled
 
-     // clumsy, but we call setKernelPackT a handful of times before 
-     // we restore the the current state, so this will "just work"
-     pushKernelPackT(getKernelPackT());
+	   // clumsy, but we call setKernelPackT a handful of times before
+	   // we restore the the current state, so this will "just work"
+	   pushKernelPackT(getKernelPackT());
 
 	   // if we are using GDR policies then we must tune the
 	   // non-GDR variants as well with and without kernel packing
 	   // enabled - this ensures that all GPUs will have the
 	   // required tune cache entries prior to potential process
 	   // divergence regardless of which GPUs are blacklisted
-	   if (i == QudaDslashPolicy::QUDA_GDR_DSLASH || 
-         i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-	       i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH || 
-         i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH) {
-	     QudaDslashPolicy policy = (i==QudaDslashPolicy::QUDA_GDR_DSLASH || i==QudaDslashPolicy::QUDA_GDR_RECV_DSLASH) ? QudaDslashPolicy::QUDA_DSLASH : QudaDslashPolicy::QUDA_FUSED_DSLASH;
+	   if (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
+	       i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
+	       i == QudaDslashPolicy::QUDA_GDR_RECV_DSLASH ||
+	       i == QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH) {
+	     QudaDslashPolicy policy = (i==QudaDslashPolicy::QUDA_GDR_DSLASH || i==QudaDslashPolicy::QUDA_GDR_RECV_DSLASH) ?
+	       QudaDslashPolicy::QUDA_DSLASH : QudaDslashPolicy::QUDA_FUSED_DSLASH;
 	     DslashPolicyImp* dslashImp = DslashFactory::create(policy);
 	     setKernelPackT(false);
 	     (*dslashImp)(dslash, in, regSize, parity, dagger, volume, ghostFace, profile);
@@ -2030,7 +2031,7 @@ void disable_policy(QudaDslashPolicy p){
 	   delete dslashImp;
 
 	   // restore default kernel packing
-     popKernelPackT();
+	   popKernelPackT();
 
 	 } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED){
 	   errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
@@ -2062,7 +2063,7 @@ void disable_policy(QudaDslashPolicy p){
      auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
      if ( p == QudaDslashPolicy::QUDA_GDR_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-	        p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
+	  p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
           p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
           p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
