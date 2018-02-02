@@ -115,7 +115,7 @@ init_QudaInvertParam_generic(QudaInvertParam& ip,
 
 //-- fill out QudaGaugeParam
 static void
-init_QudaGaugeParam_generic(QudaGaugeParam& gp, const qudaLattice *qS)
+init_QudaGaugeParam_generic(QudaGaugeParam& gp, const qudaLattice *qS, const int tBoundaryGauge)
 {
   gp = newQudaGaugeParam();
   
@@ -128,7 +128,7 @@ init_QudaGaugeParam_generic(QudaGaugeParam& gp, const qudaLattice *qS)
   gp.cuda_prec_sloppy   = QUDA_HALF_PRECISION;
   gp.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
   gp.anisotropy         = 1.0;
-  gp.t_boundary         = QUDA_ANTI_PERIODIC_T;
+  gp.t_boundary         = (tBoundaryGauge == -1) ? QUDA_ANTI_PERIODIC_T : QUDA_PERIODIC_T;
   
   LONG_T max_face = 0;
   for (int mu = 0 ; mu < qS->rank ; mu++) {
@@ -161,11 +161,8 @@ new_cudaGaugeField(QudaGaugeParam& gp, double *hbuf_u[])
   cuda_gf = new cudaGaugeField(gf_param);
   if (NULL == cuda_gf) return NULL;
 
-  if (NULL != hbuf_u) {
-    double t1 = MPI_Wtime();
+  if(NULL != hbuf_u){
     cuda_gf->copy(*cpu_gf); // C.K. This does ghost exchange as well
-    double t2 = MPI_Wtime();
-    printfQuda("TIMING - laplacianQuda: cuda_gf copy & exchangeGhost in %.6f sec.\n", t2-t1);
   }
   
   return cuda_gf;
@@ -301,7 +298,8 @@ laplacianQuda(
   
   //-- Initialize the quda-gauge parameters
   QudaGaugeParam gp;
-  init_QudaGaugeParam_generic(gp, qS);
+  int tBoundaryGauge = -1;
+  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
 
   setVerbosity(paramAPI.verbosity);
   if(getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(&gp);
@@ -388,7 +386,8 @@ doQQ_contract_Quda(
   
   //-- Initialize the quda-gauge and invert parameters
   QudaGaugeParam gp;
-  init_QudaGaugeParam_generic(gp, qS);
+  int tBoundaryGauge = -1;
+  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
 
   QudaInvertParam ip;
   init_QudaInvertParam_generic(ip, gp, paramAPI);
@@ -471,7 +470,8 @@ Qlua_invertQuda(
 
   //-- Initialize the quda-gauge parameters
   QudaGaugeParam gp;
-  init_QudaGaugeParam_generic(gp, qS);
+  int tBoundaryGauge = -1;
+  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
 
   setVerbosity(paramAPI.verbosity);
   if(getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(&gp);
@@ -542,7 +542,8 @@ momentumProjectionPropagator_Quda(
   
   //-- Initialize the quda-gauge and invert parameters
   QudaGaugeParam gp;
-  init_QudaGaugeParam_generic(gp, qS);
+  int tBoundaryGauge = -1;
+  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
 
   QudaInvertParam ip;
   init_QudaInvertParam_generic(ip, gp, paramAPI);
@@ -829,7 +830,8 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
   
   //-- Initialize the quda-gauge and invert parameters
   QudaGaugeParam gp;
-  init_QudaGaugeParam_generic(gp, qS);
+  int tBoundaryGauge = -1;
+  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
 
   QudaInvertParam ip;
   init_QudaInvertParam_generic(ip, gp, paramAPI);
@@ -1058,7 +1060,7 @@ int momentumProjectCorr_Quda(XTRN_CPLX *corrOut, const complex<QUDA_REAL> *corrQ
 
 EXTRN_C int
 QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qudaLattice *qS, const int *momlist,
-			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3,
+			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3, QUDA_REAL *h_gauge[],
 			   XTRN_CPLX *S2, XTRN_CPLX *S1,
 			   int Nc, int Ns, qudaAPI_Param paramAPI){
   
@@ -1072,19 +1074,18 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 
   if((Nc != QUDA_Nc) || (Ns != QUDA_Ns))
     return 1;
-
-  if( (paramAPI.mpParam.cntrType == what_baryon_sigma_UUS) && (hprop3==NULL) )
-    errorQuda("%s: Got hprop3 = NULL for cntrType = what_baryon_sigma_UUS\n", func_name);
   
-  //-- Load the parameters required for the CSFs
+  //-- Load the parameters required for the CSFs, TODO: May need to control this with paramAPI.mpParam.bc_t
   QudaGaugeParam gp;
-  init_QudaGaugeParam_generic(gp, qS);
+  int tBoundaryGauge = -1;
+  init_QudaGaugeParam_generic(gp, qS, tBoundaryGauge);
+  
   QudaInvertParam ip;
   init_QudaInvertParam_generic(ip, gp, paramAPI);
   setVerbosity(paramAPI.verbosity);
 
   
-  //-- Read the propagators into cuda-CSFs, load into device pointers
+  //-- Load the propagators into cuda-CSFs
   int nVec = 12;
   LONG_T fieldLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
   
@@ -1102,17 +1103,31 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   }
 
   if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
+    if(hprop3 == NULL) errorQuda("%s: Got hprop3 = NULL for cntrType = what_baryon_sigma_UUS.\n", func_name);
+
     for(int ivec=0;ivec<nVec;ivec++){
       cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]) );
       if(cudaProp3[ivec] == NULL)
 	errorQuda("%s: Cannot allocate propagators. Exiting.\n", func_name);
 
       checkCudaError();
-    }
+    }//-ivec
   }
-  printfQuda("%s: Color-spinor fields created.\n", func_name);
+  printfQuda("%s: Cuda Color-Spinor fields loaded.\n", func_name);
+
+  
+  //-- Load the gauge field, if applicable
+  GaugeField *cuda_gf = NULL;
+  if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) ){
+    for(int mu=0;mu<qS->rank;mu++)
+      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for tmd or qpdf contractions.\n", func_name);
+    
+    cuda_gf = new_cudaGaugeField(gp, h_gauge);
+    printfQuda("%s: Cuda Gauge Field loaded.\n", func_name);
+  }
   /* --------------------------------------------------------------------------------------- */
 
+  
   //-- Create a utility structure (required in momentum projection as well)
   QluaUtilArg utilArg(cudaProp1, paramAPI.mpParam.Ndata, paramAPI.mpParam.Ndata, paramAPI.mpParam.tAxis, sizeof(complex<QUDA_REAL>));
 
@@ -1132,7 +1147,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   cudaMemset(corrQuda_dev, 0, corrSize);
 
   double t1 = MPI_Wtime();
-  QuarkContract_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3,
+  QuarkContract_GPU(corrQuda_dev, cudaProp1, cudaProp2, cudaProp3, cuda_gf,
 		    (complex<QUDA_REAL>*)S2, (complex<QUDA_REAL>*)S1,
 		    paramAPI.mpParam);
   double t2 = MPI_Wtime();
@@ -1154,14 +1169,18 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   
   //-- cleanup & return
   for(int ivec=0;ivec<nVec;ivec++){
-    delete_not_null(cudaProp1[ivec]);
-    delete_not_null(cudaProp2[ivec]);
+    delete cudaProp1[ivec];
+    delete cudaProp2[ivec];
   }
   
   if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
     for(int ivec=0;ivec<nVec;ivec++)
-      delete_not_null(cudaProp3[ivec]);
+      delete cudaProp3[ivec];
   }
+
+  if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) )
+    delete cuda_gf;
+
   
   cudaFree(corrQuda_dev);
   

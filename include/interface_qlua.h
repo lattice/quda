@@ -168,7 +168,7 @@ Qlua_invertQuda(
 
 EXTRN_C int
 QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrPosSpc, const qudaLattice *qS, const int *momlist,
-			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3,
+			   QUDA_REAL *hprop1, QUDA_REAL *hprop2, QUDA_REAL *hprop3, QUDA_REAL *h_gauge[],
 			   XTRN_CPLX *S2, XTRN_CPLX *S1,
 			   int Nc, int Ns, qudaAPI_Param paramAPI);
 

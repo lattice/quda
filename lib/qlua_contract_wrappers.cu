@@ -2,6 +2,8 @@
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <gauge_field.h>
+#include <gauge_field_order.h>
 #include <color_spinor.h>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
@@ -15,10 +17,10 @@ namespace quda {
   struct QluaContractArg {
 
     typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
+    
+    Propagator prop[QUDA_PROP_NVEC];  // Input propagator
 
-    Propagator prop[QUDA_PROP_NVEC];  // Input propagator 1
-
-    const int parity;                 // only use this for single parity fields
+    const qluaCntr_Type cntrType;     // contraction type 
     const int nParity;                // number of parities we're working on
     const int nFace;                  // hard code to 1 for now
     const int dim[5];                 // full lattice dimensions
@@ -26,23 +28,50 @@ namespace quda {
     const int lL[4];      	      // 4-d local lattice dimensions
     const int volumeCB;               // checkerboarded volume
     const int volume;                 // full-site local volume
-
-  QluaContractArg(ColorSpinorField **propIn, int parity)
-  :   parity(parity), nParity(propIn[0]->SiteSubset()), nFace(1),
+    
+  QluaContractArg(ColorSpinorField **propIn, qluaCntr_Type cntrType)
+  :   cntrType(cntrType), nParity(propIn[0]->SiteSubset()), nFace(1),
       dim{ (3-nParity) * propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3), 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
       volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
     {
-      
-      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++){
-        prop[ivec].init(*propIn[ivec]);
-      }      
-      
-    }//-- constructor    
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
+    }
+
   };//-- Structure definition
   //---------------------------------------------------------------------------
-  
+
+  struct QluaContractArgU {
+
+    typedef typename colorspinor_mapper<QC_REAL,QC_Ns,QC_Nc>::type Propagator;
+    typedef typename gauge_mapper<QC_REAL,QUDA_RECONSTRUCT_NO>::type Gauge;
+    
+    Propagator prop[QUDA_PROP_NVEC];  // Input propagator
+    Gauge U;                          // Gauge Field
+
+    const qluaCntr_Type cntrType;     // contraction type 
+    const int nParity;                // number of parities we're working on
+    const int nFace;                  // hard code to 1 for now
+    const int dim[5];                 // full lattice dimensions
+    const int commDim[4];             // whether a given dimension is partitioned or not
+    const int lL[4];      	      // 4-d local lattice dimensions
+    const int volumeCB;               // checkerboarded volume
+    const int volume;                 // full-site local volume
+    
+  QluaContractArgU(ColorSpinorField **propIn, GaugeField *U, qluaCntr_Type cntrType)
+  :   U(*U), cntrType(cntrType), nParity(propIn[0]->SiteSubset()), nFace(1),
+      dim{ (3-nParity) * propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3), 1 },
+      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+      lL{propIn[0]->X(0), propIn[0]->X(1), propIn[0]->X(2), propIn[0]->X(3)},
+      volumeCB(propIn[0]->VolumeCB()),volume(propIn[0]->Volume())
+    {
+      for(int ivec=0;ivec<QUDA_PROP_NVEC;ivec++) prop[ivec].init(*propIn[ivec]);
+    }
+
+  };//-- Structure definition
+  //---------------------------------------------------------------------------
+
   
   __global__ void QluaSiteOrderCheck_kernel(QluaUtilArg *utilArg){
 
@@ -119,7 +148,7 @@ namespace quda {
     }//- i_f
     
   }//-- function
-  
+
   void convertSiteOrder_QudaQDP_to_momProj(void *corrInp_dev, const void *corrQuda_dev, QluaUtilArg utilArg){
 
     QluaUtilArg *utilArg_dev;
@@ -138,7 +167,13 @@ namespace quda {
   //---------------------------------------------------------------------------
 
   
-  __device__ __host__ inline void RunPropagatorTransform(complex<QC_REAL> *devProp, QluaContractArg *arg, int x_cb, int pty){
+  __global__ void prepareDeviceProp_kernel(complex<QC_REAL> *devProp, QluaContractArg *arg){
+
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if (x_cb >= arg->volumeCB) return;
+    if (pty >= arg->nParity) return;
 
     const int Ns = QC_Ns;
     const int Nc = QC_Nc;
@@ -171,29 +206,14 @@ namespace quda {
 	  }}}
     }
     
-  }//--function
-  //------------------------------------------------------------------------------------------
+  }//-- function
 
   
-  __global__ void propagatorTransform_kernel(complex<QC_REAL> *devProp, QluaContractArg *arg){
-
-    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
-
-    int pty  = blockIdx.y*blockDim.y + threadIdx.y;
-
-    if (x_cb >= arg->volumeCB) return;
-    if (pty >= arg->nParity) return;
-
-    RunPropagatorTransform(devProp, arg, x_cb, pty);
-  }
-  //------------------------------------------------------------------------------------------
-
-  
-  void propagatorTransform(complex<QC_REAL> *devProp, ColorSpinorField **propIn, int parity){//, int t_axis){
+  void prepareDeviceProp(complex<QC_REAL> *devProp, ColorSpinorField **propIn, qluaCntr_Type cntrType){
     
-    QluaContractArg arg(propIn, parity);//, t_axis);
-    
-    if(arg.nParity != 2) errorQuda("run_propagatorTransform: This function supports only Full Site Subset spinors!\n");
+    QluaContractArg arg(propIn, cntrType);
+      
+    if(arg.nParity != 2) errorQuda("run_prepareDeviceProp: This function supports only Full Site Subset spinors!\n");
     
     QluaContractArg *arg_dev;
     cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
@@ -203,12 +223,33 @@ namespace quda {
     dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
     dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
 
-    propagatorTransform_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
+    prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
     checkCudaError();
 
     cudaFree(arg_dev);
   }
-  //------------------------------------------------------------------------------------------
+
+  
+  void prepareDeviceProp(complex<QC_REAL> *devProp, ColorSpinorField **propIn, GaugeField *U, qluaCntr_Type cntrType){
+    
+    QluaContractArgU arg(propIn, U, cntrType);
+    
+    if(arg.nParity != 2) errorQuda("run_prepareDeviceProp: This function supports only Full Site Subset spinors!\n");
+    
+    QluaContractArg *arg_dev;
+    cudaMalloc((void**)&(arg_dev), sizeof(QluaContractArg) );
+    checkCudaErrorNoSync();
+    cudaMemcpy(arg_dev, &arg, sizeof(QluaContractArg), cudaMemcpyHostToDevice);
+
+    dim3 blockDim(THREADS_PER_BLOCK, arg.nParity, 1);
+    dim3 gridDim((arg.volumeCB + blockDim.x -1)/blockDim.x, 1, 1);
+
+    prepareDeviceProp_kernel<<<gridDim,blockDim>>>(devProp, arg_dev);
+    checkCudaError();
+
+    cudaFree(arg_dev);
+  }
+//------------------------------------------------------------------------------------------
 
   
   //-Top-level function in GPU contractions
@@ -216,6 +257,7 @@ namespace quda {
 			 ColorSpinorField **cudaProp1,
 			 ColorSpinorField **cudaProp2,
 			 ColorSpinorField **cudaProp3,
+			 GaugeField *U,
 			 complex<QC_REAL> *S2, complex<QC_REAL> *S1,
 			 momProjParam mpParam){
 
@@ -223,11 +265,9 @@ namespace quda {
     asprintf(&func_name,"QuarkContract_GPU");
 
     LONG_T locvol = mpParam.locvol;
-    int parity = 0; //-- not functional for full-site fields, just set it to zero
     
     //-- Transform the propagators
     size_t propSizeCplx = sizeof(complex<QC_REAL>) * locvol * QUDA_Nc*QUDA_Nc * QUDA_Ns*QUDA_Ns;
-    printfQuda("%s: propSizeCplx = %lld bytes\n", func_name, (LONG_T)propSizeCplx);
     
     complex<QC_REAL> *prop1_dev = NULL;
     complex<QC_REAL> *prop2_dev = NULL;
@@ -238,16 +278,21 @@ namespace quda {
     checkCudaErrorNoSync();
     cudaMemset(prop1_dev, 0, propSizeCplx);
     cudaMemset(prop2_dev, 0, propSizeCplx);
-    
-    propagatorTransform(prop1_dev, cudaProp1, parity);
-    propagatorTransform(prop2_dev, cudaProp2, parity);
 
-    if(mpParam.cntrType == what_baryon_sigma_UUS){
-      cudaMalloc((void**)&prop3_dev, propSizeCplx );
-      checkCudaErrorNoSync();
-      cudaMemset(prop3_dev, 0, propSizeCplx);
+    if( (mpParam.cntrType == what_tmd_g_F_B) || (mpParam.cntrType == what_qpdf_g_F_B) ){
+      prepareDeviceProp(prop1_dev, cudaProp1, U, mpParam.cntrType);
+      prepareDeviceProp(prop2_dev, cudaProp2, U, mpParam.cntrType);
+    }
+    else{
+      prepareDeviceProp(prop1_dev, cudaProp1, mpParam.cntrType);
+      prepareDeviceProp(prop2_dev, cudaProp2, mpParam.cntrType);
       
-      propagatorTransform(prop3_dev, cudaProp3, parity);
+      if(mpParam.cntrType == what_baryon_sigma_UUS){
+	cudaMalloc((void**)&prop3_dev, propSizeCplx );
+	checkCudaErrorNoSync();
+	cudaMemset(prop3_dev, 0, propSizeCplx);
+	prepareDeviceProp(prop3_dev, cudaProp3, mpParam.cntrType);
+      }
     }
     
     printfQuda("%s: Propagators transformed\n", func_name);
@@ -271,6 +316,7 @@ namespace quda {
       cudaMemcpy(S2_dev, S2, SmatSize, cudaMemcpyHostToDevice);
       cudaMemcpy(S1_dev, S1, SmatSize, cudaMemcpyHostToDevice);
     }
+
     
     //-- Call the kernel wrapper to perform contractions
     dim3 blockDim(THREADS_PER_BLOCK, 1, 1);
