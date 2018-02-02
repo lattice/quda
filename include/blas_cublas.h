@@ -7,6 +7,16 @@ namespace quda {
   namespace cublas {
 
     /**
+       @brief Create the CUBLAS context
+    */
+    void init();
+
+    /**
+       @brief Destroy the CUBLAS context
+    */
+    void destroy();
+
+    /**
        Batch inversion the matrix field using an LU decomposition method.
        @param[out] Ainv Matrix field containing the inverse matrices
        @param[in] A Matrix field containing the input matrices
