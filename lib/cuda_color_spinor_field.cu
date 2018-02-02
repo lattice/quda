@@ -704,15 +704,17 @@ namespace quda {
 				       cudaStream_t *stream) {
 
 #ifdef MULTI_GPU
-    int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+    int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
     int Npad = Nint / Nvec; // number Nvec buffers we have
+
+    if (precision != ghost_precision) { pushKernelPackT(true); }
     
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
-      size_t bytes = nFace*Nint*ghostFace[dim]*precision;
+      size_t bytes = nFace*Nint*ghostFace[dim]*ghost_precision;
 
-      if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
+      if (ghost_precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
 
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
 
@@ -736,7 +738,7 @@ namespace quda {
 	else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
       }
     
-      size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
+      size_t len = nFace*(ghostFace[3]/x4)*Nvec*ghost_precision;
       size_t dpitch = x4*len;
       size_t spitch = stride*Nvec*precision;
 
@@ -746,13 +748,13 @@ namespace quda {
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
       for (int s=0; s<x4; s++) { // loop over multiple 4-d volumes (if they exist)
 	void *dst = (char*)ghost_spinor + s*len;
-	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*ghost_precision;
 	cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
-	if (precision == QUDA_HALF_PRECISION) {
+	if (ghost_precision == QUDA_HALF_PRECISION) {
 	  size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
 	  int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
-	  void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*precision + s*len;
+	  void *dst = (char*)ghost_spinor + nFace*Nint*ghostFace[3]*ghost_precision + s*len;
 	  void *src = (char*)norm + norm_offset + s*(volumeCB/x4)*sizeof(float);
 	  cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
 	}
@@ -783,25 +785,28 @@ namespace quda {
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
 
       void *dst = (char*)ghost_spinor;
-      void *src = (char*)v + flavor1_offset*Nvec*precision;
-      size_t len = flavorTFace*Nvec*precision;
-      size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
+      void *src = (char*)v + flavor1_offset*Nvec*ghost_precision;
+      size_t len = flavorTFace*Nvec*ghost_precision;
+      size_t spitch = stride*Nvec*ghost_precision;//ndeg tm: stride=2*flavor_volume+pad
       size_t dpitch = 2*len;
       cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
       dst = (char*)ghost_spinor+len;
-      src = (char*)v + flavor2_offset*Nvec*precision;
+      src = (char*)v + flavor2_offset*Nvec*ghost_precision;
       cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
-      if (precision == QUDA_HALF_PRECISION) {
+      if (ghost_precision == QUDA_HALF_PRECISION) {
         int Nt_minus1_offset = (flavorVolume - flavorTFace);
         int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
-	void *dst = (char*)ghost_spinor + Nint*ghostFace[3]*precision;
+	void *dst = (char*)ghost_spinor + Nint*ghostFace[3]*ghost_precision;
 	void *src = (char*)norm + norm_offset;
         size_t dpitch = flavorTFace*sizeof(float);
         size_t spitch = flavorVolume*sizeof(float);
 	cudaMemcpy2DAsync(dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToHost, *stream);
       }
     }
+
+    if (precision != ghost_precision) { popKernelPackT(); }
+
 #else
     errorQuda("sendGhost not built on single-GPU build");
 #endif
@@ -815,13 +820,13 @@ namespace quda {
   {
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
-    int len = nFace*ghostFace[dim]*Nint*precision;
+    int len = nFace*ghostFace[dim]*Nint*ghost_precision;
     const void *src = ghost_spinor;
   
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
-    void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + precision*ghost_offset;
+    void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + ghost_precision*ghost_offset;
 
-    if (precision == QUDA_HALF_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
+    if (ghost_precision == QUDA_HALF_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
 
     cudaMemcpyAsync(ghost_dst, src, len, cudaMemcpyHostToDevice, *stream);
   }
@@ -1029,7 +1034,7 @@ namespace quda {
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+    int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
     int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
     int Npad = Nint/Nvec;
 
@@ -1045,9 +1050,11 @@ namespace quda {
 
       // all goes here
       void* ghost_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
-	+ precision*ghostOffset[dim][(dir+1)%2];
+	+ ghost_precision*ghostOffset[dim][(dir+1)%2];
       void *ghost_norm_dst = static_cast<char*>(ghost_remote_send_buffer_d[bufferIndex][dim][dir])
 	+ QUDA_SINGLE_PRECISION*ghostNormOffset[dim][(d+1)%2];
+
+    if (ghost_precision != precision) pushKernelPackT(true);
 
       if (dim != 3 || getKernelPackT()) {
 
@@ -1080,17 +1087,17 @@ namespace quda {
 	  }
 	}
 
-	size_t len = nFace*(ghostFace[3]/x4)*Nvec*precision;
+	size_t len = nFace*(ghostFace[3]/x4)*Nvec*ghost_precision;
 	size_t dpitch = x4*len;
-	size_t spitch = stride*Nvec*precision;
+	size_t spitch = stride*Nvec*ghost_precision;
 
 	for (int s=0; s<x4; s++) {
 	  void *dst = (char*)ghost_dst + s*len;
-	  void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*precision;
+	  void *src = (char*)v + (offset + s*(volumeCB/x4))*Nvec*ghost_precision;
 	  // start the copy
 	  cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	  if (precision == QUDA_HALF_PRECISION) {
+	  if (ghost_precision == QUDA_HALF_PRECISION) {
 	    size_t len = nFace*(ghostFace[3]/x4)*sizeof(float);
 	    int norm_offset = (dir == 0) ? 0 : Nt_minus_offset*sizeof(float);
 	    void *dst = (char*)ghost_norm_dst + s*len;
@@ -1123,16 +1130,16 @@ namespace quda {
 	//  -- Each Pad has size Nvec*Vsh Floats.
 	//  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
 
-	void *src = static_cast<char*>(v) + flavor1_offset*Nvec*precision;
-	size_t len = flavorTFace*Nvec*precision;
-	size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
+	void *src = static_cast<char*>(v) + flavor1_offset*Nvec*ghost_precision;
+	size_t len = flavorTFace*Nvec*ghost_precision;
+	size_t spitch = stride*Nvec*ghost_precision;//ndeg tm: stride=2*flavor_volume+pad
 	size_t dpitch = 2*len;
 	cudaMemcpy2DAsync(ghost_dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	src = static_cast<char*>(v) + flavor2_offset*Nvec*precision;
+	src = static_cast<char*>(v) + flavor2_offset*Nvec*ghost_precision;
 	cudaMemcpy2DAsync(static_cast<char*>(ghost_dst)+len, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
 
-	if (precision == QUDA_HALF_PRECISION) {
+	if (ghost_precision == QUDA_HALF_PRECISION) {
 	  int norm_offset = (dir == 0) ? 0 : flavor1_Nt_minus1_offset*sizeof(float);
 	  void *src = static_cast<char*>(norm) + norm_offset;
 	  size_t dpitch = flavorTFace*sizeof(float);
@@ -1140,6 +1147,8 @@ namespace quda {
 	  cudaMemcpy2DAsync(ghost_norm_dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToDevice, *copy_stream);
 	}
       }
+
+      if (ghost_precision != precision) popKernelPackT();
 
       if (dir == 0) {
 	// record the event
@@ -1344,8 +1353,7 @@ namespace quda {
     }
 
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-    bool pack_t = getKernelPackT();
-    setKernelPackT(true); // ensure kernel packing is enabled for all dimensions
+    pushKernelPackT(true); // ensure kernel packing is enabled for all dimensions
     const_cast<cudaColorSpinorField&>(*this).streamInit(streams); // ensures streams are set (needed for p2p)
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
@@ -1470,7 +1478,7 @@ namespace quda {
       }
     }
 
-    setKernelPackT(pack_t); // restore kernel packing
+    popKernelPackT(); // restore kernel packing
   }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {

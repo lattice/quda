@@ -1559,10 +1559,11 @@ namespace quda {
 	  if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
 #ifdef DYNAMIC_CLOVER
 	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB));
-	  ComputeCloverInvMaxGPU<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	  thrust::device_ptr<Float> ptr(arg.max_d);
-	  arg.max_h = thrust::reduce(thrust::retag<my_tag>(ptr), thrust::retag<my_tag>(ptr+2*arg.fineVolumeCB), static_cast<Float>(0.0), thrust::maximum<Float>());
-	  pool_device_free(arg.max_d);
+    ComputeCloverInvMaxGPU<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+    thrust_allocator alloc;
+    thrust::device_ptr<Float> ptr(arg.max_d);
+    arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
+    pool_device_free(arg.max_d);
 #else
 	  errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
 #endif
