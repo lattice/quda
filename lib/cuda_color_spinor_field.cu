@@ -12,6 +12,9 @@ int zeroCopy = 0;
 
 namespace quda {
 
+  static bool ghost_precision_reset = false;
+  static QudaPrecision ghost_precision_old = QUDA_INVALID_PRECISION;
+
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false),
     ghostTexInit(false), ghost_field_tex{nullptr,nullptr,nullptr,nullptr}, bufferMessageHandler(0)
@@ -442,15 +445,7 @@ namespace quda {
   void cudaColorSpinorField::destroyTexObject() {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && texInit) {
       cudaDestroyTextureObject(tex);
-      if (ghost_bytes) {
-	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
-      }
-      if (precision == QUDA_HALF_PRECISION) {
-        cudaDestroyTextureObject(texNorm);
-        if (ghost_bytes) {
-	  for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
-	}
-      }
+      if (precision == QUDA_HALF_PRECISION) cudaDestroyTextureObject(texNorm);
       texInit = false;
     }
   }
@@ -458,7 +453,8 @@ namespace quda {
   void cudaColorSpinorField::destroyGhostTexObject() const {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
       for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
-      if (ghost_precision == QUDA_HALF_PRECISION) {
+      if ( (ghost_precision_reset && ghost_precision_old == QUDA_HALF_PRECISION) ||
+	   (!ghost_precision_reset && ghost_precision == QUDA_HALF_PRECISION) ) {
 	for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
       }
       ghostTexInit = false;
@@ -487,10 +483,10 @@ namespace quda {
     if (composite_descr.is_composite) 
     {
        CompositeColorSpinorField::iterator vec;
-       for(vec = components.begin(); vec != components.end(); vec++) delete *vec;
+       for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
     } 
 
-    if ((siteSubset == QUDA_FULL_SITE_SUBSET && !composite_descr.is_composite) || (siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_component)) {
+    if ( siteSubset == QUDA_FULL_SITE_SUBSET && (!composite_descr.is_composite || composite_descr.is_component) ) {
       delete even;
       delete odd;
     }
@@ -654,8 +650,6 @@ namespace quda {
 
     return;
   }
-
-  static bool ghost_precision_reset = false;
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {
 
@@ -1343,12 +1337,14 @@ namespace quda {
 
     if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
       ghost_precision_reset = true;
+      ghost_precision_old = ghost_precision;
       ghost_precision = ghost_precision_;
     }
 
     // not overriding the ghost precision, but we did previously so need to update
     if (ghost_precision == QUDA_INVALID_PRECISION && ghost_precision != precision) {
       ghost_precision_reset = true;
+      ghost_precision_old = ghost_precision;
       ghost_precision = precision;
     }
 
