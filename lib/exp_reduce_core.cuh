@@ -361,11 +361,11 @@ SpinorX2,SpinorR2,SpinorW2,SpinorQ2,SpinorD2,SpinorH2,SpinorZ2,SpinorP2,SpinorU2
     arg.Q2.load(q2, i, parity);
     arg.D2.load(d2, i, parity);
 
-//    arg.H1.load(h1, i, parity);
+//    arg.H2.load(h2, i, parity);//Currently H2 = H1
     arg.Z2.load(z2, i, parity);
     arg.P2.load(p2, i, parity);
     arg.U2.load(u2, i, parity);
-//    arg.G1.load(g1, i, parity);
+//    arg.G2.load(g2, i, parity);//Currently G2 = G1
 
 
     arg.reduce_functor.pre();
@@ -379,25 +379,25 @@ SpinorX2,SpinorR2,SpinorW2,SpinorQ2,SpinorD2,SpinorH2,SpinorZ2,SpinorP2,SpinorU2
     arg.R1.save(r1, i, parity);
     arg.W1.save(w1, i, parity);
     arg.Q1.save(q1, i, parity);
-    arg.D1.save(d1, i, parity);
+    arg.D1.save(d1, i, parity);//Hack!
 
     arg.H1.save(h1, i, parity);
     arg.Z1.save(z1, i, parity);
     arg.P1.save(p1, i, parity);
-    arg.U1.save(u1, i, parity);
+    arg.U1.save(u1, i, parity);//Hack!
     arg.G1.save(g1, i, parity);
 
     arg.X2.save(x2, i, parity);
     arg.R2.save(r2, i, parity);
     arg.W2.save(w2, i, parity);
     arg.Q2.save(q2, i, parity);
-//    arg.D2.save(d2, i, parity);
+    arg.D2.save(d2, i, parity);
 
-//    arg.H1.save(h1, i, parity);
+    arg.H2.save(h1, i, parity);
     arg.Z2.save(z2, i, parity);
     arg.P2.save(p2, i, parity);
     arg.U2.save(u2, i, parity);
-//    arg.G1.save(g1, i, parity);
+    arg.G2.save(g1, i, parity);
 
     i += gridSize;
   }
@@ -476,7 +476,8 @@ public:
 	     SpinorQ1 &Q1, SpinorD1 &D1, SpinorH1 &H1, SpinorZ1 &Z1, SpinorP1 &P1, SpinorU1 &U1, SpinorG1 &G1, SpinorX2 &X2, SpinorR2 &R2, SpinorW2 &W2, SpinorQ2 &Q2, SpinorD2 &D2, SpinorH2 &H2, SpinorZ2 &Z2, SpinorP2 &P2, SpinorU2 &U2, SpinorG2 &G2, Reducer &r, int length, int nParity,
 	     const size_t *bytes, const size_t *norm_bytes) :
     arg(X1,R1,W1,Q1,D1,H1,Z1,P1,U1,G1,X2,R2,W2,Q2,D2,H2,Z2,P2,U2,G2, r, length/nParity),
-    result(result), nParity(nParity), X1_h(0), R1_h(0), W1_h(0), Q1_h(0), D1_h(0), H1_h(0), Z1_h(0), P1_h(0), U1_h(0), G1_h(0), 
+    result(result), nParity(nParity), 
+    X1_h(0), R1_h(0), W1_h(0), Q1_h(0), D1_h(0), H1_h(0), Z1_h(0), P1_h(0), U1_h(0), G1_h(0), 
     X2_h(0), R2_h(0), W2_h(0), Q2_h(0), D2_h(0), H2_h(0), Z2_h(0), P2_h(0), U2_h(0), G2_h(0),
     X1norm_h(0), R1norm_h(0), W1norm_h(0), Q1norm_h(0), D1norm_h(0), H1norm_h(0), Z1norm_h(0), P1norm_h(0), U1norm_h(0), G1norm_h(0),
     X2norm_h(0), R2norm_h(0), W2norm_h(0), Q2norm_h(0), D2norm_h(0), H2norm_h(0), Z2norm_h(0), P2norm_h(0), U2norm_h(0), G2norm_h(0),
@@ -612,7 +613,7 @@ void reduceComponentwiseCudaExp(doubleN reduce_buffer[Nreduce], const double2 &a
 x2.NormBytes(), r2.NormBytes(), w2.NormBytes(), q2.NormBytes(), d2.NormBytes(), h2.NormBytes(), z2.NormBytes(), p2.NormBytes(), u2.NormBytes(), g2.NormBytes()};
 
   Spinor<RegType,StoreType,M_,writeX, 0> X1(x1);
-  Spinor<RegType,StoreType,M_,writeP, 1> R1(r1);
+  Spinor<RegType,StoreType,M_,writeR, 1> R1(r1);
   Spinor<RegType,StoreType,M_,writeW, 2> W1(w1);
   Spinor<RegType,StoreType,M_,writeQ, 3> Q1(q1);
   Spinor<RegType,StoreType,M_,writeD, 4> D1(d1);
@@ -623,7 +624,7 @@ x2.NormBytes(), r2.NormBytes(), w2.NormBytes(), q2.NormBytes(), d2.NormBytes(), 
   Spinor<RegType,    zType,M_,writeG, 9> G1(g1);
 
   Spinor<RegType,StoreType,M_,writeX,10> X2(x2);
-  Spinor<RegType,StoreType,M_,writeP,11> R2(r2);
+  Spinor<RegType,StoreType,M_,writeR,11> R2(r2);
   Spinor<RegType,StoreType,M_,writeW,12> W2(w2);
   Spinor<RegType,StoreType,M_,writeQ,13> Q2(q2);
   Spinor<RegType,StoreType,M_,writeD,14> D2(d2);
@@ -636,7 +637,7 @@ x2.NormBytes(), r2.NormBytes(), w2.NormBytes(), q2.NormBytes(), d2.NormBytes(), 
   typedef typename scalar<RegType>::type Float;
   typedef typename vector<Float,2>::type Float2;
   typedef vector<Float,2> vec2;
-  Reducer<Nreduce, ReduceType, Float2, RegType> reducer_((Float2)vec2(a), (Float2)vec2(b),(Float2)vec2(c), (Float2)vec2(a2),(Float2)vec2(b),(Float2)vec2(c) );
+  Reducer<Nreduce, ReduceType, Float2, RegType> reducer_((Float2)vec2(a), (Float2)vec2(b),(Float2)vec2(c), (Float2)vec2(a2),(Float2)vec2(b2),(Float2)vec2(c2) );
 
   if(x1.IsComposite()) errorQuda("Composite fields are not supported.\n");
 

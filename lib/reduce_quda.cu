@@ -1001,8 +1001,8 @@ A.S. edit: extended to 16 for CA solvers
          dot_<scalar>   (sum[2].x, z2, r2);//l8
          norm2_<scalar> (sum[2].y, z1);//l9
 
-         sum[2].z = 0.0;
          sum[2].w = 0.0;
+         sum[2].z = 0.0;
 
       }
 
@@ -1063,14 +1063,14 @@ A.S. edit: extended to 16 for CA solvers
 
          dot_<scalar> (sum[1].x, w1, w2);//l4
          dot_<scalar> (sum[1].y, r2, w2);//l5
-         dot_<scalar> (sum[1].w, r1, r1);//l6
+         norm2_<scalar> (sum[1].w, r1);
          dot_<scalar> (sum[1].z, r1, r2);//l7
+         norm2_<scalar> (sum[2].x, r2);
 
-         dot_<scalar>   (sum[2].x, r2, r2);//l8
-         norm2_<scalar> (sum[2].y, r1);//l9
 
-         sum[2].z = 0.0;
+         sum[2].y = sum[1].w;
          sum[2].w = 0.0;
+         sum[2].z = 0.0;
       }
 
       __device__ __host__ void operator()(ReduceType sum[Nreduce], FloatN &x, FloatN &p, FloatN &u,FloatN &r,
@@ -1091,7 +1091,7 @@ A.S. edit: extended to 16 for CA solvers
       if (x1.Precision() != p1.Precision()) {
          errorQuda("\nMixed blas is not implemented.\n");
       } 
-      reduce::reduceComponentwiseCudaExp<3, double4, QudaSumFloat4,pipe2CGMergedOp_,1,1,1,1,1,0,1,1,1,0,false>
+      reduce::reduceComponentwiseCudaExp<3, double4, QudaSumFloat4,pipe2CGMergedOp_,1,1,1,1,1,0,0,0,0,0,false>
 	  (buffer, make_double2(a, 0.0), make_double2(b, 0.0), make_double2(c, 0.0), make_double2(a2, 0.0), make_double2(b2, 0.0), make_double2(c2, 0.0),  x1, r1, w1, q1, d1, h1, z1, p1, u1, g1, x2, r2, w2, q2, d2, h2, z2, p2, u2, g2);
 
        return;

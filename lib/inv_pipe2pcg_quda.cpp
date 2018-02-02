@@ -106,17 +106,18 @@ namespace quda {
         delete K;
       }
 
-      delete pp;
-
       delete tmpp;
       delete rp;
       //delete yp;
 
+      delete dp;
       delete qp;
       delete wp;
-    }
+      delete hp;
 
-    if(K) delete K;
+      delete xp_sloppy;
+      delete rp_sloppy;
+    }
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -183,22 +184,22 @@ namespace quda {
       csParam.is_composite  = false;
       csParam.composite_dim = 1;
 
-      gp = K ? ColorSpinorField::Create(csParam) : &dp->Component(1);
+      gp = K ? ColorSpinorField::Create(csParam) : &dp->Component(0);
 
 
       // these low precision fields are used by the inner solver
       if ( K ) {
         printfQuda("Allocated resources for the preconditioner.\n");
         csParam.setPrecision(param.precision_precondition);
-	q_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &qp->Component(1);
-	c_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &cp->Component(1);
+	q_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &qp->Component(0);
+	c_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &cp->Component(0);
 
-	d_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &dp->Component(1);
+	d_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : &dp->Component(0);
 	g_pre = (param.precision_precondition != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : gp;
       } else { //no preconditioner
         printfQuda("\nNo preconditioning...\n");
         q_pre = nullptr;
-        c_pre = &cp->Component(1);//qp
+        c_pre = &cp->Component(0);//qp
         d_pre = nullptr;
         g_pre = gp;//dp
       }
@@ -221,28 +222,27 @@ namespace quda {
     ColorSpinorField &tmp  = *tmpp;
     ColorSpinorField &tmp_sloppy  = *tmpp_sloppy;
 
-    ColorSpinorField &x0_sloppy = xp_sloppy->Component(0);
-    ColorSpinorField &x1_sloppy = xp_sloppy->Component(1);
-    ColorSpinorField &r0_sloppy = rp_sloppy->Component(0);
-    ColorSpinorField &r1_sloppy = rp_sloppy->Component(1);
+    ColorSpinorField &x1_sloppy = xp_sloppy->Component(0);
+    ColorSpinorField &x2_sloppy = xp_sloppy->Component(1);
+    ColorSpinorField &r1_sloppy = rp_sloppy->Component(0);
+    ColorSpinorField &r2_sloppy = rp_sloppy->Component(1);
 
     ColorSpinorField &r = *rp;
-    ColorSpinorField &z0 = zp->Component(0);
-    ColorSpinorField &w0 = wp->Component(0);
-    ColorSpinorField &q0 = qp->Component(0);
-    ColorSpinorField &p0 = pp->Component(0);
-    ColorSpinorField &c0 = cp->Component(0);
+    ColorSpinorField &z1 = zp->Component(0);
+    ColorSpinorField &w1 = wp->Component(0);
+    ColorSpinorField &q1 = qp->Component(0);
+    ColorSpinorField &p1 = pp->Component(0);
+    ColorSpinorField &c1 = cp->Component(0);
     ColorSpinorField &g = *gp;
-    ColorSpinorField &d0 = dp->Component(0);
+    ColorSpinorField &d1 = dp->Component(0);
     ColorSpinorField &h = *hp;
 
-    ColorSpinorField &z1 = zp->Component(1);
-    ColorSpinorField &w1 = wp->Component(1);
-    ColorSpinorField &q1 = qp->Component(1);
-    ColorSpinorField &p1 = pp->Component(1);
-    ColorSpinorField &c1 = cp->Component(1);
-    ColorSpinorField &g1 = gp->Component(1);
-    ColorSpinorField &d1 = dp->Component(1);
+    ColorSpinorField &z2 = zp->Component(1);
+    ColorSpinorField &w2 = wp->Component(1);
+    ColorSpinorField &q2 = qp->Component(1);
+    ColorSpinorField &p2 = pp->Component(1);
+    ColorSpinorField &c2 = cp->Component(1);
+    ColorSpinorField &d2 = dp->Component(1);
 
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
@@ -276,7 +276,7 @@ namespace quda {
     delete Ax;
     delete Ax_cuda;
 
-    const double mu    = K ? 1000.0 : 100.0; 
+    const double mu    = K ? 1000.0 : 10000.0; 
     const double blen  = b.RealLength();
     const double Anorm = sqrt(blas::norm2(r));
     const double msqrn = mu*sqrt(blen); 
@@ -286,7 +286,8 @@ namespace quda {
     mat(r, x, tmp); // => r = A*x;
     blas::xpay(b,-1.0, r);
 
-    r0_sloppy = r;
+    r1_sloppy = r;
+    x1_sloppy = x;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
@@ -305,26 +306,27 @@ namespace quda {
 
     double4 *local_reduce = new double4[3];//to keep double3 or double4 registers
 
-    double lambda[10], beta, betajp1, gamma, gammajp1, delta, deltajp1;
+    double betaj, betajp1, gammaj, gammajp1, deltaj, deltajp1, rhoj, rhojp1, mNorm;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if(K) {
-      qPre = r0_sloppy;
+      qPre = r1_sloppy;
       commGlobalReductionSet(false);
       (*K)(cPre, qPre);
       commGlobalReductionSet(true);
-      z0 = cPre;
+      z1 = cPre;
     } 
 
-    matSloppy(w0, z0, tmp_sloppy); // => w = A*u;
+    matSloppy(w1, z1, tmp_sloppy); // => w = A*u;
 
-    delta   = blas::reDotProduct(z0,w0); 
-    beta    = blas::reDotProduct(z0,r0_sloppy); 
-    double mNorm   = blas::norm2(z0);
+    deltaj   = blas::reDotProduct(z1,w1); 
+    betaj    = blas::reDotProduct(z1,r1_sloppy); 
 
-    gamma  = beta / delta;
+    gammaj  = betaj / deltaj;
+
+    rhoj    = 1.0;
 
     const double uro   = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double tau = 100.0*sqrt(uro);
@@ -332,53 +334,84 @@ namespace quda {
     blas::flops = 0;
 
     if(K) {
-      dPre = w0;
+      dPre = w1;
       commGlobalReductionSet(false);
       (*K)(gPre, dPre);
       commGlobalReductionSet(true);
-      p0 = gPre;
+      p1 = gPre;
     } 
     //
-    matSloppy(q0, p0, tmp_sloppy);
+    matSloppy(q1, p1, tmp_sloppy);
 
-    lambda[1] = blas::reDotProduct(p0,q0);
-    lambda[0] = delta;
-    lambda[6] = beta;
+    x2_sloppy = x1_sloppy;
+    axpy(+gammaj, z1, x2_sloppy);
+    r2_sloppy = r1_sloppy;
+    axpy(-gammaj, w1, r2_sloppy);
+    w2 = w1;
+    axpy(-gammaj, q1, w2);
+
+    deltajp1   = blas::reDotProduct(z2,w2); 
+    betajp1    = blas::reDotProduct(z2,r2_sloppy); 
+    mNorm      = blas::norm2(z2);
+
+    gammajp1  = betajp1 / deltajp1;
+
+    rhojp1    =  1.0 / (1 - (gammajp1*betajp1) / (gammaj*betaj));
 
     if(K) {
-      qPre = q0;
+      qPre = q1;
       commGlobalReductionSet(false);
       (*K)(cPre, qPre);
       commGlobalReductionSet(true);
-      c0 = cPre;
+      c1 = cPre;
     } 
     //
-    matSloppy(d0, c0, tmp_sloppy);
+    matSloppy(d1, c1, tmp_sloppy);
 
-    deltajp1 = lambda[0] - 2.0*gamma*lambda[1] + gamma*gamma*lambda[3]; 
-    betajp1  = lambda[6] - 2.0*gamma*lambda[0] + gamma*gamma*lambda[1];
+    if(K) {
+      dPre = d1;
+
+      commGlobalReductionSet(false);
+      (*K)(gPre, dPre);
+      commGlobalReductionSet(true);
+
+      g = gPre;
+    }      
+    //
+    matSloppy(h, g, tmp_sloppy);
+
+    q2 = q1;
+    axpy(-gammaj, d1, q2);
+    d2 = d1;
+    axpy(-gammaj,  h, d2);
+   
+    if(K) {
+      z2 = z1;
+      axpy(-gammaj, p1, z2);
+      p2 = p1;
+      axpy(-gammaj, c1, p2);
+      c2 = c1;
+      axpy(-gammaj,  g, c2);
+    }
 
     int j = 1;
 
-    PrintStats( "Pipe2PCG (before main loop)", j, mNorm, b2, 0.0);
+    PrintStats( "Pipe2PCG (before main loop)", j-1, mNorm, b2, 0.0);
 
     int updateR = 0;
 
-    gammajp1 = betajp1 / deltajp1; 
+    double phijp1[3] = {rhojp1, (rhojp1*gammajp1), (1-rhojp1)};
+    double phij  [3] = {0.0, 0.0, 1.0};
 
-    double rhoj   = 1.0;
-    double rhojp1 = 1.0 / (1-gammajp1*betajp1 / (gamma*beta) ) ;
-
+    double &lambda0 = local_reduce[0].x, &lambda1 = local_reduce[0].y, &lambda2 = local_reduce[0].w, &lambda3 = local_reduce[0].z;
+    double &lambda4 = local_reduce[1].x, &lambda5 = local_reduce[1].y, &lambda6 = local_reduce[1].w, &lambda7 = local_reduce[1].z;
+    double &lambda8 = local_reduce[2].x, &lambda9 = local_reduce[2].y, &lambda10= local_reduce[2].w, &lambda11= local_reduce[2].z;
 
     while(!convergence(mNorm, 0.0, stop, param.tol_hq) && j < param.maxiter){
 
-      double muj   = 1 - rhoj;
-      double mujp1 = 1 - rhojp1;
-
       commGlobalReductionSet(false);//disable global reduction
-      MergedLocalReducer( local_reduce, rhoj, (rhoj*gamma), muj, rhojp1, (rhojp1*gammajp1), mujp1, x0_sloppy, r0_sloppy, w0, q0, d0, h, z0, p0, c0, g, x1_sloppy, r1_sloppy, w1, q1, d1, h, z1, p1, c1, g );
+      MergedLocalReducer( local_reduce, phij[0], phij[1], phij[2], phijp1[0], phijp1[1], phijp1[2], x1_sloppy, r1_sloppy, w1, q1, d1, h, z1, p1, c1, g, x2_sloppy, r2_sloppy, w2, q2, d2, h, z2, p2, c2, g );
       commGlobalReductionSet(true);
- 
 #ifdef USE_WORKER
       {
         if(K) {
@@ -448,29 +481,47 @@ namespace quda {
       }
 #endif //end of USE_WORKER
 
-      delta = lambda[0]; 
-      beta  = lambda[6]; 
+      deltaj = lambda0;
+      betaj  = lambda6;
+      gammaj = betaj / deltaj;
 
-      gamma = beta / delta; 
+      rhoj   = 1.0 / (1.0 - (gammaj*betaj) / (gammajp1*betajp1*rhojp1));
 
-      rhoj = 1.0 / (1-gamma*beta / (gamma*betajp1*rhojp1) );
+      phij[0]    = rhoj;
+      phij[1]    = rhoj*gammaj;
+      phij[2]    = (1 - rhoj);
 
-      double phi0 = rhojp1;
-      double phi1 = - rhojp1*gammajp1;
-      double phi2 = 1.0 - rhojp1;
+      deltajp1 = 
+		phij[0]*phij[0]*lambda0-
+	      2*phij[0]*phij[1]*lambda1+
+	      2*phij[0]*phij[2]*lambda2+
+	        phij[1]*phij[1]*lambda3-
+	      2*phij[1]*phij[2]*lambda4+
+		phij[2]*phij[2]*lambda5;
 
-      deltajp1 = phi0*phi0*lambda[0]+2*phi0*phi1*lambda[1]+2*phi0*phi2*lambda[2]+phi1*phi1*lambda[3]+2*phi1*phi2*lambda[4]+phi2*phi2*lambda[5]; 
-      betajp1  = phi0*phi0*lambda[6]+2*phi0*phi1*lambda[0]+2*phi0*phi2*lambda[7]+phi1*phi1*lambda[1]+2*phi1*phi2*lambda[2]+phi2*phi2*lambda[8]; 
+      betajp1  = 
+		phij[0]*phij[0]*lambda6-
+	      2*phij[0]*phij[1]*lambda0+
+	      2*phij[0]*phij[2]*lambda7+
+		phij[1]*phij[1]*lambda1-
+	      2*phij[1]*phij[2]*lambda2+
+		phij[2]*phij[2]*lambda8;
 
-      gammajp1 = betajp1 / deltajp1; 
+      gammajp1 = betajp1 / deltajp1;
+      rhojp1   = 1.0 / (1.0 - (gammajp1*betajp1) / (gammaj*betaj*rhoj));
 
-      rhojp1 = 1.0 / (1-gammajp1*betajp1 / (gamma*beta*rhoj) );
+      phijp1[0]    = rhojp1;
+      phijp1[1]    = rhojp1*gammajp1;
+      phijp1[2]    = (1 - rhojp1);
+
+      mNorm = lambda6;
+
+      PrintStats( "Pipe2PCG:", j, mNorm, b2, 0.0);
 
       j += 2;
     }
 
-    delete[] local_reduce;
-
+    delete [] local_reduce;
 #ifdef NONBLOCK_REDUCE
     delete [] recvbuff;
 #endif
@@ -498,8 +549,6 @@ namespace quda {
     matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-
-    //delete[] local_reduce;
 
     if (param.precision_sloppy != param.precision) {
       delete tmpp_sloppy;
