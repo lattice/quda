@@ -1,5 +1,4 @@
 #include <quda_internal.h>
-#include <cublas_v2.h>
 
 #pragma once
 
