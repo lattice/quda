@@ -22,16 +22,22 @@ namespace quda {
 
   namespace cublas { 
 
+#ifdef CUBLAS_LIB
     static cublasHandle_t handle;
+#endif
 
     void init() {
+#ifdef CUBLAS_LIB
       cublasStatus_t error = cublasCreate(&handle);
       if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
+#endif
     }
 
     void destroy() {
+#ifdef CUBLAS_LIB
       cublasStatus_t error = cublasDestroy(handle);
       if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError indestroying cublas context, error code = %d\n", error);
+#endif
     }
 
     // mini kernel to set the array of pointers needed for batched cublas

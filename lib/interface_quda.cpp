@@ -502,10 +502,7 @@ void initQudaMemory()
   checkCudaError();
   createDslashEvents();
   blas::init();
-
-#ifdef CUBLAS_LIB
   cublas::init();
-#endif
 
   // initalize the memory pool allocators
   pool::init();
@@ -1270,10 +1267,7 @@ void endQuda(void)
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
 
-#ifdef CUBLAS_LIB
   cublas::destroy();
-#endif
-
   blas::end();
 
   pool::flush_pinned();
