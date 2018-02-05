@@ -54,6 +54,27 @@ qudaAPI_ContractId parseContractIdx(const char *v){
   return cId;
 }
   
+qluaCntr_Type parse_qcContractType(const char *s){
+  
+  qluaCntr_Type cT;
+  
+  if      (strcmp(s,"qbarq_g_F_B")==0)      cT = what_qbarq_g_F_B;
+  else if (strcmp(s,"qbarq_g_F_aB")==0)     cT = what_qbarq_g_F_aB;
+  else if (strcmp(s,"qbarq_g_F_hB")==0)     cT = what_qbarq_g_F_hB;
+  else if (strcmp(s,"qbarq_g_vD_vD")==0)    cT = what_qbarq_g_vD_vD;
+  else if (strcmp(s,"qbarq_g_vD_avD")==0)   cT = what_qbarq_g_vD_avD;
+  else if (strcmp(s,"qbarq_g_vD_hvD")==0)   cT = what_qbarq_g_vD_hvD;
+  else if (strcmp(s,"meson_F_B")==0)        cT = what_meson_F_B;
+  else if (strcmp(s,"meson_F_aB")==0)       cT = what_meson_F_aB;
+  else if (strcmp(s,"meson_F_hB")==0)       cT = what_meson_F_hB;
+  else if (strcmp(s,"baryon_sigma_UUS")==0) cT = what_baryon_sigma_UUS;
+  else if (strcmp(s,"qpdf_g_F_B")==0)       cT = what_qpdf_g_F_B;
+  else if (strcmp(s,"tmd_g_F_B")==0)        cT = what_tmd_g_F_B;
+  else cT = what_none;
+  
+  return cT;
+}
+  
 
 /* topology in Quda is a global variable;
  * need to check for every lattice if the topology is the same */
@@ -1074,7 +1095,12 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
 
   if((Nc != QUDA_Nc) || (Ns != QUDA_Ns))
     return 1;
-  
+
+  if(paramAPI.mpParam.cntrType == what_none)
+    errorQuda("%s: Contraction type not parsed correctly or not supported!\n", func_name);
+  else
+    printfQuda("%s: Got Contraction type \'%s\'\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
+    
   //-- Load the parameters required for the CSFs, TODO: May need to control this with paramAPI.mpParam.bc_t
   QudaGaugeParam gp;
   int tBoundaryGauge = -1;
@@ -1084,7 +1110,6 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   init_QudaInvertParam_generic(ip, gp, paramAPI);
   setVerbosity(paramAPI.verbosity);
 
-  
   //-- Load the propagators into cuda-CSFs
   int nVec = 12;
   LONG_T fieldLgh = paramAPI.mpParam.locvol * Nc * Ns * 2;
@@ -1103,7 +1128,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   }
 
   if(paramAPI.mpParam.cntrType == what_baryon_sigma_UUS){
-    if(hprop3 == NULL) errorQuda("%s: Got hprop3 = NULL for cntrType = what_baryon_sigma_UUS.\n", func_name);
+    if(hprop3 == NULL) errorQuda("%s: Got hprop3 = NULL for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
 
     for(int ivec=0;ivec<nVec;ivec++){
       cudaProp3[ivec] = new_cudaColorSpinorField(gp, ip, Nc, Ns, &(hprop3[ivec * fieldLgh]) );
@@ -1120,7 +1145,7 @@ QuarkContract_momProj_Quda(XTRN_CPLX *momproj_buf, XTRN_CPLX *corrQuda, const qu
   GaugeField *cuda_gf = NULL;
   if( (paramAPI.mpParam.cntrType == what_tmd_g_F_B) || (paramAPI.mpParam.cntrType == what_qpdf_g_F_B) ){
     for(int mu=0;mu<qS->rank;mu++)
-      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for tmd or qpdf contractions.\n", func_name);
+      if(h_gauge[mu] == NULL) errorQuda("%s: Got NULL gauge field for cntrType = %s.\n", func_name, qc_contractTypeStr[paramAPI.mpParam.cntrType]);
     
     cuda_gf = new_cudaGaugeField(gp, h_gauge);
     printfQuda("%s: Cuda Gauge Field loaded.\n", func_name);

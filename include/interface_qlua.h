@@ -35,9 +35,21 @@ typedef double QUDA_REAL;
 #define PI 2*asin(1.0)
 #define THREADS_PER_BLOCK 64
 
-
-//#include <complex_quda.h>
-
+static const char *qc_contractTypeStr[13] = {
+  "none",
+  "qbarq_g_F_B",
+  "qbarq_g_F_aB",
+  "qbarq_g_F_hB",
+  "qbarq_g_vD_vD",
+  "qbarq_g_vD_avD",
+  "qbarq_g_vD_hvD",
+  "meson_F_B",
+  "meson_F_aB",
+  "meson_F_hB",
+  "baryon_sigma_UUS",
+  "qpdf_g_F_B",
+  "tmd_g_F_B"
+};
 
 typedef enum qudaAPI_ContractId_s{
   cntr12 = 12,
@@ -130,6 +142,10 @@ QudaVerbosity parseVerbosity(const char *v);
 
 EXTRN_C
 qudaAPI_ContractId parseContractIdx(const char *v);
+
+EXTRN_C
+qluaCntr_Type parse_qcContractType(const char *s);
+
 
 EXTRN_C int
 doQQ_contract_Quda(
