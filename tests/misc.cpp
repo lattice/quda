@@ -1173,21 +1173,18 @@ get_solver_type(char* s)
     ret = QUDA_CGNE_INVERTER;
   } else if (strcmp(s, "cgnr") == 0){
     ret = QUDA_CGNR_INVERTER;
-<<<<<<< HEAD
   } else if (strcmp(s, "pipepcg") == 0){
     ret = QUDA_PIPEPCG_INVERTER;
   } else if (strcmp(s, "pipepcg3") == 0){
     ret = QUDA_PIPEPCG3_INVERTER;
   } else if (strcmp(s, "pipe2pcg") == 0){
     ret = QUDA_PIPE2PCG_INVERTER;
-=======
   } else if (strcmp(s, "cg3") == 0){
     ret = QUDA_CG3_INVERTER;
   } else if (strcmp(s, "cg3ne") == 0){
     ret = QUDA_CG3NE_INVERTER;
   } else if (strcmp(s, "cg3nr") == 0){
     ret = QUDA_CG3NR_INVERTER;
->>>>>>> feature/multigrid
   } else {
     fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
@@ -1250,7 +1247,6 @@ get_solver_str(QudaInverterType type)
   case QUDA_BICGSTABL_INVERTER:
     ret = "bicgstab-l";
     break;
-<<<<<<< HEAD
   case QUDA_PIPEPCG_INVERTER:
     ret = "pipepcg";
     break;
@@ -1259,7 +1255,6 @@ get_solver_str(QudaInverterType type)
     break;
   case QUDA_PIPE2PCG_INVERTER:
     ret = "pipe2pcg";
-=======
   case QUDA_CGNE_INVERTER:
     ret = "cgne";
     break;
@@ -1274,7 +1269,6 @@ get_solver_str(QudaInverterType type)
     break;
   case QUDA_CG3NR_INVERTER:
     ret = "cg3nr";
->>>>>>> feature/multigrid
     break;
   default:
     ret = "unknown";
