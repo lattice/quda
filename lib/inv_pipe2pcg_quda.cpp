@@ -339,6 +339,9 @@ namespace quda {
       (*K)(gPre, dPre);
       commGlobalReductionSet(true);
       p1 = gPre;
+      //
+      z2 = z1;
+      axpy(-gammaj, p1, z2);
     } 
     //
     matSloppy(q1, p1, tmp_sloppy);
@@ -364,18 +367,21 @@ namespace quda {
       (*K)(cPre, qPre);
       commGlobalReductionSet(true);
       c1 = cPre;
+      //
+      p2 = p1;
+      axpy(-gammaj, c1, p2);
     } 
     //
     matSloppy(d1, c1, tmp_sloppy);
 
     if(K) {
       dPre = d1;
-
       commGlobalReductionSet(false);
       (*K)(gPre, dPre);
       commGlobalReductionSet(true);
-
       g = gPre;
+      c2 = c1;
+      axpy(-gammaj,  g, c2);
     }      
     //
     matSloppy(h, g, tmp_sloppy);
@@ -385,15 +391,6 @@ namespace quda {
     d2 = d1;
     axpy(-gammaj,  h, d2);
    
-    if(K) {
-      z2 = z1;
-      axpy(-gammaj, p1, z2);
-      p2 = p1;
-      axpy(-gammaj, c1, p2);
-      c2 = c1;
-      axpy(-gammaj,  g, c2);
-    }
-
     int j = 1;
 
     PrintStats( "Pipe2PCG (before main loop)", j-1, mNorm, b2, 0.0);
