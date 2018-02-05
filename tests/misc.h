@@ -34,6 +34,8 @@ extern "C" {
   QudaSolveType get_solve_type(char* s);
   const char* get_solve_str(QudaSolveType);
 
+  QudaSchwarzType get_schwarz_type(char* s);
+
   QudaTwistFlavorType get_flavor_type(char* s);
 
   int get_rank_order(char* s);
@@ -48,7 +50,7 @@ extern "C" {
 
   QudaExtLibType get_solve_ext_lib_type(char* s);
 
-  QudaFieldLocation get_df_location_ritz(char* s);
+  QudaFieldLocation get_location(char* s);
 
   QudaMemoryType get_df_mem_type_ritz(char* s);
 

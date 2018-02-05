@@ -80,11 +80,14 @@ namespace quda {
 	block order, with each value corresponding to a fine-grid offset. (GPU) */
     int *coarse_to_fine_d;
 
-    /** The spin blocking */
+    /** The spin blocking. Defined as zero when the fine operator is staggered. */
     int spin_bs;
 
-    /** The mapping onto coarse spin from fine spin */
-    int *spin_map;
+    /** The mapping onto coarse spin from fine spin (inner) and fine parity (outer), for staggered */
+    int **spin_map;
+
+    /** Nspin for the fine level. Required for deallocating spin_map. */
+    const int nspin_fine;
 
     /** Whether the transfer operator is to be applied to full fields or single parity fields */
     QudaSiteSubset site_subset;
@@ -95,14 +98,12 @@ namespace quda {
     /** Whether to enable transfer operator on the GPU */
     bool enable_gpu;
 
+    /** Whether to do the block-orthogonalization on the GPU */
+    bool gpu_setup;
+
     /** Whether to apply the transfer operaton the GPU (requires
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
-
-    /**
-     * Copies the null-space vector components into the V-field
-     */
-    void fillV(ColorSpinorField &V);
 
     /** 
      * Creates the map between fine and coarse grids 
@@ -110,36 +111,8 @@ namespace quda {
      */
     void createGeoMap(int *geo_bs);
 
-    /**
-     * Creates a block-ordered version of the color-spinor field V
-     * N.B. in must be the accessor to the color-spinor field V
-     * @param out A Complex array storing the block-ordered fields
-     * @param in  Accessor for the color-spinor field V
-     */
-    //template <class Complex, class FieldOrder>
-    //void blockOrderV(Complex *out, const FieldOrder &in, int *geo_bs, int spin_bs);
-
-  /**
-     * Copies elements from the block-ordered field in back to the color-spinor field V
-     * N.B. out must be the accessor to the color-spinor field V
-     * @param out The full lattice color spinor field, not block-ordered
-     * @param in  A Complex array storing the block-ordered fields
-     */
-    //template <class FieldOrder, class Complex>
-    //void undoblockOrderV(FieldOrder &out, Complex *in, int *geo_bs, int spin_bs);   
-
-  /**
-   * Does Gram-Schmidt orthogonalization.
-   * @param v The block-ordered vectors
-   * @param nBlocks
-   * @param Nc
-   * @param blockSize
-   */
-  //template <class Complex>
-    //void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize);
-
     /** 
-     * Creates the map between fine and coarse spin dimensions
+     * Creates the map between fine spin and parity to coarse spin dimensions
      * @param spin_bs The spin block size
      */
     void createSpinMap(int spin_bs);
@@ -165,13 +138,20 @@ namespace quda {
      * @param geo_bs The geometric block sizes to use
      * @param spin_bs The spin block sizes to use
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
+     * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
+     * @param gpu_setup Whether to do the block-orthogonalization on the GPU
      */
     Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
-	     bool enable_gpu, TimeProfile &profile);
+	     QudaPrecision null_precision, bool enable_gpu, bool gpu_setup, TimeProfile &profile);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
+
+    /**
+     @brief for resetting the Transfer when the null vectors have changed
+     */
+    void reset();
 
     /** 
      * Apply the prolongator
@@ -203,7 +183,7 @@ namespace quda {
     int nvec() const {return Nvec;}
 
     /**
-     * Returns the amount of spin blocking
+     * Returns the amount of spin blocking. Defined as zero when coarsening staggered. 
      * @return spin_bs
      */
     int Spin_bs() const {return spin_bs;}
@@ -214,6 +194,18 @@ namespace quda {
      */
     const int *Geo_bs() const {return geo_bs;}
     
+    /**
+       @return Pointer to the lookup table to the fine-to-coarse map
+    */
+    const int* fineToCoarse(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const
+    { return location == QUDA_CPU_FIELD_LOCATION ? fine_to_coarse_h : fine_to_coarse_d; }
+
+    /**
+       @return Pointer to the lookup table to the coarse-to-fine map
+    */
+    const int* coarseToFine(QudaFieldLocation location=QUDA_CPU_FIELD_LOCATION) const
+    { return location == QUDA_CPU_FIELD_LOCATION ? coarse_to_fine_h : coarse_to_fine_d; }
+
     /**
      * Sets where the prolongator / restrictor should take place
      * @param location Location where the transfer operator should be computed
@@ -245,26 +237,20 @@ namespace quda {
   };
 
   /**
-     Helper method that takes a vector of ColorSpinorFields and packes them into a single matrix field.
-     @param[out] V The resulting packed matrix field
-     @param[in] B Vector of ColorSpinorFields to be packed
-     @param[in] Nvec Vector length
-   */
-  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec);
-
-  /**
      @brief Block orthogonnalize the matrix field, where the blocks are
      defined by lookup tables that map the fine grid points to the
      coarse grid points, and similarly for the spin degrees of
      freedom.
      @param[in,out] V Matrix field to be orthgonalized
-     @param[in] Nvec Vector length
+     @param[in] B input vectors
      @param[in] geo_bs Geometric block size
      @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] coarse_to_fine Coarse-to-fine lookup table (linear indices)
      @param[in] spin_bs Spin block size
    */
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
-			  const int *fine_to_coarse, int spin_bs);
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B,
+			  const int *fine_to_coarse, const int *coarse_to_fine,
+			  const int *geo_bs, const int spin_bs);
 
   /**
      @brief Apply the prolongation operator
@@ -277,7 +263,7 @@ namespace quda {
      @param[in] parity of the output fine field (if single parity output field)
    */
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		  int Nvec, const int *fine_to_coarse, const int *spin_map,
+		  int Nvec, const int *fine_to_coarse, const int * const *spin_map,
 		  int parity=QUDA_INVALID_PARITY);
 
   /**
@@ -291,7 +277,7 @@ namespace quda {
      @param[in] parity of the input fine field (if single parity input field)
    */
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map,
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
 		int parity=QUDA_INVALID_PARITY);
   
 

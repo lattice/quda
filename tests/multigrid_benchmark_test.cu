@@ -31,6 +31,7 @@ extern bool verify_results;
 extern int test_type;
 
 extern QudaPrecision prec;
+extern QudaPrecision prec_sloppy;
 
 extern void usage(char** );
 
@@ -140,11 +141,13 @@ void initFields(QudaPrecision prec)
 	(gParam.x[0]*gParam.x[2]*gParam.x[3])/2,
 	(gParam.x[0]*gParam.x[1]*gParam.x[3])/2 } );
   gParam.pad = gParam.nFace * pad * 2;
+  gParam.precision = prec_sloppy;
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
   Y_d->copy(*Y_h);
   Yhat_d->copy(*Yhat_h);
 
+  gParam.precision = param.precision;
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;
@@ -217,6 +220,10 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
+  // Set some defaults that lets the benchmark fit in memory if you run it
+  // with default parameters.
+  xdim = ydim = zdim = tdim = 8;
+
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -224,6 +231,7 @@ int main(int argc, char** argv)
     printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();

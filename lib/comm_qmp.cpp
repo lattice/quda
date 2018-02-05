@@ -262,6 +262,12 @@ void comm_allreduce_max(double* data)
   QMP_CHECK( QMP_max_double(data) );
 }
 
+void comm_allreduce_min(double* data)
+{
+  QMP_CHECK( QMP_min_double(data) );
+}
+
+
 void comm_allreduce_array(double* data, size_t size)
 {
   QMP_CHECK( QMP_sum_double_array(data, size) );

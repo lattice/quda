@@ -33,7 +33,7 @@ namespace quda {
     }
 #endif
 
-    if(create != QUDA_NULL_FIELD_CREATE &&
+    if (create != QUDA_NULL_FIELD_CREATE &&
         create != QUDA_ZERO_FIELD_CREATE &&
         create != QUDA_REFERENCE_FIELD_CREATE){
       errorQuda("ERROR: create type(%d) not supported yet\n", create);
@@ -59,7 +59,8 @@ namespace quda {
     }
 
     even = gauge;
-    odd = (char*)gauge + bytes/2; 
+    odd = static_cast<char*>(gauge) + bytes/2;
+    if (create != QUDA_ZERO_FIELD_CREATE && isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) zeroPad();
 
 #ifdef USE_TEXTURE_OBJECTS
     createTexObject(tex, gauge, true);
@@ -76,10 +77,21 @@ namespace quda {
 
   }
 
+  void cudaGaugeField::zeroPad() {
+    size_t pad_bytes = (stride - volumeCB) * precision * order;
+    int Npad = (geometry * (reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2)) / order;
+
+    size_t pitch = stride*order*precision;
+    if (pad_bytes) {
+      cudaMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      cudaMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+    }
+  }
+
 #ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
 
-    if( isNative() ){
+    if( isNative() && geometry != QUDA_COARSE_GEOMETRY ){
       // create the texture for the field components
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
@@ -123,6 +135,11 @@ namespace quda {
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/(!full ? 2 : 1) : (bytes-phase_bytes)/(!full ? 2 : 1);
 
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+		  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+      }
+
       unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
       if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
@@ -139,7 +156,7 @@ namespace quda {
   }
 
   void cudaGaugeField::destroyTexObject() {
-    if( isNative() ){
+    if( isNative() && geometry != QUDA_COARSE_GEOMETRY ){
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
       if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13){

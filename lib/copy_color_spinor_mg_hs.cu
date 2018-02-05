@@ -2,12 +2,12 @@
 
 namespace quda {
   
-  void copyGenericColorSpinorMGDS(ColorSpinorField &dst, const ColorSpinorField &src, 
+  void copyGenericColorSpinorMGHS(ColorSpinorField &dst, const ColorSpinorField &src, 
 				  QudaFieldLocation location, void *Dst, void *Src, 
 				  void *dstNorm, void *srcNorm) {
 
 #if defined(GPU_MULTIGRID)
-    double *dst_ptr = static_cast<double*>(Dst);
+    short *dst_ptr = static_cast<short*>(Dst);
     float *src_ptr = static_cast<float*>(Src);
 
     INSTANTIATE_COLOR;

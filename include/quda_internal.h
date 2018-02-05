@@ -28,6 +28,7 @@
 #endif
 
 #define MAX_SHORT 32767.0f
+#define MAX_CHAR 127.0f
 
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)

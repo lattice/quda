@@ -23,7 +23,6 @@ cpuColorSpinorField *spinor, *spinor2;
 
 ColorSpinorParam csParam;
 
-float kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
 
@@ -108,10 +107,6 @@ void end() {
 }
 
 void packTest() {
-
-  float spinorGiB = (float)Vh*spinorSiteSize*param.cuda_prec / (1 << 30);
-  printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
-  printf("Gauge mem: %.3f GiB\n", param.gaugeGiB);
 
   printf("Sending fields to GPU...\n"); fflush(stdout);
   

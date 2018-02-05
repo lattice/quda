@@ -20,7 +20,7 @@ namespace quda {
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
-    create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor,
+    create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor,
 	   param.precision, param.pad, param.siteSubset, param.siteOrder,
 	   param.fieldOrder, param.gammaBasis, param.PCtype);
   }
@@ -31,7 +31,7 @@ namespace quda {
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
-    create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor,
+    create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor,
 	   field.precision, field.pad, field.siteSubset, field.siteOrder,
 	   field.fieldOrder, field.gammaBasis, field.PCtype);
   }
@@ -109,7 +109,7 @@ namespace quda {
 
   } // createGhostZone
 
-  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor,
+  void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset,
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
 				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
@@ -124,6 +124,7 @@ namespace quda {
     nDim = Ndim;
     nColor = Nc;
     nSpin = Ns;
+    nVec = Nvec;
     twistFlavor = Twistflavor;
 
     PCtype = DWFPC;
@@ -151,11 +152,11 @@ namespace quda {
     real_length = volume*nColor*nSpin*2; // physical length
 
     bytes = (size_t)length * precision; // includes pads and ghost zones
-    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }
@@ -240,7 +241,7 @@ namespace quda {
         //this->composite_descr.id           = 0;
       }
 
-      create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor,
+      create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor,
 	     src.precision, src.pad, src.siteSubset,
 	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);
     }
@@ -252,6 +253,7 @@ namespace quda {
   {
     if (param.nColor != 0) nColor = param.nColor;
     if (param.nSpin != 0) nSpin = param.nSpin;
+    if (param.nVec != 0) nVec = param.nVec;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
     if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
@@ -295,11 +297,11 @@ namespace quda {
     real_length = volume*nColor*nSpin*2;
 
     bytes = (size_t)length * precision; // includes pads
-    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      if (isNative()) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+      if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
     }
@@ -345,6 +347,7 @@ namespace quda {
     param.location = Location();
     param.nColor = nColor;
     param.nSpin = nSpin;
+    param.nVec = nVec;
     param.twistFlavor = twistFlavor;
     param.precision = precision;
     param.nDim = nDim;
@@ -509,7 +512,7 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION ||
-	       precision == QUDA_HALF_PRECISION) {
+	       (precision == QUDA_HALF_PRECISION && nColor == 3)) {
       if (nSpin == 4) {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 2) {
@@ -533,6 +536,10 @@ namespace quda {
 
     if (a.Nspin() != b.Nspin()) {
       errorQuda("checkSpinor: spins do not match: %d %d", a.Nspin(), b.Nspin());
+    }
+
+    if (a.Nvec() != b.Nvec()) {
+      errorQuda("checkSpinor: nVec does not match: %d %d", a.Nvec(), b.Nvec());
     }
 
     if (a.TwistFlavor() != b.TwistFlavor()) {

@@ -9,6 +9,12 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
+  Solver::Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile), node_parity(0) {
+    // compute parity of the node
+    for (int i=0; i<4; i++) node_parity += commCoords(i);
+    node_parity = node_parity % 2;
+  }
+
   // solver factory
   Solver* Solver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			 DiracMatrix &matPrecon, TimeProfile &profile)
@@ -32,14 +38,11 @@ namespace quda {
       break;
     case QUDA_GCR_INVERTER:
       report("GCR");
-      if (param.preconditioner && param.maxiter == 11) { // FIXME - dirty hack
-	MG *mg = static_cast<MG*>(param.preconditioner);
-	solver = new GCR(mat, *(mg), matSloppy, matPrecon, param, profile);
-      } else if (param.preconditioner) {
-	multigrid_solver *mg = static_cast<multigrid_solver*>(param.preconditioner);
+      if (param.preconditioner) {
+	Solver *mg = param.mg_instance ? static_cast<MG*>(param.preconditioner) : static_cast<multigrid_solver*>(param.preconditioner)->mg;
 	// FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
-	param.precision_precondition = param.precision_sloppy;
-	solver = new GCR(mat, *(mg->mg), matSloppy, matPrecon, param, profile);
+	if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
+	solver = new GCR(mat, *(mg), matSloppy, matPrecon, param, profile);
       } else {
 	solver = new GCR(mat, matSloppy, matPrecon, param, profile);
       }
@@ -114,6 +117,18 @@ namespace quda {
     case QUDA_PIPE2PCG_INVERTER:
       report("Pipe2PCG");
       solver = new Pipe2PCG(mat, matSloppy, matPrecon, param, profile);
+    case QUDA_CG3_INVERTER:
+      report("CG3");
+      solver = new CG3(mat, matSloppy, param, profile);
+      break;
+    case QUDA_CG3NE_INVERTER:
+      report("CG3NE");
+      solver = new CG3NE(mat, matSloppy, param, profile);
+      break;
+    case QUDA_CG3NR_INVERTER:
+      report("CG3NR");
+      // CG3NR is included in CG3NE
+      solver = new CG3NE(mat, matSloppy, param, profile);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);

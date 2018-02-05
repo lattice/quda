@@ -132,6 +132,7 @@ set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 set(QUDA_MAX_MULTI_BLAS_N  "4" CACHE STRING "maximum value to intizlize template for multi-blas /-reduce")
 
+set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
@@ -154,6 +155,8 @@ mark_as_advanced(QUDA_FERMI_DBLE_TEX)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
+
+mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -494,6 +497,16 @@ if(QUDA_CONTRACT)
 endif(QUDA_CONTRACT)
 
 
+if(QUDA_OPENMP)
+  FIND_PACKAGE( OpenMP REQUIRED)
+  if(OPENMP_FOUND)
+    message("OPENMP FOUND")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+  endif()
+endif()
+
 # COMPILER OPTIONS and BUILD types
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
@@ -534,7 +547,7 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 # NVCC FLAGS independet off build type
 if(NOT USING_CUDA_LANG_SUPPORT)
-  set(QUDA_NVCC_FLAGS -std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+  set(QUDA_NVCC_FLAGS "-std c++11 -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false")
 else()
   set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
   set(CMAKE_CUDA_FLAGS "-arch=${QUDA_GPU_ARCH}" CACHE STRING "Flags used by the CUDA compiler" FORCE)

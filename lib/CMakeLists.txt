@@ -1,13 +1,15 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
-  multigrid.cpp transfer.cpp transfer_util.cu inv_bicgstab_quda.cpp
+  coarse_op_preconditioned.cu
+  multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp inv_pipe2pcg_quda.cpp
   inv_pipepcg_quda.cpp inv_pipepcg3_quda.cpp inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
+  inv_cg3_quda.cpp inv_cg3ne_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cu dirac.cpp
@@ -36,6 +38,7 @@ set (QUDA_OBJS
   copy_color_spinor_hd.cu copy_color_spinor_hs.cu
   copy_color_spinor_hh.cu copy_color_spinor_mg_dd.cu
   copy_color_spinor_mg_ds.cu copy_color_spinor_mg_sd.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_sh.cu
   copy_color_spinor_mg_ss.cu copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge.cu copy_gauge_mg.cu copy_clover.cu
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu

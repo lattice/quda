@@ -127,6 +127,12 @@ namespace quda {
     // do nothing
   }
 
+  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+           double kappa, double mass, double mu, double mu_factor) const {
+    errorQuda("Cannot coarsen a staggered operator (yet!), we're just getting the functions in place.");
+    //CoarseStaggeredOp(Y, X, T, *gauge, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
+  }
+
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
     : DiracStaggered(param)
@@ -193,5 +199,7 @@ namespace quda {
   {
     // do nothing
   }
+
+
 
 } // namespace quda

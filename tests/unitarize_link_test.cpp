@@ -91,7 +91,6 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.anisotropy  	   = 1.0;
   qudaGaugeParam.gauge_fix   	   = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad      	   = 0;
-  qudaGaugeParam.gaugeGiB    	   = 0;
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
   qudaGaugeParam.cuda_prec_sloppy   = prec;

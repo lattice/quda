@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <iostream>
 
 #include <complex>
 
@@ -10,34 +9,34 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
+#include <color_spinor_field.h>
 
 namespace quda {
 
-  CG3::CG3(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false)
+  CG3NE::CG3NE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matDagSloppy(matSloppy), init(false)
   {
   }
 
-  CG3::~CG3() {
+  CG3NE::~CG3NE() {
     if ( init ) {
       delete rp;
       delete yp;
-      delete tmpp;
-      delete ArSp;
+      delete AdagrSp;
+      delete AAdagrSp;
+      delete tmpSp;
       if(param.precision != param.precision_sloppy) {
         delete rSp;
         delete xSp;
         delete xS_oldp;
-        delete tmpSp;
         delete rS_oldp;
       }
-      if(!mat.isStaggered()) delete tmp2Sp;
 
       init = false;
     }
   }
 
-  void CG3::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  void CG3NE::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -58,31 +57,29 @@ namespace quda {
       return;
     }
 
+    const bool is_cg3ne = (param.inv_type == QUDA_CG3NE_INVERTER) ? true:false;
+    char name[6];
+    strcpy(name, is_cg3ne ? "CG3NE" : "CG3NR");
+
     const bool mixed_precision = (param.precision != param.precision_sloppy);
-    ColorSpinorParam csParam(x);
     if (!init) {
+      ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       rp = ColorSpinorField::Create(csParam);
-      tmpp = ColorSpinorField::Create(csParam);
       yp = ColorSpinorField::Create(csParam);
 
       // Sloppy fields
       csParam.setPrecision(param.precision_sloppy);
-      ArSp = ColorSpinorField::Create(csParam);
+      AdagrSp = ColorSpinorField::Create(csParam);
+      AAdagrSp = ColorSpinorField::Create(csParam);
       rS_oldp = ColorSpinorField::Create(csParam);
+      tmpSp = ColorSpinorField::Create(csParam);
       if(mixed_precision) {
         rSp = ColorSpinorField::Create(csParam);
         xSp = ColorSpinorField::Create(csParam);
         xS_oldp = ColorSpinorField::Create(csParam);
-        tmpSp = ColorSpinorField::Create(csParam);
       } else {
         xS_oldp = yp;
-        tmpSp = tmpp;
-      }
-      if(!mat.isStaggered()) {
-        tmp2Sp = ColorSpinorField::Create(csParam);
-      } else {
-        tmp2Sp = tmpSp;
       }
 
       init = true;
@@ -92,12 +89,11 @@ namespace quda {
     ColorSpinorField &y = *yp;
     ColorSpinorField &rS = mixed_precision ? *rSp : r;
     ColorSpinorField &xS = mixed_precision ? *xSp : x;
-    ColorSpinorField &ArS = *ArSp;
+    ColorSpinorField &AdagrS = *AdagrSp;
+    ColorSpinorField &AAdagrS = *AAdagrSp;
     ColorSpinorField &rS_old = *rS_oldp;
     ColorSpinorField &xS_old = *xS_oldp;
-    ColorSpinorField &tmp = *tmpp;
     ColorSpinorField &tmpS = *tmpSp;
-    ColorSpinorField &tmp2S = *tmp2Sp;
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
@@ -130,7 +126,7 @@ namespace quda {
     // compute initial residual depending on whether we have an initial guess or not
     double r2;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, y, tmp);
+      mat(r, x, y);
       r2 = blas::xmyNorm(b, r);
       if(b2==0) b2 = r2;
       if (mixed_precision) {
@@ -171,44 +167,54 @@ namespace quda {
     bool restart = false;
 
     int k = 0;
-    double rho = 1.0, gamma = 1.0;
+    double rho = 1.0, gamma = 1.0, Ar2 = 1.0;
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
-      matSloppy(ArS, rS, tmpS, tmp2S);
+      matDagSloppy(AdagrS, rS, tmpS);
+      matSloppy(AAdagrS, AdagrS, tmpS);
       double gamma_old = gamma;
-      double rAr = blas::reDotProduct(rS,ArS);
-      gamma = r2/rAr;
-      
-      // CG3 step
+      double Ar2_old = Ar2;
+      Ar2 = blas::norm2(AdagrS);
+      if(is_cg3ne) {
+        gamma = r2/Ar2;
+      } else {
+        double AAr2 = blas::norm2(AAdagrS);
+        gamma = Ar2/AAr2;
+      }
+      // CG3NE step
       if(k==0 || restart) { // First iteration
         if(pipeline) {
-          r2 = blas::quadrupleCG3InitNorm(gamma, xS, rS, xS_old, rS_old, ArS);
+          blas::doubleCG3Init(gamma, xS, xS_old, AdagrS);
+          r2 = blas::doubleCG3InitNorm(gamma, rS, rS_old, AAdagrS);
         } else {
           blas::copy(xS_old, xS);
           blas::copy(rS_old, rS);
 
-          blas::axpy(gamma, rS, xS);  // x += gamma*r
-          r2 = blas::axpyNorm(-gamma, ArS, rS); // r -= gamma*w
+          blas::axpy(gamma, AdagrS, xS);  // x += gamma*Adag*r            
+          r2 = blas::axpyNorm(-gamma, AAdagrS, rS); // r -= gamma*w
         }
         restart = false;
       } else {
-        rho = rho/(rho-(gamma/gamma_old)*(r2/r2_old));
+        if(is_cg3ne) {
+          rho = rho/(rho-(gamma/gamma_old)*(r2/r2_old));
+        } else {
+          rho = rho/(rho-(gamma/gamma_old)*(Ar2/Ar2_old));
+        }
         r2_old = r2;
 
         if(pipeline) {
-          r2 = blas::quadrupleCG3UpdateNorm(gamma, rho, xS, rS, xS_old, rS_old, ArS);
+          blas::doubleCG3Update(gamma, rho, xS, xS_old, AdagrS);
+          r2 = blas::doubleCG3UpdateNorm(gamma, rho, rS, rS_old, AAdagrS);
         } else {
           blas::copy(tmpS, xS);
-          blas::copy(tmp2S, rS);
-
-          blas::axpby(gamma*rho, rS, rho, xS);
-          blas::axpby(-gamma*rho, ArS, rho, rS);
-
+          blas::axpby(gamma*rho, AdagrS, rho, xS);
           blas::axpy(1.-rho, xS_old, xS);
-          r2 = blas::axpyNorm(1.-rho, rS_old, rS);
-
           blas::copy(xS_old, tmpS);
-          blas::copy(rS_old, tmp2S);
+
+          blas::copy(tmpS, rS);
+          blas::axpby(-gamma*rho, AAdagrS, rho, rS);
+          r2 = blas::axpyNorm(1.-rho, rS_old, rS);
+          blas::copy(rS_old, tmpS);
         }
       }
 
@@ -245,7 +251,7 @@ namespace quda {
           // updating the "new" vectors
           blas::copy(x, xS);
           blas::xpy(x, y);
-          mat(r, y, x, tmp); //  here we can use x as tmp
+          mat(r, y, x); //  here we can use x as tmp
           r2 = blas::xmyNorm(b, r);
           param.true_res = sqrt(r2 / b2);
           if (use_heavy_quark_res) {
@@ -256,10 +262,13 @@ namespace quda {
           if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
             blas::copy(rS, r);
             blas::axpy(-1., xS, xS_old);
-            // we preserve the orthogonality between the previous residual and the new
-            Complex rr_old = blas::cDotProduct(rS, rS_old);
-            r2_old = blas::caxpyNorm(-rr_old/r2, rS, rS_old);
-            blas::zero(xS);
+            if(is_cg3ne) {
+              // we preserve the orthogonality between the previous residual and the new
+              // This is possible only for cg3ne. For cg3nr ArS and ArS_old should be orthogonal
+              Complex rr_old = blas::cDotProduct(rS, rS_old);
+              r2_old = blas::caxpyNorm(-rr_old/r2, rS, rS_old);
+              blas::zero(xS);
+            }
           }
         }
 
@@ -267,13 +276,13 @@ namespace quda {
         if (r2 > r2_old) {
           resIncrease++;
           resIncreaseTotal++;
-          warningQuda("CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+          warningQuda("%s: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+                      name, sqrt(r2), sqrt(r2_old), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
             } else {
-              warningQuda("CG3: solver exiting due to too many true residual norm increases");
+              warningQuda("%s: solver exiting due to too many true residual norm increases", name);
               break;
             }
           }
@@ -285,26 +294,27 @@ namespace quda {
         if (use_heavy_quark_res and L2breakdown) {
           delta = 0;
           heavy_quark_check = 1;
-          warningQuda("CG3: Restarting without reliable updates for heavy-quark residual");
+          warningQuda("%s: Restarting without reliable updates for heavy-quark residual", name);
           restart = true;
           L2breakdown = false;
           if (heavy_quark_res > heavy_quark_res_old) {
             hqresIncrease++;
-            warningQuda("CG3: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+            warningQuda("%s: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", name, heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
-              warningQuda("CG3: solver exiting due to too many heavy quark residual norm increases");
+              warningQuda("%s: solver exiting due to too many heavy quark residual norm increases", name);
               break;
             }
           }
         }
       } else {
         if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
-          mat(r, x, tmp, tmp2S);
+          mat(r, x, tmpS);
           r2 = blas::xmyNorm(b, r);
           // we update sloppy and old fields
-          if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
+          if (!convergence(r2, heavy_quark_res, stop, param.tol_hq) and is_cg3ne) {
             // we preserve the orthogonality between the previous residual and the new
+              // This is possible only for cg3ne. For cg3nr ArS and ArS_old should be orthogonal
             Complex rr_old = blas::cDotProduct(rS, rS_old);
             r2_old = blas::caxpyNorm(-rr_old/r2, rS, rS_old);
           }
@@ -323,7 +333,7 @@ namespace quda {
         }
       }
 
-      PrintStats("CG3", k, r2, b2, heavy_quark_res);
+      PrintStats(name, k, r2, b2, heavy_quark_res);
     }
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -340,7 +350,7 @@ namespace quda {
 
     // compute the true residuals
     if (!mixed_precision && param.compute_true_res) {
-      mat(r, x, y, tmp);
+      mat(r, x, y);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
       if (use_heavy_quark_res) param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
     }
@@ -349,7 +359,7 @@ namespace quda {
       blas::copy(b, r);
     }
 
-    PrintSummary("CG3", k, r2, b2);
+    PrintSummary(name, k, r2, b2);
 
     // reset the flops counters
     blas::flops = 0;

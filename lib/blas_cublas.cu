@@ -93,8 +93,6 @@ namespace quda {
 	pool_device_free(Ainv_array);
 	pool_device_free(A_array);
 
-      } else if (prec == QUDA_DOUBLE_PRECISION) {
-
       } else {
 	errorQuda("%s not implemented for precision=%d", __func__, prec);
       }
@@ -119,8 +117,8 @@ namespace quda {
       long dus = stop.tv_usec - start.tv_usec;
       double time = ds + 0.000001*dus;
 
-      printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n",
-		 time, 1e-9 * flops / time);
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 #endif // CUBLAS_LIB
 
       return flops;

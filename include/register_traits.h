@@ -88,7 +88,14 @@ namespace quda {
     typedef float2 type;
     float2 a;
     vector(const double2 &a) { this->a.x = a.x; this->a.y = a.y; }
-    operator float2() const { return a; }
+    operator type() const { return a; }
+  };
+
+  template<> struct vector<int, 2> {
+    typedef int2 type;
+    int2 a;
+    vector(const int2 &a) { this->a.x = a.x; this->a.y = a.y; }
+    operator type() const { return a; }
   };
 
   template<typename> struct scalar { };

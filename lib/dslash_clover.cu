@@ -185,7 +185,6 @@ namespace quda {
     inSpinor->createComms(1);
 
 #ifdef GPU_CLOVER_DIRAC
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
     for(int i=0;i<4;i++){
       dslashParam.ghostDim[i] = comm_dim_partitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i][0] = in->GhostOffset(i,0)/in->FieldOrder();
@@ -202,10 +201,10 @@ namespace quda {
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
     if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
+      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
 
     if (in->Precision() != clover_prec)
-      errorQuda("Mixing clover and spinor precision not supported");
+      errorQuda("Mixing clover precision (%d) and spinor precision (%d) not supported", clover_prec, in->Precision());
 
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);

@@ -92,32 +92,37 @@ namespace quda {
       }
     }
 
-    virtual unsigned int maxBlockSize() const { return deviceProp.maxThreadsDim[0]; }
+    virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
 
     virtual int blockStep() const { return deviceProp.warpSize; }
     virtual int blockMin() const { return deviceProp.warpSize; }
 
+    virtual void resetBlockDim(TuneParam &param) const {
+      const unsigned int max_threads = maxBlockSize(param);
+      const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const int step = blockStep();
+
+      if (tuneGridDim()) {
+	param.block.x = step;
+      } else { // not tuning the grid dimension so have to set a valid grid size
+	// ensure the blockDim is large enough given the limit on gridDim
+	param.block.x = (minThreads()+max_blocks-1)/max_blocks;
+	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
+	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
+	  errorQuda("Local lattice volume is too large for device");
+      }
+    }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
-      const unsigned int max_threads = maxBlockSize();
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const unsigned int max_threads = maxBlockSize(param);
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
-      const int step = blockStep();
       bool ret;
 
-      param.block.x += step;
+      param.block.x += blockStep();
       int nthreads = param.block.x*param.block.y*param.block.z;
       if (param.block.x > max_threads || sharedBytesPerThread()*nthreads > max_shared) {
-
-	if (tuneGridDim()) {
-	  param.block.x = step;
-	} else { // not tuning the grid dimension so have to set a valid grid size
-	  // ensure the blockDim is large enough given the limit on gridDim
-	  param.block.x = (minThreads()+max_blocks-1)/max_blocks;
-	  param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
-	  if(param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	}
-
+	resetBlockDim(param);
 	ret = false;
       } else {
 	ret = true;
@@ -243,8 +248,9 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
-      param.shared_bytes = sharedBytesPerThread()*param.block.x > sharedBytesPerBlock(param) ?
-	sharedBytesPerThread()*param.block.x : sharedBytesPerBlock(param);
+      int nthreads = param.block.x*param.block.y*param.block.z;
+      param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
+	sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
     }
 
     /** sets default values for when tuning is disabled */
@@ -313,7 +319,7 @@ namespace quda {
        The maximum block size in the x dimension is the total number
        of threads divided by the size of the y dimension
      */
-    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
+    unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / 2; }
 
   public:
     bool advanceBlockDim(TuneParam &param) const {
@@ -347,24 +353,26 @@ namespace quda {
     virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     unsigned int vector_length_y;
+    bool tune_block_x;
 
   public:
-    TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y) { }
+  TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y), tune_block_x(true) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
       dim3 block = param.block;
       dim3 grid = param.grid;
-      bool ret = Tunable::advanceBlockDim(param);
+      bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
       param.block.y = block.y;
       param.grid.y = grid.y;
 
-      if (ret) { // we advanced the block.x so we're done
+      if (ret) {
 	return true;
       } else { // block.x (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1]) {
+	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
+	    param.block.x*(param.block.y+1) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	  param.block.y++;
 	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
 	  return true;
@@ -397,25 +405,28 @@ namespace quda {
   class TunableVectorYZ : public TunableVectorY {
 
     mutable unsigned vector_length_z;
+    bool tune_block_y;
 
   public:
     TunableVectorYZ(unsigned int vector_length_y, unsigned int vector_length_z)
-      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z) { }
+      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z), tune_block_y(true) { }
 
     bool advanceBlockDim(TuneParam &param) const
     {
       dim3 block = param.block;
       dim3 grid = param.grid;
-      bool ret = TunableVectorY::advanceBlockDim(param);
+      bool ret = tune_block_y ? TunableVectorY::advanceBlockDim(param) : tune_block_x ? Tunable::advanceBlockDim(param) : false;
       param.block.z = block.z;
       param.grid.z = grid.z;
 
-      if (ret) { // we advanced the block.y / block.x so we're done
+      if (ret) {
+	// we advanced the block.x / block.y so we're done
 	return true;
       } else { // block.x/block.y (spacetime) was reset
 
 	// we can advance spin/block-color since this is valid
-	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[1]) {
+	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[2] &&
+	    param.block.x*param.block.y*(param.block.z+1) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
 	  param.block.z++;
 	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
 	  return true;
@@ -446,7 +457,7 @@ namespace quda {
   };
 
   void loadTuneCache();
-  void saveTuneCache();
+  void saveTuneCache(bool error = false);
 
   /**
    * @brief Save profile to disk.

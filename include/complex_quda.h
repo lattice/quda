@@ -26,6 +26,16 @@
 #include <sstream>
 #include <cuComplex.h>
 
+namespace quda {
+  namespace gauge {
+    template<typename Float, typename storeFloat> struct fieldorder_wrapper;
+  }
+
+  namespace colorspinor {
+    template<typename Float, typename storeFloat> struct fieldorder_wrapper;
+  }
+}
+
 // We need this to make sure code inside quda:: that calls sqrt() using real numbers
 // doesn't try to call the complex sqrt, but the standard sqrt
 namespace quda
@@ -98,7 +108,11 @@ namespace quda
   template <typename ValueType, typename ExponentType>
     __host__ __device__
     inline ValueType pow(ValueType x, ExponentType e){
+#if (CUDA_VERSION < 7050)
+    return std::pow(x,static_cast<ValueType>(e));
+#else
     return std::pow(x,e);
+#endif
   }
   template <typename ValueType>
     __host__ __device__
@@ -547,7 +561,18 @@ public:
   inline operator std::complex<float>() const { return std::complex<float>(real(),imag()); }
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
-  // inline operator float() const { return real(); }
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<float>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<float>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
 template<>
@@ -664,10 +689,113 @@ public:
 
   // cast operators
   inline operator std::complex<double>() const { return std::complex<double>(real(),imag()); }
-
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
-  // inline operator double() { return real(); }
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<double>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
+
+  template<typename otherFloat, typename storeFloat>
+    __host__ __device__ inline complex<double>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
+};
+
+
+template<>
+struct complex <short> : public short2
+{
+public:
+  typedef short value_type;
+
+  __host__ __device__ inline complex<short>(){};
+
+  __host__ __device__ inline complex<short>(const short & re, const short& im = float())
+    {
+      real(re);
+      imag(im);
+    }
+
+  __host__ __device__ inline complex<short>(const complex<short> & z) : short2(z){}
+
+  __host__ __device__ inline complex<short>& operator+=(const complex<short> z)
+    {
+      real(real()+z.real());
+      imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline complex<short>& operator-=(const complex<short> z)
+    {
+      real(real()-z.real());
+      imag(imag()-z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline short real() const volatile{ return x; }
+  __host__ __device__ inline short imag() const volatile{ return y; }
+  __host__ __device__ inline short real() const{ return x; }
+  __host__ __device__ inline short imag() const{ return y; }
+  __host__ __device__ inline void real(short re)volatile{ x = re; }
+  __host__ __device__ inline void imag(short im)volatile{ y = im; }
+  __host__ __device__ inline void real(short re){ x = re; }
+  __host__ __device__ inline void imag(short im){ y = im; }
+
+  // cast operators
+  inline operator std::complex<short>() const { return std::complex<short>(real(),imag()); }
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
+
+};
+
+template<>
+struct complex <int> : public int2
+{
+public:
+  typedef int value_type;
+
+  __host__ __device__ inline complex<int>(){};
+
+  __host__ __device__ inline complex<int>(const int& re, const int& im = float())
+    {
+      real(re);
+      imag(im);
+    }
+
+  __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
+
+  __host__ __device__ inline complex<int>& operator+=(const complex<int> z)
+    {
+      real(real()+z.real());
+      imag(imag()+z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline complex<int>& operator-=(const complex<int> z)
+    {
+      real(real()-z.real());
+      imag(imag()-z.imag());
+      return *this;
+    }
+
+  __host__ __device__ inline int real() const volatile{ return x; }
+  __host__ __device__ inline int imag() const volatile{ return y; }
+  __host__ __device__ inline int real() const{ return x; }
+  __host__ __device__ inline int imag() const{ return y; }
+  __host__ __device__ inline void real(int re)volatile{ x = re; }
+  __host__ __device__ inline void imag(int im)volatile{ y = im; }
+  __host__ __device__ inline void real(int re){ x = re; }
+  __host__ __device__ inline void imag(int im){ y = im; }
+
+  // cast operators
+  inline operator std::complex<int>() const { return std::complex<int>(real(),imag()); }
+  template <typename T>
+  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
+
 };
 
   // Binary arithmetic operations

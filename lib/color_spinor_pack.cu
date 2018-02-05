@@ -163,7 +163,7 @@ namespace quda {
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
 
-    typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
+    typedef typename colorspinor::FieldOrderCB<typename mapper<Float>::type,Ns,Nc,1,order,Float> Q;
     Q field(a, nFace, 0, ghost);
 
     constexpr int spins_per_thread = 1; // make this autotunable
@@ -192,6 +192,8 @@ namespace quda {
       genericPackGhost<Float,order,Ns,12>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 16) {
       genericPackGhost<Float,order,Ns,16>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
+      genericPackGhost<Float,order,Ns,18>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 20) {
       genericPackGhost<Float,order,Ns,20>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) {
@@ -200,6 +202,8 @@ namespace quda {
       genericPackGhost<Float,order,Ns,28>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 32) {
       genericPackGhost<Float,order,Ns,32>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
+      genericPackGhost<Float,order,Ns,36>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 48) {
       genericPackGhost<Float,order,Ns,48>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 72) {
@@ -277,6 +281,8 @@ namespace quda {
       genericPackGhost<double>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       genericPackGhost<float>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Precision() == QUDA_HALF_PRECISION) {
+      genericPackGhost<short>(ghost, a, parity, nFace, dagger, destination);
     } else {
       errorQuda("Unsupported precision %d", a.Precision());
     }

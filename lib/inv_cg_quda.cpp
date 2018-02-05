@@ -19,18 +19,35 @@
 namespace quda {
 
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false) {
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr),
+    rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
+    rSloppyp(nullptr), xSloppyp(nullptr), init(false)
+  {
+
   }
 
   CG::~CG() {
+    profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
-      for (auto pi : p) delete pi;
-      delete rp;
-      delete yp;
-      delete App;
-      delete tmpp;
+      for (auto pi : p) if (pi) delete pi;
+      if (rp) delete rp;
+      if (pp) delete pp;
+      if (yp) delete yp;
+      if (App) delete App;
+      if(param.precision != param.precision_sloppy) {
+	if (rSloppyp) delete rSloppyp;
+	if (xSloppyp) delete xSloppyp;
+      }
+      if (tmpp) delete tmpp;
+      if(!mat.isStaggered()) {
+	if (tmp2p && tmpp != tmp2p) delete tmp2p;
+	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
+      }
+      if (rnewp) delete rnewp;
+
       init = false;
     }
+    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -62,6 +79,13 @@ namespace quda {
     CG::operator()(*xp,b);
 
     mmdag.Expose()->Mdag(x,*xp);
+
+    // with preserve_source == QUDA_PRESERVE_SOURCE_NO; b is expected to be the residual.
+    // here the residual is the same of CG, so one could improve this computing it in CG directly (ref. MR)
+    if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+      mmdag.Expose()->M(*xp, x);
+      blas::axpby(-1.0, *xp, 1.0, b);
+    }
   }
 
   CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -91,21 +115,35 @@ namespace quda {
     mdagm.Expose()->Mdag(*bp,b);
     CG::operator()(x,*bp);
 
-    if (param.compute_true_res) {
+    if (param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
       // compute the true residuals
       const double b2 = blas::norm2(b);
+      double r2;
       mdagm.Expose()->M(*bp, x);
-      const double r2 = blas::xmyNorm(b, *bp) / b2;
+      if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+	blas::axpby(-1.0, *bp, 1.0, b);
+	r2 = blas::norm2(b) / b2;
+        param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, b).z);
+      } else {
+	r2 = blas::xmyNorm(b, *bp) / b2;
+        param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, *bp).z);
+      }
       param.true_res = sqrt(r2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, *bp).z);
 
       PrintSummary("CGNR", param.iter - iter0, r2, b2);
+    } else if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+      mdagm.Expose()->M(*bp, x);
+      blas::axpby(-1.0, *bp, 1.0, b);
     }
+
   }
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
+    if (x.Precision() != param.precision || b.Precision() != param.precision)
+      errorQuda("Precision mismatch");
+
 
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
     if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
@@ -132,37 +170,59 @@ namespace quda {
       return;
     }
 
-    ColorSpinorParam csParam(x);
     if (!init) {
+      ColorSpinorParam csParam(x);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      rp = ColorSpinorField::Create(b, csParam);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(b, csParam);
+      rp = ColorSpinorField::Create(csParam);
+      yp = ColorSpinorField::Create(csParam);
+
       // sloppy fields
       csParam.setPrecision(param.precision_sloppy);
       App = ColorSpinorField::Create(csParam);
+      if(param.precision != param.precision_sloppy) {
+	rSloppyp = ColorSpinorField::Create(csParam);
+	xSloppyp = ColorSpinorField::Create(csParam);
+      } else {
+	rSloppyp = rp;
+	param.use_sloppy_partial_accumulator = false;
+      }
+
+      // temporary fields
       tmpp = ColorSpinorField::Create(csParam);
+      if(!mat.isStaggered()) {
+	// tmp2 only needed for multi-gpu Wilson-like kernels
+	tmp2p = ColorSpinorField::Create(csParam);
+	// additional high-precision temporary if Wilson and mixed-precision
+	csParam.setPrecision(param.precision);
+	tmp3p = (param.precision != param.precision_sloppy) ?
+	  ColorSpinorField::Create(csParam) : tmpp;
+      } else {
+	tmp3p = tmp2p = tmpp;
+      }
 
       init = true;
-
     }
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
     ColorSpinorField &tmp = *tmpp;
+    ColorSpinorField &tmp2 = *tmp2p;
+    ColorSpinorField &tmp3 = *tmp3p;
+    ColorSpinorField &rSloppy = *rSloppyp;
+    ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
-    csParam.setPrecision(param.precision_sloppy);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    {
+      ColorSpinorParam csParam(r);
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      csParam.setPrecision(param.precision_sloppy);
 
-    // tmp2 only needed for multi-gpu Wilson-like kernels
-    ColorSpinorField *tmp2_p = !mat.isStaggered() ? ColorSpinorField::Create(x, csParam) : &tmp;
-    ColorSpinorField &tmp2 = *tmp2_p;
-
-    // additional high-precision temporary if Wilson and mixed-precision
-    csParam.setPrecision(param.precision);
-    ColorSpinorField *tmp3_p = (x.Precision() != param.precision_sloppy && !mat.isStaggered()) ?
-      ColorSpinorField::Create(x, csParam) : &tmp;
-    ColorSpinorField &tmp3 = *tmp3_p;
+      if (Np != (int)p.size()) {
+	for (auto &pi : p) delete pi;
+	p.resize(Np);
+	for (auto &pi : p) pi = ColorSpinorField::Create(csParam);
+      }
+    }
 
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
@@ -187,51 +247,30 @@ namespace quda {
       Anorm = sqrt(blas::norm2(r)/b2);
     }
 
-
     // compute initial residual
-    mat(r, x, y, tmp3);
-    double r2 = blas::xmyNorm(b, r);
-    if (b2 == 0) {
-      b2 = r2;
-    }
-
-    csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *r_sloppy;
-    if (param.precision_sloppy == x.Precision()) {
-      r_sloppy = &r;
+    double r2 = 0.0;
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      mat(r, x, y, tmp3);
+      r2 = blas::xmyNorm(b, r);
+      if (b2 == 0) b2 = r2;
+      blas::copy(y, x);
     } else {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = ColorSpinorField::Create(r, csParam);
+      if (&r != &b) blas::copy(r, b);
+      r2 = b2;
+      blas::zero(y);
     }
+    blas::zero(x);
+    if (&x != &xSloppy) blas::zero(xSloppy);
 
-    ColorSpinorField *x_sloppy;
-    if (param.precision_sloppy == x.Precision() ||
-        !param.use_sloppy_partial_accumulator) {
-      x_sloppy = &x;
-    } else {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = ColorSpinorField::Create(x, csParam);
-    }
-
-    ColorSpinorField &xSloppy = *x_sloppy;
-    ColorSpinorField &rSloppy = *r_sloppy;
-
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    csParam.setPrecision(param.precision_sloppy);
-
+    blas::copy(rSloppy,r);
     if (Np != (int)p.size()) {
       for (auto &pi : p) delete pi;
       p.resize(Np);
+      ColorSpinorParam csParam(rSloppy);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
       for (auto &pi : p) pi = ColorSpinorField::Create(rSloppy, csParam);
     } else {
       for (auto &pi : p) *pi = rSloppy;
-    }
-
-    if (&x != &xSloppy) {
-      blas::copy(y, x);
-      blas::zero(xSloppy);
-    } else {
-      blas::zero(y);
     }
 
     const bool use_heavy_quark_res =
@@ -418,7 +457,7 @@ namespace quda {
 	}
 
 	// alternative reliable updates
-	if(alternative_reliable){
+	if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);
@@ -586,15 +625,6 @@ namespace quda {
     matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
-
-    if (&tmp3 != &tmp) delete tmp3_p;
-    if (&tmp2 != &tmp) delete tmp2_p;
-
-    if (&rSloppy != &r) delete r_sloppy;
-    if (&xSloppy != &x) delete x_sloppy;
-
-    profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }
@@ -636,86 +666,76 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   ColorSpinorParam csParam(x);
   if (!init) {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    rp = ColorSpinorField::Create(b, csParam);
+    csParam.setPrecision(param.precision);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    yp = ColorSpinorField::Create(b, csParam);
+    rp = ColorSpinorField::Create(csParam);
+    yp = ColorSpinorField::Create(csParam);
+
     // sloppy fields
     csParam.setPrecision(param.precision_sloppy);
+    pp = ColorSpinorField::Create(csParam);
     App = ColorSpinorField::Create(csParam);
-    tmpp = ColorSpinorField::Create(csParam);
-    init = true;
+    if(param.precision != param.precision_sloppy) {
+      rSloppyp = ColorSpinorField::Create(csParam);
+      xSloppyp = ColorSpinorField::Create(csParam);
+    } else {
+      rSloppyp = rp;
+      param.use_sloppy_partial_accumulator = false;
+    }
 
+    // temporary fields
+    tmpp = ColorSpinorField::Create(csParam);
+    if(!mat.isStaggered()) {
+      // tmp2 only needed for multi-gpu Wilson-like kernels
+      tmp2p = ColorSpinorField::Create(csParam);
+      // additional high-precision temporary if Wilson and mixed-precision
+      csParam.setPrecision(param.precision);
+      tmp3p = (param.precision != param.precision_sloppy) ?
+	ColorSpinorField::Create(csParam) : tmpp;
+    } else {
+      tmp3p = tmp2p = tmpp;
+    }
+
+    init = true;
   }
+
+  if(!rnewp) {
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.setPrecision(param.precision_sloppy);
+    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+  }
+
   ColorSpinorField &r = *rp;
   ColorSpinorField &y = *yp;
+  ColorSpinorField &p = *pp;
   ColorSpinorField &Ap = *App;
+  ColorSpinorField &rnew = *rnewp;
   ColorSpinorField &tmp = *tmpp;
+  ColorSpinorField &tmp2 = *tmp2p;
+  ColorSpinorField &tmp3 = *tmp3p;
+  ColorSpinorField &rSloppy = *rSloppyp;
+  ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
   // calculate residuals for all vectors
-  for(int i=0; i<param.num_src; i++){
-    mat(r.Component(i), x.Component(i), y.Component(i));
-    blas::xmyNorm(b.Component(i), r.Component(i));
-  }
-
-  // initialize r2 matrix
+  // and initialize r2 matrix
   double r2avg=0;
   MatrixXcd r2(param.num_src, param.num_src);
   for(int i=0; i<param.num_src; i++){
-    for(int j=i; j < param.num_src; j++){
+    mat(r.Component(i), x.Component(i), y.Component(i));
+    r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
+    r2avg += r2(i,i).real();
+    printfQuda("r2[%i] %e\n", i, r2(i,i).real());
+  }
+  for(int i=0; i<param.num_src; i++){
+    for(int j=i+1; j < param.num_src; j++){
       r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-      if (i!=j) r2(j,i) = std::conj(r2(i,j));
-      if (i==j) {
-        r2avg += r2(i,i).real();
-        printfQuda("r2[%i] %e\n", i, r2(i,i).real());
-      }
+      r2(j,i) = std::conj(r2(i,j));
     }
   }
 
-
-  csParam.setPrecision(param.precision_sloppy);
-  // tmp2 only needed for multi-gpu Wilson-like kernels
-  ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp2 = *tmp2_p;
-
-  ColorSpinorField *r_sloppy;
-  if (param.precision_sloppy == x.Precision()) {
-    r_sloppy = &r;
-  } else {
-    // will that work ?
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    r_sloppy = ColorSpinorField::Create(r, csParam);
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
-    }
-  }
-
-
-  ColorSpinorField *x_sloppy;
-  if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
-    x_sloppy = &x;
-  } else {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    x_sloppy = ColorSpinorField::Create(x, csParam);
-  }
-
-  // additional high-precision temporary if Wilson and mixed-precision
-  csParam.setPrecision(param.precision);
-  ColorSpinorField *tmp3_p =
-  (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp3 = *tmp3_p;
-
-  ColorSpinorField &xSloppy = *x_sloppy;
-  ColorSpinorField &rSloppy = *r_sloppy;
-
-  csParam.create = QUDA_COPY_FIELD_CREATE;
-  csParam.setPrecision(param.precision_sloppy);
-  ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &p = *pp;
-  ColorSpinorField* rpnew = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &rnew = *rpnew;
+  blas::copy(rSloppy, r);
+  blas::copy(p, rSloppy);
+  blas::copy(rnew, rSloppy);
 
   if (&x != &xSloppy) {
     blas::copy(y, x);
@@ -976,14 +996,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profile.TPSTART(QUDA_PROFILE_FREE);
 
-  if (&tmp3 != &tmp) delete tmp3_p;
-  if (&tmp2 != &tmp) delete tmp2_p;
-
-  if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
-  if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
-
-  delete rpnew;
-  delete pp;
   delete[] AC;
   profile.TPSTOP(QUDA_PROFILE_FREE);
 
@@ -1047,22 +1059,55 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   ColorSpinorParam csParam(x);
   if (!init) {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    rp = ColorSpinorField::Create(b, csParam);
+    csParam.setPrecision(param.precision);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    yp = ColorSpinorField::Create(b, csParam);
+    rp = ColorSpinorField::Create(csParam);
+    yp = ColorSpinorField::Create(csParam);
+
     // sloppy fields
     csParam.setPrecision(param.precision_sloppy);
+    pp = ColorSpinorField::Create(csParam);
     App = ColorSpinorField::Create(csParam);
-    tmpp = ColorSpinorField::Create(csParam);
-    init = true;
+    if(param.precision != param.precision_sloppy) {
+      rSloppyp = ColorSpinorField::Create(csParam);
+      xSloppyp = ColorSpinorField::Create(csParam);
+    } else {
+      rSloppyp = rp;
+      param.use_sloppy_partial_accumulator = false;
+    }
 
+    // temporary fields
+    tmpp = ColorSpinorField::Create(csParam);
+    if(!mat.isStaggered()) {
+      // tmp2 only needed for multi-gpu Wilson-like kernels
+      tmp2p = ColorSpinorField::Create(csParam);
+      // additional high-precision temporary if Wilson and mixed-precision
+      csParam.setPrecision(param.precision);
+      tmp3p = (param.precision != param.precision_sloppy) ?
+	ColorSpinorField::Create(csParam) : tmpp;
+    } else {
+      tmp3p = tmp2p = tmpp;
+    }
+
+    init = true;
   }
+
+  if(!rnewp) {
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.setPrecision(param.precision_sloppy);
+    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+  }
+
   ColorSpinorField &r = *rp;
   ColorSpinorField &y = *yp;
+  ColorSpinorField &p = *pp;
+  ColorSpinorField &pnew = *rnewp;
   ColorSpinorField &Ap = *App;
   ColorSpinorField &tmp = *tmpp;
-
+  ColorSpinorField &tmp2 = *tmp2p;
+  ColorSpinorField &tmp3 = *tmp3p;
+  ColorSpinorField &rSloppy = *rSloppyp;
+  ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
   //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
 
@@ -1086,50 +1131,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
 
-  csParam.setPrecision(param.precision_sloppy);
-  // tmp2 only needed for multi-gpu Wilson-like kernels
-  ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp2 = *tmp2_p;
-
-  ColorSpinorField *r_sloppy;
-  if (param.precision_sloppy == x.Precision()) {
-    r_sloppy = &r;
-  } else {
-    // will that work ?
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    r_sloppy = ColorSpinorField::Create(r, csParam);
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
-    }
-  }
-
-
-  ColorSpinorField *x_sloppy;
-  if (param.precision_sloppy == x.Precision() ||
-  !param.use_sloppy_partial_accumulator) {
-    x_sloppy = &x;
-  } else {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    x_sloppy = ColorSpinorField::Create(x, csParam);
-  }
-
-  // additional high-precision temporary if Wilson and mixed-precision
-  csParam.setPrecision(param.precision);
-  ColorSpinorField *tmp3_p =
-  (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp3 = *tmp3_p;
-
-  ColorSpinorField &xSloppy = *x_sloppy;
-  ColorSpinorField &rSloppy = *r_sloppy;
-
-  csParam.create = QUDA_COPY_FIELD_CREATE;
-  csParam.setPrecision(param.precision_sloppy);
-  ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &p = *pp;
-  ColorSpinorField* ppnew = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &pnew = *ppnew;
+  blas::copy(rSloppy, r);
+  blas::copy(p, rSloppy);
+  blas::copy(pnew, rSloppy);
 
   if (&x != &xSloppy) {
     blas::copy(y, x);
@@ -1575,14 +1579,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profile.TPSTART(QUDA_PROFILE_FREE);
-
-  if (&tmp3 != &tmp) delete tmp3_p;
-  if (&tmp2 != &tmp) delete tmp2_p;
-
-  if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
-  if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
-
-  delete pp;
 
   profile.TPSTOP(QUDA_PROFILE_FREE);
 

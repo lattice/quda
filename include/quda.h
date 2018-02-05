@@ -57,7 +57,6 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
-    double gaugeGiB;  /**< The storage used by the gauge fields */
 
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
@@ -222,8 +221,6 @@ extern "C" {
     int cl_pad;                            /**< The padding to use for the clover fields */
 
     int iter;                              /**< The number of iterations performed by the solver */
-    double spinorGiB;                      /**< The memory footprint of the fermion fields */
-    double cloverGiB;                      /**< The memory footprint of the clover fields */
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
@@ -316,13 +313,16 @@ extern "C" {
     int use_resident_solution;
 
     /** Whether to use the solution vector to augment the chronological basis */
-    int make_resident_chrono;
+    int chrono_make_resident;
+
+    /** Whether the solution should replace the last entry in the chronology */
+    int chrono_replace_last;
 
     /** Whether to use the resident chronological basis */
-    int use_resident_chrono;
+    int chrono_use_resident;
 
     /** The maximum length of the chronological history to store */
-    int max_chrono_dim;
+    int chrono_max_dim;
 
     /** The index to indeicate which chrono history we are augmenting */
     int chrono_index;
@@ -406,17 +406,65 @@ extern "C" {
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
+    /** Precision to store the null-space vectors in (post block orthogonalization) */
+    QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
+
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 
+    /** Number of setup iterations */
+    int num_setup_iter[QUDA_MAX_MG_LEVEL];
+
     /** Tolerance to use in the setup phase */
     double setup_tol[QUDA_MAX_MG_LEVEL];
 
+    /** Maximum number of iterations for each setup solver */
+    int setup_maxiter[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum number of iterations for refreshing the null-space vectors */
+    int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
+
+    /** Null-space type to use in the setup phase */
+    QudaSetupType setup_type;
+
+    /** Pre orthonormalize vectors in the setup phase */
+    QudaBoolean pre_orthonormalize;
+
+    /** Post orthonormalize vectors in the setup phase */
+    QudaBoolean post_orthonormalize;
+
+    /** The solver that wraps around the coarse grid correction and smoother */
+    QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance for the solver that wraps around the coarse grid correction and smoother */
+    double coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
+
     /** Smoother to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+    /** Tolerance to use for the smoother / solver on each level */
+    double smoother_tol[QUDA_MAX_MG_LEVEL];
+
+    /** Number of pre-smoother applications on each level */
+    int nu_pre[QUDA_MAX_MG_LEVEL];
+
+    /** Number of post-smoother applications on each level */
+    int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Over/under relaxation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to use additive or multiplicative Schwarz preconditioning in the smoother */
+    QudaSchwarzType smoother_schwarz_type[QUDA_MAX_MG_LEVEL];
+
+    /** Number of Schwarz cycles to apply */
+    int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
 	type of solution to receive back from this coarse grid */
@@ -428,23 +476,14 @@ extern "C" {
     /** The type of multigrid cycle to perform at each level */
     QudaMultigridCycleType cycle_type[QUDA_MAX_MG_LEVEL];
 
-    /** Number of pre-smoother applications on each level */
-    int nu_pre[QUDA_MAX_MG_LEVEL];
-
-    /** Number of post-smoother applications on each level */
-    int nu_post[QUDA_MAX_MG_LEVEL];
-
-    /** Tolerance to use for the smoother / solver on each level */
-    double smoother_tol[QUDA_MAX_MG_LEVEL];
-
-    /** Over/under relaxation factor for the smoother at each level */
-    double omega[QUDA_MAX_MG_LEVEL];
-
     /** Whether to use global reductions or not for the smoother / solver at each level */
     QudaBoolean global_reduction[QUDA_MAX_MG_LEVEL];
 
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
+
+    /** Location where the coarse-operator construction will be computedn */
+    QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;

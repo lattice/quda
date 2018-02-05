@@ -294,7 +294,7 @@ namespace quda {
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
     if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
+      errorQuda("Mixing gauge precision (%d) and spinor precision (%d) not supported", gauge.Precision(), in->Precision());
 
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);

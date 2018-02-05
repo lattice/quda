@@ -42,7 +42,8 @@ namespace quda {
 
   LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
     : nDim(field.Ndim()), pad(field.Pad()), precision(field.Precision()),
-      siteSubset(field.SiteSubset()), mem_type(field.MemType()), ghostExchange(field.GhostExchange())
+      siteSubset(field.SiteSubset()), mem_type(field.MemType()),
+      ghostExchange(field.GhostExchange()), scale(field.Scale())
   {
     for(int dir=0; dir<nDim; ++dir) {
       x[dir] = field.X()[dir];
@@ -52,11 +53,12 @@ namespace quda {
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
     : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
-      siteSubset(param.siteSubset), ghostExchange(param.ghostExchange), ghost_bytes(0),
-      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
+      scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
+      ghost_bytes(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
@@ -93,11 +95,12 @@ namespace quda {
 
   LatticeField::LatticeField(const LatticeField &field)
     : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim), precision(field.precision),
-      siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
+      scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange), ghost_bytes(0),
       ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
       my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
       backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
   {
+    precisionCheck();
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
@@ -438,20 +441,22 @@ namespace quda {
 
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
-	  comm_free(mh_send_p2p_fwd[b][dim]);
-	  comm_free(mh_recv_p2p_fwd[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
-
-	  // only close this handle if it doesn't alias the back ghost
-	  if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
+	  if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
+	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
+	    // only close this handle if it doesn't alias the back ghost
+	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+	  }
 	}
 
 	if (comm_peer2peer_enabled(0,dim)) {
-	  comm_free(mh_send_p2p_back[b][dim]);
-	  comm_free(mh_recv_p2p_back[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-
-	  cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
+	  if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
+	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
+	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
+	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+	  }
 	}
       } // buffer
     } // iterate over dim
@@ -571,6 +576,7 @@ namespace quda {
     }
     output << "pad = " << param.pad << std::endl;
     output << "precision = " << param.precision << std::endl;
+    output << "scale = " << param.scale << std::endl;
 
     output << "ghostExchange = " << param.ghostExchange << std::endl;
     for (int i=0; i<param.nDim; i++) {
