@@ -187,7 +187,7 @@ else()
   mark_as_advanced(CUDA_HOST_COMPILER)
   find_package(CUDA REQUIRED)
   set(USING_CUDA_LANG_SUPPORT False)
-  set(CUDA_LINK_LIBRARIES_KEYWORD PUBLIC)
+  set(CUDA_LINK_LIBRARIES_KEYWORD "PUBLIC")
 endif()
 
 #######################################################################
