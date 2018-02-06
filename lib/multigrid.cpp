@@ -260,8 +260,7 @@ namespace quda {
     diracParam.tmp1 = tmp_coarse;
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
-    diracCoarseResidual = new DiracCoarse(diracParam, param.location == QUDA_CUDA_FIELD_LOCATION ? true : false,
-					  param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+    diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false);
 
     // create smoothing operators
     diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());

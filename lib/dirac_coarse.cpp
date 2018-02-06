@@ -4,11 +4,12 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu, bool gpu_setup)
+  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup)
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Yhat_h(nullptr),
       Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr), Yhat_d(nullptr),
-      enable_gpu(enable_gpu), gpu_setup(gpu_setup), init(true)
+      enable_gpu(false), enable_cpu(false), gpu_setup(gpu_setup),
+      init_gpu(gpu_setup), init_cpu(!gpu_setup)
   {
     initializeCoarse();
   }
@@ -19,7 +20,8 @@ namespace quda {
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(nullptr), dirac(nullptr),
       Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Yhat_h(Yhat_h),
       Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d), Yhat_d(Yhat_d),
-      enable_gpu(Y_d && X_d && Xinv_d), gpu_setup(true), init(false)
+      enable_gpu( Y_d ? true : false), enable_cpu(Y_h ? true : false), gpu_setup(true),
+      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true)
   {
 
   }
@@ -28,18 +30,21 @@ namespace quda {
     : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
       Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Yhat_h(dirac.Yhat_h),
       Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d), Yhat_d(dirac.Yhat_d),
-      enable_gpu(dirac.enable_gpu), gpu_setup(dirac.gpu_setup), init(false)
+      enable_gpu(dirac.enable_gpu), enable_cpu(dirac.enable_cpu), gpu_setup(dirac.gpu_setup),
+      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true)
   {
 
   }
 
   DiracCoarse::~DiracCoarse()
   {
-    if (init) {
+    if (init_cpu) {
       if (Y_h) delete Y_h;
       if (X_h) delete X_h;
       if (Xinv_h) delete Xinv_h;
       if (Yhat_h) delete Yhat_h;
+    }
+    if (init_gpu) {
       if (Y_d) delete Y_d;
       if (X_d) delete X_d;
       if (Xinv_d) delete Xinv_d;
@@ -47,113 +52,137 @@ namespace quda {
     }
   }
 
-  void DiracCoarse::initializeCoarse()
+  void DiracCoarse::createY(bool gpu) const
   {
-    if (!init) errorQuda("Cannot call from this reference instance");
-
-    QudaPrecision prec = transfer->Vectors().Precision();
     int ndim = transfer->Vectors().Ndim();
     int x[QUDA_MAX_DIM];
-    //Number of coarse sites.
-    const int *geo_bs = transfer->Geo_bs();
+    const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
-
-    //Coarse Color
-    int Nc_c = transfer->nvec();
-
-    //Coarse Spin
-    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs();
+    int Nc_c = transfer->nvec();     // Coarse Color
+    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs(); // Coarse Spin
 
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = QUDA_QDP_GAUGE_ORDER;
+    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.setPrecision(prec);
+    gParam.setPrecision(transfer->Vectors(QUDA_CPU_FIELD_LOCATION).Precision()); // always use "CPU" precision for Y/X fields
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 1;
-
     gParam.geometry = QUDA_COARSE_GEOMETRY;
 
-    Y_h = new cpuGaugeField(gParam);
+    int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
+    gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
+
+    if (gpu) Y_d = new cudaGaugeField(gParam);
+    else     Y_h = new cpuGaugeField(gParam);
 
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
+    gParam.pad = 0;
 
-    X_h = new cpuGaugeField(gParam);
+    if (gpu) X_d = new cudaGaugeField(gParam);
+    else     X_h = new cpuGaugeField(gParam);
+  }
 
-    if (enable_gpu) {
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-      gParam.nFace = 1;
-      gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-      gParam.geometry = QUDA_COARSE_GEOMETRY;
-      int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
-      gParam.pad = gParam.nFace * pad * 2; // factor of 2 since we have to store bi-directional ghost zone
-      Y_d = new cudaGaugeField(gParam);
+  void DiracCoarse::createYhat(bool gpu) const
+  {
+    int ndim = transfer->Vectors().Ndim();
+    int x[QUDA_MAX_DIM];
+    const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
+    for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
+    int Nc_c = transfer->nvec();     // Coarse Color
+    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs(); // Coarse Spin
 
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      gParam.nFace = 0;
-      gParam.pad = 0;
-      gParam.geometry = QUDA_SCALAR_GEOMETRY;
-      X_d = new cudaGaugeField(gParam);
-    }
-
-    if (enable_gpu && gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
-    else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
-
-    gParam.order = QUDA_QDP_GAUGE_ORDER;
+    GaugeFieldParam gParam;
+    memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
+    gParam.nColor = Nc_c*Ns_c;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+    gParam.link_type = QUDA_COARSE_LINKS;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    // use null-space precision for preconditioned links
+    gParam.setPrecision(transfer->Vectors(gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION).Precision());
+    gParam.nDim = ndim;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 1;
     gParam.geometry = QUDA_COARSE_GEOMETRY;
-    Yhat_h = new cpuGaugeField(gParam);
 
+    int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
+    gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
+
+    if (gpu) Yhat_d = new cudaGaugeField(gParam);
+    else     Yhat_h = new cpuGaugeField(gParam);
+
+    gParam.setPrecision(gpu ? X_d->Precision() : X_h->Precision());
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
-    Xinv_h = new cpuGaugeField(gParam);
+    gParam.pad = 0;
 
-    if (enable_gpu) {
-      // use the null-space precision for the preconditioned links
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-      gParam.nFace = 1;
-      gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-      gParam.geometry = QUDA_COARSE_GEOMETRY;
-      gParam.setPrecision(transfer->Vectors(QUDA_CUDA_FIELD_LOCATION).Precision());
-      int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
-      gParam.pad = gParam.nFace * pad * 2; // factor of 2 since we have to store bi-directional ghost zone
-      Yhat_d = new cudaGaugeField(gParam);
+    if (gpu) Xinv_d = new cudaGaugeField(gParam);
+    else     Xinv_h = new cpuGaugeField(gParam);
+  }
 
-      gParam.setPrecision(prec);
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      gParam.nFace = 0;
-      gParam.pad = 0;
-      gParam.geometry = QUDA_SCALAR_GEOMETRY;
-      Xinv_d = new cudaGaugeField(gParam);
-    }
+  void DiracCoarse::initializeCoarse()
+  {
+    createY(gpu_setup);
 
-    if (enable_gpu && gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
+    if (gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
+    else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
+
+    createYhat(gpu_setup);
+
+    if (gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
     else createPreconditionedCoarseOp(*Yhat_h,*Xinv_h,*Y_h,*X_h);
 
-    if (enable_gpu) {
-      if (gpu_setup) {
-	Y_h->copy(*Y_d);
-	Yhat_h->copy(*Yhat_d);
-	X_h->copy(*X_d);
-	Xinv_h->copy(*Xinv_d);
-      } else {
-	Y_d->copy(*Y_h);
-	Yhat_d->copy(*Yhat_h);
-	X_d->copy(*X_h);
-	Xinv_d->copy(*Xinv_h);
-      }
+    if (gpu_setup) {
+      enable_gpu = true;
+      init_gpu = true;
+    } else {
+      enable_cpu = true;
+      init_cpu = true;
     }
+  }
 
+  // we only copy to host or device lazily on demand
+  void DiracCoarse::initializeLazy(QudaFieldLocation location) const
+  {
+    if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
+    switch(location) {
+    case QUDA_CUDA_FIELD_LOCATION:
+      if (enable_gpu) return;
+      createY(true);
+      createYhat(true);
+      Y_d->copy(*Y_h);
+      Yhat_d->copy(*Yhat_h);
+      X_d->copy(*X_h);
+      Xinv_d->copy(*Xinv_h);
+      enable_gpu = true;
+      init_gpu = true;
+      break;
+    case QUDA_CPU_FIELD_LOCATION:
+      if (enable_cpu) return;
+      createY(false);
+      createYhat(false);
+      Y_h->copy(*Y_d);
+      Yhat_h->copy(*Yhat_d);
+      X_h->copy(*X_d);
+      Xinv_h->copy(*Xinv_d);
+      enable_cpu = true;
+      init_cpu = true;
+      break;
+    default:
+      errorQuda("Unknown location");
+    }
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
@@ -163,10 +192,11 @@ namespace quda {
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     if (&in == &out) errorQuda("Fields cannot alias");
-    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+    QudaFieldLocation location = checkLocation(out,in);
+    initializeLazy(location);
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger, commDim);
-    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if (location == QUDA_CPU_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -176,10 +206,11 @@ namespace quda {
   void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     if (&in == &out) errorQuda("Fields cannot alias");
-    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+    QudaFieldLocation location = checkLocation(out,in);
+    initializeLazy(location);
+    if ( location  == QUDA_CUDA_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger, commDim);
-    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -189,10 +220,11 @@ namespace quda {
   void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
 			   const QudaParity parity) const
   {
-    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+    QudaFieldLocation location = checkLocation(out,in);
+    initializeLazy(location);
+    if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim);
-    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -205,10 +237,11 @@ namespace quda {
   {
     if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
 
-    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+    QudaFieldLocation location = checkLocation(out,in);
+    initializeLazy(location);
+    if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim);
-    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -217,10 +250,11 @@ namespace quda {
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    if ( checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+    QudaFieldLocation location = checkLocation(out,in);
+    initializeLazy(location);
+    if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
-    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim);
     }
     int n = in.Nspin()*in.Ncolor();
@@ -267,7 +301,7 @@ namespace quda {
     }
   }
 
-  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu, bool gpu_setup) : DiracCoarse(param, enable_gpu, gpu_setup)
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool gpu_setup) : DiracCoarse(param, gpu_setup)
   {
     /* do nothing */
   }
@@ -281,10 +315,11 @@ namespace quda {
 
   void DiracCoarsePC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    if (checkLocation(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+    QudaFieldLocation location = checkLocation(out,in);
+    initializeLazy(location);
+    if ( location == QUDA_CUDA_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim);
-    } else if ( checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim);
     }
 
