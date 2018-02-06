@@ -7,6 +7,7 @@
 #include <generics/shfl.h>
 #endif
 #include <uint_to_char.h>
+#include <worker.h>
 
 // splitting the dot-product between threads is buggy with CUDA 7.0
 #if __COMPUTE_CAPABILITY__ >= 300 && CUDA_VERSION >= 7050
