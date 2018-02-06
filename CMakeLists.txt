@@ -177,17 +177,26 @@ set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 # we need to check for some packages
 find_package(PythonInterp)
 
+if(QUDA_BUILD_SHAREDLIB AND ${CMAKE_VERSION} VERSION_LESS 3.8.0)
+  message(FATAL_ERROR "Building QUDA as shared library is only support with cmake 3.8 and newer.")
+endif()
+
 if(${CMAKE_VERSION} VERSION_GREATER 3.7.99)
   find_package(CUDAWrapper)
   set(USING_CUDA_LANG_SUPPORT True)
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED True)
+  set(QUDA_SHAREDLIB_INTERFACE "INTERFACE")
+  set(QUDA_SHAREDLIB_PUBLIC "PUBLIC")
+  set(QUDA_SHAREDLIB_PRIVATE "PRIVATE")
 else()
   set(CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host side compiler used by NVCC")
   mark_as_advanced(CUDA_HOST_COMPILER)
   find_package(CUDA REQUIRED)
   set(USING_CUDA_LANG_SUPPORT False)
-  set(CUDA_LINK_LIBRARIES_KEYWORD "PUBLIC")
+  set(QUDA_SHAREDLIB_INTERFACE "")
+  set(QUDA_SHAREDLIB_PUBLIC "")
+  set(QUDA_SHAREDLIB_PRIVATE "")
 endif()
 
 #######################################################################
