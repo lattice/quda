@@ -746,7 +746,7 @@ static void setColorSpinorParams(const int dim[4],
   for(int dir=0; dir<4; ++dir) param->x[dir] = dim[dir];
   param->x[0] /= 2;
 
-  param->precision = precision;
+  param->setPrecision(precision);
   param->pad = 0;
   param->siteSubset = QUDA_PARITY_SITE_SUBSET;
   param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;

@@ -192,9 +192,10 @@ namespace quda {
        If using CUDA native fields, this function will ensure that the
        field ordering is appropriate for the new precision setting to
        maintain this status
-       @param precision New precision value
+       @param precision_ New precision value
+       @param ghost_precision_ New ghost precision value
      */
-    void setPrecision(QudaPrecision precision) {
+    void setPrecision(QudaPrecision precision, QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) {
       // is the current status in native field order?
       bool native = false;
       if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
@@ -203,6 +204,7 @@ namespace quda {
 	    (nSpin==4) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 
       this->precision = precision;
+      this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
 
       // if this is a native field order, let's preserve that status, else keep the same field order
       if (native) fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ?
@@ -216,6 +218,7 @@ namespace quda {
       printfQuda("nDim = %d\n", nDim);
       for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
       printfQuda("precision = %d\n", precision);
+      printfQuda("ghost_precision = %d\n", ghost_precision);
       printfQuda("pad = %d\n", pad);
       printfQuda("siteSubset = %d\n", siteSubset);
       printfQuda("siteOrder = %d\n", siteOrder);
@@ -372,9 +375,11 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     virtual void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const = 0;
+			       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+			       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const = 0;
 
     /**
       This function returns true if the field is stored in an internal
@@ -686,9 +691,11 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
@@ -786,9 +793,11 @@ namespace quda {
        @param[in] halo_location Destination of the halo reading buffer
        @param[in] gdr_send Dummy for CPU
        @param[in] gdr_recv Dummy for GPU
+       @param[in] ghost_precision The precision used for the ghost exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false) const;
+		       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
+		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
     /**
        @brief Backs up the cpuColorSpinorField

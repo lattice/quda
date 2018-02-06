@@ -276,7 +276,11 @@ namespace quda {
 	//else warningQuda("Cannot copy for %d geometry gauge field", geometry);
       }
 
-      // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
+      // special copy that only copies the second set of links in the
+      // ghost zone for bi-directional link fields - at present this is
+      // only used in cudaGaugefield::exchangeGhost where we copy from
+      // the buffer into the field's ghost zone (padded
+      // region), so we only have the offset on the receiver
       if (type == 3) {
         if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
 	arg.out_offset = nDim;
@@ -300,7 +304,11 @@ namespace quda {
 	}
       }
 
-      // special copy that only copies the second set of links in the ghost zone for bi-directional link fields
+      // special copy that only copies the second set of links in the
+      // ghost zone for bi-directional link fields - at present this is
+      // only used in cudaGaugefield::exchangeGhost where we copy from
+      // the buffer into the field's ghost zone (padded
+      // region), so we only have the offset on the receiver
       if (type == 3) {
         if (geometry != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", geometry);
 	arg.out_offset = nDim;

@@ -208,7 +208,7 @@ namespace quda {
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
     UVparam.nSpin *= 2; // so nSpin == 4
-    UVparam.precision = T.Vectors(location).Precision();
+    UVparam.setPrecision(T.Vectors(location).Precision());
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 

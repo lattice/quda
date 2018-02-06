@@ -72,6 +72,7 @@ extern QudaSolveType mg_solve_type[QUDA_MAX_MG_LEVEL];
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
+extern QudaVerbosity verbosity;
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
 extern QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL];
@@ -330,8 +331,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.reliable_delta = 1e-10;
   inv_param.gcrNkrylov = 10;
 
-  inv_param.verbosity = QUDA_SUMMARIZE;
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  inv_param.verbosity = verbosity;
+  inv_param.verbosity_precondition = mg_verbosity[0];
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -395,7 +396,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = mg_verbosity[0];
 
 
@@ -653,7 +654,6 @@ int main(int argc, char **argv)
     inv_param2.inv_type_precondition = QUDA_INVALID_INVERTER;
     inv_param2.reliable_delta = 0.1;
     inv_param2.maxiter = 10000;
-    inv_param2.verbosity = QUDA_VERBOSE;
     inv_param2.chrono_use_resident = true;
     inv_param2.chrono_make_resident = true;
     inv_param2.chrono_index = 0 ;

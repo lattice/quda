@@ -149,6 +149,10 @@ static bool peer2peer_init = false;
 static bool intranode_enabled[2][4] = { {false,false,false,false},
 					{false,false,false,false} };
 
+/** this records whether there is any peer-2-peer capability
+    (regardless whether it is enabled or not) */
+static bool peer2peer_present = false;
+
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
@@ -233,6 +237,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   comm_barrier();
 
+  peer2peer_present = comm_peer2peer_enabled_global();
+
   // set gdr enablement
   if (comm_gdr_enabled()) {
     if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
@@ -244,6 +250,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   checkCudaErrorNoSync();
   return;
 }
+
+bool comm_peer2peer_present() { return peer2peer_present; }
 
 static bool enable_p2p = true;
 

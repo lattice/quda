@@ -72,7 +72,7 @@ namespace quda {
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
     gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.precision = prec;
+    gParam.setPrecision(prec);
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -124,12 +124,12 @@ namespace quda {
       gParam.nFace = 1;
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
       gParam.geometry = QUDA_COARSE_GEOMETRY;
-      gParam.precision = transfer->Vectors(QUDA_CUDA_FIELD_LOCATION).Precision();
+      gParam.setPrecision(transfer->Vectors(QUDA_CUDA_FIELD_LOCATION).Precision());
       int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
       gParam.pad = gParam.nFace * pad * 2; // factor of 2 since we have to store bi-directional ghost zone
       Yhat_d = new cudaGaugeField(gParam);
 
-      gParam.precision = prec;
+      gParam.setPrecision(prec);
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       gParam.nFace = 0;
       gParam.pad = 0;
