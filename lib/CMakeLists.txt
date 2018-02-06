@@ -103,34 +103,34 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
   $<INSTALL_INTERFACE:include>)
 
 
-target_link_libraries(quda ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
+target_link_libraries(quda PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
-  target_link_libraries(quda ${QIO_LIB} ${LIME_LIB})
+  target_link_libraries(quda INTERFACE ${QIO_LIB} ${LIME_LIB})
 endif()
 
 if(QUDA_QDPJIT)
-  target_link_libraries(quda ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
-  target_link_libraries(quda ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda ${MAGMA})
+  target_link_libraries(quda PRIVATE ${MAGMA})
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda ${PARPACK_OR_ARPACK})
+  target_link_libraries(quda PRIVATE ${PARPACK_OR_ARPACK})
 endif()
 
 if(QUDA_NUMA_NVML)
-target_link_libraries(quda ${NVML_LIBRARY})
+target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
 
@@ -140,7 +140,7 @@ endif()
 if(${CMAKE_VERSION} VERSION_LESS 3.8)
   find_library(CUDA_cuda_LIBRARY cuda HINTS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES} ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64 PATH_SUFFIXES stubs )
 endif()
-target_link_libraries(quda ${CUDA_cuda_LIBRARY})
+target_link_libraries(quda PRIVATE ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if (QUDA_DOWNLOAD_EIGEN)
