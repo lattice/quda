@@ -564,45 +564,6 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
-  class PipePCG3 : public Solver {
-    private:
-      const DiracMatrix &mat;
-      const DiracMatrix &matSloppy;
-      const DiracMatrix &matPrecon;
-
-      Solver *K;
-      SolverParam Kparam; // parameters for preconditioner solve
-
-      bool init;
-
-      ColorSpinorField *rp;       //! residual vector
-
-      ColorSpinorFieldSet *xp_sloppy;       
-      ColorSpinorFieldSet *rp_sloppy;       
-
-//      ColorSpinorFieldSet *yp;
-      ColorSpinorFieldSet *wp;       
-      ColorSpinorFieldSet *zp;
-
-      ColorSpinorFieldSet *w_pre;    //! object passed to preconditioner
-      ColorSpinorFieldSet *p_pre;    //! preconditioner result
-      ColorSpinorFieldSet *pp;        
-
-      ColorSpinorField *qp;
-      ColorSpinorField *tmpp;
-
-    public:
-      PipePCG3(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-      /**
-        @param K Preconditioner
-      */
-      PipePCG3(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-
-      virtual ~PipePCG3();
-
-      void operator()(ColorSpinorField &out, ColorSpinorField &in);
-  };
-
   class Pipe2PCG : public Solver {
     private:
       const DiracMatrix &mat;
@@ -972,6 +933,30 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
 
+    
+  };
+
+  class EKS_PCG : public BlockSolver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
+    // pointers to fields to avoid multiple creation overhead
+    std::shared_ptr<ColorSpinorField> yp, rp, App, tmpp;
+    std::vector<ColorSpinorField*> p;
+    std::shared_ptr<ColorSpinorField> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
+    std::shared_ptr<ColorSpinorField> p_oldp; 
+    bool init;
+
+    template <int n>
+    void solve_n(ColorSpinorField& out, ColorSpinorField& in);
+    int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+
+  public:
+    EKS_PCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    virtual ~EKS_PCG();
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
     
   };
 

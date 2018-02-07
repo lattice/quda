@@ -218,7 +218,7 @@ int main(int argc, char **argv)
       dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
       dslash_type == QUDA_TWISTED_MASS_DSLASH || 
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
-      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER || inv_type == QUDA_PIPEPCG_INVERTER || inv_type == QUDA_PIPEPCG3_INVERTER || inv_type == QUDA_PIPE2PCG_INVERTER || inv_type == QUDA_CG3_INVERTER ) {
+      multishift || inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER || inv_type == QUDA_PIPEPCG_INVERTER || inv_type == QUDA_SRE_PCG_INVERTER || inv_type == QUDA_LRE_PCG_INVERTER || inv_type == QUDA_PIPE2PCG_INVERTER || inv_type == QUDA_CG3_INVERTER ) {
 //    inv_param.solution_type = QUDA_MAT_SOLUTION; 
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {

@@ -3161,9 +3161,15 @@ for(int i=0; i < param->num_src; i++) {
       SolverParam solverParam(*param);
       // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       // solve->solve(*out,*in);
-      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
-      bcg(*out, *in);
-      solverParam.updateInvertParam(*param);
+      if (param->inv_type == QUDA_SRE_PCG_INVERTER) {
+        EKS_PCG ekscg(m, mSloppy, mPre, solverParam, profileMulti);
+        ekscg(*out, *in);
+        solverParam.updateInvertParam(*param);
+      } else {
+        BlockCG bcg(m, mSloppy, solverParam, profileMulti);
+        bcg(*out, *in);
+        solverParam.updateInvertParam(*param);
+      }
       // delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);

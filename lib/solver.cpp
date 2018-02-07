@@ -110,13 +110,10 @@ namespace quda {
       report("PipePCG");
       solver = new PipePCG(mat, matSloppy, matPrecon, param, profile);
       break;
-    case QUDA_PIPEPCG3_INVERTER:
-      report("PipePCG3");
-      solver = new PipePCG3(mat, matSloppy, matPrecon, param, profile);
-      break;
     case QUDA_PIPE2PCG_INVERTER:
       report("Pipe2PCG");
       solver = new Pipe2PCG(mat, matSloppy, matPrecon, param, profile);
+      break;
     case QUDA_CG3_INVERTER:
       report("CG3");
       solver = new CG3(mat, matSloppy, param, profile);
